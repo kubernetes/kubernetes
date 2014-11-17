@@ -44,9 +44,9 @@ coreos:
         After=etcd.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/apiserver
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/apiserver
-        ExecStart=/opt/bin/apiserver \
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-apiserver
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
+        ExecStart=/opt/bin/kube-apiserver \
         --address=0.0.0.0 \
         --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
@@ -63,9 +63,9 @@ coreos:
         After=kube-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/controller-manager
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/controller-manager
-        ExecStart=/opt/bin/controller-manager \
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-controller-manager
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
+        ExecStart=/opt/bin/kube-controller-manager \
         --master=127.0.0.1:8080 \
         --logtostderr=true
         Restart=always
@@ -80,9 +80,9 @@ coreos:
         After=kube-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/scheduler
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/scheduler
-        ExecStart=/opt/bin/scheduler --master=127.0.0.1:8080
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-scheduler
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
+        ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
         Restart=always
         RestartSec=10
     - name: kube-register.service

@@ -12,39 +12,40 @@ coreos:
       content: |
         [Unit]
         After=network-online.target
-        Before=apiserver.service
-        Before=controller-manager.service
+        Before=kube-apiserver.service
+        Before=kube-controller-manager.service
         Before=kubelet.service
-        Before=proxy.service
+        Before=kube-proxy.service
+        Before=kube-scheduler.service
         Description=Download Kubernetes Binaries
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
         Requires=network-online.target
 
         [Service]
-        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/apiserver
-        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/controller-manager
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kube-apiserver
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kube-controller-manager
         ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kubecfg
         ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kubelet
-        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/proxy
-        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/scheduler
-        ExecStart=/usr/bin/chmod +x /opt/bin/apiserver
-        ExecStart=/usr/bin/chmod +x /opt/bin/controller-manager
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kube-proxy
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kube-scheduler
+        ExecStart=/usr/bin/chmod +x /opt/bin/kube-apiserver
+        ExecStart=/usr/bin/chmod +x /opt/bin/kube-controller-manager
         ExecStart=/usr/bin/chmod +x /opt/bin/kubecfg
         ExecStart=/usr/bin/chmod +x /opt/bin/kubelet
-        ExecStart=/usr/bin/chmod +x /opt/bin/proxy
-        ExecStart=/usr/bin/chmod +x /opt/bin/scheduler
+        ExecStart=/usr/bin/chmod +x /opt/bin/kube-proxy
+        ExecStart=/usr/bin/chmod +x /opt/bin/kube-scheduler
         RemainAfterExit=yes
         Type=oneshot
-    - name: apiserver.service
+    - name: kube-apiserver.service
       command: start
       content: |
         [Unit]
-        ConditionFileIsExecutable=/opt/bin/apiserver
+        ConditionFileIsExecutable=/opt/bin/kube-apiserver
         Description=Kubernetes API Server
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
         [Service]
-        ExecStart=/opt/bin/apiserver \
+        ExecStart=/opt/bin/kube-apiserver \
         --address=127.0.0.1 \
         --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
@@ -54,19 +55,19 @@ coreos:
 
         [Install]
         WantedBy=multi-user.target
-    - name: scheduler.service
+    - name: kube-scheduler.service
       command: start
       content: |
         [Unit]
-        After=apiserver.service
+        After=kube-apiserver.service
         After=download-kubernetes.service
-        ConditionFileIsExecutable=/opt/bin/scheduler
+        ConditionFileIsExecutable=/opt/bin/kube-scheduler
         Description=Kubernetes Scheduler
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Wants=apiserver.service
+        Wants=kube-apiserver.service
 
         [Service]
-        ExecStart=/opt/bin/scheduler \
+        ExecStart=/opt/bin/kube-scheduler \
         --logtostderr=true \
         --master=127.0.0.1:8080
         Restart=always
@@ -74,16 +75,16 @@ coreos:
 
         [Install]
         WantedBy=multi-user.target
-    - name: controller-manager.service
+    - name: kube-controller-manager.service
       command: start
       content: |
         [Unit]
-        ConditionFileIsExecutable=/opt/bin/controller-manager
+        ConditionFileIsExecutable=/opt/bin/kube-controller-manager
         Description=Kubernetes Controller Manager
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
         [Service]
-        ExecStart=/opt/bin/controller-manager \
+        ExecStart=/opt/bin/kube-controller-manager \
         --master=127.0.0.1:8080 \
         --machines=127.0.0.1 \
         --logtostderr=true
@@ -112,16 +113,16 @@ coreos:
 
         [Install]
         WantedBy=multi-user.target
-    - name: proxy.service
+    - name: kube-proxy.service
       command: start
       content: |
         [Unit]
-        ConditionFileIsExecutable=/opt/bin/proxy
+        ConditionFileIsExecutable=/opt/bin/kube-proxy
         Description=Kubernetes Proxy
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
         [Service]
-        ExecStart=/opt/bin/proxy --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
+        ExecStart=/opt/bin/kube-proxy --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
         Restart=on-failure
         RestartSec=1
 

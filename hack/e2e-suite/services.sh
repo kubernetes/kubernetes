@@ -299,7 +299,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 # Test 6: Restart the master, make sure portals come back.
 #
 echo "Restarting the master"
-ssh-to-node "${master}" "sudo /etc/init.d/apiserver restart"
+ssh-to-node "${master}" "sudo /etc/init.d/kube-apiserver restart"
 sleep 5
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \

@@ -74,7 +74,7 @@ EOF
   # verify master has all required daemons
   echo "Validating master"
   local machine="master"
-  local -a required_daemon=("salt-master" "salt-minion" "apiserver" "nginx" "controller-manager" "scheduler")
+  local -a required_daemon=("salt-master" "salt-minion" "kube-apiserver" "nginx" "kube-controller-manager" "kube-scheduler")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"

@@ -7,8 +7,8 @@ write_files:
       #!/bin/sh
       m=$(echo $(etcdctl ls --recursive /corekube/minions | cut -d/ -f4 | sort) | tr ' ' ,)
       echo "Found $m"
-      mkdir -p /run/apiserver
-      echo "MINIONS=$m" > /run/apiserver/minions.env
+      mkdir -p /run/kube-apiserver
+      echo "MINIONS=$m" > /run/kube-apiserver/minions.env
   - path: /opt/bin/git-kubernetes-nginx.sh
     permissions: 0755
     content: |
@@ -75,21 +75,21 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        EnvironmentFile=-/run/apiserver/minions.env
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/apiserver /opt/bin/apiserver
-        ExecStart=/opt/bin/apiserver --address=127.0.0.1 --port=8080 --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true
+        EnvironmentFile=-/run/kube-apiserver/minions.env
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-apiserver /opt/bin/kube-apiserver
+        ExecStart=/opt/bin/kube-apiserver --address=127.0.0.1 --port=8080 --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true
         Restart=always
         RestartSec=2
     - name: master-apiserver-sighup.path
       command: start
       content: |
         [Path]
-        PathChanged=/run/apiserver/minions.env
+        PathChanged=/run/kube-apiserver/minions.env
     - name: master-apiserver-sighup.service
       command: start
       content: |
         [Service]
-        ExecStart=/usr/bin/pkill -SIGHUP -f apiserver
+        ExecStart=/usr/bin/pkill -SIGHUP -f kube-apiserver
     - name: minion-finder.service
       command: start
       content: |
@@ -115,8 +115,8 @@ coreos:
         After=master-apiserver.service
         Requires=master-apiserver.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/controller-manager /opt/bin/controller-manager
-        ExecStart=/opt/bin/controller-manager --master=127.0.0.1:8080 --machines=${MINIONS} --logtostderr=true
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-controller-manager /opt/bin/kube-controller-manager
+        ExecStart=/opt/bin/kube-controller-manager --master=127.0.0.1:8080 --machines=${MINIONS} --logtostderr=true
         Restart=always
         RestartSec=2
     - name: master-scheduler.service
@@ -130,8 +130,8 @@ coreos:
         After=master-apiserver.service
         Requires=master-apiserver.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/scheduler /opt/bin/scheduler
-        ExecStart=/opt/bin/scheduler --master=127.0.0.1:8080 --logtostderr=true
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-scheduler /opt/bin/kube-scheduler
+        ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080 --logtostderr=true
         Restart=always
         RestartSec=10
     #Running nginx service with --net="host" is a necessary evil until running all k8s services in docker.

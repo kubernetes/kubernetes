@@ -22,11 +22,11 @@ sudo cp kubernetes/docs/getting-started-guides/coreos/units/* /etc/systemd/syste
 ### Start the Kubernetes services
 
 ```
-sudo systemctl start apiserver
-sudo systemctl start scheduler
-sudo systemctl start controller-manager
+sudo systemctl start kube-apiserver
+sudo systemctl start kube-scheduler
+sudo systemctl start kube-controller-manager
 sudo systemctl start kubelet
-sudo systemctl start proxy
+sudo systemctl start kube-proxy
 ```
 
 ### Running commands remotely

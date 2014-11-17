@@ -1,28 +1,28 @@
 #!/bin/bash
 #
 ### BEGIN INIT INFO
-# Provides:    controller-manager
+# Provides:    kube-scheduler
 # Required-Start:    $local_fs $network $syslog
 # Required-Stop:
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: The Kubernetes controller manager
+# Short-Description: The Kubernetes scheduler plugin
 # Description:
-#   The Kubernetes controller manager is responsible for monitoring replication
-#   controllers, and creating corresponding pods to achieve the desired state.
+#   The Kubernetes scheduler plugin is responsible for scheduling pods on
+#   available minions.
 ### END INIT INFO
 
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC="The Kubernetes container manager"
-NAME=controller-manager
-DAEMON=/usr/local/bin/controller-manager
-DAEMON_ARGS=""
+DESC="The Kubernetes scheduler plugin"
+NAME=kube-scheduler
+DAEMON=/usr/local/bin/kube-scheduler
+DAEMON_ARGS=" --master=127.0.0.1:8080"
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-DAEMON_USER=controller-manager
+DAEMON_USER=kube-scheduler
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0

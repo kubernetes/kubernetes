@@ -31,11 +31,11 @@ vagrant ssh minion-3
 To view the service status and/or logs on the kubernetes-master:
 ```
 vagrant ssh master
-[vagrant@kubernetes-master ~] $ sudo systemctl status apiserver
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u apiserver
+[vagrant@kubernetes-master ~] $ sudo systemctl status kube-apiserver
+[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-apiserver
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status controller-manager
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u controller-manager
+[vagrant@kubernetes-master ~] $ sudo systemctl status kube-controller-manager
+[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-controller-manager
 
 [vagrant@kubernetes-master ~] $ sudo systemctl status etcd
 [vagrant@kubernetes-master ~] $ sudo systemctl status nginx
