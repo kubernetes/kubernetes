@@ -46,11 +46,12 @@ func (s *ipAddrSet) Init() {
 	s.ips = map[string]bool{}
 }
 
-// Adds to the ipAddrSet; returns true iff it was added (was not already in set)
+// Gets the number of IPs in the set
 func (s *ipAddrSet) Size() int {
 	return len(s.ips)
 }
 
+// Tests whether the set holds a given IP
 func (s *ipAddrSet) Contains(ip net.IP) bool {
 	key := ip.String()
 	exists := s.ips[key]
@@ -112,13 +113,11 @@ func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 	}
 	ipa.used.Init()
 
-	zero := make(net.IP, len(subnet.IP), len(subnet.IP))
+	network := make(net.IP, len(subnet.IP), len(subnet.IP))
 	for i := 0; i < len(subnet.IP); i++ {
-		zero[i] = subnet.IP[i] & subnet.Mask[i]
+		network[i] = subnet.IP[i] & subnet.Mask[i]
 	}
-	ipa.used.Add(zero) // block the zero addr
-
-	ipa.used.Add(subnet.IP) // block the network addr
+	ipa.used.Add(network) // block the network addr
 
 	broadcast := make(net.IP, len(subnet.IP), len(subnet.IP))
 	for i := 0; i < len(subnet.IP); i++ {
