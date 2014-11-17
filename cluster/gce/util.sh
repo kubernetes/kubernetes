@@ -589,55 +589,58 @@ function restart-kube-proxy {
 
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring {
-    if [[ "${MONITORING}" == "true" ]]; then
-	echo "Setting up Cluster Monitoring using Heapster."
-	detect-project
-	if ! gcutil getfirewall monitoring-heapster &> /dev/null; then
-	    gcutil addfirewall monitoring-heapster \
-		--project "${PROJECT}" \
-		--norespect_terminal_width \
-		--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-		--target_tags="${MINION_TAG}" \
-		--allowed "tcp:80,tcp:8083,tcp:8086,tcp:9200" &> /dev/null;
-	    if [ $? -ne 0 ]; then
-		echo "Failed to Setup Firewall for Monitoring" && false
-	    fi
-	fi
+  if [[ "${MONITORING}" == "true" ]]; then
+  	echo "Setting up cluster monitoring using Heapster."
 
-	# Re-use master auth for Grafana
-	get-password
-	sed -i "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
-	sed -i "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
-        local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
-	if "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" &> /dev/null \
-	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
-	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" &> /dev/null; then
-	    dashboardIP="http://`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
-	    echo 
-	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online."
+  	if ! gcutil getfirewall monitoring-heapster &> /dev/null; then
+	    if ! gcutil addfirewall monitoring-heapster \
+      		--project "${PROJECT}" \
+      		--norespect_terminal_width \
+      		--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+      		--target_tags="${MINION_TAG}" \
+      		--allowed "tcp:80,tcp:8083,tcp:8086,tcp:9200" &> /dev/null; then
+    		echo "Failed to set up firewall for monitoring" && false
+	    fi
+  	fi
+
+  	# Re-use master auth for Grafana
+  	get-password
+    ensure-temp-dir
+
+    cp "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" "${KUBE_TEMP}/influx-grafana-pod.0.json"
+  	sed "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" \
+      "${KUBE_TEMP}/influx-grafana-pod.0.json" > "${KUBE_TEMP}/influx-grafana-pod.1.json"
+  	sed "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" \
+      "${KUBE_TEMP}/influx-grafana-pod.1.json" > "${KUBE_TEMP}/influx-grafana-pod.2.json"
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  	if "${kubectl}" create -f "${KUBE_TEMP}/influx-grafana-pod.2.json" &> /dev/null \
+  	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
+  	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" &> /dev/null; then
+	    local dashboard_url="http://$(${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g')"
+	    echo
+	    echo "Grafana dashboard will be available at $dashboard_url. Wait for the monitoring dashboard to be online."
 	    echo "Use the master user name and password for the dashboard."
 	    echo
-	else
+  	else
 	    echo "Failed to Setup Monitoring"
 	    teardown-monitoring
-	fi
-    fi
+  	fi
+  fi
 }
 
 function teardown-monitoring {
   if [[ "${MONITORING}" == "true" ]]; then
-    detect-project
-    local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
-    ${kubectl} delete pods heapster &> /dev/null || true
-    ${kubectl} delete pods influx-grafana &> /dev/null || true
-    ${kubectl} delete services influx-master &> /dev/null || true
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    "${kubectl}" delete pods heapster &> /dev/null || true
+    "${kubectl}" delete pods influx-grafana &> /dev/null || true
+    "${kubectl}" delete services influx-master &> /dev/null || true
     if gcutil getfirewall monitoring-heapster &> /dev/null; then
       gcutil deletefirewall  \
-	--project "${PROJECT}" \
-	--norespect_terminal_width \
-	--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-	--force \
-	monitoring-heapster &> /dev/null || true
+      	--project "${PROJECT}" \
+      	--norespect_terminal_width \
+      	--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+      	--force \
+      	monitoring-heapster &> /dev/null || true
     fi
   fi
 }
