@@ -54,6 +54,14 @@ func TestAllocate(t *testing.T) {
 	_, ipnet, _ := net.ParseCIDR("93.76.0.0/22")
 	ipa := newIPAllocator(ipnet)
 
+	if err := ipa.Allocate(net.ParseIP("93.76.0.0")); err == nil {
+		t.Errorf("expected failure")
+	}
+
+	if err := ipa.Allocate(net.ParseIP("93.76.3.255")); err == nil {
+		t.Errorf("expected failure")
+	}
+
 	if err := ipa.Allocate(net.ParseIP("93.76.0.1")); err != nil {
 		t.Errorf("expected success, got %s", err)
 	}

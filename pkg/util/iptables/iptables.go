@@ -38,11 +38,11 @@ type Interface interface {
 	IsIpv6() bool
 }
 
-type Protocol bool
+type Protocol byte
 
 const (
-	ProtocolIpv4 Protocol = false
-	ProtocolIpv6 Protocol = true
+	ProtocolIpv4 Protocol = iota + 1
+	ProtocolIpv6
 )
 
 type Table string
