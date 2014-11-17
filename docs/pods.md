@@ -1,8 +1,10 @@
 # Pods
 
+In Kubernetes, rather than individual containers, _pods_ are the smallest deployable units that can be created, scheduled, and managed.
+
 ## What is a _pod_?
 
-A _pod_ (as in a pod of whales or pea pod) models an application-specific "logical host" in a containerized environment. It may contain one or more containers which are relatively tightly coupled -- in a pre-container world, they would have executed on the same physical or virtual host.
+A _pod_ (as in a pod of whales or pea pod) correspond to a colocated group of [Docker containers](http://docker.io) with shared [volumes](volumes.md). A pod models an application-specific "logical host" in a containerized environment. It may contain one or more containers which are relatively tightly coupled -- in a pre-container world, they would have executed on the same physical or virtual host.
 
 Like running containers, pods are considered to be relatively ephemeral rather than durable entities. As discussed in [life of a pod](pod-states.md), pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced (see [replication controller](replication-controller.md) for more details). (In the future, a higher-level API may support pod migration.)
 
