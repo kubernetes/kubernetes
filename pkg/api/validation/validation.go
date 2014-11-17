@@ -533,3 +533,13 @@ func ValidateMinion(minion *api.Minion) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateLabels(minion.Labels)...)
 	return allErrs
 }
+
+// ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
+func ValidateMinionUpdate(oldMinion *api.Minion, minion *api.Minion) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	oldMinion.Labels = minion.Labels
+	if !reflect.DeepEqual(oldMinion, minion) {
+		allErrs = append(allErrs, fmt.Errorf("Update contains more than labels changes"))
+	}
+	return allErrs
+}

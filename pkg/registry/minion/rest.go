@@ -107,10 +107,23 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 
 	oldMinion, err := rs.registry.GetMinion(ctx, minion.Name)
-
-	if errs := validation.ValidateMinionUpdate(minion); len(errs) > 0 {
+	if err != nil {
+		return nil, err
+	}
+	if errs := validation.ValidateMinionUpdate(oldMinion, minion); len(errs) > 0 {
 		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
 	}
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		// TODO: Need to fill in any server-set fields (uid, timestamp, etc) before
+		// returning minion. Can't do it properly at the moment because the registry
+		// healthchecking, which might cause it to not return the minion at all. Fix
+		// this after we move the healthchecking out of the minion registry.
+		err := rs.registry.UpdateMinion(ctx, minion)
+		if err != nil {
+			return nil, err
+		}
+		return minion, nil
+	}), nil
 }
 
 func (rs *REST) toApiMinion(name string) *api.Minion {

@@ -60,6 +60,19 @@ func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error
 	return r.Err
 }
 
+func (r *MinionRegistry) UpdateMinion(ctx api.Context, minion *api.Minion) error {
+	r.Lock()
+	defer r.Unlock()
+	r.Minion = minion.Name
+	for ix := range r.Minions.Items {
+		if r.Minions.Items[ix].Name == minion.Name {
+			r.Minions.Items[ix] = *minion
+			return r.Err
+		}
+	}
+	return r.Err
+}
+
 func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
 	r.Lock()
 	defer r.Unlock()
