@@ -440,6 +440,11 @@ func (kl *Kubelet) getRef(id dockertools.DockerID) (ref *api.ObjectReference, ok
 
 // Run a single container from a pod. Returns the docker container ID
 func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, podVolumes volumeMap, netMode string) (id dockertools.DockerID, err error) {
+	ref, err := containerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
+
 	envVariables := makeEnvironmentVariables(container)
 	binds := makeBinds(pod, container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
@@ -459,8 +464,18 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	}
 	dockerContainer, err := kl.dockerClient.CreateContainer(opts)
 	if err != nil {
+		if ref != nil {
+			record.Eventf(ref, "failed", "failed",
+				"Failed to create docker container with error(%v)", err)
+		}
 		return "", err
 	}
+	// Remember this reference so we can report events about this container
+	if ref != nil {
+		kl.setRef(dockertools.DockerID(dockerContainer.ID), ref)
+		record.Eventf(ref, "waiting", "created", "Created with docker id %v", dockerContainer.ID)
+	}
+
 	if len(container.TerminationMessagePath) != 0 {
 		p := path.Join(kl.rootDirectory, pod.Name, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
@@ -489,14 +504,13 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 		Privileged:   privileged,
 	})
 	if err != nil {
+		if ref != nil {
+			record.Eventf(ref, "failed", "failed",
+				"Failed to start with docker id %v with error(%v)", dockerContainer.ID, err)
+		}
 		return "", err
 	}
-
-	if ref, err := containerRef(pod, container); err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	} else {
-		// Remember this reference so we can report events about this container
-		kl.setRef(dockertools.DockerID(dockerContainer.ID), ref)
+	if ref != nil {
 		record.Eventf(ref, "running", "started", "Started with docker id %v", dockerContainer.ID)
 	}
 
