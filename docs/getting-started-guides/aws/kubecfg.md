@@ -11,7 +11,7 @@ wget http://storage.googleapis.com/k8s/darwin/kubecfg
 ### Linux
 
 ```
-wget http://storage.googleapis.com/k8s/darwin/kubecfg
+wget http://storage.googleapis.com/k8s/linux/kubecfg
 ```
 
 ### Copy kubecfg to your path
