@@ -1019,9 +1019,10 @@ func (kl *Kubelet) BirthCry() {
 	// TODO: get the real minion object of ourself,
 	// and use the real minion name and UID.
 	ref := &api.ObjectReference{
-		Kind: "Minion",
-		Name: kl.hostname,
-		UID:  kl.hostname,
+		Kind:      "Minion",
+		Name:      kl.hostname,
+		UID:       kl.hostname,
+		Namespace: api.NamespaceDefault,
 	}
 	record.Eventf(ref, "", "starting", "Starting kubelet.")
 }
