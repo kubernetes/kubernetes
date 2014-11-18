@@ -29,6 +29,6 @@ source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command build/build-image/make-binaries.sh "$@"
+kube::build::run_build_command hack/build-go.sh "$@"
 kube::build::copy_output
 kube::build::run_image

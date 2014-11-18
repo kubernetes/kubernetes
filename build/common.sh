@@ -90,6 +90,21 @@ readonly KUBE_RUN_IMAGES=(
   kubelet
   bootstrap
 )
+readonly KUBE_RUN_IMAGES_BINARIES=(
+  kube-apiserver
+  kube-controller-manager
+  kube-proxy
+  kube-scheduler
+  kubelet
+)
+readonly KUBE_RUN_IMAGES_DIRS=(
+  apiserver
+  controller-manager
+  proxy
+  scheduler
+  kubelet
+  bootstrap
+)
 
 
 # This is where the final release artifacts are created locally
@@ -305,16 +320,19 @@ function kube::build::run_image() {
 
   # First build the base image.  This one brings in all of the binaries.
   mkdir -p "${build_context_base}"
+  set -x
+  find ${LOCAL_OUTPUT_BINPATH}
   tar czf "${build_context_base}/kube-bins.tar.gz" \
     -C "${LOCAL_OUTPUT_BINPATH}/linux/amd64" \
-    "${KUBE_RUN_IMAGES[@]}"
+    "${KUBE_RUN_IMAGES_BINARIES[@]}"
   cp -R build/run-images/base/* "${build_context_base}/"
   kube::build::docker_build "${KUBE_RUN_IMAGE_BASE}" "${build_context_base}"
 
   local b
-  for b in "${KUBE_RUN_IMAGES[@]}" ; do
+  for b in "${KUBE_RUN_IMAGES_DIRS[@]}" ; do
     local sub_context_dir="${build_context_base}-$b"
     mkdir -p "${sub_context_dir}"
+    find build/run-images
     cp -R build/run-images/$b/* "${sub_context_dir}/"
     kube::build::docker_build "${KUBE_RUN_IMAGE_BASE}-$b" "${sub_context_dir}"
   done
