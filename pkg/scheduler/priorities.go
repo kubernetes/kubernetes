@@ -35,7 +35,7 @@ func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
 	totalCPU := 0
 	totalMemory := 0
 	for _, pod := range pods {
-		for _, container := range pod.DesiredState.Manifest.Containers {
+		for _, container := range pod.Spec.Containers {
 			totalCPU += container.CPU
 			totalMemory += container.Memory
 		}

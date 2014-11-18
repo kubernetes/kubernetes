@@ -219,9 +219,7 @@ func TestCreateReplica(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Labels: controllerSpec.Spec.Template.Labels,
 		},
-		DesiredState: api.PodState{
-			Manifest: manifest,
-		},
+		Spec: controllerSpec.Spec.Template.Spec,
 	}
 	fakeHandler.ValidateRequest(t, makeURL("/pods?namespace=default"), "POST", nil)
 	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))

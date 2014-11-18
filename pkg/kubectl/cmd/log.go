@@ -35,7 +35,7 @@ func NewCmdLog(out io.Writer) *cobra.Command {
 
 			data, err := client.RESTClient.Get().
 				Path("proxy/minions").
-				Path(pod.CurrentState.Host).
+				Path(pod.Status.Host).
 				Path("containerLogs").
 				Path(getKubeNamespace(cmd)).
 				Path(args[0]).

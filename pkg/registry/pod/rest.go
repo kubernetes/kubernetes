@@ -29,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -92,17 +91,15 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
-	pod.DesiredState.Manifest.UUID = util.NewUUID().String()
+	api.FillObjectMetaSystemFields(ctx, &pod.ObjectMeta)
 	if len(pod.Name) == 0 {
-		pod.Name = pod.DesiredState.Manifest.UUID
+		// TODO properly handle auto-generated names.
+		// See https://github.com/GoogleCloudPlatform/kubernetes/issues/148 170 & 1135
+		pod.Name = pod.UID
 	}
-	pod.DesiredState.Manifest.ID = pod.Name
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.Name, errs)
 	}
-
-	api.FillObjectMetaSystemFields(ctx, &pod.ObjectMeta)
-
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := rs.registry.CreatePod(ctx, pod); err != nil {
 			return nil, err
@@ -131,19 +128,19 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 		if err != nil {
 			return pod, err
 		}
-		pod.CurrentState.Status = status
+		pod.Status.Condition = status
 	}
-	if pod.CurrentState.Host != "" {
-		pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
+	if pod.Status.Host != "" {
+		pod.Status.HostIP = rs.getInstanceIP(pod.Status.Host)
 	}
 	return pod, err
 }
 
 func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 	return labels.Set{
-		"name":                pod.Name,
-		"DesiredState.Status": string(pod.DesiredState.Status),
-		"DesiredState.Host":   pod.DesiredState.Host,
+		"name":             pod.Name,
+		"Status.Condition": string(pod.Status.Condition),
+		"Status.Host":      pod.Status.Host,
 	}
 }
 
@@ -166,9 +163,9 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 			if err != nil {
 				return pod, err
 			}
-			pod.CurrentState.Status = status
-			if pod.CurrentState.Host != "" {
-				pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
+			pod.Status.Condition = status
+			if pod.Status.Host != "" {
+				pod.Status.HostIP = rs.getInstanceIP(pod.Status.Host)
 			}
 		}
 	}
@@ -201,20 +198,19 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 }
 
 func (rs *REST) fillPodInfo(pod *api.Pod) {
-	pod.CurrentState.Host = pod.DesiredState.Host
-	if pod.CurrentState.Host == "" {
+	if pod.Status.Host == "" {
 		return
 	}
 	// Get cached info for the list currently.
 	// TODO: Optionally use fresh info
 	if rs.podCache != nil {
-		info, err := rs.podCache.GetPodInfo(pod.CurrentState.Host, pod.Namespace, pod.Name)
+		info, err := rs.podCache.GetPodInfo(pod.Status.Host, pod.Namespace, pod.Name)
 		if err != nil {
 			if err != client.ErrPodInfoNotAvailable {
 				glog.Errorf("Error getting container info from cache: %#v", err)
 			}
 			if rs.podInfoGetter != nil {
-				info, err = rs.podInfoGetter.GetPodInfo(pod.CurrentState.Host, pod.Namespace, pod.Name)
+				info, err = rs.podInfoGetter.GetPodInfo(pod.Status.Host, pod.Namespace, pod.Name)
 			}
 			if err != nil {
 				if err != client.ErrPodInfoNotAvailable {
@@ -223,11 +219,11 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 				return
 			}
 		}
-		pod.CurrentState.Info = info
+		pod.Status.Info = info
 		netContainerInfo, ok := info["net"]
 		if ok {
 			if netContainerInfo.PodIP != "" {
-				pod.CurrentState.PodIP = netContainerInfo.PodIP
+				pod.Status.PodIP = netContainerInfo.PodIP
 			} else {
 				glog.Warningf("No network settings: %#v", netContainerInfo)
 			}
@@ -269,7 +265,7 @@ func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 }
 
 func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodCondition, error) {
-	if pod.CurrentState.Host == "" {
+	if pod.Status.Host == "" {
 		return api.PodPending, nil
 	}
 	if minions != nil {
@@ -280,7 +276,7 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodConditio
 		}
 		found := false
 		for _, minion := range res.Items {
-			if minion.Name == pod.CurrentState.Host {
+			if minion.Name == pod.Status.Host {
 				found = true
 				break
 			}
@@ -291,14 +287,14 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodConditio
 	} else {
 		glog.Errorf("Unexpected missing minion interface, status may be in-accurate")
 	}
-	if pod.CurrentState.Info == nil {
+	if pod.Status.Info == nil {
 		return api.PodPending, nil
 	}
 	running := 0
 	stopped := 0
 	unknown := 0
-	for _, container := range pod.DesiredState.Manifest.Containers {
-		if containerStatus, ok := pod.CurrentState.Info[container.Name]; ok {
+	for _, container := range pod.Spec.Containers {
+		if containerStatus, ok := pod.Status.Info[container.Name]; ok {
 			if containerStatus.State.Running != nil {
 				running++
 			} else if containerStatus.State.Termination != nil {

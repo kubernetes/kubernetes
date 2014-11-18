@@ -257,7 +257,7 @@ func podHostString(host, ip string) string {
 func printPod(pod *api.Pod, w io.Writer) error {
 	// TODO: remove me when pods are converted
 	spec := &api.PodSpec{}
-	if err := api.Scheme.Convert(&pod.DesiredState.Manifest, spec); err != nil {
+	if err := api.Scheme.Convert(&pod.Spec, spec); err != nil {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
 	il := listOfImages(spec)
@@ -268,8 +268,8 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.Name, firstImage,
-		podHostString(pod.CurrentState.Host, pod.CurrentState.HostIP),
-		labels.Set(pod.Labels), pod.CurrentState.Status)
+		podHostString(pod.Status.Host, pod.Status.HostIP),
+		labels.Set(pod.Labels), pod.Status.Condition)
 	if err != nil {
 		return err
 	}

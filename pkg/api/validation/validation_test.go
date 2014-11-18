@@ -374,13 +374,9 @@ func TestValidatePod(t *testing.T) {
 				"foo": "bar",
 			},
 		},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-				ID:      "abc",
-				RestartPolicy: api.RestartPolicy{
-					Always: &api.RestartPolicyAlways{},
-				},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{
+				Always: &api.RestartPolicyAlways{},
 			},
 		},
 	})
@@ -395,28 +391,16 @@ func TestValidatePod(t *testing.T) {
 				"foo": "bar",
 			},
 		},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
-		},
+		Spec: api.PodSpec{},
 	})
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
 
-	errs = ValidatePod(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: "foo", Namespace: api.NamespaceDefault,
-			Labels: map[string]string{
-				"foo": "bar",
-			},
-		},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-				ID:      "abc",
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{},
-					Never: &api.RestartPolicyNever{}},
-			},
+	errs = ValidatePodSpec(&api.PodSpec{
+		RestartPolicy: api.RestartPolicy{
+			Always: &api.RestartPolicyAlways{},
+			Never:  &api.RestartPolicyNever{},
 		},
 	})
 	if len(errs) != 1 {
@@ -436,9 +420,7 @@ func TestValidatePod(t *testing.T) {
 				"rfc952-24chars-orless":           "bar", //good label
 			},
 		},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
-		},
+		Spec: api.PodSpec{},
 	})
 	if len(errs) != 5 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
@@ -488,27 +470,23 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V1",
-							},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V1",
 						},
 					},
 				},
 			},
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V2",
-							},
-							{
-								Image: "bar:V2",
-							},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
+						},
+						{
+							Image: "bar:V2",
 						},
 					},
 				},
@@ -519,24 +497,20 @@ func TestValidatePodUpdate(t *testing.T) {
 		{
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V1",
-							},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V1",
 						},
 					},
 				},
 			},
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V2",
-							},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
 						},
 					},
 				},
@@ -547,26 +521,22 @@ func TestValidatePodUpdate(t *testing.T) {
 		{
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V1",
-								CPU:   100,
-							},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V1",
+							CPU:   100,
 						},
 					},
 				},
 			},
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V2",
-								CPU:   1000,
-							},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
+							CPU:   1000,
 						},
 					},
 				},
@@ -577,14 +547,12 @@ func TestValidatePodUpdate(t *testing.T) {
 		{
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V1",
-								Ports: []api.Port{
-									{HostPort: 8080, ContainerPort: 80},
-								},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V1",
+							Ports: []api.Port{
+								{HostPort: 8080, ContainerPort: 80},
 							},
 						},
 					},
@@ -592,14 +560,12 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo:V2",
-								Ports: []api.Port{
-									{HostPort: 8000, ContainerPort: 80},
-								},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo:V2",
+							Ports: []api.Port{
+								{HostPort: 8000, ContainerPort: 80},
 							},
 						},
 					},

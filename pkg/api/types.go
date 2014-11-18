@@ -455,15 +455,37 @@ type PodSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 }
 
+// PodStatus represents information about the status of a pod. Status may trail the actual
+// state of a system.
+type PodStatus struct {
+	Condition PodCondition `json:"condition,omitempty" yaml:"condition,omitempty"`
+
+	// Host is the name of the node that this Pod is currently bound to, or empty if no
+	// assignment has been done.
+	Host   string `json:"host,omitempty" yaml:"host,omitempty"`
+	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
+	PodIP  string `json:"podIP,omitempty" yaml:"podIP,omitempty"`
+
+	// The key of this map is the *name* of the container within the manifest; it has one
+	// entry per container in the manifest. The value of this map is currently the output
+	// of `docker inspect`. This output format is *not* final and should not be relied
+	// upon.
+	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
+	// when we have done this.
+	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
+}
+
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	TypeMeta   `json:",inline" yaml:",inline"`
 	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	DesiredState PodState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	CurrentState PodState `json:"currentState,omitempty" yaml:"currentState,omitempty"`
-	// NodeSelector is a selector which must be true for the pod to fit on a node
-	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
+	// Spec defines the behavior of a pod.
+	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+
+	// Status represents the current information about a pod. This data may not be up
+	// to date.
+	Status PodStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // PodTemplateSpec describes the data a pod should have when created from a template

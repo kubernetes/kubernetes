@@ -81,7 +81,7 @@ func init() {
 
 		// Convert Pod to BoundPod
 		func(in *Pod, out *BoundPod, s conversion.Scope) error {
-			if err := s.Convert(&in.DesiredState.Manifest, out, 0); err != nil {
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
 				return err
 			}
 			// Only copy a subset of fields, and override manifest attributes with the pod

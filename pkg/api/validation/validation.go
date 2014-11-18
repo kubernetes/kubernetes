@@ -345,7 +345,7 @@ func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	if !util.IsDNSSubdomain(pod.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
 	}
-	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
 	allErrs = append(allErrs, validateLabels(pod.Labels)...)
 	return allErrs
 }
@@ -383,8 +383,8 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", newPod.Name))
 	}
 
-	if len(newPod.DesiredState.Manifest.Containers) != len(oldPod.DesiredState.Manifest.Containers) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
+	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers))
 		return allErrs
 	}
 	pod := *newPod
@@ -392,13 +392,13 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 	pod.ResourceVersion = oldPod.ResourceVersion
 	// Tricky, we need to copy the container list so that we don't overwrite the update
 	var newContainers []api.Container
-	for ix, container := range pod.DesiredState.Manifest.Containers {
-		container.Image = oldPod.DesiredState.Manifest.Containers[ix].Image
+	for ix, container := range pod.Spec.Containers {
+		container.Image = oldPod.Spec.Containers[ix].Image
 		newContainers = append(newContainers, container)
 	}
-	pod.DesiredState.Manifest.Containers = newContainers
-	if !reflect.DeepEqual(pod.DesiredState.Manifest, oldPod.DesiredState.Manifest) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
+	pod.Spec.Containers = newContainers
+	if !reflect.DeepEqual(pod.Spec, oldPod.Spec) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers))
 	}
 	return allErrs
 }

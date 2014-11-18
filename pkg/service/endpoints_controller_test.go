@@ -36,20 +36,18 @@ func newPodList(count int) *api.PodList {
 		pods = append(pods, api.Pod{
 			TypeMeta:   api.TypeMeta{APIVersion: testapi.Version()},
 			ObjectMeta: api.ObjectMeta{Name: fmt.Sprintf("pod%d", i)},
-			DesiredState: api.PodState{
-				Manifest: api.ContainerManifest{
-					Containers: []api.Container{
-						{
-							Ports: []api.Port{
-								{
-									ContainerPort: 8080,
-								},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Ports: []api.Port{
+							{
+								ContainerPort: 8080,
 							},
 						},
 					},
 				},
 			},
-			CurrentState: api.PodState{
+			Status: api.PodStatus{
 				PodIP: "1.2.3.4",
 			},
 		})
@@ -61,95 +59,101 @@ func newPodList(count int) *api.PodList {
 }
 
 func TestFindPort(t *testing.T) {
-	manifest := api.ContainerManifest{
-		Containers: []api.Container{
-			{
-				Ports: []api.Port{
-					{
-						Name:          "foo",
-						ContainerPort: 8080,
-						HostPort:      9090,
-					},
-					{
-						Name:          "bar",
-						ContainerPort: 8000,
-						HostPort:      9000,
+	pod := api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: []api.Port{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+							HostPort:      9090,
+						},
+						{
+							Name:          "bar",
+							ContainerPort: 8000,
+							HostPort:      9000,
+						},
 					},
 				},
 			},
 		},
 	}
-	emptyPortsManifest := api.ContainerManifest{
-		Containers: []api.Container{
-			{
-				Ports: []api.Port{},
+
+	emptyPortsPod := api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: []api.Port{},
+				},
 			},
 		},
 	}
+
 	tests := []struct {
-		manifest api.ContainerManifest
+		pod      api.Pod
 		portName util.IntOrString
 
 		wport int
 		werr  bool
 	}{
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrString, StrVal: "foo"},
 			8080,
 			false,
 		},
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrString, StrVal: "bar"},
 			8000,
 			false,
 		},
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 8000},
 			8000,
 			false,
 		},
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 7000},
 			7000,
 			false,
 		},
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrString, StrVal: "baz"},
 			0,
 			true,
 		},
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
 			8080,
 			false,
 		},
 		{
-			manifest,
+			pod,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
 			8080,
 			false,
 		},
 		{
-			emptyPortsManifest,
+			emptyPortsPod,
 			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
 			0,
 			true,
 		},
 		{
-			emptyPortsManifest,
+			emptyPortsPod,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
 			0,
 			true,
 		},
 	}
 	for _, test := range tests {
-		port, err := findPort(&test.manifest, test.portName)
+		port, err := findPort(&test.pod, test.portName)
 		if port != test.wport {
 			t.Errorf("Expected port %d, Got %d", test.wport, port)
 		}
