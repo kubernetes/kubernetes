@@ -7,7 +7,12 @@
 
 ### Cluster turnup
 
-#### Install from source
+#### Preferred Option: Install from [0.5 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.5)
+1. ```wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.5/kubernetes.tar.gz```
+2. ```tar -xzf kubernetes.tar.gz```
+3. ```cd kubernetes```
+
+#### Alternate Option: Install from source at head
 1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
 2. ```cd kubernetes; make release```
 
@@ -18,6 +23,13 @@ cluster/kube-up.sh
 ```
 
 The script above relies on AWS S3 to deploy the software to instances running in EC2.
+
+Once the cluster is up, it will print the ip address of your cluster.
+
+```
+export PATH=$PATH:$PWD/platforms/<os>/<platform>
+export KUBERNETES_MASTER=https://<ip-address>
+```
 
 ### Running examples
 
