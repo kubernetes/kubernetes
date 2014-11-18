@@ -19,7 +19,7 @@ package api
 import (
 	stderrs "errors"
 
-	"code.google.com/p/go.net/context"
+	"golang.org/x/net/context"
 )
 
 // Context carries values across API boundaries.

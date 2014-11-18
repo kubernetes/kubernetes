@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"code.google.com/p/go.net/html"
+	"golang.org/x/net/html"
 )
 
 func parseURLOrDie(inURL string) *url.URL {

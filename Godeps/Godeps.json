@@ -15,21 +15,6 @@
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
 		},
 		{
-			"ImportPath": "code.google.com/p/go.net/context",
-			"Comment": "null-144",
-			"Rev": "ad01a6fcc8a19d3a4478c836895ffe883bd2ceab"
-		},
-		{
-			"ImportPath": "code.google.com/p/go.net/html",
-			"Comment": "null-144",
-			"Rev": "ad01a6fcc8a19d3a4478c836895ffe883bd2ceab"
-		},
-		{
-			"ImportPath": "code.google.com/p/go.net/websocket",
-			"Comment": "null-144",
-			"Rev": "ad01a6fcc8a19d3a4478c836895ffe883bd2ceab"
-		},
-		{
 			"ImportPath": "code.google.com/p/goauth2/compute/serviceaccount",
 			"Comment": "weekly-50",
 			"Rev": "7fc9d958c83464bd7650240569bf93a102266e6a"
@@ -149,6 +134,21 @@
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Comment": "null-214",
+			"Rev": "c043f0dc72e4cdd23ae039470ea9d63e6680a1b2"
+		},
+		{
+			"ImportPath": "golang.org/x/net/html",
+			"Comment": "null-214",
+			"Rev": "c043f0dc72e4cdd23ae039470ea9d63e6680a1b2"
+		},
+		{
+			"ImportPath": "golang.org/x/net/websocket",
+			"Comment": "null-214",
+			"Rev": "c043f0dc72e4cdd23ae039470ea9d63e6680a1b2"
 		},
 		{
 			"ImportPath": "gopkg.in/v1/yaml",

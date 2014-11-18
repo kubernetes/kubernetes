@@ -32,8 +32,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"code.google.com/p/go.net/html"
 	"github.com/golang/glog"
+	"golang.org/x/net/html"
 )
 
 // tagsToAttrs states which attributes of which tags require URL substitution.
