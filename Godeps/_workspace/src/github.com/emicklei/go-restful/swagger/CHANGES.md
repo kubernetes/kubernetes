@@ -1,5 +1,13 @@
 Change history of swagger
 =
+
+2014-11-14
+- operation parameters are now sorted using ordering path,query,form,header,body
+
+2014-11-12
+- respect omitempty tag value for embedded structs
+- expose ApiVersion of WebService to Swagger ApiDeclaration
+
 2014-05-29
 - (api add) Ability to define custom http.Handler to serve swagger-ui static files
 

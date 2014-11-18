@@ -155,7 +155,8 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 		SwaggerVersion: swaggerVersion,
 		BasePath:       sws.config.WebServicesUrl,
 		ResourcePath:   ws.RootPath(),
-		Models:         map[string]Model{}}
+		Models:         map[string]Model{},
+		ApiVersion:     ws.Version()}
 
 	// collect any path parameters
 	rootParams := []Parameter{}
@@ -192,6 +193,9 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 			for _, param := range route.ParameterDocs {
 				operation.Parameters = append(operation.Parameters, asSwaggerParameter(param.Data()))
 			}
+			// sort parameters
+			sort.Sort(ParameterSorter(operation.Parameters))
+
 			sws.addModelsFromRouteTo(&operation, route, &decl)
 			api.Operations = append(api.Operations, operation)
 		}
