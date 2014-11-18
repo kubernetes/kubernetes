@@ -29,8 +29,6 @@ EOF
 mkdir -p /srv/salt-overlay/salt/nginx
 echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
 
-# TODO: do aws.
-
 # Generate and distribute a shared secret (bearer token) to
 # apiserver and kubelet so that kubelet can authenticate to
 # apiserver to send events.
