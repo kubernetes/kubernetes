@@ -171,6 +171,16 @@ func TestPodUpdate(c *client.Client) bool {
 
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
+	provider := os.Getenv("KUBERNETES_PROVIDER")
+	if provider == "" {
+		glog.Errorf("unable to detect cloud type.")
+		return false
+	}
+	if provider != "gce" {
+		glog.Infof("skipping TestKubeletSendsEvent on cloud provider %s", provider)
+		return true
+	}
+
 	podClient := c.Pods(api.NamespaceDefault)
 
 	pod := loadPodOrDie("./api/examples/pod.json")
@@ -204,6 +214,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 			"involvedObject.kind":      "Pod",
 			"involvedObject.namespace": api.NamespaceDefault,
 			"source":                   "scheduler",
+			"time":                     value,
 		}.AsSelector(),
 	)
 	if err != nil {
@@ -265,6 +276,8 @@ func main() {
 		if !testPassed {
 			passed = false
 		}
+		// TODO: clean up objects created during a test after the test, so cases
+		// are independent.
 	}
 	if !passed {
 		glog.Fatalf("Tests failed")
