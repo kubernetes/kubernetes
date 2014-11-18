@@ -24,6 +24,8 @@ cert_group=kube-cert
 
 mkdir -p "$cert_dir"
 
+use_cn=false
+
 # TODO: Add support for discovery on other providers?
 if [ "$cert_ip" == "_use_gce_external_ip_" ]; then
   cert_ip=$(curl -s -H Metadata-Flavor:Google http://metadata.google.internal./computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
@@ -31,6 +33,11 @@ fi
 
 if [ "$cert_ip" == "_use_aws_external_ip_" ]; then
   cert_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+fi
+
+if [ "$cert_ip" == "_use_azure_dns_name_" ]; then
+  cert_ip=$(hostname -f | awk -F. '{ print $2 }').cloudapp.net
+  use_cn=true
 fi
 
 tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
@@ -55,10 +62,16 @@ tar xzf easy-rsa.tar.gz > /dev/null 2>&1
 cd easy-rsa-master/easyrsa3
 ./easyrsa init-pki > /dev/null 2>&1
 ./easyrsa --batch build-ca nopass > /dev/null 2>&1
-./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
+if [ $use_cn = "true" ]; then
+    ./easyrsa build-server-full $cert_ip nopass > /dev/null 2>&1
+    cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1
+    cp -p pki/private/$cert_ip.key "${cert_dir}/server.key" > /dev/null 2>&1
+else
+    ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
+    cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
+    cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
+fi
 ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1
-cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
-cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
 cp -p pki/ca.crt "${cert_dir}/ca.crt"
 cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
 cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
