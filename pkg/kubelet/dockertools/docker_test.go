@@ -23,7 +23,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/fsouza/go-dockerclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
@@ -213,9 +214,19 @@ func TestDockerKeyringLookup(t *testing.T) {
 		Email:    "grace@example.com",
 	}
 
-	dk := newDockerKeyring()
-	dk.add("bar.example.com/pong", grace)
-	dk.add("bar.example.com", ada)
+	dk := &credentialprovider.BasicDockerKeyring{}
+	dk.Add(credentialprovider.DockerConfig{
+		"bar.example.com/pong": credentialprovider.DockerConfigEntry{
+			Username: grace.Username,
+			Password: grace.Password,
+			Email:    grace.Email,
+		},
+		"bar.example.com": credentialprovider.DockerConfigEntry{
+			Username: ada.Username,
+			Password: ada.Password,
+			Email:    ada.Email,
+		},
+	})
 
 	tests := []struct {
 		image string
@@ -243,7 +254,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		match, ok := dk.lookup(tt.image)
+		match, ok := dk.Lookup(tt.image)
 		if tt.ok != ok {
 			t.Errorf("case %d: expected ok=%t, got %t", i, tt.ok, ok)
 		}

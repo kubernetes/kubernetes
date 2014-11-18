@@ -14,26 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package credentialprovider
 
 import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/url"
+	"net/http"
 	"path/filepath"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
+
+// DockerConfig represents the config file used by the docker CLI.
+// This config that represents the credentials that should be used
+// when pulling images from specific image repositories.
+type DockerConfig map[string]DockerConfigEntry
+
+type DockerConfigEntry struct {
+	Username string
+	Password string
+	Email    string
+}
 
 const (
 	dockerConfigFileLocation = ".dockercfg"
 )
 
-func readDockerConfigFile() (cfg dockerConfig, err error) {
+func ReadDockerConfigFile() (cfg DockerConfig, err error) {
+	// TODO(mattmoor): This causes the Kubelet to read /.dockercfg,
+	// which is incorrect.  It should come from $HOME/.dockercfg.
 	absDockerConfigFileLocation, err := filepath.Abs(dockerConfigFileLocation)
 	if err != nil {
 		glog.Errorf("while trying to canonicalize %s: %v", dockerConfigFileLocation, err)
@@ -45,40 +57,56 @@ func readDockerConfigFile() (cfg dockerConfig, err error) {
 		glog.Errorf("while trying to read %s: %v", absDockerConfigFileLocation, err)
 		return nil, err
 	}
+
+	return readDockerConfigFileFromBytes(contents)
+}
+
+func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte, err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		glog.Errorf("while creating request to read %s: %v", url, err)
+		return nil, err
+	}
+	if header != nil {
+		req.Header = *header
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		glog.Errorf("while trying to read %s: %v", url, err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err := fmt.Errorf("http status code: %d while fetching url: %v", resp.StatusCode)
+		glog.Errorf("while trying to read %s: %v", url, err)
+		glog.V(2).Infof("body of failing http response: %v", resp.Body)
+		return nil, err
+	}
+
+	contents, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		glog.Errorf("while trying to read %s: %v", url, err)
+		return nil, err
+	}
+
+	return contents, nil
+}
+
+func ReadDockerConfigFileFromUrl(url string, client *http.Client, header *http.Header) (cfg DockerConfig, err error) {
+	if contents, err := ReadUrl(url, client, header); err != nil {
+		return nil, err
+	} else {
+		return readDockerConfigFileFromBytes(contents)
+	}
+}
+
+func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
 	if err = json.Unmarshal(contents, &cfg); err != nil {
-		glog.Errorf("while trying to parse %s: %v", absDockerConfigFileLocation, err)
+		glog.Errorf("while trying to parse blob %q: %v", contents, err)
 		return nil, err
 	}
 	return
-}
-
-// dockerConfig represents the config file used by the docker CLI.
-// This config that represents the credentials that should be used
-// when pulling images from specific image repositories.
-type dockerConfig map[string]dockerConfigEntry
-
-func (dc dockerConfig) addToKeyring(dk *dockerKeyring) {
-	for loc, ident := range dc {
-		creds := docker.AuthConfiguration{
-			Username: ident.Username,
-			Password: ident.Password,
-			Email:    ident.Email,
-		}
-
-		parsed, err := url.Parse(loc)
-		if err != nil {
-			glog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
-			continue
-		}
-
-		dk.add(parsed.Host+parsed.Path, creds)
-	}
-}
-
-type dockerConfigEntry struct {
-	Username string
-	Password string
-	Email    string
 }
 
 // dockerConfigEntryWithAuth is used solely for deserializing the Auth field
@@ -90,7 +118,7 @@ type dockerConfigEntryWithAuth struct {
 	Auth     string
 }
 
-func (ident *dockerConfigEntry) UnmarshalJSON(data []byte) error {
+func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
 	var tmp dockerConfigEntryWithAuth
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {

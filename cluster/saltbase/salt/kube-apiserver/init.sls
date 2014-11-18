@@ -38,6 +38,19 @@
 
 {% endif %}
 
+{% if grains.cloud is defined %}
+{% if grains.cloud == 'gce' %}
+# TODO: generate and distribute tokens on other cloud providers.
+/srv/kubernetes/known_tokens.csv:
+  file.managed:
+    - source: salt://kube-apiserver/known_tokens.csv
+    - user: kube-apiserver
+    - group: kube-apiserver
+    - mode: 400
+
+{% endif %}
+{% endif %}
+
 kube-apiserver:
   group.present:
     - system: True

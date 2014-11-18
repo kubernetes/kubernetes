@@ -25,15 +25,14 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
-	"os"
 	"os/exec"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -65,7 +64,7 @@ type DockerPuller interface {
 // dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
 	client  DockerInterface
-	keyring *dockerKeyring
+	keyring credentialprovider.DockerKeyring
 }
 
 type throttledDockerPuller struct {
@@ -77,19 +76,9 @@ type throttledDockerPuller struct {
 func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
-		keyring: newDockerKeyring(),
+		keyring: credentialprovider.NewDockerKeyring(),
 	}
 
-	cfg, err := readDockerConfigFile()
-	if err == nil {
-		cfg.addToKeyring(dp.keyring)
-	} else if !os.IsNotExist(err) {
-		glog.V(1).Infof("Unable to parse Docker config file: %v", err)
-	}
-
-	if dp.keyring.count() == 0 {
-		glog.V(1).Infof("Continuing with empty Docker keyring")
-	}
 	if qps == 0.0 {
 		return dp
 	}
@@ -218,7 +207,7 @@ func (p dockerPuller) Pull(image string) error {
 		Tag:        tag,
 	}
 
-	creds, ok := p.keyring.lookup(image)
+	creds, ok := p.keyring.Lookup(image)
 	if !ok {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 	}
@@ -607,63 +596,4 @@ func parseImageName(image string) (string, string) {
 
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
-}
-
-// dockerKeyring tracks a set of docker registry credentials, maintaining a
-// reverse index across the registry endpoints. A registry endpoint is made
-// up of a host (e.g. registry.example.com), but it may also contain a path
-// (e.g. registry.example.com/foo) This index is important for two reasons:
-// - registry endpoints may overlap, and when this happens we must find the
-//   most specific match for a given image
-// - iterating a map does not yield predictable results
-type dockerKeyring struct {
-	index []string
-	creds map[string]docker.AuthConfiguration
-}
-
-func newDockerKeyring() *dockerKeyring {
-	return &dockerKeyring{
-		index: make([]string, 0),
-		creds: make(map[string]docker.AuthConfiguration),
-	}
-}
-
-func (dk *dockerKeyring) add(registry string, creds docker.AuthConfiguration) {
-	dk.creds[registry] = creds
-
-	dk.index = append(dk.index, registry)
-	dk.reindex()
-}
-
-// reindex updates the index used to identify which credentials to use for
-// a given image. The index is reverse-sorted so more specific paths are
-// matched first. For example, if for the given image "quay.io/coreos/etcd",
-// credentials for "quay.io/coreos" should match before "quay.io".
-func (dk *dockerKeyring) reindex() {
-	sort.Sort(sort.Reverse(sort.StringSlice(dk.index)))
-}
-
-const defaultRegistryHost = "index.docker.io/v1/"
-
-func (dk *dockerKeyring) lookup(image string) (docker.AuthConfiguration, bool) {
-	// range over the index as iterating over a map does not provide
-	// a predictable ordering
-	for _, k := range dk.index {
-		if !strings.HasPrefix(image, k) {
-			continue
-		}
-
-		return dk.creds[k], true
-	}
-
-	// use credentials for the default registry if provided
-	if auth, ok := dk.creds[defaultRegistryHost]; ok {
-		return auth, true
-	}
-
-	return docker.AuthConfiguration{}, false
-}
-
-func (dk dockerKeyring) count() int {
-	return len(dk.creds)
 }
