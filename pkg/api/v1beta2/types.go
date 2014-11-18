@@ -430,9 +430,11 @@ type Service struct {
 	// This service's labels.
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize services"`
 
-	// This service will route traffic to pods having labels matching this selector.
-	Selector                   map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to receive traffic for this service"`
-	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
+	// This service will route traffic to pods having labels matching this selector. If null, no endpoints will be automatically created. If empty, all pods will be selected.
+	Selector map[string]string `json:"selector" description:"label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"`
+	// An external load balancer should be set up via the cloud-provider
+	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
+
 	// PublicIPs are used by external load balancers.
 	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs from which to select the address for the external load balancer"`
 

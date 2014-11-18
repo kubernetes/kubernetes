@@ -167,11 +167,11 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 				Selector: map[string]string{"bar": "baz"},
 			},
 		},
-		"empty selector": {
+		"invalid selector": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Port:     6502,
-				Selector: map[string]string{},
+				Selector: map[string]string{"ThisSelectorFailsValidation": "ok"},
 			},
 		},
 	}

@@ -222,6 +222,71 @@ func TestSyncEndpointsError(t *testing.T) {
 	}
 }
 
+func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec:       api.ServiceSpec{},
+			},
+		},
+	}
+	testServer, endpointsHandler := makeTestServer(t,
+		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				ResourceVersion: "1",
+			},
+			Endpoints: []string{"6.7.8.9:1000"},
+		}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
+func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{},
+				},
+			},
+		},
+	}
+	testServer, endpointsHandler := makeTestServer(t,
+		serverResponse{http.StatusOK, newPodList(1)},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				ResourceVersion: "1",
+			},
+			Endpoints: []string{},
+		}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+		},
+		Endpoints: []string{"1.2.3.4:8080"},
+	})
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "PUT", &data)
+}
+
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
