@@ -25,7 +25,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"gopkg.in/v1/yaml"
@@ -42,11 +43,9 @@ type testStruct struct {
 
 func (ts *testStruct) IsAnAPIObject() {}
 
-const TestVersion = latest.Version
-
 func init() {
 	api.Scheme.AddKnownTypes("", &testStruct{})
-	api.Scheme.AddKnownTypes(TestVersion, &testStruct{})
+	api.Scheme.AddKnownTypes(testapi.Version(), &testStruct{})
 }
 
 var testData = testStruct{
@@ -57,21 +56,67 @@ var testData = testStruct{
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &YAMLPrinter{TestVersion}, yaml.Unmarshal)
+	testPrinter(t, &YAMLPrinter{testapi.Version(), api.Scheme}, yaml.Unmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &JSONPrinter{TestVersion}, json.Unmarshal)
+	testPrinter(t, &JSONPrinter{testapi.Version(), api.Scheme}, json.Unmarshal)
+}
+
+type internalType struct {
+	Name string
+	Kind string
+}
+
+type externalType struct {
+	Name string
+	Kind string `json:"kind"`
+}
+
+func (*internalType) IsAnAPIObject() {}
+func (*externalType) IsAnAPIObject() {}
+
+func newExternalScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName("", "Type", &internalType{})
+	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
+	return scheme
+}
+
+func TestPrintJSONForUnknownSchema(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	printer, err := GetPrinter("json", "", "unlikelyversion", newExternalScheme(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+	if err := printer.PrintObj(&internalType{Name: "foo"}, buf); err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+	obj := map[string]interface{}{}
+	if err := json.Unmarshal(buf.Bytes(), &obj); err != nil {
+		t.Fatalf("unexpected error: %#v\n%s", err, buf.String())
+	}
+	if obj["Name"] != "foo" {
+		t.Errorf("unexpected field: %#v", obj)
+	}
+}
+
+func TestPrintJSONForUnknownSchemaAndWrongVersion(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	printer, err := GetPrinter("json", "", "badversion", newExternalScheme(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+	if err := printer.PrintObj(&internalType{Name: "foo"}, buf); err == nil {
+		t.Errorf("unexpected non-error")
+	}
 }
 
 func TestPrintJSON(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter(TestVersion, "json", "", nil)
+	printer, err := GetPrinter("json", "", testapi.Version(), api.Scheme, nil)
 	if err != nil {
-		t.Errorf("unexpected error: %#v", err)
-	}
-	if !printer.IsVersioned() {
-		t.Errorf("printer should be versioned")
+		t.Fatalf("unexpected error: %#v", err)
 	}
 	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
 	obj := map[string]interface{}{}
@@ -82,12 +127,9 @@ func TestPrintJSON(t *testing.T) {
 
 func TestPrintYAML(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter(TestVersion, "yaml", "", nil)
+	printer, err := GetPrinter("yaml", "", testapi.Version(), api.Scheme, nil)
 	if err != nil {
-		t.Errorf("unexpected error: %#v", err)
-	}
-	if !printer.IsVersioned() {
-		t.Errorf("printer should be versioned")
+		t.Fatalf("unexpected error: %#v", err)
 	}
 	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
 	obj := map[string]interface{}{}
@@ -98,12 +140,9 @@ func TestPrintYAML(t *testing.T) {
 
 func TestPrintTemplate(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter(TestVersion, "template", "{{.id}}", nil)
+	printer, err := GetPrinter("template", "{{.id}}", "v1beta1", api.Scheme, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
-	}
-	if !printer.IsVersioned() {
-		t.Errorf("printer should be versioned")
 	}
 	err = printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
 	if err != nil {
@@ -115,19 +154,19 @@ func TestPrintTemplate(t *testing.T) {
 }
 
 func TestPrintEmptyTemplate(t *testing.T) {
-	if _, err := GetPrinter(TestVersion, "template", "", nil); err == nil {
+	if _, err := GetPrinter("template", "", testapi.Version(), api.Scheme, nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplate(t *testing.T) {
-	if _, err := GetPrinter(TestVersion, "template", "{{ .Name", nil); err == nil {
+	if _, err := GetPrinter("template", "{{ .Name", testapi.Version(), api.Scheme, nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplateFile(t *testing.T) {
-	if _, err := GetPrinter(TestVersion, "templatefile", "", nil); err == nil {
+	if _, err := GetPrinter("templatefile", "", testapi.Version(), api.Scheme, nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -147,7 +186,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	poutput = testStruct{}
-	err = latest.Codec.DecodeInto(buf.Bytes(), &poutput)
+	err = testapi.Codec().DecodeInto(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,11 +203,11 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	// Verify that given function runs without error.
 	err = unmarshalFunc(buf.Bytes(), &objOut)
 	if err != nil {
-		t.Errorf("Unexpeted error: %#v", err)
+		t.Fatalf("unexpected error: %#v", err)
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	err = latest.Codec.DecodeInto(buf.Bytes(), &objOut)
+	err = testapi.Codec().DecodeInto(buf.Bytes(), &objOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +244,7 @@ func TestCustomTypePrinting(t *testing.T) {
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&obj, buffer)
 	if err != nil {
-		t.Errorf("An error occurred printing the custom type: %#v", err)
+		t.Fatalf("An error occurred printing the custom type: %#v", err)
 	}
 	expectedOutput := "Data\ntest object"
 	if buffer.String() != expectedOutput {
@@ -236,7 +275,7 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplateEmitsVersionedObjects(t *testing.T) {
 	// kind is always blank in memory and set on the wire
-	printer, err := NewTemplatePrinter(TestVersion, []byte(`{{.kind}}`))
+	printer, err := NewTemplatePrinter([]byte(`{{.kind}}`), testapi.Version(), api.Scheme)
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
