@@ -18,8 +18,12 @@ package iptables
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
 )
@@ -111,7 +115,7 @@ func (runner *runner) EnsureRule(table Table, chain Chain, args ...string) (bool
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	exists, err := runner.checkRule(fullArgs)
+	exists, err := runner.checkRule(table, chain, args...)
 	if err != nil {
 		return false, err
 	}
@@ -132,7 +136,7 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	exists, err := runner.checkRule(fullArgs)
+	exists, err := runner.checkRule(table, chain, args...)
 	if err != nil {
 		return err
 	}
@@ -169,7 +173,47 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
-func (runner *runner) checkRule(args []string) (bool, error) {
+func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
+	checkPresent, err := getIptablesHasCheckCommand(runner.exec)
+	if err != nil {
+		glog.Warning("Error checking iptables version, assuming version at least 1.4.11: %v", err)
+		checkPresent = true
+	}
+	if checkPresent {
+		return runner.checkRuleUsingCheck(makeFullArgs(table, chain, args...))
+	} else {
+		return runner.checkRuleWithoutCheck(table, chain, args...)
+	}
+}
+
+// Executes the rule check without using the "-C" flag, instead parsing iptables-save.
+// Present for compatibility with <1.4.11 versions of iptables.
+func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
+	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("error checking rule: %s", err)
+	}
+
+	argset := util.NewStringSet(args...)
+
+	for _, line := range strings.Split(string(out), "\n") {
+		var fields = strings.Fields(line)
+
+		// Check that this is a rule for the correct chain, and that it has
+		// the correct number of argument (+2 for "-A <chain name>")
+		if strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) && len(fields) == len(args)+2 {
+			// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
+			if util.NewStringSet(fields...).IsSuperset(argset) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// Executes the rule check using the "-C" flag
+func (runner *runner) checkRuleUsingCheck(args []string) (bool, error) {
 	out, err := runner.run(opCheckRule, args)
 	if err == nil {
 		return true, nil
@@ -196,4 +240,70 @@ const (
 
 func makeFullArgs(table Table, chain Chain, args ...string) []string {
 	return append([]string{string(chain), "-t", string(table)}, args...)
+}
+
+// Checks if iptables has the "-C" flag
+func getIptablesHasCheckCommand(exec utilexec.Interface) (bool, error) {
+	vstring, err := getIptablesVersionString(exec)
+	if err != nil {
+		return false, err
+	}
+
+	v1, v2, v3, err := extractIptablesVersion(vstring)
+	if err != nil {
+		return false, err
+	}
+
+	return iptablesHasCheckCommand(v1, v2, v3), nil
+}
+
+// getIptablesVersion returns the first three components of the iptables version.
+// e.g. "iptables v1.3.66" would return (1, 3, 66, nil)
+func extractIptablesVersion(str string) (int, int, int, error) {
+	versionMatcher := regexp.MustCompile("v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+	result := versionMatcher.FindStringSubmatch(str)
+	if result == nil {
+		return 0, 0, 0, fmt.Errorf("No iptables version found in string: %s", str)
+	}
+
+	v1, err := strconv.Atoi(result[1])
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	v2, err := strconv.Atoi(result[2])
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	v3, err := strconv.Atoi(result[3])
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return v1, v2, v3, nil
+}
+
+// Runs "iptables --version" to get the version string
+func getIptablesVersionString(exec utilexec.Interface) (string, error) {
+	bytes, err := exec.Command("iptables", "--version").CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
+}
+
+// Checks if an iptables version is after 1.4.11, when --check was added
+func iptablesHasCheckCommand(v1 int, v2 int, v3 int) bool {
+	if v1 > 1 {
+		return true
+	}
+	if v1 == 1 && v2 > 4 {
+		return true
+	}
+	if v1 == 1 && v2 == 4 && v3 >= 11 {
+		return true
+	}
+	return false
 }
