@@ -172,13 +172,12 @@ func TestPodUpdate(c *client.Client) bool {
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
 	provider := os.Getenv("KUBERNETES_PROVIDER")
-	if provider == "" {
-		glog.Errorf("unable to detect cloud type.")
-		return false
-	}
 	if provider != "gce" {
 		glog.Infof("skipping TestKubeletSendsEvent on cloud provider %s", provider)
 		return true
+	}
+	if provider == "" {
+		glog.Info("KUBERNETES_PROVIDER is unset assuming \"gce\"")
 	}
 
 	podClient := c.Pods(api.NamespaceDefault)
