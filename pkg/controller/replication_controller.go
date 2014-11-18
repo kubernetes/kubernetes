@@ -31,52 +31,11 @@ import (
 // in the system with actual running pods.
 type ReplicationManager struct {
 	kubeClient client.Interface
-	podControl PodControlInterface
+	podControl PodController
 	syncTime   <-chan time.Time
 
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(controller api.ReplicationController) error
-}
-
-// PodControlInterface is an interface that knows how to add or delete pods
-// created as an interface to allow testing.
-type PodControlInterface interface {
-	// createReplica creates new replicated pods according to the spec.
-	createReplica(namespace string, controller api.ReplicationController)
-	// deletePod deletes the pod identified by podID.
-	deletePod(namespace string, podID string) error
-}
-
-// RealPodControl is the default implementation of PodControllerInterface.
-type RealPodControl struct {
-	kubeClient client.Interface
-}
-
-func (r RealPodControl) createReplica(namespace string, controller api.ReplicationController) {
-	desiredLabels := make(labels.Set)
-	for k, v := range controller.Spec.Template.Labels {
-		desiredLabels[k] = v
-	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Labels: desiredLabels,
-		},
-	}
-	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.DesiredState.Manifest); err != nil {
-		glog.Errorf("Unable to convert pod template: %v", err)
-		return
-	}
-	if labels.Set(pod.Labels).AsSelector().Empty() {
-		glog.Errorf("Unable to create pod replica, no labels")
-		return
-	}
-	if _, err := r.kubeClient.Pods(namespace).Create(pod); err != nil {
-		glog.Errorf("Unable to create pod replica: %v", err)
-	}
-}
-
-func (r RealPodControl) deletePod(namespace, podID string) error {
-	return r.kubeClient.Pods(namespace).Delete(podID)
 }
 
 // NewReplicationManager creates a new ReplicationManager.
@@ -167,7 +126,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				rm.podControl.createReplica(controller.Namespace, controller)
+				rm.podControl.createPod(controller.Namespace, controller.Spec.Template)
 			}()
 		}
 		wait.Wait()
