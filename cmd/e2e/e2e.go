@@ -169,6 +169,86 @@ func TestPodUpdate(c *client.Client) bool {
 	return true
 }
 
+// TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
+func TestKubeletSendsEvent(c *client.Client) bool {
+	provider := os.Getenv("KUBERNETES_PROVIDER")
+	if provider == "" {
+		glog.Errorf("unable to detect cloud type.")
+		return false
+	}
+	if provider != "gce" {
+		glog.Infof("skipping TestKubeletSendsEvent on cloud provider %s", provider)
+		return true
+	}
+
+	podClient := c.Pods(api.NamespaceDefault)
+
+	pod := loadPodOrDie("./api/examples/pod.json")
+	value := strconv.Itoa(time.Now().Nanosecond())
+	pod.Labels["time"] = value
+
+	_, err := podClient.Create(pod)
+	if err != nil {
+		glog.Errorf("Failed to create pod: %v", err)
+		return false
+	}
+	defer podClient.Delete(pod.Name)
+	waitForPodRunning(c, pod.Name)
+	pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+	if len(pods.Items) != 1 {
+		glog.Errorf("Failed to find the correct pod")
+		return false
+	}
+
+	_, err = podClient.Get(pod.Name)
+	if err != nil {
+		glog.Errorf("Failed to get pod: %v", err)
+		return false
+	}
+
+	// Check for scheduler event about the pod.
+	events, err := c.Events(api.NamespaceDefault).List(
+		labels.Everything(),
+		labels.Set{
+			"involvedObject.name":      pod.Name,
+			"involvedObject.kind":      "Pod",
+			"involvedObject.namespace": api.NamespaceDefault,
+			"source":                   "scheduler",
+			"time":                     value,
+		}.AsSelector(),
+	)
+	if err != nil {
+		glog.Error("Error while listing events:", err)
+		return false
+	}
+	if len(events.Items) == 0 {
+		glog.Error("Didn't see any scheduler events even though pod was running.")
+		return false
+	}
+	glog.Info("Saw scheduler event for our pod.")
+
+	// Check for kubelet event about the pod.
+	events, err = c.Events(api.NamespaceDefault).List(
+		labels.Everything(),
+		labels.Set{
+			"involvedObject.name":      pod.Name,
+			"involvedObject.kind":      "BoundPod",
+			"involvedObject.namespace": api.NamespaceDefault,
+			"source":                   "kubelet",
+		}.AsSelector(),
+	)
+	if err != nil {
+		glog.Error("Error while listing events:", err)
+		return false
+	}
+	if len(events.Items) == 0 {
+		glog.Error("Didn't see any kubelet events even though pod was running.")
+		return false
+	}
+	glog.Info("Saw kubelet event for our pod.")
+	return true
+}
+
 func main() {
 	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -186,6 +266,7 @@ func main() {
 
 	tests := []func(c *client.Client) bool{
 		TestKubernetesROService,
+		TestKubeletSendsEvent,
 		// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
 	}
 
@@ -195,6 +276,8 @@ func main() {
 		if !testPassed {
 			passed = false
 		}
+		// TODO: clean up objects created during a test after the test, so cases
+		// are independent.
 	}
 	if !passed {
 		glog.Fatalf("Tests failed")
