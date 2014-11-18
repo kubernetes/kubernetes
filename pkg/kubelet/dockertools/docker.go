@@ -30,6 +30,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -64,28 +66,24 @@ type DockerPuller interface {
 
 // dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
-	client  DockerInterface
+	client DockerInterface
+
+	mu      sync.RWMutex
 	keyring *dockerKeyring
 }
 
 type throttledDockerPuller struct {
-	puller  dockerPuller
+	puller  *dockerPuller
 	limiter util.RateLimiter
 }
 
 // NewDockerPuller creates a new instance of the default implementation of DockerPuller.
 func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
-	dp := dockerPuller{
-		client:  client,
-		keyring: newDockerKeyring(),
+	dp := &dockerPuller{
+		client: client,
 	}
 
-	cfg, err := readDockerConfigFile()
-	if err == nil {
-		cfg.addToKeyring(dp.keyring)
-	} else if !os.IsNotExist(err) {
-		glog.V(1).Infof("Unable to parse Docker config file: %v", err)
-	}
+	util.Forever(dp.refreshKeyring, 10*time.Second)
 
 	if dp.keyring.count() == 0 {
 		glog.V(1).Infof("Continuing with empty Docker keyring")
@@ -205,7 +203,7 @@ func NewDockerContainerCommandRunner(client DockerInterface) ContainerCommandRun
 	return &dockerContainerCommandRunner{client: client}
 }
 
-func (p dockerPuller) Pull(image string) error {
+func (p *dockerPuller) Pull(image string) error {
 	image, tag := parseImageName(image)
 
 	// If no tag was specified, use the default "latest".
@@ -218,12 +216,33 @@ func (p dockerPuller) Pull(image string) error {
 		Tag:        tag,
 	}
 
-	creds, ok := p.keyring.lookup(image)
+	creds, ok := p.lookupCred(image)
 	if !ok {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 	}
 
 	return p.client.PullImage(opts, creds)
+}
+
+func (p *dockerPuller) lookupCred(image string) (docker.AuthConfiguration, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.keyring.lookup(image)
+}
+
+func (p *dockerPuller) refreshKeyring() {
+	glog.Info("refresh keyring")
+	keyring := newDockerKeyring()
+	cfg, err := readDockerConfigFile()
+	if err != nil && !os.IsNotExist(err) {
+		glog.V(1).Infof("Unable to parse Docker config file: %v", err)
+		return
+	}
+	cfg.addToKeyring(keyring)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.keyring = keyring
 }
 
 func (p throttledDockerPuller) Pull(image string) error {
@@ -233,7 +252,7 @@ func (p throttledDockerPuller) Pull(image string) error {
 	return fmt.Errorf("pull QPS exceeded.")
 }
 
-func (p dockerPuller) IsImagePresent(name string) (bool, error) {
+func (p *dockerPuller) IsImagePresent(name string) (bool, error) {
 	image, _ := parseImageName(name)
 	_, err := p.client.InspectImage(image)
 	if err == nil {
