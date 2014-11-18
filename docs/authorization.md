@@ -14,9 +14,9 @@ the request, (such as user, resource kind, and namespace) with access
 policies.  An API call must be allowed by some policy in order to proceed.
 
 The following implementations are available, and are selected by flag:
-  - `--authoriation_mode=AlwaysDeny`
-  - `--authoriation_mode=AlwaysAllow`
-  - `--authoriation_mode=ABAC`
+  - `--authorization_mode=AlwaysDeny`
+  - `--authorization_mode=AlwaysAllow`
+  - `--authorization_mode=ABAC`
 
 `AlwaysDeny` blocks all requests (used in tests).
 `AlwaysAllow` allows all requests; use if you don't need authorization.
