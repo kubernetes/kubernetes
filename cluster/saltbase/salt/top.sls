@@ -15,8 +15,6 @@ base:
 {% if pillar['use-fluentd-gcp'] is defined and pillar['use-fluentd-gcp'] %}
     - fluentd-gcp
 {% endif %}
-    # We need a binary release of nsinit
-    # - nsinit
     - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn-client
