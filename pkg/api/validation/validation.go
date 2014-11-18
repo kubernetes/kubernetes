@@ -480,6 +480,11 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 		}
 		allErrs = append(allErrs, validateLabels(spec.Template.Labels).Prefix("template.labels")...)
 		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+		// TODO: Provide better error message, current message is not intuitive:
+		// e.g. "spec.template.restartPolicy: invalid value '{<nil> <nil> 0xe68308}"
+		if spec.Template.Spec.RestartPolicy.OnFailure != nil || spec.Template.Spec.RestartPolicy.Never != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.restartPolicy", spec.Template.Spec.RestartPolicy))
+		}
 	}
 	return allErrs
 }

@@ -878,7 +878,11 @@ func TestValidateReplicationController(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Spec: api.PodTemplateSpec{
-			Spec: api.PodSpec{},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicy{
+					Always: &api.RestartPolicyAlways{},
+				},
+			},
 			ObjectMeta: api.ObjectMeta{
 				Labels: invalidSelector,
 			},
@@ -977,6 +981,44 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 			Spec: api.ReplicationControllerSpec{
 				Template: &invalidPodTemplate.Spec,
+			},
+		},
+		"invalid restart policy 1": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &api.PodTemplateSpec{
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{
+							OnFailure: &api.RestartPolicyOnFailure{},
+						},
+					},
+					ObjectMeta: api.ObjectMeta{
+						Labels: validSelector,
+					},
+				},
+			},
+		},
+		"invalid restart policy 2": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &api.PodTemplateSpec{
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{
+							Never: &api.RestartPolicyNever{},
+						},
+					},
+					ObjectMeta: api.ObjectMeta{
+						Labels: validSelector,
+					},
+				},
 			},
 		},
 	}
