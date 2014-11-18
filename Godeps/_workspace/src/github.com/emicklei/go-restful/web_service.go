@@ -18,6 +18,7 @@ type WebService struct {
 	pathParameters []*Parameter
 	filters        []FilterFunction
 	documentation  string
+	apiVersion     string
 }
 
 // compiledPathExpression ensures that the path is compiled into a RegEx for those routers that need it.
@@ -34,6 +35,15 @@ func (w *WebService) compiledPathExpression() *pathExpression {
 	}
 	return w.pathExpr
 }
+
+// ApiVersion sets the API version for documentation purposes.
+func (w *WebService) ApiVersion(apiVersion string) *WebService {
+	w.apiVersion = apiVersion
+	return w
+}
+
+// Version returns the API version for documentation purposes.
+func (w WebService) Version() string { return w.apiVersion }
 
 // Path specifies the root URL template path of the WebService.
 // All Routes will be relative to this path.

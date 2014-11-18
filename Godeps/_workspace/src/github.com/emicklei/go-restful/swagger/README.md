@@ -15,7 +15,6 @@ Now, you can install the Swagger WebService for serving the Swagger specificatio
 
 	config := swagger.Config{
 		WebServices:    restful.RegisteredWebServices(),
-		WebServicesUrl: "http://localhost:8080",
 		ApiPath:        "/apidocs.json",
 		SwaggerPath:     "/apidocs/",
 		SwaggerFilePath: "/Users/emicklei/Projects/swagger-ui/dist"}
@@ -26,3 +25,4 @@ Notes
 --
 - Use RouteBuilder.Operation(..) to set the Nickname field of the API spec
 - The WebServices field of swagger.Config can be used to control which service you want to expose and document ; you can have multiple configs and therefore multiple endpoints.
+- Use tag "description" to annotate a struct field with a description to show in the UI

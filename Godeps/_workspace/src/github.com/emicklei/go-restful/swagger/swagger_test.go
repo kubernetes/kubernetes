@@ -21,6 +21,7 @@ func TestServiceToApi(t *testing.T) {
 	ws.Consumes(restful.MIME_JSON)
 	ws.Produces(restful.MIME_XML)
 	ws.Route(ws.GET("/all").To(dummy).Writes(sample{}))
+	ws.ApiVersion("1.2.3")
 	cfg := Config{
 		WebServicesUrl: "http://here.com",
 		ApiPath:        "/apipath",

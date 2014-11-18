@@ -143,7 +143,7 @@ func TestS3(t *testing.T) {
 type sample struct {
 	id       string `swagger:"required"` // TODO
 	items    []item
-	rootItem item `json:"root"`
+	rootItem item `json:"root" description:"root desc"`
 }
 
 type item struct {
@@ -184,7 +184,8 @@ func TestSampleToModelAsJson(t *testing.T) {
      ]
     },
     "root": {
-     "type": "swagger.item"
+     "type": "swagger.item",
+     "description": "root desc"
     }
    }
   }
@@ -212,8 +213,7 @@ func TestJsonTags(t *testing.T) {
      "type": "string"
     },
     "C": {
-     "type": "string",
-     "description": "(int as string)"
+     "type": "string"
     },
     "D": {
      "type": "integer",
@@ -536,7 +536,8 @@ func TestRecursiveStructure(t *testing.T) {
 
 type A1 struct {
 	B struct {
-		Id int
+		Id      int
+		Comment string `json:"comment,omitempty"`
 	}
 }
 
@@ -563,6 +564,9 @@ func TestEmbeddedStructA1(t *testing.T) {
     "Id": {
      "type": "integer",
      "format": "int32"
+    },
+    "comment": {
+     "type": "string"
     }
    }
   }
@@ -573,7 +577,9 @@ type A2 struct {
 	C
 }
 type C struct {
-	Id int `json:"B"`
+	Id      int    `json:"B"`
+	Comment string `json:"comment,omitempty"`
+	Secure  bool   `json:"secure"`
 }
 
 // go test -v -test.run TestEmbeddedStructA2 ...swagger
@@ -582,12 +588,19 @@ func TestEmbeddedStructA2(t *testing.T) {
   "swagger.A2": {
    "id": "swagger.A2",
    "required": [
-    "B"
+    "B",
+    "secure"
    ],
    "properties": {
     "B": {
      "type": "integer",
      "format": "int32"
+    },
+    "comment": {
+     "type": "string"
+    },
+    "secure": {
+     "type": "boolean"
     }
    }
   }
