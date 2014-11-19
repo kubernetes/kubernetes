@@ -242,7 +242,7 @@ function kube::build::ensure_golang() {
   kube::build::docker_image_exists golang 1.3 || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
       echo "You don't have a local copy of the golang docker image. This image is 450MB."
-      read -p "Download it now? [y/n] " -n 1 -r
+      read -p "Download it now? [y/n] " -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
         echo "Aborting." >&2
@@ -730,7 +730,18 @@ function kube::release::gcs::copy_release_artifacts() {
   echo "+++ Copying release artifacts to ${gcs_destination}"
 
   # First delete all objects at the destination
-  gsutil -q rm -f -R "${gcs_destination}" >/dev/null 2>&1 || true
+  if gsutil ls "${gcs_destination}" >/dev/null 2>&1; then
+    echo "!!! ${gcs_destination} not empty."
+    read -p "Delete everything under ${gcs_destination}? [y/n] " -r || {
+      echo "EOF on prompt.  Skipping upload"
+      return
+    }
+    [[ $REPLY =~ ^[yY]$ ]] || {
+      echo "Skipping upload"
+      return
+    }
+    gsutil -m rm -f -R "${gcs_destination}"
+  fi
 
   # Now upload everything in release directory
   gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
