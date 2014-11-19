@@ -53,7 +53,7 @@ __kubectl_parse_get()
 __kubectl_get_containers()
 {
     local template
-    template="{{ range .DesiredState.Manifest.Containers  }}{{ .Name }} {{ end }}"
+    template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
 
     local kubectl_out
     if kubectl_out=$(kubectl get -o template --template="${template}" pods "$1" 2>/dev/null); then
