@@ -737,7 +737,7 @@ function kube::release::gcs::copy_release_artifacts() {
 
   # Having the "template" scripts from the GCE cluster deploy hosted with the
   # release is useful for GKE.  Copy everything from that directory up also.
-  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp "${KUBE_ROOT}/cluster/gce/templates/*.sh" "${gcs_destination}extra/gce-templates/"
+  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp "${LOCAL_OUTPUT_ROOT}/release-stage/full/kubernetes/cluster/gce/templates/*.sh" "${gcs_destination}extra/gce-templates/"
 
   # TODO(jbeda): Generate an HTML page with links for this release so it is easy
   # to see it.  For extra credit, generate a dynamic page that builds up the
