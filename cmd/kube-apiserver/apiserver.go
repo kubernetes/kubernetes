@@ -150,6 +150,11 @@ func main() {
 
 	n := net.IPNet(portalNet)
 
+	authenticator, err := apiserver.NewAuthenticatorFromTokenFile(*tokenAuthFile)
+	if err != nil {
+		glog.Fatalf("Invalid Authentication Config: %v", err)
+	}
+
 	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(*authorizationMode, *authorizationPolicyFile)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
@@ -167,10 +172,10 @@ func main() {
 		EnableUISupport:       true,
 		APIPrefix:             *apiPrefix,
 		CorsAllowedOriginList: corsAllowedOriginList,
-		TokenAuthFile:         *tokenAuthFile,
 		ReadOnlyPort:          *readOnlyPort,
 		ReadWritePort:         *port,
 		PublicAddress:         *publicAddressOverride,
+		Authenticator:         authenticator,
 		Authorizer:            authorizer,
 	}
 	m := master.New(config)

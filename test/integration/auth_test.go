@@ -33,10 +33,14 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 )
 
 func init() {
@@ -47,24 +51,13 @@ const (
 	AliceToken   string = "abc123" // username: alice.  Present in token file.
 	BobToken     string = "xyz987" // username: bob.  Present in token file.
 	UnknownToken string = "qwerty" // Not present in token file.
-	// Keep file in sync with above constants.
-	TokenfileCSV string = `
-abc123,alice,1
-xyz987,bob,2
-`
 )
 
-func writeTestTokenFile(t *testing.T) string {
-	// Write a token file.
-	f, err := ioutil.TempFile("", "auth_integration_test")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	f.Close()
-	if err := ioutil.WriteFile(f.Name(), []byte(TokenfileCSV), 0700); err != nil {
-		t.Fatalf("unexpected error writing tokenfile: %v", err)
-	}
-	return f.Name()
+func getTestTokenAuth() authenticator.Request {
+	tokenAuthenticator := tokentest.New()
+	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
+	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
+	return bearertoken.New(tokenAuthenticator)
 }
 
 // TestWhoAmI passes a known Bearer Token to the master's /_whoami endpoint and checks that
@@ -79,15 +72,13 @@ func TestWhoAmI(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
 
@@ -467,8 +458,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
 	// Set up a master
@@ -484,7 +473,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
 	})
 
@@ -521,8 +510,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 func TestBobIsForbidden(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
 	// Set up a master
@@ -538,7 +525,7 @@ func TestBobIsForbidden(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
 	})
 
@@ -577,8 +564,6 @@ func TestBobIsForbidden(t *testing.T) {
 func TestUnknownUserIsUnauthorized(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
 	// Set up a master
@@ -594,7 +579,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
 	})
 
@@ -651,8 +636,6 @@ func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authori
 func TestNamespaceAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
 	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
@@ -668,7 +651,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
 	})
 
@@ -726,8 +709,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 func TestKindAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
 	// Set up a master
@@ -745,7 +726,7 @@ func TestKindAuthorization(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
 	})
 
@@ -797,8 +778,6 @@ func TestKindAuthorization(t *testing.T) {
 func TestReadOnlyAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile(t)
-	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
 	// Set up a master
@@ -816,7 +795,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     tokenFilename,
+		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
 	})
 

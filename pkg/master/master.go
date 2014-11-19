@@ -34,8 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/tokenfile"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -73,7 +71,7 @@ type Config struct {
 	EnableUISupport       bool
 	APIPrefix             string
 	CorsAllowedOriginList util.StringList
-	TokenAuthFile         string
+	Authenticator         authenticator.Request
 	Authorizer            authorizer.Authorizer
 
 	// Number of masters running; all masters must be started with the
@@ -111,7 +109,7 @@ type Master struct {
 	enableUISupport       bool
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
-	tokenAuthFile         string
+	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
 	masterCount           int
 
@@ -242,7 +240,7 @@ func New(c *Config) *Master {
 		enableUISupport:       c.EnableUISupport,
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
-		tokenAuthFile:         c.TokenAuthFile,
+		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 
 		masterCount:     c.MasterCount,
@@ -309,14 +307,7 @@ func (m *Master) init(c *Config) {
 	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
 	var userContexts = handlers.NewUserRequestContext()
-	var authenticator authenticator.Request
-	if len(c.TokenAuthFile) != 0 {
-		tokenAuthenticator, err := tokenfile.New(c.TokenAuthFile)
-		if err != nil {
-			glog.Fatalf("Unable to load the token authentication file '%s': %v", c.TokenAuthFile, err)
-		}
-		authenticator = bearertoken.New(tokenAuthenticator)
-	}
+	var authenticator = c.Authenticator
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
