@@ -25,7 +25,7 @@ id: cluster-pod
 containers:
   - name: etcd
     image: coreos/etcd
-    command: ["-vv"]
+    command: ["/go/bin/app", "-vv", "-listen-client-urls=http://0.0.0.0:4001"]
     ports:
       - name: etcd-port
         hostPort: 4001
