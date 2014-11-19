@@ -466,7 +466,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	if err != nil {
 		if ref != nil {
 			record.Eventf(ref, "failed", "failed",
-				"Failed to create docker container with error(%v)", err)
+				"Failed to create docker container with error: %v", err)
 		}
 		return "", err
 	}
@@ -506,7 +506,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	if err != nil {
 		if ref != nil {
 			record.Eventf(ref, "failed", "failed",
-				"Failed to start with docker id %v with error(%v)", dockerContainer.ID, err)
+				"Failed to start with docker id %v with error: %v", dockerContainer.ID, err)
 		}
 		return "", err
 	}
@@ -565,15 +565,28 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 		Image: kl.networkContainerImage,
 		Ports: ports,
 	}
+	ref, err := containerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
 	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
 	if err != nil {
+		if ref != nil {
+			record.Eventf(ref, "failed", "failed", "Failed to inspect image %s", container.Image)
+		}
 		return "", err
 	}
 	if !ok {
 		if err := kl.dockerPuller.Pull(container.Image); err != nil {
+			if ref != nil {
+				record.Eventf(ref, "failed", "failed", "Failed to pull image %s", container.Image)
+			}
 			return "", err
 		}
+	}
+	if ref != nil {
+		record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %s", container.Image)
 	}
 	return kl.runContainer(pod, container, nil, "")
 }
@@ -724,18 +737,32 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		}
 
 		glog.V(3).Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uuid, container.Name, container)
+		ref, err := containerRef(pod, &container)
+		if err != nil {
+			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+		}
 		if !api.IsPullNever(container.ImagePullPolicy) {
 			present, err := kl.dockerPuller.IsImagePresent(container.Image)
 			latest := dockertools.RequireLatestImage(container.Image)
 			if err != nil {
+				if ref != nil {
+					record.Eventf(ref, "failed", "failed", "Failed to inspect image %s", container.Image)
+				}
 				glog.Errorf("Failed to inspect image: %s: %#v skipping pod %s container %s", container.Image, err, podFullName, container.Name)
 				continue
 			}
 			if api.IsPullAlways(container.ImagePullPolicy) ||
 				(api.IsPullIfNotPresent(container.ImagePullPolicy) && (!present || latest)) {
 				if err := kl.dockerPuller.Pull(container.Image); err != nil {
+					if ref != nil {
+
+						record.Eventf(ref, "failed", "failed", "Failed to pull image %s", container.Image)
+					}
 					glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
 					continue
+				}
+				if ref != nil {
+					record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %s", container.Image)
 				}
 			}
 		}
