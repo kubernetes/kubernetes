@@ -39,7 +39,7 @@ containers:
         hostPort: 8080
         containerPort: 8080
         protocol: TCP
-    command: ["/kubernetes/kube-apiserver", "-v=5", "-address=0.0.0.0", "-etcd_servers=http://127.0.0.1:4001"]
+    command: ["/kubernetes/kube-apiserver", "-v=5", "-address=0.0.0.0", "-etcd_servers=http://127.0.0.1:4001", "-portal_net=10.0.0.0/24"]
   - name: controller-manager
     image: kubernetes
     imagePullPolicy: never

@@ -18,6 +18,7 @@ FROM  kubernetes
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 ENV ETCD_SERVERS http://127.0.0.1:4001
+ENV PORTAL_NET 10.0.0.0/24
 ENV KUBE_MINIONS ""
 
 ADD . /kubernetes

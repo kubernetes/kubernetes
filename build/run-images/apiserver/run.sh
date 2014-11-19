@@ -14,4 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./kube-apiserver -address=0.0.0.0 -etcd_servers="${ETCD_SERVERS}"
+./kube-apiserver -address=0.0.0.0 -etcd_servers="${ETCD_SERVERS}" -portal_net="${PORTAL_NET}"
