@@ -168,8 +168,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	handler.delegate = m.Handler
 
 	// Scheduler
-	schedulerConfigFactory := &factory.ConfigFactory{cl}
-	schedulerConfig := schedulerConfigFactory.Create()
+	schedulerConfigFactory := factory.NewConfigFactory(cl)
+	schedulerConfig, err := schedulerConfigFactory.Create(nil, nil)
+	if err != nil {
+		glog.Fatal("Couldn't create scheduler config: %v", err)
+	}
 	scheduler.New(schedulerConfig).Run()
 
 	endpoints := service.NewEndpointController(cl)

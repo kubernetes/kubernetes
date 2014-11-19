@@ -37,49 +37,82 @@ import (
 	"github.com/golang/glog"
 )
 
-// ConfigFactory knows how to fill out a scheduler config with its support functions.
-type ConfigFactory struct {
+// configFactory knows how to fill out a scheduler config with its support functions.
+type configFactory struct {
 	Client *client.Client
+	// queue for pods that need scheduling
+	PodQueue *cache.FIFO
+	// a means to list all scheduled pods
+	PodLister *storeToPodLister
+	// a means to list all minions
+	MinionLister *storeToMinionLister
+	// map of strings to predicate functions to be used
+	// to filter the minions for scheduling pods
+	PredicateMap map[string]algorithm.FitPredicate
+	// map of strings to priority functions to be used
+	// to prioritize the filtered minions for scheduling pods
+	PriorityMap map[string]algorithm.PriorityFunction
+}
+
+// NewConfigFactory initializes the factory.
+func NewConfigFactory(client *client.Client) *configFactory {
+	// initialize the factory struct
+	factory := &configFactory{Client: client,
+		PodQueue: cache.NewFIFO(),
+		PodLister: &storeToPodLister{cache.NewStore()},
+		MinionLister: &storeToMinionLister{cache.NewStore()},
+		PredicateMap: make(map[string]algorithm.FitPredicate),
+		PriorityMap: make(map[string]algorithm.PriorityFunction),
+	}
+
+	// add default predicates
+	factory.addDefaultPredicates()
+
+	// add default predicates
+	factory.addDefaultPriorities()
+
+	return factory
 }
 
 // Create creates a scheduler and all support functions.
-func (factory *ConfigFactory) Create() *scheduler.Config {
+func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*scheduler.Config, error) {
+	if predicateKeys == nil {
+		glog.V(2).Infof("Custom predicates list not provided, using default predicates")
+		predicateKeys = []string{"PodFitsPorts", "PodFitsResources", "NoDiskConflict", "MatchNodeSelector"}
+	}
+	predicateFuncs, err := factory.getPredicateFunctions(predicateKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	if priorityKeys == nil {
+		glog.V(2).Infof("Custom priority list not provided, using default priorities")
+		priorityKeys = []string{"LeastRequestedPriority"}
+	}
+	priorityFuncs, err := factory.getPriorityFunctions(priorityKeys)
+	if err != nil {
+		return nil, err
+	}
+
 	// Watch and queue pods that need scheduling.
-	podQueue := cache.NewFIFO()
-	cache.NewReflector(factory.createUnassignedPodLW(), &api.Pod{}, podQueue).Run()
+	cache.NewReflector(factory.createUnassignedPodLW(), &api.Pod{}, factory.PodQueue).Run()
 
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
-	podCache := cache.NewStore()
-	cache.NewReflector(factory.createAssignedPodLW(), &api.Pod{}, podCache).Run()
+	cache.NewReflector(factory.createAssignedPodLW(), &api.Pod{}, factory.PodLister.Store).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
-	minionCache := cache.NewStore()
 	if false {
 		// Disable this code until minions support watches.
-		cache.NewReflector(factory.createMinionLW(), &api.Minion{}, minionCache).Run()
+		cache.NewReflector(factory.createMinionLW(), &api.Minion{}, factory.MinionLister.Store).Run()
 	} else {
-		cache.NewPoller(factory.pollMinions, 10*time.Second, minionCache).Run()
+		cache.NewPoller(factory.pollMinions, 10*time.Second, factory.MinionLister.Store).Run()
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	minionLister := &storeToMinionLister{minionCache}
 
-	algo := algorithm.NewGenericScheduler(
-		[]algorithm.FitPredicate{
-			// Fit is defined based on the absence of port conflicts.
-			algorithm.PodFitsPorts,
-			// Fit is determined by resource availability
-			algorithm.NewResourceFitPredicate(minionLister),
-			// Fit is determined by non-conflicting disk volumes
-			algorithm.NoDiskConflict,
-			// Fit is determined by node selector query
-			algorithm.NewSelectorMatchPredicate(minionLister),
-		},
-		// Prioritize nodes by least requested utilization.
-		algorithm.LeastRequestedPriority,
-		&storeToPodLister{podCache}, r)
+	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityFuncs[0], factory.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
@@ -87,19 +120,64 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 	}
 
 	return &scheduler.Config{
-		MinionLister: minionLister,
+		MinionLister: factory.MinionLister,
 		Algorithm:    algo,
 		Binder:       &binder{factory.Client},
 		NextPod: func() *api.Pod {
-			pod := podQueue.Pop().(*api.Pod)
-			glog.V(2).Infof("About to try and schedule pod %v\n"+
-				"\tknown minions: %v\n"+
-				"\tknown scheduled pods: %v\n",
-				pod.Name, minionCache.ContainedIDs(), podCache.ContainedIDs())
+			pod := factory.PodQueue.Pop().(*api.Pod)
+			glog.V(2).Infof("glog.v2 --> About to try and schedule pod %v", pod.Name)
+			glog.Errorf("glog.error --> About to try and schedule pod %v", pod.Name)
 			return pod
 		},
-		Error: factory.makeDefaultErrorFunc(&podBackoff, podQueue),
+		Error: factory.makeDefaultErrorFunc(&podBackoff, factory.PodQueue),
+	}, nil
+}
+
+func (factory *configFactory) getPredicateFunctions(keys []string) ([]algorithm.FitPredicate, error) {
+	var function algorithm.FitPredicate
+	predicates := []algorithm.FitPredicate{}
+	for _, key := range keys {
+		glog.Errorf("Adding predicate function for key: %s", key)
+		function = factory.PredicateMap[key]
+		if function == nil {
+			return nil, fmt.Errorf("Invalid predicate key %s specified - no corresponding function found", key)
+		}
+		predicates = append(predicates, function)
 	}
+	return predicates, nil
+}
+
+func (factory *configFactory) getPriorityFunctions(keys []string) ([]algorithm.PriorityFunction, error) {
+	var function algorithm.PriorityFunction
+	priorities := []algorithm.PriorityFunction{}
+	for _, key := range keys {
+		function = factory.PriorityMap[key]
+		if function == nil {
+			return nil, fmt.Errorf("Invalid priority key %s specified - no corresponding function found", key)
+		}
+		priorities = append(priorities, function)
+	}
+	return priorities, nil
+}
+
+func (factory *configFactory) addDefaultPredicates() {
+	factory.AddPredicate("PodFitsPorts", algorithm.PodFitsPorts)
+	factory.AddPredicate("PodFitsResources", algorithm.NewResourceFitPredicate(factory.MinionLister))
+	factory.AddPredicate("NoDiskConflict", algorithm.NoDiskConflict)
+	factory.AddPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(factory.MinionLister))
+}
+
+func (factory *configFactory) AddPredicate(key string, function algorithm.FitPredicate) {
+	factory.PredicateMap[key] = function
+}
+
+func (factory *configFactory) addDefaultPriorities() {
+	factory.AddPriority("LeastRequestedPriority", algorithm.LeastRequestedPriority)
+	factory.AddPriority("SpreadingPriority", algorithm.CalculateSpreadPriority)
+}
+
+func (factory *configFactory) AddPriority(key string, function algorithm.PriorityFunction) {
+	factory.PriorityMap[key] = function
 }
 
 type listWatch struct {
@@ -129,7 +207,7 @@ func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
 
 // createUnassignedPodLW returns a listWatch that finds all pods that need to be
 // scheduled.
-func (factory *ConfigFactory) createUnassignedPodLW() *listWatch {
+func (factory *configFactory) createUnassignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
 		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
@@ -147,7 +225,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 
 // createAssignedPodLW returns a listWatch that finds all pods that are
 // already scheduled.
-func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
+func (factory *configFactory) createAssignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
 		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
@@ -156,7 +234,7 @@ func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
 }
 
 // createMinionLW returns a listWatch that gets all changes to minions.
-func (factory *ConfigFactory) createMinionLW() *listWatch {
+func (factory *configFactory) createMinionLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
 		fieldSelector: parseSelectorOrDie(""),
@@ -165,7 +243,7 @@ func (factory *ConfigFactory) createMinionLW() *listWatch {
 }
 
 // pollMinions lists all minions and returns an enumerator for cache.Poller.
-func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
+func (factory *configFactory) pollMinions() (cache.Enumerator, error) {
 	list := &api.MinionList{}
 	err := factory.Client.Get().Path("minions").Do().Into(list)
 	if err != nil {
@@ -174,7 +252,7 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &minionEnumerator{list}, nil
 }
 
-func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
+func (factory *configFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
 		glog.Errorf("Error scheduling %v: %v; retrying", pod.Name, err)
 		backoff.gc()

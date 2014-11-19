@@ -60,8 +60,14 @@ func main() {
 
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 
-	configFactory := &factory.ConfigFactory{Client: kubeClient}
-	config := configFactory.Create()
+	configFactory := factory.NewConfigFactory(kubeClient)
+	configFactory.AddPredicate("CreateOnMinion1", scheduler.CreateOnMinion1)
+	configFactory.AddPredicate("CreateOnMinion2", scheduler.CreateOnMinion2)
+
+	config, err := configFactory.Create([]string{"CreateOnMinion2"}, nil)
+	if err != nil {
+		glog.Fatalf("Failed to create scheduler configuration: %v", err)
+	}
 	s := scheduler.New(config)
 	s.Run()
 

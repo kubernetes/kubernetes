@@ -104,8 +104,11 @@ func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, p
 // RunScheduler starts up a scheduler in it's own goroutine
 func RunScheduler(cl *client.Client) {
 	// Scheduler
-	schedulerConfigFactory := &factory.ConfigFactory{cl}
-	schedulerConfig := schedulerConfigFactory.Create()
+	schedulerConfigFactory := factory.NewConfigFactory(cl)
+	schedulerConfig, err := schedulerConfigFactory.Create(nil, nil)
+	if err != nil {
+		glog.Fatal("Couldn't create scheduler config: %v", err)
+	}
 	scheduler.New(schedulerConfig).Run()
 }
 

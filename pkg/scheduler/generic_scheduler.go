@@ -38,10 +38,15 @@ func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (str
 	if err != nil {
 		return "", err
 	}
+	if len(minions.Items) == 0 {
+		return "", fmt.Errorf("no minions available to schedule pods")
+	}
+
 	filteredNodes, err := findNodesThatFit(pod, g.pods, g.predicates, minions)
 	if err != nil {
 		return "", err
 	}
+
 	priorityList, err := g.prioritizer(pod, g.pods, FakeMinionLister(filteredNodes))
 	if err != nil {
 		return "", err
@@ -49,6 +54,7 @@ func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (str
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("failed to find a fit for pod: %v", pod)
 	}
+
 	return g.selectHost(priorityList)
 }
 
