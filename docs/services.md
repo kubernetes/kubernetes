@@ -128,7 +128,19 @@ being aware of which `pods` they are accessing.
 ![Services detailed diagram](services_detail.png)
 
 ## External Services
-For some parts of your application (e.g. your frontend) you want to expose a service on an external (publically visible) IP address.  To achieve this, you can set the ```createExternalLoadBalancer``` flag on the service.  This sets up a cloud provider specific load balancer (assuming that it is supported by your cloud provider) and also sets up IPTables rules on each host that map packets from the specified External IP address to the service proxy in the same manner as internal service IP addresses.
+For some parts of your application (e.g. your frontend) you want to expose a service on an external (publically visible) IP address.
+
+If you want your service to be exposed on an external IP address, you can optionally supply a list of "publicIPs"
+which the service should respond to.  These IP address will be combined with the Service's port and will also be 
+mapped to the set of pods selected by the service.  You are then responsible for ensuring that traffic to that 
+external IP address gets sent to one or more kubernetes worker nodes. An IPTables rules on each host that maps
+packets from the specified public IP address to the service proxy in the same manner as internal service IP
+addresses.
+
+On cloud providers which support external load balancers, there is a simpler way to achieve the same thing.  On such
+providers (e.g. GCE) you can leave ```publicIPs``` empty, and instead you can set the 
+```createExternalLoadBalancer``` flag on the service.  This sets up a cloud provider specific load balancer
+(assuming that it is supported by your cloud provider) and populates the Public IP field with the appropriate value.
 
 ## Shortcomings
 We expect that using iptables for portals will work at small scale, but will
