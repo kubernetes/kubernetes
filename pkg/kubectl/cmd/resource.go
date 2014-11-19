@@ -44,7 +44,10 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 		}
 
 		version, kind, err := mapper.VersionAndKindForResource(resource)
-		checkErr(err)
+		if err != nil {
+			// The error returned by mapper is "no resource defined", which is a usage error
+			usageError(cmd, err.Error())
+		}
 
 		mapping, err = mapper.RESTMapping(version, kind)
 		checkErr(err)
