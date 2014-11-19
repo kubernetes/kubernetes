@@ -69,8 +69,8 @@ variables will not be populated.  This restriction will be removed once DNS for
 `services` is supported.
 
 A `service`, through its label selector, can resolve to 0 or more `endpoints`.
-Over the life of a `services`, the set of `pods` which comprise that
-`services` can
+Over the life of a `service`, the set of `pods` which comprise that
+`service` can
 grow, shrink, or turn over completely.  Clients will only see issues if they are
 actively using a backend when that backend is removed from the `services` (and even
 then, open connections will persist for some protocols).
