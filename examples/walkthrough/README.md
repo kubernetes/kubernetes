@@ -10,7 +10,7 @@ See [pods](../../docs/pods.md) for more details.
 Trivially, a single container might be a pod.  For example, you can express a simple web server as a pod:
 
 ```yaml
-version: v1beta1
+apiVersion: v1beta1
 id: www
 desiredState:
   manifest:
@@ -30,7 +30,7 @@ See the [design document](../../DESIGN.md) for more details.
 Now that's great for a static web server, but what about persistent storage?  We know that the container file system only lives as long as the container does, so we need more persistent storage.  To do this, you also declare a ```volume``` as part of your pod, and mount it into a container:
 
 ```yaml
-version: v1beta1
+apiVersion: v1beta1
 id: storage
 desiredState:
   manifest:
@@ -87,7 +87,7 @@ The examples below are syntactically correct, but some of the images (e.g. kuber
 However, often you want to have two different containers that work together.  An example of this would be a web server, and a helper job that polls a git repository for new updates:
 
 ```yaml
-version: v1beta1
+apiVersion: v1beta1
 id: www
 desiredState:
   manifest:
