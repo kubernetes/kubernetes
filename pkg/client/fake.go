@@ -17,7 +17,11 @@ limitations under the License.
 package client
 
 import (
+	"net/http"
+	"net/url"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -74,4 +78,39 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-apiversions", Value: nil})
 	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
+}
+
+type HttpClientFunc func(*http.Request) (*http.Response, error)
+
+func (f HttpClientFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+// FakeRESTClient provides a fake RESTClient interface.
+type FakeRESTClient struct {
+	Client HTTPClient
+	Codec  runtime.Codec
+	Req    *http.Request
+	Resp   *http.Response
+	Err    error
+}
+
+func (c *FakeRESTClient) Get() *Request {
+	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.Codec)
+}
+func (c *FakeRESTClient) Put() *Request {
+	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, c.Codec)
+}
+func (c *FakeRESTClient) Post() *Request {
+	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.Codec)
+}
+func (c *FakeRESTClient) Delete() *Request {
+	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, c.Codec)
+}
+func (c *FakeRESTClient) Do(req *http.Request) (*http.Response, error) {
+	c.Req = req
+	if c.Client != HTTPClient(nil) {
+		return c.Client.Do(req)
+	}
+	return c.Resp, c.Err
 }
