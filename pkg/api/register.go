@@ -29,6 +29,8 @@ func init() {
 		&Pod{},
 		&ReplicationControllerList{},
 		&ReplicationController{},
+		&PerNodeControllerList{},
+		&PerNodeController{},
 		&ServiceList{},
 		&Service{},
 		&MinionList{},
@@ -52,6 +54,8 @@ func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
+func (*PerNodeController) IsAnAPIObject()         {}
+func (*PerNodeControllerList) IsAnAPIObject()     {}
 func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}

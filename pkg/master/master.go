@@ -41,13 +41,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/per_node_controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/replication_controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -94,26 +95,27 @@ type Config struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	podRegistry           pod.Registry
-	controllerRegistry    controller.Registry
-	serviceRegistry       service.Registry
-	endpointRegistry      endpoint.Registry
-	minionRegistry        minion.Registry
-	bindingRegistry       binding.Registry
-	eventRegistry         generic.Registry
-	storage               map[string]apiserver.RESTStorage
-	client                *client.Client
-	portalNet             *net.IPNet
-	mux                   apiserver.Mux
-	handlerContainer      *restful.Container
-	rootWebService        *restful.WebService
-	enableLogsSupport     bool
-	enableUISupport       bool
-	apiPrefix             string
-	corsAllowedOriginList util.StringList
-	tokenAuthFile         string
-	authorizer            authorizer.Authorizer
-	masterCount           int
+	podRegistry                   pod.Registry
+	perNodeControllerRegistry     per_node_controller.Registry
+	replicationControllerRegistry replication_controller.Registry
+	serviceRegistry               service.Registry
+	endpointRegistry              endpoint.Registry
+	minionRegistry                minion.Registry
+	bindingRegistry               binding.Registry
+	eventRegistry                 generic.Registry
+	storage                       map[string]apiserver.RESTStorage
+	client                        *client.Client
+	portalNet                     *net.IPNet
+	mux                           apiserver.Mux
+	handlerContainer              *restful.Container
+	rootWebService                *restful.WebService
+	enableLogsSupport             bool
+	enableUISupport               bool
+	apiPrefix                     string
+	corsAllowedOriginList         util.StringList
+	tokenAuthFile                 string
+	authorizer                    authorizer.Authorizer
+	masterCount                   int
 
 	readOnlyServer  string
 	readWriteServer string
@@ -226,24 +228,25 @@ func New(c *Config) *Master {
 	}
 	mx := http.NewServeMux()
 	m := &Master{
-		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
-		serviceRegistry:       serviceRegistry,
-		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
-		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
-		minionRegistry:        minionRegistry,
-		client:                c.Client,
-		portalNet:             c.PortalNet,
-		mux:                   mx,
-		handlerContainer:      NewHandlerContainer(mx),
-		rootWebService:        new(restful.WebService),
-		enableLogsSupport:     c.EnableLogsSupport,
-		enableUISupport:       c.EnableUISupport,
-		apiPrefix:             c.APIPrefix,
-		corsAllowedOriginList: c.CorsAllowedOriginList,
-		tokenAuthFile:         c.TokenAuthFile,
-		authorizer:            c.Authorizer,
+		podRegistry:                   etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
+		perNodeControllerRegistry:     etcd.NewRegistry(c.EtcdHelper, nil),
+		replicationControllerRegistry: etcd.NewRegistry(c.EtcdHelper, nil),
+		serviceRegistry:               serviceRegistry,
+		endpointRegistry:              etcd.NewRegistry(c.EtcdHelper, nil),
+		bindingRegistry:               etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
+		eventRegistry:                 event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
+		minionRegistry:                minionRegistry,
+		client:                        c.Client,
+		portalNet:                     c.PortalNet,
+		mux:                           mx,
+		handlerContainer:              NewHandlerContainer(mx),
+		rootWebService:                new(restful.WebService),
+		enableLogsSupport:             c.EnableLogsSupport,
+		enableUISupport:               c.EnableUISupport,
+		apiPrefix:                     c.APIPrefix,
+		corsAllowedOriginList:         c.CorsAllowedOriginList,
+		tokenAuthFile:                 c.TokenAuthFile,
+		authorizer:                    c.Authorizer,
 
 		masterCount:     c.MasterCount,
 		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
@@ -327,7 +330,8 @@ func (m *Master) init(c *Config) {
 			Registry:      m.podRegistry,
 			Minions:       m.client.Minions(),
 		}),
-		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
+		"perNodeControllers":     per_node_controller.NewREST(m.perNodeControllerRegistry, m.podRegistry),
+		"replicationControllers": replication_controller.NewREST(m.replicationControllerRegistry, m.podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                minion.NewREST(m.minionRegistry),

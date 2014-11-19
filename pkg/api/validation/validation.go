@@ -489,6 +489,47 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 	return allErrs
 }
 
+// ValidatePerNodeController tests if required fields in the replication controller are set.
+func ValidatePerNodeController(controller *api.PerNodeController) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(controller.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", controller.Name))
+	}
+	if !util.IsDNSSubdomain(controller.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
+	}
+	allErrs = append(allErrs, ValidatePerNodeControllerSpec(&controller.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, validateLabels(controller.Labels)...)
+	return allErrs
+}
+
+// ValidatePerNodeControllerSpec tests if required fields in the replication controller spec are set.
+func ValidatePerNodeControllerSpec(spec *api.PerNodeControllerSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	selector := labels.Set(spec.Selector).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector", spec.Selector))
+	}
+
+	if spec.Template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("template", spec.Template))
+	} else {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels))
+		}
+		allErrs = append(allErrs, validateLabels(spec.Template.Labels).Prefix("template.labels")...)
+		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+		// TODO: Provide better error message, current message is not intuitive:
+		// e.g. "spec.template.restartPolicy: invalid value '{<nil> <nil> 0xe68308}"
+		if spec.Template.Spec.RestartPolicy.OnFailure != nil || spec.Template.Spec.RestartPolicy.Never != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.restartPolicy", spec.Template.Spec.RestartPolicy))
+		}
+	}
+	return allErrs
+}
+
 // ValidatePodTemplateSpec validates the spec of a pod template
 func ValidatePodTemplateSpec(spec *api.PodTemplateSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}

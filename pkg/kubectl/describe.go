@@ -42,6 +42,8 @@ func DescriberFor(kind string, c *client.Client) (Describer, bool) {
 		return &PodDescriber{c}, true
 	case "ReplicationController":
 		return &ReplicationControllerDescriber{c}, true
+	case "PerNodeController":
+		return &PerNodeControllerDescriber{c}, true
 	case "Service":
 		return &ServiceDescriber{c}, true
 	case "Minion", "Node":
@@ -57,6 +59,7 @@ type PodDescriber struct {
 }
 
 func (d *PodDescriber) Describe(namespace, name string) (string, error) {
+	//FIXME: also per-node controllers?
 	rc := d.ReplicationControllers(namespace)
 	pc := d.Pods(namespace)
 
@@ -130,6 +133,42 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
+		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		if events != nil {
+			describeEvents(events, out)
+		}
+		return nil
+	})
+}
+
+// PerNodeControllerDescriber generates information about a per-node controller
+// and the pods it has created.
+type PerNodeControllerDescriber struct {
+	client.Interface
+}
+
+func (d *PerNodeControllerDescriber) Describe(namespace, name string) (string, error) {
+	rc := d.PerNodeControllers(namespace)
+	pc := d.Pods(namespace)
+
+	controller, err := rc.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	running, waiting, succeeded, failed, err := getPodStatusForPerNodeController(pc, controller)
+	if err != nil {
+		return "", err
+	}
+
+	events, _ := d.Events(namespace).Search(controller)
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
+		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.Spec.Selector))
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
+		fmt.Fprintf(out, "Replicas:\t%d current\n", controller.Status.Replicas) //FIXME: print #nodes as desired
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
 			describeEvents(events, out)
@@ -242,6 +281,26 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 }
 
 func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, succeeded, failed int, err error) {
+	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector))
+	if err != nil {
+		return
+	}
+	for _, pod := range rcPods.Items {
+		switch pod.CurrentState.Status {
+		case api.PodRunning:
+			running++
+		case api.PodPending:
+			waiting++
+		case api.PodSucceeded:
+			succeeded++
+		case api.PodFailed:
+			failed++
+		}
+	}
+	return
+}
+
+func getPodStatusForPerNodeController(c client.PodInterface, controller *api.PerNodeController) (running, waiting, succeeded, failed int, err error) {
 	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector))
 	if err != nil {
 		return

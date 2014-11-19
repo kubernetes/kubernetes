@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package per_node_controller
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// Registry is an interface for things that know how to store ReplicationControllers.
+// Registry is an interface for things that know how to store PerNodeControllers.
 type Registry interface {
-	ListControllers(ctx api.Context) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error)
-	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
-	CreateController(ctx api.Context, controller *api.ReplicationController) error
-	UpdateController(ctx api.Context, controller *api.ReplicationController) error
-	DeleteController(ctx api.Context, controllerID string) error
+	ListPerNodeControllers(ctx api.Context) (*api.PerNodeControllerList, error)
+	WatchPerNodeControllers(ctx api.Context, resourceVersion string) (watch.Interface, error)
+	GetPerNodeController(ctx api.Context, controllerID string) (*api.PerNodeController, error)
+	CreatePerNodeController(ctx api.Context, controller *api.PerNodeController) error
+	UpdatePerNodeController(ctx api.Context, controller *api.PerNodeController) error
+	DeletePerNodeController(ctx api.Context, controllerID string) error
 }

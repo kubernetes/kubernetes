@@ -32,7 +32,8 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=$(mktemp -d -t test-etcd.XXXXXX)
-  etcd -name test -data-dir ${ETCD_DIR} -addr ${host}:${port} >/dev/null 2>/dev/null &
+  #etcd -name test -data-dir ${ETCD_DIR} -addr ${host}:${port} >/dev/null 2>/dev/null &
+  etcd >/dev/null 2>/dev/null &
   ETCD_PID=$!
 
   kube::util::wait_for_url "http://${host}:${port}/v2/keys/" "etcd: "

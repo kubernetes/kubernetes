@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package replication_controller
 
 import (
 	"fmt"
@@ -58,7 +58,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
-		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
+		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("ReplicationController.Namespace does not match the provided context"))
 	}
 
 	if len(controller.Name) == 0 {
@@ -71,24 +71,24 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	api.FillObjectMetaSystemFields(ctx, &controller.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.CreateController(ctx, controller)
+		err := rs.registry.CreateReplicationController(ctx, controller)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(ctx, controller.Name)
+		return rs.registry.GetReplicationController(ctx, controller.Name)
 	}), nil
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(ctx, id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteReplicationController(ctx, id)
 	}), nil
 }
 
 // Get obtains the ReplicationController specified by its id.
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	controller, err := rs.registry.GetController(ctx, id)
+	controller, err := rs.registry.GetReplicationController(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
-	controllers, err := rs.registry.ListControllers(ctx)
+	controllers, err := rs.registry.ListReplicationControllers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -129,17 +129,17 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
-		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
+		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("ReplicationController.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateController(ctx, controller)
+		err := rs.registry.UpdateReplicationController(ctx, controller)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(ctx, controller.Name)
+		return rs.registry.GetReplicationController(ctx, controller.Name)
 	}), nil
 }
 
@@ -149,7 +149,7 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}
-	incoming, err := rs.registry.WatchControllers(ctx, resourceVersion)
+	incoming, err := rs.registry.WatchReplicationControllers(ctx, resourceVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -167,20 +167,6 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 		}
 		return e, match
 	}), nil
-}
-
-func (rs *REST) waitForController(ctx api.Context, controller *api.ReplicationController) (runtime.Object, error) {
-	for {
-		pods, err := rs.podLister.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
-		if err != nil {
-			return controller, err
-		}
-		if len(pods.Items) == controller.Spec.Replicas {
-			break
-		}
-		time.Sleep(rs.pollPeriod)
-	}
-	return controller, nil
 }
 
 func (rs *REST) fillCurrentState(ctx api.Context, controller *api.ReplicationController) error {

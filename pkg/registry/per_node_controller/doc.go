@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package controller provides Registry interface and it's RESTStorage
-// implementation for storing ReplicationController api objects.
-package controller
+// Package per_node_controller provides Registry interface and its
+// RESTStorage implementation for storing PerNodeController api objects.
+package per_node_controller

@@ -148,6 +148,7 @@ func ExpandResourceShortcut(resource string) string {
 	shortForms := map[string]string{
 		"po": "pods",
 		"rc": "replicationcontrollers",
+		"pc": "pernodecontrollers",
 		"se": "services",
 		"mi": "minions",
 		"ev": "events",

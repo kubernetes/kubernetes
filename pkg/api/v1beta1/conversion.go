@@ -307,6 +307,66 @@ func init() {
 			return nil
 		},
 
+		func(in *newer.PerNodeController, out *PerNodeController, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			out.Status.Replicas = in.Status.Replicas
+			return nil
+		},
+		func(in *PerNodeController, out *newer.PerNodeController, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			out.Status.Replicas = in.Status.Replicas
+			return nil
+		},
+
+		func(in *newer.PerNodeControllerSpec, out *PerNodeControllerSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+				return err
+			}
+			if in.TemplateRef != nil && in.Template == nil {
+				return errors.New("objects with a template ref cannot be converted to older objects, must populate template")
+			}
+			if in.Template != nil {
+				if err := s.Convert(in.Template, &out.Template, 0); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		func(in *PerNodeControllerSpec, out *newer.PerNodeControllerSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+				return err
+			}
+			out.Template = &newer.PodTemplateSpec{}
+			if err := s.Convert(&in.Template, out.Template, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
 		func(in *newer.PodTemplateSpec, out *PodTemplate, s conversion.Scope) error {
 			if err := s.Convert(&in.Spec, &out.DesiredState.Manifest, 0); err != nil {
 				return err
@@ -628,6 +688,25 @@ func init() {
 			return s.Convert(&in.Items, &out.Items, 0)
 		},
 		func(in *ReplicationControllerList, out *newer.ReplicationControllerList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.PerNodeControllerList, out *PerNodeControllerList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *PerNodeControllerList, out *newer.PerNodeControllerList, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}

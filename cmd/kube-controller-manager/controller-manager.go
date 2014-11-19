@@ -30,6 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	//FIXME: move minion to pkg.controller
+	//FIXME: rename these imports
 	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -96,6 +98,9 @@ func main() {
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
+
+	perNoderManager := replicationControllerPkg.NewPerNodeManager(kubeClient)
+	perNoderManager.Run(10 * time.Second)
 
 	cloud := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 	nodeResources := &api.NodeResources{

@@ -215,6 +215,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 
 var podColumns = []string{"NAME", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
 var replicationControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR", "REPLICAS"}
+var perNodeControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
 var minionColumns = []string{"NAME"}
 var statusColumns = []string{"STATUS"}
@@ -226,6 +227,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, printPodList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
+	h.Handler(perNodeControllerColumns, printPerNodeController)
+	h.Handler(perNodeControllerColumns, printPerNodeControllerList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(minionColumns, printMinion)
@@ -302,6 +305,22 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer) error {
 	for _, controller := range list.Items {
 		if err := printReplicationController(&controller, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPerNodeController(controller *api.PerNodeController, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
+		controller.Name, makeImageList(&controller.Spec.Template.Spec),
+		labels.Set(controller.Spec.Selector))
+	return err
+}
+
+func printPerNodeControllerList(list *api.PerNodeControllerList, w io.Writer) error {
+	for _, controller := range list.Items {
+		if err := printPerNodeController(&controller, w); err != nil {
 			return err
 		}
 	}

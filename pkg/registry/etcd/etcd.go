@@ -36,8 +36,10 @@ import (
 const (
 	// PodPath is the path to pod resources in etcd
 	PodPath string = "/registry/pods"
-	// ControllerPath is the path to controller resources in etcd
-	ControllerPath string = "/registry/controllers"
+	// ReplicationControllerPath is the path to replication controller resources in etcd
+	ReplicationControllerPath string = "/registry/controllers" //FIXME: move to replication_controllers?
+	// PerNodeControllerPath is the path to per-node controller resources in etcd
+	PerNodeControllerPath string = "/registry/per_node_controllers"
 	// ServicePath is the path to service resources in etcd
 	ServicePath string = "/registry/services/specs"
 	// ServiceEndpointPath is the path to service endpoints resources in etcd
@@ -328,38 +330,38 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 	})
 }
 
-// ListControllers obtains a list of ReplicationControllers.
-func (r *Registry) ListControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
+// ListReplicationControllers obtains a list of ReplicationControllers.
+func (r *Registry) ListReplicationControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
 	controllers := &api.ReplicationControllerList{}
-	key := makeControllerListKey(ctx)
+	key := makeReplicationControllerListKey(ctx)
 	err := r.ExtractToList(key, controllers)
 	return controllers, err
 }
 
-// WatchControllers begins watching for new, changed, or deleted controllers.
-func (r *Registry) WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
+// WatchReplicationControllers begins watching for new, changed, or deleted controllers.
+func (r *Registry) WatchReplicationControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, "replicationControllers")
 	if err != nil {
 		return nil, err
 	}
-	key := makeControllerListKey(ctx)
+	key := makeReplicationControllerListKey(ctx)
 	return r.WatchList(key, version, tools.Everything)
 }
 
-// makeControllerListKey constructs etcd paths to controller directories enforcing namespace rules.
-func makeControllerListKey(ctx api.Context) string {
-	return MakeEtcdListKey(ctx, ControllerPath)
+// makeReplicationControllerListKey constructs etcd paths to controller directories enforcing namespace rules.
+func makeReplicationControllerListKey(ctx api.Context) string {
+	return MakeEtcdListKey(ctx, ReplicationControllerPath)
 }
 
-// makeControllerKey constructs etcd paths to controller items enforcing namespace rules.
-func makeControllerKey(ctx api.Context, id string) (string, error) {
-	return MakeEtcdItemKey(ctx, ControllerPath, id)
+// makeReplicationControllerKey constructs etcd paths to controller items enforcing namespace rules.
+func makeReplicationControllerKey(ctx api.Context, id string) (string, error) {
+	return MakeEtcdItemKey(ctx, ReplicationControllerPath, id)
 }
 
-// GetController gets a specific ReplicationController specified by its ID.
-func (r *Registry) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
+// GetReplicationController gets a specific ReplicationController specified by its ID.
+func (r *Registry) GetReplicationController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
-	key, err := makeControllerKey(ctx, controllerID)
+	key, err := makeReplicationControllerKey(ctx, controllerID)
 	if err != nil {
 		return nil, err
 	}
@@ -370,9 +372,9 @@ func (r *Registry) GetController(ctx api.Context, controllerID string) (*api.Rep
 	return &controller, nil
 }
 
-// CreateController creates a new ReplicationController.
-func (r *Registry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
-	key, err := makeControllerKey(ctx, controller.Name)
+// CreateReplicationController creates a new ReplicationController.
+func (r *Registry) CreateReplicationController(ctx api.Context, controller *api.ReplicationController) error {
+	key, err := makeReplicationControllerKey(ctx, controller.Name)
 	if err != nil {
 		return err
 	}
@@ -380,9 +382,9 @@ func (r *Registry) CreateController(ctx api.Context, controller *api.Replication
 	return etcderr.InterpretCreateError(err, "replicationController", controller.Name)
 }
 
-// UpdateController replaces an existing ReplicationController.
-func (r *Registry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
-	key, err := makeControllerKey(ctx, controller.Name)
+// UpdateReplicationController replaces an existing ReplicationController.
+func (r *Registry) UpdateReplicationController(ctx api.Context, controller *api.ReplicationController) error {
+	key, err := makeReplicationControllerKey(ctx, controller.Name)
 	if err != nil {
 		return err
 	}
@@ -390,9 +392,81 @@ func (r *Registry) UpdateController(ctx api.Context, controller *api.Replication
 	return etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
 }
 
-// DeleteController deletes a ReplicationController specified by its ID.
-func (r *Registry) DeleteController(ctx api.Context, controllerID string) error {
-	key, err := makeControllerKey(ctx, controllerID)
+// DeleteReplicationController deletes a ReplicationController specified by its ID.
+func (r *Registry) DeleteReplicationController(ctx api.Context, controllerID string) error {
+	key, err := makeReplicationControllerKey(ctx, controllerID)
+	if err != nil {
+		return err
+	}
+	err = r.Delete(key, false)
+	return etcderr.InterpretDeleteError(err, "replicationController", controllerID)
+}
+
+// ListPerNodeControllers obtains a list of PerNodeControllers.
+func (r *Registry) ListPerNodeControllers(ctx api.Context) (*api.PerNodeControllerList, error) {
+	controllers := &api.PerNodeControllerList{}
+	key := makePerNodeControllerListKey(ctx)
+	err := r.ExtractToList(key, controllers)
+	return controllers, err
+}
+
+// WatchPerNodeControllers begins watching for new, changed, or deleted controllers.
+func (r *Registry) WatchPerNodeControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "replicationControllers")
+	if err != nil {
+		return nil, err
+	}
+	key := makePerNodeControllerListKey(ctx)
+	return r.WatchList(key, version, tools.Everything)
+}
+
+// makePerNodeControllerListKey constructs etcd paths to controller directories enforcing namespace rules.
+func makePerNodeControllerListKey(ctx api.Context) string {
+	return MakeEtcdListKey(ctx, PerNodeControllerPath)
+}
+
+// makePerNodeControllerKey constructs etcd paths to controller items enforcing namespace rules.
+func makePerNodeControllerKey(ctx api.Context, id string) (string, error) {
+	return MakeEtcdItemKey(ctx, PerNodeControllerPath, id)
+}
+
+// GetPerNodeController gets a specific PerNodeController specified by its ID.
+func (r *Registry) GetPerNodeController(ctx api.Context, controllerID string) (*api.PerNodeController, error) {
+	var controller api.PerNodeController
+	key, err := makePerNodeControllerKey(ctx, controllerID)
+	if err != nil {
+		return nil, err
+	}
+	err = r.ExtractObj(key, &controller, false)
+	if err != nil {
+		return nil, etcderr.InterpretGetError(err, "replicationController", controllerID)
+	}
+	return &controller, nil
+}
+
+// CreatePerNodeController creates a new PerNodeController.
+func (r *Registry) CreatePerNodeController(ctx api.Context, controller *api.PerNodeController) error {
+	key, err := makePerNodeControllerKey(ctx, controller.Name)
+	if err != nil {
+		return err
+	}
+	err = r.CreateObj(key, controller, 0)
+	return etcderr.InterpretCreateError(err, "replicationController", controller.Name)
+}
+
+// UpdatePerNodeController replaces an existing PerNodeController.
+func (r *Registry) UpdatePerNodeController(ctx api.Context, controller *api.PerNodeController) error {
+	key, err := makePerNodeControllerKey(ctx, controller.Name)
+	if err != nil {
+		return err
+	}
+	err = r.SetObj(key, controller)
+	return etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
+}
+
+// DeletePerNodeController deletes a PerNodeController specified by its ID.
+func (r *Registry) DeletePerNodeController(ctx api.Context, controllerID string) error {
+	key, err := makePerNodeControllerKey(ctx, controllerID)
 	if err != nil {
 		return err
 	}

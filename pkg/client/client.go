@@ -29,6 +29,7 @@ import (
 type Interface interface {
 	PodsNamespacer
 	ReplicationControllersNamespacer
+	PerNodeControllersNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
 	VersionInterface
@@ -38,6 +39,10 @@ type Interface interface {
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	return newReplicationControllers(c, namespace)
+}
+
+func (c *Client) PerNodeControllers(namespace string) PerNodeControllerInterface {
+	return newPerNodeControllers(c, namespace)
 }
 
 func (c *Client) Minions() MinionInterface {

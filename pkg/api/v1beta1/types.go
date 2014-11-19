@@ -438,6 +438,53 @@ type ReplicationController struct {
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
+// PerNodeControllerSpec is the specification of a per-node pod controller.
+// As the internal representation of a per-node controller, it may have either
+// a TemplateRef or a Template set.
+type PerNodeControllerSpec struct {
+	//FIXME: how does it know whether it has already done a node or not?
+	//Maybe an automatic kubernetes.io/per-node-controller=uuid label?
+	// Selector is a label query over pods on each node that match this
+	// controller.
+	Selector map[string]string `json:"selector" yaml:"selector"`
+	//FIXME: need a node selector, too?
+
+	// TemplateRef is a reference to an object that describes the pod
+	// that will be created on each node. This reference is ignored if a
+	// Template is set.  Must be set before converting to a v1beta3 API
+	// object
+	Template PodTemplate `json:"template,omitempty" yaml:"template,omitempty"`
+}
+
+// PerNodeControllerStatus represents the current status of a per-node
+// controller.
+type PerNodeControllerStatus struct {
+	// Replicas is the number of actual replicas.
+	//FIXME: not implemented properly?  Not meaningful?
+	Replicas int `json:"replicas" yaml:"replicas"`
+}
+
+// PerNodeController represents the configuration of a per-node controller.
+type PerNodeController struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Spec defines the desired behavior of this per-node controller.
+	Spec PerNodeControllerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+
+	// Status is the current status of this per-node controller. This data may be
+	// out of date by some window of time.
+	Status PerNodeControllerStatus `json:"status,omitempty" yaml:"status,omitempty"`
+
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+}
+
+// PerNodeControllerList is a collection of replication controllers.
+type PerNodeControllerList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	Items []PerNodeController `json:"items" yaml:"items"`
+}
+
 // PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
 	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
