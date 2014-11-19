@@ -426,40 +426,13 @@ function kube-up {
 
     printf "\n"
     echo "Kubernetes cluster created."
-    echo "Sanity checking cluster..."
-
-    # Wait for salt on the minions
-    sleep 30
-
-    # Basic sanity checking
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        # Make sure docker is installed
-        echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
-            $AZ_CS.cloudapp.net which docker > /dev/null || {
-            echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo "cluster. (sorry!)" >&2
-            exit 1
-        }
-    done
-
-    echo
-    echo "Kubernetes cluster is running.  The master is running at:"
-    echo
-    echo "  https://${KUBE_MASTER_IP}"
-    echo
-    echo "The user name and password to use is located in ~/.kubernetes_auth."
-    echo
-
-    echo "--> nginx auth"
 
     local kube_cert=".kubecfg.crt"
     local kube_key=".kubecfg.key"
     local ca_cert=".kubernetes.ca.crt"
 
     # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-# config file.  Distribute the same way the htpasswd is done.
+    # config file.  Distribute the same way the htpasswd is done.
 (umask 077
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
         sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
@@ -481,6 +454,31 @@ EOF
     chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
         "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
 )
+
+    # Wait for salt on the minions
+    sleep 30
+
+    echo "Sanity checking cluster..."
+    # Basic sanity checking
+    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+        # Make sure docker is installed
+        echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
+            $AZ_CS.cloudapp.net which docker > /dev/null || {
+            echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
+            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo "cluster. (sorry!)" >&2
+            exit 1
+        }
+    done
+
+    echo
+    echo "Kubernetes cluster is running.  The master is running at:"
+    echo
+    echo "  https://${KUBE_MASTER_IP}"
+    echo
+    echo "The user name and password to use is located in ~/.kubernetes_auth."
+    echo
 }
 
 # Delete a kubernetes cluster
