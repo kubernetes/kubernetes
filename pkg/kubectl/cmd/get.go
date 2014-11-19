@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+
 	"github.com/spf13/cobra"
 )
 
@@ -66,27 +66,29 @@ Examples:
 			if len(outputVersion) == 0 {
 				outputVersion = mapping.APIVersion
 			}
-			printer, err := kubectl.GetPrinter(outputVersion, outputFormat, templateFile, defaultPrinter)
+
+			printer, err := kubectl.GetPrinter(outputFormat, templateFile, outputVersion, mapping.ObjectConvertor, defaultPrinter)
 			checkErr(err)
 
 			restHelper := kubectl.NewRESTHelper(client, mapping)
 			obj, err := restHelper.Get(namespace, name, labelSelector)
 			checkErr(err)
 
-			if !GetFlagBool(cmd, "watch-only") {
+			isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch-only")
+
+			// print the current object
+			if !isWatchOnly {
 				if err := printer.PrintObj(obj, out); err != nil {
 					checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
 				}
 			}
 
-			if GetFlagBool(cmd, "watch") || GetFlagBool(cmd, "watch-only") {
-				vi, err := latest.InterfacesFor(outputVersion)
+			// print watched changes
+			if isWatch || isWatchOnly {
+				rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
 				checkErr(err)
 
-				rv, err := vi.MetadataAccessor.ResourceVersion(obj)
-				checkErr(err)
-
-				w, err := restHelper.Watch(namespace, rv, labelSelector, labels.Set{}.AsSelector())
+				w, err := restHelper.Watch(namespace, rv, labelSelector, labels.Everything())
 				checkErr(err)
 
 				kubectl.WatchLoop(w, printer, out)

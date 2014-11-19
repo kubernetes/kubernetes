@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -33,39 +32,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
-
-type httpClientFunc func(*http.Request) (*http.Response, error)
-
-func (f httpClientFunc) Do(req *http.Request) (*http.Response, error) {
-	return f(req)
-}
-
-type FakeRESTClient struct {
-	Client client.HTTPClient
-	Req    *http.Request
-	Resp   *http.Response
-	Err    error
-}
-
-func (c *FakeRESTClient) Get() *client.Request {
-	return client.NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Codec())
-}
-func (c *FakeRESTClient) Put() *client.Request {
-	return client.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Codec())
-}
-func (c *FakeRESTClient) Post() *client.Request {
-	return client.NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Codec())
-}
-func (c *FakeRESTClient) Delete() *client.Request {
-	return client.NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Codec())
-}
-func (c *FakeRESTClient) Do(req *http.Request) (*http.Response, error) {
-	c.Req = req
-	if c.Client != client.HTTPClient(nil) {
-		return c.Client.Do(req)
-	}
-	return c.Resp, c.Err
-}
 
 func objBody(obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), obj))))
@@ -112,9 +78,10 @@ func TestRESTHelperDelete(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client := &FakeRESTClient{
-			Resp: test.Resp,
-			Err:  test.HttpErr,
+		client := &client.FakeRESTClient{
+			Codec: testapi.Codec(),
+			Resp:  test.Resp,
+			Err:   test.HttpErr,
 		}
 		modifier := &RESTHelper{
 			RESTClient: client,
@@ -147,7 +114,7 @@ func TestRESTHelperCreate(t *testing.T) {
 
 	tests := []struct {
 		Resp     *http.Response
-		RespFunc httpClientFunc
+		RespFunc client.HttpClientFunc
 		HttpErr  error
 		Modify   bool
 		Object   runtime.Object
@@ -192,9 +159,10 @@ func TestRESTHelperCreate(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		client := &FakeRESTClient{
-			Resp: test.Resp,
-			Err:  test.HttpErr,
+		client := &client.FakeRESTClient{
+			Codec: testapi.Codec(),
+			Resp:  test.Resp,
+			Err:   test.HttpErr,
 		}
 		if test.RespFunc != nil {
 			client.Client = test.RespFunc
@@ -275,9 +243,10 @@ func TestRESTHelperGet(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client := &FakeRESTClient{
-			Resp: test.Resp,
-			Err:  test.HttpErr,
+		client := &client.FakeRESTClient{
+			Codec: testapi.Codec(),
+			Resp:  test.Resp,
+			Err:   test.HttpErr,
 		}
 		modifier := &RESTHelper{
 			RESTClient: client,
@@ -317,7 +286,7 @@ func TestRESTHelperUpdate(t *testing.T) {
 
 	tests := []struct {
 		Resp      *http.Response
-		RespFunc  httpClientFunc
+		RespFunc  client.HttpClientFunc
 		HttpErr   error
 		Overwrite bool
 		Object    runtime.Object
@@ -368,9 +337,10 @@ func TestRESTHelperUpdate(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		client := &FakeRESTClient{
-			Resp: test.Resp,
-			Err:  test.HttpErr,
+		client := &client.FakeRESTClient{
+			Codec: testapi.Codec(),
+			Resp:  test.Resp,
+			Err:   test.HttpErr,
 		}
 		if test.RespFunc != nil {
 			client.Client = test.RespFunc

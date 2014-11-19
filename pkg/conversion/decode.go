@@ -36,6 +36,9 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	if version == "" && s.InternalVersion != "" {
 		return nil, fmt.Errorf("version not set in '%s'", string(data))
 	}
+	if kind == "" {
+		return nil, fmt.Errorf("kind not set in '%s'", string(data))
+	}
 	obj, err := s.NewObject(version, kind)
 	if err != nil {
 		return nil, err
