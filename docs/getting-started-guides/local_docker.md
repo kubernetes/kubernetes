@@ -37,8 +37,9 @@ docker run -v /var/run/docker.sock:/var/run/docker.sock kubernetes-bootstrap
 ### Build kubernetes client
 
 ```
-./build/make-client.sh
+./hack/build-go.sh
 # set $host_os and $host_arch to match your local host os and architecture.
+host_os=linux host_arch=amd64
 export PATH=$(readlink -f _output/build/$host_os/$host_arch):$PATH
 ```
 
