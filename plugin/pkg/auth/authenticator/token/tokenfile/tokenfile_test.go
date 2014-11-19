@@ -109,5 +109,5 @@ func newWithContents(t *testing.T, contents string) (auth *TokenAuthenticator, e
 		t.Fatalf("unexpected error writing tokenfile: %v", err)
 	}
 
-	return New(f.Name())
+	return NewCSV(f.Name())
 }
