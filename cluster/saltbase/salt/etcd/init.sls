@@ -24,7 +24,7 @@ etcd-tar:
     - source_hash: {{ etcd_tar_hash }}
     - archive_format: tar
     - if_missing: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
-    - tar_options: z
+    - tar_options: xz
   file.directory:
     - name: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
     - user: root
