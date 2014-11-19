@@ -35,7 +35,7 @@ func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.Mini
 	}
 	for i := range minions {
 		list.Items[i].Name = minions[i]
-		list.Items[i].NodeResources = nodeResources
+		list.Items[i].Spec.Capacity = nodeResources.Capacity
 	}
 	return &list
 }

@@ -637,30 +637,42 @@ type EndpointsList struct {
 	Items []Endpoints `json:"items" yaml:"items"`
 }
 
-// NodeResources represents resources on a Kubernetes system node
+// NodeSpec describes the attributes that a node is created with.
+type NodeSpec struct {
+	// Capacity represents the available resources of a node
+	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+}
+
+// NodeStatus is information about the current status of a node.
+type NodeStatus struct {
+	// Queried from cloud provider, if available.
+	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
+}
+
+// NodeResources is an object for conveying resource information about a node.
 // see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+// TODO: Use ResourceList instead?
 type NodeResources struct {
-	// Capacity represents the available resources.
+	// Capacity represents the available resources of a node
 	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 }
 
 type ResourceName string
 
-// TODO Replace this with a more complete "Quantity" struct
 type ResourceList map[ResourceName]util.IntOrString
 
-// Minion is a worker node in Kubernetenes.
-// The name of the minion according to etcd is in ID.
+// Minion is a worker node in Kubernetenes
+// The name of the minion according to etcd is in ObjectMeta.Name.
+// TODO: Rename to Node
 type Minion struct {
 	TypeMeta   `json:",inline" yaml:",inline"`
 	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	// Queried from cloud provider, if available.
-	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
-	// Resources available on the node
-	NodeResources NodeResources `json:"resources,omitempty" yaml:"resources,omitempty"`
-	// Labels for the node
-	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	// Spec defines the behavior of a node.
+	Spec NodeSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+
+	// Status describes the current status of a Node
+	Status NodeStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // MinionList is a list of minions.

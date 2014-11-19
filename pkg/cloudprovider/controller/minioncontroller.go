@@ -70,8 +70,10 @@ func (s *MinionController) SyncStatic(period time.Duration) error {
 				continue
 			}
 			_, err := s.kubeClient.Minions().Create(&api.Minion{
-				ObjectMeta:    api.ObjectMeta{Name: minionID},
-				NodeResources: *s.staticResources,
+				ObjectMeta: api.ObjectMeta{Name: minionID},
+				Spec: api.NodeSpec{
+					Capacity: s.staticResources.Capacity,
+				},
 			})
 			if err == nil {
 				registered.Insert(minionID)
@@ -145,7 +147,7 @@ func (s *MinionController) cloudMinions() (*api.MinionList, error) {
 			resources = s.staticResources
 		}
 		if resources != nil {
-			result.Items[i].NodeResources = *resources
+			result.Items[i].Spec.Capacity = resources.Capacity
 		}
 	}
 	return result, nil

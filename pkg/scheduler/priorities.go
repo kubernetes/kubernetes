@@ -41,8 +41,8 @@ func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
 		}
 	}
 
-	percentageCPU := calculatePercentage(totalCPU, resources.GetIntegerResource(node.NodeResources.Capacity, resources.CPU, 0))
-	percentageMemory := calculatePercentage(totalMemory, resources.GetIntegerResource(node.NodeResources.Capacity, resources.Memory, 0))
+	percentageCPU := calculatePercentage(totalCPU, resources.GetIntegerResource(node.Spec.Capacity, resources.CPU, 0))
+	percentageMemory := calculatePercentage(totalMemory, resources.GetIntegerResource(node.Spec.Capacity, resources.Memory, 0))
 	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Percentage:(%d\\%m, %d\\%)", totalCPU, totalMemory, percentageCPU, percentageMemory)
 
 	return HostPriority{

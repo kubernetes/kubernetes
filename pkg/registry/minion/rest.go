@@ -135,7 +135,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	host := minion.HostIP
+	host := minion.Status.HostIP
 	if host == "" {
 		host = minion.Name
 	}

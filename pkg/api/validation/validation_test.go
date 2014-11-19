@@ -1033,13 +1033,19 @@ func TestValidateMinion(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []api.Minion{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc"},
-			HostIP:     "something",
-			Labels:     validSelector,
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc",
+				Labels: validSelector,
+			},
+			Status: api.NodeStatus{
+				HostIP: "something",
+			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
-			HostIP:     "something",
+			Status: api.NodeStatus{
+				HostIP: "something",
+			},
 		},
 	}
 	for _, successCase := range successCases {
@@ -1050,13 +1056,19 @@ func TestValidateMinion(t *testing.T) {
 
 	errorCases := map[string]api.Minion{
 		"zero-length Name": {
-			ObjectMeta: api.ObjectMeta{Name: ""},
-			HostIP:     "something",
-			Labels:     validSelector,
+			ObjectMeta: api.ObjectMeta{
+				Name:   "",
+				Labels: validSelector,
+			},
+			Status: api.NodeStatus{
+				HostIP: "something",
+			},
 		},
 		"invalid-labels": {
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Labels:     invalidSelector,
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: invalidSelector,
+			},
 		},
 	}
 	for k, v := range errorCases {

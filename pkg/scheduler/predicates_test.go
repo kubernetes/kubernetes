@@ -111,7 +111,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Minion{NodeResources: makeResources(10, 20)}
+		node := api.Minion{Spec: api.NodeSpec{Capacity: makeResources(10, 20).Capacity}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
@@ -335,7 +335,7 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Minion{Labels: test.labels}
+		node := api.Minion{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 
 		fit := NodeSelector{FakeNodeInfo(node)}
 		fits, err := fit.PodSelectorMatches(test.pod, []api.Pod{}, "machine")
