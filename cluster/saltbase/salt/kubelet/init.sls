@@ -38,6 +38,8 @@
 
 {% endif %}
 
+{% if grains.cloud is defined %}
+{% if grains.cloud == 'gce' %}
 # Kubelet will run without this file but will not be able to send events to the apiserver.
 /var/lib/kubelet/kubernetes_auth:
   file.managed:
@@ -45,6 +47,8 @@
     - user: root
     - group: root
     - mode: 400
+{% endif %}
+{% endif %}
 
 kubelet:
   group.present:
@@ -65,5 +69,9 @@ kubelet:
 {% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/kubelet
 {% endif %}
+{% if grains.cloud is defined %}
+{% if grains.cloud == 'gce' %}
       - file: /var/lib/kubelet/kubernetes_auth
+{% endif %}
+{% endif %}
 
