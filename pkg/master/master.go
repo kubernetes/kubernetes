@@ -335,6 +335,7 @@ func (m *Master) init(c *Config) {
 	registry.ForEachPlugin(func(plugin registry.Plugin) {
 		name := plugin.Name()
 		store := etcd.NewRegistry2(c.EtcdHelper, path.Join("/registry", plugin.Path()), nil)
+		//FIXME: need to pass, cloud, minionreg, portalnet for services.
 		rest, err := plugin.New(store)
 		if err != nil {
 			glog.Fatalf("Unable to instantiate registry plugin %q: %v", name, err)

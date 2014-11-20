@@ -18,7 +18,9 @@ package service
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -35,4 +37,22 @@ type Registry interface {
 	// TODO: endpoints and their implementation should be separated, setting endpoints should be
 	// supported via the API, and the endpoints-controller should use the API to update endpoints.
 	endpoint.Registry
+}
+
+type plugin struct{}
+
+func (p plugin) Name() string {
+	return "services2"
+}
+
+func (p plugin) Path() string {
+	return "services/specs"
+}
+
+func (p plugin) New(store registry.Store) (apiserver.RESTStorage, error) {
+	return NewRESTv2(store), nil
+}
+
+func init() {
+	registry.RegisterPlugin(&plugin{})
 }
