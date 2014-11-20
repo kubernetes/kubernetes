@@ -549,7 +549,7 @@ function kube::release::package_salt_tarball() {
 function kube::release::package_full_tarball() {
   echo "+++ Building tarball: full"
 
-  local release_stage="${RELESAE_STAGE}/full/kubernetes"
+  local release_stage="${RELEASE_STAGE}/full/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
