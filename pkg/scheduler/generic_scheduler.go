@@ -150,9 +150,9 @@ func EqualPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) 
 
 func NewGenericScheduler(predicates []FitPredicate, prioritizers []PriorityFunction, pods PodLister, random *rand.Rand) Scheduler {
 	return &genericScheduler{
-		predicates:  predicates,
+		predicates:   predicates,
 		prioritizers: prioritizers,
-		pods:        pods,
-		random:      random,
+		pods:         pods,
+		random:       random,
 	}
 }

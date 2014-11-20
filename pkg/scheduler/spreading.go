@@ -50,7 +50,7 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 		// than the filtered minion count
 		values := make([]int, len(counts))
 		idx := 0
-		for  _, count := range counts {
+		for _, count := range counts {
 			values[idx] = count
 			idx++
 		}
@@ -62,7 +62,7 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 	//score int
 	for _, minion := range minions.Items {
 		if maxCount > 0 {
-			fScore = 100 * ( float32(counts[minion.Name]) / float32(maxCount) )
+			fScore = 100 * (float32(counts[minion.Name]) / float32(maxCount))
 		}
 		result = append(result, HostPriority{host: minion.Name, score: int(fScore)})
 	}

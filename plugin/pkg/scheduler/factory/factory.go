@@ -58,11 +58,11 @@ type configFactory struct {
 func NewConfigFactory(client *client.Client) *configFactory {
 	// initialize the factory struct
 	factory := &configFactory{Client: client,
-		PodQueue: cache.NewFIFO(),
-		PodLister: &storeToPodLister{cache.NewStore()},
+		PodQueue:     cache.NewFIFO(),
+		PodLister:    &storeToPodLister{cache.NewStore()},
 		MinionLister: &storeToMinionLister{cache.NewStore()},
 		PredicateMap: make(map[string]algorithm.FitPredicate),
-		PriorityMap: make(map[string]algorithm.PriorityFunction),
+		PriorityMap:  make(map[string]algorithm.PriorityFunction),
 	}
 
 	// add default predicates
