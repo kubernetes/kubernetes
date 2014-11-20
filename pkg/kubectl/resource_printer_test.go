@@ -288,3 +288,45 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
+
+func TestPrinters(t *testing.T) {
+	om := func(name string) api.ObjectMeta { return api.ObjectMeta{Name: name} }
+	templatePrinter, err := NewTemplatePrinter([]byte("{{.name}}"), testapi.Version(), api.Scheme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	templatePrinter2, err := NewTemplatePrinter([]byte("{{len .items}}"), testapi.Version(), api.Scheme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	printers := map[string]ResourcePrinter{
+		"humanReadable":        NewHumanReadablePrinter(true),
+		"humanReadableHeaders": NewHumanReadablePrinter(false),
+		"json":                 &JSONPrinter{testapi.Version(), api.Scheme},
+		"yaml":                 &YAMLPrinter{testapi.Version(), api.Scheme},
+		"template":             templatePrinter,
+		"template2":            templatePrinter2,
+	}
+	objects := map[string]runtime.Object{
+		"pod":             &api.Pod{ObjectMeta: om("pod")},
+		"emptyPodList":    &api.PodList{},
+		"nonEmptyPodList": &api.PodList{Items: []api.Pod{{}}},
+	}
+	// map of printer name to set of objects it should fail on.
+	expectedErrors := map[string]util.StringSet{
+		"template2": util.NewStringSet("pod", "emptyPodList"),
+	}
+
+	for pName, p := range printers {
+		for oName, obj := range objects {
+			b := &bytes.Buffer{}
+			if err := p.PrintObj(obj, b); err != nil {
+				if set, found := expectedErrors[pName]; found && set.Has(oName) {
+					// expected error
+					continue
+				}
+				t.Errorf("printer '%v', object '%v'; error: '%v'", pName, oName, err)
+			}
+		}
+	}
+}

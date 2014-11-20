@@ -361,9 +361,10 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
 type TemplatePrinter struct {
-	template  *template.Template
-	version   string
-	convertor runtime.ObjectConvertor
+	rawTemplate string
+	template    *template.Template
+	version     string
+	convertor   runtime.ObjectConvertor
 }
 
 func NewTemplatePrinter(tmpl []byte, asVersion string, convertor runtime.ObjectConvertor) (*TemplatePrinter, error) {
@@ -371,7 +372,12 @@ func NewTemplatePrinter(tmpl []byte, asVersion string, convertor runtime.ObjectC
 	if err != nil {
 		return nil, err
 	}
-	return &TemplatePrinter{t, asVersion, convertor}, nil
+	return &TemplatePrinter{
+		rawTemplate: string(tmpl),
+		template:    t,
+		version:     asVersion,
+		convertor:   convertor,
+	}, nil
 }
 
 // PrintObj formats the obj with the Go Template.
@@ -388,7 +394,10 @@ func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if err := json.Unmarshal(data, &out); err != nil {
 		return err
 	}
-	return p.template.Execute(w, out)
+	if err = p.template.Execute(w, out); err != nil {
+		return fmt.Errorf("error executing template '%v': '%v'\n----data----\n%#v\n", p.rawTemplate, err, out)
+	}
+	return nil
 }
 
 func tabbedString(f func(io.Writer) error) (string, error) {
