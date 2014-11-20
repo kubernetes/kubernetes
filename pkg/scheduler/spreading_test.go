@@ -71,7 +71,7 @@ func TestSpreadPriority(t *testing.T) {
 				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 1}},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 100}},
 			test:         "one label match",
 		},
 		{
@@ -82,7 +82,7 @@ func TestSpreadPriority(t *testing.T) {
 				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 1}},
+			expectedList: []HostPriority{{"machine1", 100}, {"machine2", 100}},
 			test:         "two label matches on different machines",
 		},
 		{
@@ -94,7 +94,7 @@ func TestSpreadPriority(t *testing.T) {
 				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
+			expectedList: []HostPriority{{"machine1", 50}, {"machine2", 100}},
 			test:         "three label matches",
 		},
 	}

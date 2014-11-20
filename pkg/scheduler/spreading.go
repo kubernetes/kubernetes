@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"math/rand"
+	"sort"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -37,18 +38,37 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 		return nil, err
 	}
 
+	var maxCount int
+	var fScore float32
 	counts := map[string]int{}
-	for _, pod := range pods {
-		counts[pod.Status.Host]++
+	if len(pods) > 0 {
+		for _, pod := range pods {
+			counts[pod.Status.Host]++
+		}
+
+		// doing this separately since the pod count can be much higher
+		// than the filtered minion count
+		values := make([]int, len(counts))
+		idx := 0
+		for  _, count := range counts {
+			values[idx] = count
+			idx++
+		}
+		sort.Sort(sort.IntSlice(values))
+		maxCount = values[len(values)-1]
 	}
 
 	result := []HostPriority{}
+	//score int
 	for _, minion := range minions.Items {
-		result = append(result, HostPriority{host: minion.Name, score: counts[minion.Name]})
+		if maxCount > 0 {
+			fScore = 100 * ( float32(counts[minion.Name]) / float32(maxCount) )
+		}
+		result = append(result, HostPriority{host: minion.Name, score: int(fScore)})
 	}
 	return result, nil
 }
 
 func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
-	return NewGenericScheduler(predicates, CalculateSpreadPriority, podLister, random)
+	return NewGenericScheduler(predicates, []PriorityFunction{CalculateSpreadPriority}, podLister, random)
 }

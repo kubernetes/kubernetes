@@ -112,7 +112,7 @@ func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*sch
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityFuncs[0], factory.PodLister, r)
+	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityFuncs, factory.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
@@ -126,7 +126,6 @@ func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*sch
 		NextPod: func() *api.Pod {
 			pod := factory.PodQueue.Pop().(*api.Pod)
 			glog.V(2).Infof("glog.v2 --> About to try and schedule pod %v", pod.Name)
-			glog.Errorf("glog.error --> About to try and schedule pod %v", pod.Name)
 			return pod
 		},
 		Error: factory.makeDefaultErrorFunc(&podBackoff, factory.PodQueue),
@@ -137,7 +136,6 @@ func (factory *configFactory) getPredicateFunctions(keys []string) ([]algorithm.
 	var function algorithm.FitPredicate
 	predicates := []algorithm.FitPredicate{}
 	for _, key := range keys {
-		glog.Errorf("Adding predicate function for key: %s", key)
 		function = factory.PredicateMap[key]
 		if function == nil {
 			return nil, fmt.Errorf("Invalid predicate key %s specified - no corresponding function found", key)
@@ -174,6 +172,7 @@ func (factory *configFactory) AddPredicate(key string, function algorithm.FitPre
 func (factory *configFactory) addDefaultPriorities() {
 	factory.AddPriority("LeastRequestedPriority", algorithm.LeastRequestedPriority)
 	factory.AddPriority("SpreadingPriority", algorithm.CalculateSpreadPriority)
+	factory.AddPriority("EqualPriority", algorithm.EqualPriority)
 }
 
 func (factory *configFactory) AddPriority(key string, function algorithm.PriorityFunction) {
@@ -210,7 +209,7 @@ func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
 func (factory *configFactory) createUnassignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
-		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+		fieldSelector: labels.Set{"Status.Host": ""}.AsSelector(),
 		resource:      "pods",
 	}
 }
@@ -228,7 +227,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 func (factory *configFactory) createAssignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
+		fieldSelector: parseSelectorOrDie("Status.Host!="),
 		resource:      "pods",
 	}
 }

@@ -74,7 +74,6 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // TODO: migrate this into some per-volume specific code?
 func NoDiskConflict(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
-	glog.Errorf("custom predicate NoDiskConflict --> node: %s", node)
 	for ix := range manifest.Volumes {
 		for podIx := range existingPods {
 			if isVolumeConflict(manifest.Volumes[ix], &existingPods[podIx]) {
@@ -105,7 +104,6 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	glog.Errorf("custom predicate PodFitsResources --> node: %s", node)
 	podRequest := getResourceRequest(&pod)
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
 		// no resources requested always fits.
@@ -154,7 +152,6 @@ type NodeSelector struct {
 
 func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	if len(pod.Spec.NodeSelector) == 0 {
-	glog.Errorf("custom predicate PodSelectorMatches --> node: %s", node)
 		return true, nil
 	}
 	selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
@@ -166,7 +163,6 @@ func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, n
 }
 
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	glog.Errorf("custom predicate PodFitsPorts --> node: %s", node)
 	existingPorts := getUsedPorts(existingPods...)
 	wantPorts := getUsedPorts(pod)
 	for wport := range wantPorts {
