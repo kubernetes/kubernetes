@@ -1003,8 +1003,8 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "spec.template" &&
 				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.replicas" &&
-				field != "spec.template.label" &&
-				field != "label" {
+				field != "spec.template.labels" &&
+				field != "labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1080,7 +1080,7 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if field != "name" &&
-				field != "label" {
+				field != "labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
