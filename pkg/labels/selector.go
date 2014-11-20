@@ -428,7 +428,7 @@ func Parse(selector string) (SetBasedSelector, error) {
 
 // TODO: unify with validation.validateLabels
 func validateLabelKey(k string) error {
-	if !util.IsDNS952Label(k) {
+	if !util.IsDNSLabel(k) {
 		return errors.NewFieldNotSupported("key", k)
 	}
 	return nil

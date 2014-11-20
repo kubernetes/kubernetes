@@ -18,6 +18,7 @@ package labels
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -222,8 +223,9 @@ func TestRequirementConstructor(t *testing.T) {
 		{"x", In, util.NewStringSet("foo"), true},
 		{"x", NotIn, util.NewStringSet("foo"), true},
 		{"x", Exists, nil, true},
-		{"abcdefghijklmnopqrstuvwxy", Exists, nil, false}, //breaks DNS952 rule that len(key) < 25
-		{"1foo", In, util.NewStringSet("bar"), false},     //breaks DNS952 rule that keys start with [a-z]
+		{"1foo", In, util.NewStringSet("bar"), true},
+		{"1234", In, util.NewStringSet("bar"), true},
+		{strings.Repeat("a", 64), Exists, nil, false}, //breaks DNS rule that len(key) <= 63
 	}
 	for _, rc := range requirementConstructorTests {
 		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals); err == nil && !rc.Success {

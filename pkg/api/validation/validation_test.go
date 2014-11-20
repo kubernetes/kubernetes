@@ -39,11 +39,16 @@ func TestValidateLabels(t *testing.T) {
 	successCases := []map[string]string{
 		{"simple": "bar"},
 		{"now-with-dashes": "bar"},
+		{"1-starts-with-num": "bar"},
+		{"1234": "bar"},
 		{"simple/simple": "bar"},
 		{"now-with-dashes/simple": "bar"},
 		{"now-with-dashes/now-with-dashes": "bar"},
 		{"now.with.dots/simple": "bar"},
 		{"now-with.dashes-and.dots/simple": "bar"},
+		{"1-num.2-num/3-num": "bar"},
+		{"1234/5678": "bar"},
+		{"1.2.3.4/5678": "bar"},
 	}
 	for i := range successCases {
 		errs := validateLabels(successCases[i], "field")
@@ -53,12 +58,11 @@ func TestValidateLabels(t *testing.T) {
 	}
 
 	errorCases := []map[string]string{
-		{"123cantbeginwithnumber": "bar"},          //invalid
-		{"NoUppercase123": "bar"},                  //invalid
-		{"nospecialchars^=@": "bar"},               //invalid
-		{"cantendwithadash-": "bar"},               //invalid
-		{"rfc952-mustbe24charactersorless": "bar"}, //invalid
+		{"NoUppercase123": "bar"},
+		{"nospecialchars^=@": "bar"},
+		{"cantendwithadash-": "bar"},
 		{"only/one/slash": "bar"},
+		{strings.Repeat("a", 254): "bar"},
 	}
 	for i := range errorCases {
 		errs := validateLabels(errorCases[i], "field")
@@ -445,19 +449,14 @@ func TestValidatePod(t *testing.T) {
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 			Labels: map[string]string{
-				"123cantbeginwithnumber":          "bar", //invalid
-				"NoUppercase123":                  "bar", //invalid
-				"nospecialchars^=@":               "bar", //invalid
-				"cantendwithadash-":               "bar", //invalid
-				"rfc952-mustbe24charactersorless": "bar", //invalid
-				"rfc952-dash-nodots-lower":        "bar", //good label
-				"rfc952-24chars-orless":           "bar", //good label
+				"1/2/3/4/5": "bar", // invalid
+				"valid":     "bar", // good
 			},
 		},
 		Spec: api.PodSpec{},
 	})
-	if len(errs) != 5 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
 	}
 }
 

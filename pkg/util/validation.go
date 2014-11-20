@@ -20,28 +20,52 @@ import (
 	"regexp"
 )
 
-const dnsLabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
-
-var dnsLabelRegexp = regexp.MustCompile("^" + dnsLabelFmt + "$")
-
-const dnsLabelMaxLength int = 63
-
 // IsDNSLabel tests for a string that conforms to the definition of a label in
-// DNS (RFC 1035/1123).
+// DNS (RFC 1123).
 func IsDNSLabel(value string) bool {
-	return len(value) <= dnsLabelMaxLength && dnsLabelRegexp.MatchString(value)
+	return IsDNS1123Label(value)
 }
 
-const dnsSubdomainFmt string = dnsLabelFmt + "(\\." + dnsLabelFmt + ")*"
-
-var dnsSubdomainRegexp = regexp.MustCompile("^" + dnsSubdomainFmt + "$")
-
-const dnsSubdomainMaxLength int = 253
-
 // IsDNSSubdomain tests for a string that conforms to the definition of a
-// subdomain in DNS (RFC 1035/1123).
+// subdomain in DNS (RFC 1123).
 func IsDNSSubdomain(value string) bool {
-	return len(value) <= dnsSubdomainMaxLength && dnsSubdomainRegexp.MatchString(value)
+	return IsDNS1123Subdomain(value)
+}
+
+const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+
+var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
+
+const dns1123LabelMaxLength int = 63
+
+// IsDNS1123Label tests for a string that conforms to the definition of a label in
+// DNS (RFC 1123).
+func IsDNS1123Label(value string) bool {
+	return len(value) <= dns1123LabelMaxLength && dns1123LabelRegexp.MatchString(value)
+}
+
+const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
+
+var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
+
+const dns1123SubdomainMaxLength int = 253
+
+// IsDNS1123Subdomain tests for a string that conforms to the definition of a
+// subdomain in DNS (RFC 1123).
+func IsDNS1123Subdomain(value string) bool {
+	return len(value) <= dns1123SubdomainMaxLength && dns1123SubdomainRegexp.MatchString(value)
+}
+
+const dns952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+
+var dns952LabelRegexp = regexp.MustCompile("^" + dns952LabelFmt + "$")
+
+const dns952LabelMaxLength int = 24
+
+// IsDNS952Label tests for a string that conforms to the definition of a label in
+// DNS (RFC 952).
+func IsDNS952Label(value string) bool {
+	return len(value) <= dns952LabelMaxLength && dns952LabelRegexp.MatchString(value)
 }
 
 const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
@@ -57,14 +81,4 @@ func IsCIdentifier(value string) bool {
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
 func IsValidPortNum(port int) bool {
 	return 0 < port && port < 65536
-}
-
-const dns952IdentifierFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-
-var dns952Regexp = regexp.MustCompile("^" + dns952IdentifierFmt + "$")
-
-const dns952MaxLength = 24
-
-func IsDNS952Label(value string) bool {
-	return len(value) <= dns952MaxLength && dns952Regexp.MatchString(value)
 }

@@ -397,7 +397,7 @@ func validateLabels(labels map[string]string, field string) errs.ValidationError
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
 			continue
 		}
-		if (ns != "" && !util.IsDNSSubdomain(ns)) || !util.IsDNS952Label(n) {
+		if (ns != "" && !util.IsDNSSubdomain(ns)) || !util.IsDNSLabel(n) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
 		}
 	}
