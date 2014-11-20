@@ -78,7 +78,8 @@ func CreateObject(client *client.RESTClient, mapping *meta.RESTMapping, obj runt
 	// TODO: This should be using RESTHelper
 	err = client.Post().Path(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
 	if err != nil {
-		return &errs.ValidationError{errs.ValidationErrorTypeInvalid, name, err}
+		e := errs.NewFieldInvalid(name, err)
+		return &e
 	}
 
 	return nil
