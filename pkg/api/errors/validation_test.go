@@ -27,7 +27,7 @@ func TestMakeFuncs(t *testing.T) {
 		expected ValidationErrorType
 	}{
 		{
-			func() *ValidationError { return NewFieldInvalid("f", "v") },
+			func() *ValidationError { return NewFieldInvalid("f", "v", "d") },
 			ValidationErrorTypeInvalid,
 		},
 		{
@@ -57,8 +57,8 @@ func TestMakeFuncs(t *testing.T) {
 }
 
 func TestValidationError(t *testing.T) {
-	s := NewFieldInvalid("foo", "bar").Error()
-	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
+	s := NewFieldInvalid("foo", "bar", "deet").Error()
+	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, "deet") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
 		t.Errorf("error message did not contain expected values, got %s", s)
 	}
 }
@@ -73,7 +73,7 @@ func TestErrListPrefix(t *testing.T) {
 			"foo[0].bar",
 		},
 		{
-			NewFieldInvalid("field", "value"),
+			NewFieldInvalid("field", "value", ""),
 			"foo.field",
 		},
 		{
@@ -103,7 +103,7 @@ func TestErrListPrefixIndex(t *testing.T) {
 			"[1][0].bar",
 		},
 		{
-			NewFieldInvalid("field", "value"),
+			NewFieldInvalid("field", "value", ""),
 			"[1].field",
 		},
 		{

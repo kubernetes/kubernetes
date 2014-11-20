@@ -26,10 +26,10 @@ import (
 func ValidateEvent(event *api.Event) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if event.Namespace != event.InvolvedObject.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
 	}
 	if !util.IsDNSSubdomain(event.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", event.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", event.Namespace, ""))
 	}
 	return allErrs
 }

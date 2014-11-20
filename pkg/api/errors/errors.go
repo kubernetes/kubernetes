@@ -30,7 +30,7 @@ type StatusError struct {
 	ErrStatus api.Status
 }
 
-var _ error = &statusError{}
+var _ error = &StatusError{}
 
 // Error implements the Error interface.
 func (e *StatusError) Error() string {

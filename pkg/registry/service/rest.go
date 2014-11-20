@@ -100,8 +100,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	} else {
 		// Try to respect the requested IP.
 		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			// TODO: Differentiate "IP already allocated" from real errors.
-			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP)}
+			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
 			return nil, errors.NewInvalid("service", service.Name, el)
 		}
 	}
@@ -222,9 +221,8 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		if err != nil {
 			return nil, err
 		}
-		if service.Spec.PortalIP != cur.Spec.PortalIP {
-			// TODO: Would be nice to pass "field is immutable" to users.
-			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP)}
+		if service.Spec.PortalIP != "" && service.Spec.PortalIP != cur.Spec.PortalIP {
+			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable")}
 			return nil, errors.NewInvalid("service", service.Name, el)
 		}
 		// Copy over non-user fields.

@@ -273,7 +273,7 @@ func getTestRequests() []struct {
 		// Normal methods on services
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"POST", "/api/v1beta1/services" + syncFlags, aService, code200},
-		{"PUT", "/api/v1beta1/services/a" + syncFlags, aService, code422}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"PUT", "/api/v1beta1/services/a" + syncFlags, aService, code409}, // TODO: GET and put back server-provided fields to avoid a 422
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"GET", "/api/v1beta1/services/a", "", code200},
 		{"DELETE", "/api/v1beta1/services/a" + syncFlags, "", code200},

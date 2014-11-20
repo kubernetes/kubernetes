@@ -17,49 +17,44 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
-	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"gopkg.in/v1/yaml"
 )
 
 // DataToObjects converts the raw JSON data into API objects
-func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (result []runtime.Object, errors errs.ValidationErrorList) {
+func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (result []runtime.Object, errors util.ErrorList) {
 	configObj := []runtime.RawExtension{}
 
 	if err := yaml.Unmarshal(data, &configObj); err != nil {
-		errors = append(errors, errs.NewFieldInvalid("unmarshal", err))
-		return result, errors.Prefix("Config")
+		errors = append(errors, fmt.Errorf("config unmarshal: %v", err))
+		return result, errors
 	}
 
 	for i, in := range configObj {
 		version, kind, err := t.DataVersionAndKind(in.RawJSON)
 		if err != nil {
-			itemErrs := errs.ValidationErrorList{}
-			itemErrs = append(itemErrs, errs.NewFieldInvalid("kind", string(in.RawJSON)))
-			errors = append(errors, itemErrs.PrefixIndex(i).Prefix("item")...)
+			errors = append(errors, fmt.Errorf("item[%d] kind: %v", i, err))
 			continue
 		}
 
 		mapping, err := m.RESTMapping(version, kind)
 		if err != nil {
-			itemErrs := errs.ValidationErrorList{}
-			itemErrs = append(itemErrs, errs.NewFieldRequired("mapping", err))
-			errors = append(errors, itemErrs.PrefixIndex(i).Prefix("item")...)
+			errors = append(errors, fmt.Errorf("item[%d] mapping: %v", i, err))
 			continue
 		}
 
 		obj, err := mapping.Codec.Decode(in.RawJSON)
 		if err != nil {
-			itemErrs := errs.ValidationErrorList{}
-			itemErrs = append(itemErrs, errs.NewFieldInvalid("decode", err))
-			errors = append(errors, itemErrs.PrefixIndex(i).Prefix("item")...)
+			errors = append(errors, fmt.Errorf("item[%d] decode: %v", i, err))
 			continue
 		}
 		result = append(result, obj)

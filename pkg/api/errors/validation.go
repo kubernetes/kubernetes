@@ -78,42 +78,47 @@ type ValidationError struct {
 	Type     ValidationErrorType
 	Field    string
 	BadValue interface{}
+	Detail   string
 }
 
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
-	return fmt.Sprintf("%s: %v '%v'", v.Field, ValueOf(v.Type), v.BadValue)
+	s := fmt.Sprintf("%s: %s '%v'", v.Field, ValueOf(v.Type), v.BadValue)
+	if v.Detail != "" {
+		s += fmt.Sprintf(": %s", v.Detail)
+	}
+	return s
 }
 
 // NewFieldRequired returns a *ValidationError indicating "value required"
 func NewFieldRequired(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeRequired, field, value}
+	return &ValidationError{ValidationErrorTypeRequired, field, value, ""}
 }
 
 // NewFieldInvalid returns a *ValidationError indicating "invalid value"
-func NewFieldInvalid(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeInvalid, field, value}
+func NewFieldInvalid(field string, value interface{}, detail string) *ValidationError {
+	return &ValidationError{ValidationErrorTypeInvalid, field, value, detail}
 }
 
 // NewFieldNotSupported returns a *ValidationError indicating "unsupported value"
 func NewFieldNotSupported(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeNotSupported, field, value}
+	return &ValidationError{ValidationErrorTypeNotSupported, field, value, ""}
 }
 
 // NewFieldForbidden returns a *ValidationError indicating "forbidden"
 func NewFieldForbidden(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeForbidden, field, value}
+	return &ValidationError{ValidationErrorTypeForbidden, field, value, ""}
 }
 
 // NewFieldDuplicate returns a *ValidationError indicating "duplicate value"
 func NewFieldDuplicate(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeDuplicate, field, value}
+	return &ValidationError{ValidationErrorTypeDuplicate, field, value, ""}
 }
 
 // NewFieldNotFound returns a *ValidationError indicating "value not found"
 func NewFieldNotFound(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeNotFound, field, value}
+	return &ValidationError{ValidationErrorTypeNotFound, field, value, ""}
 }
 
 // ValidationErrorList is a collection of ValidationErrors.  This does not
