@@ -36,7 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // TODO: Also handle lists of simple services, and multiple input files

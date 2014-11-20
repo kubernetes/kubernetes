@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 const usage = "usage: enscope specFilename configFilename"

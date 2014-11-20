@@ -29,7 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 type testStruct struct {

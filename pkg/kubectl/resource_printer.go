@@ -31,7 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // GetPrinter takes a format type, an optional format argument, a version and a convertor

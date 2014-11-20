@@ -18,8 +18,9 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
@@ -34,11 +35,17 @@ func (re *RawExtension) MarshalJSON() ([]byte, error) {
 	return re.RawJSON, nil
 }
 
-// SetYAML implements the yaml.Setter interface.
-func (re *RawExtension) SetYAML(tag string, value interface{}) bool {
+// UnmarshalYAML implements the yaml.UnmarshalYAML interface.
+func (re *RawExtension) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	fmt.Println("START-UNMARSHAL")
+	var value interface{}
+	if err := unmarshal(&value); err != nil {
+		return err
+	}
+
 	if value == nil {
 		re.RawJSON = []byte("null")
-		return true
+		return nil
 	}
 	// Why does the yaml package send value as a map[interface{}]interface{}?
 	// It's especially frustrating because encoding/json does the right thing
@@ -48,13 +55,14 @@ func (re *RawExtension) SetYAML(tag string, value interface{}) bool {
 	// into an API object.
 	b, err := yaml.Marshal(value)
 	if err != nil {
-		panic("yaml can't reverse its own object")
+		return fmt.Errorf("yaml can't reverse its own object")
 	}
 	re.RawJSON = b
-	return true
+	return nil
 }
 
-// GetYAML implements the yaml.Getter interface.
-func (re *RawExtension) GetYAML() (tag string, value interface{}) {
-	return tag, re.RawJSON
+// MarshalYAML implements the yaml.MarshalYAML interface.
+func (re *RawExtension) MarshalYAML() (interface{}, error) {
+	fmt.Println("START-MARSHAL")
+	return re.RawJSON, nil
 }

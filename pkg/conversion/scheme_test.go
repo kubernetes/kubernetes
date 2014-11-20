@@ -27,7 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/google/gofuzz"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")

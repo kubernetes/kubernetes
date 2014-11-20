@@ -26,7 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // DataToObjects converts the raw JSON data into API objects

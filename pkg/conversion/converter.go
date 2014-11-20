@@ -46,11 +46,19 @@ type Converter struct {
 	NameFunc func(t reflect.Type) string
 }
 
+type logger struct {
+}
+
+func (l logger) Logf(format string, args ...interface{}) {
+	fmt.Printf(format+"\n", args)
+}
+
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
 		funcs:    map[typePair]reflect.Value{},
 		NameFunc: func(t reflect.Type) string { return t.Name() },
+		Debug:    logger{},
 	}
 }
 
