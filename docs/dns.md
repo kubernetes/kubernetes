@@ -47,5 +47,5 @@ resolution to serve your various DNS endpoints.  A simple example might be to ru
 and create a service called `blog` in Kubernetes.  Then external DNS requests to `blog.mydomain.com` will
 automatically resolve to the service proxy and be forwarded to the pods running Wordpress.
 
-Full documentation of the SkyDNS server is in the [SkyDNS repository](https://github.com/skydnsservices/skydns)
+Full documentation of the SkyDNS server is in the [SkyDNS repository](https://github.com/skynetservices/skydns)
 and abbreviated information is available by typing `skydns --help`.
