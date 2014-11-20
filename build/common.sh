@@ -93,6 +93,7 @@ readonly KUBE_RUN_IMAGES=(
 
 
 # This is where the final release artifacts are created locally
+readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 
 # ---------------------------------------------------------------------------
@@ -242,7 +243,7 @@ function kube::build::ensure_golang() {
   kube::build::docker_image_exists golang 1.3 || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
       echo "You don't have a local copy of the golang docker image. This image is 450MB."
-      read -p "Download it now? [y/n] " -n 1 -r
+      read -p "Download it now? [y/n] " -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
         echo "Aborting." >&2
@@ -484,7 +485,7 @@ function kube::release::package_client_tarballs() {
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     echo "+++ Building tarball: client $platform_tag"
 
-    local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/client/${platform_tag}/kubernetes"
+    local release_stage="${RELEASE_STAGE}/client/${platform_tag}/kubernetes"
     rm -rf "${release_stage}"
     mkdir -p "${release_stage}/client/bin"
 
@@ -506,7 +507,7 @@ function kube::release::package_server_tarballs() {
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     echo "+++ Building tarball: server $platform_tag"
 
-    local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/server/${platform_tag}/kubernetes"
+    local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
     rm -rf "${release_stage}"
     mkdir -p "${release_stage}/server/bin"
 
@@ -530,7 +531,7 @@ function kube::release::package_server_tarballs() {
 function kube::release::package_salt_tarball() {
   echo "+++ Building tarball: salt"
 
-  local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/salt/kubernetes"
+  local release_stage="${RELEASE_STAGE}/salt/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
@@ -548,7 +549,7 @@ function kube::release::package_salt_tarball() {
 function kube::release::package_full_tarball() {
   echo "+++ Building tarball: full"
 
-  local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/full/kubernetes"
+  local release_stage="${RELESAE_STAGE}/full/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
@@ -730,14 +731,42 @@ function kube::release::gcs::copy_release_artifacts() {
   echo "+++ Copying release artifacts to ${gcs_destination}"
 
   # First delete all objects at the destination
-  gsutil -q rm -f -R "${gcs_destination}" >/dev/null 2>&1 || true
+  if gsutil ls "${gcs_destination}" >/dev/null 2>&1; then
+    echo "!!! ${gcs_destination} not empty."
+    read -p "Delete everything under ${gcs_destination}? [y/n] " -r || {
+      echo "EOF on prompt.  Skipping upload"
+      return
+    }
+    [[ $REPLY =~ ^[yY]$ ]] || {
+      echo "Skipping upload"
+      return
+    }
+    gsutil -m rm -f -R "${gcs_destination}"
+  fi
 
   # Now upload everything in release directory
   gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
 
   # Having the "template" scripts from the GCE cluster deploy hosted with the
   # release is useful for GKE.  Copy everything from that directory up also.
-  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp "${KUBE_ROOT}/cluster/gce/templates/*.sh" "${gcs_destination}extra/gce-templates/"
+  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
+    "${RELEASE_STAGE}/full/kubernetes/cluster/gce/templates/*.sh" \
+    "${gcs_destination}extra/gce-templates/"
+
+  # Upload the "naked" binaries to GCS.  This is useful for install scripts that
+  # download the binaries directly and don't need tars.
+  local platform platforms
+  platforms=($(cd "${RELEASE_STAGE}/client" ; echo *))
+  for platform in "${platforms[@]}"; do
+    local src="${RELEASE_STAGE}/client/${platform}/kubernetes/client/bin/*"
+    local dst="${gcs_destination}bin/${platform/-//}/"
+    # We assume here the "server package" is a superset of the "client package"
+    if [[ -d "${RELEASE_STAGE}/server/${platform}" ]]; then
+      src="${RELEASE_STAGE}/server/${platform}/kubernetes/server/bin/*"
+    fi
+    gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
+      "$src" "$dst"
+  done
 
   # TODO(jbeda): Generate an HTML page with links for this release so it is easy
   # to see it.  For extra credit, generate a dynamic page that builds up the
