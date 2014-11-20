@@ -107,12 +107,21 @@ type ObjectMeta struct {
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 
 	// Labels are key value pairs that may be used to scope and select individual resources.
+	// Label keys are of the form:
+	//     label-key ::= prefixed-name | name
+	//     prefixed-name ::= prefix '/' name
+	//     prefix ::= DNS_SUBDOMAIN
+	//     name ::= DNS_LABEL
+	// The prefix is optional.  If the prefix is not specified, the key is assumed to be private
+	// to the user.  Other system components that wish to use labels must specify a prefix.  The
+	// "kubernetes.io/" prefix is reserved for use by kubernetes components.
 	// TODO: replace map[string]string with labels.LabelSet type
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	// Annotations are unstructured key value data stored with a resource that may be set by
 	// external tooling. They are not queryable and should be preserved when modifying
-	// objects.
+	// objects.  Annotation keys have the same formatting restrictions as Label keys. See the
+	// comments on Labels for details.
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 

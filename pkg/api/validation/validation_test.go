@@ -35,6 +35,39 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ValidationErrorList) 
 	}
 }
 
+func TestValidateLabels(t *testing.T) {
+	successCases := []map[string]string{
+		{"simple": "bar"},
+		{"now-with-dashes": "bar"},
+		{"simple/simple": "bar"},
+		{"now-with-dashes/simple": "bar"},
+		{"now-with-dashes/now-with-dashes": "bar"},
+		{"now.with.dots/simple": "bar"},
+		{"now-with.dashes-and.dots/simple": "bar"},
+	}
+	for i := range successCases {
+		errs := validateLabels(successCases[i], "field")
+		if len(errs) != 0 {
+			t.Errorf("case[%d] expected success, got %#v", i, errs)
+		}
+	}
+
+	errorCases := []map[string]string{
+		{"123cantbeginwithnumber": "bar"},          //invalid
+		{"NoUppercase123": "bar"},                  //invalid
+		{"nospecialchars^=@": "bar"},               //invalid
+		{"cantendwithadash-": "bar"},               //invalid
+		{"rfc952-mustbe24charactersorless": "bar"}, //invalid
+		{"only/one/slash": "bar"},
+	}
+	for i := range errorCases {
+		errs := validateLabels(errorCases[i], "field")
+		if len(errs) != 1 {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},

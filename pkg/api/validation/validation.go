@@ -385,8 +385,20 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 func validateLabels(labels map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	for k := range labels {
-		if !util.IsDNS952Label(k) {
-			allErrs = append(allErrs, errs.NewFieldNotSupported(field, k))
+		var n, ns string
+		parts := strings.Split(k, "/")
+		switch len(parts) {
+		case 1:
+			n = parts[0]
+		case 2:
+			ns = parts[0]
+			n = parts[1]
+		default:
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
+			continue
+		}
+		if (ns != "" && !util.IsDNSSubdomain(ns)) || !util.IsDNS952Label(n) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
 		}
 	}
 	return allErrs
