@@ -9,6 +9,7 @@ install:
   - ./hack/travis/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
+  - ./hack/verify-description.sh
   - ./hack/travis/install-std-race.sh
   - ./hack/build-go.sh
   - go get ./contrib/podex
