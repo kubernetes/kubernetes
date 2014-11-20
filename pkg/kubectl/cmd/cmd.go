@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -36,6 +37,7 @@ import (
 type Factory struct {
 	Mapper    meta.RESTMapper
 	Typer     runtime.ObjectTyper
+	Validator func(*cobra.Command) (validation.Schema, error)
 	Client    func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error)
 	Describer func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error)
 	Printer   func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
@@ -46,6 +48,13 @@ func NewFactory() *Factory {
 	return &Factory{
 		Mapper: latest.RESTMapper,
 		Typer:  api.Scheme,
+		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
+			if GetFlagBool(cmd, "validate") {
+				return &clientSwaggerSchema{getKubeClient(cmd), api.Scheme}, nil
+			} else {
+				return validation.NullSchema{}, nil
+			}
+		},
 		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
 			return getKubeClient(cmd), nil
 		},
@@ -87,6 +96,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.PersistentFlags().Bool("insecure-skip-tls-verify", false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
 	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
+	cmds.PersistentFlags().Bool("validate", false, "If true, use a schema to validate the input before sending it")
 
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdProxy(out))
@@ -215,4 +225,29 @@ func getKubeClient(cmd *cobra.Command) *client.Client {
 		glog.Fatalf("Error creating kubernetes client: %v", err)
 	}
 	return c
+}
+
+type clientSwaggerSchema struct {
+	c *client.Client
+	t runtime.ObjectTyper
+}
+
+func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
+	version, _, err := c.t.DataVersionAndKind(data)
+	if err != nil {
+		return err
+	}
+	schemaData, err := c.c.RESTClient.Get().
+		AbsPath("/swaggerapi/api").
+		Path(version).
+		Do().
+		Raw()
+	if err != nil {
+		return err
+	}
+	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
+	if err != nil {
+		return err
+	}
+	return schema.ValidateBytes(data)
 }
