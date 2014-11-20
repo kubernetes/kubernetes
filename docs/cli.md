@@ -148,7 +148,7 @@ kubecfg -h [-c config/file.json] [-p :,..., :] <method>
 * `-template=""`: If present, parse this string as a golang template and use it for output printing
 * `-template_file=""`: If present, load this file as a golang template and use it for output printing
 * `-u=1m0s`: Update interval period
-* `-v=0`: log level for V logs
+* `-v=0`: log level for V logs. See [Logging Conventions](devel/logging.md) for details
 * `-verbose=true|false`: If true, print extra information
 * `-vmodule=""`: comma-separated list of pattern=N settings for file-filtered logging
 * `-www=""`: If -proxy is true, use this directory to serve static files
