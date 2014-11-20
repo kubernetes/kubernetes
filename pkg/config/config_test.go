@@ -92,7 +92,7 @@ func TestCreateNoNameItem(t *testing.T) {
 		t.Errorf("Expected required value error for missing name")
 	}
 
-	e := errs[0].(errors.ValidationError)
+	e := errs[0].(*errors.ValidationError)
 	if errors.ValueOf(e.Type) != "required value" {
 		t.Errorf("Expected ValidationErrorTypeRequired error, got %#v", e)
 	}
@@ -121,7 +121,7 @@ func TestCreateInvalidItem(t *testing.T) {
 		t.Errorf("Expected invalid value error for kind")
 	}
 
-	e := errs[0].(errors.ValidationError)
+	e := errs[0].(*errors.ValidationError)
 	if errors.ValueOf(e.Type) != "invalid value" {
 		t.Errorf("Expected ValidationErrorTypeInvalid error, got %#v", e)
 	}
@@ -153,7 +153,7 @@ func TestCreateNoClientItems(t *testing.T) {
 		t.Errorf("Expected invalid value error for client")
 	}
 
-	e := errs[0].(errors.ValidationError)
+	e := errs[0].(*errors.ValidationError)
 	if errors.ValueOf(e.Type) != "unsupported value" {
 		t.Errorf("Expected ValidationErrorTypeUnsupported error, got %#v", e)
 	}

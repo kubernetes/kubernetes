@@ -54,7 +54,7 @@ func TestErrorNew(t *testing.T) {
 
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     ValidationError
+		Err     *ValidationError
 		Details *api.StatusDetails
 	}{
 		{

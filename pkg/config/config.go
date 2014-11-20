@@ -52,7 +52,7 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 		}
 
 		if err := CreateObject(client, mapping, obj); err != nil {
-			reportError(&allErrors, i, *err)
+			reportError(&allErrors, i, err)
 		}
 	}
 
@@ -65,21 +65,18 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 func CreateObject(client *client.RESTClient, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
 	name, err := mapping.MetadataAccessor.Name(obj)
 	if err != nil || name == "" {
-		e := errs.NewFieldRequired("name", err)
-		return &e
+		return errs.NewFieldRequired("name", err)
 	}
 
 	namespace, err := mapping.Namespace(obj)
 	if err != nil {
-		e := errs.NewFieldRequired("namespace", err)
-		return &e
+		return errs.NewFieldRequired("namespace", err)
 	}
 
 	// TODO: This should be using RESTHelper
 	err = client.Post().Path(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
 	if err != nil {
-		e := errs.NewFieldInvalid(name, err)
-		return &e
+		return errs.NewFieldInvalid(name, err)
 	}
 
 	return nil
@@ -87,7 +84,7 @@ func CreateObject(client *client.RESTClient, mapping *meta.RESTMapping, obj runt
 
 // reportError reports the single item validation error and properly set the
 // prefix and index to match the Config item JSON index
-func reportError(allErrs *errs.ValidationErrorList, index int, err errs.ValidationError) {
+func reportError(allErrs *errs.ValidationErrorList, index int, err *errs.ValidationError) {
 	i := errs.ValidationErrorList{}
 	*allErrs = append(*allErrs, append(i, err).PrefixIndex(index).Prefix("item")...)
 }

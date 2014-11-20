@@ -29,7 +29,7 @@ import (
 
 func expectPrefix(t *testing.T, prefix string, errs errors.ValidationErrorList) {
 	for i := range errs {
-		if f, p := errs[i].(errors.ValidationError).Field, prefix; !strings.HasPrefix(f, p) {
+		if f, p := errs[i].(*errors.ValidationError).Field, prefix; !strings.HasPrefix(f, p) {
 			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])
 		}
 	}
@@ -69,10 +69,10 @@ func TestValidateVolumes(t *testing.T) {
 			continue
 		}
 		for i := range errs {
-			if errs[i].(errors.ValidationError).Type != v.T {
+			if errs[i].(*errors.ValidationError).Type != v.T {
 				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
 			}
-			if errs[i].(errors.ValidationError).Field != v.F {
+			if errs[i].(*errors.ValidationError).Field != v.F {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
 		}
@@ -125,10 +125,10 @@ func TestValidatePorts(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			if errs[i].(errors.ValidationError).Type != v.T {
+			if errs[i].(*errors.ValidationError).Type != v.T {
 				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
 			}
-			if errs[i].(errors.ValidationError).Field != v.F {
+			if errs[i].(*errors.ValidationError).Field != v.F {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
 		}
@@ -995,7 +995,7 @@ func TestValidateReplicationController(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(errors.ValidationError).Field
+			field := errs[i].(*errors.ValidationError).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
 				field != "name" &&
 				field != "namespace" &&
@@ -1078,7 +1078,7 @@ func TestValidateMinion(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(errors.ValidationError).Field
+			field := errs[i].(*errors.ValidationError).Field
 			if field != "name" &&
 				field != "label" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
