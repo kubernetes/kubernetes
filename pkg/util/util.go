@@ -88,32 +88,40 @@ func NewIntOrStringFromString(val string) IntOrString {
 	return IntOrString{Kind: IntstrString, StrVal: val}
 }
 
-// SetYAML implements the yaml.Setter interface.
-func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (intstr *IntOrString) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	fmt.Printf("THREE UNMARSHAL INTORSTRING\n")
+	var value interface{}
+	if err := unmarshal(&value); err != nil {
+		fmt.Printf("IOSERR1: %s", err)
+		return err
+	}
 	switch v := value.(type) {
 	case int:
+		fmt.Printf("THREE UNMARSHAL INT FOUND: %v\n", v)
 		intstr.Kind = IntstrInt
 		intstr.IntVal = v
-		return true
+		return nil
 	case string:
+		fmt.Printf("THREE UNMARSHAL STRING FOUND: %v\n", v)
 		intstr.Kind = IntstrString
 		intstr.StrVal = v
-		return true
+		return nil
 	}
-	return false
+	err := fmt.Errorf("invalid type %T for value %q", value, value)
+	fmt.Printf("IOSERR2: %s", err)
+	return err
 }
 
-// GetYAML implements the yaml.Getter interface.
-func (intstr IntOrString) GetYAML() (tag string, value interface{}) {
+// MarshalYAML implements the yaml.Marshaler interface.
+func (intstr IntOrString) MarshalYAML() (interface{}, error) {
 	switch intstr.Kind {
 	case IntstrInt:
-		value = intstr.IntVal
+		return intstr.IntVal, nil
 	case IntstrString:
-		value = intstr.StrVal
-	default:
-		panic("impossible IntOrString.Kind")
+		return intstr.StrVal, nil
 	}
-	return
+	return nil, fmt.Errorf("invalid IntOrString.Kind: %v", intstr.Kind)
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.

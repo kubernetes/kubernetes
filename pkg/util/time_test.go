@@ -18,11 +18,12 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 type TimeHolder struct {
@@ -43,9 +44,11 @@ func TestTimeMarshalYAML(t *testing.T) {
 		input := TimeHolder{c.input}
 		result, err := yaml.Marshal(&input)
 		if err != nil {
+			fmt.Printf("1 Failed to marshal input: '%v': %v\n", input, err)
 			t.Errorf("Failed to marshal input: '%v': %v", input, err)
 		}
 		if string(result) != c.result {
+			fmt.Printf("2 Failed to marshal input: '%v': expected %+v, got %q\n", input, c.result, string(result))
 			t.Errorf("Failed to marshal input: '%v': expected %+v, got %q", input, c.result, string(result))
 		}
 	}
@@ -132,6 +135,7 @@ func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
 		var result TimeHolder
 		err = yaml.Unmarshal(jsonMarshalled, &result)
 		if err != nil {
+			fmt.Printf("2: Failed to unmarshal '%+v': %v\n", string(jsonMarshalled), err)
 			t.Errorf("2: Failed to unmarshal '%+v': %v", string(jsonMarshalled), err)
 		}
 

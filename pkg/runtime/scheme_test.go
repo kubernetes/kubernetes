@@ -17,6 +17,7 @@ limitations under the License.
 package runtime_test
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -216,6 +217,7 @@ func TestExtensionMapping(t *testing.T) {
 
 		gotDecoded, err := scheme.Decode([]byte(item.encoded))
 		if err != nil {
+			fmt.Printf("TESTERROR: unexpected error '%v' (%v)\n", err, item.encoded)
 			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
 		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
 			var eEx, aEx runtime.Object

@@ -18,6 +18,7 @@ package runtime_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -69,6 +70,7 @@ func TestEmbeddedObject(t *testing.T) {
 
 	decoded, err := s.Decode(wire)
 	if err != nil {
+		fmt.Printf("TERROR Unexpected decode error %v", err)
 		t.Fatalf("Unexpected decode error %v", err)
 	}
 

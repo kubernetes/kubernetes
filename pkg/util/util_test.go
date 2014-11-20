@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 func TestHandleCrash(t *testing.T) {

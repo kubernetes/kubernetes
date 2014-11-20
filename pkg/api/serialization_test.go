@@ -19,10 +19,12 @@ package api_test
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -31,11 +33,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/davecgh/go-spew/spew"
 	docker "github.com/fsouza/go-dockerclient"
 	fuzz "github.com/google/gofuzz"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz_iters", 1, "How many fuzzing iterations to do.")
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
@@ -138,6 +141,17 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 			c.RandString(): c.RandString(),
 		}
 	},
+	func(cs *api.ContainerStateRunning, c fuzz.Continue) {
+		cs.StartedAt = time.Now()
+	},
+	func(cs *api.ContainerStateTerminated, c fuzz.Continue) {
+		cs.ExitCode = int(c.RandUint64())
+		cs.Signal = int(c.RandUint64())
+		cs.Reason = c.RandString()
+		cs.Message = c.RandString()
+		cs.StartedAt = time.Now()
+		cs.FinishedAt = time.Now()
+	},
 )
 
 func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
@@ -161,18 +175,100 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		t.Errorf("%v: %v", name, err)
 		return
 	}
+	// Check if the object passed into runTest is equivalent to serializing
+	// then deserializing the object.
 	if !reflect.DeepEqual(source, obj2) {
+		fmt.Printf("SPEW:\n")
+		spew.Dump(source, obj2)
 		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v", name, util.ObjectDiff(source, obj2), codec, string(data), source)
+
+		spl, ok := source.(*api.PodList)
+		opl, ok := obj2.(*api.PodList)
+		if !ok {
+			t.Errorf("NOT OKAY\n")
+		} else {
+			if !reflect.DeepEqual(spl, opl) {
+				fmt.Printf("PL NOT EQUAL\n")
+			} else {
+				fmt.Printf("PL EQUAL\n")
+			}
+			if !reflect.DeepEqual(spl.Items, opl.Items) {
+				fmt.Printf("ITEMS NOT EQUAL\n")
+			} else {
+				fmt.Printf("ITEMS EQUAL\n")
+			}
+			if !reflect.DeepEqual(spl.Items[0].Status.Info, opl.Items[0].Status.Info) {
+				spew.Dump(spl.Items[0].Status.Info, opl.Items[0].Status.Info)
+				fmt.Printf("STATUS INFO NOT EQUAL\n")
+			} else {
+				fmt.Printf("STATUS INFO EQUAL\n")
+			}
+
+			for sk, sv := range spl.Items[0].Status.Info {
+				for ok, ov := range opl.Items[0].Status.Info {
+					if sk == ok {
+						fmt.Printf("KEYS EQUAL %s\n", sk)
+					} else {
+						fmt.Printf("KEYS NOT EQUAL %s %s\n", sk, ok)
+					}
+					if !reflect.DeepEqual(sv.State.Running, ov.State.Running) {
+						spew.Dump(sv.State.Running, ov.State.Running)
+						fmt.Printf("STATUS INFO CSTATUS running NOT EQUAL\n")
+						fmt.Printf("running started at: %+#v, %+#v\n", sv.State.Running.StartedAt, ov.State.Running.StartedAt)
+						fmt.Printf("location: %+#v\n", ov.State.Running.StartedAt.Location().String())
+					} else {
+						spew.Dump(sv.State.Running, ov.State.Running)
+						fmt.Printf("STATUS INFO CSTATUS running EQUAL\n")
+					}
+					if !reflect.DeepEqual(sv.State.Waiting, ov.State.Waiting) {
+						spew.Dump(sv.State.Waiting, ov.State.Waiting)
+						fmt.Printf("STATUS INFO CSTATUS waiting NOT EQUAL\n")
+					} else {
+						spew.Dump(sv.State.Waiting, ov.State.Waiting)
+						fmt.Printf("STATUS INFO CSTATUS waiting EQUAL\n")
+					}
+					if !reflect.DeepEqual(sv.State.Termination, ov.State.Termination) {
+						spew.Dump(sv.State.Termination, ov.State.Termination)
+						fmt.Printf("STATUS INFO CSTATUS termination NOT EQUAL\n")
+					} else {
+						spew.Dump(sv.State.Termination, ov.State.Termination)
+						fmt.Printf("STATUS INFO CSTATUS termination EQUAL\n")
+					}
+				}
+			}
+
+			if !reflect.DeepEqual(spl.Items[0].Spec, opl.Items[0].Spec) {
+				fmt.Printf("SPEC NOT EQUAL\n")
+			} else {
+				fmt.Printf("SPEC EQUAL\n")
+			}
+			if !reflect.DeepEqual(spl.Items[0].CreationTimestamp, opl.Items[0].CreationTimestamp) {
+				fmt.Printf("CT NOT EQUAL\n")
+			} else {
+				fmt.Printf("creation time: %+#v, %+#v\n", spl.Items[0].CreationTimestamp, opl.Items[0].CreationTimestamp)
+				fmt.Printf("CT EQUAL\n")
+			}
+			if !reflect.DeepEqual(spl.TypeMeta, opl.TypeMeta) {
+				fmt.Printf("TYPEMETA NOT EQUAL\n")
+			} else {
+				fmt.Printf("TYPEMETA EQUAL\n")
+			}
+		}
 		return
 	}
 
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface().(runtime.Object)
+	fmt.Printf("THREE START\n")
 	err = codec.DecodeInto(data, obj3)
 	if err != nil {
+		fmt.Printf("THREE DATA: %s\n", data)
+		fmt.Printf("THREE 2: %v: %v\n", name, err)
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}
 	if !reflect.DeepEqual(source, obj3) {
+		fmt.Printf("THREE DATA: %s\n", data)
+		fmt.Printf("THREE 3: %v: %v\n", name, err)
 		t.Errorf("3: %v: diff: %v\nCodec: %v", name, util.ObjectDiff(source, obj3), codec)
 		return
 	}
@@ -188,7 +284,7 @@ func TestSpecificKind(t *testing.T) {
 		return
 	}
 	runTest(t, v1beta1.Codec, item)
-	runTest(t, v1beta2.Codec, item)
+	//runTest(t, v1beta2.Codec, item)
 	api.Scheme.Log(nil)
 }
 

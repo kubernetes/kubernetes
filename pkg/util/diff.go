@@ -23,6 +23,10 @@ import (
 
 // StringDiff diffs a and b and returns a human readable diff.
 func StringDiff(a, b string) string {
+	fmt.Printf("BLAH\n\nA: " + a + "\n\nB: " + b + "\n\n")
+	if a == b {
+		fmt.Printf("ITS EQUAL SILLY\n\n")
+	}
 	ba := []byte(a)
 	bb := []byte(b)
 	out := []byte{}

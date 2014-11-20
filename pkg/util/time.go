@@ -18,6 +18,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -81,33 +82,42 @@ func (t Time) MarshalJSON() ([]byte, error) {
 }
 
 // SetYAML implements the yaml.Setter interface.
-func (t *Time) SetYAML(tag string, value interface{}) bool {
-	if value == nil {
-		t.Time = time.Time{}
-		return true
+//func (t *Time) SetYAML(tag string, value interface{}) bool {
+// UnmarshalYAML implements the yaml.UnmarshalYAML interface.
+func (t *Time) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	fmt.Printf("TIME UNMARSHAL\n")
+	var value *string
+	if err := unmarshal(&value); err != nil {
+		fmt.Printf("TIME UNMARSHAL 1: %s\n", err)
+		return err
 	}
 
-	str, ok := value.(string)
-	if !ok {
-		return false
+	if *value == "null" || *value == "" {
+		fmt.Printf("TIME UNMARSHAL 2")
+		return nil
 	}
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(time.RFC3339, *value)
 	if err != nil {
-		return false
+		fmt.Printf("TIME UNMARSHAL 3: %s\n", err)
+		return err
 	}
 
 	t.Time = pt
-	return true
+	fmt.Printf("TIME UNMARSHAL 4: %s\n", pt)
+	return nil
 }
 
 // GetYAML implements the yaml.Getter interface.
-func (t Time) GetYAML() (tag string, value interface{}) {
+//func (t Time) GetYAML() (tag string, value interface{}) {
+// MarshalYAML implements the yaml.MarshalYAML interface.
+func (t Time) MarshalYAML() (interface{}, error) {
+	fmt.Printf("TIME MARSHAL\n")
 	if t.IsZero() {
-		value = "null"
-		return
+		fmt.Printf("TIME MARSHAL str: %s\n", "null")
+		return "null", nil
 	}
 
-	value = t.Format(time.RFC3339)
-	return tag, value
+	fmt.Printf("TIME MARSHAL str: %s\n", t.Format(time.RFC3339))
+	return t.Format(time.RFC3339), nil
 }

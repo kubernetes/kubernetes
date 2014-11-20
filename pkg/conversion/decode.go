@@ -17,10 +17,12 @@ limitations under the License.
 package conversion
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
-	"gopkg.in/v1/yaml"
+	"github.com/davecgh/go-spew/spew"
+	"gopkg.in/v2/yaml"
 )
 
 // Decode converts a YAML or JSON string back into a pointer to an api object.
@@ -44,12 +46,16 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 		return nil, err
 	}
 
+	fmt.Printf("PreDecode Unmarshaled obj: %s\n", obj)
+	fmt.Printf("Decode Unmarshaled Data: %q\n", data)
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.
-	err = yaml.Unmarshal(data, obj)
+	err = json.Unmarshal(data, obj)
 	if err != nil {
 		return nil, err
 	}
+	spew.Dump(obj)
+	fmt.Printf("Decode Unmarshaled: %s\n", obj)
 
 	// Version and Kind should be blank in memory.
 	err = s.SetVersionAndKind("", "", obj)
@@ -63,6 +69,7 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("s.converter.Convert kind: %q, InternalVersion: %q, version: %q\n", kind, s.InternalVersion, version)
 		err = s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(version, s.InternalVersion))
 		if err != nil {
 			return nil, err
@@ -108,6 +115,7 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 
 	if objVersion == dataVersion {
 		// Easy case!
+		fmt.Printf("easy case\n")
 		err = yaml.Unmarshal(data, obj)
 		if err != nil {
 			return err
@@ -119,6 +127,7 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		}
 		// yaml is a superset of json, so we use it to decode here. That way,
 		// we understand both.
+		fmt.Printf("hard case\n")
 		err = yaml.Unmarshal(data, external)
 		if err != nil {
 			return err
