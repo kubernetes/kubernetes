@@ -48,6 +48,8 @@ grains:
   network_mode: openvswitch
   node_ip: $MINION_IP
   etcd_servers: $MASTER_IP
+  networkInterfaceName: eth1
+  apiservers: $MASTER_IP
   roles:
     - kubernetes-pool
     - kubernetes-pool-vagrant
