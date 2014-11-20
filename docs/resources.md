@@ -11,7 +11,9 @@ The resource model aims to be:
 ## The resource model
 A Kubernetes _resource_ is something that can be requested by, allocated to, or consumed by a pod or container.  Examples include memory (RAM), CPU, disk-time, and network bandwidth.
 
-Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that Kubernetes schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_. Note that the resource model currently prohibits over-committing resources; we will want to relax that restriction later.
+Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that Kubernetes schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_. 
+
+Note that the resource model currently prohibits over-committing resources; we will want to relax that restriction later.
 
 ### Resource types
 
@@ -44,26 +46,30 @@ Internally (i.e., everywhere else), Kubernetes will represent resource quantitie
 
 ### Resource specifications
 
-A _resource specification_ can be used to describe resource requests, resource allocations, and/or resource usage for a container or pod, and capacity for a node.  For example (although it would be unusual to see all of these fields simultaneously):
+Both users and a number of system components, such as schedulers, (horizontal) auto-scalers, (vertical) auto-sizers, load balancers, and worker-pool managers need to reason about resource requirements of workloads, resource capacities of nodes, and resource usage. Kubernetes divides specifications of *desired state*, aka the Spec, and representations of *current state*, aka the Status. Resource requirements and total node capacity fall into the specification category, while resource usage, characterizations derived from usage (e.g., maximum usage, histograms), and other resource demand signals (e.g., CPU load) clearly fall into the status category and are discussed in the Appendix for now.
+
+Resource requirements for a container or pod should have the following form:
 ```
-resources: [
+resourceRequirementSpec: [
   request:   [ cpu: 2.5, memory: "40Mi" ],
   limit:     [ cpu: 4.0, memory: "99Mi" ],
-  capacity:  [ cpu: 12,  memory: "128Gi" ],
-  maxusage:  [ cpu: 3.8, memory: "80Mi" ],
 ]
 ```
-
 Where:
-* _request_: the amount of resources being requested, or that were requested and have been allocated. Scheduler algorithms will use these quantities to test feasibility (whether a pod will fit onto a node).  If a container (or pod) tries to use more resources than its _request_, any associated SLOs are voided - e.g., the program it is running may be throttled (compressible resource types), or the attempt may be denied. If _request_ is omitted for a container, it defaults to _limit_ if that is explicitly specified, otherwise to an implementation-defined value; this will always be 0 for a user-defined resource type. If _request_ is omitted for a pod, it defaults to the sum of the (explicit ior implicit) _request_ values for the containers it encloses.
+* _request_ [optional]: the amount of resources being requested, or that were requested and have been allocated. Scheduler algorithms will use these quantities to test feasibility (whether a pod will fit onto a node).  If a container (or pod) tries to use more resources than its _request_, any associated SLOs are voided - e.g., the program it is running may be throttled (compressible resource types), or the attempt may be denied. If _request_ is omitted for a container, it defaults to _limit_ if that is explicitly specified, otherwise to an implementation-defined value; this will always be 0 for a user-defined resource type. If _request_ is omitted for a pod, it defaults to the sum of the (explicit ior implicit) _request_ values for the containers it encloses.
 
 * _limit_ [optional]: an upper bound or cap on the maximum amount of resources that will be made available to a container otr pod; if a container or pod uses more resources than its _limit_, it may be terminated. The _limit_ defaults to "unbounded"; in practice, this probably means the capacity of an enclosing container, pod, or node, but may result in non-deterministic behavior, especially for memory.
 
-* _capacity_: the total allocatable resources of a node.  Initially, the resources at a given scope will bound the resources of the sum of inner scopes. This may be loosened in the future to permit overcommittment.
+Total capacity for a node should have a similar structure:
+```
+resourceCapacitySpec: [
+  total:     [ cpu: 12,  memory: "128Gi" ]
+]
+```
+Where:
+* _total_: the total allocatable resources of a node.  Initially, the resources at a given scope will bound the resources of the sum of inner scopes. 
 
-* _maxusage_: the largest observed resource usage.  (See the Appendix for richer data structures.)
-
-Notes:
+#### Notes
 
   * It is an error to specify the same resource type more than once in each list.
 
@@ -83,7 +89,7 @@ The following resource types are predefined ("reserved") by Kubernetes in the `r
   * Units: Kubernetes Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "Kubernetes CPU")
   * Internal representation: milli-KCUs
   * Compressible? yes
-  * Qualities: [this is a placeholder for the kind of thing that may be supported in the future]
+  * Qualities: this is a placeholder for the kind of thing that may be supported in the future -- see [#147](https://github.com/GoogleCloudPlatform/kubernetes/issues/147)
     * [future] `schedulingLatency`: as per lmctfy
     * [future] `cpuConversionFactor`: property of a node: the speed of a CPU core on the node's processor divided by the speed of the canonical Kubernetes CPU (a floating point value; default = 1.0).
 
@@ -135,13 +141,16 @@ The defined properties are as follows:
 
 The following are planned future extensions to the resource model, included here to encourage comments.
 
-## Extended usage data
+## Usage data
+
+Because resource usage and related metrics change continuously, need to be tracked over time (i.e., historically), can be characterized in a variety of ways, and are fairly voluminous, we will not include usage in core API objects, such as [Pods](pods.md) and Nodes, but will provide separate APIs for accessing and managing that data. See the Appendix for possible representations of usage data, but the representation we'll use is TBD.
 
 Singleton values for observed and predicted future usage will rapidly prove inadequate, so we will support the following structure for extended usage information: 
 
 ```
-resources: [
+resourceStatus: [
   usage:     [ cpu: <CPU-info>, memory: <memory-info> ],
+  maxusage:  [ cpu: <CPU-info>, memory: <memory-info> ],
   predicted: [ cpu: <CPU-info>, memory: <memory-info> ],
 ]
 ```
