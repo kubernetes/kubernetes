@@ -390,7 +390,7 @@ func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
 	for i := range pod.Spec.Containers {
 		here := &pod.Spec.Containers[i]
 		if here == container {
-			return fmt.Sprintf("spec.containers[%n]", i), nil
+			return fmt.Sprintf("spec.containers[%d]", i), nil
 		}
 	}
 	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)

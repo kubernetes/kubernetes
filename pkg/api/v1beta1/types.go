@@ -549,7 +549,7 @@ type Status struct {
 	// "Failure" or "Working" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
-	Reason StatusReason `json:"reason,omitempty" yaml:"reason,omitempty" description:"machine-readable description of why this operation is in the "Failure" or "Working" status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"`
+	Reason StatusReason `json:"reason,omitempty" yaml:"reason,omitempty" description:"machine-readable description of why this operation is in the 'Failure' or 'Working' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"`
 	// Extended data associated with the reason.  Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by

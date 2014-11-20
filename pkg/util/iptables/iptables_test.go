@@ -399,7 +399,7 @@ func TestGetIptablesHasCheckCommand(t *testing.T) {
 			t.Errorf("Expected error: %v, Got error: %v", testCase.Err, err)
 		}
 		if err == nil && testCase.Expected != check {
-			t.Errorf("Expected result: %v, Got result: %v")
+			t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, check)
 		}
 	}
 }

@@ -95,7 +95,7 @@ func SetList(list Object, objects []Object) error {
 		} else if src.Type().ConvertibleTo(dest.Type()) {
 			dest.Set(src.Convert(dest.Type()))
 		} else {
-			return fmt.Errorf("item[%v]: Type mismatch: Expected %v, got %v", dest.Type(), src.Type())
+			return fmt.Errorf("item[%d]: Type mismatch: Expected %v, got %v", i, dest.Type(), src.Type())
 		}
 	}
 	items.Set(slice)

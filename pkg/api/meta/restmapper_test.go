@@ -82,7 +82,7 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 		v, k, err := mapper.VersionAndKindForResource(testCase.Resource)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
-			t.Errorf("%d: unexpected error behavior %f: %v", i, testCase.Err, err)
+			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
 			continue
 		}
 		if v != testCase.APIVersion || k != testCase.Kind {
@@ -147,7 +147,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		mapping, err := mapper.RESTMapping(testCase.APIVersion, testCase.Kind)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
-			t.Errorf("%d: unexpected error behavior %f: %v", i, testCase.Err, err)
+			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
 		}
 		if hasErr {
 			continue

@@ -230,7 +230,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	} else if response.Action == "set" {
 		service, err := etcdResponseToService(response)
 		if err != nil {
-			glog.Errorf("Failed to parse %s Port: %s", response, err)
+			glog.Errorf("Failed to parse %#v Port: %s", response, err)
 			return
 		}
 

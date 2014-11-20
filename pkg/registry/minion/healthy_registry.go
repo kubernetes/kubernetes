@@ -81,7 +81,7 @@ func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.Mini
 		if status == health.Healthy {
 			result.Items = append(result.Items, minion)
 		} else {
-			glog.Errorf("%s failed a health check, ignoring.", minion)
+			glog.Errorf("%#v failed a health check, ignoring.", minion)
 		}
 	}
 	return result, nil

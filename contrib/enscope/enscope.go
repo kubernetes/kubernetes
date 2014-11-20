@@ -132,8 +132,6 @@ func enscope(parent string, spec EnscopeSpec, in interface{}) (out interface{}, 
 			}
 		}
 		return o, nil
-	default:
-		return in, nil
 	}
 	return in, nil
 }

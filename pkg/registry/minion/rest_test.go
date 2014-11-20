@@ -152,7 +152,7 @@ func TestMinionStorageValidUpdate(t *testing.T) {
 		"baz": "home",
 	}
 	if _, err = storage.Update(ctx, minion); err != nil {
-		t.Error("Unexpected error: %v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
