@@ -86,7 +86,7 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 	var info version.Info
 	err = json.Unmarshal(body, &info)
 	if err != nil {
-		return nil, fmt.Errorf("Got '%s': %v", string(body), err)
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
 }
@@ -100,7 +100,7 @@ func (c *Client) ServerAPIVersions() (*api.APIVersions, error) {
 	var v api.APIVersions
 	err = json.Unmarshal(body, &v)
 	if err != nil {
-		return nil, fmt.Errorf("Got '%s': %v", string(body), err)
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &v, nil
 }

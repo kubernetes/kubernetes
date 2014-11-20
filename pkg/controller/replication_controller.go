@@ -204,7 +204,7 @@ func (rm *ReplicationManager) synchronize() {
 			glog.V(4).Infof("periodic sync of %v", controllers[ix].Name)
 			err := rm.syncHandler(controllers[ix])
 			if err != nil {
-				glog.Errorf("Error synchronizing: %#v", err)
+				glog.Errorf("Error synchronizing: %v", err)
 			}
 		}(ix)
 	}

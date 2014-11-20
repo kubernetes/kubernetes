@@ -31,7 +31,7 @@ func (r *udpEchoServer) Loop() {
 	for {
 		n, cliAddr, err := r.ReadFrom(buffer[0:])
 		if err != nil {
-			fmt.Printf("ReadFrom failed: %#v\n", err)
+			fmt.Printf("ReadFrom failed: %v\n", err)
 			continue
 		}
 		r.WriteTo(buffer[0:n], cliAddr)

@@ -711,7 +711,7 @@ func TestCreateServiceWithConflictingNamespace(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
-		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%v'", err.Error())
+		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
 }
 
@@ -729,6 +729,6 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
-		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%v'", err.Error())
+		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
 }

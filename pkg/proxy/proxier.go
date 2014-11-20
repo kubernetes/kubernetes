@@ -82,7 +82,7 @@ func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Prox
 	for _, retryTimeout := range endpointDialTimeout {
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
 		if err != nil {
-			glog.Errorf("Couldn't find an endpoint for %s %v", service, err)
+			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			return nil, err
 		}
 		glog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
@@ -296,7 +296,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 		}
 		return &udpProxySocket{conn}, nil
 	}
-	return nil, fmt.Errorf("Unknown protocol %q", protocol)
+	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }
 
 // Proxier is a simple proxy for TCP connections between a localhost:lport
@@ -316,13 +316,13 @@ func NewProxier(loadBalancer LoadBalancer, listenAddress net.IP, iptables iptabl
 	glog.Infof("Initializing iptables")
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
-		glog.Errorf("Failed to initialize iptables: %s", err)
+		glog.Errorf("Failed to initialize iptables: %v", err)
 		return nil
 	}
 	// Flush old iptables rules (since the bound ports will be invalid after a restart).
 	// When OnUpdate() is first called, the rules will be recreated.
 	if err := iptablesFlush(iptables); err != nil {
-		glog.Errorf("Failed to flush iptables: %s", err)
+		glog.Errorf("Failed to flush iptables: %v", err)
 		return nil
 	}
 	return &Proxier{
@@ -343,7 +343,7 @@ func (proxier *Proxier) SyncLoop() {
 		case <-time.After(syncInterval):
 			glog.V(2).Infof("Periodic sync")
 			if err := iptablesInit(proxier.iptables); err != nil {
-				glog.Errorf("Failed to ensure iptables: %s", err)
+				glog.Errorf("Failed to ensure iptables: %v", err)
 			}
 			proxier.ensurePortals()
 		}
@@ -358,7 +358,7 @@ func (proxier *Proxier) ensurePortals() {
 	for name, info := range proxier.serviceMap {
 		err := proxier.openPortal(name, info)
 		if err != nil {
-			glog.Errorf("Failed to ensure portal for %q: %s", name, err)
+			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
 		}
 	}
 }
@@ -449,17 +449,17 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			glog.V(4).Infof("Something changed for service %q: stopping it", service.Name)
 			err := proxier.closePortal(service.Name, info)
 			if err != nil {
-				glog.Errorf("Failed to close portal for %q: %s", service.Name, err)
+				glog.Errorf("Failed to close portal for %q: %v", service.Name, err)
 			}
 			err = proxier.stopProxy(service.Name, info)
 			if err != nil {
-				glog.Errorf("Failed to stop service %q: %s", service.Name, err)
+				glog.Errorf("Failed to stop service %q: %v", service.Name, err)
 			}
 		}
 		glog.V(1).Infof("Adding new service %q at %s:%d/%s (local :%d)", service.Name, serviceIP, service.Spec.Port, service.Spec.Protocol, service.Spec.ProxyPort)
 		info, err := proxier.addServiceOnPort(service.Name, service.Spec.Protocol, service.Spec.ProxyPort, udpIdleTimeout)
 		if err != nil {
-			glog.Errorf("Failed to start proxy for %q: %+v", service.Name, err)
+			glog.Errorf("Failed to start proxy for %q: %v", service.Name, err)
 			continue
 		}
 		info.portalIP = serviceIP
@@ -469,7 +469,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		}
 		err = proxier.openPortal(service.Name, info)
 		if err != nil {
-			glog.Errorf("Failed to open portal for %q: %s", service.Name, err)
+			glog.Errorf("Failed to open portal for %q: %v", service.Name, err)
 		}
 	}
 	proxier.mu.Lock()
@@ -479,11 +479,11 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			glog.V(1).Infof("Stopping service %q", name)
 			err := proxier.closePortal(name, info)
 			if err != nil {
-				glog.Errorf("Failed to close portal for %q: %s", name, err)
+				glog.Errorf("Failed to close portal for %q: %v", name, err)
 			}
 			err = proxier.stopProxyInternal(name, info)
 			if err != nil {
-				glog.Errorf("Failed to stop service %q: %s", name, err)
+				glog.Errorf("Failed to stop service %q: %v", name, err)
 			}
 		}
 	}

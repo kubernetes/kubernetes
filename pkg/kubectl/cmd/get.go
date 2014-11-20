@@ -79,7 +79,7 @@ Examples:
 			// print the current object
 			if !isWatchOnly {
 				if err := printer.PrintObj(obj, out); err != nil {
-					checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
+					checkErr(fmt.Errorf("unable to output the provided object: %v", err))
 				}
 			}
 

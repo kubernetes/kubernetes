@@ -294,7 +294,7 @@ func (a genericAccessor) SetSelfLink(selfLink string) {
 func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("Couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
 	}
 	v, err := conversion.EnforcePtr(dest)
 	if err != nil {
@@ -309,7 +309,7 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 		v.Set(field.Convert(v.Type()))
 		return nil
 	}
-	return fmt.Errorf("Couldn't assign/convert %v to %v", field.Type(), v.Type())
+	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
 // extractFromTypeMeta extracts pointers to version and kind fields from an object

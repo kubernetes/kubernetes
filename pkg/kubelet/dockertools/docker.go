@@ -99,7 +99,7 @@ var dockerVersionWithExec = []uint{1, 1, 3}
 func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) {
 	env, err := d.client.Version()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get docker server version - %s", err)
+		return nil, fmt.Errorf("failed to get docker server version - %v", err)
 	}
 	version := []uint{}
 	for _, entry := range *env {
@@ -108,7 +108,7 @@ func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) 
 			for _, elem := range elems {
 				val, err := strconv.ParseUint(elem, 10, 32)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse docker server version (%s) - %s", entry, err)
+					return nil, fmt.Errorf("failed to parse docker server version %q: %v", entry, err)
 				}
 				version = append(version, uint(val))
 			}
@@ -169,7 +169,7 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	}
 	execObj, err := d.client.CreateExec(createOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %s", err)
+		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %v", err)
 	}
 	var buf bytes.Buffer
 	wrBuf := bufio.NewWriter(&buf)
@@ -403,7 +403,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 			if found {
 				data, err := ioutil.ReadFile(path)
 				if err != nil {
-					glog.Errorf("Error on reading termination-log %s(%v)", path, err)
+					glog.Errorf("Error on reading termination-log %s: %v", path, err)
 				} else {
 					containerStatus.State.Termination.Message = string(data)
 				}

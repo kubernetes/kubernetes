@@ -241,7 +241,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		}
 		r.body = bytes.NewBuffer(data)
 	default:
-		r.err = fmt.Errorf("Unknown type used for body: %#v", obj)
+		r.err = fmt.Errorf("unknown type used for body: %#v", obj)
 	}
 	return r
 }
@@ -305,7 +305,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		if resp.Body != nil {
 			body, _ = ioutil.ReadAll(resp.Body)
 		}
-		return nil, fmt.Errorf("For request '%v', got status: %v\nbody: %v", req.URL, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("for request '%v', got status: %v\nbody: %v", req.URL, resp.StatusCode, string(body))
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
 }

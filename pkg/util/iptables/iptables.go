@@ -89,7 +89,7 @@ func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 				return true, nil
 			}
 		}
-		return false, fmt.Errorf("error creating chain %q: %s: %s", chain, err, out)
+		return false, fmt.Errorf("error creating chain %q: %v: %s", chain, err, out)
 	}
 	return false, nil
 }
@@ -103,7 +103,7 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 
 	out, err := runner.run(opFlushChain, fullArgs)
 	if err != nil {
-		return fmt.Errorf("error flushing chain %q: %s: %s", chain, err, out)
+		return fmt.Errorf("error flushing chain %q: %v: %s", chain, err, out)
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func (runner *runner) EnsureRule(table Table, chain Chain, args ...string) (bool
 	}
 	out, err := runner.run(opAppendRule, fullArgs)
 	if err != nil {
-		return false, fmt.Errorf("error appending rule: %s: %s", err, out)
+		return false, fmt.Errorf("error appending rule: %v: %s", err, out)
 	}
 	return false, nil
 }
@@ -145,7 +145,7 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 	}
 	out, err := runner.run(opDeleteRule, fullArgs)
 	if err != nil {
-		return fmt.Errorf("error deleting rule: %s: %s", err, out)
+		return fmt.Errorf("error deleting rule: %v: %s", err, out)
 	}
 	return nil
 }
@@ -191,7 +191,7 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
 	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("error checking rule: %s", err)
+		return false, fmt.Errorf("error checking rule: %v", err)
 	}
 
 	argset := util.NewStringSet(args...)
@@ -225,7 +225,7 @@ func (runner *runner) checkRuleUsingCheck(args []string) (bool, error) {
 			return false, nil
 		}
 	}
-	return false, fmt.Errorf("error checking rule: %s: %s", err, out)
+	return false, fmt.Errorf("error checking rule: %v: %s", err, out)
 }
 
 type operation string
@@ -263,7 +263,7 @@ func extractIptablesVersion(str string) (int, int, int, error) {
 	versionMatcher := regexp.MustCompile("v([0-9]+)\\.([0-9]+)\\.([0-9]+)")
 	result := versionMatcher.FindStringSubmatch(str)
 	if result == nil {
-		return 0, 0, 0, fmt.Errorf("No iptables version found in string: %s", str)
+		return 0, 0, 0, fmt.Errorf("no iptables version found in string: %s", str)
 	}
 
 	v1, err := strconv.Atoi(result[1])

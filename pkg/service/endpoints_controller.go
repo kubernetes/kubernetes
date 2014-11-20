@@ -86,7 +86,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					},
 				}
 			} else {
-				glog.Errorf("Error getting endpoints: %#v", err)
+				glog.Errorf("Error getting endpoints: %v", err)
 				continue
 			}
 		}
@@ -106,7 +106,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 		}
 		if err != nil {
-			glog.Errorf("Error updating endpoints: %#v", err)
+			glog.Errorf("Error updating endpoints: %v", err)
 			continue
 		}
 	}

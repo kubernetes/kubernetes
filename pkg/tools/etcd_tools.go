@@ -378,7 +378,7 @@ func checkEtcd(host string) error {
 		return err
 	}
 	if !strings.HasPrefix("etcd", string(body)) {
-		return fmt.Errorf("Unknown server: %s", string(body))
+		return fmt.Errorf("unknown server: %s", string(body))
 	}
 	return nil
 }

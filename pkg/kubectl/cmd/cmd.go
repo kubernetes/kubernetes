@@ -52,7 +52,7 @@ func NewFactory() *Factory {
 		Describer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
 			describer, ok := kubectl.DescriberFor(mapping.Kind, getKubeClient(cmd))
 			if !ok {
-				return nil, fmt.Errorf("No description has been implemented for %q", mapping.Kind)
+				return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
 			}
 			return describer, nil
 		},

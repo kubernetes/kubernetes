@@ -99,7 +99,7 @@ func NewConflict(kind, name string, err error) error {
 			Kind: kind,
 			ID:   name,
 		},
-		Message: fmt.Sprintf("%s %q cannot be updated: %s", kind, name, err),
+		Message: fmt.Sprintf("%s %q cannot be updated: %v", kind, name, err),
 	}}
 }
 
@@ -124,7 +124,7 @@ func NewInvalid(kind, name string, errs ValidationErrorList) error {
 			ID:     name,
 			Causes: causes,
 		},
-		Message: fmt.Sprintf("%s %q is invalid: %s", kind, name, errs.ToError()),
+		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, errs.ToError()),
 	}}
 }
 

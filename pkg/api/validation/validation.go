@@ -434,7 +434,7 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 				if services.Items[i].Name != service.Name &&
 					services.Items[i].Spec.CreateExternalLoadBalancer &&
 					services.Items[i].Spec.Port == service.Spec.Port {
-					allErrs = append(allErrs, errs.NewConflict("service", service.Name, fmt.Errorf("Port: %d is already in use", service.Spec.Port)))
+					allErrs = append(allErrs, errs.NewConflict("service", service.Name, fmt.Errorf("port: %d is already in use", service.Spec.Port)))
 					break
 				}
 			}
@@ -548,7 +548,7 @@ func ValidateMinionUpdate(oldMinion *api.Minion, minion *api.Minion) errs.Valida
 	oldMinion.Labels = minion.Labels
 	oldMinion.ObjectMeta.Labels = minion.ObjectMeta.Labels
 	if !reflect.DeepEqual(oldMinion, minion) {
-		allErrs = append(allErrs, fmt.Errorf("Update contains more than labels changes"))
+		allErrs = append(allErrs, fmt.Errorf("update contains more than labels changes"))
 	}
 	return allErrs
 }

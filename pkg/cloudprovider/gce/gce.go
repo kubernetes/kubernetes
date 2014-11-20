@@ -78,7 +78,7 @@ func getProjectAndZone() (string, string, error) {
 	}
 	parts := strings.Split(result, "/")
 	if len(parts) != 4 {
-		return "", "", fmt.Errorf("Unexpected response: %s", result)
+		return "", "", fmt.Errorf("unexpected response: %s", result)
 	}
 	return parts[1], parts[3], nil
 }
@@ -91,7 +91,7 @@ func getInstanceID() (string, error) {
 	}
 	parts := strings.Split(result, ".")
 	if len(parts) == 0 {
-		return "", fmt.Errorf("Unexpected response: %s", result)
+		return "", fmt.Errorf("unexpected response: %s", result)
 	}
 	return parts[0], nil
 }
@@ -266,7 +266,7 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	}
 	ip := net.ParseIP(res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	if ip == nil {
-		return nil, fmt.Errorf("Invalid network IP: %s", res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+		return nil, fmt.Errorf("invalid network IP: %s", res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
 	return ip, nil
 }
