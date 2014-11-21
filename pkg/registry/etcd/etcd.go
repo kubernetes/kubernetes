@@ -152,7 +152,7 @@ func (r *Registry) GetPod(ctx api.Context, id string) (*api.Pod, error) {
 	return &pod, nil
 }
 
-func makeContainerKey(machine string) string {
+func makeBoundPodsKey(machine string) string {
 	return "/registry/nodes/" + machine + "/boundpods"
 }
 
@@ -207,7 +207,7 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 		return err
 	}
 	// Doing the constraint check this way provides atomicity guarantees.
-	contKey := makeContainerKey(machine)
+	contKey := makeBoundPodsKey(machine)
 	err = r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
 		boundPodList := in.(*api.BoundPods)
 		boundPodList.Items = append(boundPodList.Items, *boundPod)
@@ -257,7 +257,7 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 		return nil
 	}
 
-	containerKey := makeContainerKey(podOut.Status.Host)
+	containerKey := makeBoundPodsKey(podOut.Status.Host)
 	return r.AtomicUpdate(containerKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
 		boundPods := in.(*api.BoundPods)
 		for ix := range boundPods.Items {
@@ -295,7 +295,7 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 		return nil
 	}
 	// Next, remove the pod from the machine atomically.
-	contKey := makeContainerKey(machine)
+	contKey := makeBoundPodsKey(machine)
 	return r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
 		pods := in.(*api.BoundPods)
 		newPods := make([]api.BoundPod, 0, len(pods.Items))
@@ -395,7 +395,7 @@ func makeServiceListKey(ctx api.Context) string {
 	return MakeEtcdListKey(ctx, ServicePath)
 }
 
-// makePodKey constructs etcd paths to service items enforcing namespace rules.
+// makeServiceKey constructs etcd paths to service items enforcing namespace rules.
 func makeServiceKey(ctx api.Context, name string) (string, error) {
 	return MakeEtcdItemKey(ctx, ServicePath, name)
 }
