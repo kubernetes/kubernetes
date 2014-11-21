@@ -107,3 +107,8 @@ func TestCache(t *testing.T) {
 func TestFIFOCache(t *testing.T) {
 	doTestStore(t, NewFIFO())
 }
+
+func TestUndeltaStore(t *testing.T) {
+	nop := func([]interface{}) {}
+	doTestStore(t, NewUndeltaStore(nop))
+}
