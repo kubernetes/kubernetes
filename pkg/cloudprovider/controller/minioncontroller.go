@@ -54,19 +54,39 @@ func NewMinionController(
 // Run starts syncing instances from cloudprovider periodically, or create initial minion list.
 func (s *MinionController) Run(period time.Duration) {
 	if s.cloud != nil && len(s.matchRE) > 0 {
-		go util.Forever(func() { s.Sync() }, period)
+		go util.Forever(func() { s.SyncCloud() }, period)
 	} else {
-		for _, minionID := range s.minions {
-			s.kubeClient.Minions().Create(&api.Minion{
-				ObjectMeta:    api.ObjectMeta{Name: minionID},
-				NodeResources: *s.staticResources,
-			})
-		}
+		go s.SyncStatic(period)
 	}
 }
 
-// Sync syncs list of instances from cloudprovider to master etcd registry.
-func (s *MinionController) Sync() error {
+// SyncStatic registers list of machines from command line flag. It returns after successful
+// registration of all machines.
+func (s *MinionController) SyncStatic(period time.Duration) error {
+	registered := util.NewStringSet()
+	for {
+		for _, minionID := range s.minions {
+			if registered.Has(minionID) {
+				continue
+			}
+			_, err := s.kubeClient.Minions().Create(&api.Minion{
+				ObjectMeta:    api.ObjectMeta{Name: minionID},
+				NodeResources: *s.staticResources,
+			})
+			if err == nil {
+				registered.Insert(minionID)
+			}
+		}
+		if registered.Len() == len(s.minions) {
+			return nil
+		}
+		time.Sleep(period)
+	}
+	return nil
+}
+
+// SyncCloud syncs list of instances from cloudprovider to master etcd registry.
+func (s *MinionController) SyncCloud() error {
 	matches, err := s.cloudMinions()
 	if err != nil {
 		return err
@@ -84,14 +104,20 @@ func (s *MinionController) Sync() error {
 	for _, minion := range matches.Items {
 		if _, ok := minionMap[minion.Name]; !ok {
 			glog.Infof("Create minion in registry: %s", minion.Name)
-			s.kubeClient.Minions().Create(&minion)
+			_, err = s.kubeClient.Minions().Create(&minion)
+			if err != nil {
+				glog.Errorf("Create minion error: %s", minion.Name)
+			}
 		}
 		delete(minionMap, minion.Name)
 	}
 
 	for minionID := range minionMap {
 		glog.Infof("Delete minion from registry: %s", minionID)
-		s.kubeClient.Minions().Delete(minionID)
+		err = s.kubeClient.Minions().Delete(minionID)
+		if err != nil {
+			glog.Errorf("Delete minion error: %s", minionID)
+		}
 	}
 	return nil
 }
