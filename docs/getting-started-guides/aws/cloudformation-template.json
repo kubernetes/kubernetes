@@ -88,7 +88,7 @@
         "FromPort": "1",
         "ToPort": "65535",
         "SourceSecurityGroupId": {
-          "Fn::GetAtt" : [ "KubernetesSecurityGroup", "GroupId" ] 
+          "Fn::GetAtt" : [ "KubernetesSecurityGroup", "GroupId" ]
         }
       }
     },
@@ -155,11 +155,12 @@
           "        Requires=etcd.service\n",
           "        After=etcd.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-apiserver\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/v0.5.2/bin/linux/amd64/kube-apiserver\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver\n",
           "        ExecStart=/opt/bin/kube-apiserver \\\n",
           "        --address=0.0.0.0 \\\n",
           "        --port=8080 \\\n",
+          "        --portal_net 10.1.0.0/16 \\\n",
           "        --etcd_servers=http://127.0.0.1:4001 \\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
@@ -173,7 +174,7 @@
           "        Requires=kube-apiserver.service\n",
           "        After=kube-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-controller-manager\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/v0.5.2/bin/linux/amd64/kube-controller-manager\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager\n",
           "        ExecStart=/opt/bin/kube-controller-manager \\\n",
           "        --master=127.0.0.1:8080 \\\n",
@@ -189,7 +190,7 @@
           "        Requires=kube-apiserver.service\n",
           "        After=kube-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-scheduler\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/v0.5.2/bin/linux/amd64/kube-scheduler\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler\n",
           "        ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080\n",
           "        Restart=always\n",
@@ -203,9 +204,9 @@
           "        Requires=etcd.service\n",
           "        After=etcd.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/proxy\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/proxy\n",
-          "        ExecStart=/opt/bin/proxy \\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/v0.5.2/bin/linux/amd64/kube-proxy\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy\n",
+          "        ExecStart=/opt/bin/kube-proxy \\\n",
           "        --etcd_servers=http://127.0.0.1:4001 \\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
@@ -304,7 +305,7 @@
           "        After=setup-network-environment.service\n\n",
           "        [Service]\n",
           "        EnvironmentFile=/etc/network-environment\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kubelet\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/v0.5.2/bin/linux/amd64/kubelet\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet\n",
           "        ExecStart=/opt/bin/kubelet \\\n",
           "        --address=0.0.0.0 \\\n",
@@ -323,9 +324,9 @@
           "        Requires=setup-network-environment.service\n",
           "        After=setup-network-environment.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/proxy\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/proxy\n",
-          "        ExecStart=/opt/bin/proxy \\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/v0.5.2/bin/linux/amd64/kube-proxy\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy\n",
+          "        ExecStart=/opt/bin/kube-proxy \\\n",
           "        --etcd_servers=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":4001\\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
@@ -345,7 +346,7 @@
         "MinSize": "3",
         "MaxSize": "12",
         "DesiredCapacity": {"Ref": "ClusterSize"}
-      } 
+      }
     }
   },
   "Outputs": {
