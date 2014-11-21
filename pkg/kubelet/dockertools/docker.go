@@ -311,6 +311,9 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 		return nil, err
 	}
 	for _, dockerContainer := range containers {
+		if len(dockerContainer.Names) == 0 {
+			continue
+		}
 		dockerPodName, dockerUUID, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
 		if dockerPodName != podFullName {
 			continue
