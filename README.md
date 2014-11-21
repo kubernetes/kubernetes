@@ -28,8 +28,6 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [CloudStack](docs/getting-started-guides/cloudstack.md)
   * [Rackspace](docs/getting-started-guides/rackspace.md)
   * [vSphere](docs/getting-started-guides/vsphere.md)
-
-* The following clouds are currently broken at Kubernetes head.  Please sync your client to `v0.3` (`git checkout v0.3`) to use these:
   * [Microsoft Azure](docs/getting-started-guides/azure.md)
 
 * [Kubernetes 101](examples/walkthrough)

@@ -26,11 +26,13 @@ umask $umask
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-# Turn on debugging for salt-minion
-# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
 
 hostnamef=$(hostname -f)
-sudo apt-get install ipcalc
+apt-get install -y ipcalc
 netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
 network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')
 cbrstring="$network $netmask"
@@ -46,8 +48,10 @@ grains:
   cbr-string: $cbrstring
 EOF
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-curl -L http://bootstrap.saltstack.com | sh -s -- -X
+install-salt
+
+# Wait a few minutes and trigger another Salt run to better recover from
+# any transient errors.
+echo "Sleeping 180"
+sleep 180
+salt-call state.highstate || true

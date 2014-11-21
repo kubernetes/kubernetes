@@ -35,7 +35,7 @@ cat <<EOF >/etc/salt/master.d/reactor.conf
 # React to new minions starting by running highstate on them.
 reactor:
   - 'salt/minion/*/start':
-    - /srv/reactor/start.sls
+    - /srv/reactor/highstate-new.sls
 EOF
 
 mkdir -p /srv/salt/nginx
@@ -49,12 +49,20 @@ echo "$SERVER_CRT" > /etc/openvpn/server.crt
 echo "$SERVER_KEY" > /etc/openvpn/server.key
 umask $umask
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-#
-# -M installs the master
-curl -L http://bootstrap.saltstack.com | sh -s -- -M -X
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
 
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
+cat <<EOF >/etc/salt/master.d/log-level-debug.d
+log_level: debug
+log_level_logfile: debug
+EOF
+
+install-salt --master
+
+# Wait a few minutes and trigger another Salt run to better recover from
+# any transient errors.
+echo "Sleeping 180"
+sleep 180
+salt-call state.highstate || true
