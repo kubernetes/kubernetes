@@ -113,6 +113,15 @@ func TestSelectorMatches(t *testing.T) {
 	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", labelset)
 }
 
+func TestOneTermEqualSelector(t *testing.T) {
+	if !OneTermEqualSelector("x", "y").Matches(Set{"x": "y"}) {
+		t.Errorf("No match when match expected.")
+	}
+	if OneTermEqualSelector("x", "y").Matches(Set{"x": "z"}) {
+		t.Errorf("Match when none expected.")
+	}
+}
+
 func expectMatchDirect(t *testing.T, selector, ls Set) {
 	if !SelectorFromSet(selector).Matches(ls) {
 		t.Errorf("Wanted %s to match '%s', but it did not.\n", selector, ls)
