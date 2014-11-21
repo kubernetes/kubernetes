@@ -6,25 +6,34 @@ We can verify that a Fluentd collector is running by ssh-ing into one of the nod
 
 ![A Kubernetes Cluster in Google's Developer Console](dev-console.png)
 
-Let's take a look in minion 1 (i.e. node 1).
+Let's take a look in node 1.
 
-```shell
+```console
 $ gcloud compute --project "kubernetes-elk" ssh --zone "us-central1-b" "kubernetes-minion-1"
 ...
 $ sudo -s
 $ docker ps
+satnam@kubernetes-minion-1:~$ sudo -s
+root@kubernetes-minion-1:/home/satnam# docker ps
 CONTAINER ID        IMAGE                                     COMMAND                CREATED             STATUS              PORTS                    NAMES
-0e71c3db878a        google/cadvisor:0.4.1                     "/usr/bin/cadvisor /   7 hours ago         Up 7 hours                                   k8s_cadvisor.417cd83c_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0.default.file_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0_5f2d8a1c
-6ea1901525c3        kubernetes/fluentd-elasticsearch:latest   "/run.sh"              7 hours ago         Up 7 hours                                   k8s_fluentd-es.1b9eab35_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde.default.file_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde_c22dca2a
-95a3d765c82f        kubernetes/pause:go                       "/pause"               7 hours ago         Up 7 hours          0.0.0.0:4194->8080/tcp   k8s_net.f72d85c8_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0.default.file_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0_1d5ecdfa
-95251be68df0        kubernetes/pause:go                       "/pause"               7 hours ago         Up 7 hours                                   k8s_net.fadb6b63_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde.default.file_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde_9517d2c0
+a309846b005c        ubuntu:14.04                              "\"bash -c 'i=\"0\";   3 days ago          Up 3 days                                    k8s_synth-lgr.ede24f12_synthetic-logger-10lps-pod.default.etcd_35c7b808-6c45-11e4-a194-42010af05d02_2abc4cd9                                
+d8d60784806b        kubernetes/pause:latest                   "/pause"               3 days ago          Up 3 days                                    k8s_net.dbcb7509_synthetic-logger-10lps-pod.default.etcd_35c7b808-6c45-11e4-a194-42010af05d02_be1026dd                                      
+2f47a6219e82        kubernetes/heapster:0.2                   "/run.sh /bin/bash"    3 days ago          Up 3 days                                    k8s_heapster.24e32151_heapster.default.etcd_511e5a9d-6c39-11e4-a194-42010af05d02_b5ed97c1                                                   
+7dfd030bab93        kubernetes/fluentd-elasticsearch:latest   "/run.sh"              3 days ago          Up 3 days                                    k8s_fluentd-es.f0eebcdc_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde.default.file_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde_90bbba27   
+9a869d00c17b        ubuntu:14.04                              "\"bash -c 'i=\"0\";   3 days ago          Up 3 days                                    k8s_synth-lgr.f0d3e2b_synthetic-logger-0.25lps-pod.default.etcd_7c7d3b8d-6c39-11e4-a194-42010af05d02_d3c519d5                               
+6abc80cadf3f        kubernetes/pause:latest                   "/pause"               3 days ago          Up 3 days                                    k8s_net.dbcb7509_synthetic-logger-0.25lps-pod.default.etcd_7c7d3b8d-6c39-11e4-a194-42010af05d02_a8e3b763                                    
+9b2787803043        kubernetes/pause:latest                   "/pause"               3 days ago          Up 3 days                                    k8s_net.dbcb7509_heapster.default.etcd_511e5a9d-6c39-11e4-a194-42010af05d02_f3fac3cc                                                        
+fda05d821371        kubernetes/pause:latest                   "/pause"               3 days ago          Up 3 days                                    k8s_net.dbcb7509_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde.default.file_fluentdesmanife2u464h05heqcpotoddodpnehjaqsde_936da1a7          
+04b1225d0ed3        google/cadvisor:0.5.0                     "/usr/bin/cadvisor"    3 days ago          Up 3 days                                    k8s_cadvisor.b0dae998_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0.default.file_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0_70af8640     
+ecf63dd4aa43        kubernetes/pause:latest                   "/pause"               3 days ago          Up 3 days           0.0.0.0:4194->8080/tcp   k8s_net.a0f18f6e_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0.default.file_cadvisormanifes12uqn2ohido76855gdecd9roadm7l0_9e43beba          
 ```
-There are two containers running running on this node. The container ```google/cadvisor``` provides monitoring support and the containers ```kubernetes/fluentd-elasticsearch``` is constantly looking at the logs files of Docker containers in the directories ```/var/lib/docker/containers/*``` and sending (tailing)
+
+There are several containers running running on this node. The containers `google/cadvisor` and `kubernetes/heapster` provide monitoring and profiling support. The container `kubernetes/fluentd-elasticsearch` is constantly looking at the logs files of Docker containers in the directories `/var/lib/docker/containers/*` and sending (tailing)
 this information in Logstash format to port 9200 on the local node.
 
 We can look at the pod specification used to launch the Fluentd Elasticsearch container which is stored as a manifest file on the node.
 
-```shell
+```console
 $ cd /etc/kubernetes/manifests/
 $ ls
 cadvisor.manifest  fluentd-es.manifest
@@ -45,11 +54,11 @@ volumes:
         path: /var/lib/docker/containers
 ```
 
-This is just a regular pod specification which you could have run using ```kubectl.sh```. However, what you could not have done yourself is run an instance of this pod specification on each node which is what is accomplished with the manifest file at cluster creation time. Notice that CAdvisor also has a manifest pod specification.
+This is just a regular pod specification which you could have run using `kubectl.sh`. However, what you could not have done yourself is run an instance of this pod specification on each node which is what is accomplished with the manifest file at cluster creation time. Notice that CAdvisor also has a manifest pod specification.
 
 We can connect to a running Fluentd Elasticsearch container to inspect the Fluentd configuration.
 
-```shell
+```console
 $ docker exec -ti 3c3816c0cfc6 bash
 $ cat /etc/td-agent/td-agent.conf
 ...
@@ -72,9 +81,10 @@ $ cat /etc/td-agent/td-agent.conf
    flush_interval 5s
 </match>
 ```
+
 This configures Fluentd to gather all the Docker container log files and send them in Logstash format to port 9200.
 
-Once you have turned up a Kubernetes cluster with the environment variable``FLUENTD_ELASTICSEARCH=true`` you can use the ``Makefile`` in this GitHub directory to try out some logging experiments.
+Once you have turned up a Kubernetes cluster you can use the `Makefile` in this GitHub directory to try out some logging experiments.
 
 We need to create an instance of Elasticsearch which will run on the cluster (this is not done automatically as part of the manifest pod creation step). We only want to run one instance of Elasticsearch on the cluster but we want it to appear as if it is running on every node. We can accomplish this by writing a suitable pod specification and service specification since this "appear to run everywhere on the cluster" abstraction is one of the things that Kubernetes provides.
 
@@ -121,25 +131,28 @@ selector:
   app: elasticsearch
 createExternalLoadBalancer: true
 ```
-The service specification will group together all containers that have the label ```app=elasticsearch``` (we will only use one) and for these containers it will map their internal port (9200) to port 9200 for a service which will act as a proxy for all the identified containers. Furthermore, an external load balancer is created to allow external access to the pods that are encapsulated by this service. The container ports identified by the service description are proxied by a single IP address scoped within the cluster.
 
-```shell
+The service specification will group together all containers that have the label `app=elasticsearch` (we will only use one) and for these containers it will map their internal port (9200) to port 9200 for a service which will act as a proxy for all the identified containers. Furthermore, an external load balancer is created to allow external access to the pods that are encapsulated by this service. The container ports identified by the service description are proxied by a single IP address scoped within the cluster.
+
+```console
 $ kubectl.sh get services
 NAME                LABELS              SELECTOR            IP                  PORT
 elasticsearch                           app=elasticsearch   10.0.0.1            9200
 ```
+
 Inside the cluster, the Elasticsearch service is reached at http://10.0.0.1:9200 which is its service address.
 
-We can see which node the Elasticsearch instance is actually running one e.g. in the example below it is running on minion-3.
+We can see which node the Elasticsearch instance is actually running one e.g. in the example below it is running on node 3.
 
-``` shell
+```console
 $ kubectl.sh get pods
 NAME                           IMAGE(S)                   HOST                                                           LABELS                      STATUS
 elasticsearch-pod              dockerfile/elasticsearch   kubernetes-minion-3.c.kubernetes-elk.internal/146.148.59.62    app=elasticsearch           Running
 ```
-You can see that Elasticsearch can be reached on port 9200 on minion-1:
 
-```shell
+You can see that Elasticsearch can be reached on port 9200 on node 1:
+
+```console
 $ curl localhost:9200
 {
   "status" : 200,
@@ -155,11 +168,11 @@ $ curl localhost:9200
 }
 ```
 
-If we ran the same curl command on minion-2, minion-3, or minion-4 we would have got a response from the same instance of Elasticsearch. The actual instance is running on minion-3, but it appears to run on every node.
+If we ran the same curl command on node 2, node 3, or node 4 we would have got a response from the same instance of Elasticsearch. The actual instance is running on node 3, but it appears to run on every node.
 
 We can also contact the Elasticsearch instance from outside the cluster by finding its external IP address and port number.
 
-```shell
+```console
 $ gcutil getforwardingrule elasticsearch
 +---------------+---------------------------------------+
 | name          | elasticsearch                         |
@@ -208,7 +221,7 @@ labels:
   app: kibana-viewer
 ```
 
-This runs a specially made Kibana Docker image which is tailored for use with Kubernetes. One reason for this is that this image needs to know how to contact the Elasticsearch server which it should do by contacting the internal cluster IP and port number for the service. This information is made available with environment variable. For a service called ``elasticsearch`` the environment variables ``ELASTICSEARCH_SERVICE_HOST`` and ``ELASTICSEARCH_SERVICE_PORT`` define the internal cluster IP address and port of the Elasticsearch service. This capability allows us to compose Kubernetes services. This pod wires up port 80 of the container which serves the Kibana dashboard web page.
+This runs a specially made Kibana Docker image which is tailored for use with Kubernetes. One reason for this is that this image needs to know how to contact the Elasticsearch server which it should do by contacting the internal cluster IP and port number for the service. This information is made available with environment variable. For a service called `elasticsearch` the environment variables `ELASTICSEARCH_SERVICE_HOST` and `ELASTICSEARCH_SERVICE_PORT` define the internal cluster IP address and port of the Elasticsearch service. This capability allows us to compose Kubernetes services. This pod wires up port 80 of the container which serves the Kibana dashboard web page.
 
 The Kibana service is defined as follows [kibana-service.yml](kibana-service.yml):
 
@@ -245,7 +258,7 @@ labels:
 
 Once Elasticsearch, Kibana and the synthetic logger are running we should see something like:
 
-```shell
+```console
 $ kubectl.sh get pods
 NAME                           IMAGE(S)                   HOST                                                           LABELS                      STATUS
 synthetic-logger-0.25lps-pod   ubuntu:14.04               kubernetes-minion-2.c.kubernetes-elk.internal/146.148.37.102   name=synth-logging-source   Running
@@ -278,13 +291,14 @@ $ gcutil getforwardingrule kibana
 | target        | us-central1/targetPools/kibana |
 +---------------+--------------------------------+
 ```
+
 This tells us that inside the cluster the Elasticsearch service is known as 10.0.0.1:9200 and outside the cluster it is known as 130.211.122.249:9200. Inside the cluster the Kibana service is known as 10.0.0.1:5601 and outside the cluster it is known as 23.236.59.213:5601. Let's visit this web site and check that we can see some logs.
 
 ![Kibana](kibana.png)
 
-Note that in this example Kibana is running on minion-2. We can ssh into this machine and look at its log files to make sure it got the correct information about where to find Elasticsearch.
+Note that in this example Kibana is running on node 2. We can ssh into this machine and look at its log files to make sure it got the correct information about where to find Elasticsearch.
 
-```shell
+```console
 $ gcloud compute --project "kubernetes-elk" ssh --zone "us-central1-a"
 $ sudo -s
 $ docker ps
@@ -306,7 +320,8 @@ ELASTICSEARCH_PORT_9200_TCP_PROTO=tcp
 ELASTICSEARCH_SERVICE_HOST=10.0.0.1
 ELASTICSEARCH_SERVICE_PORT=9200
 ```
-As expected we see that ``ELASTICSEARCH_SERVICE_HOST`` has the value 10.0.0.1 and that ``ELASTICSEARCH_SERVICE_PORT`` has the value 9200.
+
+As expected we see that `ELASTICSEARCH_SERVICE_HOST` has the value 10.0.0.1 and that `ELASTICSEARCH_SERVICE_PORT` has the value 9200.
 
 ## Summary and Other Things
 * Kubernetes provides intrinsic support for various logging options including the collection of Docker log files using Fluentd.
