@@ -66,4 +66,3 @@ install-salt --master
 echo "Sleeping 180"
 sleep 180
 salt-call state.highstate || true
-

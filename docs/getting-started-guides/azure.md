@@ -9,8 +9,8 @@
 ### Prerequisites for your workstation
 
 1. Be running a Linux or Mac OS X.
-5. Get or build a [binary release](binary_release.md)
-4. If you want to build your own release, you need to have [Docker
+2. Get or build a [binary release](binary_release.md)
+3. If you want to build your own release, you need to have [Docker
 installed](https://docs.docker.com/installation/).  On Mac OS X you can use
 boot2docker.
 

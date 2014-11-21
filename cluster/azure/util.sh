@@ -23,22 +23,26 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/azure/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 function azure_call {
-    params=""
-    for param in "$@"
-    do
-        params="${params} \"${param}\""
+    local -a params=()
+    local param
+    # the '... in "$@"' is implicit on a for, so doesn't need to be stated.
+    for param; do
+        params+=("${param}")
     done
-    rv=1
-    stderr="getaddrinfo ENOTFOUND"
-    while [ $rv -ne 0 -a -n "$(echo $stderr | grep "getaddrinfo ENOTFOUND")" ]; do
-        set +e
-        { stderr=$(bash -c "azure $params" 2>&1 1>&3-) ;} 3>&1
-        rv=$?
-        set -e
-    done
-    if [ $rv -ne 0 ]; then
-        echo $stderr 1>&2
-        exit
+    local rc=0
+    local stderr
+    local count=0
+    while [[ count -lt 10 ]]; do
+        stderr=$(azure "${params[@]}" 2>&1 >&3) && break
+        rc=$?
+        if [[ "${stderr}" != *"getaddrinfo ENOTFOUND"* ]]; then
+            break
+        fi
+        count=$(($count + 1))
+    done 3>&1
+    if [[ "${rc}" -ne 0 ]]; then
+        echo "${stderr}" >&2
+        return "${rc}"
     fi
 }
 
@@ -48,13 +52,13 @@ function json_val () {
 
 # Verify prereqs
 function verify-prereqs {
-    if [ -z "$(which azure)" ]; then
+    if [[ -z "$(which azure)" ]]; then
         echo "Couldn't find azure in PATH"
         echo "  please install with 'npm install azure-cli'"
         exit 1
     fi
 
-    if [ -z "$(azure_call account list | grep true)" ]; then
+    if [[ -z "$(azure_call account list | grep true)" ]]; then
         echo "Default azure account not set"
         echo "  please set with 'azure account set'"
         exit 1
@@ -142,8 +146,8 @@ function upload-server-tars() {
     echo "==> SALT_TAR_URL: $SALT_TAR_URL"
 
     echo "--> Checking storage exsists..."
-    if [ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
-    grep data)" ]; then
+    if [[ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
+    grep data)" ]]; then
         echo "--> Creating storage..."
         azure_call storage account create -l "$AZ_LOCATION" $AZ_STG
     fi
@@ -153,8 +157,8 @@ function upload-server-tars() {
         json_val '["primaryKey"]')
 
     echo "--> Checking storage container exsists..."
-    if [ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
-      $CONTAINER 2>/dev/null | grep data)" ]; then
+    if [[ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
+      $CONTAINER 2>/dev/null | grep data)" ]]; then
         echo "--> Creating storage container..."
         azure_call storage container create \
             -a $AZ_STG \
@@ -164,8 +168,8 @@ function upload-server-tars() {
     fi
 
     echo "--> Checking server binary exists in the container..."
-    if [ -n "$(azure_call storage blob show -a $AZ_STG -k "$stg_key" \
-      $CONTAINER $server_binary_url 2>/dev/null | grep data)" ]; then
+    if [[ -n "$(azure_call storage blob show -a $AZ_STG -k "$stg_key" \
+      $CONTAINER $server_binary_url 2>/dev/null | grep data)" ]]; then
         echo "--> Deleting server binary in the container..."
         azure_call storage blob delete \
             -a $AZ_STG \
@@ -183,8 +187,8 @@ function upload-server-tars() {
         $server_binary_url
 
     echo "--> Checking salt data exists in the container..."
-    if [ -n "$(azure_call storage blob show -a $AZ_STG -k "$stg_key" \
-      $CONTAINER $salt_url 2>/dev/null | grep data)" ]; then
+    if [[ -n "$(azure_call storage blob show -a $AZ_STG -k "$stg_key" \
+      $CONTAINER $salt_url 2>/dev/null | grep data)" ]]; then
         echo "--> Deleting salt data in the container..."
         azure_call storage blob delete \
             -a $AZ_STG \
@@ -210,7 +214,7 @@ function upload-server-tars() {
 # Vars set:
 #
 function detect-minions () {
-    if [ -z "$AZ_CS" ]; then
+    if [[ -z "$AZ_CS" ]]; then
         verify-prereqs
     fi
     ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
@@ -228,7 +232,7 @@ function detect-minions () {
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master () {
-    if [ -z "$AZ_CS" ]; then
+    if [[ -z "$AZ_CS" ]]; then
         verify-prereqs
     fi
 
@@ -350,16 +354,16 @@ function kube-up {
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/salt-master.sh"
     ) > "${KUBE_TEMP}/master-start.sh"
 
-    if [ ! -f $AZ_SSH_KEY ]; then
+    if [[ ! -f $AZ_SSH_KEY ]]; then
         ssh-keygen -f $AZ_SSH_KEY -N ''
     fi
 
-    if [ ! -f $AZ_SSH_CERT ]; then
+    if [[ ! -f $AZ_SSH_CERT ]]; then
         openssl req -new -x509 -days 1095 -key $AZ_SSH_KEY -out $AZ_SSH_CERT \
             -subj "/CN=azure-ssh-key"
     fi
 
-    if [ -z "$(azure_call network vnet show $AZ_VNET 2>/dev/null | grep data)" ]; then
+    if [[ -z "$(azure_call network vnet show $AZ_VNET 2>/dev/null | grep data)" ]]; then
         #azure network vnet create with $AZ_SUBNET
         #FIXME not working
         echo error create vnet $AZ_VNET with subnet $AZ_SUBNET

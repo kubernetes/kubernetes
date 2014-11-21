@@ -53,7 +53,6 @@ install-salt() {
     dpkg -i "${tar}"
   done
 
-# This will install any of the unmet dependencies from above.
+  # This will install any of the unmet dependencies from above.
   apt-get install -f -y
-
 }
