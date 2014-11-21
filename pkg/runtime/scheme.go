@@ -95,6 +95,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 // given in conversion.Scope. It's placed in all schemes as a ConversionFunc to enable plugins;
 // see the comment for RawExtension.
 func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conversion.Scope) error {
+	fmt.Printf("RAWEXTENSIONTEXT: %s", in.RawJSON)
 	if len(in.RawJSON) == 4 && string(in.RawJSON) == "null" {
 		out.Object = nil
 		return nil

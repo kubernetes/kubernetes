@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // MetaFactory is used to store and retrieve the version and kind
@@ -64,6 +64,8 @@ func (SimpleMetaFactory) Interpret(data []byte) (version, kind string, err error
 	if err != nil {
 		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
 	}
+	fmt.Printf("HELLO1: %s", data)
+	fmt.Printf("HELLO2: %s", findKind.Kind)
 	return findKind.APIVersion, findKind.Kind, nil
 }
 

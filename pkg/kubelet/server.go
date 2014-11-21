@@ -37,7 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.

@@ -19,6 +19,7 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+	"runtime/debug"
 )
 
 // Scheme defines an entire encoding and decoding scheme.
@@ -148,6 +149,7 @@ func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
 		if t, ok := types[typeName]; ok {
 			return reflect.New(t).Interface(), nil
 		}
+		debug.PrintStack()
 		return nil, fmt.Errorf("No type '%v' for version '%v'", typeName, versionName)
 	}
 	return nil, fmt.Errorf("No version '%v'", versionName)
