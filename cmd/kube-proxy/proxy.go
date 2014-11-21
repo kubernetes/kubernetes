@@ -19,10 +19,13 @@ package main
 import (
 	"flag"
 	"net"
+	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -38,6 +41,7 @@ var (
 	etcdConfigFile = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
 	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
 	clientConfig   = &client.Config{}
+	healthz_port   = flag.Int("healthz_port", 10249, "The port to bind the health check server. Use 0 to disable.")
 )
 
 func init() {
@@ -98,6 +102,15 @@ func main() {
 				serviceConfig.Channel("etcd"),
 				endpointsConfig.Channel("etcd"))
 		}
+	}
+
+	if *healthz_port > 0 {
+		go util.Forever(func() {
+			err := http.ListenAndServe(bindAddress.String()+":"+strconv.Itoa(*healthz_port), nil)
+			if err != nil {
+				glog.Errorf("Starting health server failed: %v", err)
+			}
+		}, 5*time.Second)
 	}
 
 	protocol := iptables.ProtocolIpv4
