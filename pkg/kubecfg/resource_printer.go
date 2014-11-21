@@ -204,7 +204,7 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.Name, makeImageList(pod.Spec),
 		podHostString(pod.Status.Host, pod.Status.HostIP),
-		labels.Set(pod.Labels), pod.Status.Condition)
+		labels.Set(pod.Labels), pod.Status.Phase)
 	return err
 }
 

@@ -93,7 +93,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(spec))
 		fmt.Fprintf(out, "Host:\t%s\n", pod.Status.Host+"/"+pod.Status.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
-		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Condition))
+		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", getReplicationControllersForLabels(rc, labels.Set(pod.Labels)))
 		if events != nil {
 			describeEvents(events, out)
@@ -247,7 +247,7 @@ func getPodStatusForReplicationController(c client.PodInterface, controller *api
 		return
 	}
 	for _, pod := range rcPods.Items {
-		switch pod.Status.Condition {
+		switch pod.Status.Phase {
 		case api.PodRunning:
 			running++
 		case api.PodPending:

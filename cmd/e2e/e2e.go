@@ -46,10 +46,10 @@ func waitForPodRunning(c *client.Client, id string) {
 			glog.Warningf("Get pod failed: %v", err)
 			continue
 		}
-		if pod.Status.Condition == api.PodRunning {
+		if pod.Status.Phase == api.PodRunning {
 			break
 		}
-		glog.Infof("Waiting for pod status to be running (%s)", pod.Status.Condition)
+		glog.Infof("Waiting for pod status to be running (%s)", pod.Status.Phase)
 	}
 }
 

@@ -129,7 +129,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 		if err != nil {
 			return pod, err
 		}
-		pod.Status.Condition = status
+		pod.Status.Phase = status
 	}
 	if pod.Status.Host != "" {
 		pod.Status.HostIP = rs.getInstanceIP(pod.Status.Host)
@@ -143,11 +143,11 @@ func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 	// see https://github.com/GoogleCloudPlatform/kubernetes/pull/2503
 
 	var olderPodStatus v1beta1.PodStatus
-	api.Scheme.Convert(pod.Status.Condition, &olderPodStatus)
+	api.Scheme.Convert(pod.Status.Phase, &olderPodStatus)
 
 	return labels.Set{
 		"name":                pod.Name,
-		"Status.Condition":    string(pod.Status.Condition),
+		"Status.Phase":        string(pod.Status.Phase),
 		"Status.Host":         pod.Status.Host,
 		"DesiredState.Status": string(olderPodStatus),
 		"DesiredState.Host":   pod.Status.Host,
@@ -173,7 +173,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 			if err != nil {
 				return pod, err
 			}
-			pod.Status.Condition = status
+			pod.Status.Phase = status
 			if pod.Status.Host != "" {
 				pod.Status.HostIP = rs.getInstanceIP(pod.Status.Host)
 			}
@@ -274,7 +274,7 @@ func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 	return addr.String()
 }
 
-func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodCondition, error) {
+func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodPhase, error) {
 	if pod.Status.Host == "" {
 		return api.PodPending, nil
 	}

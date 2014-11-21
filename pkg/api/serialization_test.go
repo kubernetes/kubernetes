@@ -86,8 +86,8 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 	},
-	func(j *api.PodCondition, c fuzz.Continue) {
-		statuses := []api.PodCondition{api.PodPending, api.PodRunning, api.PodFailed}
+	func(j *api.PodPhase, c fuzz.Continue) {
+		statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed}
 		*j = statuses[c.Rand.Intn(len(statuses))]
 	},
 	func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
