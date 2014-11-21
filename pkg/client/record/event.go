@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,6 +32,8 @@ import (
 
 // EventRecorder knows how to store events (client.Client implements it.)
 // EventRecorder must respect the namespace that will be embedded in 'event'.
+// It is assumed that EventRecorder will return the same sorts of errors as
+// pkg/client's REST client.
 type EventRecorder interface {
 	Create(event *api.Event) (*api.Event, error)
 }
@@ -44,13 +48,39 @@ func StartRecording(recorder EventRecorder, sourceName string) watch.Interface {
 		eventCopy := *event
 		event = &eventCopy
 		event.Source = sourceName
+		try := 0
 		for {
+			try++
 			_, err := recorder.Create(event)
 			if err == nil {
 				break
 			}
-			glog.Errorf("Sleeping: Unable to write event: %v", err)
-			time.Sleep(10 * time.Second)
+			// If we can't contact the server, then hold everything while we keep trying.
+			// Otherwise, something about the event is malformed and we should abandon it.
+			giveUp := false
+			switch err.(type) {
+			case *client.RequestConstructionError:
+				// We will construct the request the same next time, so don't keep trying.
+				giveUp = true
+			case *errors.StatusError:
+				// This indicates that the server understood and rejected our request.
+				giveUp = true
+			case *errors.UnexpectedObjectError:
+				// We don't expect this; it implies the server's response didn't match a
+				// known pattern. Go ahead and retry.
+			default:
+				// This case includes actual http transport errors. Go ahead and retry.
+			}
+			if giveUp {
+				glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
+				break
+			}
+			if try >= 3 {
+				glog.Errorf("Unable to write event '%#v': '%v' (retry limit exceeded!)", event, err)
+				break
+			}
+			glog.Errorf("Unable to write event: '%v' (will retry in 1 second)", err)
+			time.Sleep(1 * time.Second)
 		}
 	})
 }
