@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -137,10 +138,19 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
+
+	// TODO we are populating both Status and DesiredState because selectors are not aware of API versions
+	// see https://github.com/GoogleCloudPlatform/kubernetes/pull/2503
+
+	var olderPodStatus v1beta1.PodStatus
+	api.Scheme.Convert(pod.Status.Condition, &olderPodStatus)
+
 	return labels.Set{
-		"name":             pod.Name,
-		"Status.Condition": string(pod.Status.Condition),
-		"Status.Host":      pod.Status.Host,
+		"name":                pod.Name,
+		"Status.Condition":    string(pod.Status.Condition),
+		"Status.Host":         pod.Status.Host,
+		"DesiredState.Status": string(olderPodStatus),
+		"DesiredState.Host":   pod.Status.Host,
 	}
 }
 
