@@ -90,8 +90,8 @@ func init() {
 			return s.Convert(&in.Annotations, &out.Annotations, 0)
 		},
 
-		// Convert all to the new PodCondition constants
-		func(in *newer.PodCondition, out *PodStatus, s conversion.Scope) error {
+		// Convert all to the new PodPhase constants
+		func(in *newer.PodPhase, out *PodStatus, s conversion.Scope) error {
 			switch *in {
 			case "":
 				*out = ""
@@ -104,13 +104,13 @@ func init() {
 			case newer.PodFailed:
 				*out = PodTerminated
 			default:
-				return errors.New("The string provided is not a valid PodCondition constant value")
+				return errors.New("The string provided is not a valid PodPhase constant value")
 			}
 
 			return nil
 		},
 
-		func(in *PodStatus, out *newer.PodCondition, s conversion.Scope) error {
+		func(in *PodStatus, out *newer.PodPhase, s conversion.Scope) error {
 			switch *in {
 			case "":
 				*out = ""
@@ -122,7 +122,7 @@ func init() {
 				// Older API versions did not contain enough info to map to PodSucceeded
 				*out = newer.PodFailed
 			default:
-				return errors.New("The string provided is not a valid PodCondition constant value")
+				return errors.New("The string provided is not a valid PodPhase constant value")
 			}
 			return nil
 		},
@@ -279,7 +279,7 @@ func init() {
 		},
 
 		func(in *newer.PodStatus, out *PodState, s conversion.Scope) error {
-			if err := s.Convert(&in.Condition, &out.Status, 0); err != nil {
+			if err := s.Convert(&in.Phase, &out.Status, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
@@ -291,7 +291,7 @@ func init() {
 			return nil
 		},
 		func(in *PodState, out *newer.PodStatus, s conversion.Scope) error {
-			if err := s.Convert(&in.Status, &out.Condition, 0); err != nil {
+			if err := s.Convert(&in.Status, &out.Phase, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {

@@ -159,7 +159,7 @@ func makeContainerKey(machine string) string {
 // CreatePod creates a pod based on a specification.
 func (r *Registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	// Set current status to "Waiting".
-	pod.Status.Condition = api.PodPending
+	pod.Status.Phase = api.PodPending
 	pod.Status.Host = ""
 	key, err := makePodKey(ctx, pod.Name)
 	if err != nil {

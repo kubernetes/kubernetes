@@ -366,24 +366,24 @@ type Lifecycle struct {
 	PreStop *Handler `json:"preStop,omitempty" yaml:"preStop,omitempty"`
 }
 
-// PodCondition is a label for the condition of a pod at the current time.
-type PodCondition string
+// PodPhase is a label for the condition of a pod at the current time.
+type PodPhase string
 
 // These are the valid states of pods.
 const (
 	// PodPending means the pod has been accepted by the system, but one or more of the containers
 	// has not been started. This includes time before being bound to a node, as well as time spent
 	// pulling images onto the host.
-	PodPending PodCondition = "Pending"
+	PodPending PodPhase = "Pending"
 	// PodRunning means the pod has been bound to a node and all of the containers have been started.
 	// At least one container is still running or is in the process of being restarted.
-	PodRunning PodCondition = "Running"
+	PodRunning PodPhase = "Running"
 	// PodSucceeded means that all containers in the pod have voluntarily terminated
 	// with a container exit code of 0, and the system is not going to restart any of these containers.
-	PodSucceeded PodCondition = "Succeeded"
+	PodSucceeded PodPhase = "Succeeded"
 	// PodFailed means that all containers in the pod have terminated, and at least one container has
 	// terminated in a failure (exited with a non-zero exit code or was stopped by the system).
-	PodFailed PodCondition = "Failed"
+	PodFailed PodPhase = "Failed"
 )
 
 type ContainerStateWaiting struct {
@@ -456,7 +456,7 @@ type PodSpec struct {
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
-	Condition PodCondition `json:"condition,omitempty" yaml:"condition,omitempty"`
+	Phase PodPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 

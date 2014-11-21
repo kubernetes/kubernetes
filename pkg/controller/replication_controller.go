@@ -143,8 +143,8 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
-		if api.PodSucceeded != value.Status.Condition &&
-			api.PodFailed != value.Status.Condition {
+		if api.PodSucceeded != value.Status.Phase &&
+			api.PodFailed != value.Status.Phase {
 			result = append(result, value)
 		}
 	}

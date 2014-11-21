@@ -205,7 +205,7 @@ func TestListPodListSelection(t *testing.T) {
 				Status:     api.PodStatus{Host: "barhost"},
 			}, {
 				ObjectMeta: api.ObjectMeta{Name: "baz"},
-				Status:     api.PodStatus{Condition: "bazstatus"},
+				Status:     api.PodStatus{Phase: "bazstatus"},
 			}, {
 				ObjectMeta: api.ObjectMeta{
 					Name:   "qux",
@@ -236,7 +236,7 @@ func TestListPodListSelection(t *testing.T) {
 			label:       "label=qux",
 			expectedIDs: util.NewStringSet("qux"),
 		}, {
-			field:       "Status.Condition=bazstatus",
+			field:       "Status.Phase=bazstatus",
 			expectedIDs: util.NewStringSet("baz"),
 		}, {
 			field:       "Status.Host=barhost",
@@ -400,7 +400,7 @@ func TestMakePodStatus(t *testing.T) {
 
 	tests := []struct {
 		pod    *api.Pod
-		status api.PodCondition
+		status api.PodPhase
 		test   string
 	}{
 		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
