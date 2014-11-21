@@ -46,6 +46,7 @@ func init() {
 }
 
 func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools.FakeDockerClient) {
+	// TODO: get rid of fakeEtcdClient and return value.
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeDocker := &dockertools.FakeDockerClient{
 		RemovedImages: util.StringSet{},
@@ -54,10 +55,11 @@ func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
-	kubelet.etcdClient = fakeEtcdClient
 	kubelet.rootDirectory = "/tmp/kubelet"
 	kubelet.podWorkers = newPodWorkers()
 	kubelet.sourceReady = func(source string) bool { return true }
+	kubelet.masterServiceNamespace = api.NamespaceDefault
+	kubelet.serviceLister = testServiceLister{}
 
 	return kubelet, fakeEtcdClient, fakeDocker
 }

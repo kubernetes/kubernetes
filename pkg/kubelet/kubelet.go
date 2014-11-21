@@ -99,6 +99,7 @@ func NewMainKubelet(
 		hostname:               hostname,
 		dockerClient:           dockerClient,
 		etcdClient:             etcdClient,
+		kubeClient:             kubeClient,
 		rootDirectory:          rootDirectory,
 		resyncInterval:         resyncInterval,
 		networkContainerImage:  networkContainerImage,
