@@ -41,7 +41,7 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := SourceURL{"http://localhost:49575/_not_found_", ch, nil}
+	c := sourceURL{"http://localhost:49575/_not_found_", ch, nil}
 	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
@@ -107,7 +107,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := SourceURL{testServer.URL, ch, nil}
+		c := sourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
@@ -184,7 +184,7 @@ func TestExtractFromHTTP(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := SourceURL{testServer.URL, ch, nil}
+		c := sourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue

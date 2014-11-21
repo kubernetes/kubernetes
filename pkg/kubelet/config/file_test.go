@@ -81,7 +81,7 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := SourceFile{"/some/fake/file", ch}
+	c := sourceFile{"/some/fake/file", ch}
 	err := c.extractFromPath()
 	if err == nil {
 		t.Errorf("Expected error")
@@ -143,7 +143,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{}, 1)
-	c := SourceFile{file.Name(), ch}
+	c := sourceFile{file.Name(), ch}
 	err := c.extractFromPath()
 	if err == nil {
 		t.Fatalf("Expected error")
@@ -164,7 +164,7 @@ func TestExtractFromValidDataFile(t *testing.T) {
 	expectedPod.Name = simpleSubdomainSafeHash(file.Name())
 
 	ch := make(chan interface{}, 1)
-	c := SourceFile{file.Name(), ch}
+	c := sourceFile{file.Name(), ch}
 	err = c.extractFromPath()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -184,7 +184,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := SourceFile{dirName, ch}
+	c := sourceFile{dirName, ch}
 	err = c.extractFromPath()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -232,7 +232,7 @@ func TestExtractFromDir(t *testing.T) {
 	}
 
 	ch := make(chan interface{}, 1)
-	c := SourceFile{dirName, ch}
+	c := sourceFile{dirName, ch}
 	err = c.extractFromPath()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

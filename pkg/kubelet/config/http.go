@@ -33,30 +33,29 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-type SourceURL struct {
+type sourceURL struct {
 	url     string
 	updates chan<- interface{}
 	data    []byte
 }
 
-func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) *SourceURL {
-	config := &SourceURL{
+func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) {
+	config := &sourceURL{
 		url:     url,
 		updates: updates,
 		data:    nil,
 	}
 	glog.V(1).Infof("Watching URL %s", url)
 	go util.Forever(config.run, period)
-	return config
 }
 
-func (s *SourceURL) run() {
+func (s *sourceURL) run() {
 	if err := s.extractFromURL(); err != nil {
 		glog.Errorf("Failed to read URL: %v", err)
 	}
 }
 
-func (s *SourceURL) extractFromURL() error {
+func (s *sourceURL) extractFromURL() error {
 	resp, err := http.Get(s.url)
 	if err != nil {
 		return err
