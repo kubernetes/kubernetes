@@ -145,7 +145,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 	return selector
 }
 
-// createUnassignedPodLW returns a listWatch that finds all pods that are
+// createAssignedPodLW returns a listWatch that finds all pods that are
 // already scheduled.
 func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
 	return &listWatch{
