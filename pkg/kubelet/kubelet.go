@@ -390,7 +390,7 @@ func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
 	for i := range pod.Spec.Containers {
 		here := &pod.Spec.Containers[i]
 		if here == container {
-			return fmt.Sprintf("spec.containers[%n]", i), nil
+			return fmt.Sprintf("spec.containers[%d]", i), nil
 		}
 	}
 	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)
@@ -479,12 +479,12 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	if len(container.TerminationMessagePath) != 0 {
 		p := path.Join(kl.rootDirectory, pod.Name, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
-			glog.Errorf("Error on creating %s(%v)", p, err)
+			glog.Errorf("Error on creating %s: %v", p, err)
 		} else {
 			containerLogPath := path.Join(p, dockerContainer.ID)
 			fs, err := os.Create(containerLogPath)
 			if err != nil {
-				glog.Errorf("Error on creating termination-log file: %s(%v)", containerLogPath, err)
+				glog.Errorf("Error on creating termination-log file %s: %v", containerLogPath, err)
 			}
 			defer fs.Close()
 			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
@@ -495,7 +495,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	if capabilities.Get().AllowPrivileged {
 		privileged = container.Privileged
 	} else if container.Privileged {
-		return "", fmt.Errorf("Container requested privileged mode, but it is disallowed globally.")
+		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
 	}
 	err = kl.dockerClient.StartContainer(dockerContainer.ID, &docker.HostConfig{
 		PortBindings: portBindings,
@@ -606,7 +606,7 @@ func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers docke
 			go func() {
 				err := kl.killContainer(dockerContainer)
 				if err != nil {
-					glog.Errorf("Failed to delete container. (%v)  Skipping pod %s", err, podFullName)
+					glog.Errorf("Failed to delete container: %v; Skipping pod %s", err, podFullName)
 					errs <- err
 				}
 				wg.Done()
@@ -645,7 +645,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		}
 		netID, err = kl.createNetworkContainer(pod)
 		if err != nil {
-			glog.Errorf("Failed to introspect network container. (%v)  Skipping pod %s", err, podFullName)
+			glog.Errorf("Failed to introspect network container: %v; Skipping pod %s", err, podFullName)
 			return err
 		}
 		if count > 0 {
@@ -661,7 +661,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
-		glog.Errorf("Unable to mount volumes for pod %s: (%v), skipping pod", podFullName, err)
+		glog.Errorf("Unable to mount volumes for pod %s: %v; skipping pod", podFullName, err)
 		return err
 	}
 
@@ -748,7 +748,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				if ref != nil {
 					record.Eventf(ref, "failed", "failed", "Failed to inspect image %s", container.Image)
 				}
-				glog.Errorf("Failed to inspect image: %s: %#v skipping pod %s container %s", container.Image, err, podFullName, container.Name)
+				glog.Errorf("Failed to inspect image %s: %v; skipping pod %s container %s", container.Image, err, podFullName, container.Name)
 				continue
 			}
 			if api.IsPullAlways(container.ImagePullPolicy) ||
@@ -758,7 +758,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 						record.Eventf(ref, "failed", "failed", "Failed to pull image %s", container.Image)
 					}
-					glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
+					glog.Errorf("Failed to pull image %s: %v; skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
 					continue
 				}
 				if ref != nil {
@@ -828,7 +828,7 @@ func (kl *Kubelet) reconcileVolumes(pods []api.BoundPod) error {
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
 			err := vol.TearDown()
 			if err != nil {
-				glog.Errorf("Could not tear down volume %s (%s)", name, err)
+				glog.Errorf("Could not tear down volume %s: %v", name, err)
 			}
 		}
 	}
@@ -865,7 +865,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		kl.podWorkers.Run(podFullName, func() {
 			err := kl.syncPod(pod, dockerContainers)
 			if err != nil {
-				glog.Errorf("Error syncing pod, skipping: %s", err)
+				glog.Errorf("Error syncing pod, skipping: %v", err)
 			}
 		})
 	}
@@ -883,7 +883,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 			glog.V(1).Infof("Killing unwanted container %+v", pc)
 			err = kl.killContainer(container)
 			if err != nil {
-				glog.Errorf("Error killing container %+v: %s", pc, err)
+				glog.Errorf("Error killing container %+v: %v", pc, err)
 			}
 		}
 	}
@@ -924,7 +924,7 @@ func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	for i := range pods {
 		pod := &pods[i]
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {
-			glog.Warningf("Pod %s: HostPort is already allocated, ignoring: %s", GetPodFullName(pod), errs)
+			glog.Warningf("Pod %s: HostPort is already allocated, ignoring: %v", GetPodFullName(pod), errs)
 			continue
 		}
 		filtered = append(filtered, *pod)
@@ -964,7 +964,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 
 		err := handler.SyncPods(kl.pods)
 		if err != nil {
-			glog.Errorf("Couldn't sync containers: %s", err)
+			glog.Errorf("Couldn't sync containers: %v", err)
 		}
 	}
 }
@@ -974,7 +974,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
 	_, err := kl.GetPodInfo(podFullName, "")
 	if err == dockertools.ErrNoContainersInPod {
-		return fmt.Errorf("Pod not found (%s)\n", podFullName)
+		return fmt.Errorf("pod not found (%s)\n", podFullName)
 	}
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, true)
 	if err != nil {
@@ -982,7 +982,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	}
 	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, "", containerName)
 	if !found {
-		return fmt.Errorf("Container not found (%s)\n", containerName)
+		return fmt.Errorf("container not found (%s)\n", containerName)
 	}
 	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail, follow, stdout, stderr)
 }

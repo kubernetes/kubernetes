@@ -278,7 +278,7 @@ func TestNotFound(t *testing.T) {
 		}
 
 		if response.StatusCode != v.Status {
-			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v, k, response)
+			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v.Method, k, response)
 		}
 	}
 }

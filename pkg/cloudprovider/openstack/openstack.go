@@ -79,7 +79,7 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
-		err := fmt.Errorf("No OpenStack cloud provider config file given")
+		err := fmt.Errorf("no OpenStack cloud provider config file given")
 		return Config{}, err
 	}
 

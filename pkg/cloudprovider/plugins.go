@@ -85,7 +85,7 @@ func InitCloudProvider(name string, configFilePath string) Interface {
 
 	cloud, err := GetCloudProvider(name, config)
 	if err != nil {
-		glog.Fatalf("Couldn't init cloud provider %q: %#v", name, err)
+		glog.Fatalf("Couldn't init cloud provider %q: %v", name, err)
 	}
 	if cloud == nil {
 		glog.Fatalf("Unknown cloud provider: %s", name)

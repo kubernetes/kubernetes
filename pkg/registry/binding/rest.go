@@ -76,5 +76,5 @@ func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RES
 
 // Update returns an error-- this object may not be updated.
 func (b *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	return nil, fmt.Errorf("Bindings may not be changed.")
+	return nil, fmt.Errorf("bindings may not be changed.")
 }

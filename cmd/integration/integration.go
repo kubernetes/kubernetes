@@ -248,16 +248,16 @@ func podExists(c *client.Client, podNamespace string, podID string) wait.Conditi
 func runReplicationControllerTest(c *client.Client) {
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
-		glog.Fatalf("Unexpected error: %#v", err)
+		glog.Fatalf("Unexpected error: %v", err)
 	}
 	var controller api.ReplicationController
 	if err := api.Scheme.DecodeInto(data, &controller); err != nil {
-		glog.Fatalf("Unexpected error: %#v", err)
+		glog.Fatalf("Unexpected error: %v", err)
 	}
 
 	glog.Infof("Creating replication controllers")
 	if _, err := c.ReplicationControllers(api.NamespaceDefault).Create(&controller); err != nil {
-		glog.Fatalf("Unexpected error: %#v", err)
+		glog.Fatalf("Unexpected error: %v", err)
 	}
 	glog.Infof("Done creating replication controllers")
 

@@ -26,7 +26,7 @@ func TestExecutorNoArgs(t *testing.T) {
 	cmd := ex.Command("true")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Errorf("expected success, got %+v", err)
+		t.Errorf("expected success, got %v", err)
 	}
 	if len(out) != 0 {
 		t.Errorf("expected no output, got %q", string(out))

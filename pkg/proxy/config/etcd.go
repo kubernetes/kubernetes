@@ -135,7 +135,7 @@ func (s ConfigSourceEtcd) decodeServices(node *etcd.Node, retServices []api.Serv
 	var svc api.Service
 	err := latest.Codec.DecodeInto([]byte(node.Value), &svc)
 	if err != nil {
-		glog.Errorf("Failed to load Service: %s (%#v)", node.Value, err)
+		glog.Errorf("Failed to load Service: %s (%v)", node.Value, err)
 	} else {
 		// so we got a service we can handle, and now get endpoints
 		retServices = append(retServices, svc)
@@ -182,7 +182,7 @@ func (s ConfigSourceEtcd) GetEndpoints(namespace, service string) (api.Endpoints
 	key := path.Join(registryRoot, "endpoints", namespace, service)
 	response, err := s.client.Get(key, true, false)
 	if err != nil {
-		glog.Errorf("Failed to get the key: %s %v", key, err)
+		glog.Errorf("Failed to get the key %q: %v", key, err)
 		return api.Endpoints{}, err
 	}
 	// Parse all the endpoint specifications in this value.
@@ -230,7 +230,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	} else if response.Action == "set" {
 		service, err := etcdResponseToService(response)
 		if err != nil {
-			glog.Errorf("Failed to parse %s Port: %s", response, err)
+			glog.Errorf("Failed to parse %#v Port: %s", response, err)
 			return
 		}
 
@@ -256,7 +256,7 @@ func (s ConfigSourceEtcd) ProcessEndpointResponse(response *etcd.Response) {
 	var endpoints api.Endpoints
 	err := latest.Codec.DecodeInto([]byte(response.Node.Value), &endpoints)
 	if err != nil {
-		glog.Errorf("Failed to parse service out of etcd key: %v : %+v", response.Node.Value, err)
+		glog.Errorf("Failed to parse service out of etcd key: %v : %v", response.Node.Value, err)
 		return
 	}
 	endpointsUpdate := EndpointsUpdate{Op: ADD, Endpoints: []api.Endpoints{endpoints}}

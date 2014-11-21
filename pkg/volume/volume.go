@@ -131,7 +131,7 @@ func (g *GitDir) SetUp() error {
 	}
 
 	if len(files) != 1 {
-		return fmt.Errorf("Unexpected directory contents: %v", files)
+		return fmt.Errorf("unexpected directory contents: %v", files)
 	}
 	dir := path.Join(g.GetPath(), files[0].Name())
 	if _, err := g.ExecCommand("git", []string{"checkout", g.Revision}, dir); err != nil {
@@ -389,7 +389,7 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 	currentVolumes := make(map[string]Cleaner)
 	podIDDirs, err := ioutil.ReadDir(rootDirectory)
 	if err != nil {
-		glog.Errorf("Could not read directory: %s, (%s)", rootDirectory, err)
+		glog.Errorf("Could not read directory %s: %v", rootDirectory, err)
 	}
 	// Volume information is extracted from the directory structure:
 	// (ROOT_DIR)/(POD_ID)/volumes/(VOLUME_KIND)/(VOLUME_NAME)
@@ -404,14 +404,14 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 		}
 		volumeKindDirs, err := ioutil.ReadDir(podIDPath)
 		if err != nil {
-			glog.Errorf("Could not read directory: %s, (%s)", podIDPath, err)
+			glog.Errorf("Could not read directory %s: %v", podIDPath, err)
 		}
 		for _, volumeKindDir := range volumeKindDirs {
 			volumeKind := volumeKindDir.Name()
 			volumeKindPath := path.Join(podIDPath, volumeKind)
 			volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
 			if err != nil {
-				glog.Errorf("Could not read directory: %s, (%s)", volumeKindPath, err)
+				glog.Errorf("Could not read directory %s: %v", volumeKindPath, err)
 			}
 			for _, volumeNameDir := range volumeNameDirs {
 				volumeName := volumeNameDir.Name()
@@ -419,7 +419,7 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 				// TODO(thockin) This should instead return a reference to an extant volume object
 				cleaner, err := CreateVolumeCleaner(volumeKind, volumeName, podID, rootDirectory)
 				if err != nil {
-					glog.Errorf("Could not create volume cleaner: %s, (%s)", volumeNameDir.Name(), err)
+					glog.Errorf("Could not create volume cleaner for %s: %v", volumeNameDir.Name(), err)
 					continue
 				}
 				currentVolumes[identifier] = cleaner

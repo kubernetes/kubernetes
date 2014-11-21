@@ -123,16 +123,16 @@ func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) 
 
 func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("Invalid print handler. %#v is not a function.", printFunc)
+		return fmt.Errorf("invalid print handler. %#v is not a function.", printFunc)
 	}
 	funcType := printFunc.Type()
 	if funcType.NumIn() != 2 || funcType.NumOut() != 1 {
-		return fmt.Errorf("Invalid print handler." +
+		return fmt.Errorf("invalid print handler." +
 			"Must accept 2 parameters and return 1 value.")
 	}
 	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
-		return fmt.Errorf("Invalid print handler. The expected signature is: "+
+		return fmt.Errorf("invalid print handler. The expected signature is: "+
 			"func handler(obj %v, w io.Writer) error", funcType.In(0))
 	}
 	return nil
@@ -321,7 +321,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			return resultValue.Interface().(error)
 		}
 	} else {
-		return fmt.Errorf("Error: unknown type %#v", obj)
+		return fmt.Errorf("unknown type %#v", obj)
 	}
 }
 

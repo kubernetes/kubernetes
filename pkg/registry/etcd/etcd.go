@@ -77,10 +77,10 @@ func MakeEtcdItemKey(ctx api.Context, prefix string, id string) (string, error) 
 	key := MakeEtcdListKey(ctx, prefix)
 	ns, ok := api.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
-		return "", fmt.Errorf("Invalid request.  Namespace parameter required.")
+		return "", fmt.Errorf("invalid request.  Namespace parameter required.")
 	}
 	if len(id) == 0 {
-		return "", fmt.Errorf("Invalid request.  Id parameter required.")
+		return "", fmt.Errorf("invalid request.  Id parameter required.")
 	}
 	key = key + "/" + id
 	return key, nil
@@ -212,7 +212,7 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 		boundPodList := in.(*api.BoundPods)
 		boundPodList.Items = append(boundPodList.Items, *boundPod)
 		if !constraint.Allowed(boundPodList.Items) {
-			return nil, fmt.Errorf("The assignment would cause a constraint violation")
+			return nil, fmt.Errorf("the assignment would cause a constraint violation")
 		}
 		return boundPodList, nil
 	})
@@ -268,7 +268,7 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 		}
 		// This really shouldn't happen
 		glog.Warningf("Couldn't find: %s in %#v", pod.Name, boundPods)
-		return boundPods, fmt.Errorf("Failed to update pod, couldn't find %s in %#v", pod.Name, boundPods)
+		return boundPods, fmt.Errorf("failed to update pod, couldn't find %s in %#v", pod.Name, boundPods)
 	})
 }
 

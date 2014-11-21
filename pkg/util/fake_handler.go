@@ -68,7 +68,7 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 
 	bodyReceived, err := ioutil.ReadAll(request.Body)
 	if err != nil && f.T != nil {
-		f.T.Logf("Received read error: %#v", err)
+		f.T.Logf("Received read error: %v", err)
 	}
 	f.RequestBody = string(bodyReceived)
 }

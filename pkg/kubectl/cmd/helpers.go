@@ -112,7 +112,7 @@ func GetFilesFromDir(directory string, fileType string) []string {
 // location or from stdin if location == "-".
 func ReadConfigData(location string) ([]byte, error) {
 	if len(location) == 0 {
-		return nil, fmt.Errorf("Location given but empty")
+		return nil, fmt.Errorf("location given but empty")
 	}
 
 	if location == "-" {
@@ -138,21 +138,21 @@ func ReadConfigDataFromLocation(location string) ([]byte, error) {
 	if strings.Index(location, "http://") == 0 || strings.Index(location, "https://") == 0 {
 		resp, err := http.Get(location)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to access URL %s: %v\n", location, err)
+			return nil, fmt.Errorf("unable to access URL %s: %v\n", location, err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("Unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
+			return nil, fmt.Errorf("unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
 		}
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to read URL %s: %v\n", location, err)
+			return nil, fmt.Errorf("unable to read URL %s: %v\n", location, err)
 		}
 		return data, nil
 	} else {
 		data, err := ioutil.ReadFile(location)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to read %s: %v\n", location, err)
+			return nil, fmt.Errorf("unable to read %s: %v\n", location, err)
 		}
 		return data, nil
 	}

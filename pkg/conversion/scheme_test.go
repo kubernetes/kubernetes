@@ -169,10 +169,10 @@ func objDiff(a, b interface{}) string {
 	// An alternate diff attempt, in case json isn't showing you
 	// the difference. (reflect.DeepEqual makes a distinction between
 	// nil and empty slices, for example.)
-	return util.StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
-	)
+	//return util.StringDiff(
+	//	fmt.Sprintf("%#v", a),
+	//	fmt.Sprintf("%#v", b),
+	//)
 }
 
 func runTest(t *testing.T, source interface{}) {

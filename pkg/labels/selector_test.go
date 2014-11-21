@@ -192,10 +192,10 @@ func TestRequiresExactMatch(t *testing.T) {
 	for k, v := range testCases {
 		value, found := v.S.RequiresExactMatch(v.Label)
 		if value != v.Value {
-			t.Errorf("%s: expected value %v, got %s", k, v.Value, value)
+			t.Errorf("%s: expected value %s, got %s", k, v.Value, value)
 		}
 		if found != v.Found {
-			t.Errorf("%s: expected found %v, got %s", k, v.Found, found)
+			t.Errorf("%s: expected found %t, got %t", k, v.Found, found)
 		}
 	}
 }

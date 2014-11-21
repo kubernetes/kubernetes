@@ -143,13 +143,13 @@ func TestTransformResponse(t *testing.T) {
 		response, created, err := r.transformResponse(test.Response, &http.Request{})
 		hasErr := err != nil
 		if hasErr != test.Error {
-			t.Errorf("%d: unexpected error: %f %v", i, test.Error, err)
+			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
 		}
 		if !(test.Data == nil && response == nil) && !reflect.DeepEqual(test.Data, response) {
 			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)
 		}
 		if test.Created != created {
-			t.Errorf("%d: expected created %f, got %f", i, test.Created, created)
+			t.Errorf("%d: expected created %t, got %t", i, test.Created, created)
 		}
 	}
 }
@@ -196,7 +196,7 @@ func TestRequestWatch(t *testing.T) {
 		watch, err := testCase.Request.Watch()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
-			t.Errorf("%d: expected %f, got %f: %v", i, testCase.Err, hasErr, err)
+			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
 		}
 		if hasErr && watch != nil {
 			t.Errorf("%d: watch should be nil when error is returned", i)
@@ -231,7 +231,7 @@ func TestRequestStream(t *testing.T) {
 		body, err := testCase.Request.Stream()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
-			t.Errorf("%d: expected %f, got %f: %v", i, testCase.Err, hasErr, err)
+			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
 		}
 		if hasErr && body != nil {
 			t.Errorf("%d: body should be nil when error is returned", i)
@@ -266,7 +266,7 @@ func TestRequestDo(t *testing.T) {
 		body, err := testCase.Request.Do().Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
-			t.Errorf("%d: expected %f, got %f: %v", i, testCase.Err, hasErr, err)
+			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
 		}
 		if hasErr && body != nil {
 			t.Errorf("%d: body should be nil when error is returned", i)

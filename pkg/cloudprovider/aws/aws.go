@@ -61,7 +61,7 @@ func getAuth() (auth aws.Auth, err error) {
 // readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
 func readAWSCloudConfig(config io.Reader) (*AWSCloudConfig, error) {
 	if config == nil {
-		return nil, fmt.Errorf("No AWS cloud provider config file given")
+		return nil, fmt.Errorf("no AWS cloud provider config file given")
 	}
 
 	var cfg AWSCloudConfig
@@ -71,7 +71,7 @@ func readAWSCloudConfig(config io.Reader) (*AWSCloudConfig, error) {
 	}
 
 	if cfg.Global.Region == "" {
-		return nil, fmt.Errorf("No region specified in configuration file")
+		return nil, fmt.Errorf("no region specified in configuration file")
 	}
 
 	return &cfg, nil
@@ -81,7 +81,7 @@ func readAWSCloudConfig(config io.Reader) (*AWSCloudConfig, error) {
 func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 	cfg, err := readAWSCloudConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read AWS cloud provider config file: %s", err)
+		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
 	}
 
 	auth, err := authFunc()
@@ -91,7 +91,7 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 
 	region, ok := aws.Regions[cfg.Global.Region]
 	if !ok {
-		return nil, fmt.Errorf("Not a valid AWS region: %s", cfg.Global.Region)
+		return nil, fmt.Errorf("not a valid AWS region: %s", cfg.Global.Region)
 	}
 
 	ec2 := ec2.New(auth, region)
@@ -130,22 +130,22 @@ func (aws *AWSCloud) IPAddress(name string) (net.IP, error) {
 		return nil, err
 	}
 	if len(resp.Reservations) == 0 {
-		return nil, fmt.Errorf("No reservations found for host: %s", name)
+		return nil, fmt.Errorf("no reservations found for host: %s", name)
 	}
 	if len(resp.Reservations) > 1 {
-		return nil, fmt.Errorf("Multiple reservations found for host: %s", name)
+		return nil, fmt.Errorf("multiple reservations found for host: %s", name)
 	}
 	if len(resp.Reservations[0].Instances) == 0 {
-		return nil, fmt.Errorf("No instances found for host: %s", name)
+		return nil, fmt.Errorf("no instances found for host: %s", name)
 	}
 	if len(resp.Reservations[0].Instances) > 1 {
-		return nil, fmt.Errorf("Multiple instances found for host: %s", name)
+		return nil, fmt.Errorf("multiple instances found for host: %s", name)
 	}
 
 	ipAddress := resp.Reservations[0].Instances[0].PrivateIpAddress
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
-		return nil, fmt.Errorf("Invalid network IP: %s", ipAddress)
+		return nil, fmt.Errorf("invalid network IP: %s", ipAddress)
 	}
 	return ip, nil
 }
@@ -157,7 +157,7 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 		return []string{}, err
 	}
 	if resp == nil {
-		return []string{}, fmt.Errorf("No InstanceResp returned")
+		return []string{}, fmt.Errorf("no InstanceResp returned")
 	}
 
 	re, err := regexp.Compile(regex)

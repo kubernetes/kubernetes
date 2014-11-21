@@ -167,7 +167,7 @@ func etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool, inc
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
 		if !IsEtcdNotFound(err) {
-			glog.Errorf("watch was unable to retrieve the current index for the provided key: %v (%#v)", err, key)
+			glog.Errorf("watch was unable to retrieve the current index for the provided key (%q): %v", key, err)
 			return resourceVersion, err
 		}
 		if index, ok := etcdErrorIndex(err); ok {

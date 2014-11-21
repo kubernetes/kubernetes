@@ -41,7 +41,7 @@ type watchEvent struct {
 func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
 	obj, ok := event.Object.(runtime.Object)
 	if !ok {
-		return nil, fmt.Errorf("The event object cannot be safely converted to JSON: %v", reflect.TypeOf(event.Object).Name())
+		return nil, fmt.Errorf("the event object cannot be safely converted to JSON: %v", reflect.TypeOf(event.Object).Name())
 	}
 	data, err := codec.Encode(obj)
 	if err != nil {

@@ -102,7 +102,7 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 		// If all worked, we get back an *api.Service object.
 		return nil
 	}
-	return fmt.Errorf("Unexpected response: %#v", resp)
+	return fmt.Errorf("unexpected response: %#v", resp)
 }
 
 // ensureEndpointsContain sets the endpoints for the given service. Also removes

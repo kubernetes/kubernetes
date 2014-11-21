@@ -207,14 +207,14 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 		info, err := rs.podCache.GetPodInfo(pod.Status.Host, pod.Namespace, pod.Name)
 		if err != nil {
 			if err != client.ErrPodInfoNotAvailable {
-				glog.Errorf("Error getting container info from cache: %#v", err)
+				glog.Errorf("Error getting container info from cache: %v", err)
 			}
 			if rs.podInfoGetter != nil {
 				info, err = rs.podInfoGetter.GetPodInfo(pod.Status.Host, pod.Namespace, pod.Name)
 			}
 			if err != nil {
 				if err != client.ErrPodInfoNotAvailable {
-					glog.Errorf("Error getting fresh container info: %#v", err)
+					glog.Errorf("Error getting fresh container info: %v", err)
 				}
 				return
 			}
@@ -258,7 +258,7 @@ func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 	}
 	addr, err := instances.IPAddress(host)
 	if err != nil {
-		glog.Errorf("Error getting instance IP for %q: %#v", host, err)
+		glog.Errorf("Error getting instance IP for %q: %v", host, err)
 		return ""
 	}
 	return addr.String()

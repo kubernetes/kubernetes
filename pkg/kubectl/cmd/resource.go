@@ -60,7 +60,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 
 	mapping, namespace, name, _ = ResourceFromFile(filename, typer, mapper)
 	if len(name) == 0 {
-		checkErr(fmt.Errorf("The resource in the provided file has no name (or ID) defined"))
+		checkErr(fmt.Errorf("the resource in the provided file has no name (or ID) defined"))
 	}
 
 	return
@@ -132,7 +132,7 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 
 	// TODO: allow unversioned objects?
 	if len(version) == 0 {
-		checkErr(fmt.Errorf("The resource in the provided file has no apiVersion defined"))
+		checkErr(fmt.Errorf("the resource in the provided file has no apiVersion defined"))
 	}
 
 	mapping, err = mapper.RESTMapping(version, kind)
@@ -156,7 +156,7 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 func CompareNamespaceFromFile(cmd *cobra.Command, namespace string) error {
 	defaultNamespace := getKubeNamespace(cmd)
 	if defaultNamespace != namespace {
-		return fmt.Errorf("The namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)
+		return fmt.Errorf("the namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)
 	}
 	return nil
 }

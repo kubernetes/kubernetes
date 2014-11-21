@@ -52,7 +52,7 @@ func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) 
 
 func (s *SourceURL) run() {
 	if err := s.extractFromURL(); err != nil {
-		glog.Errorf("Failed to read URL: %s", err)
+		glog.Errorf("Failed to read URL: %v", err)
 	}
 }
 

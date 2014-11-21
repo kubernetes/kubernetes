@@ -88,7 +88,7 @@ func TestRESTHelperDelete(t *testing.T) {
 		}
 		err := modifier.Delete("bar", "foo")
 		if (err != nil) != test.Err {
-			t.Errorf("unexpected error: %f %v", test.Err, err)
+			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
 		if err != nil {
 			continue
@@ -178,7 +178,7 @@ func TestRESTHelperCreate(t *testing.T) {
 		}
 		err := modifier.Create("bar", test.Modify, data)
 		if (err != nil) != test.Err {
-			t.Errorf("%d: unexpected error: %f %v", i, test.Err, err)
+			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}
 		if err != nil {
 			continue
@@ -253,7 +253,7 @@ func TestRESTHelperGet(t *testing.T) {
 		}
 		obj, err := modifier.Get("bar", "foo", labels.Everything())
 		if (err != nil) != test.Err {
-			t.Errorf("unexpected error: %f %v", test.Err, err)
+			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
 		if err != nil {
 			continue
@@ -356,7 +356,7 @@ func TestRESTHelperUpdate(t *testing.T) {
 		}
 		err := modifier.Update("bar", "foo", test.Overwrite, data)
 		if (err != nil) != test.Err {
-			t.Errorf("%d: unexpected error: %f %v", i, test.Err, err)
+			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}
 		if err != nil {
 			continue

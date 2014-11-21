@@ -184,7 +184,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			bytes, err := json.Marshal(token)
 			if err != nil {
-				t.Fatalf("unexpected error: %+v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			fmt.Fprintln(w, string(bytes))
 		} else {

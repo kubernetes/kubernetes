@@ -40,7 +40,7 @@ import (
 func GetServerVersion(client *client.Client) (*version.Info, error) {
 	info, err := client.ServerVersion()
 	if err != nil {
-		return nil, fmt.Errorf("Got error: %v", err)
+		return nil, err
 	}
 	return info, nil
 }
@@ -100,7 +100,7 @@ func LoadNamespaceInfo(path string) (*NamespaceInfo, error) {
 // SaveNamespaceInfo saves a NamespaceInfo object at the specified file path.
 func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
 	if !util.IsDNSLabel(ns.Namespace) {
-		return fmt.Errorf("Namespace %s is not a valid DNS Label", ns.Namespace)
+		return fmt.Errorf("namespace %s is not a valid DNS Label", ns.Namespace)
 	}
 	data, err := json.Marshal(ns)
 	err = ioutil.WriteFile(path, data, 0600)
@@ -193,7 +193,7 @@ func portsFromString(spec string) ([]api.Port, error) {
 		pieces := strings.Split(part, ":")
 		if len(pieces) < 1 || len(pieces) > 2 {
 			glog.Infof("Bad port spec: %s", part)
-			return nil, fmt.Errorf("Bad port spec: %s", part)
+			return nil, fmt.Errorf("bad port spec: %s", part)
 		}
 		host := 0
 		container := 0
@@ -230,7 +230,7 @@ func portsFromString(spec string) ([]api.Port, error) {
 func RunController(ctx api.Context, image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
 	// TODO replace ctx with a namespace string
 	if servicePort > 0 && !util.IsDNSLabel(name) {
-		return fmt.Errorf("Service creation requested, but an invalid name for a service was provided (%s). Service names must be valid DNS labels.", name)
+		return fmt.Errorf("service creation requested, but an invalid name for a service was provided (%s). Service names must be valid DNS labels.", name)
 	}
 	ports, err := portsFromString(portSpec)
 	if err != nil {

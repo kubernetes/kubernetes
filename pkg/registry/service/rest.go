@@ -65,7 +65,7 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 	services, err := registry.ListServices(api.NewContext())
 	if err != nil {
 		// This is really bad.
-		glog.Errorf("can't list services to init service REST: %s", err)
+		glog.Errorf("can't list services to init service REST: %v", err)
 		return
 	}
 	for i := range services.Items {
@@ -76,7 +76,7 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 		}
 		if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
 			// This is really bad.
-			glog.Errorf("service %q PortalIP %s could not be allocated: %s", service.Name, service.Spec.PortalIP, err)
+			glog.Errorf("service %q PortalIP %s could not be allocated: %v", service.Name, service.Spec.PortalIP, err)
 		}
 	}
 }
@@ -119,11 +119,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 			}
 			balancer, ok := rs.cloud.TCPLoadBalancer()
 			if !ok {
-				return nil, fmt.Errorf("The cloud provider does not support external TCP load balancers.")
+				return nil, fmt.Errorf("the cloud provider does not support external TCP load balancers.")
 			}
 			zones, ok := rs.cloud.Zones()
 			if !ok {
-				return nil, fmt.Errorf("The cloud provider does not support zone enumeration.")
+				return nil, fmt.Errorf("the cloud provider does not support zone enumeration.")
 			}
 			hosts, err := rs.machines.ListMinions(ctx)
 			if err != nil {

@@ -82,7 +82,7 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("http status code: %d while fetching url: %v", resp.StatusCode)
+		err := fmt.Errorf("http status code: %d while fetching url %s", resp.StatusCode, url)
 		glog.Errorf("while trying to read %s: %v", url, err)
 		glog.V(2).Infof("body of failing http response: %v", resp.Body)
 		return nil, err

@@ -218,7 +218,7 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 		return err
 	}
 	if !dv.CanAddr() {
-		return fmt.Errorf("Can't write to dest")
+		return fmt.Errorf("can't write to dest")
 	}
 	sv, err := EnforcePtr(src)
 	if err != nil {
@@ -252,7 +252,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
-		return fmt.Errorf("Can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.NameFunc(st), c.NameFunc(dt))
+		return fmt.Errorf("can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.NameFunc(st), c.NameFunc(dt))
 	}
 
 	// This should handle all simple types.
@@ -346,7 +346,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 			dv.SetMapIndex(dk, dkv)
 		}
 	default:
-		return fmt.Errorf("Couldn't copy '%v' into '%v'", st, dt)
+		return fmt.Errorf("couldn't copy '%v' into '%v'", st, dt)
 	}
 	return nil
 }
