@@ -31,17 +31,8 @@ log_level: debug
 log_level_logfile: debug
 EOF
 
-# Our minions will have a pool role to distinguish them from the master.
-#cat <<EOF >/etc/salt/minion.d/grains.conf
-#grains:
-#  roles:
-#    - kubernetes-pool
-#  cbr-cidr: $MINION_IP_RANGE
-#  cloud: gce
-#EOF
-
 hostnamef=$(hostname -f)
-sudo apt-get install ipcalc
+apt-get install -y ipcalc
 netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
 network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')
 cbrstring="$network $netmask"
