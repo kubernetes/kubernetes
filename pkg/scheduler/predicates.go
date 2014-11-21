@@ -122,8 +122,8 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	}
 
 	// TODO: convert to general purpose resource matching, when pods ask for resources
-	totalMilliCPU := int(resources.GetFloatResource(info.NodeResources.Capacity, resources.CPU, 0) * 1000)
-	totalMemory := resources.GetIntegerResource(info.NodeResources.Capacity, resources.Memory, 0)
+	totalMilliCPU := int(resources.GetFloatResource(info.Spec.Capacity, resources.CPU, 0) * 1000)
+	totalMemory := resources.GetIntegerResource(info.Spec.Capacity, resources.Memory, 0)
 
 	fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 	fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory

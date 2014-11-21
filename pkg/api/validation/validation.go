@@ -544,9 +544,7 @@ func ValidateMinion(minion *api.Minion) errs.ValidationErrorList {
 // ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
 func ValidateMinionUpdate(oldMinion *api.Minion, minion *api.Minion) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	// TODO: why we need two labels for minion.
 	oldMinion.Labels = minion.Labels
-	oldMinion.ObjectMeta.Labels = minion.ObjectMeta.Labels
 	if !reflect.DeepEqual(oldMinion, minion) {
 		allErrs = append(allErrs, fmt.Errorf("update contains more than labels changes"))
 	}

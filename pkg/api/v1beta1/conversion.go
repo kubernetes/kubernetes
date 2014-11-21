@@ -498,12 +498,12 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+			if err := s.Convert(&in.ObjectMeta.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
 
-			out.HostIP = in.HostIP
-			return s.Convert(&in.NodeResources, &out.NodeResources, 0)
+			out.HostIP = in.Status.HostIP
+			return s.Convert(&in.Spec.Capacity, &out.NodeResources.Capacity, 0)
 		},
 		func(in *Minion, out *newer.Minion, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
@@ -512,12 +512,12 @@ func init() {
 			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
 				return err
 			}
 
-			out.HostIP = in.HostIP
-			return s.Convert(&in.NodeResources, &out.NodeResources, 0)
+			out.Status.HostIP = in.HostIP
+			return s.Convert(&in.NodeResources.Capacity, &out.Spec.Capacity, 0)
 		},
 
 		func(in *newer.BoundPod, out *BoundPod, s conversion.Scope) error {

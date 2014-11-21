@@ -664,24 +664,22 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
+	// Capacity represents the available resources of a node
+	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 }
 
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
-}
-
-// NodeResources represents resources on a Kubernetes system node
-// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
-type NodeResources struct {
-	// Capacity represents the available resources.
-	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	// Queried from cloud provider, if available.
+	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 }
 
 type ResourceName string
 
 type ResourceList map[ResourceName]util.IntOrString
 
-// Node is a worker node in Kubernetenes.
+// Node is a worker node in Kubernetes.
 // The name of the node according to etcd is in ID.
 type Node struct {
 	TypeMeta   `json:",inline" yaml:",inline"`
@@ -692,9 +690,6 @@ type Node struct {
 
 	// Status describes the current status of a Node
 	Status NodeStatus `json:"status,omitempty" yaml:"status,omitempty"`
-
-	// NodeResources describe the resoruces available on the node.
-	NodeResources NodeResources `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
 // NodeList is a list of minions.

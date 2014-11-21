@@ -130,7 +130,7 @@ func TestMinionStorageInvalidUpdate(t *testing.T) {
 	if !ok {
 		t.Fatalf("Object is not a minion: %#v", obj)
 	}
-	minion.HostIP = "1.2.3.4"
+	minion.Status.HostIP = "1.2.3.4"
 	if _, err = storage.Update(ctx, minion); err == nil {
 		t.Error("Unexpected non-error.")
 	}
@@ -163,13 +163,19 @@ func TestMinionStorageValidatesCreate(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	failureCases := map[string]api.Minion{
 		"zero-length Name": {
-			ObjectMeta: api.ObjectMeta{Name: ""},
-			HostIP:     "something",
-			Labels:     validSelector,
+			ObjectMeta: api.ObjectMeta{
+				Name:   "",
+				Labels: validSelector,
+			},
+			Status: api.NodeStatus{
+				HostIP: "something",
+			},
 		},
 		"invalid-labels": {
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Labels:     invalidSelector,
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: invalidSelector,
+			},
 		},
 	}
 	for _, failureCase := range failureCases {

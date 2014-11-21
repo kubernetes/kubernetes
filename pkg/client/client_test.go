@@ -592,8 +592,10 @@ func TestCreateMinion(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "minion-1",
 		},
-		HostIP: "123.321.456.654",
-		NodeResources: api.NodeResources{
+		Status: api.NodeStatus{
+			HostIP: "123.321.456.654",
+		},
+		Spec: api.NodeSpec{
 			Capacity: api.ResourceList{
 				resources.CPU:    util.NewIntOrStringFromInt(1000),
 				resources.Memory: util.NewIntOrStringFromInt(1024 * 1024),
