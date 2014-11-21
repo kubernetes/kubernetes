@@ -483,3 +483,9 @@ func ParseSelector(selector string) (Selector, error) {
 	}
 	return andTerm(items), nil
 }
+
+// OneTermEqualSelector returns an object that matches objects where one label/field equals one value.
+// Cannot return an error.
+func OneTermEqualSelector(k, v string) Selector {
+	return &hasTerm{label: k, value: v}
+}
