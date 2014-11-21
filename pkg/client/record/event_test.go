@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -156,5 +158,83 @@ func TestEventf(t *testing.T) {
 		recorder.Stop()
 		logger.Stop()
 		logger2.Stop()
+	}
+}
+
+func TestWriteEventError(t *testing.T) {
+	ref := &api.ObjectReference{
+		Kind:       "Pod",
+		Name:       "foo",
+		Namespace:  "baz",
+		UID:        "bar",
+		APIVersion: "v1beta1",
+	}
+	type entry struct {
+		timesToSendError int
+		attemptsMade     int
+		attemptsWanted   int
+		err              error
+	}
+	table := map[string]*entry{
+		"giveUp1": {
+			timesToSendError: 1000,
+			attemptsWanted:   1,
+			err:              &client.RequestConstructionError{},
+		},
+		"giveUp2": {
+			timesToSendError: 1000,
+			attemptsWanted:   1,
+			err:              &errors.StatusError{},
+		},
+		"retry1": {
+			timesToSendError: 1000,
+			attemptsWanted:   3,
+			err:              &errors.UnexpectedObjectError{},
+		},
+		"retry2": {
+			timesToSendError: 1000,
+			attemptsWanted:   3,
+			err:              fmt.Errorf("A weird error"),
+		},
+		"succeedEventually": {
+			timesToSendError: 2,
+			attemptsWanted:   2,
+			err:              fmt.Errorf("A weird error"),
+		},
+	}
+	done := make(chan struct{})
+
+	defer record.StartRecording(
+		&testEventRecorder{
+			OnEvent: func(event *api.Event) (*api.Event, error) {
+				if event.Message == "finished" {
+					close(done)
+					return event, nil
+				}
+				item, ok := table[event.Message]
+				if !ok {
+					t.Errorf("Unexpected event: %#v", event)
+					return event, nil
+				}
+				item.attemptsMade++
+				if item.attemptsMade < item.timesToSendError {
+					return nil, item.err
+				}
+				return event, nil
+			},
+		},
+		"eventTest",
+	).Stop()
+
+	for caseName := range table {
+		record.Event(ref, "Status", "Reason", caseName)
+	}
+	record.Event(ref, "Status", "Reason", "finished")
+	<-done
+
+	for caseName, item := range table {
+		if e, a := item.attemptsWanted, item.attemptsMade; e != a {
+			t.Errorf("case %v: wanted %v, got %v attempts", caseName, e, a)
+		}
 	}
 }
