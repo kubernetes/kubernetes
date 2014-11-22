@@ -26,6 +26,11 @@ type typePair struct {
 	dest   reflect.Type
 }
 
+type typeNamePair struct {
+	fieldType reflect.Type
+	fieldName string
+}
+
 // DebugLogger allows you to get debugging messages if necessary.
 type DebugLogger interface {
 	Logf(format string, args ...interface{})
@@ -36,6 +41,15 @@ type Converter struct {
 	// Map from the conversion pair to a function which can
 	// do the conversion.
 	funcs map[typePair]reflect.Value
+
+	// This is a map from a source field type and name, to a list of destination
+	// field type and name.
+	structFieldDests map[typeNamePair][]typeNamePair
+
+	// Allows for the opposite lookup of structFieldDests. So that SourceFromDest
+	// copy flag also works. So this is a map of destination field name, to potential
+	// source field name and type to look for.
+	structFieldSources map[typeNamePair][]typeNamePair
 
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
@@ -49,8 +63,10 @@ type Converter struct {
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
-		funcs:    map[typePair]reflect.Value{},
-		NameFunc: func(t reflect.Type) string { return t.Name() },
+		funcs:              map[typePair]reflect.Value{},
+		NameFunc:           func(t reflect.Type) string { return t.Name() },
+		structFieldDests:   map[typeNamePair][]typeNamePair{},
+		structFieldSources: map[typeNamePair][]typeNamePair{},
 	}
 }
 
@@ -177,6 +193,22 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 	return nil
 }
 
+// SetStructFieldCopy registers a correspondence. Whenever a struct field is encountered
+// which has a type and name matching srcFieldType and srcFieldName, it wil be copied
+// into the field in the destination struct matching destFieldType & Name, if such a
+// field exists.
+// May be called multiple times, even for the same source field & type--all applicable
+// copies will be performed.
+func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
+	st := reflect.TypeOf(srcFieldType)
+	dt := reflect.TypeOf(destFieldType)
+	srcKey := typeNamePair{st, srcFieldName}
+	destKey := typeNamePair{dt, destFieldName}
+	c.structFieldDests[srcKey] = append(c.structFieldDests[srcKey], destKey)
+	c.structFieldSources[destKey] = append(c.structFieldSources[destKey], srcKey)
+	return nil
+}
+
 // FieldMatchingFlags contains a list of ways in which struct fields could be
 // copied. These constants may be | combined.
 type FieldMatchingFlags int
@@ -201,6 +233,10 @@ const (
 
 // IsSet returns true if the given flag or combination of flags is set.
 func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
+	if flag == DestFromSource {
+		// The bit logic doesn't work on the default value.
+		return f&SourceToDest != SourceToDest
+	}
 	return f&flag == flag
 }
 
@@ -274,39 +310,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 
 	switch dv.Kind() {
 	case reflect.Struct:
-		listType := dt
-		if scope.flags.IsSet(SourceToDest) {
-			listType = st
-		}
-		for i := 0; i < listType.NumField(); i++ {
-			f := listType.Field(i)
-			df := dv.FieldByName(f.Name)
-			sf := sv.FieldByName(f.Name)
-			if sf.IsValid() {
-				// No need to check error, since we know it's valid.
-				field, _ := st.FieldByName(f.Name)
-				scope.setSrcTag(field.Tag)
-			}
-			if df.IsValid() {
-				field, _ := dt.FieldByName(f.Name)
-				scope.setDestTag(field.Tag)
-			}
-			// TODO: set top level of scope.src/destTagStack with these field tags here.
-			if !df.IsValid() || !sf.IsValid() {
-				switch {
-				case scope.flags.IsSet(IgnoreMissingFields):
-					// No error.
-				case scope.flags.IsSet(SourceToDest):
-					return fmt.Errorf("%v not present in dest (%v to %v)", f.Name, st, dt)
-				default:
-					return fmt.Errorf("%v not present in src (%v to %v)", f.Name, st, dt)
-				}
-				continue
-			}
-			if err := c.convert(sf, df, scope); err != nil {
-				return err
-			}
-		}
+		return c.convertStruct(sv, dv, scope)
 	case reflect.Slice:
 		if sv.IsNil() {
 			// Don't make a zero-length slice.
@@ -349,4 +353,100 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		return fmt.Errorf("couldn't copy '%v' into '%v'", st, dt)
 	}
 	return nil
+}
+
+func (c *Converter) convertStruct(sv, dv reflect.Value, scope *scope) error {
+	dt, st := dv.Type(), sv.Type()
+
+	listType := dt
+	if scope.flags.IsSet(SourceToDest) {
+		listType = st
+	}
+	for i := 0; i < listType.NumField(); i++ {
+		f := listType.Field(i)
+		if found, err := c.checkStructField(f.Name, sv, dv, scope); found {
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		df := dv.FieldByName(f.Name)
+		sf := sv.FieldByName(f.Name)
+		if sf.IsValid() {
+			// No need to check error, since we know it's valid.
+			field, _ := st.FieldByName(f.Name)
+			scope.setSrcTag(field.Tag)
+		}
+		if df.IsValid() {
+			field, _ := dt.FieldByName(f.Name)
+			scope.setDestTag(field.Tag)
+		}
+		// TODO: set top level of scope.src/destTagStack with these field tags here.
+		if !df.IsValid() || !sf.IsValid() {
+			switch {
+			case scope.flags.IsSet(IgnoreMissingFields):
+				// No error.
+			case scope.flags.IsSet(SourceToDest):
+				return fmt.Errorf("%v not present in dest (%v to %v)", f.Name, st, dt)
+			default:
+				return fmt.Errorf("%v not present in src (%v to %v)", f.Name, st, dt)
+			}
+			continue
+		}
+		if err := c.convert(sf, df, scope); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkStructField returns true if the field name matches any of the struct
+// field copying rules. The error should be ignored if it returns false.
+func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, scope *scope) (bool, error) {
+	replacementMade := false
+	if scope.flags.IsSet(DestFromSource) {
+		df := dv.FieldByName(fieldName)
+		if !df.IsValid() {
+			return false, nil
+		}
+		destKey := typeNamePair{df.Type(), fieldName}
+		// Check each of the potential source (type, name) pairs to see if they're
+		// present in sv.
+		for _, potentialSourceKey := range c.structFieldSources[destKey] {
+			sf := sv.FieldByName(potentialSourceKey.fieldName)
+			if !sf.IsValid() {
+				continue
+			}
+			if sf.Type() == potentialSourceKey.fieldType {
+				// Both the source's name and type matched, so copy.
+				if err := c.convert(sf, df, scope); err != nil {
+					return true, err
+				}
+				replacementMade = true
+			}
+		}
+		return replacementMade, nil
+	}
+
+	sf := sv.FieldByName(fieldName)
+	if !sf.IsValid() {
+		return false, nil
+	}
+	srcKey := typeNamePair{sf.Type(), fieldName}
+	// Check each of the potential dest (type, name) pairs to see if they're
+	// present in dv.
+	for _, potentialDestKey := range c.structFieldDests[srcKey] {
+		df := dv.FieldByName(potentialDestKey.fieldName)
+		if !df.IsValid() {
+			continue
+		}
+		if df.Type() == potentialDestKey.fieldType {
+			// Both the dest's name and type matched, so copy.
+			if err := c.convert(sf, df, scope); err != nil {
+				return true, err
+			}
+			replacementMade = true
+		}
+	}
+	return replacementMade, nil
 }
