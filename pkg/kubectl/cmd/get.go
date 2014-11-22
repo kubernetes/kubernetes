@@ -45,7 +45,7 @@ Examples:
   $ kubectl get replicationController 1234-56-7890-234234-456456
   <list single replication controller in ps output format>
 
-  $ kubectl get -f json pod 1234-56-7890-234234-456456
+  $ kubectl get -o json pod 1234-56-7890-234234-456456
   <list single pod in json output format>`,
 		Run: func(cmd *cobra.Command, args []string) {
 			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, f.Mapper)
