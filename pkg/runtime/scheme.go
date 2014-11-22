@@ -217,6 +217,14 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return s.raw.AddConversionFuncs(conversionFuncs...)
 }
 
+// AddStructFieldConversion allows you to specify a mechanical copy for a moved
+// or renamed struct field without writing an entire conversion function. See
+// the comment in conversion.Converter.SetStructFieldCopy for parameter details.
+// Call as many times as needed, even on the same fields.
+func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
+	return s.raw.AddStructFieldConversion(srcFieldType, srcFieldName, destFieldType, destFieldName)
+}
+
 // Convert will attempt to convert in into out. Both must be pointers.
 // For easy testing of conversion functions. Returns an error if the conversion isn't
 // possible.
