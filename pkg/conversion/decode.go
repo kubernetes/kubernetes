@@ -19,7 +19,9 @@ package conversion
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
+	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
 
@@ -28,6 +30,8 @@ import (
 // technique. The object will be converted, if necessary, into the
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
+// The decoded object will be processed recursively to seek any struct
+// fields which implement the defaultable interface.
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	version, kind, err := s.DataVersionAndKind(data)
 	if err != nil {
@@ -50,6 +54,7 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	applyDefaults(obj)
 
 	// Version and Kind should be blank in memory.
 	err = s.SetVersionAndKind("", "", obj)
@@ -72,11 +77,63 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	return obj, nil
 }
 
+// Objects that can be converted to this interface will have defaults
+// applied.
+type defaultable interface {
+	ApplyDefaults()
+}
+
+// applyDefaults recursively process its argument to apply defaults to any
+// struct or pointer-to-struct fields that satisfy the defaultable
+// interface.
+func applyDefaults(obj interface{}) {
+	applyDefaultsToValue(reflect.ValueOf(obj))
+}
+
+// applyDefaultsToValue is a helper function which uses reflection to
+// explore a type, looking for any structs that implement th edefaultable
+// interface.
+func applyDefaultsToValue(value reflect.Value) {
+	if !value.CanInterface() {
+		return
+	}
+	t := value.Type()
+	switch t.Kind() {
+	case reflect.Struct:
+		if value.CanAddr() {
+			ptr := value.Addr()
+			intf := ptr.Interface()
+			if d, ok := intf.(defaultable); ok {
+				glog.Infof("Applying defaults to type '%T'", intf)
+				d.ApplyDefaults()
+			}
+		}
+		// FIXME: should this be before or after applying to self?
+		for i := 0; i < value.NumField(); i++ {
+			applyDefaultsToValue(value.Field(i))
+		}
+	case reflect.Ptr:
+		if !value.IsNil() {
+			applyDefaultsToValue(value.Elem())
+		}
+	case reflect.Array, reflect.Slice:
+		for i := 0; i < value.Len(); i++ {
+			applyDefaultsToValue(value.Index(i))
+		}
+	case reflect.Map:
+		for _, k := range value.MapKeys() {
+			applyDefaultsToValue(value.MapIndex(k))
+		}
+	}
+}
+
 // DecodeInto parses a YAML or JSON string and stores it in obj. Returns an error
 // if data.Kind is set and doesn't match the type of obj. Obj should be a
 // pointer to an api type.
 // If obj's version doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
+// The decoded object will be processed recursively to seek any struct
+// fields which implement the defaultable interface.
 func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if len(data) == 0 {
 		// This is valid YAML, but it's a bad idea not to return an error
@@ -112,6 +169,7 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		if err != nil {
 			return err
 		}
+		applyDefaults(obj)
 	} else {
 		external, err := s.NewObject(dataVersion, dataKind)
 		if err != nil {
@@ -123,6 +181,7 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		if err != nil {
 			return err
 		}
+		applyDefaults(external)
 		err = s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion))
 		if err != nil {
 			return err
