@@ -63,7 +63,7 @@ func NewScheme() *Scheme {
 		InternalVersion: "",
 		MetaFactory:     DefaultMetaFactory,
 	}
-	s.converter.NameFunc = s.nameFunc
+	s.converter.nameFunc = s.nameFunc
 	return s
 }
 
@@ -185,7 +185,7 @@ func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
 // add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
-		err := s.converter.Register(f)
+		err := s.converter.RegisterConversionFunc(f)
 		if err != nil {
 			return err
 		}

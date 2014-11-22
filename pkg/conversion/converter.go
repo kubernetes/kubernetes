@@ -35,22 +35,22 @@ type DebugLogger interface {
 type Converter struct {
 	// Map from the conversion pair to a function which can
 	// do the conversion.
-	funcs map[typePair]reflect.Value
+	conversionFuncs map[typePair]reflect.Value
 
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
 
-	// NameFunc is called to retrieve the name of a type; this name is used for the
+	// nameFunc is called to retrieve the name of a type; this name is used for the
 	// purpose of deciding whether two types match or not (i.e., will we attempt to
 	// do a conversion). The default returns the go type name.
-	NameFunc func(t reflect.Type) string
+	nameFunc func(t reflect.Type) string
 }
 
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
-		funcs:    map[typePair]reflect.Value{},
-		NameFunc: func(t reflect.Type) string { return t.Name() },
+		conversionFuncs: map[typePair]reflect.Value{},
+		nameFunc:        func(t reflect.Type) string { return t.Name() },
 	}
 }
 
@@ -137,14 +137,18 @@ func (s *scope) Meta() *Meta {
 	return s.meta
 }
 
-// Register registers a conversion func with the Converter. conversionFunc must take
-// three parameters: a pointer to the input type, a pointer to the output type, and
-// a conversion.Scope (which should be used if recursive conversion calls are desired).
-// It must return an error.
+// RegisterConversionFunc registers a conversion func with the Converter.
+// conversionFunc must take three parameters: a pointer to the input type, a
+// pointer to the output type, and a conversion.Scope (which should be used
+// if recursive conversion calls are desired).  It must return an error.
 //
 // Example:
-// c.Register(func(in *Pod, out *v1beta1.Pod, s Scope) error { ... return nil })
-func (c *Converter) Register(conversionFunc interface{}) error {
+// c.RegisteConversionFuncr(
+//         func(in *Pod, out *v1beta1.Pod, s Scope) error {
+//                 // conversion logic...
+//                 return nil
+//          })
+func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 	fv := reflect.ValueOf(conversionFunc)
 	ft := fv.Type()
 	if ft.Kind() != reflect.Func {
@@ -173,7 +177,7 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 	if ft.Out(0) != errorType {
 		return fmt.Errorf("expected error return, got: %v", ft)
 	}
-	c.funcs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
+	c.conversionFuncs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
 	return nil
 }
 
@@ -237,7 +241,7 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
-	if fv, ok := c.funcs[typePair{st, dt}]; ok {
+	if fv, ok := c.conversionFuncs[typePair{st, dt}]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
@@ -251,8 +255,8 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		return ret.(error)
 	}
 
-	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
-		return fmt.Errorf("can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.NameFunc(st), c.NameFunc(dt))
+	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.nameFunc(dt) != c.nameFunc(st) {
+		return fmt.Errorf("Can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.nameFunc(st), c.nameFunc(dt))
 	}
 
 	// This should handle all simple types.
