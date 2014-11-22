@@ -118,14 +118,14 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type C struct{}
 	c := NewConverter()
 	c.Debug = t
-	err := c.Register(func(in *A, out *B, s Scope) error {
+	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		return s.Convert(&in.Baz, &out.Baz, 0)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	err = c.Register(func(in *B, out *A, s Scope) error {
+	err = c.RegisterConversionFunc(func(in *B, out *A, s Scope) error {
 		out.Foo = in.Bar
 		return s.Convert(&in.Baz, &out.Baz, 0)
 	})
@@ -161,7 +161,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	err = c.Register(func(in *A, out *C, s Scope) error {
+	err = c.RegisterConversionFunc(func(in *A, out *C, s Scope) error {
 		return fmt.Errorf("C can't store an A, silly")
 	})
 	if err != nil {
@@ -184,7 +184,7 @@ func TestConverter_fuzz(t *testing.T) {
 
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
-	c.NameFunc = func(t reflect.Type) string {
+	c.nameFunc = func(t reflect.Type) string {
 		// Hide the fact that we don't have separate packages for these things.
 		return map[reflect.Type]string{
 			reflect.TypeOf(TestType1{}):         "TestType1",
@@ -270,7 +270,7 @@ func TestConverter_tags(t *testing.T) {
 	}
 	c := NewConverter()
 	c.Debug = t
-	err := c.Register(
+	err := c.RegisterConversionFunc(
 		func(in *string, out *string, s Scope) error {
 			if e, a := "foo", s.SrcTag().Get("test"); e != a {
 				t.Errorf("expected %v, got %v", e, a)
@@ -296,7 +296,7 @@ func TestConverter_meta(t *testing.T) {
 	c := NewConverter()
 	c.Debug = t
 	checks := 0
-	err := c.Register(
+	err := c.RegisterConversionFunc(
 		func(in *Foo, out *Bar, s Scope) error {
 			if s.Meta() == nil || s.Meta().SrcVersion != "test" || s.Meta().DestVersion != "passes" {
 				t.Errorf("Meta did not get passed!")
@@ -309,7 +309,7 @@ func TestConverter_meta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Register(
+	err = c.RegisterConversionFunc(
 		func(in *string, out *string, s Scope) error {
 			if s.Meta() == nil || s.Meta().SrcVersion != "test" || s.Meta().DestVersion != "passes" {
 				t.Errorf("Meta did not get passed a second time!")
