@@ -18,6 +18,7 @@ package pod
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 )
 
@@ -31,8 +32,19 @@ type BasicBoundPodFactory struct {
 	ServiceRegistry service.Registry
 }
 
+// getServiceEnvironmentVariables populates a list of environment variables that are use
+// in the container environment to get access to services.
+func getServiceEnvironmentVariables(ctx api.Context, registry service.Registry, machine string) ([]api.EnvVar, error) {
+	var result []api.EnvVar
+	services, err := registry.ListServices(ctx)
+	if err != nil {
+		return result, err
+	}
+	return envvars.FromServices(services), nil
+}
+
 func (b *BasicBoundPodFactory) MakeBoundPod(machine string, pod *api.Pod) (*api.BoundPod, error) {
-	envVars, err := service.GetServiceEnvironmentVariables(api.NewContext(), b.ServiceRegistry, machine)
+	envVars, err := getServiceEnvironmentVariables(api.NewContext(), b.ServiceRegistry, machine)
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +56,6 @@ func (b *BasicBoundPodFactory) MakeBoundPod(machine string, pod *api.Pod) (*api.
 		boundPod.Spec.Containers[ix].Env = append(container.Env, envVars...)
 	}
 	// Make a dummy self link so that references to this bound pod will work.
-	// TODO: When kubelets get boundPods from apiserver instead of etcd, then
-	// the selflink should be generated there.
 	boundPod.SelfLink = "/api/v1beta1/boundPods/" + boundPod.Name
 	return boundPod, nil
 }
