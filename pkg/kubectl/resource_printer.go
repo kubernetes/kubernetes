@@ -190,7 +190,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 var podColumns = []string{"NAME", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
 var replicationControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
-var minionColumns = []string{"NAME"}
+var minionColumns = []string{"NAME", "LABELS"}
 var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"NAME", "KIND", "STATUS", "REASON", "MESSAGE"}
 
@@ -298,7 +298,7 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 }
 
 func printMinion(minion *api.Minion, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\n", minion.Name)
+	_, err := fmt.Fprintf(w, "%s\t%s\n", minion.Name, labels.Set(minion.Labels))
 	return err
 }
 

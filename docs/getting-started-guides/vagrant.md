@@ -78,8 +78,8 @@ You may need to build the binaries first, you can do this with ```make```
 ```
 $ export KUBERNETES_PROVIDER=vagrant
 $ ./cluster/kubecfg.sh list /minions
-Minion identifier
-----------
+Minion identifier    Labels
+----------           ----------
 10.245.2.4
 10.245.2.3
 10.245.2.2
@@ -141,8 +141,8 @@ Your cluster is running, you can list the minions in your cluster:
 
 ```
 $ cluster/kubecfg.sh list /minions
-Minion identifier
-----------
+Minion identifier    Labels
+----------           ----------
 10.245.2.4
 10.245.2.3
 10.245.2.2
