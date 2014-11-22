@@ -37,28 +37,27 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-type SourceFile struct {
+type sourceFile struct {
 	path    string
 	updates chan<- interface{}
 }
 
-func NewSourceFile(path string, period time.Duration, updates chan<- interface{}) *SourceFile {
-	config := &SourceFile{
+func NewSourceFile(path string, period time.Duration, updates chan<- interface{}) {
+	config := &sourceFile{
 		path:    path,
 		updates: updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
 	go util.Forever(config.run, period)
-	return config
 }
 
-func (s *SourceFile) run() {
+func (s *sourceFile) run() {
 	if err := s.extractFromPath(); err != nil {
 		glog.Errorf("Unable to read config path %q: %v", s.path, err)
 	}
 }
 
-func (s *SourceFile) extractFromPath() error {
+func (s *sourceFile) extractFromPath() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {

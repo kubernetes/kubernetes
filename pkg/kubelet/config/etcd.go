@@ -37,30 +37,29 @@ func EtcdKeyForHost(hostname string) string {
 	return path.Join("/", "registry", "nodes", hostname, "boundpods")
 }
 
-type SourceEtcd struct {
+type sourceEtcd struct {
 	key     string
 	helper  tools.EtcdHelper
 	updates chan<- interface{}
 }
 
 // NewSourceEtcd creates a config source that watches and pulls from a key in etcd
-func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface{}) *SourceEtcd {
+func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface{}) {
 	helper := tools.EtcdHelper{
 		client,
 		latest.Codec,
 		tools.RuntimeVersionAdapter{latest.ResourceVersioner},
 	}
-	source := &SourceEtcd{
+	source := &sourceEtcd{
 		key:     key,
 		helper:  helper,
 		updates: updates,
 	}
 	glog.V(1).Infof("Watching etcd for %s", key)
 	go util.Forever(source.run, time.Second)
-	return source
 }
 
-func (s *SourceEtcd) run() {
+func (s *sourceEtcd) run() {
 	watching := s.helper.Watch(s.key, 0)
 	for {
 		select {
