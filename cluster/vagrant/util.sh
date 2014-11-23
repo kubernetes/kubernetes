@@ -62,7 +62,7 @@ function kube-up {
 }
 EOF
 
-   chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
+   chmod 0600 ~/.kubernetes_vagrant_auth "${HOME}/${kube_cert}" \
      "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
   )
 
