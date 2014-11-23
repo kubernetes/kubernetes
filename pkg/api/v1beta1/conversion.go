@@ -602,6 +602,24 @@ func init() {
 			return nil
 		},
 
+		func(in *newer.MasterFlags, out *MasterFlags, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Spec, &out.Spec, 0)
+		},
+		func(in *MasterFlags, out *newer.MasterFlags, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Spec, &out.Spec, 0)
+		},
 		func(in *newer.Event, out *Event, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
@@ -720,6 +738,25 @@ func init() {
 			return s.Convert(&in.Items, &out.Items, 0)
 		},
 		func(in *EventList, out *newer.EventList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.MasterFlagsList, out *MasterFlagsList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *MasterFlagsList, out *newer.MasterFlagsList, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}

@@ -42,6 +42,8 @@ const (
 	ServicePath string = "/registry/services/specs"
 	// ServiceEndpointPath is the path to service endpoints resources in etcd
 	ServiceEndpointPath string = "/registry/services/endpoints"
+	// MasterFlagsPath is the path to master component flags in etcd
+	ConfigPath string = "/registry/masterFlags"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -390,7 +392,7 @@ func (r *Registry) DeleteController(ctx api.Context, controllerID string) error 
 	return etcderr.InterpretDeleteError(err, "replicationController", controllerID)
 }
 
-// makePodListKey constructs etcd paths to service directories enforcing namespace rules.
+// makeServiceListKey constructs etcd paths to service directories enforcing namespace rules.
 func makeServiceListKey(ctx api.Context) string {
 	return MakeEtcdListKey(ctx, ServicePath)
 }

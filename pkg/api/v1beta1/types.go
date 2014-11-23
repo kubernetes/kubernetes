@@ -780,3 +780,21 @@ type BoundPods struct {
 	// Items is the list of all pods bound to a given host.
 	Items []BoundPod `json:"items" yaml:"items" description:"list of all pods bound to a given host"`
 }
+
+// MasterFlagsSpec specifies configuration of a kubernetes master component.
+type MasterFlagsSpec struct {
+	// The command line flags as key-value pairs.
+	CmdLineArg map[string]string `json:"cmdlinearg" yaml:"cmdlinearg"`
+}
+
+// MasterFlags represents the configuration of a kubernetes master component.
+type MasterFlags struct {
+	TypeMeta   `json:",inline" yaml:",inline"`
+	Spec MasterFlagsSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// MasterFlagsList is a list of MasterFlagss
+type MasterFlagsList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items []MasterFlags `json:"items" yaml:"items"`
+}

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -56,6 +57,20 @@ func main() {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
+	// Fetch additional flags from the API server
+	flagsClient := kubeClient.MasterFlags(api.NamespaceDefault)
+	flags, err := flagsClient.Get("scheduler")
+	if err != nil {
+		glog.Fatalf("Could not read flags from api server: %v", err)
+	}
+	for k, v := range flags.Spec.CmdLineArg {
+		f := flag.Lookup(k)
+		if (f == nil) {
+			glog.Fatalf("Could not find flag %s", k)
+		}
+		f.Value.Set(v);
+	}
+	
 	record.StartRecording(kubeClient.Events(""), "scheduler")
 
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
