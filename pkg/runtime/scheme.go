@@ -203,7 +203,8 @@ func (s *Scheme) Log(l conversion.DebugLogger) {
 
 // AddConversionFuncs adds a function to the list of conversion functions. The given
 // function should know how to convert between two API objects. We deduce how to call
-// it from the types of its two parameters; see the comment for Converter.Register.
+// it from the types of its two parameters; see the comment for
+// Converter.RegisterConversionFunction.
 //
 // Note that, if you need to copy sub-objects that didn't change, it's safe to call
 // Convert() inside your conversionFuncs, as long as you don't start a conversion
@@ -215,6 +216,13 @@ func (s *Scheme) Log(l conversion.DebugLogger) {
 // function for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return s.raw.AddConversionFuncs(conversionFuncs...)
+}
+
+// AddDefaultingFuncs adds a function to the list of value-defaulting functions.
+// We deduce how to call it from the types of its two parameters; see the
+// comment for Converter.RegisterDefaultingFunction.
+func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
+	return s.raw.AddDefaultingFuncs(defaultingFuncs...)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers.

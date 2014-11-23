@@ -37,6 +37,9 @@ type Converter struct {
 	// do the conversion.
 	conversionFuncs map[typePair]reflect.Value
 
+	// Map from a type to a function which applies defaults.
+	defaultingFuncs map[reflect.Type]reflect.Value
+
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
 
@@ -50,6 +53,7 @@ type Converter struct {
 func NewConverter() *Converter {
 	return &Converter{
 		conversionFuncs: map[typePair]reflect.Value{},
+		defaultingFuncs: map[reflect.Type]reflect.Value{},
 		nameFunc:        func(t reflect.Type) string { return t.Name() },
 	}
 }
@@ -181,6 +185,33 @@ func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 	return nil
 }
 
+// RegisterDefaultingFunc registers a value-defaulting func with the Converter.
+// defaultingFunc must take one parameters: a pointer to the input type.
+//
+// Example:
+// c.RegisteDefaultingFuncr(
+//         func(in *v1beta1.Pod) {
+//                 // defaulting logic...
+//          })
+func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
+	fv := reflect.ValueOf(defaultingFunc)
+	ft := fv.Type()
+	if ft.Kind() != reflect.Func {
+		return fmt.Errorf("expected func, got: %v", ft)
+	}
+	if ft.NumIn() != 1 {
+		return fmt.Errorf("expected one 'in' param, got: %v", ft)
+	}
+	if ft.NumOut() != 0 {
+		return fmt.Errorf("expected zero 'out' params, got: %v", ft)
+	}
+	if ft.In(0).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
+	}
+	c.defaultingFuncs[ft.In(0).Elem()] = fv
+	return nil
+}
+
 // FieldMatchingFlags contains a list of ways in which struct fields could be
 // copied. These constants may be | combined.
 type FieldMatchingFlags int
@@ -241,6 +272,17 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
+
+	// Apply default values.
+	if fv, ok := c.defaultingFuncs[st]; ok {
+		if c.Debug != nil {
+			c.Debug.Logf("Applying defaults for '%v'", st)
+		}
+		args := []reflect.Value{sv.Addr()}
+		fv.Call(args)
+	}
+
+	// Convert sv to dv.
 	if fv, ok := c.conversionFuncs[typePair{st, dt}]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
@@ -249,10 +291,10 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		ret := fv.Call(args)[0].Interface()
 		// This convolution is necessary because nil interfaces won't convert
 		// to errors.
-		if ret == nil {
-			return nil
+		if ret != nil {
+			return ret.(error)
 		}
-		return ret.(error)
+		return nil
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.nameFunc(dt) != c.nameFunc(st) {
@@ -352,5 +394,6 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	default:
 		return fmt.Errorf("couldn't copy '%v' into '%v'", st, dt)
 	}
+
 	return nil
 }
