@@ -18,6 +18,7 @@ package conversion
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"reflect"
 )
 
@@ -37,6 +38,10 @@ type Converter struct {
 	// do the conversion.
 	conversionFuncs map[typePair]reflect.Value
 
+	// Map from the defaulting pair to a function which can
+	// do the value defaulting.
+	defaultingFuncs map[typePair]reflect.Value
+
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
 
@@ -50,6 +55,7 @@ type Converter struct {
 func NewConverter() *Converter {
 	return &Converter{
 		conversionFuncs: map[typePair]reflect.Value{},
+		defaultingFuncs: map[typePair]reflect.Value{},
 		nameFunc:        func(t reflect.Type) string { return t.Name() },
 	}
 }
@@ -181,6 +187,37 @@ func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 	return nil
 }
 
+// RegisterDefaultingFunc registers a value-defaulting func with the Converter.
+// defaultingFunc must take two parameters: a pointer to the input type and a
+// pointer to the output type.
+//
+// Example:
+// c.RegisteDefaultingFuncr(
+//         func(in *v1beta1.Pod, out *api.Pod) {
+//                 // defaulting logic...
+//          })
+func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
+	fv := reflect.ValueOf(defaultingFunc)
+	ft := fv.Type()
+	if ft.Kind() != reflect.Func {
+		return fmt.Errorf("expected func, got: %v", ft)
+	}
+	if ft.NumIn() != 2 {
+		return fmt.Errorf("expected two 'in' params, got: %v", ft)
+	}
+	if ft.NumOut() != 0 {
+		return fmt.Errorf("expected zero 'out' params, got: %v", ft)
+	}
+	if ft.In(0).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
+	}
+	if ft.In(1).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
+	}
+	c.defaultingFuncs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
+	return nil
+}
+
 // FieldMatchingFlags contains a list of ways in which struct fields could be
 // copied. These constants may be | combined.
 type FieldMatchingFlags int
@@ -237,6 +274,19 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 	return c.convert(sv, dv, s)
 }
 
+// applyDefaults looks for a default-value function for the specified type
+// pair and calls it.
+func (c *Converter) applyDefaults(sv, dv reflect.Value) {
+	dt, st := dv.Type(), sv.Type()
+	if fv, ok := c.defaultingFuncs[typePair{st, dt}]; ok {
+		if c.Debug != nil {
+			glog.Errorf("Applying defaults for '%v' to '%v'", st, dt)
+		}
+		args := []reflect.Value{sv.Addr(), dv.Addr()}
+		fv.Call(args)
+	}
+}
+
 // convert recursively copies sv into dv, calling an appropriate conversion function if
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
@@ -249,10 +299,11 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		ret := fv.Call(args)[0].Interface()
 		// This convolution is necessary because nil interfaces won't convert
 		// to errors.
-		if ret == nil {
-			return nil
+		if ret != nil {
+			return ret.(error)
 		}
-		return ret.(error)
+		c.applyDefaults(sv, dv)
+		return nil
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.nameFunc(dt) != c.nameFunc(st) {
@@ -352,5 +403,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	default:
 		return fmt.Errorf("couldn't copy '%v' into '%v'", st, dt)
 	}
+
+	c.applyDefaults(sv, dv)
 	return nil
 }

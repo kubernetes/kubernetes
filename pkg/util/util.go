@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"runtime"
 	"time"
@@ -149,4 +150,18 @@ func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 		regexps = append(regexps, r)
 	}
 	return regexps, nil
+}
+
+// Tests whether all pointer fields in a struct are nil.
+func AllFieldsNil(obj interface{}) bool {
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	for i := 0; i < v.NumField(); i++ {
+		if v.Field(i).Kind() == reflect.Ptr && !v.Field(i).IsNil() {
+			return false
+		}
+	}
+	return true
 }
