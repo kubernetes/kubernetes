@@ -1,0 +1,59 @@
+/*
+Copyright 2014 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package volume
+
+import (
+	"io/ioutil"
+	"os"
+	"path"
+)
+
+// Interface is a directory used by pods or hosts.
+// All method implementations of methods in the volume interface must be idempotent.
+type Interface interface {
+	// GetPath returns the directory path the volume is mounted to.
+	GetPath() string
+}
+
+// Builder interface provides method to set up/mount the volume.
+type Builder interface {
+	// Uses Interface to provide the path for Docker binds.
+	Interface
+	// SetUp prepares and mounts/unpacks the volume to a directory path.
+	// This may be called more than once, so implementations must be
+	// idempotent.
+	SetUp() error
+}
+
+// Cleaner interface provides method to cleanup/unmount the volumes.
+type Cleaner interface {
+	Interface
+	// TearDown unmounts the volume and removes traces of the SetUp procedure.
+	TearDown() error
+}
+
+func RenameDirectory(oldPath, newName string) (string, error) {
+	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
+	if err != nil {
+		return "", err
+	}
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		return "", err
+	}
+	return newPath, nil
+}

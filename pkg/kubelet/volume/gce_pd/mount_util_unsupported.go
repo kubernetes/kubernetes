@@ -1,4 +1,4 @@
-// +build windows
+// +build !linux
 
 /*
 Copyright 2014 Google Inc. All rights reserved.
@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volume
+package gce_pd
 
 import (
 	"fmt"
