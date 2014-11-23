@@ -125,50 +125,6 @@ func TestKubernetesROService(c *client.Client) bool {
 	return true
 }
 
-func TestPodUpdate(c *client.Client) bool {
-	podClient := c.Pods(api.NamespaceDefault)
-
-	pod := loadPodOrDie("./api/examples/pod.json")
-	value := strconv.Itoa(time.Now().Nanosecond())
-	pod.Labels["time"] = value
-
-	_, err := podClient.Create(pod)
-	if err != nil {
-		glog.Errorf("Failed to create pod: %v", err)
-		return false
-	}
-	defer podClient.Delete(pod.Name)
-	waitForPodRunning(c, pod.Name)
-	pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
-	if len(pods.Items) != 1 {
-		glog.Errorf("Failed to find the correct pod")
-		return false
-	}
-
-	podOut, err := podClient.Get(pod.Name)
-	if err != nil {
-		glog.Errorf("Failed to get pod: %v", err)
-		return false
-	}
-	value = "time" + value
-	pod.Labels["time"] = value
-	pod.ResourceVersion = podOut.ResourceVersion
-	pod.UID = podOut.UID
-	pod, err = podClient.Update(pod)
-	if err != nil {
-		glog.Errorf("Failed to update pod: %v", err)
-		return false
-	}
-	waitForPodRunning(c, pod.Name)
-	pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
-	if len(pods.Items) != 1 {
-		glog.Errorf("Failed to find the correct pod after update.")
-		return false
-	}
-	glog.Infof("pod update OK")
-	return true
-}
-
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
 	provider := os.Getenv("KUBERNETES_PROVIDER")
@@ -266,7 +222,6 @@ func main() {
 	tests := []func(c *client.Client) bool{
 		TestKubernetesROService,
 		TestKubeletSendsEvent,
-		// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
 	}
 
 	passed := true
