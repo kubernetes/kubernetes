@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volume
+package gce_pd
 
 import (
 	"errors"
@@ -27,7 +27,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	gce_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
 const partitionRegex = "[a-z][a-z]*(?P<partition>[0-9][0-9]*)?"
@@ -38,21 +39,21 @@ type GCEDiskUtil struct{}
 
 // Attaches a disk specified by a volume.GCEPersistentDisk to the current kubelet.
 // Mounts the disk to it's global path.
-func (util *GCEDiskUtil) AttachDisk(GCEPD *GCEPersistentDisk) error {
+func (util *GCEDiskUtil) AttachDisk(pd *gcePersistentDisk) error {
 	gce, err := cloudprovider.GetCloudProvider("gce", nil)
 	if err != nil {
 		return err
 	}
 	flags := uintptr(0)
-	if GCEPD.ReadOnly {
-		flags = MOUNT_MS_RDONLY
+	if pd.readOnly {
+		flags = mount.FlagReadOnly
 	}
-	if err := gce.(*gce_cloud.GCECloud).AttachDisk(GCEPD.PDName, GCEPD.ReadOnly); err != nil {
+	if err := gce.(*gce_cloud.GCECloud).AttachDisk(pd.pdName, pd.readOnly); err != nil {
 		return err
 	}
-	devicePath := path.Join("/dev/disk/by-id/", "google-"+GCEPD.PDName)
-	if GCEPD.Partition != "" {
-		devicePath = devicePath + "-part" + GCEPD.Partition
+	devicePath := path.Join("/dev/disk/by-id/", "google-"+pd.pdName)
+	if pd.partition != "" {
+		devicePath = devicePath + "-part" + pd.partition
 	}
 	//TODO(jonesdl) There should probably be better method than busy-waiting here.
 	numTries := 0
@@ -70,7 +71,7 @@ func (util *GCEDiskUtil) AttachDisk(GCEPD *GCEPersistentDisk) error {
 		}
 		time.Sleep(time.Second)
 	}
-	globalPDPath := makeGlobalPDName(GCEPD.RootDir, GCEPD.PDName, GCEPD.ReadOnly)
+	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
 	// Only mount the PD globally once.
 	mountpoint, err := isMountPoint(globalPDPath)
 	if err != nil {
@@ -84,7 +85,7 @@ func (util *GCEDiskUtil) AttachDisk(GCEPD *GCEPersistentDisk) error {
 		}
 	}
 	if !mountpoint {
-		err = GCEPD.mounter.Mount(devicePath, globalPDPath, GCEPD.FSType, flags, "")
+		err = pd.mounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
 		if err != nil {
 			os.RemoveAll(globalPDPath)
 			return err
@@ -112,7 +113,7 @@ func getDeviceName(devicePath, canonicalDevicePath string) (string, error) {
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
 // Expects a GCE device path symlink. Ex: /dev/disk/by-id/google-mydisk-part1
-func (util *GCEDiskUtil) DetachDisk(GCEPD *GCEPersistentDisk, devicePath string) error {
+func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk, devicePath string) error {
 	// Follow the symlink to the actual device path.
 	canonicalDevicePath, err := filepath.EvalSymlinks(devicePath)
 	if err != nil {
@@ -122,8 +123,8 @@ func (util *GCEDiskUtil) DetachDisk(GCEPD *GCEPersistentDisk, devicePath string)
 	if err != nil {
 		return err
 	}
-	globalPDPath := makeGlobalPDName(GCEPD.RootDir, deviceName, GCEPD.ReadOnly)
-	if err := GCEPD.mounter.Unmount(globalPDPath, 0); err != nil {
+	globalPDPath := makeGlobalPDName(pd.plugin.host, deviceName, pd.readOnly)
+	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(globalPDPath); err != nil {

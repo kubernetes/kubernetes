@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -150,7 +151,8 @@ func SimpleRunKubelet(client *client.Client,
 	dockerClient dockertools.DockerInterface,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
-	masterServiceNamespace string) {
+	masterServiceNamespace string,
+	volumePlugins []volume.Plugin) {
 	kcfg := KubeletConfig{
 		KubeClient:            client,
 		EtcdClient:            etcdClient,
@@ -167,6 +169,7 @@ func SimpleRunKubelet(client *client.Client,
 		MinimumGCAge:            10 * time.Second,
 		MaxContainerCount:       5,
 		MasterServiceNamespace:  masterServiceNamespace,
+		VolumePlugins:           volumePlugins,
 	}
 	RunKubelet(&kcfg)
 }
@@ -267,6 +270,7 @@ type KubeletConfig struct {
 	Port                    uint
 	Runonce                 bool
 	MasterServiceNamespace  string
+	VolumePlugins           []volume.Plugin
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -288,7 +292,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		pc.IsSourceSeen,
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS),
-		kc.MasterServiceNamespace)
+		kc.MasterServiceNamespace,
+		kc.VolumePlugins)
 
 	if err != nil {
 		return nil, err

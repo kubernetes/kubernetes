@@ -27,7 +27,7 @@ type Aggregate interface {
 
 // NewAggregate converts a slice of errors into an Aggregate interface, which
 // is itself an implementation of the error interface.  If the slice is empty,
-// this returs nil.
+// this returns nil.
 func NewAggregate(errlist []error) Aggregate {
 	if len(errlist) == 0 {
 		return nil
