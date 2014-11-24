@@ -230,6 +230,7 @@ type Container struct {
 	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" yaml:"imagePullPolicy"`
+	ExternalName    string  `json:"externalName,omitempty" yaml:"externalName,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
