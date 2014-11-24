@@ -72,7 +72,11 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 	}
 	if source.EmptyDir != nil {
 		numVolumes++
-		//EmptyDirs have nothing to validate
+		// EmptyDirs have nothing to validate
+	}
+	if source.GitRepo != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateGitRepo(source.GitRepo)...)
 	}
 	if source.GCEPersistentDisk != nil {
 		numVolumes++
@@ -92,21 +96,29 @@ func validateHostDir(hostDir *api.HostDir) errs.ValidationErrorList {
 	return allErrs
 }
 
-var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
+func validateGitRepo(gitRepo *api.GitRepo) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if gitRepo.Repository == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("gitRepo.Repository", gitRepo.Repository))
+	}
+	return allErrs
+}
 
 func validateGCEPersistentDisk(PD *api.GCEPersistentDisk) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if PD.PDName == "" {
-		allErrs = append(allErrs, errs.NewFieldInvalid("PD.PDName", PD.PDName))
+		allErrs = append(allErrs, errs.NewFieldRequired("PD.PDName", PD.PDName))
 	}
 	if PD.FSType == "" {
-		allErrs = append(allErrs, errs.NewFieldInvalid("PD.FSType", PD.FSType))
+		allErrs = append(allErrs, errs.NewFieldRequired("PD.FSType", PD.FSType))
 	}
 	if PD.Partition < 0 || PD.Partition > 255 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("PD.Partition", PD.Partition))
 	}
 	return allErrs
 }
+
+var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
 func validatePorts(ports []api.Port) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
