@@ -31,9 +31,16 @@ type Token interface {
 
 // Request attempts to extract authentication information from a request and returns
 // information about the current user and true if successful, false if not successful,
-// or an error if the token could not be checked.
+// or an error if the request could not be checked.
 type Request interface {
 	AuthenticateRequest(req *http.Request) (user.Info, bool, error)
+}
+
+// Password checks a username and password against a backing authentication store and
+// returns information about the user and true if successful, false if not successful,
+// or an error if the username and password could not be checked
+type Password interface {
+	AuthenticatePassword(user, password string) (user.Info, bool, error)
 }
 
 // TokenFunc is a function that implements the Token interface.
@@ -50,4 +57,12 @@ type RequestFunc func(req *http.Request) (user.Info, bool, error)
 // AuthenticateRequest implements authenticator.Request.
 func (f RequestFunc) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	return f(req)
+}
+
+// PasswordFunc is a function that implements the Password interface.
+type PasswordFunc func(user, password string) (user.Info, bool, error)
+
+// AuthenticatePassword implements authenticator.Password.
+func (f PasswordFunc) AuthenticatePassword(user, password string) (user.Info, bool, error) {
+	return f(user, password)
 }
