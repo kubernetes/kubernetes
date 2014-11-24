@@ -187,7 +187,7 @@ function kube::build::prepare_output() {
   # volume mounts.  We can work around this by explicitly adding a security
   # context to the _output directory.
   # Details: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Resource_Management_and_Linux_Containers_Guide/sec-Sharing_Data_Across_Containers.html#sec-Mounting_a_Host_Directory_to_a_Container
-  if which selinuxenabled >/dev/null && \
+  if which selinuxenabled &>/dev/null && \
       selinuxenabled && \
       which chcon >/dev/null ; then
     if [[ ! $(ls -Zd "${LOCAL_OUTPUT_ROOT}") =~ svirt_sandbox_file_t ]] ; then
@@ -592,7 +592,7 @@ function kube::release::create_tarball() {
 
   # Find gnu tar if it is available
   local tar=tar
-  if which gtar > /dev/null; then
+  if which gtar &>/dev/null; then
     tar=gtar
   fi
 
