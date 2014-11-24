@@ -117,14 +117,21 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: search by UID if it's set
-	fields := labels.Set{
-		"involvedObject.kind":      ref.Kind,
-		"involvedObject.namespace": ref.Namespace,
-		"involvedObject.name":      ref.Name,
-	}.AsSelector()
 	if e.namespace != "" && ref.Namespace != e.namespace {
 		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.namespace)
 	}
-	return e.List(labels.Everything(), fields)
+	fields := labels.Set{}
+	if ref.Kind != "" {
+		fields["involvedObject.kind"] = ref.Kind
+	}
+	if ref.Namespace != "" {
+		fields["involvedObject.namespace"] = ref.Namespace
+	}
+	if ref.Name != "" {
+		fields["involvedObject.name"] = ref.Name
+	}
+	if ref.UID != "" {
+		fields["involvedObject.uid"] = ref.UID
+	}
+	return e.List(labels.Everything(), fields.AsSelector())
 }

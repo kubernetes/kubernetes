@@ -66,7 +66,6 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 			labels.Everything(),
 			labels.Set{
 				"involvedObject.name":      name,
-				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": namespace,
 			}.AsSelector(),
 		)
@@ -86,7 +85,13 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
 
-	events, _ := d.Events(namespace).Search(pod)
+	var events *api.EventList
+	if ref, err := api.GetReference(pod); err != nil {
+		glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+	} else {
+		ref.Kind = "" // Find BoundPod objects, too!
+		events, _ = d.Events(namespace).Search(ref)
+	}
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
