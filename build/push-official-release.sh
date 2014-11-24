@@ -22,8 +22,9 @@ set -o pipefail
 
 KUBE_RELEASE_VERSION=${1-}
 
-[[ -n ${KUBE_RELEASE_VERSION} ]] || {
-  echo "!!! You must specify the version you are releasing in the form of vX.Y.Z" >&2
+VERSION_REGEX="v[0-9]+.[0-9]+(.[0-9]+)?"
+[[ ${KUBE_RELEASE_VERSION} =~ $VERSION_REGEX ]] || {
+  echo "!!! You must specify the version you are releasing in the form of '$VERSION_REGEX'" >&2
   exit 1
 }
 
