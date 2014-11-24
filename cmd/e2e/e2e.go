@@ -182,7 +182,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 
 	podClient := c.Pods(api.NamespaceDefault)
 
-	pod := loadPodOrDie("./api/examples/pod.json")
+	pod := loadPodOrDie("./cmd/e2e/pod.json")
 	value := strconv.Itoa(time.Now().Nanosecond())
 	pod.Labels["time"] = value
 
