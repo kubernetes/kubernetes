@@ -62,7 +62,17 @@ func (h *RESTHandler) setSelfLink(obj runtime.Object, req *http.Request) error {
 	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
-	err := h.selfLinker.SetSelfLink(obj, newURL.String())
+	namespace, err := h.selfLinker.Namespace(obj)
+	if err != nil {
+		return err
+	}
+	// TODO Remove this when namespace is in path
+	if len(namespace) > 0 {
+		query := newURL.Query()
+		query.Set("namespace", namespace)
+		newURL.RawQuery = query.Encode()
+	}
+	err = h.selfLinker.SetSelfLink(obj, newURL.String())
 	if err != nil {
 		return err
 	}
@@ -89,10 +99,20 @@ func (h *RESTHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) 
 	if err != nil {
 		return err
 	}
+	namespace, err := h.selfLinker.Namespace(obj)
+	if err != nil {
+		return err
+	}
 	newURL := *req.URL
 	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
+	// TODO Remove this when namespace is in path
+	if len(namespace) > 0 {
+		query := newURL.Query()
+		query.Set("namespace", namespace)
+		newURL.RawQuery = query.Encode()
+	}
 	return h.selfLinker.SetSelfLink(obj, newURL.String())
 }
 
