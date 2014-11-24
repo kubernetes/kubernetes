@@ -489,11 +489,16 @@ function kube::release::package_client_tarballs() {
     rm -rf "${release_stage}"
     mkdir -p "${release_stage}/client/bin"
 
-    # This fancy expression will expand to prepend a path
-    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_CLIENT_BINARIES array.
-    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/client/bin/"
+    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+    fi
+
+    local bin
+    for bin in "${client_bins[@]}"; do
+      cp "${LOCAL_OUTPUT_BINPATH}/${platform}/${bin}" \
+        "${release_stage}/client/bin/"
+    done
 
     local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
@@ -518,7 +523,11 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     # Include the client binaries here too as they are useful debugging tools.
-    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+    fi
+    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
@@ -557,8 +566,12 @@ function kube::release::package_full_tarball() {
   # The server binaries are included with the server binary tarball.
   local platform
   for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
+    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+    fi
     mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/platforms/${platform}"
   done
 
