@@ -81,10 +81,10 @@ desiredState:
     volumes:
       - name: testpd
         source:
-          - persistentDisk:
-              # This GCE PD must already exist and be formatted ext4
-              pdName: test
-              fsType: ext4
+          persistentDisk:
+            # This GCE PD must already exist and be formatted ext4
+            pdName: test
+            fsType: ext4
 id: testpd
 kind: Pod
 ```
