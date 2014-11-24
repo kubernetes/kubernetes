@@ -17,6 +17,7 @@
 1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
 2. ```cd kubernetes; make release```
 3. ```export PATH=$PATH:$PWD/_output/local/bin/<os>/<platform>```
+
 #### Turn up the cluster
 ```
 export KUBERNETES_PROVIDER=aws
