@@ -62,8 +62,21 @@ according to a policy, but the only policy supported for now is round-robin).
 When a `pod` is scheduled, the master adds a set of environment variables for
 each active `service`.  We support both
 [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/)
-variables and simpler {SVCNAME}_SERVICE_HOST and {SVCNAME}_SERVICE_PORT
-variables.  This does imply an ordering requirement - any `service` that a `pod`
+variables (see [makeLinkVariables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/pkg/kubelet/envvars/envvars.go#L49)) and simpler {SVCNAME}_SERVICE_HOST and {SVCNAME}_SERVICE_PORT
+variables, where the service name is upper-cased and dashes are converted to underscores.
+For example, the service "redis-master" exposed on TCP port 6379 and allocated IP address
+10.0.0.11 produces the following environment variables:
+```
+REDIS_MASTER_SERVICE_HOST=10.0.0.11
+REDIS_MASTER_SERVICE_PORT=6379
+REDIS_MASTER_PORT=tcp://10.0.0.11:6379
+REDIS_MASTER_PORT_6379_TCP=tcp://10.0.0.11:6379
+REDIS_MASTER_PORT_6379_TCP_PROTO=tcp
+REDIS_MASTER_PORT_6379_TCP_PORT=6379
+REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.0.11
+```
+
+This does imply an ordering requirement - any `service` that a `pod`
 wants to access must be created before the `pod` itself, or else the environment
 variables will not be populated.  This restriction will be removed once DNS for
 `services` is supported.
