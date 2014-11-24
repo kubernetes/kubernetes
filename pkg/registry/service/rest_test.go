@@ -19,7 +19,6 @@ package service
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -285,79 +284,6 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	}
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
-	}
-}
-
-func TestServiceRegistryMakeLinkVariables(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	registry.List = api.ServiceList{
-		Items: []api.Service{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "foo-bar"},
-				Spec: api.ServiceSpec{
-					Port:     8080,
-					Selector: map[string]string{"bar": "baz"},
-					Protocol: "TCP",
-					PortalIP: "1.2.3.4",
-				},
-			},
-			{
-				ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-				Spec: api.ServiceSpec{
-					Port:     8081,
-					Selector: map[string]string{"bar": "baz"},
-					Protocol: "UDP",
-					PortalIP: "5.6.7.8",
-				},
-			},
-			{
-				ObjectMeta: api.ObjectMeta{Name: "q-u-u-x"},
-				Spec: api.ServiceSpec{
-					Port:     8082,
-					Selector: map[string]string{"bar": "baz"},
-					Protocol: "TCP",
-					PortalIP: "9.8.7.6",
-				},
-			},
-		},
-	}
-	machine := "machine"
-	vars, err := GetServiceEnvironmentVariables(ctx, registry, machine)
-	if err != nil {
-		t.Errorf("Unexpected err: %v", err)
-	}
-	expected := []api.EnvVar{
-		{Name: "FOO_BAR_SERVICE_HOST", Value: "1.2.3.4"},
-		{Name: "FOO_BAR_SERVICE_PORT", Value: "8080"},
-		{Name: "FOO_BAR_PORT", Value: "tcp://1.2.3.4:8080"},
-		{Name: "FOO_BAR_PORT_8080_TCP", Value: "tcp://1.2.3.4:8080"},
-		{Name: "FOO_BAR_PORT_8080_TCP_PROTO", Value: "tcp"},
-		{Name: "FOO_BAR_PORT_8080_TCP_PORT", Value: "8080"},
-		{Name: "FOO_BAR_PORT_8080_TCP_ADDR", Value: "1.2.3.4"},
-		{Name: "ABC_123_SERVICE_HOST", Value: "5.6.7.8"},
-		{Name: "ABC_123_SERVICE_PORT", Value: "8081"},
-		{Name: "ABC_123_PORT", Value: "udp://5.6.7.8:8081"},
-		{Name: "ABC_123_PORT_8081_UDP", Value: "udp://5.6.7.8:8081"},
-		{Name: "ABC_123_PORT_8081_UDP_PROTO", Value: "udp"},
-		{Name: "ABC_123_PORT_8081_UDP_PORT", Value: "8081"},
-		{Name: "ABC_123_PORT_8081_UDP_ADDR", Value: "5.6.7.8"},
-		{Name: "Q_U_U_X_SERVICE_HOST", Value: "9.8.7.6"},
-		{Name: "Q_U_U_X_SERVICE_PORT", Value: "8082"},
-		{Name: "Q_U_U_X_PORT", Value: "tcp://9.8.7.6:8082"},
-		{Name: "Q_U_U_X_PORT_8082_TCP", Value: "tcp://9.8.7.6:8082"},
-		{Name: "Q_U_U_X_PORT_8082_TCP_PROTO", Value: "tcp"},
-		{Name: "Q_U_U_X_PORT_8082_TCP_PORT", Value: "8082"},
-		{Name: "Q_U_U_X_PORT_8082_TCP_ADDR", Value: "9.8.7.6"},
-	}
-	if len(vars) != len(expected) {
-		t.Errorf("Expected %d env vars, got: %+v", len(expected), vars)
-		return
-	}
-	for i := range expected {
-		if !reflect.DeepEqual(vars[i], expected[i]) {
-			t.Errorf("expected %#v, got %#v", vars[i], expected[i])
-		}
 	}
 }
 

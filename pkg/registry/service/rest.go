@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -211,27 +209,6 @@ func (*REST) New() runtime.Object {
 	return &api.Service{}
 }
 
-// GetServiceEnvironmentVariables populates a list of environment variables that are use
-// in the container environment to get access to services.
-func GetServiceEnvironmentVariables(ctx api.Context, registry Registry, machine string) ([]api.EnvVar, error) {
-	var result []api.EnvVar
-	services, err := registry.ListServices(ctx)
-	if err != nil {
-		return result, err
-	}
-	for _, service := range services.Items {
-		// Host
-		name := makeEnvVariableName(service.Name) + "_SERVICE_HOST"
-		result = append(result, api.EnvVar{Name: name, Value: service.Spec.PortalIP})
-		// Port
-		name = makeEnvVariableName(service.Name) + "_SERVICE_PORT"
-		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Spec.Port)})
-		// Docker-compatible vars.
-		result = append(result, makeLinkVariables(service)...)
-	}
-	return result, nil
-}
-
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	service := obj.(*api.Service)
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
@@ -299,39 +276,4 @@ func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
 		return err
 	}
 	return nil
-}
-
-func makeEnvVariableName(str string) string {
-	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
-}
-
-func makeLinkVariables(service api.Service) []api.EnvVar {
-	prefix := makeEnvVariableName(service.Name)
-	protocol := string(api.ProtocolTCP)
-	if service.Spec.Protocol != "" {
-		protocol = string(service.Spec.Protocol)
-	}
-	portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, service.Spec.Port, strings.ToUpper(protocol))
-	return []api.EnvVar{
-		{
-			Name:  prefix + "_PORT",
-			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.PortalIP, service.Spec.Port),
-		},
-		{
-			Name:  portPrefix,
-			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.PortalIP, service.Spec.Port),
-		},
-		{
-			Name:  portPrefix + "_PROTO",
-			Value: strings.ToLower(protocol),
-		},
-		{
-			Name:  portPrefix + "_PORT",
-			Value: strconv.Itoa(service.Spec.Port),
-		},
-		{
-			Name:  portPrefix + "_ADDR",
-			Value: service.Spec.PortalIP,
-		},
-	}
 }
