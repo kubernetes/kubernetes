@@ -101,10 +101,13 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 	} else {
 		singular = strings.ToLower(kind)
 	}
-	if !strings.HasSuffix(singular, "s") {
-		plural = singular + "s"
-	} else {
+	switch string(singular[len(singular)-1]) {
+	case "s":
 		plural = singular
+	case "y":
+		plural = strings.TrimSuffix(singular, "y") + "ies"
+	default:
+		plural = singular + "s"
 	}
 	return
 }
