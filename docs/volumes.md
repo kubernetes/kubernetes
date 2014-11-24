@@ -50,3 +50,28 @@ There are some restrictions when using a GCEPersistentDisk:
   - avoid creating multiple pods that use the same Volume
     - if multiple pods refer to the same Volume and both are scheduled on the same machine, regardless of whether they are read-only or read-write, then the second pod scheduled will fail.
     - Replication controllers can only be created for pods that use read-only mounts.
+
+Example configuration:
+```yaml
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    containers:
+      - image: kubernetes/pause
+        name: testpd
+        volumeMounts:
+          - mountPath: "/testpd"
+            name: "testpd"
+    id: testpd
+    version: v1beta1
+    volumes:
+      - name: testpd
+        source:
+          - persistentDisk:
+              # This GCE PD must already exist and be formatted ext4
+              pdName: test
+              fsType: ext4
+  id: testpd
+  kind: Pod
+  ```
+
