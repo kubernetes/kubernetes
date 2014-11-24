@@ -18,6 +18,7 @@ package standalone
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -112,9 +113,18 @@ func RunScheduler(cl *client.Client) {
 
 // RunControllerManager starts a controller
 func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int64) {
-	if int64(int(nodeMilliCPU)) != nodeMilliCPU || int64(int(nodeMemory)) != nodeMemory {
-		glog.Fatalf("Overflow, nodeCPU or nodeMemory too large for the platform")
+	if int64(int(nodeMilliCPU)) != nodeMilliCPU {
+		glog.Warningf("node_milli_cpu is too big for platform. Clamping: %d -> %d",
+			nodeMilliCPU, math.MaxInt32)
+		nodeMilliCPU = math.MaxInt32
 	}
+
+	if int64(int(nodeMemory)) != nodeMemory {
+		glog.Warningf("node_memory is too big for platform. Clamping: %d -> %d",
+			nodeMemory, math.MaxInt32)
+		nodeMemory = math.MaxInt32
+	}
+
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
 			resources.CPU:    util.NewIntOrStringFromInt(int(nodeMilliCPU)),
