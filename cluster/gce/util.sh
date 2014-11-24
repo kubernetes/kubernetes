@@ -328,8 +328,10 @@ function kube-up {
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
+      echo "ZONE='${ZONE}'"
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+      echo "ENABLE_DOCKER_REGISTRY_CACHE='${ENABLE_DOCKER_REGISTRY_CACHE:-false}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"

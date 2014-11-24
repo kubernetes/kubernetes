@@ -36,6 +36,17 @@ grains:
   cloud: gce
 EOF
 
+# Decide if enable the cache
+if [[ "${ENABLE_DOCKER_REGISTRY_CACHE}" == "true" ]]; then 
+    REGION=$(echo "${ZONE}" | cut -f 1,2 -d -)
+    echo "Enable docker registry cache at region: " $REGION
+    DOCKER_OPTS="--registry-mirror=\"https://${REGION}.docker-cache.clustermaster.net\""
+
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_opts: $DOCKER_OPTS
+EOF
+fi
+
 install-salt
 
 # Wait a few minutes and trigger another Salt run to better recover from
