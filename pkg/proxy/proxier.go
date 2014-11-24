@@ -204,7 +204,7 @@ func (udp *udpProxySocket) ProxyLoop(service string, info *serviceInfo, proxier 
 			}
 			continue
 		}
-		svrConn.SetDeadline(time.Now().Add(info.timeout))
+		err = svrConn.SetDeadline(time.Now().Add(info.timeout))
 		if err != nil {
 			glog.Errorf("SetDeadline failed: %v", err)
 			continue
@@ -248,7 +248,7 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 			}
 			break
 		}
-		svrConn.SetDeadline(time.Now().Add(timeout))
+		err = svrConn.SetDeadline(time.Now().Add(timeout))
 		if err != nil {
 			glog.Errorf("SetDeadline failed: %v", err)
 			break
