@@ -85,7 +85,7 @@ desiredState:
               # This GCE PD must already exist and be formatted ext4
               pdName: test
               fsType: ext4
-  id: testpd
-  kind: Pod
-  ```
+id: testpd
+kind: Pod
+```
 
