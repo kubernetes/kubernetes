@@ -23,6 +23,8 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+
+	"github.com/golang/glog"
 )
 
 const MOUNT_MS_BIND = syscall.MS_BIND
@@ -32,6 +34,7 @@ type DiskMounter struct{}
 
 // Wraps syscall.Mount()
 func (mounter *DiskMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	glog.V(5).Infof("Mounting %s %s %s %d %s", source, target, fstype, flags, data)
 	return syscall.Mount(source, target, fstype, flags, data)
 }
 
