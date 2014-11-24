@@ -578,7 +578,7 @@ func TestFillPodInfo(t *testing.T) {
 			"net": {
 				State: api.ContainerState{
 					Running: &api.ContainerStateRunning{
-						StartedAt: expectedTime,
+						StartedAt: util.Time{expectedTime},
 					},
 				},
 				RestartCount: 1,
