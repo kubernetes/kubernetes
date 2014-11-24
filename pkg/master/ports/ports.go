@@ -26,4 +26,7 @@ const (
 	// ControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	ControllerManagerPort = 10252
+	// ProxyPort is the default port for the proxy status server.
+	// May be overriden by a flag at startup.
+	ProxyPort = 10249
 )
