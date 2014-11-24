@@ -18,6 +18,7 @@ package conversion
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"reflect"
 )
 
@@ -35,22 +36,27 @@ type DebugLogger interface {
 type Converter struct {
 	// Map from the conversion pair to a function which can
 	// do the conversion.
-	funcs map[typePair]reflect.Value
+	conversionFuncs map[typePair]reflect.Value
+
+	// Map from the defaulting pair to a function which can
+	// do the value defaulting.
+	defaultingFuncs map[typePair]reflect.Value
 
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
 
-	// NameFunc is called to retrieve the name of a type; this name is used for the
+	// nameFunc is called to retrieve the name of a type; this name is used for the
 	// purpose of deciding whether two types match or not (i.e., will we attempt to
 	// do a conversion). The default returns the go type name.
-	NameFunc func(t reflect.Type) string
+	nameFunc func(t reflect.Type) string
 }
 
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
-		funcs:    map[typePair]reflect.Value{},
-		NameFunc: func(t reflect.Type) string { return t.Name() },
+		conversionFuncs: map[typePair]reflect.Value{},
+		defaultingFuncs: map[typePair]reflect.Value{},
+		nameFunc:        func(t reflect.Type) string { return t.Name() },
 	}
 }
 
@@ -137,14 +143,18 @@ func (s *scope) Meta() *Meta {
 	return s.meta
 }
 
-// Register registers a conversion func with the Converter. conversionFunc must take
-// three parameters: a pointer to the input type, a pointer to the output type, and
-// a conversion.Scope (which should be used if recursive conversion calls are desired).
-// It must return an error.
+// RegisterConversionFunc registers a conversion func with the Converter.
+// conversionFunc must take three parameters: a pointer to the input type, a
+// pointer to the output type, and a conversion.Scope (which should be used
+// if recursive conversion calls are desired).  It must return an error.
 //
 // Example:
-// c.Register(func(in *Pod, out *v1beta1.Pod, s Scope) error { ... return nil })
-func (c *Converter) Register(conversionFunc interface{}) error {
+// c.RegisteConversionFuncr(
+//         func(in *Pod, out *v1beta1.Pod, s Scope) error {
+//                 // conversion logic...
+//                 return nil
+//          })
+func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 	fv := reflect.ValueOf(conversionFunc)
 	ft := fv.Type()
 	if ft.Kind() != reflect.Func {
@@ -173,7 +183,38 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 	if ft.Out(0) != errorType {
 		return fmt.Errorf("expected error return, got: %v", ft)
 	}
-	c.funcs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
+	c.conversionFuncs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
+	return nil
+}
+
+// RegisterDefaultingFunc registers a value-defaulting func with the Converter.
+// defaultingFunc must take two parameters: a pointer to the input type and a
+// pointer to the output type.
+//
+// Example:
+// c.RegisteDefaultingFuncr(
+//         func(in *v1beta1.Pod, out *api.Pod) {
+//                 // defaulting logic...
+//          })
+func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
+	fv := reflect.ValueOf(defaultingFunc)
+	ft := fv.Type()
+	if ft.Kind() != reflect.Func {
+		return fmt.Errorf("expected func, got: %v", ft)
+	}
+	if ft.NumIn() != 2 {
+		return fmt.Errorf("expected two 'in' params, got: %v", ft)
+	}
+	if ft.NumOut() != 0 {
+		return fmt.Errorf("expected zero 'out' params, got: %v", ft)
+	}
+	if ft.In(0).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
+	}
+	if ft.In(1).Kind() != reflect.Ptr {
+		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
+	}
+	c.defaultingFuncs[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
 	return nil
 }
 
@@ -233,11 +274,24 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 	return c.convert(sv, dv, s)
 }
 
+// applyDefaults looks for a default-value function for the specified type
+// pair and calls it.
+func (c *Converter) applyDefaults(sv, dv reflect.Value) {
+	dt, st := dv.Type(), sv.Type()
+	if fv, ok := c.defaultingFuncs[typePair{st, dt}]; ok {
+		if c.Debug != nil {
+			glog.Errorf("Applying defaults for '%v' to '%v'", st, dt)
+		}
+		args := []reflect.Value{sv.Addr(), dv.Addr()}
+		fv.Call(args)
+	}
+}
+
 // convert recursively copies sv into dv, calling an appropriate conversion function if
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
-	if fv, ok := c.funcs[typePair{st, dt}]; ok {
+	if fv, ok := c.conversionFuncs[typePair{st, dt}]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
@@ -245,14 +299,15 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		ret := fv.Call(args)[0].Interface()
 		// This convolution is necessary because nil interfaces won't convert
 		// to errors.
-		if ret == nil {
-			return nil
+		if ret != nil {
+			return ret.(error)
 		}
-		return ret.(error)
+		c.applyDefaults(sv, dv)
+		return nil
 	}
 
-	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
-		return fmt.Errorf("can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.NameFunc(st), c.NameFunc(dt))
+	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.nameFunc(dt) != c.nameFunc(st) {
+		return fmt.Errorf("Can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.nameFunc(st), c.nameFunc(dt))
 	}
 
 	// This should handle all simple types.
@@ -348,5 +403,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	default:
 		return fmt.Errorf("couldn't copy '%v' into '%v'", st, dt)
 	}
+
+	c.applyDefaults(sv, dv)
 	return nil
 }
