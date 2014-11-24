@@ -23,7 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -206,14 +205,10 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 	if err != nil {
 		return err
 	}
-	// Doing the constraint check this way provides atomicity guarantees.
 	contKey := makeBoundPodsKey(machine)
 	err = r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
 		boundPodList := in.(*api.BoundPods)
 		boundPodList.Items = append(boundPodList.Items, *boundPod)
-		if !constraint.Allowed(boundPodList.Items) {
-			return nil, fmt.Errorf("the assignment would cause a constraint violation")
-		}
 		return boundPodList, nil
 	})
 	if err != nil {
