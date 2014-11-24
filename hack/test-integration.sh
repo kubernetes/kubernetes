@@ -43,6 +43,6 @@ KUBE_GOFLAGS="-tags 'integration no-docker' " \
 
 kube::log::status "Running integration test scenario"
 
-"${KUBE_OUTPUT_HOSTBIN}/integration"
+"${KUBE_OUTPUT_HOSTBIN}/integration" --v=10
 
 cleanup
