@@ -19,6 +19,7 @@ package labels
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -303,9 +304,11 @@ func (lsel *LabelSelector) String() (string, error) {
 // The input will cause an error if it does not follow this form:
 //
 //     <selector-syntax> ::= <requirement> | <requirement> "," <selector-syntax>
-//         <requirement> ::= KEY <set-restriction>
+//         <requirement> ::= WHITESPACE_OPT KEY <set-restriction>
 //     <set-restriction> ::= "" | <inclusion-exclusion> <value-set>
-// <inclusion-exclusion> ::= " in " | " not in "
+// <inclusion-exclusion> ::= <inclusion> | <exclusion>
+//           <exclusion> ::= WHITESPACE "not" <inclusion>
+//           <inclusion> ::= WHITESPACE "in" WHITESPACE
 //           <value-set> ::= "(" <values> ")"
 //              <values> ::= VALUE | VALUE "," <values>
 //
@@ -313,6 +316,10 @@ func (lsel *LabelSelector) String() (string, error) {
 //      [^, ]+
 // VALUE is a sequence of zero or more characters that does not contain ',', ' ' or ')'
 //      [^, )]*
+// WHITESPACE_OPT is a sequence of zero or more whitespace characters
+//      \s*
+// WHITESPACE is a sequence of one or more whitespace characters
+//      \s+
 //
 // Example of valid syntax:
 //  "x in (foo,,baz),y,z not in ()"
@@ -338,9 +345,15 @@ func Parse(selector string) (SetBasedSelector, error) {
 		waitOp
 		inVals
 	)
-	const inPre = "in ("
-	const notInPre = "not in ("
 	const pos = "position %d:%s"
+	inRegex, errIn := regexp.Compile("^\\s*in\\s+\\(")
+	if errIn != nil {
+		return nil, errIn
+	}
+	notInRegex, errNotIn := regexp.Compile("^\\s*not\\s+in\\s+\\(")
+	if errNotIn != nil {
+		return nil, errNotIn
+	}
 
 	state := startReq
 	strStart := 0
@@ -350,8 +363,7 @@ func Parse(selector string) (SetBasedSelector, error) {
 			switch selector[i] {
 			case ',':
 				return nil, fmt.Errorf("a requirement can't be empty. "+pos, i, selector)
-			case ' ':
-				return nil, fmt.Errorf("white space not allowed before key. "+pos, i, selector)
+			case ' ', '\t', '\n', '\f', '\r':
 			default:
 				state = inKey
 				strStart = i
@@ -365,17 +377,17 @@ func Parse(selector string) (SetBasedSelector, error) {
 				} else {
 					items = append(items, *req)
 				}
-			case ' ':
+			case ' ', '\t', '\n', '\f', '\r':
 				state = waitOp
 				key = selector[strStart:i]
 			}
 		case waitOp:
-			if len(selector)-i >= len(inPre) && selector[i:len(inPre)+i] == inPre {
+			if loc := inRegex.FindStringIndex(selector[i:]); loc != nil {
 				op = In
-				i += len(inPre) - 1
-			} else if len(selector)-i >= len(notInPre) && selector[i:len(notInPre)+i] == notInPre {
+				i += loc[1] - loc[0] - 1
+			} else if loc = notInRegex.FindStringIndex(selector[i:]); loc != nil {
 				op = NotIn
-				i += len(notInPre) - 1
+				i += loc[1] - loc[0] - 1
 			} else {
 				return nil, fmt.Errorf("expected \" in (\"/\" not in (\" after key. "+pos, i, selector)
 			}
