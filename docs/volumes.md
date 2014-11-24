@@ -41,6 +41,8 @@ Watch out when using this type of volume, because:
   - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDir.
 
 ### GCEPersistentDisk
+__Important: You must create and format a PD before you can use it__
+
 A Volume with a GCEPersistentDisk property allows access to files on a Google Compute Engine (GCE)
 [Persistent Disk](http://cloud.google.com/compute/docs/disks).
 
@@ -51,7 +53,19 @@ There are some restrictions when using a GCEPersistentDisk:
     - if multiple pods refer to the same Volume and both are scheduled on the same machine, regardless of whether they are read-only or read-write, then the second pod scheduled will fail.
     - Replication controllers can only be created for pods that use read-only mounts.
 
-Example configuration:
+#### Creating a PD
+Before you can use a GCE PD with a pod, you need to create it and format it.
+
+__We are actively working on making this more streamlined.__
+
+```sh
+gcutil adddisk --size_gb=<size> --zone=<zone> <name>
+gcutil attachdisk --disk <name> kubernetes-master
+gcutil ssh kubernetes-master sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-test2 /mnt/tmp
+gcutil detachdisk --device_name google-<name> kubernetes-master
+```
+
+#### GCE PD Example configuration:
 ```yaml
 apiVersion: v1beta1
 desiredState:
