@@ -42,12 +42,13 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc-123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path3"}}},
 		{Name: "empty", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
 		{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
+		{Name: "gitrepo", Source: &api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != 5 || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd") {
+	if len(names) != 6 || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo") {
 		t.Errorf("wrong names result: %v", names)
 	}
 
