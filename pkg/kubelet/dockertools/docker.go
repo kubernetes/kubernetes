@@ -387,7 +387,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 	waiting := true
 	if inspectResult.State.Running {
 		containerStatus.State.Running = &api.ContainerStateRunning{
-			StartedAt: util.Time{inspectResult.State.StartedAt},
+			StartedAt: inspectResult.State.StartedAt,
 		}
 		if containerName == "net" && inspectResult.NetworkSettings != nil {
 			containerStatus.PodIP = inspectResult.NetworkSettings.IPAddress
@@ -398,8 +398,8 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 		containerStatus.State.Termination = &api.ContainerStateTerminated{
 			ExitCode:   inspectResult.State.ExitCode,
 			Reason:     "",
-			StartedAt:  util.Time{inspectResult.State.StartedAt},
-			FinishedAt: util.Time{inspectResult.State.FinishedAt},
+			StartedAt:  inspectResult.State.StartedAt,
+			FinishedAt: inspectResult.State.FinishedAt,
 		}
 		if tPath != "" {
 			path, found := inspectResult.Volumes[tPath]

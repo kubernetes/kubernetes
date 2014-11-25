@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -326,16 +328,19 @@ type ContainerStateWaiting struct {
 }
 
 type ContainerStateRunning struct {
-	StartedAt util.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty" description:"time at which the container was last (re-)started"`
+	// TODO: change to util.Time
+	StartedAt time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty" description:"time at which the container was last (re-)started"`
 }
 
 type ContainerStateTerminated struct {
-	ExitCode   int       `json:"exitCode" yaml:"exitCode" description:"exit status from the last termination of the container"`
-	Signal     int       `json:"signal,omitempty" yaml:"signal,omitempty" description:"signal from the last termination of the container"`
-	Reason     string    `json:"reason,omitempty" yaml:"reason,omitempty" description:"(brief) reason from the last termination of the container"`
-	Message    string    `json:"message,omitempty" yaml:"message,omitempty" description:"message regarding the last termination of the container"`
-	StartedAt  util.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty" description:"time at which previous execution of the container started"`
-	FinishedAt util.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty" description:"time at which the container last terminated"`
+	ExitCode int    `json:"exitCode" yaml:"exitCode" description:"exit status from the last termination of the container"`
+	Signal   int    `json:"signal,omitempty" yaml:"signal,omitempty" description:"signal from the last termination of the container"`
+	Reason   string `json:"reason,omitempty" yaml:"reason,omitempty" description:"(brief) reason from the last termination of the container"`
+	Message  string `json:"message,omitempty" yaml:"message,omitempty" description:"message regarding the last termination of the container"`
+	// TODO: change to util.Time
+	StartedAt time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty" description:"time at which previous execution of the container started"`
+	// TODO: change to util.Time
+	FinishedAt time.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty" description:"time at which the container last terminated"`
 }
 
 // ContainerState holds a possible state of container.
