@@ -133,6 +133,7 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
+	// FIXME: if this were not a pointer, fuzzing would be a bit easier.
 	Source *VolumeSource `json:"source" yaml:"source"`
 }
 

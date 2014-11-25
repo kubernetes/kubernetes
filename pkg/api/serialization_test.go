@@ -37,6 +37,13 @@ import (
 
 var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
 
+// Helper. FIXME: maybe this should be part of the fuzz pkg?
+func fuzzOneOf(c fuzz.Continue, objs ...interface{}) {
+	//FIXME: would be nicer to use FuzzOnePtr() and reflect.
+	i := c.RandUint64() % uint64(len(objs))
+	c.Fuzz(objs[i])
+}
+
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	func(j *runtime.PluginBase, c fuzz.Continue) {
@@ -137,6 +144,16 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		pm[c.RandString()] = docker.PortMapping{
 			c.RandString(): c.RandString(),
 		}
+	},
+	func(rp *api.RestartPolicy, c fuzz.Continue) {
+		// Exactly one of the fields should be set.
+		//FIXME: the fuzz can still end up nil.  What if fuzz allowed me to say that?
+		fuzzOneOf(c, &rp.Always, &rp.OnFailure, &rp.Never)
+	},
+	func(vs *api.VolumeSource, c fuzz.Continue) {
+		// Exactly one of the fields should be set.
+		//FIXME: the fuzz can still end up nil.  What if fuzz allowed me to say that?
+		fuzzOneOf(c, &vs.HostDir, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.GitRepo)
 	},
 )
 
