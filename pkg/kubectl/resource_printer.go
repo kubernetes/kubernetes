@@ -28,7 +28,6 @@ import (
 	"text/template"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
@@ -243,7 +242,7 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.Name, firstImage,
 		podHostString(pod.Status.Host, pod.Status.HostIP),
-		labels.Set(pod.Labels), pod.Status.Phase)
+		formatLabels(pod.Labels), pod.Status.Phase)
 	if err != nil {
 		return err
 	}
@@ -269,7 +268,7 @@ func printPodList(podList *api.PodList, w io.Writer) error {
 func printReplicationController(controller *api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
 		controller.Name, makeImageList(&controller.Spec.Template.Spec),
-		labels.Set(controller.Spec.Selector), controller.Spec.Replicas)
+		formatLabels(controller.Spec.Selector), controller.Spec.Replicas)
 	return err
 }
 
@@ -283,8 +282,8 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printService(svc *api.Service, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", svc.Name, labels.Set(svc.Labels),
-		labels.Set(svc.Spec.Selector), svc.Spec.PortalIP, svc.Spec.Port)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", svc.Name, formatLabels(svc.Labels),
+		formatLabels(svc.Spec.Selector), svc.Spec.PortalIP, svc.Spec.Port)
 	return err
 }
 
@@ -298,7 +297,7 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 }
 
 func printMinion(minion *api.Minion, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", minion.Name, labels.Set(minion.Labels))
+	_, err := fmt.Fprintf(w, "%s\t%s\n", minion.Name, formatLabels(minion.Labels))
 	return err
 }
 

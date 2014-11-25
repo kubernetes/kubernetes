@@ -80,9 +80,9 @@ $ export KUBERNETES_PROVIDER=vagrant
 $ ./cluster/kubecfg.sh list /minions
 Minion identifier    Labels
 ----------           ----------
-10.245.2.4
-10.245.2.3
-10.245.2.2
+10.245.2.4           <none>
+10.245.2.3           <none>
+10.245.2.2           <none>
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -143,9 +143,9 @@ Your cluster is running, you can list the minions in your cluster:
 $ cluster/kubecfg.sh list /minions
 Minion identifier    Labels
 ----------           ----------
-10.245.2.4
-10.245.2.3
-10.245.2.2
+10.245.2.4           <none>
+10.245.2.3           <none>
+10.245.2.2           <none>
 ```
 
 Now start running some containers!
