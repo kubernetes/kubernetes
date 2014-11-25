@@ -39,8 +39,7 @@ redis-master-pod    gurpartap/redis     kubernetes-minion-3.c.thockin-dev.intern
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-$ gcutil ssh --zone us-central1-b kubernetes-minion-3
-$ sudo docker ps
+me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-3
 
 me@kubernetes-minion-3:~$ sudo docker ps
 CONTAINER ID  IMAGE                   COMMAND              CREATED         STATUS
@@ -165,33 +164,33 @@ redis-slave         name=redis,role=slave   name=redis,role=slave    10.0.0.2   
 guestbook                                   name=guestbook           10.0.0.3            3000
 ```
 
-To play with the service itself, find the external IP of the load balancer from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<ip>:3000`.
+To play with the service itself, find the external IP of the load balancer from the [Google Cloud Console][cloud-console] or the `gcloud` tool, and visit `http://<ip>:3000`.
 
 ```shell
-$ gcutil getforwardingrule guestbook
-+---------------+-----------------------------------+
-| name          | guestbook                         |
-| description   |                                   |
-| creation-time | 2014-10-15T19:07:24.837-07:00     |
-| region        | us-central1                       |
-| ip            | 12.34.56.78                       |
-| protocol      | TCP                               |
-| port-range    | 3000-3000                         |
-| target        | us-central1/targetPools/guestbook |
-+---------------+-----------------------------------+
+$ gcloud compute forwarding-rules describe --region=us-central1 guestbook
+IPAddress: 11.22.33.44
+IPProtocol: TCP
+creationTimestamp: '2014-11-24T16:08:15.327-08:00'
+id: '17594840560849468061'
+kind: compute#forwardingRule
+name: guestbook
+portRange: 1-65535
+region: https://www.googleapis.com/compute/v1/projects/jbeda-prod/regions/us-central1
+selfLink: https://www.googleapis.com/compute/v1/projects/jbeda-prod/regions/us-central1/forwardingRules/guestbook
+target: https://www.googleapis.com/compute/v1/projects/jbeda-prod/regions/us-central1/targetPools/guestbook
 ```
 
-You may need to open the firewall for port 3000 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+You may need to open the firewall for port 3000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
-$ gcutil addfirewall --allowed=tcp:3000 --target_tags=kubernetes-minion kubernetes-minion-3000
+$ gcloud compute firewall-rules create --allow=tcp:3000 --target-tags=kubernetes-minion kubernetes-minion-3000
 ```
 
 If you are running Kubernetes locally, you can just visit http://localhost:3000
-For details about limiting traffic to specific sources, see the [gcutil documentation][gcutil-docs]
+For details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
 
 [cloud-console]: https://console.developer.google.com
-[gcutil-docs]: https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall
+[gce-firewall-docs]: https://cloud.google.com/compute/docs/networking#firewalls
 
 ### Step Seven: Cleanup
 

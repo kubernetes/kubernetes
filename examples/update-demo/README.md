@@ -33,10 +33,12 @@ It also assumes that `$DOCKER_HUB_USER` is set to your Docker user id.  We use t
 $ export DOCKER_HUB_USER=my-docker-id
 ```
 
-You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```bash
-$ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
+$ gcloud compute firewall-rules create \
+  --allow tcp:8080 --target-tags=kubernetes-minion \
+  --zone=us-central1-a kubernetes-minion-8080
 ```
 
 ### Step Zero: Build the Docker images

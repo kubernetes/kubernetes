@@ -40,11 +40,12 @@ We set up this bridge on each node with SaltStack, in [container_bridge.py](clus
 
 We make these addresses routable in GCE:
 
-     gcutil addroute ${MINION_NAMES[$i]} ${MINION_IP_RANGES[$i]} \
-     --norespect_terminal_width \
-     --project ${PROJECT} \
-     --network ${NETWORK} \
-     --next_hop_instance ${ZONE}/instances/${MINION_NAMES[$i]} &
+    gcloud compute routes add "${MINION_NAMES[$i]}" \
+      --project "${PROJECT}" \
+      --destination-range "${MINION_IP_RANGES[$i]}" \
+      --network "${NETWORK}" \
+      --next-hop-instance "${MINION_NAMES[$i]}" \
+      --next-hop-instance-zone "${ZONE}" &
 
 The minion IP ranges are /24s in the 10-dot space.
 
