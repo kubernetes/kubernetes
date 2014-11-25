@@ -18,6 +18,7 @@ package util
 
 import (
 	"regexp"
+	"strings"
 )
 
 // IsDNSLabel tests for a string that conforms to the definition of a label in
@@ -81,4 +82,24 @@ func IsCIdentifier(value string) bool {
 // IsValidPortNum tests that the argument is a valid, non-zero port number.
 func IsValidPortNum(port int) bool {
 	return 0 < port && port < 65536
+}
+
+// IsQualifiedName tests whether a string fits the "optionally-namespaced
+// name" pattern: [ DNS_SUBDOMAIN "/" ] DNS_LABEL
+func IsQualifiedName(value string) bool {
+	var n, ns string
+	parts := strings.Split(value, "/")
+	switch len(parts) {
+	case 1:
+		n = parts[0]
+	case 2:
+		ns = parts[0]
+		n = parts[1]
+	default:
+		return false
+	}
+	if (ns != "" && !IsDNSSubdomain(ns)) || !IsDNSLabel(n) {
+		return false
+	}
+	return true
 }
