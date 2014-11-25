@@ -40,6 +40,7 @@ readonly KUBE_CLIENT_TARGETS=(
   cmd/kubernetes
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
+readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
 # The set of test targets that we are building for all platforms
 readonly KUBE_TEST_TARGETS=(
@@ -56,6 +57,7 @@ readonly KUBE_CLIENT_PLATFORMS=(
   linux/arm
   darwin/amd64
   darwin/386
+  windows/amd64
 )
 
 readonly KUBE_ALL_TARGETS=(
@@ -280,6 +282,9 @@ kube::golang::build_binaries() {
 
         for binary in "${binaries[@]}"; do
           local bin=$(basename "${binary}")
+          if [[ ${GOOS} == "windows" ]]; then
+            bin="${bin}.exe"
+          fi
           go build -o "${output_path}/${bin}" \
               "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
