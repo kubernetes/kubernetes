@@ -14,6 +14,10 @@ At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. En
 
 You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
 
+#### go
+
+You need [go](https://golang.org/doc/install) in your path, please make sure it is installed and in your ``$PATH``.
+
 ### Starting the cluster
 
 In a separate tab of your terminal, run:
