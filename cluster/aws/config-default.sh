@@ -23,7 +23,7 @@ NUM_MINIONS=4
 # This is the ubuntu 14.04 image for us-west-2 + ebs
 # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
 # This will need to be updated from time to time as amis are deprecated
-IMAGE=ami-55d69e65
+IMAGE=ami-39501209
 INSTANCE_PREFIX=kubernetes
 AWS_SSH_KEY=$HOME/.ssh/kube_aws_rsa
 
