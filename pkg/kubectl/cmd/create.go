@@ -43,7 +43,9 @@ Examples:
 			if len(filename) == 0 {
 				usageError(cmd, "Must specify filename to create")
 			}
-			mapping, namespace, name, data := ResourceFromFile(filename, f.Typer, f.Mapper)
+			schema, err := f.Validator(cmd)
+			checkErr(err)
+			mapping, namespace, name, data := ResourceFromFile(filename, f.Typer, f.Mapper, schema)
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
