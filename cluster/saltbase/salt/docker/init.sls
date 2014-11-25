@@ -44,6 +44,8 @@ purge-old-docker:
   pkg.removed:
     - pkgs:
       - lxc-docker-1.2.0
+      - lxc-docker-1.3.0
+      - lxc-docker-1.3.1
 
 {{ environment_file }}:
   file.managed:
@@ -70,9 +72,9 @@ purge-old-docker:
 # 7. Add the old version to purge-old-docker above.
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
-{% set deb='lxc-docker-1.3.0_1.3.0-20141016165047-c78088f_amd64.deb' %}
-{% set deb_hash='sha1=99c2135e4f1f469b771226c3846e0b6accb6056a' %}
-{% set docker_ver='1.3.0' %}
+{% set deb='lxc-docker-1.3.2_1.3.2_amd64.deb' %}
+{% set deb_hash='sha1=e271afeba8156fda9c6e7527c21ae237974a8c51' %}
+{% set docker_ver='1.3.2' %}
 
 /var/cache/docker-install/{{ deb }}:
   file.managed:
@@ -83,7 +85,7 @@ purge-old-docker:
     - mode: 644
     - makedirs: true
 
-# Drop the license file into /usr/share so that everyting is crystal clear.
+# Drop the license file into /usr/share so that everything is crystal clear.
 /usr/share/doc/docker/apache.txt:
   file.managed:
     - source: {{ storage_base }}apache2.txt
