@@ -17,8 +17,6 @@
 # Launches a container and verifies it can be reached. Assumes that
 # we're being called by hack/e2e-test.sh (we use some env vars it sets up).
 
-# TODO: Convert uses of gcutil to gcloud
-
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -41,7 +39,7 @@ function teardown() {
   rm -rf ${config}
   echo "Waiting for disk to become unmounted"
   sleep 20
-  gcutil deletedisk -f --zone=${ZONE} ${disk_name}
+  gcloud compute disks delete --quiet --zone="${ZONE}" "${disk_name}"
 }
 
 trap "teardown" EXIT
@@ -49,13 +47,14 @@ trap "teardown" EXIT
 perl -p -e "s/%.*%/${disk_name}/g" ${KUBE_ROOT}/examples/gce-pd/testpd.yaml > ${config}
 
 # Create and mount the disk.
-gcutil adddisk --size_gb=10 --zone=${ZONE} ${disk_name}
-gcutil attachdisk --disk ${disk_name} ${MASTER_NAME}
-gcutil ssh ${MASTER_NAME} sudo rm -rf /mnt/tmp 
-gcutil ssh ${MASTER_NAME} sudo mkdir /mnt/tmp
-gcutil ssh ${MASTER_NAME} sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-${disk_name} /mnt/tmp
-gcutil ssh ${MASTER_NAME} sudo umount /mnt/tmp
-gcloud compute instances detach-disk --disk ${disk_name} --zone ${ZONE} ${MASTER_NAME}
+gcloud compute disks create --zone="${ZONE}" --size=10GB "${disk_name}"
+gcloud compute instances attach-disk --zone="${ZONE}" --disk="${disk_name}" \
+  --device-name temp-data "${MASTER_NAME}"
+gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo rm -rf /mnt/tmp"
+gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo mkdir -p /mnt/tmp"
+gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
+gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo umount /mnt/tmp"
+gcloud compute instances detach-disk --zone="${ZONE}" --disk "${disk_name}" "${MASTER_NAME}"
 
 ${KUBECFG} -c ${config} create pods
 

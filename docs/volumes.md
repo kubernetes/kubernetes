@@ -59,10 +59,15 @@ Before you can use a GCE PD with a pod, you need to create it and format it.
 __We are actively working on making this more streamlined.__
 
 ```sh
-gcutil adddisk --size_gb=<size> --zone=<zone> <name>
-gcutil attachdisk --disk <name> kubernetes-master
-gcutil ssh kubernetes-master sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-test2 /mnt/tmp
-gcutil detachdisk --device_name google-<name> kubernetes-master
+DISK_NAME=my-data-disk
+DISK_SIZE=500GB
+ZONE=us-central1-a
+
+gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE $DISK_NAME
+gcloud compute instances attach-disk --zone=$ZONE --disk=$DISK_NAME --device-name temp-data kubernetes-master
+gcloud compute ssh --zone=$ZONE kubernetes-master \
+  --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
+gcloud compute instances detach-disk --zone=$ZONE --disk $DISK_NAME kubernetes-master
 ```
 
 #### GCE PD Example configuration:

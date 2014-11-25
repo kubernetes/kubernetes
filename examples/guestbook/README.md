@@ -66,8 +66,7 @@ redis-master        dockerfile/redis    kubernetes-minion-3.c.briandpe-api.inter
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-$ gcutil ssh --zone us-central1-b kubernetes-minion-3
-$ sudo docker ps
+me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-3
 
 me@kubernetes-minion-3:~$ sudo docker ps
 CONTAINER ID  IMAGE                     COMMAND               CREATED         STATUS        PORTS     NAMES
@@ -308,23 +307,23 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:8000`.
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcloud` tool, and visit `http://<host-ip>:8000`.
 
 ```shell
-$ gcutil listinstances
+$ gcloud compute instances list
 ```
 
-You may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+You may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
-$ gcutil addfirewall --allowed=tcp:8000 --target_tags=kubernetes-minion kubernetes-minion-8000
+$ gcloud compute firewall-rules create --allow=tcp:8000 --target-tags=kubernetes-minion kubernetes-minion-8000
 ```
 
 If you are running Kubernetes locally, you can just visit http://localhost:8000.
-For details about limiting traffic to specific sources, see the [gcutil documentation][gcutil-docs].
+For details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
 
 [cloud-console]: https://console.developer.google.com
-[gcutil-docs]: https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall
+[gce-firewall-docs]: https://cloud.google.com/compute/docs/networking#firewalls
 
 ### Step Six: Cleanup
 
