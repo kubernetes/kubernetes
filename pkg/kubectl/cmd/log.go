@@ -29,15 +29,18 @@ func NewCmdLog(out io.Writer) *cobra.Command {
 			if len(args) != 2 {
 				usageError(cmd, "<pod> and <container> are required for log")
 			}
+
+			namespace := getKubeNamespace(cmd)
+
 			client := getKubeClient(cmd)
-			pod, err := client.Pods("default").Get(args[0])
+			pod, err := client.Pods(namespace).Get(args[0])
 			checkErr(err)
 
 			data, err := client.RESTClient.Get().
 				Path("proxy/minions").
 				Path(pod.Status.Host).
 				Path("containerLogs").
-				Path(getKubeNamespace(cmd)).
+				Path(namespace).
 				Path(args[0]).
 				Path(args[1]).
 				Do().
