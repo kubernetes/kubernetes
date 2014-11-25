@@ -11,7 +11,8 @@
 ##### a) Preferred Option: Install from [0.5 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.5)
 1. ```wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.5/kubernetes.tar.gz```
 2. ```tar -xzf kubernetes.tar.gz; cd kubernetes```
-4. ```export PATH=$PATH:$PWD/platforms/<os>/<platform>```
+3. ```export PATH=$PATH:$PWD/platforms/<os>/<platform>```
+4. __Temporary for v0.5__ : Edit the ```cluster/aws/config-default.sh``` so that ```IMAGE=ami-39501209``` 
 
 ##### b) Alternate Option: Install from source at head
 1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
