@@ -16,7 +16,7 @@ limitations under the License.
 
 package user
 
-// UserInfo describes a user that has been authenticated to the system.
+// Info describes a user that has been authenticated to the system.
 type Info interface {
 	// GetName returns the name that uniquely identifies this user among all
 	// other active users.
