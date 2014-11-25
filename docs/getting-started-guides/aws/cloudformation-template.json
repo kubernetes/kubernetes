@@ -220,7 +220,7 @@
           "        Requires=kube-apiserver.service\n",
           "        After=kube-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/k8s/kube-register\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes-release/release/kube-register\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register\n",
           "        ExecStart=/opt/bin/kube-register \\\n",
           "        --metadata=role=knode \\\n",
