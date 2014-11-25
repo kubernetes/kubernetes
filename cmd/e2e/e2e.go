@@ -175,7 +175,11 @@ func TestPodUpdate(c *client.Client) bool {
 func TestImportantURLs(c *client.Client) bool {
 	tests := []struct {
 		path string
-	}{}
+	}{
+		{path: "/validate"},
+		{path: "/healthz"},
+		// TODO: test proxy links here
+	}
 	ok := true
 	for _, test := range tests {
 		glog.Infof("testing: %s", test.path)
@@ -183,10 +187,10 @@ func TestImportantURLs(c *client.Client) bool {
 			AbsPath(test.path).
 			Do().
 			Raw()
-	}
-	if err != nil {
-		glog.Errorf("Failed: %v\nBody: %s", err, string(data))
-		ok := false
+		if err != nil {
+			glog.Errorf("Failed: %v\nBody: %s", err, string(data))
+			ok = false
+		}
 	}
 	return ok
 }
@@ -288,6 +292,7 @@ func main() {
 	tests := []func(c *client.Client) bool{
 		TestKubernetesROService,
 		TestKubeletSendsEvent,
+		TestImportantURLs,
 		// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
 	}
 
