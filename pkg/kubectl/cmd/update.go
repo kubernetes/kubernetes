@@ -43,9 +43,7 @@ Examples:
 			if len(filename) == 0 {
 				usageError(cmd, "Must specify filename to update")
 			}
-			schema, err := f.Validator(cmd)
-			checkErr(err)
-			mapping, namespace, name, data := ResourceFromFile(filename, f.Typer, f.Mapper, schema)
+			mapping, namespace, name, data := ResourceFromFile(filename, f.Typer, f.Mapper)
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 

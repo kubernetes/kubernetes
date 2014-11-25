@@ -40,21 +40,12 @@ func NewInvalidTypeError(expected reflect.Kind, observed reflect.Kind, fieldName
 	return &InvalidTypeError{expected, observed, fieldName}
 }
 
-// Schema is an interface that knows how to validate an API object serialized to a byte array.
-type Schema interface {
-	ValidateBytes(data []byte) error
-}
-
-type NullSchema struct{}
-
-func (NullSchema) ValidateBytes(data []byte) error { return nil }
-
-type SwaggerSchema struct {
+type Schema struct {
 	api swagger.ApiDeclaration
 }
 
-func NewSwaggerSchemaFromBytes(data []byte) (Schema, error) {
-	schema := &SwaggerSchema{}
+func NewSchemaFromBytes(data []byte) (*Schema, error) {
+	schema := &Schema{}
 	err := json.Unmarshal(data, &schema.api)
 	if err != nil {
 		return nil, err
@@ -62,7 +53,7 @@ func NewSwaggerSchemaFromBytes(data []byte) (Schema, error) {
 	return schema, nil
 }
 
-func (s *SwaggerSchema) ValidateBytes(data []byte) error {
+func (s *Schema) ValidateBytes(data []byte) error {
 	var obj interface{}
 	err := json.Unmarshal(data, &obj)
 	if err != nil {
@@ -74,7 +65,7 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	return s.ValidateObject(obj, apiVersion, "", apiVersion+"."+kind)
 }
 
-func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, typeName string) error {
+func (s *Schema) ValidateObject(obj interface{}, apiVersion, fieldName, typeName string) error {
 	models := s.api.Models
 	// TODO: handle required fields here too.
 	model, ok := models[typeName]
@@ -107,7 +98,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 	return nil
 }
 
-func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) error {
+func (s *Schema) validateField(value interface{}, apiVersion, fieldName, fieldType string, fieldDetails *swagger.ModelProperty) error {
 	if strings.HasPrefix(fieldType, apiVersion) {
 		return s.ValidateObject(value, apiVersion, fieldName, fieldType)
 	}
