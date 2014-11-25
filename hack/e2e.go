@@ -40,6 +40,7 @@ var (
 	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
+	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
 		"By default, verify that client and server have exact version match. "+
 		"You can explicitly set to false if you're, e.g., testing client changes "+
@@ -172,6 +173,9 @@ func Test() (failed, passed []string) {
 
 func runBash(stepName, bashFragment string) bool {
 	cmd := exec.Command("bash", "-s")
+	if *trace_bash {
+		cmd.Args = append(cmd.Args, "-x")
+	}
 	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
 	return finishRunning(stepName, cmd)
 }
