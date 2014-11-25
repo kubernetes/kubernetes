@@ -100,32 +100,34 @@ type Meta struct {
 
 // scope contains information about an ongoing conversion.
 type scope struct {
-	converter    *Converter
-	meta         *Meta
-	flags        FieldMatchingFlags
-	srcTagStack  []reflect.StructTag
-	destTagStack []reflect.StructTag
+	converter *Converter
+	meta      *Meta
+	flags     FieldMatchingFlags
+
+	// srcStack & destStack are separate because they may not have a 1:1
+	// relationship.
+	srcStack  scopeStack
+	destStack scopeStack
 }
 
-// push adds a level to the src/dest tag stacks.
-func (s *scope) push() {
-	s.srcTagStack = append(s.srcTagStack, "")
-	s.destTagStack = append(s.destTagStack, "")
+type scopeStackElem struct {
+	tag   reflect.StructTag
+	value reflect.Value
 }
 
-// pop removes a level to the src/dest tag stacks.
-func (s *scope) pop() {
-	n := len(s.srcTagStack)
-	s.srcTagStack = s.srcTagStack[:n-1]
-	s.destTagStack = s.destTagStack[:n-1]
+type scopeStack []scopeStackElem
+
+func (s *scopeStack) pop() {
+	n := len(*s)
+	*s = (*s)[:n-1]
 }
 
-func (s *scope) setSrcTag(tag reflect.StructTag) {
-	s.srcTagStack[len(s.srcTagStack)-1] = tag
+func (s *scopeStack) push(e scopeStackElem) {
+	*s = append(*s, e)
 }
 
-func (s *scope) setDestTag(tag reflect.StructTag) {
-	s.destTagStack[len(s.destTagStack)-1] = tag
+func (s *scopeStack) top() *scopeStackElem {
+	return &(*s)[len(*s)-1]
 }
 
 // Convert continues a conversion.
@@ -135,12 +137,12 @@ func (s *scope) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
 
 // SrcTag returns the tag of the struct containing the current source item, if any.
 func (s *scope) SrcTag() reflect.StructTag {
-	return s.srcTagStack[len(s.srcTagStack)-1]
+	return s.srcStack.top().tag
 }
 
 // DestTag returns the tag of the struct containing the current dest item, if any.
 func (s *scope) DestTag() reflect.StructTag {
-	return s.destTagStack[len(s.destTagStack)-1]
+	return s.destStack.top().tag
 }
 
 // Flags returns the flags with which the current conversion was started.
@@ -265,7 +267,9 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 		flags:     flags,
 		meta:      meta,
 	}
-	s.push() // Easy way to make SrcTag and DestTag never fail
+	// Leave something on the stack, so that calls to struct tag getters never fail.
+	s.srcStack.push(scopeStackElem{})
+	s.destStack.push(scopeStackElem{})
 	return c.convert(sv, dv, s)
 }
 
@@ -305,8 +309,10 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		c.Debug.Logf("Trying to convert '%v' to '%v'", st, dt)
 	}
 
-	scope.push()
-	defer scope.pop()
+	scope.srcStack.push(scopeStackElem{value: sv})
+	scope.destStack.push(scopeStackElem{value: dv})
+	defer scope.srcStack.pop()
+	defer scope.destStack.pop()
 
 	switch dv.Kind() {
 	case reflect.Struct:
@@ -375,11 +381,11 @@ func (c *Converter) convertStruct(sv, dv reflect.Value, scope *scope) error {
 		if sf.IsValid() {
 			// No need to check error, since we know it's valid.
 			field, _ := st.FieldByName(f.Name)
-			scope.setSrcTag(field.Tag)
+			scope.srcStack.top().tag = field.Tag
 		}
 		if df.IsValid() {
 			field, _ := dt.FieldByName(f.Name)
-			scope.setDestTag(field.Tag)
+			scope.destStack.top().tag = field.Tag
 		}
 		// TODO: set top level of scope.src/destTagStack with these field tags here.
 		if !df.IsValid() || !sf.IsValid() {
