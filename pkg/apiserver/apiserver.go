@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -286,9 +287,17 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 		errorJSON(err, codec, w)
 		return
 	}
+	// PR #2243: Pretty-print JSON by default.
+	formatted := &bytes.Buffer{}
+	err = json.Indent(formatted, output, "", "  ")
+	if err != nil {
+		// Note: If codec is broken, this results in an infinite recursion
+		errorJSON(err, codec, w)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	w.Write(output)
+	w.Write(formatted.Bytes())
 }
 
 // errorJSON renders an error to the response.
@@ -299,7 +308,8 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
 
 // writeRawJSON writes a non-API object in JSON.
 func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	output, err := json.Marshal(object)
+	// PR #2243: Pretty-print JSON by default.
+	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
