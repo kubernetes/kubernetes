@@ -47,7 +47,11 @@
     - user: kube-apiserver
     - group: kube-apiserver
     - mode: 400
-
+    - watch:
+      - user: kube-apiserver
+      - group: kube-apiserver
+    - watch_in:
+      - service: kube-apiserver
 {% endif %}
 {% endif %}
 
