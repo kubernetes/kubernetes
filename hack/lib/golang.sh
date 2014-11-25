@@ -24,6 +24,7 @@ readonly KUBE_SERVER_TARGETS=(
   cmd/apiserver
   cmd/controller-manager
   cmd/kubelet
+  cmd/onramp
   plugin/cmd/scheduler
 )
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
