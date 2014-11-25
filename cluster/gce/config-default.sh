@@ -44,3 +44,5 @@ if [[ "${FLUENTD_GCP-}" != "true" ]]; then
     FLUENTD_ELASTICSEARCH="true"
   fi
 fi
+# When set to true, Docker Cache is enabled by default as part of the cluster bring up.
+ENABLE_DOCKER_REGISTRY_CACHE=true
