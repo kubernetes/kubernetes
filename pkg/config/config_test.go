@@ -21,10 +21,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -92,13 +92,9 @@ func TestCreateNoNameItem(t *testing.T) {
 		t.Errorf("Expected required value error for missing name")
 	}
 
-	e := errs[0].(errors.ValidationError)
-	if errors.ValueOf(e.Type) != "required value" {
-		t.Errorf("Expected ValidationErrorTypeRequired error, got %#v", e)
-	}
-
-	if e.Field != "Config.item[0].name" {
-		t.Errorf("Expected 'Config.item[0].name' as error field, got '%#v'", e.Field)
+	errStr := errs[0].Error()
+	if !strings.Contains(errStr, "Config.item[0]: name") {
+		t.Errorf("Expected 'Config.item[0]: name' in error string, got '%s'", errStr)
 	}
 }
 
@@ -121,13 +117,9 @@ func TestCreateInvalidItem(t *testing.T) {
 		t.Errorf("Expected invalid value error for kind")
 	}
 
-	e := errs[0].(errors.ValidationError)
-	if errors.ValueOf(e.Type) != "invalid value" {
-		t.Errorf("Expected ValidationErrorTypeInvalid error, got %#v", e)
-	}
-
-	if e.Field != "Config.item[0].kind" {
-		t.Errorf("Expected 'Config.item[0].kind' as error field, got '%#v'", e.Field)
+	errStr := errs[0].Error()
+	if !strings.Contains(errStr, "Config.item[0] kind") {
+		t.Errorf("Expected 'Config.item[0] kind' in error string, got '%s'", errStr)
 	}
 }
 
@@ -153,12 +145,8 @@ func TestCreateNoClientItems(t *testing.T) {
 		t.Errorf("Expected invalid value error for client")
 	}
 
-	e := errs[0].(errors.ValidationError)
-	if errors.ValueOf(e.Type) != "unsupported value" {
-		t.Errorf("Expected ValidationErrorTypeUnsupported error, got %#v", e)
-	}
-
-	if e.Field != "Config.item[0].client" {
-		t.Errorf("Expected 'Config.item[0].client' as error field, got '%#v'", e.Field)
+	errStr := errs[0].Error()
+	if !strings.Contains(errStr, "Config.item[0] client") {
+		t.Errorf("Expected 'Config.item[0] client' in error string, got '%s'", errStr)
 	}
 }

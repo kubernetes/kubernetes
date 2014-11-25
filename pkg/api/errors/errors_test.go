@@ -54,7 +54,7 @@ func TestErrorNew(t *testing.T) {
 
 func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		Err     ValidationError
+		Err     *ValidationError
 		Details *api.StatusDetails
 	}{
 		{
@@ -69,7 +69,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			NewFieldInvalid("field[0].name", "bar"),
+			NewFieldInvalid("field[0].name", "bar", "detail"),
 			&api.StatusDetails{
 				Kind: "kind",
 				ID:   "name",

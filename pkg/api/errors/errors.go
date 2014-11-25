@@ -30,6 +30,8 @@ type StatusError struct {
 	ErrStatus api.Status
 }
 
+var _ error = &StatusError{}
+
 // Error implements the Error interface.
 func (e *StatusError) Error() string {
 	return e.ErrStatus.Message
@@ -107,7 +109,7 @@ func NewConflict(kind, name string, err error) error {
 func NewInvalid(kind, name string, errs ValidationErrorList) error {
 	causes := make([]api.StatusCause, 0, len(errs))
 	for i := range errs {
-		if err, ok := errs[i].(ValidationError); ok {
+		if err, ok := errs[i].(*ValidationError); ok {
 			causes = append(causes, api.StatusCause{
 				Type:    api.CauseType(err.Type),
 				Message: err.Error(),
@@ -130,18 +132,16 @@ func NewInvalid(kind, name string, errs ValidationErrorList) error {
 
 // NewBadRequest creates an error that indicates that the request is invalid and can not be processed.
 func NewBadRequest(reason string) error {
-	return &StatusError{
-		api.Status{
-			Status: api.StatusFailure,
-			Code:   http.StatusBadRequest,
-			Reason: api.StatusReasonBadRequest,
-			Details: &api.StatusDetails{
-				Causes: []api.StatusCause{
-					{Message: reason},
-				},
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusBadRequest,
+		Reason: api.StatusReasonBadRequest,
+		Details: &api.StatusDetails{
+			Causes: []api.StatusCause{
+				{Message: reason},
 			},
 		},
-	}
+	}}
 }
 
 // NewInternalError returns an error indicating the item is invalid and cannot be processed.

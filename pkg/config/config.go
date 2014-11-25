@@ -17,10 +17,13 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // ClientFunc returns the RESTClient defined for given resource
@@ -30,33 +33,33 @@ type ClientFunc func(mapping *meta.RESTMapping) (*client.RESTClient, error)
 // be valid API type. It requires ObjectTyper to parse the Version and Kind and
 // RESTMapper to get the resource URI and REST client that knows how to create
 // given type
-func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientFunc, objects []runtime.Object) errs.ValidationErrorList {
-	allErrors := errs.ValidationErrorList{}
+func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientFunc, objects []runtime.Object) util.ErrorList {
+	allErrors := util.ErrorList{}
 	for i, obj := range objects {
 		version, kind, err := typer.ObjectVersionAndKind(obj)
 		if err != nil {
-			reportError(&allErrors, i, errs.NewFieldInvalid("kind", obj))
+			allErrors = append(allErrors, fmt.Errorf("Config.item[%d] kind: %v", i, err))
 			continue
 		}
 
 		mapping, err := mapper.RESTMapping(version, kind)
 		if err != nil {
-			reportError(&allErrors, i, errs.NewFieldNotSupported("mapping", err))
+			allErrors = append(allErrors, fmt.Errorf("Config.item[%d] mapping: %v", i, err))
 			continue
 		}
 
 		client, err := clientFor(mapping)
 		if err != nil {
-			reportError(&allErrors, i, errs.NewFieldNotSupported("client", obj))
+			allErrors = append(allErrors, fmt.Errorf("Config.item[%d] client: %v", i, err))
 			continue
 		}
 
 		if err := CreateObject(client, mapping, obj); err != nil {
-			reportError(&allErrors, i, *err)
+			allErrors = append(allErrors, fmt.Errorf("Config.item[%d]: %v", i, err))
 		}
 	}
 
-	return allErrors.Prefix("Config")
+	return allErrors
 }
 
 // CreateObject creates the obj using the provided clients and the resource URI
@@ -65,28 +68,19 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 func CreateObject(client *client.RESTClient, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
 	name, err := mapping.MetadataAccessor.Name(obj)
 	if err != nil || name == "" {
-		e := errs.NewFieldRequired("name", err)
-		return &e
+		return errs.NewFieldRequired("name", err)
 	}
 
 	namespace, err := mapping.Namespace(obj)
 	if err != nil {
-		e := errs.NewFieldRequired("namespace", err)
-		return &e
+		return errs.NewFieldRequired("namespace", err)
 	}
 
 	// TODO: This should be using RESTHelper
 	err = client.Post().Path(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
 	if err != nil {
-		return &errs.ValidationError{errs.ValidationErrorTypeInvalid, name, err}
+		return errs.NewFieldInvalid(name, obj, err.Error())
 	}
 
 	return nil
-}
-
-// reportError reports the single item validation error and properly set the
-// prefix and index to match the Config item JSON index
-func reportError(allErrs *errs.ValidationErrorList, index int, err errs.ValidationError) {
-	i := errs.ValidationErrorList{}
-	*allErrs = append(*allErrs, append(i, err).PrefixIndex(index).Prefix("item")...)
 }
