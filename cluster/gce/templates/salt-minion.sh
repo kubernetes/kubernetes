@@ -36,13 +36,21 @@ grains:
   cloud: gce
 EOF
 
+DOCKER_OPTS=""
+
+if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
+  DOCKER_OPTS="${EXTRA_DOCKER_OPTS}"
+fi
+
 # Decide if enable the cache
-if [[ "${ENABLE_DOCKER_REGISTRY_CACHE}" == "true" ]]; then 
+if [[ "${ENABLE_DOCKER_REGISTRY_CACHE}" == "true" ]]; then
     REGION=$(echo "${ZONE}" | cut -f 1,2 -d -)
     echo "Enable docker registry cache at region: " $REGION
-    DOCKER_OPTS="--registry-mirror=\"https://${REGION}.docker-cache.clustermaster.net\""
+    DOCKER_OPTS="${DOCKER_OPTS} --registry-mirror='https://${REGION}.docker-cache.clustermaster.net'"
+fi
 
-    cat <<EOF >>/etc/salt/minion.d/grains.conf
+if [[ -n "{DOCKER_OPTS}" ]]; then
+cat <<EOF >>/etc/salt/minion.d/grains.conf
   docker_opts: $DOCKER_OPTS
 EOF
 fi
