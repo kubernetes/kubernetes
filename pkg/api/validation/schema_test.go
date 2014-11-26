@@ -30,12 +30,12 @@ import (
 	fuzz "github.com/google/gofuzz"
 )
 
-func LoadSchemaForTest(file string) (*Schema, error) {
+func LoadSchemaForTest(file string) (Schema, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
-	return NewSchemaFromBytes(data)
+	return NewSwaggerSchemaFromBytes(data)
 }
 
 // TODO: this is cloned from serialization_test.go, refactor to somewhere common like util

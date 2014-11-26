@@ -152,12 +152,18 @@ func readConfigData() []byte {
 
 // readConfig reads and parses pod, replicationController, and service
 // configuration files. If any errors log and exit non-zero.
-func readConfig(storage string, serverCodec runtime.Codec) []byte {
+func readConfig(storage string, c *client.Client) []byte {
+	serverCodec := c.RESTClient.Codec
 	if len(*config) == 0 {
 		glog.Fatal("Need config file (-c)")
 	}
 
-	data, err := parser.ToWireFormat(readConfigData(), storage, latest.Codec, serverCodec)
+	dataInput := readConfigData()
+	err := kubecfg.ValidateObject(dataInput, c)
+	if err != nil {
+		glog.Fatalf("Error validating %v as an object for %v: %v\n", *config, storage, err)
+	}
+	data, err := parser.ToWireFormat(dataInput, storage, latest.Codec, serverCodec)
 
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
@@ -383,7 +389,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>/<id>", method, prettyWireStorage())
 		}
 	case "print":
-		data := readConfig(storage, c.RESTClient.Codec)
+		data := readConfig(storage, c)
 		obj, err := latest.Codec.Decode(data)
 		if err != nil {
 			glog.Fatalf("error setting resource version: %v", err)
@@ -403,7 +409,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 	}
 	if setBody {
 		if len(version) > 0 {
-			data := readConfig(storage, c.RESTClient.Codec)
+			data := readConfig(storage, c)
 			obj, err := latest.Codec.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
@@ -419,7 +425,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 			}
 			r.Body(data)
 		} else {
-			r.Body(readConfig(storage, c.RESTClient.Codec))
+			r.Body(readConfig(storage, c))
 		}
 	}
 	result := r.Do()
