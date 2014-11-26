@@ -47,3 +47,8 @@ func (h HostPriorityList) Swap(i, j int) {
 }
 
 type PriorityFunction func(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error)
+
+type PriorityConfig struct {
+	Function PriorityFunction
+	Weight   int
+}

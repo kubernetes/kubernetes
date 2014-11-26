@@ -59,12 +59,12 @@ func TestCreateLists(t *testing.T) {
 		},
 		// Assigned pod
 		{
-			location: "/api/" + testapi.Version() + "/pods?fields=Status.Host!%3D",
+			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host!%3D",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod
 		{
-			location: "/api/" + testapi.Version() + "/pods?fields=Status.Host%3D",
+			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host%3D",
 			factory:  factory.createUnassignedPodLW,
 		},
 	}
@@ -108,21 +108,21 @@ func TestCreateWatches(t *testing.T) {
 		// Assigned pod watches
 		{
 			rv:       "",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=Status.Host!%3D&resourceVersion=",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=",
 			factory:  factory.createAssignedPodLW,
 		}, {
 			rv:       "42",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=Status.Host!%3D&resourceVersion=42",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod watches
 		{
 			rv:       "",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=Status.Host%3D&resourceVersion=",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=",
 			factory:  factory.createUnassignedPodLW,
 		}, {
 			rv:       "42",
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=Status.Host%3D&resourceVersion=42",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
 			factory:  factory.createUnassignedPodLW,
 		},
 	}

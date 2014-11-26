@@ -27,7 +27,7 @@ import (
 
 type genericScheduler struct {
 	predicates   []FitPredicate
-	prioritizers []PriorityFunction
+	prioritizers []PriorityConfig
 	pods         PodLister
 	random       *rand.Rand
 	randomLock   sync.Mutex
@@ -62,7 +62,7 @@ func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, er
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
-	sort.Sort(priorityList)
+	sort.Sort(sort.Reverse(priorityList))
 
 	hosts := getMinHosts(priorityList)
 	g.randomLock.Lock()
@@ -97,19 +97,21 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicat
 	return api.MinionList{Items: filtered}, nil
 }
 
-func prioritizeNodes(pod api.Pod, podLister PodLister, priorities []PriorityFunction, minionLister MinionLister) (HostPriorityList, error) {
+func prioritizeNodes(pod api.Pod, podLister PodLister, priorities []PriorityConfig, minionLister MinionLister) (HostPriorityList, error) {
 	result := HostPriorityList{}
 	combinedScores := map[string]int{}
 	for _, priority := range priorities {
-		prioritizedList, err := priority(pod, podLister, minionLister)
-		if err != nil {
-			return HostPriorityList{}, err
-		}
-		if len(priorities) == 1 {
-			return prioritizedList, nil
-		}
-		for _, hostEntry := range prioritizedList {
-			combinedScores[hostEntry.host] += hostEntry.score
+		weight := priority.Weight
+		// skip the priority function if the weight is specified as 0
+		if weight > 0 {
+			priorityFunc := priority.Function
+			prioritizedList, err := priorityFunc(pod, podLister, minionLister)
+			if err != nil {
+				return HostPriorityList{}, err
+			}
+			for _, hostEntry := range prioritizedList {
+				combinedScores[hostEntry.host] += hostEntry.score * weight
+			}
 		}
 	}
 	for host, score := range combinedScores {
@@ -148,7 +150,7 @@ func EqualPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) 
 	return result, nil
 }
 
-func NewGenericScheduler(predicates []FitPredicate, prioritizers []PriorityFunction, pods PodLister, random *rand.Rand) Scheduler {
+func NewGenericScheduler(predicates []FitPredicate, prioritizers []PriorityConfig, pods PodLister, random *rand.Rand) Scheduler {
 	return &genericScheduler{
 		predicates:   predicates,
 		prioritizers: prioritizers,

@@ -49,9 +49,9 @@ type configFactory struct {
 	// map of strings to predicate functions to be used
 	// to filter the minions for scheduling pods
 	PredicateMap map[string]algorithm.FitPredicate
-	// map of strings to priority functions to be used
+	// map of strings to priority config to be used
 	// to prioritize the filtered minions for scheduling pods
-	PriorityMap map[string]algorithm.PriorityFunction
+	PriorityMap map[string]algorithm.PriorityConfig
 }
 
 // NewConfigFactory initializes the factory.
@@ -62,13 +62,10 @@ func NewConfigFactory(client *client.Client) *configFactory {
 		PodLister:    &storeToPodLister{cache.NewStore()},
 		MinionLister: &storeToMinionLister{cache.NewStore()},
 		PredicateMap: make(map[string]algorithm.FitPredicate),
-		PriorityMap:  make(map[string]algorithm.PriorityFunction),
+		PriorityMap:  make(map[string]algorithm.PriorityConfig),
 	}
 
-	// add default predicates
 	factory.addDefaultPredicates()
-
-	// add default predicates
 	factory.addDefaultPriorities()
 
 	return factory
@@ -89,7 +86,7 @@ func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*sch
 		glog.V(2).Infof("Custom priority list not provided, using default priorities")
 		priorityKeys = []string{"LeastRequestedPriority"}
 	}
-	priorityFuncs, err := factory.getPriorityFunctions(priorityKeys)
+	priorityConfigs, err := factory.getPriorityConfigs(priorityKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +109,7 @@ func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*sch
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityFuncs, factory.PodLister, r)
+	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityConfigs, factory.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
@@ -133,11 +130,10 @@ func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*sch
 }
 
 func (factory *configFactory) getPredicateFunctions(keys []string) ([]algorithm.FitPredicate, error) {
-	var function algorithm.FitPredicate
 	predicates := []algorithm.FitPredicate{}
 	for _, key := range keys {
-		function = factory.PredicateMap[key]
-		if function == nil {
+		function, ok := factory.PredicateMap[key]
+		if !ok {
 			return nil, fmt.Errorf("Invalid predicate key %s specified - no corresponding function found", key)
 		}
 		predicates = append(predicates, function)
@@ -145,17 +141,16 @@ func (factory *configFactory) getPredicateFunctions(keys []string) ([]algorithm.
 	return predicates, nil
 }
 
-func (factory *configFactory) getPriorityFunctions(keys []string) ([]algorithm.PriorityFunction, error) {
-	var function algorithm.PriorityFunction
-	priorities := []algorithm.PriorityFunction{}
+func (factory *configFactory) getPriorityConfigs(keys []string) ([]algorithm.PriorityConfig, error) {
+	configs := []algorithm.PriorityConfig{}
 	for _, key := range keys {
-		function = factory.PriorityMap[key]
-		if function == nil {
+		config, ok := factory.PriorityMap[key]
+		if !ok {
 			return nil, fmt.Errorf("Invalid priority key %s specified - no corresponding function found", key)
 		}
-		priorities = append(priorities, function)
+		configs = append(configs, config)
 	}
-	return priorities, nil
+	return configs, nil
 }
 
 func (factory *configFactory) addDefaultPredicates() {
@@ -170,13 +165,22 @@ func (factory *configFactory) AddPredicate(key string, function algorithm.FitPre
 }
 
 func (factory *configFactory) addDefaultPriorities() {
-	factory.AddPriority("LeastRequestedPriority", algorithm.LeastRequestedPriority)
-	factory.AddPriority("SpreadingPriority", algorithm.CalculateSpreadPriority)
-	factory.AddPriority("EqualPriority", algorithm.EqualPriority)
+	factory.AddPriority("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1)
+	factory.AddPriority("SpreadingPriority", algorithm.CalculateSpreadPriority, 1)
+	factory.AddPriority("EqualPriority", algorithm.EqualPriority, 0)
 }
 
-func (factory *configFactory) AddPriority(key string, function algorithm.PriorityFunction) {
-	factory.PriorityMap[key] = function
+func (factory *configFactory) AddPriority(key string, function algorithm.PriorityFunction, weight int) {
+	factory.PriorityMap[key] = algorithm.PriorityConfig{Function: function, Weight: weight}
+}
+
+func (factory *configFactory) SetWeight(key string, weight int) {
+	config, ok := factory.PriorityMap[key]
+	if !ok {
+		glog.Errorf("Invalid priority key %s specified - no corresponding function found", key)
+		return
+	}
+	config.Weight = weight
 }
 
 type listWatch struct {
@@ -209,7 +213,7 @@ func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
 func (factory *configFactory) createUnassignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
-		fieldSelector: labels.Set{"Status.Host": ""}.AsSelector(),
+		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
 		resource:      "pods",
 	}
 }
@@ -227,7 +231,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 func (factory *configFactory) createAssignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie("Status.Host!="),
+		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
 		resource:      "pods",
 	}
 }

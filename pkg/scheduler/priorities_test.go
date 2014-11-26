@@ -74,12 +74,12 @@ func TestLeastRequested(t *testing.T) {
 	}{
 		{
 			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled",
 		},
 		{
 			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested",
 			pods: []api.Pod{
 				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
@@ -90,8 +90,8 @@ func TestLeastRequested(t *testing.T) {
 		},
 		{
 			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
-			expectedList: []HostPriority{{"machine1", 37 /* int(75% / 2) */}, {"machine2", 62 /* int( 75% + 50% / 2) */}},
-			test:         "no resources requested",
+			expectedList: []HostPriority{{"machine1", 6 /* int(200%-75% / 2) */}, {"machine2", 3 /* int( 200%-125% / 2) */}},
+			test:         "resources requested",
 			pods: []api.Pod{
 				{Spec: cpuOnly, Status: api.PodStatus{Host: "machine1"}},
 				{Spec: cpuAndMemory, Status: api.PodStatus{Host: "machine2"}},

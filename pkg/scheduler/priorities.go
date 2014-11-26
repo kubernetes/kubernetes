@@ -22,11 +22,13 @@ import (
 	"github.com/golang/glog"
 )
 
-func calculatePercentage(requested, capacity int) int {
+// the unused capacity is calculated on a scale of 0-10
+// 0 being the lowest priority and 10 being the highest
+func calculateScore(requested, capacity int) int {
 	if capacity == 0 {
 		return 0
 	}
-	return (requested * 100) / capacity
+	return ((capacity - requested) * 10) / capacity
 }
 
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
@@ -41,13 +43,13 @@ func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
 		}
 	}
 
-	percentageCPU := calculatePercentage(totalCPU, resources.GetIntegerResource(node.Spec.Capacity, resources.CPU, 0))
-	percentageMemory := calculatePercentage(totalMemory, resources.GetIntegerResource(node.Spec.Capacity, resources.Memory, 0))
-	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Percentage:(%d\\%m, %d\\%)", totalCPU, totalMemory, percentageCPU, percentageMemory)
+	cpuScore := calculateScore(totalCPU, resources.GetIntegerResource(node.Spec.Capacity, resources.CPU, 0))
+	memoryScore := calculateScore(totalMemory, resources.GetIntegerResource(node.Spec.Capacity, resources.Memory, 0))
+	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Score:(%d, %d)", totalCPU, totalMemory, cpuScore, memoryScore)
 
 	return HostPriority{
 		host:  node.Name,
-		score: int((percentageCPU + percentageMemory) / 2),
+		score: int((cpuScore + memoryScore) / 2),
 	}
 }
 
