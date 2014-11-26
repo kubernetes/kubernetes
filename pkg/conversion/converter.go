@@ -361,7 +361,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 
 	switch dv.Kind() {
 	case reflect.Struct:
-		return c.convertStruct(sv, dv, scope)
+		return c.convertKV(toKVValue(sv), toKVValue(dv), scope)
 	case reflect.Slice:
 		if sv.IsNil() {
 			// Don't make a zero-length slice.
@@ -408,46 +408,99 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	return nil
 }
 
-func (c *Converter) convertStruct(sv, dv reflect.Value, scope *scope) error {
-	dt, st := dv.Type(), sv.Type()
-
-	listType := dt
-	if scope.flags.IsSet(SourceToDest) {
-		listType = st
+func toKVValue(v reflect.Value) kvValue {
+	switch v.Kind() {
+	case reflect.Struct:
+		return structAdaptor(v)
 	}
-	for i := 0; i < listType.NumField(); i++ {
-		f := listType.Field(i)
-		if found, err := c.checkStructField(f.Name, sv, dv, scope); found {
+	return nil
+}
+
+// kvValue lets us write the same conversion logic to work with both maps
+// and structs. Only maps with string keys make sense for this.
+type kvValue interface {
+	// returns all keys, as a []string.
+	keys() []string
+	// Will just return "" for maps.
+	tagOf(key string) reflect.StructTag
+	// Will return the zero Value if the key doesn't exist.
+	value(key string) reflect.Value
+	// Maps require explict setting-- will do nothing for structs.
+	// Returns false on failure.
+	confirmSet(key string, v reflect.Value) bool
+}
+
+type structAdaptor reflect.Value
+
+func (sa structAdaptor) len() int {
+	v := reflect.Value(sa)
+	return v.Type().NumField()
+}
+
+func (sa structAdaptor) keys() []string {
+	v := reflect.Value(sa)
+	t := v.Type()
+	keys := make([]string, t.NumField())
+	for i := range keys {
+		keys[i] = t.Field(i).Name
+	}
+	return keys
+}
+
+func (sa structAdaptor) tagOf(key string) reflect.StructTag {
+	v := reflect.Value(sa)
+	field, ok := v.Type().FieldByName(key)
+	if ok {
+		return field.Tag
+	}
+	return ""
+}
+
+func (sa structAdaptor) value(key string) reflect.Value {
+	v := reflect.Value(sa)
+	return v.FieldByName(key)
+}
+
+func (sa structAdaptor) confirmSet(key string, v reflect.Value) bool {
+	return true
+}
+
+// convertKV can convert things that consist of key/value pairs, like structs
+// and some maps.
+func (c *Converter) convertKV(skv, dkv kvValue, scope *scope) error {
+	if skv == nil || dkv == nil {
+		// TODO: add keys to stack to support really understandable error messages.
+		return fmt.Errorf("Unable to convert %#v to %#v", skv, dkv)
+	}
+
+	lister := dkv
+	if scope.flags.IsSet(SourceToDest) {
+		lister = skv
+	}
+	for _, key := range lister.keys() {
+		if found, err := c.checkField(key, skv, dkv, scope); found {
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		df := dv.FieldByName(f.Name)
-		sf := sv.FieldByName(f.Name)
-		if sf.IsValid() {
-			// No need to check error, since we know it's valid.
-			field, _ := st.FieldByName(f.Name)
-			scope.srcStack.top().tag = field.Tag
-		}
-		if df.IsValid() {
-			field, _ := dt.FieldByName(f.Name)
-			scope.destStack.top().tag = field.Tag
-		}
-		// TODO: set top level of scope.src/destTagStack with these field tags here.
+		df := dkv.value(key)
+		sf := skv.value(key)
 		if !df.IsValid() || !sf.IsValid() {
 			switch {
 			case scope.flags.IsSet(IgnoreMissingFields):
 				// No error.
 			case scope.flags.IsSet(SourceToDest):
-				return scope.error("%v not present in dest (%v to %v)", f.Name, st, dt)
+				return scope.error("%v not present in dest", key)
 			default:
-				return scope.error("%v not present in src (%v to %v)", f.Name, st, dt)
+				return scope.error("%v not present in src", key)
 			}
 			continue
 		}
-		scope.srcStack.top().key = f.Name
-		scope.srcStack.top().key = f.Name
+		scope.srcStack.top().key = key
+		scope.srcStack.top().tag = skv.tagOf(key)
+		scope.destStack.top().key = key
+		scope.destStack.top().tag = dkv.tagOf(key)
 		if err := c.convert(sf, df, scope); err != nil {
 			return err
 		}
@@ -455,12 +508,12 @@ func (c *Converter) convertStruct(sv, dv reflect.Value, scope *scope) error {
 	return nil
 }
 
-// checkStructField returns true if the field name matches any of the struct
+// checkField returns true if the field name matches any of the struct
 // field copying rules. The error should be ignored if it returns false.
-func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, scope *scope) (bool, error) {
+func (c *Converter) checkField(fieldName string, skv, dkv kvValue, scope *scope) (bool, error) {
 	replacementMade := false
 	if scope.flags.IsSet(DestFromSource) {
-		df := dv.FieldByName(fieldName)
+		df := dkv.value(fieldName)
 		if !df.IsValid() {
 			return false, nil
 		}
@@ -468,7 +521,7 @@ func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, sco
 		// Check each of the potential source (type, name) pairs to see if they're
 		// present in sv.
 		for _, potentialSourceKey := range c.structFieldSources[destKey] {
-			sf := sv.FieldByName(potentialSourceKey.fieldName)
+			sf := skv.value(potentialSourceKey.fieldName)
 			if !sf.IsValid() {
 				continue
 			}
@@ -479,13 +532,14 @@ func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, sco
 				if err := c.convert(sf, df, scope); err != nil {
 					return true, err
 				}
+				dkv.confirmSet(fieldName, df)
 				replacementMade = true
 			}
 		}
 		return replacementMade, nil
 	}
 
-	sf := sv.FieldByName(fieldName)
+	sf := skv.value(fieldName)
 	if !sf.IsValid() {
 		return false, nil
 	}
@@ -493,7 +547,7 @@ func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, sco
 	// Check each of the potential dest (type, name) pairs to see if they're
 	// present in dv.
 	for _, potentialDestKey := range c.structFieldDests[srcKey] {
-		df := dv.FieldByName(potentialDestKey.fieldName)
+		df := dkv.value(potentialDestKey.fieldName)
 		if !df.IsValid() {
 			continue
 		}
@@ -504,6 +558,7 @@ func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, sco
 			if err := c.convert(sf, df, scope); err != nil {
 				return true, err
 			}
+			dkv.confirmSet(potentialDestKey.fieldName, df)
 			replacementMade = true
 		}
 	}
