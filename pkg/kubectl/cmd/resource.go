@@ -155,8 +155,10 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 // prevents a user from unintentionally updating the wrong namespace.
 func CompareNamespaceFromFile(cmd *cobra.Command, namespace string) error {
 	defaultNamespace := getKubeNamespace(cmd)
-	if defaultNamespace != namespace {
-		return fmt.Errorf("the namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)
+	if len(namespace) > 0 {
+		if defaultNamespace != namespace {
+			return fmt.Errorf("the namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)
+		}
 	}
 	return nil
 }
