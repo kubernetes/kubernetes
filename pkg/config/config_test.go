@@ -35,7 +35,7 @@ func getTyperAndMapper() (runtime.ObjectTyper, meta.RESTMapper) {
 	return api.Scheme, latest.RESTMapper
 }
 
-func getFakeClient(t *testing.T, validURLs []string) (ClientFunc, *httptest.Server) {
+func getFakeClient(t *testing.T, validURLs []string) (ClientPosterFunc, *httptest.Server) {
 	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
 		for _, u := range validURLs {
 			if u == r.RequestURI {
@@ -45,7 +45,7 @@ func getFakeClient(t *testing.T, validURLs []string) (ClientFunc, *httptest.Serv
 		t.Errorf("Unexpected HTTP request: %s, expected %v", r.RequestURI, validURLs)
 	}
 	server := httptest.NewServer(http.HandlerFunc(handlerFunc))
-	return func(mapping *meta.RESTMapping) (*client.RESTClient, error) {
+	return func(mapping *meta.RESTMapping) (RESTClientPoster, error) {
 		fakeCodec := runtime.CodecFor(api.Scheme, "v1beta1")
 		fakeUri, _ := url.Parse(server.URL + "/api/v1beta1")
 		return client.NewRESTClient(fakeUri, fakeCodec), nil
@@ -134,7 +134,7 @@ func TestCreateNoClientItems(t *testing.T) {
 	typer, mapper := getTyperAndMapper()
 	_, s := getFakeClient(t, []string{"/api/v1beta1/pods", "/api/v1beta1/services"})
 
-	noClientFunc := func(mapping *meta.RESTMapping) (*client.RESTClient, error) {
+	noClientFunc := func(mapping *meta.RESTMapping) (RESTClientPoster, error) {
 		return nil, fmt.Errorf("no client")
 	}
 

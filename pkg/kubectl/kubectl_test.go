@@ -17,15 +17,12 @@ limitations under the License.
 package kubectl
 
 import (
-	"bytes"
-	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 )
 
 func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T) {
@@ -82,59 +79,6 @@ func TestLoadNamespaceInfo(t *testing.T) {
 			if !reflect.DeepEqual(nsInfo, tt.nsInfo) {
 				t.Errorf("Expected %v, got %v", tt.nsInfo, nsInfo)
 			}
-		}
-	}
-}
-
-func TestLoadClientAuthInfoOrPrompt(t *testing.T) {
-	loadAuthInfoTests := []struct {
-		authData string
-		authInfo *clientauth.Info
-		r        io.Reader
-	}{
-		{
-			`{"user": "user", "password": "pass"}`,
-			&clientauth.Info{User: "user", Password: "pass"},
-			nil,
-		},
-		{
-			"", nil, nil,
-		},
-		{
-			"missing",
-			&clientauth.Info{User: "user", Password: "pass"},
-			bytes.NewBufferString("user\npass"),
-		},
-	}
-	for _, loadAuthInfoTest := range loadAuthInfoTests {
-		tt := loadAuthInfoTest
-		aifile, err := ioutil.TempFile("", "testAuthInfo")
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		if tt.authData != "missing" {
-			defer os.Remove(aifile.Name())
-			defer aifile.Close()
-			_, err = aifile.WriteString(tt.authData)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-		} else {
-			aifile.Close()
-			os.Remove(aifile.Name())
-		}
-		authInfo, err := LoadClientAuthInfoOrPrompt(aifile.Name(), tt.r)
-		if len(tt.authData) == 0 && tt.authData != "missing" {
-			if err == nil {
-				t.Error("LoadClientAuthInfoOrPrompt didn't fail on empty file")
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(authInfo, tt.authInfo) {
-			t.Errorf("Expected %#v, got %#v", tt.authInfo, authInfo)
 		}
 	}
 }
