@@ -29,11 +29,11 @@ function json_val {
 # TODO (ayurchuk) Refactor the get_* functions to use filters
 # TODO (bburns) Parameterize this for multiple cluster per project
 function get_instance_ids {
-  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance["Tags"] if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
+  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance.get("Tags", []) if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
 }
 
 function get_vpc_id {
-  python -c 'import json,sys; lst = [str(vpc["VpcId"]) for vpc in json.load(sys.stdin)["Vpcs"] for tag in vpc["Tags"] if tag["Value"] == "kubernetes-vpc"]; print "".join(lst)'
+  python -c 'import json,sys; lst = [str(vpc["VpcId"]) for vpc in json.load(sys.stdin)["Vpcs"] for tag in vpc.get("Tags", []) if tag["Value"] == "kubernetes-vpc"]; print "".join(lst)'
 }
 
 function get_subnet_id {
@@ -57,7 +57,7 @@ function expect_instance_states {
 }
 
 function get_instance_public_ip {
-  python -c "import json,sys; lst = [str(instance['NetworkInterfaces'][0]['Association']['PublicIp']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] for tag in instance['Tags'] if tag['Value'] == '$1' and instance['State']['Name'] == 'running']; print ' '.join(lst)"
+  python -c "import json,sys; lst = [str(instance['NetworkInterfaces'][0]['Association']['PublicIp']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] for tag in instance.get('Tags', []) if tag['Value'] == '$1' and instance['State']['Name'] == 'running']; print ' '.join(lst)"
 }
 
 function detect-master () {
