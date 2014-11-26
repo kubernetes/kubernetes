@@ -113,6 +113,7 @@ type scope struct {
 type scopeStackElem struct {
 	tag   reflect.StructTag
 	value reflect.Value
+	key   string
 }
 
 type scopeStack []scopeStackElem
@@ -128,6 +129,37 @@ func (s *scopeStack) push(e scopeStackElem) {
 
 func (s *scopeStack) top() *scopeStackElem {
 	return &(*s)[len(*s)-1]
+}
+
+func (s scopeStack) describe() string {
+	desc := ""
+	if len(s) > 1 {
+		desc = "(" + s[1].value.Type().String() + ")"
+	}
+	for i, v := range s {
+		if i < 2 {
+			// First layer on stack is not real; second is handled specially above.
+			continue
+		}
+		if v.key == "" {
+			desc += fmt.Sprintf(".%v", v.value.Type())
+		} else {
+			desc += fmt.Sprintf(".%v", v.key)
+		}
+	}
+	return desc
+}
+
+// Formats src & dest as indices for printing.
+func (s *scope) setIndices(src, dest int) {
+	s.srcStack.top().key = fmt.Sprintf("[%v]", src)
+	s.destStack.top().key = fmt.Sprintf("[%v]", dest)
+}
+
+// Formats src & dest as map keys for printing.
+func (s *scope) setKeys(src, dest interface{}) {
+	s.srcStack.top().key = fmt.Sprintf(`["%v"]`, src)
+	s.destStack.top().key = fmt.Sprintf(`["%v"]`, dest)
 }
 
 // Convert continues a conversion.
@@ -153,6 +185,19 @@ func (s *scope) Flags() FieldMatchingFlags {
 // Meta returns the meta object that was originally passed to Convert.
 func (s *scope) Meta() *Meta {
 	return s.meta
+}
+
+// describe prints the path to get to the current (source, dest) values.
+func (s *scope) describe() (src, dest string) {
+	return s.srcStack.describe(), s.destStack.describe()
+}
+
+// error makes an error that includes information about where we were in the objects
+// we were asked to convert.
+func (s *scope) error(message string, args ...interface{}) error {
+	srcPath, destPath := s.describe()
+	where := fmt.Sprintf("converting %v to %v: ", srcPath, destPath)
+	return fmt.Errorf(where+message, args...)
 }
 
 // Register registers a conversion func with the Converter. conversionFunc must take
@@ -292,7 +337,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
-		return fmt.Errorf("can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.NameFunc(st), c.NameFunc(dt))
+		return scope.error("type names don't match (%v, %v)", c.NameFunc(st), c.NameFunc(dt))
 	}
 
 	// This should handle all simple types.
@@ -325,6 +370,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		}
 		dv.Set(reflect.MakeSlice(dt, sv.Len(), sv.Cap()))
 		for i := 0; i < sv.Len(); i++ {
+			scope.setIndices(i, i)
 			if err := c.convert(sv.Index(i), dv.Index(i), scope); err != nil {
 				return err
 			}
@@ -350,13 +396,14 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 				return err
 			}
 			dkv := reflect.New(dt.Elem()).Elem()
+			scope.setKeys(sk.Interface(), dk.Interface())
 			if err := c.convert(sv.MapIndex(sk), dkv, scope); err != nil {
 				return err
 			}
 			dv.SetMapIndex(dk, dkv)
 		}
 	default:
-		return fmt.Errorf("couldn't copy '%v' into '%v'", st, dt)
+		return scope.error("couldn't copy '%v' into '%v'; didn't understand types", st, dt)
 	}
 	return nil
 }
@@ -393,12 +440,14 @@ func (c *Converter) convertStruct(sv, dv reflect.Value, scope *scope) error {
 			case scope.flags.IsSet(IgnoreMissingFields):
 				// No error.
 			case scope.flags.IsSet(SourceToDest):
-				return fmt.Errorf("%v not present in dest (%v to %v)", f.Name, st, dt)
+				return scope.error("%v not present in dest (%v to %v)", f.Name, st, dt)
 			default:
-				return fmt.Errorf("%v not present in src (%v to %v)", f.Name, st, dt)
+				return scope.error("%v not present in src (%v to %v)", f.Name, st, dt)
 			}
 			continue
 		}
+		scope.srcStack.top().key = f.Name
+		scope.srcStack.top().key = f.Name
 		if err := c.convert(sf, df, scope); err != nil {
 			return err
 		}
@@ -425,6 +474,8 @@ func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, sco
 			}
 			if sf.Type() == potentialSourceKey.fieldType {
 				// Both the source's name and type matched, so copy.
+				scope.srcStack.top().key = potentialSourceKey.fieldName
+				scope.destStack.top().key = fieldName
 				if err := c.convert(sf, df, scope); err != nil {
 					return true, err
 				}
@@ -448,6 +499,8 @@ func (c *Converter) checkStructField(fieldName string, sv, dv reflect.Value, sco
 		}
 		if df.Type() == potentialDestKey.fieldType {
 			// Both the dest's name and type matched, so copy.
+			scope.srcStack.top().key = fieldName
+			scope.destStack.top().key = potentialDestKey.fieldName
 			if err := c.convert(sf, df, scope); err != nil {
 				return true, err
 			}
