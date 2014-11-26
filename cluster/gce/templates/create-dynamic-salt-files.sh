@@ -22,8 +22,9 @@ mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 node_instance_prefix: $NODE_INSTANCE_PREFIX
 portal_net: $PORTAL_NET
-use-fluentd-es: $FLUENTD_ELASTICSEARCH
-use-fluentd-gcp: $FLUENTD_GCP
+enable_node_monitoring: $ENABLE_NODE_MONITORING
+enable_node_logging: $ENABLE_NODE_LOGGING
+logging_destination: $LOGGING_DESTINATION
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

@@ -8,12 +8,16 @@ base:
     - docker
     - kubelet
     - kube-proxy
+{% if pillar['enable_node_monitoring'] is defined and pillar['enable_node_monitoring'] %}
     - cadvisor
-{% if pillar['use-fluentd-es'] is defined and pillar['use-fluentd-es'] %}
-    - fluentd-es
 {% endif %}
-{% if pillar['use-fluentd-gcp'] is defined and pillar['use-fluentd-gcp'] %}
+{% if pillar['enable_node_logging'] is defined and pillar['enable_node_logging'] %}
+  {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'elasticsearch' %}
+    - fluentd-es
+  {% endif %}
+  {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'gcp' %}
     - fluentd-gcp
+  {% endif %}
 {% endif %}
     - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}

@@ -37,3 +37,10 @@ MINION_TAG="tags=${INSTANCE_PREFIX}-minion"
 MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${RAX_NUM_MINIONS}}))
 KUBE_NETWORK=($(eval echo "10.240.{1..${RAX_NUM_MINIONS}}.0/24"))
 PORTAL_NET="10.0.0.0/16"
+
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING=true
+LOGGING_DESTINATION=elasticsearch

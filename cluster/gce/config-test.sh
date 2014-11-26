@@ -35,7 +35,13 @@ MINION_SCOPES=("storage-ro" "compute-rw")
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
-MONITORING=false
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
+
+ENABLE_NODE_MONITORING=true
+
+ENABLE_NODE_LOGGING=true
+LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+
+ENABLE_CLUSTER_MONITORING=false

@@ -82,6 +82,9 @@ mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   portal_net: $PORTAL_NET
   cert_ip: $MASTER_IP
+  enable_node_monitoring: $ENABLE_NODE_MONITORING
+  enable_node_logging: $ENABLE_NODE_LOGGING
+  logging_destination: $LOGGING_DESTINATION
 EOF
 
 # Configure the salt-master

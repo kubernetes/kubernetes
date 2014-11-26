@@ -37,3 +37,10 @@ for ((i=0; i < NUM_MINIONS; i++)) do
   MINION_NAMES[$i]="${MINION_IP[$i]}"
   VAGRANT_MINION_NAMES[$i]="minion-$[$i+1]"
 done
+
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING=true
+LOGGING_DESTINATION=elasticsearch

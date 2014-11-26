@@ -5,11 +5,15 @@
 ### Logging with Fluentd and Elastiscsearch
 
 To enable logging of the stdout and stderr output of every Docker container in
-a Kubernetes cluster set the shell environment
-variable ``FLUENTD_ELASTICSEARCH`` to ``true`` e.g. in bash:
+a Kubernetes cluster set the shell environment variables
+``ENABLE_NODE_LOGGING`` to ``true`` and ``LOGGING_DESTINATION`` to ``elasticsearch``.
+
+e.g. in bash:
 ```
-export FLUENTD_ELASTICSEARCH=true
+export ENABLE_NODE_LOGGING=true
+export LOGGING_DESTINATION=elasticsearch
 ```
+
 This will instantiate a [Fluentd](http://www.fluentd.org/) instance on each node which will
 collect all the Dcoker container log files. The collected logs will
 be targetted at an [Elasticsearch](http://www.elasticsearch.org/) instance assumed to be running on the
@@ -20,4 +24,5 @@ Elasticsearch service (more informaiton to follow shortly in the contrib directo
 ### Logging with Fluentd and Google Compute Platform
 
 To enable logging of Docker contains in a cluster using Google Compute
-Platform set the shell environment variable ``FLUENTD_GCP`` to ``true``.
+Platform set the config flags ``ENABLE_NODE_LOGGING`` to ``true`` and
+``LOGGING_DESTINATION`` to ``gcp``.

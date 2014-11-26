@@ -106,14 +106,14 @@ function ensure-temp-dir {
 }
 
 function setup-monitoring {
-  if [ ${MONITORING-} ]; then
+  if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     # TODO: Implement this.
     echo "Monitoring not currently supported on AWS"
   fi
 }
 
 function teardown-monitoring {
-  if [ ${MONITORING-} ]; then
+  if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     # TODO: Implement this.
     echo "Monitoring not currently supported on AWS"
   fi
@@ -255,8 +255,9 @@ function kube-up {
     echo "readonly AWS_ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
-    echo "readonly FLUENTD_ELASTICSEARCH='${FLUENTD_ELASTICSEARCH:-false}'"
-    echo "readonly FLUENTD_GCP='false'"
+    echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
+    echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+    echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
