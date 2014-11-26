@@ -52,9 +52,13 @@ func NewFactory(clientBuilder clientcmd.Builder) *Factory {
 		ClientBuilder: clientBuilder,
 		Mapper:        latest.RESTMapper,
 		Typer:         api.Scheme,
-		Validator:     func(cmd *cobra.Command) (validation.Schema, error) {
+		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
 			if GetFlagBool(cmd, "validate") {
-				return &clientSwaggerSchema{getKubeClient(cmd), api.Scheme}, nil
+				client, err := clientBuilder.Client()
+				if err != nil {
+					return nil, err
+				}
+				return &clientSwaggerSchema{client, api.Scheme}, nil
 			} else {
 				return validation.NullSchema{}, nil
 			}
@@ -164,4 +168,29 @@ func GetExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
 	// TODO: determine when --ns-path is set but equal to the default
 	// value and return its value and true.
 	return "", false
+}
+
+type clientSwaggerSchema struct {
+	c *client.Client
+	t runtime.ObjectTyper
+}
+
+func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
+	version, _, err := c.t.DataVersionAndKind(data)
+	if err != nil {
+		return err
+	}
+	schemaData, err := c.c.RESTClient.Get().
+		AbsPath("/swaggerapi/api").
+		Path(version).
+		Do().
+		Raw()
+	if err != nil {
+		return err
+	}
+	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
+	if err != nil {
+		return err
+	}
+	return schema.ValidateBytes(data)
 }

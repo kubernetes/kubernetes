@@ -24,6 +24,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
+	"gopkg.in/v2/yaml"
 )
 
 type InvalidTypeError struct {
@@ -64,11 +65,11 @@ func NewSwaggerSchemaFromBytes(data []byte) (Schema, error) {
 
 func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	var obj interface{}
-	err := json.Unmarshal(data, &obj)
+	err := yaml.Unmarshal(data, &obj)
 	if err != nil {
 		return err
 	}
-	fields := obj.(map[string]interface{})
+	fields := obj.(map[interface{}]interface{})
 	apiVersion := fields["apiVersion"].(string)
 	kind := fields["kind"].(string)
 	return s.ValidateObject(obj, apiVersion, "", apiVersion+"."+kind)
@@ -83,12 +84,12 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 		return nil
 	}
 	properties := model.Properties
-	fields := obj.(map[string]interface{})
+	fields := obj.(map[interface{}]interface{})
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
 	}
 	for key, value := range fields {
-		details, ok := properties[key]
+		details, ok := properties[key.(string)]
 		if !ok {
 			glog.V(2).Infof("couldn't find properties for %s, skipping", key)
 			continue
@@ -98,7 +99,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 			glog.V(2).Infof("Skipping nil field: %s", key)
 			continue
 		}
-		err := s.validateField(value, apiVersion, fieldName+key, fieldType, &details)
+		err := s.validateField(value, apiVersion, fieldName+key.(string), fieldType, &details)
 		if err != nil {
 			glog.Errorf("Validation failed for: %s, %v", key, value)
 			return err
@@ -116,7 +117,8 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 		// Be loose about what we accept for 'string' since we use IntOrString in a couple of places
 		_, isString := value.(string)
 		_, isNumber := value.(float64)
-		if !isString && !isNumber {
+		_, isInteger := value.(int)
+		if !isString && !isNumber && !isInteger {
 			return NewInvalidTypeError(reflect.String, reflect.TypeOf(value).Kind(), fieldName)
 		}
 	case "array":
@@ -133,7 +135,9 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 		}
 	case "uint64":
 	case "integer":
-		if _, ok := value.(float64); !ok {
+		_, isNumber := value.(float64)
+		_, isInteger := value.(int)
+		if !isNumber && !isInteger {
 			return NewInvalidTypeError(reflect.Int, reflect.TypeOf(value).Kind(), fieldName)
 		}
 	case "float64":
