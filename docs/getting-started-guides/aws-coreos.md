@@ -1,6 +1,5 @@
 __Note (11/21/2014): This mostly works, but doesn't currently register minions correctly.__
 
-See [non-cloud formation instructions](aws.md) for a working install, we're in the process of fixing the cloud formation version.  Sorry!
 
 # Getting started on Amazon EC2
 
