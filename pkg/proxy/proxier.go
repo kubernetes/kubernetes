@@ -578,11 +578,20 @@ var localhostIPv6 = net.ParseIP("::1")
 
 // Build a slice of iptables args for a portal rule.
 func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
+	// This list needs to include all fields as they are eventually spit out
+	// by iptables-save.  This is because some systems do not support the
+	// 'iptables -C' arg, and so fall back on parsing iptables-save output.
+	// If this does not match, it will not pass the check.  For example:
+	// adding the /32 on the destination IP arg is not strictly required,
+	// but causes this list to not match the final iptables-save output.
+	// This is fragile and I hope one day we can stop supporting such old
+	// iptables versions.
 	args := []string{
 		"-m", "comment",
 		"--comment", service,
 		"-p", strings.ToLower(string(protocol)),
-		"-d", destIP.String(),
+		"-m", strings.ToLower(string(protocol)),
+		"-d", fmt.Sprintf("%s/32", destIP.String()),
 		"--dport", fmt.Sprintf("%d", destPort),
 	}
 	// This is tricky.  If the proxy is bound (see Proxier.listenAddress)
