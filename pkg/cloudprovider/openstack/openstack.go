@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 var ErrNotFound = errors.New("Failed to find object")
@@ -147,10 +148,13 @@ type Instances struct {
 
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
+	glog.V(2).Info("openstack.Instances() called")
+
 	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
 	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
 
@@ -177,13 +181,19 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		return true, nil
 	})
 	if err != nil {
+		glog.Warningf("Failed to find compute flavors: %v", err)
 		return nil, false
 	}
+
+	glog.V(2).Infof("Found %v compute flavors", len(flavor_to_resource))
+	glog.V(1).Info("Claiming to support Instances")
 
 	return &Instances{compute, flavor_to_resource}, true
 }
 
 func (i *Instances) List(name_filter string) ([]string, error) {
+	glog.V(2).Infof("openstack List(%v) called", name_filter)
+
 	opts := servers.ListOpts{
 		Name:   name_filter,
 		Status: "ACTIVE",
@@ -204,6 +214,8 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	glog.V(2).Infof("Found %v entries: %v", len(ret), ret)
 
 	return ret, nil
 }
@@ -288,14 +300,21 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 }
 
 func (i *Instances) IPAddress(name string) (net.IP, error) {
+	glog.V(2).Infof("IPAddress(%v) called", name)
+
 	ip, err := getAddressByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
+
+	glog.V(2).Infof("IPAddress(%v) => %v", name, ip)
+
 	return net.ParseIP(ip), err
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
+	glog.V(2).Infof("GetNodeResources(%v) called", name)
+
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		return nil, err
@@ -313,6 +332,8 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	if !ok {
 		return nil, ErrNotFound
 	}
+
+	glog.V(2).Infof("GetNodeResources(%v) => %v", name, rsrc)
 
 	return rsrc, nil
 }
@@ -333,6 +354,7 @@ func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 		Region: os.region,
 	})
 	if err != nil {
+		glog.Warningf("Failed to find neutron endpoint: %v", err)
 		return nil, false
 	}
 
@@ -340,8 +362,11 @@ func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 		Region: os.region,
 	})
 	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
+
+	glog.V(1).Info("Claiming to support TCPLoadBalancer")
 
 	return &LoadBalancer{network, compute, os.lbOpts}, true
 }
@@ -392,6 +417,8 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 // each region.
 
 func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (net.IP, error) {
+	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, port, hosts)
+
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
@@ -459,6 +486,8 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+	glog.V(2).Infof("UpdateTCPLoadBalancer(%v, %v, %v)", name, region, hosts)
+
 	vip, err := getVipByName(lb.network, name)
 	if err != nil {
 		return err
@@ -518,6 +547,8 @@ func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []strin
 }
 
 func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
+	glog.V(2).Infof("DeleteTCPLoadBalancer(%v, %v)", name, region)
+
 	vip, err := getVipByName(lb.network, name)
 	if err != nil {
 		return err
@@ -545,8 +576,12 @@ func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
 }
 
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
+	glog.V(1).Info("Claiming to support Zones")
+
 	return os, true
 }
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
+	glog.V(1).Infof("Current zone is %v", os.region)
+
 	return cloudprovider.Zone{Region: os.region}, nil
 }
