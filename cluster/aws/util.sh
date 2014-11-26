@@ -268,6 +268,7 @@ function kube-up {
 
   master_id=$($AWS_CMD run-instances \
     --image-id $IMAGE \
+    --iam-instance-profile Name=$IAM_PROFILE \
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
     --private-ip-address 172.20.0.9 \
@@ -290,6 +291,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
     minion_id=$($AWS_CMD run-instances \
       --image-id $IMAGE \
+      --iam-instance-profile Name=$IAM_PROFILE \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
       --private-ip-address 172.20.0.1${i} \
