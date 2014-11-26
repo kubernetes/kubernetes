@@ -552,7 +552,7 @@ func ValidateBoundPod(pod *api.BoundPod) (errors []error) {
 func ValidateMinion(minion *api.Minion) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(minion.Namespace) != 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace, ""))
 	}
 	if len(minion.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", minion.Name))
