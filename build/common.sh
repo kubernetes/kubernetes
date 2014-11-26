@@ -19,6 +19,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+DOCKER_OPTS=${DOCKER_OPTS:-""}
+DOCKER_NATIVE=${DOCKER_NATIVE:-""}
+DOCKER=(docker ${DOCKER_OPTS})
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
 
@@ -64,11 +68,13 @@ readonly LOCAL_OUTPUT_SUBPATH="${LOCAL_OUTPUT_ROOT}/dockerized"
 readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
 readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 
+readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
+
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 
-readonly DOCKER_MOUNT_ARGS_BASE=(--volume "${LOCAL_OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}")
+readonly DOCKER_MOUNT_ARGS_BASE=(--volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}")
 # DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
 
 # We create a Docker data container to cache incremental build artifacts.  We
@@ -110,6 +116,7 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 #   KUBE_BUILD_DATA_CONTAINER_NAME
 #   DOCKER_MOUNT_ARGS
 function kube::build::verify_prereqs() {
+  echo "+++ Verifying Prerequisites...."
   if [[ -z "$(which docker)" ]]; then
     echo "Can't find 'docker' in PATH, please fix and retry." >&2
     echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
@@ -117,22 +124,24 @@ function kube::build::verify_prereqs() {
   fi
 
   if kube::build::is_osx; then
-    if [[ -z "$(which boot2docker)" ]]; then
-      echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
-      echo "See: https://docs.docker.com/installation/mac/" >&2
-      exit 1
-    fi
-    if [[ $(boot2docker status) != "running" ]]; then
-      echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
-      exit 1
-    else
-      # Reach over and set the clock. After sleep/resume the clock will skew.
-      echo "+++ Setting boot2docker clock"
-      boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+    if [[ -z "$DOCKER_NATIVE" ]];then
+      if [[ -z "$(which boot2docker)" ]]; then
+        echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
+        echo "See: https://docs.docker.com/installation/mac/" >&2
+        exit 1
+      fi
+      if [[ $(boot2docker status) != "running" ]]; then
+        echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
+        exit 1
+      else
+        # Reach over and set the clock. After sleep/resume the clock will skew.
+        echo "+++ Setting boot2docker clock"
+        boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+      fi
     fi
   fi
 
-  if ! docker info > /dev/null 2>&1 ; then
+  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
     {
       echo "Can't connect to 'docker' daemon.  please fix and retry."
       echo
@@ -173,7 +182,7 @@ function kube::build::clean_output() {
   fi
 
   echo "+++ Removing data container"
-  docker rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
   echo "+++ Cleaning out local _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
@@ -213,7 +222,7 @@ function kube::build::docker_image_exists() {
 
   # We cannot just specify the IMAGE here as `docker images` doesn't behave as
   # expected.  See: https://github.com/docker/docker/issues/8048
-  docker images | grep -Eq "^${1}\s+${2}\s+"
+  "${DOCKER[@]}" images | grep -Eq "^${1}\s+${2}\s+"
 }
 
 # Takes $1 and computes a short has for it. Useful for unique tag generation
@@ -252,7 +261,7 @@ function kube::build::ensure_golang() {
     }
 
     echo "+++ Pulling docker image: golang:${KUBE_BUILD_GOLANG_VERSION}"
-    docker pull golang:${KUBE_BUILD_GOLANG_VERSION}
+    "${DOCKER[@]}" pull golang:${KUBE_BUILD_GOLANG_VERSION}
   }
 }
 
@@ -327,7 +336,7 @@ function kube::build::run_image() {
 function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
-  local -ra build_cmd=(docker build -t "${image}" "${context_dir}")
+  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "${context_dir}")
 
   echo "+++ Building Docker image ${image}."
   local docker_output
@@ -350,7 +359,7 @@ function kube::build::clean_image() {
   local -r image=$1
 
   echo "+++ Deleting docker image ${image}"
-  docker rmi ${image} 2> /dev/null || true
+  "${DOCKER[@]}" rmi ${image} 2> /dev/null || true
 }
 
 function kube::build::clean_images() {
@@ -364,14 +373,14 @@ function kube::build::clean_images() {
   done
 
   echo "+++ Cleaning all other untagged docker images"
-  docker rmi $(docker images -q --filter 'dangling=true') 2> /dev/null || true
+  "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
 }
 
 function kube::build::ensure_data_container() {
-  if ! docker inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
+  if ! "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
     echo "+++ Creating data container"
     local -ra docker_cmd=(
-      docker run
+      "${DOCKER[@]}" run
       "${DOCKER_DATA_MOUNT_ARGS[@]}"
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
       "${KUBE_BUILD_IMAGE}"
@@ -384,6 +393,7 @@ function kube::build::ensure_data_container() {
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
 function kube::build::run_build_command() {
+  echo "+++ Running build command...."
   [[ $# != 0 ]] || { echo "Invalid input." >&2; return 4; }
 
   kube::build::ensure_data_container
@@ -405,16 +415,16 @@ function kube::build::run_build_command() {
   fi
 
   local -ra docker_cmd=(
-    docker run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
+    "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
 
   # Remove the container if it is left over from some previous aborted run
-  docker rm -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
   "${docker_cmd[@]}" "$@"
 
   # Remove the container after we run.  '--rm' might be appropriate but it
   # appears that sometimes it fails. See
   # https://github.com/docker/docker/issues/3968
-  docker rm -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
 }
 
 # Test if the output directory is remote (and can only be accessed through
@@ -430,33 +440,48 @@ function kube::build::is_output_remote() {
 # If the Docker server is remote, copy the results back out.
 function kube::build::copy_output() {
   if kube::build::is_output_remote; then
-    # When we are on the Mac with boot2docker (or to a remote Docker in any
-    # other situation) we need to copy the results back out.  Ideally we would
-    # leave the container around and use 'docker cp' to copy the results out.
-    # However, that doesn't work for mounted volumes currently
-    # (https://github.com/dotcloud/docker/issues/1992).  And it is just plain
-    # broken (https://github.com/dotcloud/docker/issues/6483).
-    #
-    # The easiest thing I (jbeda) could figure out was to launch another
-    # container pointed at the same volume, tar the output directory and ship
-    # that tar over stdout.
+    # At time of this code, docker cp does not work when copying from a volume.
+    # As a workaround, the binaries are first copied to a local filesystem,
+    # /tmp, then docker cp'd to the local binaries output directory.
+    # The fix for the volume bug has been accepted and once it's widely
+    # deployed the code below should be simplified to a simple docker cp
+    # Bug: https://github.com/docker/docker/pull/8509
+    local -a docker_run_opts=(
+      "--name=${KUBE_BUILD_CONTAINER_NAME}"
+       "${DOCKER_MOUNT_ARGS[@]}"
+       -d
+      )
+
+    local -ra docker_cmd=(
+      "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}"
+    )
 
     echo "+++ Syncing back _output/dockerized/bin directory from remote Docker"
     rm -rf "${LOCAL_OUTPUT_BINPATH}"
     mkdir -p "${LOCAL_OUTPUT_BINPATH}"
 
-    # The '</dev/null' here makes us run docker in a "non-interactive" mode. Not
-    # doing this corrupts the output stream.
-    kube::build::run_build_command sh -c "tar c -C ${REMOTE_OUTPUT_BINPATH} . ; sleep 1" </dev/null \
-      | tar xv -C "${LOCAL_OUTPUT_BINPATH}"
+    # Remove the container if it is left over from some previous aborted run
+    "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    "${docker_cmd[@]}" bash -c "cp -r ${REMOTE_OUTPUT_BINPATH} /tmp/bin;touch /tmp/finished;rm /tmp/bin/test_for_remote;/bin/sleep 600" > /dev/null 2>&1
 
-    # I (jbeda) also tried getting rsync working using 'docker run' as the
-    # 'remote shell'.  This mostly worked but there was a hang when
-    # closing/finishing things off. Ug.
-    #
-    # local DOCKER="docker run -i --rm --name=${KUBE_BUILD_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
-    # DOCKER+=" bash -c 'shift ; exec \"\$@\"' --"
-    # rsync --blocking-io -av -e "${DOCKER}" foo:${REMOTE_OUTPUT_BINPATH}/ ${LOCAL_OUTPUT_BINPATH}
+    # Wait until binaries have finished coppying
+    count=0
+    while true;do
+      if docker "${DOCKER_OPTS}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
+        docker "${DOCKER_OPTS}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
+        break;
+      fi
+
+      let count=count+1
+      if [[ $count -eq 60 ]]; then
+        # break after 5m
+        echo "!!! Timed out waiting for binaries..."
+        break
+      fi
+      sleep 5
+    done
+
+    "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
   else
     echo "+++ Output directory is local.  No need to copy results out."
   fi
@@ -494,11 +519,12 @@ function kube::release::package_client_tarballs() {
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
 
-    local bin
-    for bin in "${client_bins[@]}"; do
-      cp "${LOCAL_OUTPUT_BINPATH}/${platform}/${bin}" \
-        "${release_stage}/client/bin/"
-    done
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_CLIENT_BINARIES array.
+    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/client/bin/"
+
 
     local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
@@ -679,7 +705,7 @@ function kube::release::gcs::ensure_release_bucket() {
 function kube::release::gcs::ensure_docker_registry() {
   local -r reg_container_name="gcs-registry"
 
-  local -r running=$(docker inspect ${reg_container_name} 2>/dev/null \
+  local -r running=$("${DOCKER[@]}" inspect ${reg_container_name} 2>/dev/null \
     | build/json-extractor.py 0.State.Running 2>/dev/null)
 
   [[ "$running" != "true" ]] || return 0
@@ -695,11 +721,11 @@ function kube::release::gcs::ensure_docker_registry() {
   fi
 
   # If we have an old one sitting around, remove it
-  docker rm ${reg_container_name} >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm ${reg_container_name} >/dev/null 2>&1 || true
 
   echo "+++ Starting GCS backed Docker registry"
   local -ra docker_cmd=(
-    docker run -d "--name=${reg_container_name}"
+    "${DOCKER[@]}" run -d "--name=${reg_container_name}"
     -e "GCS_BUCKET=${KUBE_GCS_RELEASE_BUCKET}"
     -e "STORAGE_PATH=${KUBE_GCS_DOCKER_REG_PREFIX}"
     -e "GCP_OAUTH2_REFRESH_TOKEN=${refresh_token}"
@@ -723,9 +749,9 @@ function kube::release::gcs::push_images() {
   for b in "${KUBE_RUN_IMAGES[@]}" ; do
     image_name="${KUBE_RUN_IMAGE_BASE}-${b}"
     echo "+++ Tagging and pushing ${image_name} to GCS bucket ${KUBE_GCS_RELEASE_BUCKET}"
-    docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${image_name}"
-    docker push "localhost:5000/${image_name}"
-    docker rmi "localhost:5000/${image_name}"
+    "${DOCKER[@]}" tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${image_name}"
+    "${DOCKER[@]}" push "localhost:5000/${image_name}"
+    "${DOCKER[@]}" rmi "localhost:5000/${image_name}"
   done
 }
 
