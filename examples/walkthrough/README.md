@@ -100,7 +100,6 @@ desiredState:
           - name: www-data
             mountPath: /srv/www
             readOnly: true
-    containers:
       - name: git-monitor
         image: kubernetes/git-monitor
         env:
