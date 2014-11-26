@@ -33,6 +33,11 @@ type ServiceLister interface {
 	ListServices(api.Context) (*api.ServiceList, error)
 }
 
+// ControllerLister is an abstract interface for testing.
+type ControllerLister interface {
+	ListControllers(api.Context) (*api.ReplicationControllerList, error)
+}
+
 func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationErrorList) {
 	allErrs := errs.ValidationErrorList{}
 
@@ -462,7 +467,7 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 }
 
 // ValidateReplicationController tests if required fields in the replication controller are set.
-func ValidateReplicationController(controller *api.ReplicationController) errs.ValidationErrorList {
+func ValidateReplicationController(controller *api.ReplicationController, lister ControllerLister, ctx api.Context) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(controller.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", controller.Name))
@@ -472,6 +477,17 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.V
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
 	allErrs = append(allErrs, validateLabels(controller.Labels)...)
+	controllers, err := lister.ListControllers(ctx)
+	if err != nil {
+		allErrs = append(allErrs, errs.NewInternalError(err))
+	} else {
+		for i := range controllers.Items {
+			// TODO: We should use Selector/Label type.
+			if controllers.Items[i].Name != controller.Name && reflect.DeepEqual(controller.Spec.Selector, controllers.Items[i].Spec.Selector) {
+				allErrs = append(allErrs, errs.NewConflict("replicationcontroller", controller.Name, fmt.Errorf("Selector is already in use.")))
+			}
+		}
+	}
 	return allErrs
 }
 

@@ -21,14 +21,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// TODO: Why do we have this AND MemoryRegistry?
 type ControllerRegistry struct {
 	Err         error
-	Controllers *api.ReplicationControllerList
+	Controllers api.ReplicationControllerList
 }
 
 func (r *ControllerRegistry) ListControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
-	return r.Controllers, r.Err
+	return &r.Controllers, r.Err
 }
 
 func (r *ControllerRegistry) GetController(ctx api.Context, ID string) (*api.ReplicationController, error) {

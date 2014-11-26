@@ -827,6 +827,7 @@ func TestValidateService(t *testing.T) {
 }
 
 func TestValidateReplicationController(t *testing.T) {
+	registry := &registrytest.ControllerRegistry{Controllers: api.ReplicationControllerList{}}
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Spec: api.PodTemplateSpec{
@@ -872,7 +873,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateReplicationController(&successCase); len(errs) != 0 {
+		if errs := ValidateReplicationController(&successCase, registry, api.NewDefaultContext()); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -990,7 +991,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v)
+		errs := ValidateReplicationController(&v, registry, api.NewDefaultContext())
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -1007,6 +1008,79 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "label" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
+		}
+	}
+}
+
+func TestValidateReplicationControllerConflict(t *testing.T) {
+	validPodTemplate := api.PodTemplate{
+		Spec: api.PodTemplateSpec{
+			ObjectMeta: api.ObjectMeta{
+				Labels: map[string]string{"foo": "bar"},
+			},
+		},
+	}
+	testCases := []struct {
+		name       string
+		controller api.ReplicationController
+		existing   api.ReplicationControllerList
+		numErrs    int
+	}{
+		{
+			name: "conflict rc selector",
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"foo": "bar"},
+					Template: &validPodTemplate.Spec,
+				},
+			},
+			existing: api.ReplicationControllerList{
+				Items: []api.ReplicationController{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "cba123", Namespace: api.NamespaceDefault},
+						Spec: api.ReplicationControllerSpec{
+							Replicas: 2,
+							Selector: map[string]string{"foo": "bar"},
+							Template: &validPodTemplate.Spec,
+						},
+					},
+				},
+			},
+			numErrs: 1,
+		},
+		{
+			name: "no conflict rc selector",
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"foo": "bar"},
+					Template: &validPodTemplate.Spec,
+				},
+			},
+			existing: api.ReplicationControllerList{
+				Items: []api.ReplicationController{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "cba123", Namespace: api.NamespaceDefault},
+						Spec: api.ReplicationControllerSpec{
+							Replicas: 2,
+							Selector: map[string]string{"bar": "foo"},
+							Template: &validPodTemplate.Spec,
+						},
+					},
+				},
+			},
+			numErrs: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		registry := &registrytest.ControllerRegistry{Controllers: tc.existing}
+		errs := ValidateReplicationController(&tc.controller, registry, api.NewDefaultContext())
+		if len(errs) != tc.numErrs {
+			t.Errorf("Unexpected error list for case %q: %+v", tc.name, errs)
 		}
 	}
 }

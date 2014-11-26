@@ -64,7 +64,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if len(controller.Name) == 0 {
 		controller.Name = util.NewUUID().String()
 	}
-	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
+	if errs := validation.ValidateReplicationController(controller, rs.registry, ctx); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
 
@@ -131,7 +131,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
 		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
-	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
+	if errs := validation.ValidateReplicationController(controller, rs.registry, ctx); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {

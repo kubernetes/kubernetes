@@ -51,7 +51,7 @@ func TestListControllersError(t *testing.T) {
 }
 
 func TestListEmptyControllerList(t *testing.T) {
-	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{ListMeta: api.ListMeta{ResourceVersion: "1"}}}
+	mockRegistry := registrytest.ControllerRegistry{nil, api.ReplicationControllerList{ListMeta: api.ListMeta{ResourceVersion: "1"}}}
 	storage := REST{
 		registry: &mockRegistry,
 	}
@@ -71,7 +71,7 @@ func TestListEmptyControllerList(t *testing.T) {
 
 func TestListControllerList(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{
-		Controllers: &api.ReplicationControllerList{
+		Controllers: api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				{
 					ObjectMeta: api.ObjectMeta{

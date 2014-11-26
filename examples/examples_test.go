@@ -39,7 +39,7 @@ func validateObject(obj runtime.Object) (errors []error) {
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = validation.ValidateReplicationController(t)
+		errors = validation.ValidateReplicationController(t, &registrytest.ControllerRegistry{}, api.NewDefaultContext())
 	case *api.ReplicationControllerList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
