@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
-func TestMinionREST(t *testing.T) {
+func TestMinionRegistryREST(t *testing.T) {
 	ms := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
 	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Node).Name != "foo" {
@@ -87,7 +87,7 @@ func TestMinionREST(t *testing.T) {
 	}
 }
 
-func TestMinionStorageWithHealthCheck(t *testing.T) {
+func TestMinionRegistryHealthCheck(t *testing.T) {
 	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
 	minionHealthRegistry := HealthyRegistry{
 		delegate: minionRegistry,
@@ -119,7 +119,7 @@ func contains(nodes *api.NodeList, nodeID string) bool {
 	return false
 }
 
-func TestMinionStorageInvalidUpdate(t *testing.T) {
+func TestMinionRegistryInvalidUpdate(t *testing.T) {
 	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
@@ -136,7 +136,7 @@ func TestMinionStorageInvalidUpdate(t *testing.T) {
 	}
 }
 
-func TestMinionStorageValidUpdate(t *testing.T) {
+func TestMinionRegistryValidUpdate(t *testing.T) {
 	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
@@ -156,7 +156,7 @@ func TestMinionStorageValidUpdate(t *testing.T) {
 	}
 }
 
-func TestMinionStorageValidatesCreate(t *testing.T) {
+func TestMinionRegistryValidatesCreate(t *testing.T) {
 	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
 	validSelector := map[string]string{"a": "b"}

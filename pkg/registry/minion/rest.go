@@ -29,14 +29,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// REST implements the RESTStorage interface, backed by a MinionRegistry.
+// REST adapts minion into apiserver's RESTStorage model.
 type REST struct {
 	registry Registry
 }
 
-// NewREST returns a new REST.
+// NewREST returns a new apiserver.RESTStorage implementation for minion.
 func NewREST(m Registry) *REST {
 	return &REST{
 		registry: m,
@@ -46,6 +47,7 @@ func NewREST(m Registry) *REST {
 var ErrDoesNotExist = errors.New("The requested resource does not exist.")
 var ErrNotHealty = errors.New("The requested minion is not healthy.")
 
+// Create satisfies the RESTStorage interface.
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	minion, ok := obj.(*api.Node)
 	if !ok {
@@ -67,6 +69,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}), nil
 }
 
+// Delete satisfies the RESTStorage interface.
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	minion, err := rs.registry.GetMinion(ctx, id)
 	if minion == nil {
@@ -80,6 +83,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 	}), nil
 }
 
+// Get satisfies the RESTStorage interface.
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	minion, err := rs.registry.GetMinion(ctx, id)
 	if minion == nil {
@@ -88,6 +92,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return minion, err
 }
 
+// List satisfies the RESTStorage interface.
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	return rs.registry.ListMinions(ctx)
 }
@@ -96,6 +101,7 @@ func (rs *REST) New() runtime.Object {
 	return &api.Node{}
 }
 
+// Update satisfies the RESTStorage interface.
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	minion, ok := obj.(*api.Node)
 	if !ok {
@@ -121,8 +127,10 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}), nil
 }
 
-func (rs *REST) toApiMinion(name string) *api.Node {
-	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
+// Watch returns Minions events via a watch.Interface.
+// It implements apiserver.ResourceWatcher.
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return rs.registry.WatchMinions(ctx, label, field, resourceVersion)
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified minion.
