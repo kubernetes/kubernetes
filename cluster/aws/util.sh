@@ -229,7 +229,10 @@ function kube-up {
   fi
 
   $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1 || true
-  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
+  VPC_ID=$($AWS_CMD describe-vpcs | get_vpc_id)
+  if [ ! -f VPC_ID ]; then
+	  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
+  fi
   $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > /dev/null
   $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > /dev/null
   $AWS_CMD create-tags --resources $VPC_ID --tags Key=Name,Value=kubernetes-vpc > /dev/null
