@@ -245,7 +245,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	return true
 }
 
-// cleanupBetweenTests deletes object that were produced by a test so that they don't affect
+// cleanupBetweenTests deletes objects that were produced by a test so that they don't affect
 // the next test.
 func cleanupBetweenTests(c *client.Client) {
 	// Assume all tests use either namespace "default" or "other".
