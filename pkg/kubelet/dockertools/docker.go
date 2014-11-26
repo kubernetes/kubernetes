@@ -379,7 +379,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 		return &api.ContainerStatus{}, nil
 	}
 
-	glog.V(3).Infof("Container: %s [%s] inspect result %+v", *inspectResult)
+	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
 	containerStatus := api.ContainerStatus{
 		Image: inspectResult.Config.Image,
 	}
