@@ -189,6 +189,7 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 // Executes the rule check without using the "-C" flag, instead parsing iptables-save.
 // Present for compatibility with <1.4.11 versions of iptables.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
+	glog.V(1).Infof("running iptables-save -t %s", string(table))
 	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("error checking rule: %v", err)
@@ -206,6 +207,7 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 			if util.NewStringSet(fields...).IsSuperset(argset) {
 				return true, nil
 			}
+			glog.V(5).Infof("DBG: fields is not a superset of args: fields=%v  args=%v", fields, args)
 		}
 	}
 
