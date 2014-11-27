@@ -152,6 +152,8 @@ type VolumeSource struct {
 	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk" yaml:"persistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepo `json:"gitRepo" yaml:"gitRepo"`
+	// HTTPSource represents a file or archive of files that can be downloaded from a URL.
+	HTTPSource *HTTPSource `json:"httpSource" yaml:"httpSource"`
 }
 
 // HostDir represents bare host directory volume.
@@ -200,6 +202,19 @@ type GitRepo struct {
 	// Commit hash, this is optional
 	Revision string `yaml:"revision" json:"revision"`
 	// TODO: Consider credentials here.
+}
+
+// HTTPSource represents a file or archive that can be pulled from an URL.
+// This can optionally be marked an `archive` in which case an attempt will be made to extract
+// it based on the mime type.  If extraction fails, or archive is false, the downloaded file is placed
+// in the volume.
+type HTTPSource struct {
+	// URL to download.  Only 'http[s]://' urls are supported.  Be careful in multi-user situations, as
+	// the ability to download from arbitrary URLs may represent a security threat.
+	URL string `yaml:"url,omitempty" json:"url,omitempty"`
+	// Is the file on this URL an archive?  If so, extract it based on mime type.
+	// Supported mime-types are "application/x-compressed" (tgz) and "application/zip" (zip)
+	Archive bool `yaml:"archive,omitempty" json:"archive,omitempty"`
 }
 
 // Port represents a network port in a single container

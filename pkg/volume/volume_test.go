@@ -17,7 +17,12 @@ limitations under the License.
 package volume
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"reflect"
@@ -291,5 +296,176 @@ func TestGitVolume(t *testing.T) {
 	err = g.TearDown()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+type DataHandler struct {
+	data        []byte
+	contentType string
+	statusCode  int
+	t           *testing.T
+}
+
+func (d *DataHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	resp.WriteHeader(d.statusCode)
+	resp.Header().Set("Content-type", d.contentType)
+	_, err := resp.Write(d.data)
+	if err != nil {
+		d.t.Errorf("unexpected error: %v", err)
+	}
+}
+
+type fileNameAndContents struct {
+	fileName string
+	contents string
+}
+
+func makeZip(contents []fileNameAndContents) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	writer := zip.NewWriter(buf)
+	for _, f := range contents {
+		file, err := writer.Create(f.fileName)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = file.Write([]byte(f.contents)); err != nil {
+			return nil, err
+		}
+	}
+	err := writer.Close()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func makeTarball(contents []fileNameAndContents) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	writer := tar.NewWriter(buf)
+	for _, f := range contents {
+		header := &tar.Header{
+			Name: f.fileName,
+			Size: int64(len(f.contents)),
+		}
+		if err := writer.WriteHeader(header); err != nil {
+			return nil, err
+		}
+		if _, err := writer.Write([]byte(f.contents)); err != nil {
+			return nil, err
+		}
+	}
+	err := writer.Close()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func TestHTTPVolume(t *testing.T) {
+	tests := []struct {
+		files       []fileNameAndContents
+		contentType string
+		path        string
+		code        int
+	}{
+		{[]fileNameAndContents{{"test.txt", "this is a test file"}}, "text/plain", "/", http.StatusOK},
+		{[]fileNameAndContents{{"test2.txt", "this is a different test"}}, "text/plain", "/some/path/here/", http.StatusOK},
+		{[]fileNameAndContents{{"error.txt", "nothing here"}}, "text/plain", "/some/error/", http.StatusInternalServerError},
+		{[]fileNameAndContents{{"testA.txt", "this is an A archive test"}, {"testB.txt", "this is an B archive test"}}, "application/x-compressed", "/some/path/here/", http.StatusOK},
+		{[]fileNameAndContents{{"testZipA.txt", "this is an zip A archive test"}, {"testZipB.txt", "this is an zip B archive test"}}, "application/zip", "/some/zippy/path/here/", http.StatusOK},
+	}
+	for _, test := range tests {
+		var fileName string
+		var handler http.Handler
+		var archive bool
+		if len(test.files) == 1 {
+			handler = &DataHandler{
+				data:        []byte(test.files[0].contents),
+				contentType: test.contentType,
+				statusCode:  test.code,
+				t:           t,
+			}
+			fileName = test.files[0].fileName
+			archive = false
+		} else {
+			var err error
+			var data []byte
+			if isZip("", test.contentType) {
+				if data, err = makeZip(test.files); err != nil {
+					t.Fatalf("failed to build zip: %v", err)
+				}
+				fileName = "archive.zip"
+			} else if isTarball("", test.contentType) {
+				if data, err = makeTarball(test.files); err != nil {
+					t.Fatalf("failed to build tar: %v", err)
+				}
+				fileName = "archive.tgz"
+			} else {
+				t.Fatalf("unexpected archive content type: %s", test.contentType)
+			}
+			handler = &DataHandler{
+				data:        data,
+				contentType: test.contentType,
+				statusCode:  test.code,
+				t:           t,
+			}
+			archive = true
+		}
+		server := httptest.NewServer(handler)
+		dir := os.TempDir() + "/http"
+		h := HTTPDir{
+			URL:     server.URL + test.path + fileName,
+			RootDir: dir,
+			Name:    "test",
+			PodID:   "foo",
+			Archive: archive,
+		}
+		err := h.SetUp()
+		volDir := dir + "/foo/volumes/http/test"
+		if test.code != http.StatusOK {
+			if err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			_, err := ioutil.ReadDir(volDir)
+			if err == nil {
+				t.Errorf("unexpected non-error opening %s", volDir)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		files, err := ioutil.ReadDir(volDir)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(files) != len(test.files) {
+			t.Errorf("unexpected files. expected: %d, saw %d", len(test.files), len(files))
+		}
+		fileSet := map[string]string{}
+		for _, file := range test.files {
+			fileSet[file.fileName] = file.contents
+		}
+		for _, f := range files {
+			contents, found := fileSet[f.Name()]
+			if !found {
+				t.Errorf("unexpected file: %#v", f.Name())
+			}
+			file, err := os.Open(path.Join(volDir, f.Name()))
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			fileContents, err := ioutil.ReadAll(file)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if string(fileContents) != contents {
+				t.Errorf("expected %s, saw %s", contents, fileContents)
+			}
+		}
+		err = h.TearDown()
+		if err != nil {
+			t.Errorf("unexpeceted error: %v")
+		}
 	}
 }
