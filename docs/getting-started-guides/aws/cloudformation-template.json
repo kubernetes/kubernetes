@@ -18,7 +18,7 @@
     "InstanceType": {
       "Description": "EC2 HVM instance type (m3.medium, etc).",
       "Type": "String",
-      "Default": "t2.micro",
+      "Default": "m3.medium",
       "AllowedValues": [
         "m3.medium",
         "m3.large",
@@ -62,22 +62,18 @@
     },
     "KeyPair": {
       "Description": "The name of an EC2 Key Pair to allow SSH access to the instance.",
-      "Default": "kubernetes",
       "Type": "String"
     },
     "VpcId": {
       "Description": "The ID of the VPC to launch into.",
-      "Default": "vpc-175a9672",
-      "Type": "AWS::EC2::VPC::Id"
+      "Type": "String"
     },
     "SubnetId": {
       "Description": "The ID of the VPC to launch into (that must be within the supplied VPC)",
-      "Default": "subnet-99a951c0",
-      "Type": "AWS::EC2::Subnet::Id"
+      "Type": "String"
     },
     "SubnetAZ": {
       "Description": "The availability zone of the subnet supplied (for example eu-west-1a)",
-      "Default": "eu-west-1a",
       "Type": "String"
     }
   },
@@ -113,7 +109,7 @@
     "KubernetesIngressUDP": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
-        "GroupId": {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]},dginpidg]
+        "GroupId": {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]},
         "IpProtocol": "udp",
         "FromPort": "1",
         "ToPort": "65535",
