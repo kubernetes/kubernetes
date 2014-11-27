@@ -1,0 +1,8 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "Service",
+  "id": "redis-master",
+  "port": 6379,
+  "containerPort": "redis-server",
+  "selector": { "name": "redis", "role": "master" }
+}

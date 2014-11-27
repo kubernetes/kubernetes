@@ -17,35 +17,37 @@ limitations under the License.
 package kubecfg
 
 import (
-	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-// ProxyServer is a http.Handler which proxies Kubenetes APIs to remote API server.
+// ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
-	Host   string
-	Auth   *client.AuthInfo
-	Client *client.Client
-}
-
-func makeFileHandler(prefix, base string) http.Handler {
-	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
+	httputil.ReverseProxy
 }
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
-func NewProxyServer(filebase, host string, auth *client.AuthInfo) *ProxyServer {
-	server := &ProxyServer{
-		Host:   host,
-		Auth:   auth,
-		Client: client.New(host, auth),
+func NewProxyServer(filebase string, cfg *client.Config) (*ProxyServer, error) {
+	prefix := cfg.Prefix
+	if prefix == "" {
+		prefix = "/api"
 	}
-	http.Handle("/api/", server)
-	http.Handle("/static/", makeFileHandler("/static/", filebase))
-	return server
+	target, err := url.Parse(singleJoiningSlash(cfg.Host, prefix))
+	if err != nil {
+		return nil, err
+	}
+	proxy := newProxyServer(target)
+	if proxy.Transport, err = client.TransportFor(cfg); err != nil {
+		return nil, err
+	}
+	http.Handle("/api/", http.StripPrefix("/api/", proxy))
+	http.Handle("/static/", newFileHandler("/static/", filebase))
+	return proxy, nil
 }
 
 // Serve starts the server (http.DefaultServeMux) on TCP port 8001, loops forever.
@@ -53,28 +55,27 @@ func (s *ProxyServer) Serve() error {
 	return http.ListenAndServe(":8001", nil)
 }
 
-func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Header().Add("Content-type", "application/json")
-	data, _ := api.Encode(api.Status{
-		Status:  api.StatusFailure,
-		Message: fmt.Sprintf("internal error: %#v", err),
-	})
-	w.Write(data)
+func newProxyServer(target *url.URL) *ProxyServer {
+	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+	}
+	return &ProxyServer{ReverseProxy: httputil.ReverseProxy{Director: director}}
 }
 
-func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	result := s.Client.Verb(r.Method).AbsPath(r.URL.Path).Body(r.Body).Do()
-	if result.Error() != nil {
-		s.doError(w, result.Error())
-		return
+func newFileHandler(prefix, base string) http.Handler {
+	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
 	}
-	data, err := result.Raw()
-	if err != nil {
-		s.doError(w, err)
-		return
-	}
-	w.Header().Add("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	return a + b
 }

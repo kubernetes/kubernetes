@@ -1,63 +1,15 @@
-{% set root = '/var/src/kube-proxy' %}
-{% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
-{% set package_dir = root + '/src/' + package %}
 {% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/kube-proxy' %}
 {% else %}
 {% set environment_file = '/etc/default/kube-proxy' %}
 {% endif %}
 
-{{ package_dir }}:
-  file.recurse:
-    - source: salt://kube-proxy/go
-    - user: root
-    {% if grains['os_family'] == 'RedHat' %}
-    - group: root
-    {% else %}
-    - group: staff
-    {% endif %}
-    - dir_mode: 775
-    - file_mode: 664
-    - makedirs: True
-    - recurse:
-      - user
-      - group
-      - mode
-
-third-party-go:
-  file.recurse:
-    - name: {{ root }}/src
-    - source: salt://third-party/go/src
-    - user: root
-    {% if grains['os_family'] == 'RedHat' %}
-    - group: root
-    {% else %}
-    - group: staff
-    {% endif %}
-    - dir_mode: 775
-    - file_mode: 664
-    - makedirs: True
-    - recurse:
-      - user
-      - group
-      - mode
-
-kube-proxy-build:
-  cmd.run:
-    - cwd: {{ root }}
-    - names:
-      - go build {{ package }}/cmd/proxy
-    - env:
-      - PATH: {{ grains['path'] }}:/usr/local/bin
-      - GOPATH: {{ root }}
-    - require:
-      - file: {{ package_dir }}
-
 /usr/local/bin/kube-proxy:
-  file.symlink:
-    - target: {{ root }}/proxy
-    - watch:
-      - cmd: kube-proxy-build
+  file.managed:
+    - source: salt://kube-bins/kube-proxy
+    - user: root
+    - group: root
+    - mode: 755
 
 {% if grains['os_family'] == 'RedHat' %}
 
@@ -99,7 +51,6 @@ kube-proxy:
   service.running:
     - enable: True
     - watch:
-      - cmd: kube-proxy-build
       - file: {{ environment_file }}
 {% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/kube-proxy

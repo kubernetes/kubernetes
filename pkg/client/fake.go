@@ -17,89 +17,100 @@ limitations under the License.
 package client
 
 import (
+	"net/http"
+	"net/url"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// FakeClient implements Interface. Meant to be embedded into a struct to get a default
+type FakeAction struct {
+	Action string
+	Value  interface{}
+}
+
+// Fake implements Interface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
-type FakeClient struct {
-	// FakeClient by default keeps a simple list of the methods that have been called.
-	Actions []string
+type Fake struct {
+	Actions       []FakeAction
+	PodsList      api.PodList
+	Ctrl          api.ReplicationController
+	ServiceList   api.ServiceList
+	EndpointsList api.EndpointsList
+	MinionsList   api.MinionList
+	EventsList    api.EventList
+	Err           error
+	Watch         watch.Interface
 }
 
-func (client *FakeClient) ListPods(selector labels.Selector) (api.PodList, error) {
-	client.Actions = append(client.Actions, "list-pods")
-	return api.PodList{}, nil
+func (c *Fake) ReplicationControllers(namespace string) ReplicationControllerInterface {
+	return &FakeReplicationControllers{Fake: c, Namespace: namespace}
 }
 
-func (client *FakeClient) GetPod(name string) (api.Pod, error) {
-	client.Actions = append(client.Actions, "get-pod")
-	return api.Pod{}, nil
+func (c *Fake) Minions() MinionInterface {
+	return &FakeMinions{Fake: c}
 }
 
-func (client *FakeClient) DeletePod(name string) error {
-	client.Actions = append(client.Actions, "delete-pod")
-	return nil
+func (c *Fake) Events(namespace string) EventInterface {
+	return &FakeEvents{Fake: c}
 }
 
-func (client *FakeClient) CreatePod(pod api.Pod) (api.Pod, error) {
-	client.Actions = append(client.Actions, "create-pod")
-	return api.Pod{}, nil
+func (c *Fake) Endpoints(namespace string) EndpointsInterface {
+	return &FakeEndpoints{Fake: c, Namespace: namespace}
 }
 
-func (client *FakeClient) UpdatePod(pod api.Pod) (api.Pod, error) {
-	client.Actions = append(client.Actions, "update-pod")
-	return api.Pod{}, nil
+func (c *Fake) Pods(namespace string) PodInterface {
+	return &FakePods{Fake: c, Namespace: namespace}
 }
 
-func (client *FakeClient) ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error) {
-	client.Actions = append(client.Actions, "list-controllers")
-	return api.ReplicationControllerList{}, nil
+func (c *Fake) Services(namespace string) ServiceInterface {
+	return &FakeServices{Fake: c, Namespace: namespace}
 }
 
-func (client *FakeClient) GetReplicationController(name string) (api.ReplicationController, error) {
-	client.Actions = append(client.Actions, "get-controller")
-	return api.ReplicationController{}, nil
+func (c *Fake) ServerVersion() (*version.Info, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-version", Value: nil})
+	versionInfo := version.Get()
+	return &versionInfo, nil
 }
 
-func (client *FakeClient) CreateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
-	client.Actions = append(client.Actions, "create-controller")
-	return api.ReplicationController{}, nil
+func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-apiversions", Value: nil})
+	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
 }
 
-func (client *FakeClient) UpdateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
-	client.Actions = append(client.Actions, "update-controller")
-	return api.ReplicationController{}, nil
+type HttpClientFunc func(*http.Request) (*http.Response, error)
+
+func (f HttpClientFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
-func (client *FakeClient) DeleteReplicationController(controller string) error {
-	client.Actions = append(client.Actions, "delete-controller")
-	return nil
+// FakeRESTClient provides a fake RESTClient interface.
+type FakeRESTClient struct {
+	Client HTTPClient
+	Codec  runtime.Codec
+	Req    *http.Request
+	Resp   *http.Response
+	Err    error
 }
 
-func (client *FakeClient) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	client.Actions = append(client.Actions, "watch-controllers")
-	return watch.NewFake(), nil
+func (c *FakeRESTClient) Get() *Request {
+	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.Codec)
 }
-
-func (client *FakeClient) GetService(name string) (api.Service, error) {
-	client.Actions = append(client.Actions, "get-controller")
-	return api.Service{}, nil
+func (c *FakeRESTClient) Put() *Request {
+	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, c.Codec)
 }
-
-func (client *FakeClient) CreateService(controller api.Service) (api.Service, error) {
-	client.Actions = append(client.Actions, "create-service")
-	return api.Service{}, nil
+func (c *FakeRESTClient) Post() *Request {
+	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.Codec)
 }
-
-func (client *FakeClient) UpdateService(controller api.Service) (api.Service, error) {
-	client.Actions = append(client.Actions, "update-service")
-	return api.Service{}, nil
+func (c *FakeRESTClient) Delete() *Request {
+	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, c.Codec)
 }
-
-func (client *FakeClient) DeleteService(controller string) error {
-	client.Actions = append(client.Actions, "delete-service")
-	return nil
+func (c *FakeRESTClient) Do(req *http.Request) (*http.Response, error) {
+	c.Req = req
+	if c.Client != HTTPClient(nil) {
+		return c.Client.Do(req)
+	}
+	return c.Resp, c.Err
 }

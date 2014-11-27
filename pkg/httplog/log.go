@@ -32,13 +32,17 @@ import (
 // Intended to wrap calls to your ServeMux.
 func Handler(delegate http.Handler, pred StacktracePred) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer MakeLogged(req, &w).StacktraceWhen(pred).Log()
+		defer NewLogged(req, &w).StacktraceWhen(pred).Log()
 		delegate.ServeHTTP(w, req)
 	})
 }
 
-// StacktracePred returns true if a stacktrace should be logged for this status
+// StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
+
+type logger interface {
+	Addf(format string, data ...interface{})
+}
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
@@ -54,16 +58,24 @@ type respLogger struct {
 	logStacktracePred StacktracePred
 }
 
+// Simple logger that logs immediately when Addf is called
+type passthroughLogger struct{}
+
+// Addf logs info immediately.
+func (passthroughLogger) Addf(format string, data ...interface{}) {
+	glog.Infof(format, data...)
+}
+
 // DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
 	return status < http.StatusOK || status >= http.StatusBadRequest
 }
 
-// MakeLogged turns a normal response writer into a logged response writer.
+// NewLogged turns a normal response writer into a logged response writer.
 //
 // Usage:
 //
-// defer MakeLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
+// defer NewLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
 //
 // (Only the call to Log() is defered, so you can set everything up in one line!)
 //
@@ -71,10 +83,10 @@ func DefaultStacktracePred(status int) bool {
 // through the logger.
 //
 // Use LogOf(w).Addf(...) to log something along with the response result.
-func MakeLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
+func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 	if _, ok := (*w).(*respLogger); ok {
 		// Don't double-wrap!
-		panic("multiple MakeLogged calls!")
+		panic("multiple NewLogged calls!")
 	}
 	rl := &respLogger{
 		startTime:         time.Now(),
@@ -86,14 +98,18 @@ func MakeLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 	return rl
 }
 
-// LogOf returns the logger hiding in w. Panics if there isn't such a logger,
-// because MakeLogged() must have been previously called for the log to work.
-func LogOf(w http.ResponseWriter) *respLogger {
+// LogOf returns the logger hiding in w. If there is not an existing logger
+// then a passthroughLogger will be created which will log to stdout immediately
+// when Addf is called.
+func LogOf(req *http.Request, w http.ResponseWriter) logger {
+	if _, exists := w.(*respLogger); !exists {
+		pl := &passthroughLogger{}
+		return pl
+	}
 	if rl, ok := w.(*respLogger); ok {
 		return rl
 	}
-	panic("Logger not installed yet!")
-	return nil
+	panic("Unable to find or create the logger!")
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
@@ -104,7 +120,7 @@ func Unlogged(w http.ResponseWriter) http.ResponseWriter {
 	return w
 }
 
-// Sets the stacktrace logging predicate, which decides when to log a stacktrace.
+// StacktraceWhen sets the stacktrace logging predicate, which decides when to log a stacktrace.
 // There's a default, so you don't need to call this unless you don't like the default.
 func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
 	rl.logStacktracePred = pred
@@ -124,7 +140,7 @@ func StatusIsNot(statuses ...int) StacktracePred {
 	}
 }
 
-// Add additional data to be logged with this request.
+// Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
 	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
 }
@@ -132,20 +148,30 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	glog.Infof("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo)
+	glog.V(2).Infof("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo)
 }
 
-// Implement http.ResponseWriter
+// Header implements http.ResponseWriter.
 func (rl *respLogger) Header() http.Header {
 	return rl.w.Header()
 }
 
-// Implement http.ResponseWriter
+// Write implements http.ResponseWriter.
 func (rl *respLogger) Write(b []byte) (int, error) {
 	return rl.w.Write(b)
 }
 
-// Implement http.ResponseWriter
+// Flush implements http.Flusher even if the underlying http.Writer doesn't implement it.
+// Flush is used for streaming purposes and allows to flush buffered data to the client.
+func (rl *respLogger) Flush() {
+	if flusher, ok := rl.w.(http.Flusher); ok {
+		flusher.Flush()
+	} else {
+		glog.V(2).Infof("Unable to convert %v into http.Flusher", rl.w)
+	}
+}
+
+// WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
 	rl.status = status
 	if rl.logStacktracePred(status) {

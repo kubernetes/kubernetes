@@ -22,7 +22,7 @@ DAEMON_ARGS=""
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-DAEMON_USER=kube-proxy
+DAEMON_USER=root
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0

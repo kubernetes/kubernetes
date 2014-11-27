@@ -20,52 +20,90 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
-func TestCreateVolumeBuilders(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "CreateVolumes")
+type MockDiskUtil struct{}
+
+// TODO(jonesdl) To fully test this, we could create a loopback device
+// and mount that instead.
+func (util *MockDiskUtil) AttachDisk(PD *GCEPersistentDisk) error {
+	err := os.MkdirAll(path.Join(PD.RootDir, "global", "pd", PD.PDName), 0750)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		return err
 	}
-	defer os.RemoveAll(tempDir)
+	return nil
+}
+
+func (util *MockDiskUtil) DetachDisk(PD *GCEPersistentDisk, devicePath string) error {
+	err := os.RemoveAll(path.Join(PD.RootDir, "global", "pd", PD.PDName))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MockMounter struct{}
+
+func (mounter *MockMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	return nil
+}
+
+func (mounter *MockMounter) Unmount(target string, flags int) error {
+	return nil
+}
+
+func (mounter *MockMounter) RefCount(vol Interface) (string, int, error) {
+	return "", 0, nil
+}
+
+func TestCreateVolumeBuilders(t *testing.T) {
+	tempDir := "CreateVolumes"
 	createVolumesTests := []struct {
 		volume api.Volume
 		path   string
 		podID  string
-		kind   string
 	}{
 		{
 			api.Volume{
 				Name: "host-dir",
 				Source: &api.VolumeSource{
-					HostDirectory: &api.HostDirectory{"/dir/path"},
+					HostDir: &api.HostDir{"/dir/path"},
 				},
 			},
 			"/dir/path",
-			"my-id",
 			"",
 		},
 		{
 			api.Volume{
 				Name: "empty-dir",
 				Source: &api.VolumeSource{
-					EmptyDirectory: &api.EmptyDirectory{},
+					EmptyDir: &api.EmptyDir{},
 				},
 			},
 			path.Join(tempDir, "/my-id/volumes/empty/empty-dir"),
 			"my-id",
-			"empty",
 		},
-		{api.Volume{}, "", "", ""},
+		{
+			api.Volume{
+				Name: "gce-pd",
+				Source: &api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDisk{"my-disk", "ext4", 0, false},
+				},
+			},
+			path.Join(tempDir, "/my-id/volumes/gce-pd/gce-pd"),
+			"my-id",
+		},
+		{api.Volume{}, "", ""},
 		{
 			api.Volume{
 				Name:   "empty-dir",
 				Source: &api.VolumeSource{},
 			},
-			"",
 			"",
 			"",
 		},
@@ -79,16 +117,12 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			}
 			continue
 		}
-		if tt.volume.Source.HostDirectory == nil && tt.volume.Source.EmptyDirectory == nil {
+		if tt.volume.Source.HostDir == nil && tt.volume.Source.EmptyDir == nil && tt.volume.Source.GCEPersistentDisk == nil {
 			if err != ErrUnsupportedVolumeType {
 				t.Errorf("Unexpected error: %v", err)
 			}
 			continue
 		}
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		err = vb.SetUp()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -96,14 +130,64 @@ func TestCreateVolumeBuilders(t *testing.T) {
 		if path != tt.path {
 			t.Errorf("Unexpected bind path. Expected %v, got %v", tt.path, path)
 		}
-		vc, err := CreateVolumeCleaner(tt.kind, tt.volume.Name, tt.podID, tempDir)
-		if tt.kind == "" {
-			if err != ErrUnsupportedVolumeType {
-				t.Errorf("Unexpected error: %v", err)
-			}
+	}
+}
+
+func TestCreateVolumeCleaners(t *testing.T) {
+	tempDir := "CreateVolumeCleaners"
+	createVolumeCleanerTests := []struct {
+		kind  string
+		name  string
+		podID string
+	}{
+		{"empty", "empty-vol", "my-id"},
+		{"", "", ""},
+		{"gce-pd", "gce-pd-vol", "my-id"},
+	}
+	for _, tt := range createVolumeCleanerTests {
+		vol, err := CreateVolumeCleaner(tt.kind, tt.name, tt.podID, tempDir)
+		if tt.kind == "" && err != nil && vol == nil {
 			continue
 		}
-		err = vc.TearDown()
+		if err != nil {
+			t.Errorf("Unexpected error occured: %v", err)
+		}
+		actualKind := reflect.TypeOf(vol).Elem().Name()
+		if tt.kind == "empty" && actualKind != "EmptyDir" {
+			t.Errorf("CreateVolumeCleaner returned invalid type. Expected EmptyDirectory, got %v, %v", tt.kind, actualKind)
+		}
+		if tt.kind == "gce-pd" && actualKind != "GCEPersistentDisk" {
+			t.Errorf("CreateVolumeCleaner returned invalid type. Expected PersistentDisk, got %v, %v", tt.kind, actualKind)
+		}
+	}
+}
+
+func TestSetUpAndTearDown(t *testing.T) {
+	tempDir, err := ioutil.TempDir("", "CreateVolumes")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+	fakeID := "my-id"
+	type VolumeTester interface {
+		Builder
+		Cleaner
+	}
+	volumes := []VolumeTester{
+		&EmptyDir{"empty", fakeID, tempDir},
+		&GCEPersistentDisk{"pd", fakeID, tempDir, "pd-disk", "ext4", "", false, &MockDiskUtil{}, &MockMounter{}},
+	}
+
+	for _, vol := range volumes {
+		err = vol.SetUp()
+		path := vol.GetPath()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %v", path)
+		}
+		err = vol.TearDown()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -139,5 +223,73 @@ func TestGetActiveVolumes(t *testing.T) {
 		if _, ok := volumeMap[name]; !ok {
 			t.Errorf("Expected volume map entry not found: %v", name)
 		}
+	}
+}
+
+type fakeExec struct {
+	cmds   [][]string
+	dirs   []string
+	data   []byte
+	err    error
+	action func([]string, string)
+}
+
+func (f *fakeExec) ExecCommand(cmd []string, dir string) ([]byte, error) {
+	f.cmds = append(f.cmds, cmd)
+	f.dirs = append(f.dirs, dir)
+	f.action(cmd, dir)
+	return f.data, f.err
+}
+
+func TestGitVolume(t *testing.T) {
+	var fcmd exec.FakeCmd
+	fcmd = exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) {
+				os.MkdirAll(path.Join(fcmd.Dirs[0], "kubernetes"), 0750)
+				return []byte{}, nil
+			},
+			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fake := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	dir := os.TempDir() + "/git"
+	g := GitDir{
+		Source:   "https://github.com/GoogleCloudPlatform/kubernetes.git",
+		Revision: "2a30ce65c5ab586b98916d83385c5983edd353a1",
+		PodID:    "foo",
+		RootDir:  dir,
+		Name:     "test-pod",
+		exec:     &fake,
+	}
+	err := g.SetUp()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedCmds := [][]string{
+		{"git", "clone", g.Source},
+		{"git", "checkout", g.Revision},
+		{"git", "reset", "--hard"},
+	}
+	if fake.CommandCalls != len(expectedCmds) {
+		t.Errorf("unexpected command calls: expected 3, saw: %d", fake.CommandCalls)
+	}
+	if !reflect.DeepEqual(expectedCmds, fcmd.CombinedOutputLog) {
+		t.Errorf("unexpected commands: %v, expected: %v", fcmd.CombinedOutputLog, expectedCmds)
+	}
+	expectedDirs := []string{g.GetPath(), g.GetPath() + "/kubernetes", g.GetPath() + "/kubernetes"}
+	if len(fcmd.Dirs) != 3 || !reflect.DeepEqual(expectedDirs, fcmd.Dirs) {
+		t.Errorf("unexpected directories: %v, expected: %v", fcmd.Dirs, expectedDirs)
+	}
+	err = g.TearDown()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

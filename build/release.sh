@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -18,20 +18,25 @@
 # images and other build artifacts.  All intermediate artifacts will be hosted
 # publicly on Google Cloud Storage currently.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-source $(dirname $0)/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
-verify-prereqs
-verify-gcs-prereqs
-ensure-gcs-release-bucket
-build-image
-run-build-command build/build-image/make-binaries.sh
-run-build-command build/build-image/make-cross.sh
-run-build-command build/build-image/run-tests.sh
-run-build-command build/build-image/run-integration.sh
-copy-output
-run-image
-package-tarballs
-push-images-to-gcs
-copy-release-to-gcs
+KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
+
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command hack/build-cross.sh
+
+if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
+  kube::build::run_build_command hack/test-go.sh
+  kube::build::run_build_command hack/test-integration.sh
+fi
+
+kube::build::copy_output
+kube::build::run_image
+kube::release::package_tarballs
+kube::release::gcs::release

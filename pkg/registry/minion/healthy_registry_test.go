@@ -17,57 +17,52 @@ limitations under the License.
 package minion
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
 type alwaysYes struct{}
 
-func fakeHTTPResponse(status int) *http.Response {
-	return &http.Response{
-		StatusCode: status,
-		Body:       ioutil.NopCloser(&bytes.Buffer{}),
-	}
-}
-
-func (alwaysYes) Get(url string) (*http.Response, error) {
-	return fakeHTTPResponse(http.StatusOK), nil
+func (alwaysYes) HealthCheck(host string) (health.Status, error) {
+	return health.Healthy, nil
 }
 
 func TestBasicDelegation(t *testing.T) {
-	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"})
+	ctx := api.NewContext()
+	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"}, api.NodeResources{})
 	healthy := HealthyRegistry{
 		delegate: mockMinionRegistry,
 		client:   alwaysYes{},
 	}
-	list, err := healthy.List()
+	list, err := healthy.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, mockMinionRegistry.Minions) {
+	if !reflect.DeepEqual(list, &mockMinionRegistry.Minions) {
 		t.Errorf("Expected %v, Got %v", mockMinionRegistry.Minions, list)
 	}
-	err = healthy.Insert("foo")
+	err = healthy.CreateMinion(ctx, &api.Minion{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	ok, err := healthy.Contains("m1")
+	minion, err := healthy.GetMinion(ctx, "m1")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !ok {
+	if minion == nil {
 		t.Errorf("Unexpected absence of 'm1'")
 	}
-	ok, err = healthy.Contains("m5")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	minion, err = healthy.GetMinion(ctx, "m5")
+	if err == nil {
+		t.Errorf("unexpected non-error")
 	}
-	if ok {
+	if minion != nil {
 		t.Errorf("Unexpected presence of 'm5'")
 	}
 }
@@ -76,34 +71,34 @@ type notMinion struct {
 	minion string
 }
 
-func (n *notMinion) Get(url string) (*http.Response, error) {
-	if url != "http://"+n.minion+":10250/healthz" {
-		return fakeHTTPResponse(http.StatusOK), nil
+func (n *notMinion) HealthCheck(host string) (health.Status, error) {
+	if host != n.minion {
+		return health.Healthy, nil
 	} else {
-		return fakeHTTPResponse(http.StatusInternalServerError), nil
+		return health.Unhealthy, nil
 	}
 }
 
 func TestFiltering(t *testing.T) {
-	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"})
+	ctx := api.NewContext()
+	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"}, api.NodeResources{})
 	healthy := HealthyRegistry{
 		delegate: mockMinionRegistry,
 		client:   &notMinion{minion: "m1"},
-		port:     10250,
 	}
 	expected := []string{"m2", "m3"}
-	list, err := healthy.List()
+	list, err := healthy.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, expected) {
+	if !reflect.DeepEqual(list, registrytest.MakeMinionList(expected, api.NodeResources{})) {
 		t.Errorf("Expected %v, Got %v", expected, list)
 	}
-	ok, err := healthy.Contains("m1")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	minion, err := healthy.GetMinion(ctx, "m1")
+	if err == nil {
+		t.Errorf("unexpected non-error")
 	}
-	if ok {
+	if minion != nil {
 		t.Errorf("Unexpected presence of 'm1'")
 	}
 }

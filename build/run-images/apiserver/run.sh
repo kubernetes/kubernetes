@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,8 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# If the user doesn't specify a minion, assume we are running in a single node
-# configuration and that we have a local minion.
-KUBE_MINIONS="${KUBE_MINIONS:-$(hostname -f)}"
-
-./apiserver -address=0.0.0.0 -etcd_servers="${ETCD_SERVERS}" --machines="${KUBE_MINIONS}"
+./kube-apiserver -address=0.0.0.0 -etcd_servers="${ETCD_SERVERS}"

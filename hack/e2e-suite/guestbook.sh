@@ -18,31 +18,34 @@
 # works. Assumes that we're being called by hack/e2e-test.sh (we use some env
 # vars it sets up).
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
-source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-GUESTBOOK="${KUBE_REPO_ROOT}/examples/guestbook"
+GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
 # Launch the guestbook example
-$CLOUDCFG -c "${GUESTBOOK}/redis-master.json" create /pods
-$CLOUDCFG -c "${GUESTBOOK}/redis-master-service.json" create /services
-$CLOUDCFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
+$KUBECFG -c "${GUESTBOOK}/redis-master.json" create /pods
+$KUBECFG -c "${GUESTBOOK}/redis-master-service.json" create /services
+$KUBECFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
 
 sleep 5
 
-POD_LIST_1=$($CLOUDCFG -json list pods | jq ".items[].id")
+POD_LIST_1=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
 echo "Pods running: ${POD_LIST_1}"
 
-$CLOUDCFG stop redisSlaveController
+$KUBECFG stop redisSlaveController
 # Needed until issue #103 gets fixed
 sleep 25
-$CLOUDCFG rm redisSlaveController
-$CLOUDCFG delete services/redismaster
-$CLOUDCFG delete pods/redis-master-2
+$KUBECFG rm redisSlaveController
+$KUBECFG delete services/redis-master
+$KUBECFG delete pods/redis-master
 
-POD_LIST_2=$($CLOUDCFG -json list pods | jq ".items[].id")
+POD_LIST_2=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
 echo "Pods running after shutdown: ${POD_LIST_2}"
 
 exit 0

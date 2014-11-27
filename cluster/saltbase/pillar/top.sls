@@ -1,4 +1,5 @@
 base:
   '*':
     - mine
-    - common
+    - cluster-params
+    - privilege

@@ -1,7 +1,7 @@
 # Kubernetes
 Kubernetes is an open source implementation of container cluster management.
 
-[Kubernetes Design Document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md) - [Kubernetes @ Google I/O 2014](http://youtu.be/tsk0pWf4ipw)
+[Kubernetes Design Document](DESIGN.md) - [Kubernetes @ Google I/O 2014](http://youtu.be/tsk0pWf4ipw)
 
 [![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes)
 [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes)
@@ -16,19 +16,41 @@ While the concepts and architecture in Kubernetes represent years of experience 
 ### Contents
 * Getting Started Guides
   * [Google Compute Engine](docs/getting-started-guides/gce.md)
-  * [Vagrant](docs/getting-started-guides/vagrant.md)
   * [Locally](docs/getting-started-guides/locally.md)
+  * [Vagrant](docs/getting-started-guides/vagrant.md)
+  * [AWS with CoreOS and Cloud Formation](docs/getting-started-guides/aws-coreos.md)
+  * [AWS](docs/getting-started-guides/aws.md)
+  * Fedora (w/ [Ansible](docs/getting-started-guides/fedora/fedora_ansible_config.md) or [manual](docs/getting-started-guides/fedora/fedora_manual_config.md))
+  * [Circle CI](https://circleci.com/docs/docker#google-compute-engine-and-kubernetes)
+  * [Digital Ocean](https://github.com/bketelsen/coreos-kubernetes-digitalocean)
   * [CoreOS](docs/getting-started-guides/coreos.md)
-  * [Fedora](docs/getting-started-guides/fedora.md)
-* [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
-* [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/ce4fcc4ad89ed7b481a46a0ad4c99dee4c6f24ba/api/kubernetes.html)
+  * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
+  * [CloudStack](docs/getting-started-guides/cloudstack.md)
+  * [Rackspace](docs/getting-started-guides/rackspace.md)
+  * [vSphere](docs/getting-started-guides/vsphere.md)
+  * [Microsoft Azure](docs/getting-started-guides/azure.md)
+
+* [Kubernetes 101](examples/walkthrough)
+* [kubecfg command line tool](docs/cli.md)
+* [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
+* [Kubernetes Client Libraries](docs/client-libraries.md)
 * [Discussion and Community Support](#community-discussion-and-support)
-* [Hacking on Kubernetes](#development)
+* [Hacking on Kubernetes](CONTRIBUTING.md)
+* [Hacking on Kubernetes Salt configuration](docs/salt.md)
+* [Kubernetes User Interface](docs/ux.md)
 
 ## Where to go next?
-[Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
 
-[Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
+Check out examples of Kubernetes in action, and community projects in the larger ecosystem:
+
+* [Kubernetes 101](examples/walkthrough/README.md)
+* [Kubernetes 201](examples/walkthrough/k8s201.md)
+* [Detailed example application](examples/guestbook/README.md)
+* [Example of dynamic updates](examples/update-demo/README.md)
+* [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
+* [Community projects](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Kubernetes-Community)
+* [Development guide](docs/devel/development.md)
+* [User contributed recipes](contrib/recipes)
 
 Or fork and start hacking!
 
@@ -36,76 +58,6 @@ Or fork and start hacking!
 
 If you have questions or want to start contributing please reach out.  We don't bite!
 
-The Kubernetes team is hanging out on IRC on the [#google-containers room on freenode.net](http://webchat.freenode.net/?channels=google-containers).  We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers).
+The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers).  We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
 
-If you are a company and are looking for a more formal engagement with Google around Kubernetes and containers at Google as a whole, please fill out [this form](https://docs.google.com/a/google.com/forms/d/1_RfwC8LZU4CKe4vKq32x5xpEJI5QZ-j0ShGmZVv9cm4/viewform). and we'll be in touch.
-
-## Development
-
-### Hooks
-```
-# Before committing any changes, please link/copy these hooks into your .git
-# directory. This will keep you from accidentally committing non-gofmt'd
-# go code.
-#
-# NOTE: The "../.." part seems odd but is correct, since the newly created
-# links will be 2 levels down the tree.
-cd kubernetes
-ln -s ../../hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
-ln -s ../../hooks/commit-msg .git/hooks/commit-msg
-```
-
-### Unit tests
-```
-cd kubernetes
-hack/test-go.sh
-```
-
-### Coverage
-```
-cd kubernetes
-go tool cover -html=target/c.out
-```
-
-### Integration tests
-```
-# You need an etcd somewhere in your path.
-# To get from head:
-go get github.com/coreos/etcd
-go install github.com/coreos/etcd
-sudo ln -s "$GOPATH/bin/etcd" /usr/bin/etcd
-# Or just use the packaged one:
-sudo ln -s "$REPO_ROOT/target/bin/etcd" /usr/bin/etcd
-```
-
-```
-cd kubernetes
-hack/integration-test.sh
-```
-
-### End-to-End tests
-With a GCE account set up for running `cluster/kube-up.sh` (see Setup above):
-```
-cd kubernetes
-hack/e2e-test.sh
-```
-
-### Keeping your development fork in sync
-One time after cloning your forked repo:
-```
-git remote add upstream https://github.com/GoogleCloudPlatform/kubernetes.git
-```
-
-Then each time you want to sync to upstream:
-```
-git fetch upstream
-git rebase upstream/master
-```
-
-### Regenerating the documentation
-```
-cd kubernetes/api
-sudo docker build -t kubernetes/raml2html .
-sudo docker run --name="docgen" kubernetes/raml2html
-sudo docker cp docgen:/data/kubernetes.html .
-```
+If you are a company and are looking for a more formal engagement with Google around Kubernetes and containers at Google as a whole, please fill out [this form](https://docs.google.com/a/google.com/forms/d/1_RfwC8LZU4CKe4vKq32x5xpEJI5QZ-j0ShGmZVv9cm4/viewform) and we'll be in touch.

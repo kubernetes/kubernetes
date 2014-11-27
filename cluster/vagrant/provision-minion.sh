@@ -16,42 +16,52 @@
 
 # exit on any error
 set -e
-source $(dirname $0)/provision-config.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
 
 MINION_IP=$4
-# we will run provision to update code each time we test, so we do not want to do salt install each time
-if [ ! -f "/var/kube-vagrant-setup" ]; then
 
-  if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
-    echo "Adding host entry for $MASTER_NAME"
-    echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+# Setup hosts file to support ping by hostname to master
+if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
+  echo "Adding $MASTER_NAME to hosts file"
+  echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+fi
+
+# Setup hosts file to support ping by hostname to each minion in the cluster
+minion_ip_array=(${MINION_IPS//,/ })
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  minion=${MINION_NAMES[$i]}
+  ip=${minion_ip_array[$i]}
+  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
+    echo "Adding $minion to hosts file"
+    echo "$ip $minion" >> /etc/hosts
   fi
+done
 
-  # Prepopulate the name of the Master
-  mkdir -p /etc/salt/minion.d
-  echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+# Let the minion know who its master is
+mkdir -p /etc/salt/minion.d
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-  # Our minions will have a pool role to distinguish them from the master.
-  cat <<EOF >/etc/salt/minion.d/grains.conf
+# Our minions will have a pool role to distinguish them from the master.
+cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  minion_ip: $MINION_IP
+  network_mode: openvswitch
+  node_ip: $MINION_IP
   etcd_servers: $MASTER_IP
+  networkInterfaceName: eth1
+  apiservers: $MASTER_IP
   roles:
     - kubernetes-pool
+    - kubernetes-pool-vagrant
   cbr-cidr: $MINION_IP_RANGE
+  minion_ip: $MINION_IP
 EOF
 
+# we will run provision to update code each time we test, so we do not want to do salt install each time
+if ! which salt-minion >/dev/null 2>&1; then
   # Install Salt
-  #
-  # We specify -X to avoid a race condition that can cause minion failure to
-  # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-  curl -sS -L http://bootstrap.saltstack.com | sh -s -- -X
-
-  ## TODO this only works on systemd distros, need to find a work-around as removing -X above fails to start the services installed
-  systemctl enable salt-minion
-  systemctl start salt-minion
-
-  # a file we touch to state that base-setup is done
-  echo "Salt configured" > /var/kube-vagrant-setup
-
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
 fi
+
+# run the networking setup
+"${KUBE_ROOT}/cluster/vagrant/provision-network.sh" $@

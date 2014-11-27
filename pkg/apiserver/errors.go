@@ -22,115 +22,57 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/golang/glog"
 )
 
-// apiServerError is an error intended for consumption by a REST API server
-type apiServerError struct {
-	api.Status
-}
-
-// Error implements the Error interface.
-func (e *apiServerError) Error() string {
-	return e.Status.Message
-}
-
-// NewNotFoundErr returns a new error which indicates that the resource of the kind and the name was not found.
-func NewNotFoundErr(kind, name string) error {
-	return &apiServerError{api.Status{
-		Status: api.StatusFailure,
-		Code:   http.StatusNotFound,
-		Reason: api.ReasonTypeNotFound,
-		Details: &api.StatusDetails{
-			Kind: kind,
-			ID:   name,
-		},
-		Message: fmt.Sprintf("%s %q not found", kind, name),
-	}}
-}
-
-// NewAlreadyExistsErr returns an error indicating the item requested exists by that identifier
-func NewAlreadyExistsErr(kind, name string) error {
-	return &apiServerError{api.Status{
-		Status: api.StatusFailure,
-		Code:   http.StatusConflict,
-		Reason: api.ReasonTypeAlreadyExists,
-		Details: &api.StatusDetails{
-			Kind: kind,
-			ID:   name,
-		},
-		Message: fmt.Sprintf("%s %q already exists", kind, name),
-	}}
-}
-
-// NewConflictErr returns an error indicating the item can't be updated as provided.
-func NewConflictErr(kind, name string, err error) error {
-	return &apiServerError{api.Status{
-		Status: api.StatusFailure,
-		Code:   http.StatusConflict,
-		Reason: api.ReasonTypeConflict,
-		Details: &api.StatusDetails{
-			Kind: kind,
-			ID:   name,
-		},
-		Message: fmt.Sprintf("%s %q cannot be updated: %s", kind, name, err),
-	}}
-}
-
-// IsNotFound returns true if the specified error was created by NewNotFoundErr
-func IsNotFound(err error) bool {
-	return reasonForError(err) == api.ReasonTypeNotFound
-}
-
-// IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
-func IsAlreadyExists(err error) bool {
-	return reasonForError(err) == api.ReasonTypeAlreadyExists
-}
-
-// IsConflict determines if the err is an error which indicates the provided update conflicts
-func IsConflict(err error) bool {
-	return reasonForError(err) == api.ReasonTypeConflict
-}
-
-func reasonForError(err error) api.ReasonType {
-	switch t := err.(type) {
-	case *apiServerError:
-		return t.Status.Reason
-	}
-	return api.ReasonTypeUnknown
+// statusError is an object that can be converted into an api.Status
+type statusError interface {
+	Status() api.Status
 }
 
 // errToAPIStatus converts an error to an api.Status object.
 func errToAPIStatus(err error) *api.Status {
 	switch t := err.(type) {
-	case *apiServerError:
-		status := t.Status
+	case statusError:
+		status := t.Status()
 		status.Status = api.StatusFailure
 		//TODO: check for invalid responses
 		return &status
 	default:
 		status := http.StatusInternalServerError
 		switch {
-		//TODO: replace me with NewUpdateConflictErr
+		//TODO: replace me with NewConflictErr
 		case tools.IsEtcdTestFailed(err):
 			status = http.StatusConflict
 		}
+		// Log errors that were not converted to an error status
+		// by REST storage - these typically indicate programmer
+		// error by not using pkg/api/errors, or unexpected failure
+		// cases.
+		glog.V(1).Infof("An unchecked error was received: %v", err)
 		return &api.Status{
 			Status:  api.StatusFailure,
 			Code:    status,
-			Reason:  api.ReasonTypeUnknown,
+			Reason:  api.StatusReasonUnknown,
 			Message: err.Error(),
 		}
 	}
 }
 
-// notFound renders a simple not found error
+// notFound renders a simple not found error.
 func notFound(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, "Not Found: %#v", req.RequestURI)
 }
 
-// badGatewayError renders a simple bad gateway error
+// badGatewayError renders a simple bad gateway error.
 func badGatewayError(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusBadGateway)
 	fmt.Fprintf(w, "Bad Gateway: %#v", req.RequestURI)
+}
+
+// forbidden renders a simple forbidden error
+func forbidden(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusForbidden)
+	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
 }

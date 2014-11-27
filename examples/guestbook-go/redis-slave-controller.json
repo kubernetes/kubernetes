@@ -1,0 +1,25 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "ReplicationController",
+  "id": "redis-slave-controller",
+  "desiredState": {
+    "replicas": 2,
+    "replicaSelector": { "name": "redis", "role": "slave" },
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "redis-slave-controller",
+          "containers": [{
+            "name": "redis-slave",
+            "image": "gurpartap/redis",
+            "command": ["sh", "-c", "redis-server /etc/redis/redis.conf --slaveof $REDIS_MASTER_SERVICE_HOST $REDIS_MASTER_SERVICE_PORT"],
+            "ports": [{ "name": "redis-server", "containerPort": 6379 }]
+          }]
+        }
+      },
+      "labels": { "name": "redis", "role": "slave" }
+    }
+  },
+  "labels": { "name": "redis", "role": "slave" }
+}

@@ -16,30 +16,32 @@ limitations under the License.
 
 package version
 
-import (
-	"fmt"
-)
-
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
 type Info struct {
-	Major     string `json:"major" yaml:"major"`
-	Minor     string `json:"minor" yaml:"minor"`
-	GitCommit string `json:"gitCommit" yaml:"gitCommit"`
+	Major        string `json:"major" yaml:"major"`
+	Minor        string `json:"minor" yaml:"minor"`
+	GitVersion   string `json:"gitVersion" yaml:"gitVersion"`
+	GitCommit    string `json:"gitCommit" yaml:"gitCommit"`
+	GitTreeState string `json:"gitTreeState" yaml:"gitTreeState"`
 }
 
 // Get returns the overall codebase version. It's for detecting
 // what code a binary was built from.
 func Get() Info {
+	// These variables typically come from -ldflags settings and in
+	// their absence fallback to the settings in pkg/version/base.go
 	return Info{
-		Major:     "0",
-		Minor:     "1",
-		GitCommit: commitFromGit,
+		Major:        gitMajor,
+		Minor:        gitMinor,
+		GitVersion:   gitVersion,
+		GitCommit:    gitCommit,
+		GitTreeState: gitTreeState,
 	}
 }
 
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
-	return fmt.Sprintf("version %s.%s, build %s", info.Major, info.Minor, info.GitCommit)
+	return info.GitVersion
 }

@@ -19,12 +19,16 @@ package util
 import (
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"reflect"
+	"sync"
 )
 
 // TestInterface is a simple interface providing Errorf, to make injection for
-// testing easier (insert 'yo dawg' meme here)
+// testing easier (insert 'yo dawg' meme here).
 type TestInterface interface {
 	Errorf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
 }
 
 // LogInterface is a simple interface to allow injection of Logf to report serving errors.
@@ -32,7 +36,9 @@ type LogInterface interface {
 	Logf(format string, args ...interface{})
 }
 
-// FakeHandler is to assist in testing HTTP requests.
+// FakeHandler is to assist in testing HTTP requests. Notice that FakeHandler is
+// not thread safe and you must not direct traffic to except for the request
+// you want to test. You can do this by hiding it in an http.ServeMux.
 type FakeHandler struct {
 	RequestReceived *http.Request
 	RequestBody     string
@@ -41,24 +47,54 @@ type FakeHandler struct {
 	// For logging - you can use a *testing.T
 	// This will keep log messages associated with the test.
 	T LogInterface
+
+	// Enforce "only one use" constraint.
+	lock           sync.Mutex
+	requestCount   int
+	hasBeenChecked bool
 }
 
 func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.requestCount++
+	if f.hasBeenChecked {
+		panic("got request after having been validated")
+	}
+
 	f.RequestReceived = request
 	response.WriteHeader(f.StatusCode)
 	response.Write([]byte(f.ResponseBody))
 
 	bodyReceived, err := ioutil.ReadAll(request.Body)
 	if err != nil && f.T != nil {
-		f.T.Logf("Received read error: %#v", err)
+		f.T.Logf("Received read error: %v", err)
 	}
 	f.RequestBody = string(bodyReceived)
 }
 
 // ValidateRequest verifies that FakeHandler received a request with expected path, method, and body.
-func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
-	if f.RequestReceived.URL.Path != expectedPath {
-		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectedPath)
+func (f *FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	if f.requestCount != 1 {
+		t.Logf("Expected 1 call, but got %v. Only the last call is recorded and checked.", f.requestCount)
+	}
+	f.hasBeenChecked = true
+
+	expectURL, err := url.Parse(expectedPath)
+	if err != nil {
+		t.Errorf("Couldn't parse %v as a URL.", expectedPath)
+	}
+	if f.RequestReceived == nil {
+		t.Errorf("Unexpected nil request received for %s", expectedPath)
+		return
+	}
+	if f.RequestReceived.URL.Path != expectURL.Path {
+		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectURL.Path)
+	}
+	if e, a := expectURL.Query(), f.RequestReceived.URL.Query(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected query for request %#v, received: %q, expected: %q", f.RequestReceived, a, e)
 	}
 	if f.RequestReceived.Method != expectedMethod {
 		t.Errorf("Unexpected method: %q, expected: %q", f.RequestReceived.Method, expectedMethod)

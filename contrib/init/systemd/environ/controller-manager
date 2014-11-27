@@ -1,0 +1,10 @@
+###
+# The following values are used to configure the kubernetes controller-manager
+
+# defaults from config and apiserver should be adequate
+
+# Comma seperated list of minions
+KUBELET_ADDRESSES="--machines=127.0.0.1"
+
+# Add you own!
+KUBE_CONTROLLER_MANAGER_ARGS=""

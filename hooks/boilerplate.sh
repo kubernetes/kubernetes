@@ -16,17 +16,22 @@
 
 # Print 1 if the file in $1 has the correct boilerplate header, 0 otherwise.
 FILE=$1
-EXT=${FILE#*.}
+EXT=${FILE##*.}
 
 REF_FILE="$(dirname $0)/boilerplate.${EXT}.txt"
 
-if [[ ! -e "${REF_FILE}" ]]; then
+if [ ! -e $REF_FILE ]; then
   echo "1"
   exit 0
 fi
 
 LINES=$(cat "${REF_FILE}" | wc -l | tr -d ' ')
-DIFFER=$(head "-${LINES}" "${FILE}" | diff -q - "${REF_FILE}")
+if [[ "${EXT}" == "go" ]]; then
+  # remove build tags from the top of Go file
+  DIFFER=$(cat "${FILE}" | sed '/\/\*/,$!d' | head "-${LINES}" | diff -q - "${REF_FILE}")
+else
+  DIFFER=$(head "-${LINES}" "${FILE}" | diff -q - "${REF_FILE}")
+fi
 
 if [[ -z "${DIFFER}" ]]; then
   echo "1"

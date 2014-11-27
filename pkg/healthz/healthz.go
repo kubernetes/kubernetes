@@ -20,6 +20,11 @@ import (
 	"net/http"
 )
 
+// mux is an interface describing the methods InstallHandler requires.
+type mux interface {
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+}
+
 func init() {
 	http.HandleFunc("/healthz", handleHealthz)
 }
@@ -31,6 +36,6 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 // InstallHandler registers a handler for health checking on the path "/healthz" to mux.
-func InstallHandler(mux *http.ServeMux) {
+func InstallHandler(mux mux) {
 	mux.HandleFunc("/healthz", handleHealthz)
 }

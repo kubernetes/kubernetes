@@ -14,44 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from an HTTP GET response
+// Reads the pod configuration from an HTTP GET response.
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
 
-type SourceURL struct {
+type sourceURL struct {
 	url     string
 	updates chan<- interface{}
+	data    []byte
 }
 
-func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) *SourceURL {
-	config := &SourceURL{
+func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) {
+	config := &sourceURL{
 		url:     url,
 		updates: updates,
+		data:    nil,
 	}
-	glog.Infof("Watching URL %s", url)
+	glog.V(1).Infof("Watching URL %s", url)
 	go util.Forever(config.run, period)
-	return config
 }
 
-func (s *SourceURL) run() {
+func (s *sourceURL) run() {
 	if err := s.extractFromURL(); err != nil {
-		glog.Errorf("Failed to read URL: %s", err)
+		glog.Errorf("Failed to read URL: %v", err)
 	}
 }
 
-func (s *SourceURL) extractFromURL() error {
+func (s *sourceURL) extractFromURL() error {
 	resp, err := http.Get(s.url)
 	if err != nil {
 		return err
@@ -61,57 +65,84 @@ func (s *SourceURL) extractFromURL() error {
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("%v: %v", s.url, resp.Status)
+	}
 	if len(data) == 0 {
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
+	// Short circuit if the manifest has not changed since the last time it was read.
+	if bytes.Compare(data, s.data) == 0 {
+		return nil
+	}
+	s.data = data
 
 	// First try as if it's a single manifest
-	var pod kubelet.Pod
-	singleErr := yaml.Unmarshal(data, &pod.Manifest)
-	// TODO: replace with validation
-	if singleErr == nil && pod.Manifest.Version == "" {
-		// If data is a []ContainerManifest, trying to put it into a ContainerManifest
-		// will not give an error but also won't set any of the fields.
-		// Our docs say that the version field is mandatory, so using that to judge wether
-		// this was actually successful.
-		singleErr = fmt.Errorf("got blank version field")
-	}
-
+	var manifest api.ContainerManifest
+	// TODO: should be api.Scheme.Decode
+	singleErr := yaml.Unmarshal(data, &manifest)
 	if singleErr == nil {
-		name := pod.Manifest.ID
-		if name == "" {
-			name = "1"
+		if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
+			singleErr = fmt.Errorf("invalid manifest: %v", errs)
 		}
-		pod.Name = name
-		s.updates <- kubelet.PodUpdate{[]kubelet.Pod{pod}, kubelet.SET}
+	}
+	if singleErr == nil {
+		pod := api.BoundPod{}
+		if err := api.Scheme.Convert(&manifest, &pod); err != nil {
+			return err
+		}
+		if len(pod.Name) == 0 {
+			pod.Name = "1"
+		}
+		if len(pod.Namespace) == 0 {
+			pod.Namespace = api.NamespaceDefault
+		}
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET}
 		return nil
 	}
 
 	// That didn't work, so try an array of manifests.
 	var manifests []api.ContainerManifest
+	// TODO: should be api.Scheme.Decode
 	multiErr := yaml.Unmarshal(data, &manifests)
 	// We're not sure if the person reading the logs is going to care about the single or
 	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
 	// done at the end. Hence not returning early here.
-	if multiErr == nil && len(manifests) > 0 && manifests[0].Version == "" {
-		multiErr = fmt.Errorf("got blank version field")
+	if multiErr == nil {
+		for _, manifest := range manifests {
+			if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
+				multiErr = fmt.Errorf("invalid manifest: %v", errs)
+				break
+			}
+		}
 	}
 	if multiErr == nil {
-		pods := []kubelet.Pod{}
-		for i := range manifests {
-			pod := kubelet.Pod{Manifest: manifests[i]}
-			name := pod.Manifest.ID
-			if name == "" {
-				name = fmt.Sprintf("%d", i+1)
-			}
-			pod.Name = name
-			pods = append(pods, pod)
+		// A single manifest that did not pass semantic validation will yield an empty
+		// array of manifests (and no error) when unmarshaled as such.  In that case,
+		// if the single manifest at least had a Version, we return the single-manifest
+		// error (if any).
+		if len(manifests) == 0 && len(manifest.Version) != 0 {
+			return singleErr
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
+		list := api.ContainerManifestList{Items: manifests}
+		boundPods := &api.BoundPods{}
+		if err := api.Scheme.Convert(&list, boundPods); err != nil {
+			return err
+		}
+		for i := range boundPods.Items {
+			pod := &boundPods.Items[i]
+			if len(pod.Name) == 0 {
+				pod.Name = fmt.Sprintf("%d", i+1)
+			}
+			if len(pod.Namespace) == 0 {
+				pod.Namespace = api.NamespaceDefault
+			}
+		}
+		s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET}
 		return nil
 	}
 
 	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
 		"single manifest (%v: %+v) or as multiple manifests (%v: %+v).\n",
-		s.url, string(data), singleErr, pod.Manifest, multiErr, manifests)
+		s.url, string(data), singleErr, manifest, multiErr, manifests)
 }

@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,4 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./controller-manager -etcd_servers="${ETCD_SERVERS}" -master="${API_SERVER}"
+# If the user doesn't specify a minion, assume we are running in a single node
+# configuration and that we have a local minion.
+KUBE_MINIONS="${KUBE_MINIONS:-$(hostname -f)}"
+
+./kube-controller-manager -master="${API_SERVER}" --machines="${KUBE_MINIONS}"

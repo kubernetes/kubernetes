@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"runtime"
 	"time"
 
@@ -59,12 +60,6 @@ func Forever(f func(), period time.Duration) {
 	}
 }
 
-// MakeJSONString returns obj marshalled as a JSON string, ignoring any errors.
-func MakeJSONString(obj interface{}) string {
-	data, _ := json.Marshal(obj)
-	return string(data)
-}
-
 // IntOrString is a type that can hold an int or a string.  When used in
 // JSON or YAML marshalling and unmarshalling, it produces or consumes the
 // inner type.  This allows you to have, for example, a JSON field that can
@@ -83,13 +78,13 @@ const (
 	IntstrString                   // The IntOrString holds a string.
 )
 
-// MakeIntOrStringFromInt creates an IntOrString object with an int value.
-func MakeIntOrStringFromInt(val int) IntOrString {
+// NewIntOrStringFromInt creates an IntOrString object with an int value.
+func NewIntOrStringFromInt(val int) IntOrString {
 	return IntOrString{Kind: IntstrInt, IntVal: val}
 }
 
-// MakeIntOrStringFromInt creates an IntOrString object with a string value.
-func MakeIntOrStringFromString(val string) IntOrString {
+// NewIntOrStringFromString creates an IntOrString object with a string value.
+func NewIntOrStringFromString(val string) IntOrString {
 	return IntOrString{Kind: IntstrString, StrVal: val}
 }
 
@@ -143,22 +138,15 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// StringDiff diffs a and b and returns a human readable diff.
-func StringDiff(a, b string) string {
-	ba := []byte(a)
-	bb := []byte(b)
-	out := []byte{}
-	i := 0
-	for ; i < len(ba) && i < len(bb); i++ {
-		if ba[i] != bb[i] {
-			break
+// Takes a list of strings and compiles them into a list of regular expressions
+func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
+	regexps := []*regexp.Regexp{}
+	for _, regexpStr := range regexpStrings {
+		r, err := regexp.Compile(regexpStr)
+		if err != nil {
+			return []*regexp.Regexp{}, err
 		}
-		out = append(out, ba[i])
+		regexps = append(regexps, r)
 	}
-	out = append(out, []byte("\n\nA: ")...)
-	out = append(out, ba[i:]...)
-	out = append(out, []byte("\n\nB: ")...)
-	out = append(out, bb[i:]...)
-	out = append(out, []byte("\n\n")...)
-	return string(out)
+	return regexps, nil
 }

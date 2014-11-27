@@ -19,75 +19,119 @@ This example demonstrates the usage of Kubernetes to perform a live update on a 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#setup):
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#contents):
 
-    $ cd kubernetes
-    $ hack/dev-build-and-up.sh
-    $ hack/build-go.sh
+```bash
+$ cd kubernetes
+$ hack/dev-build-and-up.sh
+```
 
 This example also assumes that you have [Docker](http://docker.io) installed on your local machine.
 
-It also assumes that ```$DOCKER_USER``` is set to your docker user id.
-
-You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
-
-```shell
-$ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
+It also assumes that `$DOCKER_HUB_USER` is set to your Docker user id.  We use this to upload the docker images that are used in the demo.
+```bash
+$ export DOCKER_HUB_USER=my-docker-id
 ```
 
-### Step One: Build the image
+You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
-    $ cd kubernetes/examples/update-demo/image
-    $ docker build -t $DOCKER_USER/data .
-    $ docker push $DOCKER_USER/data
+```bash
+$ gcloud compute firewall-rules create \
+  --allow tcp:8080 --target-tags=kubernetes-minion \
+  --zone=us-central1-a kubernetes-minion-8080
+```
+
+### Step Zero: Build the Docker images
+
+This can take a few minutes to download/upload stuff.
+
+```bash
+$ cd examples/update-demo
+$ ./0-build-images.sh
+```
+
+### Step One: Turn up the UX for the demo
+
+You can use bash job control to run this in the background.  This can sometimes spew to the output so you could also run it in a different terminal.
+
+```
+$ ./1-run-web-proxy.sh &
+Running local proxy to Kubernetes API Server.  Run this in a
+separate terminal or run it in the background.
+
+    http://localhost:8001/static/
+
++ ../../cluster/kubecfg.sh -proxy -www local/
+I0922 11:43:54.886018 15659 kubecfg.go:209] Starting to serve on localhost:8001
+```
+
+Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
 ### Step Two: Run the controller
-Now we will turn up two replicas of that image.  They all serve on port 8080, mapped to internal port 80
+Now we will turn up two replicas of an image.  They all serve on port 8080, mapped to internal port 80
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh -p 8080:80 run $DOCKER_USER/data 2 dataController
+```bash
+$ ./2-create-replication-controller.sh
+```
 
-### Step Three: Turn up the UX for the demo
-In a different terminal:
+After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh -proxy -www examples/update-demo/local/
+### Step Three: Try resizing the controller
 
-Now visit the the [demo website](http://localhost:8001/static/index.html).  You should see two light blue squares with pod IDs and ip addresses.
-
-### Step Four: Try resizing the controller
 Now we will increase the number of replicas from two to four:
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh resize dataController 4
+```bash
+$ ./3-scale.sh
+```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
 
-### Step Five: Update the docker image
-We will now update the docker image to serve a different color.
+### Step Four: Update the docker image
+We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
-    $ cd kubernetes/examples/update-demo/image
-    $ ${EDITOR} data.json
-
-Edit the ```color``` value so that it is a new color.  For example:
-```js
-{
-  "color": "#F00"
-}
+```bash
+$ ./4-rolling-update.sh
 ```
-Will set the color to red.
+The rollingUpdate command in kubecfg will do 2 things:
 
-Once you are happy with the color, build a new image:
+1. Update the template in the replication controller to the new image (`$DOCKER_HUB_USER/update-demo:kitten`)
+2. Kill each of the pods one by one.  It'll let the replication controller create new pods to replace those that were killed.
 
-    $ docker build -t $DOCKER_USER/data .
-    $ docker push $DOCKER_USER/data
+Watch the UX, it will update one pod every 10 seconds until all of the pods have the new image.
 
-### Step Six: Roll the update out to your servers
-We will now update the servers that are running out in your cluster.
+### Step Five: Bring down the pods
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh -u=30s rollingupdate dataController
+```bash
+$ ./5-down.sh
+```
 
-Watch the UX, it will update one pod every 30 seconds until all of the pods have the new color.
+This will first 'stop' the replication controller by turning the target number of replicas to 0.  It'll then delete that controller.
 
 [cloud-console]: https://console.developer.google.com
+
+### Step Six: Cleanup
+
+To turn down a Kubernetes cluster:
+
+```bash
+$ cd ../..  # Up to kubernetes.
+$ cluster/kube-down.sh
+```
+
+Kill the proxy running in the background:
+After you are done running this demo make sure to kill it:
+
+```bash
+$ jobs
+[1]+  Running                 ./1-run-web-proxy.sh &
+$ kill %1
+[1]+  Terminated: 15          ./1-run-web-proxy.sh
+```
+
+
+### Image Copyright
+
+Note that he images included here are public domain.
+
+* [kitten](http://commons.wikimedia.org/wiki/File:Kitten-stare.jpg)
+* [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)

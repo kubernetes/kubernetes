@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,4 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./proxy --etcd_servers="${ETCD_SERVERS}"
+./kube-proxy --etcd_servers="${ETCD_SERVERS}"

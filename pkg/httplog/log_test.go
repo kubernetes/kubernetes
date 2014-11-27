@@ -65,19 +65,19 @@ func TestStatusIsNot(t *testing.T) {
 	}
 }
 
-func TestMakeLogged(t *testing.T) {
+func TestNewLogged(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		MakeLogged(req, &w)
+		NewLogged(req, &w)
 		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("Expected MakeLogged to panic")
+				t.Errorf("Expected NewLogged to panic")
 			}
 		}()
-		MakeLogged(req, &w)
+		NewLogged(req, &w)
 	}
 	w := httptest.NewRecorder()
 	handler(w, req)
@@ -91,17 +91,14 @@ func TestLogOf(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			var want *respLogger
+			var want string
 			if makeLogger {
-				want = MakeLogged(req, &w)
+				NewLogged(req, &w)
+				want = "*httplog.respLogger"
 			} else {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("Expected LogOf to panic")
-					}
-				}()
+				want = "*httplog.passthroughLogger"
 			}
-			got := LogOf(w)
+			got := reflect.TypeOf(LogOf(r, w)).String()
 			if want != got {
 				t.Errorf("Expected %v, got %v", want, got)
 			}
@@ -121,7 +118,7 @@ func TestUnlogged(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			want := w
 			if makeLogger {
-				MakeLogged(req, &w)
+				NewLogged(req, &w)
 			}
 			got := Unlogged(w)
 			if want != got {

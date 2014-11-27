@@ -1,20 +1,55 @@
-etcd-install:
-  git.latest:
-    - target: /var/src/etcd
-    - name: git://github.com/coreos/etcd
-  cmd.wait:
-    - cwd: /var/src/etcd
-    - names:
-      - ./build
-    - env:
-      - PATH: {{ grains['path'] }}:/usr/local/bin
+# We are caching the etcd tar file in GCS for reliability and speed.  To
+# update this to a new version, do the following:
+# 2. Download tar file:
+#    curl -LO https://github.com/coreos/etcd/releases/download/<ver>/etcd-<ver>-linux-amd64.tar.gz
+# 3. Upload to GCS (the cache control makes :
+#    gsutil cp <tar> gs://kubernetes-release/etcd/<tar>
+# 4. Make it world readable:
+#    gsutil -m acl ch -R -g all:R gs://kubernetes-release/etcd/
+# 5. Get a hash of the tar:
+#    shasum <tar>
+# 6. Update this file with new tar version and new hash
+
+{% set etcd_version="v0.4.6" %}
+{% set etcd_tar_url="https://storage.googleapis.com/kubernetes-release/etcd/etcd-%s-linux-amd64.tar.gz"
+  | format(etcd_version)  %}
+{% set etcd_tar_hash="sha1=5db514e30b9f340eda00671230d5136855ae14d7" %}
+
+etcd-tar:
+  archive:
+    - extracted
+    - user: root
+    - name: /usr/local/src
+    - source: {{ etcd_tar_url }}
+    - source_hash: {{ etcd_tar_hash }}
+    - archive_format: tar
+    - if_missing: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
+    - tar_options: xz
+  file.directory:
+    - name: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
+    - user: root
+    - group: root
     - watch:
-      - git: etcd-install
+      - archive: etcd-tar
+    - recurse:
+      - user
+      - group
+
+etcd-symlink:
   file.symlink:
     - name: /usr/local/bin/etcd
-    - target: /var/src/etcd/bin/etcd
+    - target: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64/etcd
+    - force: true
     - watch:
-      - cmd: etcd-install
+      - archive: etcd-tar
+
+etcdctl-symlink:
+  file.symlink:
+    - name: /usr/local/bin/etcdctl
+    - target: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64/etcdctl
+    - force: true
+    - watch:
+      - archive: etcd-tar
 
 etcd:
   group.present:
@@ -24,8 +59,6 @@ etcd:
     - gid_from_name: True
     - shell: /sbin/nologin
     - home: /var/etcd
-    - require:
-      - group: etcd
 
 /etc/etcd:
   file.directory:
@@ -83,5 +116,6 @@ etcd-service:
       - file: /usr/lib/systemd/system/etcd.service
       - file: /etc/default/etcd
       {% endif %}
-      - cmd: etcd-install
+      - file: etcd-tar
+      - file: etcd-symlink
 

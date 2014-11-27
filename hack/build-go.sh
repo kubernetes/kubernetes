@@ -20,25 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(dirname "$0")
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
-
-# Go to the top of the tree.
-cd "${KUBE_REPO_ROOT}"
-
-# Update the version.
-"${hackdir}/version-gen.sh"
-
-if [[ $# == 0 ]]; then
-  # Update $@ with the default list of targets to build.
-  set -- cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg
-fi
-
-binaries=()
-for arg; do
-  binaries+=("${KUBE_GO_PACKAGE}/${arg}")
-done
-
-go install "${binaries[@]}"
+kube::golang::build_binaries "$@"
+kube::golang::place_bins

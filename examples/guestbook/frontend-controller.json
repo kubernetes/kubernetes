@@ -13,11 +13,16 @@
            "containers": [{
              "name": "php-redis",
              "image": "brendanburns/php-redis",
+             "cpu": 100,
+             "memory": 50000000,
              "ports": [{"containerPort": 80, "hostPort": 8000}]
            }]
          }
        },
-       "labels": {"name": "frontend"}
+       "labels": {
+         "name": "frontend",
+         "uses": "redisslave,redis-master"
+       }
       }},
   "labels": {"name": "frontend"}
 }

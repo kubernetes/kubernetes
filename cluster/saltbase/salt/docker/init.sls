@@ -4,39 +4,10 @@
 {% set environment_file = '/etc/default/docker' %}
 {% endif %}
 
-{% if grains['os_family'] != 'RedHat' %}
-
-docker-repo:
-  pkgrepo.managed:
-    - humanname: Docker Repo
-    - name: deb https://get.docker.io/ubuntu docker main
-    - key_url: https://get.docker.io/gpg
-    - require:
-      - pkg: pkg-core
-
-# The default GCE images have ip_forwarding explicitly set to 0.
-# Here we take care of commenting that out.
-/etc/sysctl.d/11-gce-network-security.conf:
-  file.replace:
-    - pattern: '^net.ipv4.ip_forward=0'
-    - repl: '# net.ipv4.ip_forward=0'
-
-net.ipv4.ip_forward:
-  sysctl.present:
-    - value: 1
-
 bridge-utils:
   pkg.installed
 
-cbr0:
-  container_bridge.ensure:
-    - cidr: {{ grains['cbr-cidr'] }}
-    - mtu: 1460
-
-{% endif %}
-
-{% if grains['os_family'] == 'RedHat' %}
-
+{% if grains.os_family == 'RedHat' %}
 docker-io:
   pkg:
     - installed
@@ -44,10 +15,37 @@ docker-io:
 docker:
   service.running:
     - enable: True
-    - require: 
+    - require:
       - pkg: docker-io
 
 {% else %}
+
+{% if grains.cloud is defined
+   and grains.cloud == 'gce' %}
+# The default GCE images have ip_forwarding explicitly set to 0.
+# Here we take care of commenting that out.
+/etc/sysctl.d/11-gce-network-security.conf:
+  file.replace:
+    - pattern: '^net.ipv4.ip_forward=0'
+    - repl: '# net.ipv4.ip_forward=0'
+{% endif %}
+
+# TODO: This should really be based on network strategy instead of os_family
+net.ipv4.ip_forward:
+  sysctl.present:
+    - value: 1
+
+cbr0:
+  container_bridge.ensure:
+    - cidr: {{ grains['cbr-cidr'] }}
+    - mtu: 1460
+
+purge-old-docker:
+  pkg.removed:
+    - pkgs:
+      - lxc-docker-1.2.0
+      - lxc-docker-1.3.0
+      - lxc-docker-1.3.1
 
 {{ environment_file }}:
   file.managed:
@@ -58,22 +56,58 @@ docker:
     - mode: 644
     - makedirs: true
 
-lxc-docker:
-  pkg.installed
+# We are caching the Docker deb file in GCS for reliability and speed.  To
+# update this to a new version of docker, do the following:
+# 1. Find new deb name with:
+#    curl https://get.docker.com/ubuntu/dists/docker/main/binary-amd64/Packages
+# 2. Download based on that:
+#    curl -O https://get.docker.com/ubuntu/pool/main/<...>
+# 3. Upload to GCS:
+#    gsutil cp <deb> gs://kubernetes-release/docker/<deb>
+# 4. Make it world readable:
+#    gsutil acl ch -R -g all:R gs://kubernetes-release/docker/<deb>
+# 5. Get a hash of the deb:
+#    shasum <deb>
+# 6. Update this file with new deb name, new hash and new version
+# 7. Add the old version to purge-old-docker above.
 
-# There is a race here, I think.  As the package is installed, it will start
-# docker.  If it doesn't write its pid file fast enough then this next stanza
-# will try to ensure that docker is running.  That might start another copy of
-# docker causing the thing to get wedged.
-#
-# See docker issue https://github.com/dotcloud/docker/issues/6184
+{% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
+{% set deb='lxc-docker-1.3.2_1.3.2_amd64.deb' %}
+{% set deb_hash='sha1=e271afeba8156fda9c6e7527c21ae237974a8c51' %}
+{% set docker_ver='1.3.2' %}
 
-# docker:
-#   service.running:
-#     - enable: True
-#     - require:
-#       - pkg: lxc-docker
-#     - watch:
-#       - file: /etc/default/docker
+/var/cache/docker-install/{{ deb }}:
+  file.managed:
+    - source: {{ storage_base }}{{ deb }}
+    - source_hash: {{ deb_hash }}
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+
+# Drop the license file into /usr/share so that everything is crystal clear.
+/usr/share/doc/docker/apache.txt:
+  file.managed:
+    - source: {{ storage_base }}apache2.txt
+    - source_hash: sha1=2b8b815229aa8a61e483fb4ba0588b8b6c491890
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+
+lxc-docker-{{ docker_ver }}:
+  pkg.installed:
+    - sources:
+      - lxc-docker-{{ docker_ver }}: /var/cache/docker-install/{{ deb }}
+
+docker:
+  service.running:
+    - enable: True
+    - require:
+      - pkg: lxc-docker-{{ docker_ver }}
+    - watch:
+      - file: {{ environment_file }}
+      - container_bridge: cbr0
+      - pkg: lxc-docker-{{ docker_ver }}
 
 {% endif %}

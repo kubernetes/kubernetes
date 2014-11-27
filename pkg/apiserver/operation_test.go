@@ -25,21 +25,25 @@ import (
 	"testing"
 	"time"
 
+	// TODO: remove dependency on api, apiserver should be generic
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestOperation(t *testing.T) {
 	ops := NewOperations()
 
-	c := make(chan interface{})
-	op := ops.NewOperation(c)
+	c := make(chan RESTResult)
+	called := make(chan struct{})
+	op := ops.NewOperation(c, func(RESTResult) { go close(called) })
 	// Allow context switch, so that op's ID can get added to the map and Get will work.
 	// This is just so we can test Get. Ordinary users have no need to call Get immediately
 	// after calling NewOperation, because it returns the operation directly.
 	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		c <- "All done"
+		c <- RESTResult{Object: &Simple{ObjectMeta: api.ObjectMeta{Name: "All done"}}}
 	}()
 
 	if op.expired(time.Now().Add(-time.Minute)) {
@@ -69,9 +73,15 @@ func TestOperation(t *testing.T) {
 		t.Errorf("Unexpectedly slow completion")
 	}
 
+	_, open := <-called
+	if open {
+		t.Errorf("expected hook to be called!")
+	}
+
 	time.Sleep(100 * time.Millisecond)
-	if waited != waiters {
-		t.Errorf("Multiple waiters doesn't work, only %v finished", waited)
+	finished := atomic.LoadInt32(&waited)
+	if finished != waiters {
+		t.Errorf("Multiple waiters doesn't work, only %v finished", finished)
 	}
 
 	if op.expired(time.Now().Add(-time.Second)) {
@@ -86,45 +96,54 @@ func TestOperation(t *testing.T) {
 		t.Errorf("expire failed to remove the operation %#v", ops)
 	}
 
-	if op.result.(string) != "All done" {
+	if op.result.Object.(*Simple).Name != "All done" {
 		t.Errorf("Got unexpected result: %#v", op.result)
 	}
 }
 
 func TestOperationsList(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
+	testOver := make(chan struct{})
+	defer close(testOver)
+	simpleStorage := &SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+			// Eliminate flakes by ensuring the create operation takes longer than this test.
+			<-testOver
+			return obj, nil
+		},
+	}
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	}, codec, "/prefix", "version", selfLinker)
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
-	simple := Simple{
-		Name: "foo",
+	simple := &Simple{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	data, err := codec.Encode(simple)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	response, err := client.Post(server.URL+"/prefix/version/foo", "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
+		t.Fatalf("Unexpected response %#v", response)
 	}
 
 	response, err = client.Get(server.URL + "/prefix/version/operations")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status code %#v", response)
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := codec.Decode(body)
 	if err != nil {
@@ -143,46 +162,47 @@ func TestOpGet(t *testing.T) {
 	testOver := make(chan struct{})
 	defer close(testOver)
 	simpleStorage := &SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			// Eliminate flakes by ensuring the create operation takes longer than this test.
 			<-testOver
 			return obj, nil
 		},
 	}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	}, codec, "/prefix", "version", selfLinker)
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
-	simple := Simple{
-		Name: "foo",
+	simple := &Simple{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	data, err := codec.Encode(simple)
 	t.Log(string(data))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	response, err := client.Do(request)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
+		t.Fatalf("Unexpected response %#v", response)
 	}
 
 	var itemOut api.Status
 	body, err := extractBody(response, &itemOut)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
@@ -191,12 +211,12 @@ func TestOpGet(t *testing.T) {
 
 	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details.ID, nil)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	_, err = client.Do(req2)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if response.StatusCode != http.StatusAccepted {

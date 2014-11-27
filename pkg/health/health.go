@@ -17,7 +17,7 @@ limitations under the License.
 package health
 
 import (
-	"net/http"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
@@ -35,39 +35,63 @@ const (
 
 // HealthChecker defines an abstract interface for checking container health.
 type HealthChecker interface {
-	HealthCheck(currentState api.PodState, container api.Container) (Status, error)
+	HealthCheck(podFullName, podUUID string, currentState api.PodState, container api.Container) (Status, error)
+	CanCheck(probe *api.LivenessProbe) bool
+}
+
+// protects allCheckers
+var checkerLock = sync.Mutex{}
+var allCheckers = []HealthChecker{}
+
+// AddHealthChecker adds a health checker to the list of known HealthChecker objects.
+// Any subsequent call to NewHealthChecker will know about this HealthChecker.
+func AddHealthChecker(checker HealthChecker) {
+	checkerLock.Lock()
+	defer checkerLock.Unlock()
+	allCheckers = append(allCheckers, checker)
 }
 
 // NewHealthChecker creates a new HealthChecker which supports multiple types of liveness probes.
 func NewHealthChecker() HealthChecker {
+	checkerLock.Lock()
+	defer checkerLock.Unlock()
 	return &muxHealthChecker{
-		checkers: map[string]HealthChecker{
-			"http": &HTTPHealthChecker{
-				client: &http.Client{},
-			},
-			"tcp": &TCPHealthChecker{},
-		},
+		checkers: append([]HealthChecker{}, allCheckers...),
 	}
 }
 
 // muxHealthChecker bundles multiple implementations of HealthChecker of different types.
 type muxHealthChecker struct {
-	checkers map[string]HealthChecker
+	// Given a LivenessProbe, cycle through each known checker and see if it supports
+	// the specific kind of probe (by returning non-nil).
+	checkers []HealthChecker
+}
+
+func (m *muxHealthChecker) findCheckerFor(probe *api.LivenessProbe) HealthChecker {
+	for i := range m.checkers {
+		if m.checkers[i].CanCheck(probe) {
+			return m.checkers[i]
+		}
+	}
+	return nil
 }
 
 // HealthCheck delegates the health-checking of the container to one of the bundled implementations.
-// It chooses an implementation according to container.LivenessProbe.Type.
-// If there is no matching health checker it returns Unknown, nil.
-func (m *muxHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
-	checker, ok := m.checkers[container.LivenessProbe.Type]
-	if !ok || checker == nil {
-		glog.Warningf("Failed to find health checker for %s %s", container.Name, container.LivenessProbe.Type)
+// If there is no health checker that can check container it returns Unknown, nil.
+func (m *muxHealthChecker) HealthCheck(podFullName, podUUID string, currentState api.PodState, container api.Container) (Status, error) {
+	checker := m.findCheckerFor(container.LivenessProbe)
+	if checker == nil {
+		glog.Warningf("Failed to find health checker for %s %+v", container.Name, container.LivenessProbe)
 		return Unknown, nil
 	}
-	return checker.HealthCheck(currentState, container)
+	return checker.HealthCheck(podFullName, podUUID, currentState, container)
 }
 
-// A helper function to look up a port in a container by name.
+func (m *muxHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return m.findCheckerFor(probe) != nil
+}
+
+// findPortByName is a helper function to look up a port in a container by name.
 // Returns the HostPort if found, -1 if not found.
 func findPortByName(container api.Container, portName string) int {
 	for _, port := range container.Ports {
@@ -76,4 +100,15 @@ func findPortByName(container api.Container, portName string) int {
 		}
 	}
 	return -1
+}
+
+func (s Status) String() string {
+	switch s {
+	case Healthy:
+		return "healthy"
+	case Unhealthy:
+		return "unhealthy"
+	default:
+		return "unknown"
+	}
 }

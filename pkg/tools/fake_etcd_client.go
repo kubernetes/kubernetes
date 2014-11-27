@@ -27,6 +27,8 @@ import (
 type EtcdResponseWithError struct {
 	R *etcd.Response
 	E error
+	// if N is non-null, it will be assigned into the map after this response is used for an operation
+	N *EtcdResponseWithError
 }
 
 // TestLogger is a type passed to Test functions to support formatted test logs.
@@ -47,6 +49,8 @@ type FakeEtcdClient struct {
 	Ix          int
 	TestIndex   bool
 	ChangeIndex uint64
+	LastSetTTL  uint64
+	Machines    []string
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -55,9 +59,11 @@ type FakeEtcdClient struct {
 	// Write to this to prematurely stop a Watch that is running in a goroutine.
 	WatchInjectError chan<- error
 	WatchStop        chan<- bool
+	// If non-nil, will be returned immediately when Watch is called.
+	WatchImmediateError error
 }
 
-func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
+func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	ret := &FakeEtcdClient{
 		t:                    t,
 		expectNotFoundGetSet: map[string]struct{}{},
@@ -78,6 +84,10 @@ func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	return ret
 }
 
+func (f *FakeEtcdClient) GetCluster() []string {
+	return f.Machines
+}
+
 func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {
 	f.expectNotFoundGetSet[key] = struct{}{}
 }
@@ -92,6 +102,15 @@ func (f *FakeEtcdClient) generateIndex() uint64 {
 	return f.ChangeIndex
 }
 
+// Requires that f.Mutex be held.
+func (f *FakeEtcdClient) updateResponse(key string) {
+	resp, found := f.Data[key]
+	if !found || resp.N == nil {
+		return
+	}
+	f.Data[key] = *resp.N
+}
+
 func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
@@ -103,6 +122,7 @@ func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response,
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	result := f.Data[key]
 	if result.R == nil {
@@ -121,6 +141,7 @@ func (f *FakeEtcdClient) nodeExists(key string) bool {
 }
 
 func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Response, error) {
+	f.LastSetTTL = ttl
 	if f.Err != nil {
 		return nil, f.Err
 	}
@@ -151,6 +172,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 				Value:         value,
 				CreatedIndex:  i,
 				ModifiedIndex: i,
+				TTL:           int64(ttl),
 			},
 		},
 	}
@@ -161,6 +183,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	return f.setLocked(key, value, ttl)
 }
@@ -182,6 +205,7 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	if !f.nodeExists(key) {
 		f.t.Logf("c&s: node doesn't exist")
@@ -206,6 +230,7 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	if f.nodeExists(key) {
 		return nil, EtcdErrorNodeExist
@@ -219,6 +244,8 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 		return nil, f.Err
 	}
 
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -235,6 +262,9 @@ func (f *FakeEtcdClient) WaitForWatchCompletion() {
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
+	if f.WatchImmediateError != nil {
+		return nil, f.WatchImmediateError
+	}
 	f.WatchResponse = receiver
 	f.WatchStop = stop
 	f.WatchIndex = waitIndex
@@ -257,6 +287,4 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	case err := <-injectedError:
 		return nil, err
 	}
-	// Never get here.
-	return nil, nil
 }

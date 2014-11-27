@@ -1,0 +1,24 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "ReplicationController",
+  "id": "guestbook-controller",
+  "desiredState": {
+    "replicas": 3,
+    "replicaSelector": { "name": "guestbook" },
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "guestbook-controller",
+          "containers": [{
+            "image": "kubernetes/guestbook",
+            "name": "guestbook",
+            "ports": [{ "name": "http-server", "containerPort": 3000 }]
+          }],
+        }
+      },
+      "labels": { "name": "guestbook" }
+    },
+  },
+  "labels": { "name": "guestbook" }
+}

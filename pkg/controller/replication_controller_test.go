@@ -17,83 +17,82 @@ limitations under the License.
 package controller
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 )
 
-// TODO: Move this to a common place, it's needed in multiple tests.
-var apiPath = "/api/v1beta1"
-
 func makeURL(suffix string) string {
-	return apiPath + suffix
+	return path.Join("/api", testapi.Version(), suffix)
 }
 
 type FakePodControl struct {
 	controllerSpec []api.ReplicationController
-	deletePodID    []string
+	deletePodName  []string
 	lock           sync.Mutex
 }
 
-func (f *FakePodControl) createReplica(spec api.ReplicationController) {
+func (f *FakePodControl) createReplica(namespace string, spec api.ReplicationController) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
-func (f *FakePodControl) deletePod(podID string) error {
+func (f *FakePodControl) deletePod(namespace string, podName string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.deletePodID = append(f.deletePodID, podID)
+	f.deletePodName = append(f.deletePodName, podName)
 	return nil
 }
 
-func makeReplicationController(replicas int) api.ReplicationController {
+func newReplicationController(replicas int) api.ReplicationController {
 	return api.ReplicationController{
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo/bar",
-							},
-						},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
 					},
 				},
-				Labels: map[string]string{
-					"name": "foo",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
 				},
 			},
 		},
 	}
 }
 
-func makePodList(count int) api.PodList {
+func newPodList(count int) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
-			JSONBase: api.JSONBase{
-				ID: fmt.Sprintf("pod%d", i),
+			ObjectMeta: api.ObjectMeta{
+				Name: fmt.Sprintf("pod%d", i),
 			},
 		})
 	}
-	return api.PodList{
+	return &api.PodList{
 		Items: pods,
 	}
 }
@@ -102,182 +101,191 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 	if len(fakePodControl.controllerSpec) != expectedCreates {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.controllerSpec))
 	}
-	if len(fakePodControl.deletePodID) != expectedDeletes {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodID))
+	if len(fakePodControl.deletePodName) != expectedDeletes {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodName))
 	}
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
+	body, _ := latest.Codec.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := makeReplicationController(2)
+	controllerSpec := newReplicationController(2)
 
 	manager.syncReplicationController(controllerSpec)
 	validateSyncReplication(t, &fakePodControl, 0, 0)
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
+	body, _ := latest.Codec.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := makeReplicationController(1)
+	controllerSpec := newReplicationController(1)
 
 	manager.syncReplicationController(controllerSpec)
 	validateSyncReplication(t, &fakePodControl, 0, 1)
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body, _ := api.Encode(makePodList(0))
+	body := runtime.EncodeOrDie(testapi.Codec(), newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := makeReplicationController(2)
+	controllerSpec := newReplicationController(2)
 
 	manager.syncReplicationController(controllerSpec)
 	validateSyncReplication(t, &fakePodControl, 2, 0)
 }
 
 func TestCreateReplica(t *testing.T) {
-	body, _ := api.Encode(api.Pod{})
+	ns := api.NamespaceDefault
+	body := runtime.EncodeOrDie(testapi.Codec(), &api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	podControl := RealPodControl{
 		kubeClient: client,
 	}
 
 	controllerSpec := api.ReplicationController{
-		JSONBase: api.JSONBase{
-			Kind: "ReplicationController",
+		ObjectMeta: api.ObjectMeta{
+			Name: "test",
 		},
-		DesiredState: api.ReplicationControllerState{
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo/bar",
-							},
-						},
+		Spec: api.ReplicationControllerSpec{
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name":                  "foo",
+						"type":                  "production",
+						"replicationController": "test",
 					},
 				},
-				Labels: map[string]string{
-					"name": "foo",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
 				},
 			},
 		},
 	}
 
-	podControl.createReplica(controllerSpec)
+	podControl.createReplica(ns, controllerSpec)
+
+	manifest := api.ContainerManifest{}
+	if err := api.Scheme.Convert(&controllerSpec.Spec.Template.Spec, &manifest); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	expectedPod := api.Pod{
-		JSONBase: api.JSONBase{
-			Kind:       "Pod",
-			APIVersion: "v1beta1",
+		ObjectMeta: api.ObjectMeta{
+			Labels: controllerSpec.Spec.Template.Labels,
 		},
-		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
-		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
+		Spec: controllerSpec.Spec.Template.Spec,
 	}
-	fakeHandler.ValidateRequest(t, makeURL("/pods"), "POST", nil)
-	actualPod := api.Pod{}
-	if err := json.Unmarshal([]byte(fakeHandler.RequestBody), &actualPod); err != nil {
+	fakeHandler.ValidateRequest(t, makeURL("/pods?namespace=default"), "POST", nil)
+	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
+	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(expectedPod, actualPod) {
+	if !reflect.DeepEqual(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
-		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", expectedPod, actualPod)
+		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}
 }
 
-func TestSyncronize(t *testing.T) {
+func TestSynchonize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
-		JSONBase: api.JSONBase{APIVersion: "v1beta1"},
-		DesiredState: api.ReplicationControllerState{
+		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		Spec: api.ReplicationControllerSpec{
 			Replicas: 4,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo/bar",
-							},
-						},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
 					},
 				},
-				Labels: map[string]string{
-					"name": "foo",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
 				},
 			},
 		},
 	}
 	controllerSpec2 := api.ReplicationController{
-		JSONBase: api.JSONBase{APIVersion: "v1beta1"},
-		DesiredState: api.ReplicationControllerState{
+		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+		Spec: api.ReplicationControllerSpec{
 			Replicas: 3,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "bar/baz",
-							},
-						},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "bar",
+						"type": "production",
 					},
 				},
-				Labels: map[string]string{
-					"name": "bar",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "bar/baz",
+						},
+					},
 				},
 			},
 		},
 	}
 
-	fakeEtcd := tools.MakeFakeEtcdClient(t)
+	fakeEtcd := tools.NewFakeEtcdClient(t)
 	fakeEtcd.Data["/registry/controllers"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: util.MakeJSONString(controllerSpec1),
+						Value: runtime.EncodeOrDie(testapi.Codec(), &controllerSpec1),
 					},
 					{
-						Value: util.MakeJSONString(controllerSpec2),
+						Value: runtime.EncodeOrDie(testapi.Codec(), &controllerSpec2),
 					},
 				},
 			},
@@ -286,12 +294,12 @@ func TestSyncronize(t *testing.T) {
 
 	fakePodHandler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "{\"apiVersion\": \"v1beta1\", \"kind\": \"PodList\"}",
+		ResponseBody: "{\"apiVersion\": \"" + testapi.Version() + "\", \"kind\": \"PodList\"}",
 		T:            t,
 	}
 	fakeControllerHandler := util.FakeHandler{
 		StatusCode: 200,
-		ResponseBody: api.EncodeOrDie(&api.ReplicationControllerList{
+		ResponseBody: runtime.EncodeOrDie(latest.Codec, &api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				controllerSpec1,
 				controllerSpec2,
@@ -300,15 +308,16 @@ func TestSyncronize(t *testing.T) {
 		T: t,
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/api/v1beta1/pods/", &fakePodHandler)
-	mux.Handle("/api/v1beta1/replicationControllers/", &fakeControllerHandler)
+	mux.Handle("/api/"+testapi.Version()+"/pods/", &fakePodHandler)
+	mux.Handle("/api/"+testapi.Version()+"/replicationControllers/", &fakeControllerHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		t.Errorf("Unexpected request for %v", req.RequestURI)
 	})
 	testServer := httptest.NewServer(mux)
-	client := client.New(testServer.URL, nil)
-	manager := MakeReplicationManager(client)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	manager := NewReplicationManager(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
 
@@ -319,16 +328,13 @@ func TestSyncronize(t *testing.T) {
 
 type FakeWatcher struct {
 	w *watch.FakeWatcher
-	*client.FakeClient
-}
-
-func (fw FakeWatcher) WatchReplicationControllers(l, f labels.Selector, rv uint64) (watch.Interface, error) {
-	return fw.w, nil
+	*client.Fake
 }
 
 func TestWatchControllers(t *testing.T) {
-	client := FakeWatcher{watch.NewFake(), &client.FakeClient{}}
-	manager := MakeReplicationManager(client)
+	fakeWatch := watch.NewFake()
+	client := &client.Fake{Watch: fakeWatch}
+	manager := NewReplicationManager(client)
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})
 	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
@@ -339,12 +345,13 @@ func TestWatchControllers(t *testing.T) {
 		return nil
 	}
 
-	resourceVersion := uint64(0)
+	resourceVersion := ""
 	go manager.watchControllers(&resourceVersion)
 
 	// Test normal case
-	testControllerSpec.ID = "foo"
-	client.w.Add(&testControllerSpec)
+	testControllerSpec.Name = "foo"
+
+	fakeWatch.Add(&testControllerSpec)
 
 	select {
 	case <-received:

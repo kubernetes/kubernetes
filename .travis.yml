@@ -3,20 +3,21 @@ language: go
 go:
   - 1.3
   - 1.2
-  - tip
 
-install: 
+install:
   - go get code.google.com/p/go.tools/cmd/cover
-  - go get github.com/coreos/etcd
+  - ./hack/travis/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
-  - ./hack/install-std-race.sh
+  - ./hack/verify-description.sh
+  - ./hack/travis/install-std-race.sh
   - ./hack/build-go.sh
+  - go get ./contrib/podex
 
 script:
-  - ./hack/test-go.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/integration-test.sh
+  - KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"

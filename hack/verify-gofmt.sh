@@ -16,19 +16,37 @@
 
 # GoFmt apparently is changing @ head...
 
-GO_VERSION=($(go version))
-echo "Detected go version: $(go version)"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3" ]]; then
-  echo "Unknown go version, skipping gofmt."
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+GO_VERSION=($(go version))
+
+if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3') ]]; then
+  echo "Unknown go version '${GO_VERSION}', skipping gofmt."
   exit 0
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
+cd "${KUBE_ROOT}"
 
-files="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "third_party/\|release/\|output/\|target/")"
-bad=$(gofmt -s -l ${files})
-if [[ -n "${bad}" ]]; then
-  echo "$bad"
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+bad_files=$(find_files | xargs gofmt -s -l)
+if [[ -n "${bad_files}" ]]; then
+  echo "!!! gofmt needs to be run on the following files: "
+  echo "${bad_files}"
   exit 1
 fi

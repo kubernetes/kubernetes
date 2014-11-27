@@ -18,9 +18,11 @@ package cloudprovider
 
 import (
 	"net"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// Interface is an abstract, pluggable interface for cloud providers
+// Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	TCPLoadBalancer() (TCPLoadBalancer, bool)
@@ -28,6 +30,16 @@ type Interface interface {
 	Instances() (Instances, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
+	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
+	Clusters() (Clusters, bool)
+}
+
+// Clusters is an abstract, pluggable interface for clusters of containers.
+type Clusters interface {
+	// List lists the names of the available clusters.
+	ListClusters() ([]string, error)
+	// Master gets back the address (either DNS name or IP address) of the master node for the cluster.
+	Master(clusterName string) (string, error)
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
@@ -35,8 +47,8 @@ type TCPLoadBalancer interface {
 	// TCPLoadBalancerExists returns whether the specified load balancer exists.
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	TCPLoadBalancerExists(name, region string) (bool, error)
-	// CreateTCPLoadBalancer creates a new tcp load balancer.
-	CreateTCPLoadBalancer(name, region string, port int, hosts []string) error
+	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address of the balancer
+	CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (net.IP, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// DeleteTCPLoadBalancer deletes a specified load balancer.
@@ -49,9 +61,11 @@ type Instances interface {
 	IPAddress(name string) (net.IP, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
+	// GetNodeResources gets the resources for a particular node
+	GetNodeResources(name string) (*api.NodeResources, error)
 }
 
-// Zone represents the location of a particular machine
+// Zone represents the location of a particular machine.
 type Zone struct {
 	FailureDomain string
 	Region        string

@@ -18,43 +18,11 @@ package util
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"gopkg.in/v1/yaml"
 )
-
-type FakeJSONBase struct {
-	ID string
-}
-type FakePod struct {
-	FakeJSONBase `json:",inline" yaml:",inline"`
-	Labels       map[string]string
-	Int          int
-	Str          string
-}
-
-func TestMakeJSONString(t *testing.T) {
-	pod := FakePod{
-		FakeJSONBase: FakeJSONBase{ID: "foo"},
-		Labels: map[string]string{
-			"foo": "bar",
-			"baz": "blah",
-		},
-		Int: -6,
-		Str: "a string",
-	}
-
-	body := MakeJSONString(pod)
-
-	expectedBody, err := json.Marshal(pod)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if string(expectedBody) != body {
-		t.Errorf("JSON doesn't match.  Expected %s, saw %s", expectedBody, body)
-	}
-}
 
 func TestHandleCrash(t *testing.T) {
 	count := 0
@@ -71,15 +39,15 @@ func TestHandleCrash(t *testing.T) {
 	}
 }
 
-func TestMakeIntOrStringFromInt(t *testing.T) {
-	i := MakeIntOrStringFromInt(93)
+func TestNewIntOrStringFromInt(t *testing.T) {
+	i := NewIntOrStringFromInt(93)
 	if i.Kind != IntstrInt || i.IntVal != 93 {
 		t.Errorf("Expected IntVal=93, got %+v", i)
 	}
 }
 
-func TestMakeIntOrStringFromString(t *testing.T) {
-	i := MakeIntOrStringFromString("76")
+func TestNewIntOrStringFromString(t *testing.T) {
+	i := NewIntOrStringFromString("76")
 	if i.Kind != IntstrString || i.StrVal != "76" {
 		t.Errorf("Expected StrVal=\"76\", got %+v", i)
 	}
@@ -101,10 +69,10 @@ func TestIntOrStringUnmarshalYAML(t *testing.T) {
 	for _, c := range cases {
 		var result IntOrStringHolder
 		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal: %v", err)
+			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
 		}
 		if result.IOrS != c.result {
-			t.Errorf("Failed to unmarshal IntOrString: got %+v", result)
+			t.Errorf("Failed to unmarshal input '%v': expected: %+v, got %+v", c.input, c.result, result)
 		}
 	}
 }
@@ -122,10 +90,10 @@ func TestIntOrStringMarshalYAML(t *testing.T) {
 		input := IntOrStringHolder{c.input}
 		result, err := yaml.Marshal(&input)
 		if err != nil {
-			t.Errorf("Failed to marshal: %v", err)
+			t.Errorf("Failed to marshal input '%v': %v", input, err)
 		}
 		if string(result) != c.result {
-			t.Errorf("Failed to marshal IntOrString: got %q", string(result))
+			t.Errorf("Failed to marshal input '%v': expected: %+v, got %q", input, c.result, string(result))
 		}
 	}
 }
@@ -142,10 +110,10 @@ func TestIntOrStringUnmarshalJSON(t *testing.T) {
 	for _, c := range cases {
 		var result IntOrStringHolder
 		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal: %v", err)
+			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
 		}
 		if result.IOrS != c.result {
-			t.Errorf("Failed to unmarshal IntOrString: got %+v", result)
+			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
 		}
 	}
 }
@@ -163,10 +131,37 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 		input := IntOrStringHolder{c.input}
 		result, err := json.Marshal(&input)
 		if err != nil {
-			t.Errorf("Failed to marshal: %v", err)
+			t.Errorf("Failed to marshal input '%v': %v", input, err)
 		}
 		if string(result) != c.result {
-			t.Errorf("Failed to marshal IntOrString: got %q", string(result))
+			t.Errorf("Failed to marshal input '%v': expected: %+v, got %q", input, c.result, string(result))
+		}
+	}
+}
+
+func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
+	cases := []struct {
+		input IntOrString
+	}{
+		{IntOrString{Kind: IntstrInt, IntVal: 123}},
+		{IntOrString{Kind: IntstrString, StrVal: "123"}},
+	}
+
+	for _, c := range cases {
+		input := IntOrStringHolder{c.input}
+		jsonMarshalled, err := json.Marshal(&input)
+		if err != nil {
+			t.Errorf("1: Failed to marshal input: '%v': %v", input, err)
+		}
+
+		var result IntOrStringHolder
+		err = yaml.Unmarshal(jsonMarshalled, &result)
+		if err != nil {
+			t.Errorf("2: Failed to unmarshal '%+v': %v", string(jsonMarshalled), err)
+		}
+
+		if !reflect.DeepEqual(input, result) {
+			t.Errorf("3: Failed to marshal input '%+v': got %+v", input, result)
 		}
 	}
 }
@@ -176,5 +171,30 @@ func TestStringDiff(t *testing.T) {
 	expect := "aaa\n\nA: bb\n\nB: cc\n\n"
 	if diff != expect {
 		t.Errorf("diff returned %v", diff)
+	}
+}
+
+func TestCompileRegex(t *testing.T) {
+	uncompiledRegexes := []string{"endsWithMe$", "^startingWithMe"}
+	regexes, err := CompileRegexps(uncompiledRegexes)
+
+	if err != nil {
+		t.Errorf("Failed to compile legal regexes: '%v': %v", uncompiledRegexes, err)
+	}
+	if len(regexes) != len(uncompiledRegexes) {
+		t.Errorf("Wrong number of regexes returned: '%v': %v", uncompiledRegexes, regexes)
+	}
+
+	if !regexes[0].MatchString("Something that endsWithMe") {
+		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[0], regexes[0])
+	}
+	if regexes[0].MatchString("Something that doesn't endsWithMe.") {
+		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[0], regexes[0])
+	}
+	if !regexes[1].MatchString("startingWithMe is very important") {
+		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[1], regexes[1])
+	}
+	if regexes[1].MatchString("not startingWithMe should fail") {
+		t.Errorf("Wrong regex returned: '%v': %v", uncompiledRegexes[1], regexes[1])
 	}
 }

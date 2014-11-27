@@ -17,302 +17,299 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path"
-	"runtime/debug"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 )
 
-// Codec defines methods for serializing and deserializing API
-// objects
-type Codec interface {
-	Encode(obj interface{}) (data []byte, err error)
-	Decode(data []byte) (interface{}, error)
-	DecodeInto(data []byte, obj interface{}) error
+// mux is an object that can register http handlers.
+type Mux interface {
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// APIServer is an HTTPHandler that delegates to RESTStorage objects.
+// defaultAPIServer exposes nested objects for testability.
+type defaultAPIServer struct {
+	http.Handler
+	group *APIGroupVersion
+}
+
+const (
+	StatusUnprocessableEntity = 422
+)
+
+// Handle returns a Handler function that exposes the provided storage interfaces
+// as RESTful resources at prefix, serialized by codec, and also includes the support
+// http resources.
+func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, selfLinker runtime.SelfLinker) http.Handler {
+	prefix := root + "/" + version
+	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker)
+	container := restful.NewContainer()
+	mux := container.ServeMux
+	group.InstallREST(container, root, version)
+	ws := new(restful.WebService)
+	InstallSupport(container, ws)
+	container.Add(ws)
+	return &defaultAPIServer{mux, group}
+}
+
+// TODO: This is a whole API version right now. Maybe should rename it.
+// APIGroupVersion is a http.Handler that exposes multiple RESTStorage objects
 // It handles URLs of the form:
-// ${prefix}/${storage_key}[/${object_name}]
-// Where 'prefix' is an arbitrary string, and 'storage_key' points to a RESTStorage object stored in storage.
+// /${storage_key}[/${object_name}]
+// Where 'storage_key' points to a RESTStorage object stored in storage.
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
-type APIServer struct {
-	storage     map[string]RESTStorage
-	codec       Codec
-	ops         *Operations
-	asyncOpWait time.Duration
-	handler     http.Handler
+type APIGroupVersion struct {
+	handler RESTHandler
 }
 
-// New creates a new APIServer object. 'storage' contains a map of handlers. 'codec'
-// is an interface for decoding to and from JSON. 'prefix' is the hosting path prefix.
-//
-// The codec will be used to decode the request body into an object pointer returned by
-// RESTStorage.New().  The Create() and Update() methods should cast their argument to
-// the type returned by New().
+// NewAPIGroupVersion returns an object that will serve a set of REST resources and their
+// associated operations.  The provided codec controls serialization and deserialization.
+// This is a helper method for registering multiple sets of REST handlers under different
+// prefixes onto a server.
 // TODO: add multitype codec serialization
-func New(storage map[string]RESTStorage, codec Codec, prefix string) *APIServer {
-	s := &APIServer{
-		storage: storage,
-		codec:   codec,
-		ops:     NewOperations(),
+func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, canonicalPrefix string, selfLinker runtime.SelfLinker) *APIGroupVersion {
+	return &APIGroupVersion{RESTHandler{
+		storage:         storage,
+		codec:           codec,
+		canonicalPrefix: canonicalPrefix,
+		selfLinker:      selfLinker,
+		ops:             NewOperations(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
-	}
-
-	mux := http.NewServeMux()
-
-	prefix = strings.TrimRight(prefix, "/")
-
-	// Primary API handlers
-	restPrefix := prefix + "/"
-	mux.Handle(restPrefix, http.StripPrefix(restPrefix, http.HandlerFunc(s.handleREST)))
-
-	// Watch API handlers
-	watchPrefix := path.Join(prefix, "watch") + "/"
-	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage, codec}))
-
-	// Support services for the apiserver
-	logsPrefix := "/logs/"
-	mux.Handle(logsPrefix, http.StripPrefix(logsPrefix, http.FileServer(http.Dir("/var/log/"))))
-	healthz.InstallHandler(mux)
-	mux.HandleFunc("/version", handleVersion)
-	mux.HandleFunc("/", handleIndex)
-
-	// Handle both operations and operations/* with the same handler
-	handler := &OperationHandler{s.ops, s.codec}
-	operationPrefix := path.Join(prefix, "operations")
-	mux.Handle(operationPrefix, http.StripPrefix(operationPrefix, handler))
-	operationsPrefix := operationPrefix + "/"
-	mux.Handle(operationsPrefix, http.StripPrefix(operationsPrefix, handler))
-
-	// Proxy minion requests
-	mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
-
-	s.handler = mux
-
-	return s
+	}}
 }
 
-// ServeHTTP implements the standard net/http interface.
-func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if x := recover(); x != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "apis panic. Look in log for details.")
-			glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
-		}
-	}()
-	defer httplog.MakeLogged(req, &w).StacktraceWhen(
-		httplog.StatusIsNot(
-			http.StatusOK,
-			http.StatusAccepted,
-			http.StatusConflict,
-			http.StatusNotFound,
-		),
-	).Log()
-
-	// Dispatch to the internal handler
-	s.handler.ServeHTTP(w, req)
+// This magic incantation returns *ptrToObject for an arbitrary pointer
+func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
+	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-// handleREST handles requests to all our RESTStorage objects.
-func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
-	parts := splitPath(req.URL.Path)
-	if len(parts) < 1 {
-		notFound(w, req)
+func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, kinds map[string]reflect.Type, h restful.RouteFunction) {
+	glog.V(3).Infof("Installing /%s/%s\n", version, path)
+	object := storage.New()
+	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
+	if err != nil {
+		glog.Warningf("error getting kind: %v\n", err)
 		return
 	}
-	storage := s.storage[parts[0]]
-	if storage == nil {
-		httplog.LogOf(w).Addf("'%v' has no storage object", parts[0])
-		notFound(w, req)
+	versionedPtr, err := api.Scheme.New(version, kind)
+	if err != nil {
+		glog.Warningf("error making object: %v\n", err)
 		return
 	}
+	versionedObject := indirectArbitraryPointer(versionedPtr)
+	glog.V(3).Infoln("type: ", reflect.TypeOf(versionedObject))
 
-	s.handleRESTStorage(parts, req, w, storage)
-}
+	// See github.com/emicklei/go-restful/blob/master/jsr311.go for routing logic
+	// and status-code behavior
 
-// handleRESTStorage is the main dispatcher for a storage object.  It switches on the HTTP method, and then
-// on path length, according to the following table:
-//   Method     Path          Action
-//   GET        /foo          list
-//   GET        /foo/bar      get 'bar'
-//   POST       /foo          create
-//   PUT        /foo/bar      update 'bar'
-//   DELETE     /foo/bar      delete 'bar'
-// Returns 404 if the method/pattern doesn't match one of these entries
-// The s accepts several query parameters:
-//    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
-//    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
-//    labels=<label-selector> Used for filtering list operations
-func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	sync := req.URL.Query().Get("sync") == "true"
-	timeout := parseTimeout(req.URL.Query().Get("timeout"))
-	switch req.Method {
-	case "GET":
-		switch len(parts) {
-		case 1:
-			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
-			if err != nil {
-				errorJSON(err, s.codec, w)
-				return
-			}
-			list, err := storage.List(selector)
-			if err != nil {
-				errorJSON(err, s.codec, w)
-				return
-			}
-			writeJSON(http.StatusOK, s.codec, list, w)
-		case 2:
-			item, err := storage.Get(parts[1])
-			if err != nil {
-				errorJSON(err, s.codec, w)
-				return
-			}
-			writeJSON(http.StatusOK, s.codec, item, w)
-		default:
-			notFound(w, req)
-		}
+	ws.Route(ws.POST(path).To(h).
+		Doc("create a " + kind).
+		Operation("create" + kind).
+		Reads(versionedObject)) // from the request
 
-	case "POST":
-		if len(parts) != 1 {
-			notFound(w, req)
-			return
-		}
-		body, err := readBody(req)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		obj := storage.New()
-		err = s.codec.DecodeInto(body, obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		out, err := storage.Create(obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	case "DELETE":
-		if len(parts) != 2 {
-			notFound(w, req)
-			return
-		}
-		out, err := storage.Delete(parts[1])
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	case "PUT":
-		if len(parts) != 2 {
-			notFound(w, req)
-			return
-		}
-		body, err := readBody(req)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		obj := storage.New()
-		err = s.codec.DecodeInto(body, obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		out, err := storage.Update(obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	default:
-		notFound(w, req)
-	}
-}
-
-// handleVersionReq writes the server's version information.
-func handleVersion(w http.ResponseWriter, req *http.Request) {
-	writeRawJSON(http.StatusOK, version.Get(), w)
-}
-
-// createOperation creates an operation to process a channel response
-func (s *APIServer) createOperation(out <-chan interface{}, sync bool, timeout time.Duration) *Operation {
-	op := s.ops.NewOperation(out)
-	if sync {
-		op.WaitFor(timeout)
-	} else if s.asyncOpWait != 0 {
-		op.WaitFor(s.asyncOpWait)
-	}
-	return op
-}
-
-// finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
-// Operation to receive the result and returning its ID down the writer.
-func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
-	obj, complete := op.StatusOrResult()
-	if complete {
-		status := http.StatusOK
-		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		case *api.Status:
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		}
-		writeJSON(status, s.codec, obj, w)
+	// TODO: This seems like a hack. Add NewList() to storage?
+	listKind := kind + "List"
+	if _, ok := kinds[listKind]; !ok {
+		glog.V(1).Infof("no list type: %v\n", listKind)
 	} else {
-		writeJSON(http.StatusAccepted, s.codec, obj, w)
+		versionedListPtr, err := api.Scheme.New(version, listKind)
+		if err != nil {
+			glog.Errorf("error making list: %v\n", err)
+		} else {
+			versionedList := indirectArbitraryPointer(versionedListPtr)
+			glog.V(3).Infoln("type: ", reflect.TypeOf(versionedList))
+			ws.Route(ws.GET(path).To(h).
+				Doc("list objects of kind "+kind).
+				Operation("list"+kind).
+				Returns(http.StatusOK, "OK", versionedList))
+		}
+	}
+
+	ws.Route(ws.GET(path + "/{name}").To(h).
+		Doc("read the specified " + kind).
+		Operation("read" + kind).
+		Param(ws.PathParameter("name", "name of the "+kind).DataType("string")).
+		Writes(versionedObject)) // on the response
+
+	ws.Route(ws.PUT(path + "/{name}").To(h).
+		Doc("update the specified " + kind).
+		Operation("update" + kind).
+		Param(ws.PathParameter("name", "name of the "+kind).DataType("string")).
+		Reads(versionedObject)) // from the request
+
+	// TODO: Support PATCH
+
+	ws.Route(ws.DELETE(path + "/{name}").To(h).
+		Doc("delete the specified " + kind).
+		Operation("delete" + kind).
+		Param(ws.PathParameter("name", "name of the "+kind).DataType("string")))
+}
+
+// InstallREST registers the REST handlers (storage, watch, and operations) into a restful Container.
+// It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
+// in a slash. A restful WebService is created for the group and version.
+func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) {
+	prefix := path.Join(root, version)
+	restHandler := &g.handler
+	strippedHandler := http.StripPrefix(prefix, restHandler)
+	watchHandler := &WatchHandler{
+		storage:         g.handler.storage,
+		codec:           g.handler.codec,
+		canonicalPrefix: g.handler.canonicalPrefix,
+		selfLinker:      g.handler.selfLinker,
+	}
+	proxyHandler := &ProxyHandler{prefix + "/proxy/", g.handler.storage, g.handler.codec}
+	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
+	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
+
+	// Create a new WebService for this APIGroupVersion at the specified path prefix
+	// TODO: Pass in more descriptive documentation
+	ws := new(restful.WebService)
+	ws.Path(prefix)
+	ws.Doc("API at " + root + ", version " + version)
+	// TODO: change to restful.MIME_JSON when we convert YAML->JSON and set content type in client
+	ws.Consumes("*/*")
+	ws.Produces(restful.MIME_JSON)
+	// TODO: require json on input
+	//ws.Consumes(restful.MIME_JSON)
+
+	// TODO: add scheme to APIGroupVersion rather than using api.Scheme
+
+	kinds := api.Scheme.KnownTypes(version)
+	glog.V(4).Infof("InstallREST: %v kinds: %#v", version, kinds)
+
+	// TODO: #2057: Return API resources on "/".
+
+	// TODO: Add status documentation using Returns()
+	// Errors (see api/errors/errors.go as well as go-restful router):
+	// http.StatusNotFound, http.StatusMethodNotAllowed,
+	// http.StatusUnsupportedMediaType, http.StatusNotAcceptable,
+	// http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
+	// http.StatusRequestTimeout, http.StatusConflict, http.StatusPreconditionFailed,
+	// 422 (StatusUnprocessableEntity), http.StatusInternalServerError,
+	// http.StatusServiceUnavailable
+	// and api error codes
+	// Note that if we specify a versioned Status object here, we may need to
+	// create one for the tests, also
+	// Success:
+	// http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent
+	//
+	// test/integration/auth_test.go is currently the most comprehensive status code test
+
+	// TODO: eliminate all the restful wrappers
+	// TODO: create a separate handler per verb
+	h := func(req *restful.Request, resp *restful.Response) {
+		glog.V(4).Infof("User-Agent: %s\n", req.HeaderParameter("User-Agent"))
+		strippedHandler.ServeHTTP(resp.ResponseWriter, req.Request)
+	}
+
+	for path, storage := range g.handler.storage {
+		registerResourceHandlers(ws, version, path, storage, kinds, h)
+	}
+
+	// TODO: port the rest of these. Sadly, if we don't, we'll have inconsistent
+	// API behavior, as well as lack of documentation
+	mux := container.ServeMux
+
+	// Note: update GetAttribs() when adding a handler.
+	mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
+	mux.Handle(prefix+"/proxy/", http.StripPrefix(prefix+"/proxy/", proxyHandler))
+	mux.Handle(prefix+"/redirect/", http.StripPrefix(prefix+"/redirect/", redirectHandler))
+	mux.Handle(prefix+"/operations", http.StripPrefix(prefix+"/operations", opHandler))
+	mux.Handle(prefix+"/operations/", http.StripPrefix(prefix+"/operations/", opHandler))
+
+	container.Add(ws)
+}
+
+// TODO: Convert to go-restful
+func InstallValidator(mux Mux, servers map[string]Server) {
+	validator, err := NewValidator(servers)
+	if err != nil {
+		glog.Errorf("failed to set up validator: %v", err)
+		return
+	}
+	if validator != nil {
+		mux.Handle("/validate", validator)
 	}
 }
 
-// writeJSON renders an object as JSON to the response
-func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseWriter) {
+// TODO: document all handlers
+// InstallSupport registers the APIServer support functions
+func InstallSupport(container *restful.Container, ws *restful.WebService) {
+	// TODO: convert healthz to restful and remove container arg
+	healthz.InstallHandler(container.ServeMux)
+	ws.Route(ws.GET("/").To(handleIndex))
+	ws.Route(ws.GET("/version").To(handleVersion))
+}
+
+// InstallLogsSupport registers the APIServer log support function into a mux.
+func InstallLogsSupport(mux Mux) {
+	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
+	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
+	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+}
+
+// handleVersion writes the server's version information.
+func handleVersion(req *restful.Request, resp *restful.Response) {
+	// TODO: use restful's Response methods
+	writeRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
+}
+
+// APIVersionHandler returns a handler which will list the provided versions as available.
+func APIVersionHandler(versions ...string) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		// TODO: use restful's Response methods
+		writeRawJSON(http.StatusOK, api.APIVersions{Versions: versions}, resp.ResponseWriter)
+	}
+}
+
+// writeJSON renders an object as JSON to the response.
+func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
 	if err != nil {
+		// Note: If codec is broken, this results in an infinite recursion
+		errorJSON(err, codec, w)
+		return
+	}
+	// PR #2243: Pretty-print JSON by default.
+	formatted := &bytes.Buffer{}
+	err = json.Indent(formatted, output, "", "  ")
+	if err != nil {
+		// Note: If codec is broken, this results in an infinite recursion
 		errorJSON(err, codec, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	w.Write(output)
+	w.Write(formatted.Bytes())
 }
 
-// errorJSON renders an error to the response
-func errorJSON(err error, codec Codec, w http.ResponseWriter) {
+// errorJSON renders an error to the response.
+func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
 	status := errToAPIStatus(err)
 	writeJSON(status.Code, codec, status, w)
 }
 
 // writeRawJSON writes a non-API object in JSON.
 func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	output, err := json.Marshal(object)
+	// PR #2243: Pretty-print JSON by default.
+	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -328,7 +325,7 @@ func parseTimeout(str string) time.Duration {
 		if err == nil {
 			return timeout
 		}
-		glog.Errorf("Failed to parse: %#v '%s'", err, str)
+		glog.Errorf("Failed to parse %q: %v", str, err)
 	}
 	return 30 * time.Second
 }
@@ -338,7 +335,7 @@ func readBody(req *http.Request) ([]byte, error) {
 	return ioutil.ReadAll(req.Body)
 }
 
-// splitPath returns the segments for a URL path
+// splitPath returns the segments for a URL path.
 func splitPath(path string) []string {
 	path = strings.Trim(path, "/")
 	if path == "" {

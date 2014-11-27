@@ -2,6 +2,6 @@
 
 There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com):
 
-[Single Kubernetes example in any environment](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-1/)
-
-[Multiple host example using VMware Fusion](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-2/)
+* [Single Node Cluster](coreos/coreos_single_node_cluster.md)
+* [Multi-node Cluster](coreos/coreos_multinode_cluster.md)
+* [Multi-node cluster using cloud-config and Weave on Vagrant](https://github.com/errordeveloper/weave-demos/blob/master/poseidon/README.md)

@@ -16,75 +16,158 @@
 
 # exit on any error
 set -e
-source $(dirname $0)/provision-config.sh
 
-# we will run provision to update code each time we test, so we do not want to do salt install each time
-if [ ! -f "/var/kube-vagrant-setup" ]; then
-  mkdir -p /etc/salt/minion.d
-  echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
 
-  cat <<EOF >/etc/salt/minion.d/grains.conf
+function release_not_found() {
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  exit 1
+}
+
+# Look for our precompiled binary releases.  When running from a source repo,
+# these are generated under _output.  When running from an release tarball these
+# are under ./server.
+server_binary_tar="/vagrant/server/kubernetes-server-linux-amd64.tar.gz"
+if [[ ! -f "$server_binary_tar" ]]; then
+  server_binary_tar="/vagrant/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+fi
+if [[ ! -f "$server_binary_tar" ]]; then
+  release_not_found
+fi
+
+salt_tar="/vagrant/server/kubernetes-salt.tar.gz"
+if [[ ! -f "$salt_tar" ]]; then
+  salt_tar="/vagrant/_output/release-tars/kubernetes-salt.tar.gz"
+fi
+if [[ ! -f "$salt_tar" ]]; then
+  release_not_found
+fi
+
+
+# Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
+minion_ip_array=(${MINION_IPS//,/ })
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  minion=${MINION_NAMES[$i]}
+  ip=${minion_ip_array[$i]}
+  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
+    echo "Adding $minion to hosts file"
+    echo "$ip $minion" >> /etc/hosts
+  fi
+done
+
+# Update salt configuration
+mkdir -p /etc/salt/minion.d
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+
+cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
+  node_ip: $MASTER_IP
   master_ip: $MASTER_IP
+  publicAddressOverride: $MASTER_IP
+  network_mode: openvswitch
+  networkInterfaceName: eth1
   etcd_servers: $MASTER_IP
-  minion_ips: $MINION_IPS
+  cloud: vagrant
+  cloud_provider: vagrant
   roles:
     - kubernetes-master
 EOF
 
-  # Configure the salt-master
-  # Auto accept all keys from minions that try to join
-  mkdir -p /etc/salt/master.d
-  cat <<EOF >/etc/salt/master.d/auto-accept.conf
+mkdir -p /srv/salt-overlay/pillar
+cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
+  portal_net: $PORTAL_NET
+  cert_ip: $MASTER_IP
+  enable_node_monitoring: $ENABLE_NODE_MONITORING
+  enable_node_logging: $ENABLE_NODE_LOGGING
+  logging_destination: $LOGGING_DESTINATION
+EOF
+
+# Configure the salt-master
+# Auto accept all keys from minions that try to join
+mkdir -p /etc/salt/master.d
+cat <<EOF >/etc/salt/master.d/auto-accept.conf
 open_mode: True
 auto_accept: True
 EOF
 
-  cat <<EOF >/etc/salt/master.d/reactor.conf
+cat <<EOF >/etc/salt/master.d/reactor.conf
 # React to new minions starting by running highstate on them.
 reactor:
   - 'salt/minion/*/start':
-    - /srv/reactor/start.sls
+    - /srv/reactor/highstate-new.sls
 EOF
 
-  cat <<EOF >/etc/salt/master.d/salt-output.conf
+cat <<EOF >/etc/salt/master.d/salt-output.conf
 # Minimize the amount of output to terminal
 state_verbose: False
-state_output: mixed  
+state_output: mixed
 EOF
 
-  # Install Salt
-  #
-  # We specify -X to avoid a race condition that can cause minion failure to
-  # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-  #
-  # -M installs the master
-  # FIXME: The following line should be replaced with:
-  # curl -L http://bootstrap.saltstack.com | sh -s -- -M
-  # when the merged salt-api service is included in the fedora salt-master rpm
-  # Merge is here: https://github.com/saltstack/salt/pull/13554
-  # Fedora git repository is here: http://pkgs.fedoraproject.org/cgit/salt.git/
-  # (a new service file needs to be added for salt-api)
-  curl -sS -L https://raw.githubusercontent.com/saltstack/salt-bootstrap/v2014.06.30/bootstrap-salt.sh | sh -s -- -M
-
-  mkdir -p /srv/salt/nginx
-  echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
-
-  # a file we touch to state that base-setup is done
-  echo "Salt configured" > /var/kube-vagrant-setup
-fi
-
-# Build release
-echo "Building release"
-pushd /vagrant
-  ./release/build-release.sh kubernetes
-popd
+# Configure nginx authorization
+mkdir -p "$KUBE_TEMP"
+mkdir -p /srv/salt-overlay/salt/nginx
+python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpasswd" "$MASTER_USER" "$MASTER_PASSWD"
+MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
+echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
 
 echo "Running release install script"
-pushd /vagrant/output/release/master-release/src/scripts
-  ./master-release-install.sh
+rm -rf /kube-install
+mkdir -p /kube-install
+pushd /kube-install
+  tar xzf "$salt_tar"
+  cp "$server_binary_tar" .
+  ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
 popd
 
-echo "Executing configuration"
-salt '*' mine.update
-salt --force-color '*' state.highstate
+# we will run provision to update code each time we test, so we do not want to do salt installs each time
+if ! which salt-master >/dev/null 2>&1; then
+
+  # Configure the salt-api
+  cat <<EOF >/etc/salt/master.d/salt-api.conf
+# Set vagrant user as REST API user
+external_auth:
+  pam:
+    vagrant:
+      - .*
+rest_cherrypy:
+  port: 8000
+  host: 127.0.0.1
+  disable_ssl: True
+  webhook_disable_auth: True
+EOF
+
+
+  # Install Salt Master
+  #
+  # -M installs the master
+  # -N does not install the minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -N
+
+  # Install salt-api
+  #
+  # This is used to inform the cloud provider used in the vagrant cluster
+  yum install -y salt-api
+  # Set log level to a level higher than "info" to prevent the message about
+  # enabling the service (which is not an error) from being printed to stderr.
+  SYSTEMD_LOG_LEVEL=notice systemctl enable salt-api
+  systemctl start salt-api
+
+fi
+
+if ! which salt-minion >/dev/null 2>&1; then
+
+  # Install Salt minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+
+else
+  # Only run highstate when updating the config.  In the first-run case, Salt is
+  # set up to run highstate as new minions join for the first time.
+  echo "Executing configuration"
+  salt '*' mine.update
+  salt --force-color '*' state.highstate
+fi

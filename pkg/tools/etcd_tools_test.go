@@ -17,16 +17,16 @@ limitations under the License.
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -36,19 +36,22 @@ type fakeClientGetSet struct {
 }
 
 type TestResource struct {
-	api.JSONBase `json:",inline" yaml:",inline"`
-	Value        int `json:"value" yaml:"value,omitempty"`
+	api.TypeMeta   `json:",inline" yaml:",inline"`
+	api.ObjectMeta `json:"metadata" yaml:"metadata"`
+	Value          int `json:"value" yaml:"value,omitempty"`
 }
 
-var scheme *conversion.Scheme
-var codec = api.Codec
-var versioner = api.ResourceVersioner
+func (*TestResource) IsAnAPIObject() {}
+
+var scheme *runtime.Scheme
+var codec runtime.Codec
+var versioner = RuntimeVersionAdapter{meta.NewAccessor()}
 
 func init() {
-	scheme = conversion.NewScheme()
-	scheme.ExternalVersion = "v1beta1"
-	scheme.AddKnownTypes("", TestResource{})
-	scheme.AddKnownTypes("v1beta1", TestResource{})
+	scheme = runtime.NewScheme()
+	scheme.AddKnownTypes("", &TestResource{})
+	scheme.AddKnownTypes("v1beta1", &TestResource{})
+	codec = runtime.CodecFor(scheme, "v1beta1")
 }
 
 func TestIsEtcdNotFound(t *testing.T) {
@@ -63,53 +66,152 @@ func TestIsEtcdNotFound(t *testing.T) {
 	try(fmt.Errorf("some other kind of error"), false)
 }
 
-func TestExtractList(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+func TestExtractToList(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
+			EtcdIndex: 10,
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value:         `{"id":"foo"}`,
+						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 1,
 					},
 					{
-						Value:         `{"id":"bar"}`,
+						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 2,
 					},
 					{
-						Value:         `{"id":"baz"}`,
+						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 3,
 					},
 				},
 			},
 		},
 	}
-	expect := []api.Pod{
-		{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}},
-		{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 2}},
-		{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 3}},
+	expect := api.PodList{
+		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
+		},
 	}
 
-	var got []api.Pod
-	helper := EtcdHelper{fakeClient, codec, versioner}
-	err := helper.ExtractList("/some/key", &got)
+	var got api.PodList
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+// TestExtractToListAcrossDirectories ensures that the client excludes directories and flattens tree-response - simulates cross-namespace query
+func TestExtractToListAcrossDirectories(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+		R: &etcd.Response{
+			EtcdIndex: 10,
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: `{"name": "directory1"}`,
+						Dir:   true,
+						Nodes: []*etcd.Node{
+							{
+								Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+								ModifiedIndex: 1,
+							},
+						},
+					},
+					{
+						Value: `{"name": "directory2"}`,
+						Dir:   true,
+						Nodes: []*etcd.Node{
+							{
+								Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
+								ModifiedIndex: 2,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	expect := api.PodList{
+		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
+		},
 	}
 
-	for i := 0; i < len(expect); i++ {
-		if !reflect.DeepEqual(got[i], expect[i]) {
-			t.Errorf("\nWanted:\n%#v\nGot:\n%#v\n", expect[i], got[i])
-		}
+	var got api.PodList
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	err := helper.ExtractToList("/some/key", &got)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+func TestExtractToListExcludesDirectories(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+		R: &etcd.Response{
+			EtcdIndex: 10,
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+						ModifiedIndex: 1,
+					},
+					{
+						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
+						ModifiedIndex: 2,
+					},
+					{
+						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
+						ModifiedIndex: 3,
+					},
+					{
+						Value: `{"name": "directory"}`,
+						Dir:   true,
+					},
+				},
+			},
+		},
+	}
+	expect := api.PodList{
+		ListMeta: api.ListMeta{ResourceVersion: "10"},
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
+		},
+	}
+
+	var got api.PodList
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	err := helper.ExtractToList("/some/key", &got)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }
 
 func TestExtractObj(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	expect := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	fakeClient.Set("/some/key", util.MakeJSONString(expect), 0)
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	fakeClient := NewFakeEtcdClient(t)
+	expect := api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	fakeClient.Set("/some/key", runtime.EncodeOrDie(testapi.Codec(), &expect), 0)
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	var got api.Pod
 	err := helper.ExtractObj("/some/key", &got, false)
 	if err != nil {
@@ -121,7 +223,7 @@ func TestExtractObj(t *testing.T) {
 }
 
 func TestExtractObjNotFoundErr(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -160,15 +262,36 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	try("/some/key3")
 }
 
+func TestCreateObj(t *testing.T) {
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	err := helper.CreateObj("/some/key", obj, 5)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err := testapi.Codec().Encode(obj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	node := fakeClient.Data["/some/key"].R.Node
+	if e, a := string(data), node.Value; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
+	if e, a := uint64(5), fakeClient.LastSetTTL; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
+}
+
 func TestSetObj(t *testing.T) {
-	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	fakeClient := MakeFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -180,24 +303,24 @@ func TestSetObj(t *testing.T) {
 }
 
 func TestSetObjWithVersion(t *testing.T) {
-	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}}
-	fakeClient := MakeFakeEtcdClient(t)
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         api.EncodeOrDie(obj),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), obj),
 				ModifiedIndex: 1,
 			},
 		},
 	}
 
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
-	data, err := codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -209,14 +332,14 @@ func TestSetObjWithVersion(t *testing.T) {
 }
 
 func TestSetObjWithoutResourceVersioner(t *testing.T) {
-	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	fakeClient := MakeFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, codec, nil}
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := EtcdHelper{fakeClient, testapi.Codec(), nil}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -228,15 +351,14 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 }
 
 func TestAtomicUpdate(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	codec := scheme
-	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
-	obj := &TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 1}
-	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	})
 	if err != nil {
@@ -254,8 +376,8 @@ func TestAtomicUpdate(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 2}
-	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
 		if in.(*TestResource).Value != 1 {
@@ -282,11 +404,41 @@ func TestAtomicUpdate(t *testing.T) {
 	}
 }
 
-func TestAtomicUpdate_CreateCollision(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+func TestAtomicUpdateNoChange(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	codec := scheme
-	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, versioner}
+
+	// Create a new node.
+	fakeClient.ExpectNotFoundGet("/some/key")
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+		return obj, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+
+	// Update an existing node with the same data
+	callbackCalled := false
+	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	fakeClient.Err = errors.New("should not be called")
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+		callbackCalled = true
+		return objUpdate, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	if !callbackCalled {
+		t.Errorf("tryUpdate callback should have been called.")
+	}
+}
+
+func TestAtomicUpdate_CreateCollision(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	helper := EtcdHelper{fakeClient, codec, versioner}
 
 	fakeClient.ExpectNotFoundGet("/some/key")
 
@@ -302,7 +454,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 			defer wgDone.Done()
 
 			firstCall := true
-			err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+			err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 				defer func() { firstCall = false }()
 
 				if firstCall {
@@ -312,7 +464,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 				}
 
 				currValue := in.(*TestResource).Value
-				obj := TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: currValue + 1}
+				obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
 				return obj, nil
 			})
 			if err != nil {
@@ -330,343 +482,5 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	}
 	if stored.Value != concurrency {
 		t.Errorf("Some of the writes were lost. Stored value: %d", stored.Value)
-	}
-}
-
-func TestWatchInterpretation_ListCreate(t *testing.T) {
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(podBytes),
-		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Added, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestWatchInterpretation_ListAdd(t *testing.T) {
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: string(podBytes),
-		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Modified, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestWatchInterpretation_Delete(t *testing.T) {
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "delete",
-		PrevNode: &etcd.Node{
-			Value: string(podBytes),
-		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Deleted, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	w.emit = func(e watch.Event) {
-		t.Errorf("Unexpected emit: %v", e)
-	}
-
-	w.sendResult(&etcd.Response{
-		Action: "update",
-	})
-}
-
-func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	w.emit = func(e watch.Event) {
-		t.Errorf("Unexpected emit: %v", e)
-	}
-	w.sendResult(&etcd.Response{
-		Action: "set",
-	})
-}
-
-func TestWatchInterpretation_ResponseBadData(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	w.emit = func(e watch.Event) {
-		t.Errorf("Unexpected emit: %v", e)
-	}
-	w.sendResult(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: "foobar",
-		},
-	})
-}
-
-func TestWatch(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
-	h := EtcdHelper{fakeClient, codec, versioner}
-
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	fakeClient.WaitForWatchCompletion()
-	// when no get can be done AND the server doesn't provide an index, the Watch is 0 (from now)
-	if fakeClient.WatchIndex != 0 {
-		t.Errorf("Expected client to be at index %d, got %#v", 0, fakeClient)
-	}
-
-	// Test normal case
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: string(podBytes),
-		},
-	}
-
-	event := <-watching.ResultChan()
-	if e, a := watch.Modified, event.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-
-	// Test error case
-	fakeClient.WatchInjectError <- fmt.Errorf("Injected error")
-
-	// Did everything shut down?
-	if _, open := <-fakeClient.WatchResponse; open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
-	}
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
-	}
-}
-
-func TestWatchFromZeroIndex(t *testing.T) {
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         api.EncodeOrDie(pod),
-				ModifiedIndex: 1,
-			},
-			Action:    "compareAndSwap",
-			EtcdIndex: 2,
-		},
-	}
-	h := EtcdHelper{fakeClient, codec, versioner}
-
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	fakeClient.WaitForWatchCompletion()
-
-	// the existing node is detected and the index set
-	event := <-watching.ResultChan()
-	if e, a := watch.Modified, event.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	actualPod, ok := event.Object.(*api.Pod)
-	if !ok {
-		t.Fatalf("expected a pod, got %#v", event.Object)
-	}
-	if actualPod.ResourceVersion != 1 {
-		t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
-	}
-	pod.ResourceVersion = 1
-	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	watching.Stop()
-}
-
-func TestWatchListFromZeroIndex(t *testing.T) {
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Dir: true,
-				Nodes: etcd.Nodes{
-					&etcd.Node{
-						Value:         api.EncodeOrDie(pod),
-						ModifiedIndex: 1,
-						Nodes:         etcd.Nodes{},
-					},
-					&etcd.Node{
-						Value:         api.EncodeOrDie(pod),
-						ModifiedIndex: 2,
-						Nodes:         etcd.Nodes{},
-					},
-				},
-			},
-			Action:    "get",
-			EtcdIndex: 3,
-		},
-	}
-	h := EtcdHelper{fakeClient, codec, versioner}
-
-	watching, err := h.WatchList("/some/key", 0, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	// the existing node is detected and the index set
-	event := <-watching.ResultChan()
-	for i := 0; i < 2; i++ {
-		if e, a := watch.Modified, event.Type; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		actualPod, ok := event.Object.(*api.Pod)
-		if !ok {
-			t.Fatalf("expected a pod, got %#v", event.Object)
-		}
-		if actualPod.ResourceVersion != 1 {
-			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
-		}
-		pod.ResourceVersion = 1
-		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-	}
-
-	fakeClient.WaitForWatchCompletion()
-	watching.Stop()
-}
-
-func TestWatchFromNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: &etcd.EtcdError{
-			Index:     2,
-			ErrorCode: 100,
-		},
-	}
-	h := EtcdHelper{fakeClient, codec, versioner}
-
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	fakeClient.WaitForWatchCompletion()
-	if fakeClient.WatchIndex != 2 {
-		t.Errorf("Expected client to wait for %d, got %#v", 2, fakeClient)
-	}
-
-	watching.Stop()
-}
-
-func TestWatchFromOtherError(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: &etcd.EtcdError{
-			Index:     2,
-			ErrorCode: 101,
-		},
-	}
-	h := EtcdHelper{fakeClient, codec, versioner}
-
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	select {
-	case _, ok := <-watching.ResultChan():
-		if ok {
-			t.Fatalf("expected result channel to be closed")
-		}
-	case <-time.After(1 * time.Millisecond):
-		t.Fatalf("watch should have closed channel: %#v", watching)
-	}
-
-	if fakeClient.WatchResponse != nil || fakeClient.WatchIndex != 0 {
-		t.Fatalf("Watch should not have been invoked: %#v", fakeClient)
-	}
-}
-
-func TestWatchPurposefulShutdown(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	h := EtcdHelper{fakeClient, codec, versioner}
-	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
-
-	// Test purposeful shutdown
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	fakeClient.WaitForWatchCompletion()
-	watching.Stop()
-
-	// Did everything shut down?
-	if _, open := <-fakeClient.WatchResponse; open {
-		t.Errorf("A stop did not cause a graceful shutdown")
-	}
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
 	}
 }

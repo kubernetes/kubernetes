@@ -7,12 +7,10 @@
 - [The Kubernetes Node](#the-kubernetes-node)
   - [Kubelet](#kubelet)
   - [Kubernetes Proxy](#kubernetes-proxy)
-- [The Kubernetes Master](#the-kubernetes-master)
+- [The Kubernetes Control Plane](#the-kubernetes-control-plane)
   - [etcd](#etcd)
   - [Kubernetes API Server](#kubernetes-api-server)
   - [Kubernetes Controller Manager Server](#kubernetes-controller-manager-server)
-- [Network Model](#network-model)
-- [Release Process](#release-process)
 - [GCE Cluster Configuration](#gce-cluster-configuration)
   - [Cluster Security](#cluster-security)
 
@@ -52,7 +50,7 @@ While Docker itself works with individual containers, Kubernetes provides higher
 
 A _pod_ (as in a pod of whales or pea pod) is a relatively tightly coupled group of containers that are scheduled onto the same host. It models an application-specific "virtual host" in a containerized environment. Pods serve as units of scheduling, deployment, and horizontal scaling/replication, share fate, and share some resources, such as storage volumes and IP addresses.
 
-[More details on pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md).
+[More details on pods](docs/pods.md).
 
 ### Labels
 
@@ -66,11 +64,11 @@ Kubernetes currently supports two objects that use label selectors to keep track
 - `service`: A service is a configuration unit for the [proxies](#kubernetes-proxy) that run on every worker node.  It is named and points to one or more pods.
 - `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
 
-The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. 
+The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector.
 
 For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
 
-[More details on labels](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/labels.md).
+[More details on labels](docs/labels.md).
 
 ## The Kubernetes Node
 
@@ -96,13 +94,13 @@ There are 4 ways that a container manifest can be provided to the Kubelet:
 
 ### Kubernetes Proxy
 
-Each node also runs a simple network proxy.  This reflects `services` as defined in the Kubernetes API on each node and can do simple TCP stream forwarding or round robin TCP forwarding across a set of backends.
+Each node also runs a simple network proxy.  This reflects `services` (see [here](docs/services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
 
-Service endpoints are currently found through [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) environment variables specifying ports opened by the service proxy. Currently the user must select a unique port to expose the service on on the proxy, as well as the container's port to target.
+Service endpoints are currently found through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes {FOO}_SERVICE_HOST and {FOO}_SERVICE_PORT variables are supported).  These variables resolve to ports managed by the service proxy.
 
 ## The Kubernetes Control Plane
 
-The Kubernetes control plane is split into a set of components, but they all run on a single _master_ node.  These work together to provide an unified view of the cluster.
+The Kubernetes control plane is split into a set of components, but they all run on a single _master_ node.  These work together to provide a unified view of the cluster.
 
 ### etcd
 
@@ -123,10 +121,6 @@ Beyond just servicing REST operations, validating them and storing them in `etcd
 
 The `replicationController` type described above isn't strictly necessary for Kubernetes to be useful.  It is really a service that is layered on top of the simple `pod` API.  To enforce this layering, the logic for the replicationController is actually broken out into another server.  This server watches `etcd` for changes to `replicationController` objects and then uses the public Kubernetes API to implement the replication algorithm.
 
-## Release Process
-
-Right now "building" or "releasing" Kubernetes consists of some scripts (in `release/`) to create a `tar` of the necessary data and then uploading it to Google Cloud Storage.  In the future we will generate Docker images for the bulk of the above described components: [Issue #19](https://github.com/GoogleCloudPlatform/kubernetes/issues/19).
-
 ## GCE Cluster Configuration
 
 The scripts and data in the `cluster/` directory automates creating a set of Google Compute Engine VMs and installing all of the Kubernetes components.  There is a single master node and a set of worker (called minion) nodes.
@@ -138,10 +132,9 @@ The heavy lifting of configuring the VMs is done by [SaltStack](http://www.salts
 The bootstrapping works like this:
 
 1. The `kube-up.sh` script uses the GCE [`startup-script`](https://developers.google.com/compute/docs/howtos/startupscript) mechanism for both the master node and the minion nodes.
-  * For the minion, this simply configures and installs SaltStack.  The network range that this minion is assigned is baked into the startup-script for that minion (see [the networking doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) for more details).
-  * For the master, the release files are downloaded from GCS and unpacked.  Various parts (specifically the SaltStack configuration) are installed in the right places.
+  * For the minion, this simply configures and installs SaltStack.  The network range that this minion is assigned is baked into the startup-script for that minion (see [the networking doc](docs/networking.md) for more details).
+  * For the master, the release files are staged and then downloaded from GCS and unpacked.  Various parts (specifically the SaltStack configuration) are installed in the right places.  Binaries are included in these tar files.
 2. SaltStack then installs the necessary servers on each node.
-  * All go code is currently downloaded to each machine and compiled at install time.
   * The custom networking bridge is configured on each minion before Docker is installed.
   * Configuration (like telling the `apiserver` the hostnames of the minions) is dynamically created during the saltstack install.
 3. After the VMs are started, the `kube-up.sh` script will call `curl` every 2 seconds until the `apiserver` starts responding.
@@ -150,7 +143,7 @@ The bootstrapping works like this:
 
 ### Cluster Security
 
-As there is no security currently built into the `apiserver`, the salt configuration will install `nginx`.  `nginx` is configured to serve HTTPS with a self signed certificate.  HTTP basic auth is used from the client to `nginx`.  `nginx` then forwards the request on to the `apiserver` over plain old HTTP.  Because a self signed certificate is used, access to the server should be safe from eavesdropping but is subject to "man in the middle" attacks.  Access via the browser will result in warnings and tools like curl will require an "--insecure" flag.
+As there is no security currently built into the `apiserver`, the salt configuration will install `nginx`.  `nginx` is configured to serve HTTPS with a self signed certificate.  HTTP basic auth is used from the client to `nginx`.  `nginx` then forwards the request on to the `apiserver` over plain old HTTP.  As part of cluster spin up, ssh is used to download both the public cert for the server and a client cert pair.  These are used for mutual authentication to nginx.
 
 All communication within the cluster (worker nodes to the master, for instance) occurs on the internal virtual network and should be safe from eavesdropping.
 

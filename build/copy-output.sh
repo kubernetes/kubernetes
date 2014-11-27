@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -18,10 +18,12 @@
 #
 # This is a no-op on Linux when the Docker daemon is local.  This is only
 # necessary on Mac OS X with boot2docker.
+set -o errexit
+set -o nounset
+set -o pipefail
 
-set -e
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
-source $(dirname $0)/common.sh
-
-verify-prereqs
-copy-output
+kube::build::verify_prereqs
+kube::build::copy_output

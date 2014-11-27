@@ -20,35 +20,41 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-var storageToType = map[string]reflect.Type{
-	"pods":                   reflect.TypeOf(api.Pod{}),
-	"services":               reflect.TypeOf(api.Service{}),
-	"replicationControllers": reflect.TypeOf(api.ReplicationController{}),
-	"minions":                reflect.TypeOf(api.Minion{}),
+type Parser struct {
+	storageToType map[string]reflect.Type
+}
+
+// NewParser creates a new parser.
+func NewParser(objectMap map[string]runtime.Object) *Parser {
+	typeMap := make(map[string]reflect.Type)
+	for name, obj := range objectMap {
+		typeMap[name] = reflect.TypeOf(obj).Elem()
+	}
+	return &Parser{typeMap}
 }
 
 // ToWireFormat takes input 'data' as either json or yaml, checks that it parses as the
 // appropriate object type, and returns json for sending to the API or an error.
-func ToWireFormat(data []byte, storage string) ([]byte, error) {
-	prototypeType, found := storageToType[storage]
+func (p *Parser) ToWireFormat(data []byte, storage string, decode runtime.Codec, encode runtime.Codec) ([]byte, error) {
+	prototypeType, found := p.storageToType[storage]
 	if !found {
 		return nil, fmt.Errorf("unknown storage type: %v", storage)
 	}
 
-	obj := reflect.New(prototypeType).Interface()
-	err := api.DecodeInto(data, obj)
+	obj := reflect.New(prototypeType).Interface().(runtime.Object)
+	err := decode.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	return api.Encode(obj)
+	return encode.Encode(obj)
 }
 
-func SupportedWireStorage() []string {
+func (p *Parser) SupportedWireStorage() []string {
 	types := []string{}
-	for k := range storageToType {
+	for k := range p.storageToType {
 		types = append(types, k)
 	}
 	return types

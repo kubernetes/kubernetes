@@ -30,6 +30,7 @@ import (
 const statusServerEarlyShutdown = -1
 
 func TestHealthChecker(t *testing.T) {
+	AddHealthChecker(&HTTPHealthChecker{client: &http.Client{}})
 	var healthCheckerTests = []struct {
 		status int
 		health Status
@@ -45,29 +46,29 @@ func TestHealthChecker(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(tt.status)
 		}))
+		defer ts.Close()
 		u, err := url.Parse(ts.URL)
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
+			t.Fatalf("Unexpected error: %v", err)
 		}
 		host, port, err := net.SplitHostPort(u.Host)
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
+			t.Fatalf("Unexpected error: %v", err)
 		}
 		if tt.status == statusServerEarlyShutdown {
 			ts.Close()
 		}
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: &api.HTTPGetProbe{
-					Port: util.MakeIntOrStringFromString(port),
+				HTTPGet: &api.HTTPGetAction{
+					Port: util.NewIntOrStringFromString(port),
 					Path: "/foo/bar",
 					Host: host,
 				},
-				Type: "http",
 			},
 		}
 		hc := NewHealthChecker()
-		health, err := hc.HealthCheck(api.PodState{}, container)
+		health, err := hc.HealthCheck("test", "", api.PodState{}, container)
 		if err != nil && tt.health != Unknown {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -99,41 +100,38 @@ func TestFindPortByName(t *testing.T) {
 
 func TestMuxHealthChecker(t *testing.T) {
 	muxHealthCheckerTests := []struct {
-		health    Status
-		probeType string
+		health Status
 	}{
-		{Healthy, "http"},
-		{Unknown, "ftp"},
+		// TODO: This test should run through a few different checker types.
+		{Healthy},
 	}
 	mc := &muxHealthChecker{
-		checkers: make(map[string]HealthChecker),
+		checkers: []HealthChecker{
+			&HTTPHealthChecker{client: &http.Client{}},
+		},
 	}
-	hc := &HTTPHealthChecker{
-		client: &http.Client{},
-	}
-	mc.checkers["http"] = hc
 	for _, muxHealthCheckerTest := range muxHealthCheckerTests {
 		tt := muxHealthCheckerTest
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
+		defer ts.Close()
 		u, err := url.Parse(ts.URL)
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
+			t.Fatalf("Unexpected error: %v", err)
 		}
 		host, port, err := net.SplitHostPort(u.Host)
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
+			t.Fatalf("Unexpected error: %v", err)
 		}
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: &api.HTTPGetProbe{},
+				HTTPGet: &api.HTTPGetAction{},
 			},
 		}
-		container.LivenessProbe.Type = tt.probeType
-		container.LivenessProbe.HTTPGet.Port = util.MakeIntOrStringFromString(port)
+		container.LivenessProbe.HTTPGet.Port = util.NewIntOrStringFromString(port)
 		container.LivenessProbe.HTTPGet.Host = host
-		health, err := mc.HealthCheck(api.PodState{}, container)
+		health, err := mc.HealthCheck("test", "", api.PodState{}, container)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

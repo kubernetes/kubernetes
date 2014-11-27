@@ -17,26 +17,50 @@ limitations under the License.
 package apiserver
 
 import (
-	"errors"
+	stderrs "errors"
+	"net/http"
+	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 )
 
-func TestErrorNew(t *testing.T) {
-	err := NewAlreadyExistsErr("test", "1")
-	if !IsAlreadyExists(err) {
-		t.Errorf("expected to be already_exists")
+func Test_errToAPIStatus(t *testing.T) {
+	err := errors.NewNotFound("foo", "bar")
+	status := errToAPIStatus(err)
+	if status.Reason != api.StatusReasonNotFound || status.Status != api.StatusFailure {
+		t.Errorf("unexpected status object: %#v", status)
 	}
-	if IsConflict(err) {
-		t.Errorf("expected to not be confict")
-	}
-	if IsNotFound(err) {
-		t.Errorf("expected to not be not_found")
-	}
+}
 
-	if !IsConflict(NewConflictErr("test", "2", errors.New("message"))) {
-		t.Errorf("expected to be confict")
+func TestErrorsToAPIStatus(t *testing.T) {
+	cases := map[error]api.Status{
+		errors.NewAlreadyExists("foo", "bar"): {
+			Status:  api.StatusFailure,
+			Code:    http.StatusConflict,
+			Reason:  "AlreadyExists",
+			Message: "foo \"bar\" already exists",
+			Details: &api.StatusDetails{
+				Kind: "foo",
+				ID:   "bar",
+			},
+		},
+		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
+			Status:  api.StatusFailure,
+			Code:    http.StatusConflict,
+			Reason:  "Conflict",
+			Message: "foo \"bar\" cannot be updated: failure",
+			Details: &api.StatusDetails{
+				Kind: "foo",
+				ID:   "bar",
+			},
+		},
 	}
-	if !IsNotFound(NewNotFoundErr("test", "3")) {
-		t.Errorf("expected to be not found")
+	for k, v := range cases {
+		actual := errToAPIStatus(k)
+		if !reflect.DeepEqual(actual, &v) {
+			t.Errorf("%s: Expected %#v, Got %#v", k, v, actual)
+		}
 	}
 }

@@ -17,117 +17,119 @@
 # This command checks that the built commands can function together for
 # simple scenarios.  It does not require Docker so it can run in travis.
 
-function wait_for_url {
-  url=$1
-  prefix=${2:-}
-  wait=${3:-0.2}
-  times=${4:-10}
+set -o errexit
+set -o nounset
+set -o pipefail
 
-  set +e
-  for i in $(seq 1 $times); do
-    out=$(curl -fs $url 2>/dev/null)
-    if [ $? -eq 0 ]; then
-      set -e
-      echo ${prefix}${out}
-      return 0
-    fi
-    sleep $wait
-  done
-  echo "ERROR: timed out for $url"
-  set -e
-  return 1
-}
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 function cleanup()
 {
-    set +e
-    kill ${APISERVER_PID} 1>&2 2>/dev/null
-    kill ${CTLRMGR_PID} 1>&2 2>/dev/null
-    kill ${KUBELET_PID} 1>&2 2>/dev/null
-    kill ${PROXY_PID} 1>&2 2>/dev/null
-    kill ${ETCD_PID} 1>&2 2>/dev/null
-    rm -rf ${ETCD_DIR} 1>&2 2>/dev/null
-    echo "Complete"
+    [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
+    [[ -n ${CTLRMGR_PID-} ]] && kill ${CTLRMGR_PID} 1>&2 2>/dev/null
+    [[ -n ${KUBELET_PID-} ]] && kill ${KUBELET_PID} 1>&2 2>/dev/null
+    [[ -n ${PROXY_PID-} ]] && kill ${PROXY_PID} 1>&2 2>/dev/null
+
+    kube::etcd::cleanup
+
+    kube::log::status "Clean up complete"
 }
 
 trap cleanup EXIT SIGINT
 
-ETCD_HOST=127.0.0.1
-ETCD_PORT=4001
+kube::etcd::start
+
+ETCD_HOST=${ETCD_HOST:-127.0.0.1}
+ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
-GO_OUT=$(dirname $0)/../output/go/bin
+CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 
-if [ "$(which etcd)" == "" ]; then
-  echo "etcd must be in your PATH"
-  exit 1
-fi
-
-running_etcd=$(ps -ef | grep etcd | grep -c name)
-if [ "$running_etcd" != "0" ]; then
-  echo "etcd appears to already be running on this machine, please kill and restart the test."
-  exit 1
-fi
-
-# Stop on any failures
-set -e
-
-# Start etcd
-ETCD_DIR=$(mktemp -d -t test-cmd.XXXXXX)
-etcd -name test -data-dir ${ETCD_DIR} -bind-addr $ETCD_HOST:$ETCD_PORT >/dev/null 2>/dev/null &
-ETCD_PID=$!
-
-wait_for_url "http://localhost:4001/version" "etcd: "
-
-
-# Check kubecfg
-out=$(${GO_OUT}/kubecfg -version)
-echo kubecfg: $out
+# Check kubectl
+kube::log::status "Running kubectl with no options"
+"${KUBE_OUTPUT_HOSTBIN}/kubectl"
 
 # Start kubelet
-${GO_OUT}/kubelet \
-  --etcd_servers="http://127.0.0.1:${ETCD_PORT}" \
+kube::log::status "Starting kubelet"
+"${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+  --root_dir=/tmp/kubelet.$$ \
+  --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
 
-wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
 
-# Start apiserver
-${GO_OUT}/apiserver \
+# Start kube-apiserver
+kube::log::status "Starting kube-apiserver"
+"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
+  --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
-  --etcd_servers="http://127.0.0.1:${ETCD_PORT}" \
-  --machines="127.0.0.1" \
-  --minion_port=${KUBELET_PORT} 1>&2 &
+  --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+  --public_address_override="127.0.0.1" \
+  --kubelet_port=${KUBELET_PORT} \
+  --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
-wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
-KUBE_CMD="${GO_OUT}/kubecfg -h http://127.0.0.1:${API_PORT} -expect_version_match"
+kube_cmd=(
+  "${KUBE_OUTPUT_HOSTBIN}/kubectl"
+)
 
-${KUBE_CMD} list pods
-echo "kubecfg(pods): ok"
-
-${KUBE_CMD} list services
-${KUBE_CMD} -c examples/guestbook/frontend-service.json create services
-${KUBE_CMD} delete services/frontend
-echo "kubecfg(services): ok"
-
-${KUBE_CMD} list minions
-${KUBE_CMD} get minions/127.0.0.1
-echo "kubecfg(minions): ok"
+kube_flags=(
+  -s "http://127.0.0.1:${API_PORT}"
+  --match-server-version
+)
 
 # Start controller manager
-#${GO_OUT}/controller-manager \
-#  --etcd_servers="http://127.0.0.1:${ETCD_PORT}" \
-#  --master="127.0.0.1:${API_PORT}" 1>&2 &
-#CTLRMGR_PID=$!
+kube::log::status "Starting CONTROLLER-MANAGER"
+"${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
+  --machines="127.0.0.1" \
+  --master="127.0.0.1:${API_PORT}" 1>&2 &
+CTLRMGR_PID=$!
+
+kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
+
+kube::log::status "Testing kubectl(pods)"
+"${kube_cmd[@]}" get pods "${kube_flags[@]}"
+"${kube_cmd[@]}" create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+"${kube_cmd[@]}" get pods "${kube_flags[@]}"
+"${kube_cmd[@]}" get pod redis-master "${kube_flags[@]}"
+[[ "$("${kube_cmd[@]}" get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]]
+output_pod=$("${kube_cmd[@]}" get pod redis-master -o json --output-version=v1beta1 "${kube_flags[@]}")
+"${kube_cmd[@]}" delete pod redis-master "${kube_flags[@]}"
+[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}") -eq 0 ]]
+echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
+[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}") -eq 1 ]]
+"${kube_cmd[@]}" get pods -o yaml "${kube_flags[@]}" | grep -q "id: redis-master"
+"${kube_cmd[@]}" describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
+"${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+
+kube::log::status "Testing kubectl(services)"
+"${kube_cmd[@]}" get services "${kube_flags[@]}"
+"${kube_cmd[@]}" create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
+"${kube_cmd[@]}" get services "${kube_flags[@]}"
+"${kube_cmd[@]}" delete service frontend "${kube_flags[@]}"
+
+kube::log::status "Testing kubectl(replicationcontrollers)"
+"${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
+"${kube_cmd[@]}" create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+"${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
+"${kube_cmd[@]}" describe replicationcontroller frontendController "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
+
+kube::log::status "Testing kubectl(minions)"
+"${kube_cmd[@]}" get minions "${kube_flags[@]}"
+"${kube_cmd[@]}" get minions 127.0.0.1 "${kube_flags[@]}"
+
+kube::log::status "TEST PASSED"
 
 # Start proxy
 #PROXY_LOG=/tmp/kube-proxy.log
-#${GO_OUT}/proxy \
+#${KUBE_OUTPUT_HOSTBIN}/kube-proxy \
 #  --etcd_servers="http://127.0.0.1:${ETCD_PORT}" 1>&2 &
 #PROXY_PID=$!

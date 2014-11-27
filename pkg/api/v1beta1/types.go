@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/fsouza/go-dockerclient-copiedstructs"
 )
 
 // Common string formats
@@ -27,7 +27,7 @@ import (
 // Many fields in this API have formatting requirements.  The commonly used
 // formats are defined here.
 //
-// C_IDENTIFIER:  This is a string that conforms the definition of an "identifier"
+// C_IDENTIFIER:  This is a string that conforms to the definition of an "identifier"
 //     in the C language.  This is captured by the following regex:
 //         [A-Za-z_][A-Za-z0-9_]*
 //     This defines the format, but not the length restriction, which should be
@@ -50,160 +50,263 @@ import (
 // This is used as the representation of Kubernetes workloads.
 type ContainerManifest struct {
 	// Required: This must be a supported version string, such as "v1beta1".
-	Version string `yaml:"version" json:"version"`
+	Version string `yaml:"version" json:"version" description:"manifest version; must be v1beta1"`
 	// Required: This must be a DNS_SUBDOMAIN.
 	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID         string      `yaml:"id" json:"id"`
-	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
-	Containers []Container `yaml:"containers" json:"containers"`
+	ID string `yaml:"id" json:"id" description:"manifest name; must be a DNS_SUBDOMAIN"`
+	// TODO: UUID on Manifext is deprecated in the future once we are done
+	// with the API refactory. It is required for now to determine the instance
+	// of a Pod.
+	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty" description:"manifest UUID"`
+	Volumes       []Volume      `yaml:"volumes" json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
+	Containers    []Container   `yaml:"containers" json:"containers" description:"list of containers belonging to the pod"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
 type ContainerManifestList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []ContainerManifest `json:"items" yaml:"items" description:"list of pod container manifests"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name" description:"volume name; must be a DNS_LABEL and unique within the pod"`
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source *VolumeSource `yaml:"source" json:"source"`
+	Source *VolumeSource `yaml:"source" json:"source" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"`
 }
 
+// VolumeSource represents the source location of a valume to mount.
+// Only one of its members may be specified.
 type VolumeSource struct {
-	// Only one of the following sources may be specified
-	// HostDirectory represents a pre-existing directory on the host machine that is directly
+	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
 	// things that are allowed to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and
 	// who can/can not mount host directories as read/write.
-	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
-	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
-	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
+	HostDir *HostDir `yaml:"hostDir" json:"hostDir" description:"pre-existing host directory; generally for privileged system daemons or other agents tied to the host"`
+	// EmptyDir represents a temporary directory that shares a pod's lifetime.
+	EmptyDir *EmptyDir `yaml:"emptyDir" json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
+	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	GCEPersistentDisk *GCEPersistentDisk `yaml:"persistentDisk" json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
+	// GitRepo represents a git repository at a particular revision.
+	GitRepo *GitRepo `json:"gitRepo" yaml:"gitRepo" description:"git repository at a particular revision"`
 }
 
-// Bare host directory volume.
-type HostDirectory struct {
-	Path string `yaml:"path" json:"path"`
+// HostDir represents bare host directory volume.
+type HostDir struct {
+	Path string `yaml:"path" json:"path" description:"path of the directory on the host"`
 }
 
-type EmptyDirectory struct{}
+type EmptyDir struct{}
+
+// Protocol defines network protocols supported for things like conatiner ports.
+type Protocol string
+
+const (
+	// ProtocolTCP is the TCP protocol.
+	ProtocolTCP Protocol = "TCP"
+	// ProtocolUDP is the UDP protocol.
+	ProtocolUDP Protocol = "UDP"
+)
+
+// GCEPersistentDisk represents a Persistent Disk resource in Google Compute Engine.
+//
+// A GCE PD must exist and be formatted before mounting to a container.
+// The disk must also be in the same GCE project and zone as the kubelet.
+// A GCE PD can only be mounted as read/write once.
+type GCEPersistentDisk struct {
+	// Unique name of the PD resource. Used to identify the disk in GCE
+	PDName string `yaml:"pdName" json:"pdName" description:"unique name of the PD resource in GCE"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// TODO: why omitempty if required?
+	FSType string `yaml:"fsType,omitempty" json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
+	// Optional: Partition on the disk to mount.
+	// If omitted, kubelet will attempt to mount the device name.
+	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field 0 or empty.
+	Partition int `yaml:"partition,omitempty" json:"partition,omitempty" description:"partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
+}
+
+// GitRepo represents a volume that is pulled from git when the pod is created.
+type GitRepo struct {
+	// Repository URL
+	Repository string `yaml:"repository" json:"repository" description:"repository URL"`
+	// Commit hash, this is optional
+	Revision string `yaml:"revision" json:"revision" description:"commit hash for the specified revision"`
+}
 
 // Port represents a network port in a single container
 type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	// Optional: Defaults to ContainerPort.  If specified, this must be a
-	// valid port number, 0 < x < 65536.
-	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
+	Name string `yaml:"name,omitempty" json:"name,omitempty" description:"name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"`
+	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
+	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
 	// Required: This must be a valid port number, 0 < x < 65536.
-	ContainerPort int `yaml:"containerPort" json:"containerPort"`
+	ContainerPort int `yaml:"containerPort" json:"containerPort" description:"number of port to expose on the pod's IP address"`
 	// Optional: Defaults to "TCP".
-	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty" description:"protocol for port; must be UDP or TCP; TCP if unspecified"`
 	// Optional: What host IP to bind the external port to.
-	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
+	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty" description:"host IP to bind the port to"`
 }
 
-// VolumeMount describes a mounting of a Volume within a container
+// VolumeMount describes a mounting of a Volume within a container.
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name" description:"name of the volume to mount"`
 	// Optional: Defaults to false (read-write).
-	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty" description:"mounted read-only if true, read-write otherwise (false or unspecified)"`
 	// Required.
 	// Exactly one of the following must be set.  If both are set, prefer MountPath.
 	// DEPRECATED: Path will be removed in a future version of the API.
-	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
-	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
+	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty" description:"path within the container at which the volume should be mounted; overrides path"`
+	Path      string `yaml:"path,omitempty" json:"path,omitempty" description:"path within the container at which the volume should be mounted; deprecated"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
 	// DEPRECATED: MountType will be removed in a future version of the API.
-	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
+	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty" description:"LOCAL or HOST; defaults to LOCAL; deprecated"`
 }
 
-// EnvVar represents an environment variable present in a Container
+// EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
 	// Exactly one of the following must be set.  If both are set, prefer Name.
 	// DEPRECATED: EnvVar.Key will be removed in a future version of the API.
-	Name string `yaml:"name" json:"name"`
-	Key  string `yaml:"key,omitempty" json:"key,omitempty"`
+	Name string `yaml:"name" json:"name" description:"name of the environment variable; must be a C_IDENTIFIER"`
+	Key  string `yaml:"key,omitempty" json:"key,omitempty" description:"name of the environment variable; must be a C_IDENTIFIER; deprecated - use name instead"`
 	// Optional: defaults to "".
-	Value string `yaml:"value,omitempty" json:"value,omitempty"`
+	Value string `yaml:"value,omitempty" json:"value,omitempty" description:"value of the environment variable; defaults to empty string"`
 }
 
-// HTTPGetProbe describes a liveness probe based on HTTP Get requests.
-type HTTPGetProbe struct {
+// HTTPGetAction describes an action based on HTTP Get requests.
+type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+	Path string `yaml:"path,omitempty" json:"path,omitempty" description:"path to access on the HTTP server"`
 	// Required: Name or number of the port to access on the container.
-	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
+	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty" description:"number or name of the port to access on the container"`
 	// Optional: Host name to connect to, defaults to the pod IP.
-	Host string `yaml:"host,omitempty" json:"host,omitempty"`
+	Host string `yaml:"host,omitempty" json:"host,omitempty" description:"hostname to connect to; defaults to pod IP"`
 }
 
-// TCPSocketProbe describes a liveness probe based on opening a socket
-type TCPSocketProbe struct {
+// TCPSocketAction describes an action based on opening a socket
+type TCPSocketAction struct {
 	// Required: Port to connect to.
-	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
+	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty" description:"number of name of the port to access on the container"`
+}
+
+// ExecAction describes a "run in container" action.
+type ExecAction struct {
+	// Command is the command line to execute inside the container, the working directory for the
+	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
+	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
+	// a shell, you need to explicitly call out to that shell.
+	// A return code of zero is treated as 'Healthy', non-zero is 'Unhealthy'
+	Command []string `yaml:"command,omitempty" json:"command,omitempty" description:"command line to execute inside the container; working directory for the command is root ('/') in the container's file system; the command is exec'd, not run inside a shell; exit status of 0 is treated as live/healthy and non-zero is unhealthy"`
 }
 
 // LivenessProbe describes a liveness probe to be examined to the container.
+// TODO: pass structured data to the actions, and document that data here.
 type LivenessProbe struct {
-	// Type of liveness probe.  Current legal values "http", "tcp"
-	Type string `yaml:"type,omitempty" json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'http'
-	HTTPGet *HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+	HTTPGet *HTTPGetAction `yaml:"httpGet,omitempty" json:"httpGet,omitempty" description:"parameters for HTTP-based liveness probe"`
 	// TCPSocketProbe parameter, required if Type == 'tcp'
-	TCPSocket *TCPSocketProbe `yaml:"tcpSocket,omitempty" json:"tcpSocket,omitempty"`
+	TCPSocket *TCPSocketAction `yaml:"tcpSocket,omitempty" json:"tcpSocket,omitempty" description:"parameters for TCP-based liveness probe"`
+	// ExecProbe parameter, required if Type == 'exec'
+	Exec *ExecAction `yaml:"exec,omitempty" json:"exec,omitempty" description:"parameters for exec-based liveness probe"`
 	// Length of time before health checking is activated.  In seconds.
-	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
+	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty" description:"number of seconds after the container has started before liveness probes are initiated"`
 }
+
+// PullPolicy describes a policy for if/when to pull a container image
+type PullPolicy string
+
+const (
+	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
+	PullAlways PullPolicy = "PullAlways"
+	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
+	PullNever PullPolicy = "PullNever"
+	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
+	PullIfNotPresent PullPolicy = "PullIfNotPresent"
+)
 
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod"`
 	// Required.
-	Image string `yaml:"image" json:"image"`
+	Image string `yaml:"image" json:"image" description:"Docker image name"`
 	// Optional: Defaults to whatever is defined in the image.
-	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
+	Command []string `yaml:"command,omitempty" json:"command,omitempty" description:"command argv array; not executed within a shell; defaults to entrypoint or command in the image"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir string   `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
-	Ports      []Port   `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Env        []EnvVar `yaml:"env,omitempty" json:"env,omitempty"`
+	WorkingDir string   `yaml:"workingDir,omitempty" json:"workingDir,omitempty" description:"container's working directory; defaults to image's default"`
+	Ports      []Port   `yaml:"ports,omitempty" json:"ports,omitempty" description:"list of ports to expose from the container"`
+	Env        []EnvVar `yaml:"env,omitempty" json:"env,omitempty" description:"list of environment variables to set in the container"`
 	// Optional: Defaults to unlimited.
-	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
+	Memory int `yaml:"memory,omitempty" json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
 	// Optional: Defaults to unlimited.
-	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty"`
-	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
-	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
+	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty" description:"CPU share in thousandths of a core"`
+	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesystem"`
+	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails"`
+	Lifecycle     *Lifecycle     `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events"`
+	// Optional: Defaults to /dev/termination-log
+	TerminationMessagePath string `yaml:"terminationMessagePath,omitempty" json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log"`
+	// Optional: Default to false.
+	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false"`
+	// Optional: Policy for pulling images for this container
+	ImagePullPolicy PullPolicy `json:"imagePullPolicy" yaml:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise"`
 }
 
-// Event is the representation of an event logged to etcd backends
-type Event struct {
-	Event     string             `json:"event,omitempty"`
-	Manifest  *ContainerManifest `json:"manifest,omitempty"`
-	Container *Container         `json:"container,omitempty"`
-	Timestamp int64              `json:"timestamp"`
+// Handler defines a specific action that should be taken
+// TODO: merge this with liveness probing?
+// TODO: pass structured data to these actions, and document that data here.
+type Handler struct {
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	Exec *ExecAction `yaml:"exec,omitempty" json:"exec,omitempty" description:"exec-based hook handler"`
+	// HTTPGet specifies the http request to perform.
+	HTTPGet *HTTPGetAction `yaml:"httpGet,omitempty" json:"httpGet,omitempty" description:"HTTP-based hook handler"`
+}
+
+// Lifecycle describes actions that the management system should take in response to container lifecycle
+// events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
+// until the action is complete, unless the container process fails, in which case the handler is aborted.
+type Lifecycle struct {
+	// PostStart is called immediately after a container is created.  If the handler fails, the container
+	// is terminated and restarted.
+	PostStart *Handler `yaml:"postStart,omitempty" json:"postStart,omitempty" description:"called immediately after a container is started; if the handler fails, the container is terminated and restarted according to its restart policy; other management of the container blocks until the hook completes"`
+	// PreStop is called immediately before a container is terminated.  The reason for termination is
+	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
+	PreStop *Handler `yaml:"preStop,omitempty" json:"preStop,omitempty" description:"called before a container is terminated; the container is terminated after the handler completes; other management of the container blocks until the hook completes"`
 }
 
 // The below types are used by kube_client and api_server.
 
-// JSONBase is shared by all objects sent to, or returned from the client
-type JSONBase struct {
-	Kind              string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	ID                string `json:"id,omitempty" yaml:"id,omitempty"`
-	CreationTimestamp string `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-	SelfLink          string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-	ResourceVersion   uint64 `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-	APIVersion        string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+// TypeMeta is shared by all objects sent to, or returned from the client.
+type TypeMeta struct {
+	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty" description:"kind of object, in CamelCase"`
+	ID                string    `json:"id,omitempty" yaml:"id,omitempty" description:"name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"`
+	UID               string    `json:"uid,omitempty" yaml:"uid,omitempty" description:"UUID assigned by the system upon creation, unique across space and time"`
+	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; recorded by the system; null for lists"`
+	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty" description:"URL for the object"`
+	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"`
+	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" description:"version of the schema the object should have"`
+	Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"`
+
+	// Annotations are unstructured key value data stored with a resource that may be set by
+	// external tooling. They are not queryable and should be preserved when modifying
+	// objects.
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"`
 }
 
 // PodStatus represents a status of a pod.
@@ -219,156 +322,241 @@ const (
 	PodTerminated PodStatus = "Terminated"
 )
 
-// PodInfo contains one entry for every container with available info.
-type PodInfo map[string]docker.Container
-
-// RestartPolicyType represents a restart policy for a pod.
-type RestartPolicyType string
-
-// Valid restart policies defined for a PodState.RestartPolicy.
-const (
-	RestartAlways    RestartPolicyType = "RestartAlways"
-	RestartOnFailure RestartPolicyType = "RestartOnFailure"
-	RestartNever     RestartPolicyType = "RestartNever"
-)
-
-type RestartPolicy struct {
-	// Optional: Defaults to "RestartAlways".
-	Type RestartPolicyType `yaml:"type,omitempty" json:"type,omitempty"`
+type ContainerStateWaiting struct {
+	// Reason could be pulling image,
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty" description:"(brief) reason the container is not yet running, such as pulling its image"`
 }
 
-// PodState is the state of a pod, used as either input (desired state) or output (current state)
+type ContainerStateRunning struct {
+	// TODO: change to util.Time
+	StartedAt time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty" description:"time at which the container was last (re-)started"`
+}
+
+type ContainerStateTerminated struct {
+	ExitCode int    `json:"exitCode" yaml:"exitCode" description:"exit status from the last termination of the container"`
+	Signal   int    `json:"signal,omitempty" yaml:"signal,omitempty" description:"signal from the last termination of the container"`
+	Reason   string `json:"reason,omitempty" yaml:"reason,omitempty" description:"(brief) reason from the last termination of the container"`
+	Message  string `json:"message,omitempty" yaml:"message,omitempty" description:"message regarding the last termination of the container"`
+	// TODO: change to util.Time
+	StartedAt time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty" description:"time at which previous execution of the container started"`
+	// TODO: change to util.Time
+	FinishedAt time.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty" description:"time at which the container last terminated"`
+}
+
+// ContainerState holds a possible state of container.
+// Only one of its members may be specified.
+// If none of them is specified, the default one is ContainerStateWaiting.
+type ContainerState struct {
+	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" yaml:"waiting,omitempty" description:"details about a waiting container"`
+	Running     *ContainerStateRunning    `json:"running,omitempty" yaml:"running,omitempty" description:"details about a running container"`
+	Termination *ContainerStateTerminated `json:"termination,omitempty" yaml:"termination,omitempty" description:"details about a terminated container"`
+}
+
+type ContainerStatus struct {
+	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
+	// defined for container?
+	State ContainerState `json:"state,omitempty" yaml:"state,omitempty" description:"details about the container's current condition"`
+	// Note that this is calculated from dead containers.  But those containers are subject to
+	// garbage collection.  This value will get capped at 5 by GC.
+	RestartCount int `json:"restartCount" yaml:"restartCount" description:"the number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed"`
+	// TODO(dchen1107): Deprecated this soon once we pull entire PodStatus from node,
+	// not just PodInfo. Now we need this to remove docker.Container from API
+	PodIP string `json:"podIP,omitempty" yaml:"podIP,omitempty" description:"pod's IP address"`
+	// TODO(dchen1107): Need to decide how to reprensent this in v1beta3
+	Image string `yaml:"image" json:"image" description:"image of the container"`
+}
+
+// PodInfo contains one entry for every container with available info.
+type PodInfo map[string]ContainerStatus
+
+type RestartPolicyAlways struct{}
+
+// TODO(dchen1107): Define what kinds of failures should restart
+// TODO(dchen1107): Decide whether to support policy knobs, and, if so, which ones.
+type RestartPolicyOnFailure struct{}
+
+type RestartPolicyNever struct{}
+
+type RestartPolicy struct {
+	// Only one of the following restart policy may be specified.
+	// If none of the following policies is specified, the default one
+	// is RestartPolicyAlways.
+	Always    *RestartPolicyAlways    `json:"always,omitempty" yaml:"always,omitempty" description:"always restart the container after termination"`
+	OnFailure *RestartPolicyOnFailure `json:"onFailure,omitempty" yaml:"onFailure,omitempty" description:"restart the container if it fails for any reason, but not if it succeeds (exit 0)"`
+	Never     *RestartPolicyNever     `json:"never,omitempty" yaml:"never,omitempty" description:"never restart the container"`
+}
+
+// PodState is the state of a pod, used as either input (desired state) or output (current state).
 type PodState struct {
-	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
-	Status   PodStatus         `json:"status,omitempty" yaml:"status,omitempty"`
-	Host     string            `json:"host,omitempty" yaml:"host,omitempty"`
-	HostIP   string            `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
-	PodIP    string            `json:"podIP,omitempty" yaml:"podIP,omitempty"`
+	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty" description:"manifest of containers and volumes comprising the pod"`
+	Status   PodStatus         `json:"status,omitempty" yaml:"status,omitempty" description:"current condition of the pod, Waiting, Running, or Terminated"`
+	// A human readable message indicating details about why the pod is in this state.
+	Message string `json:"message,omitempty" yaml:"message,omitempty" description:"human readable message indicating details about why the pod is in this condition"`
+	Host    string `json:"host,omitempty" yaml:"host,omitempty" description:"host to which the pod is assigned; empty if not yet scheduled"`
+	HostIP  string `json:"hostIP,omitempty" yaml:"hostIP,omitempty" description:"IP address of the host to which the pod is assigned; empty if not yet scheduled"`
+	PodIP   string `json:"podIP,omitempty" yaml:"podIP,omitempty" description:"IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"`
 
 	// The key of this map is the *name* of the container within the manifest; it has one
-	// entry per container in the manifest. The value of this map is currently the output
-	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon. To allow marshalling/unmarshalling, we copied the client's structs and added
-	// json/yaml tags.
-	// TODO: Make real decisions about what our info should look like.
-	Info          PodInfo       `json:"info,omitempty" yaml:"info,omitempty"`
-	RestartPolicy RestartPolicy `json:"restartpolicy,omitempty" yaml:"restartpolicy,omitempty"`
+	// entry per container in the manifest. The value of this map is ContainerStatus for
+	// the container.
+	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty" description:"map of container name to container status"`
 }
 
 // PodList is a list of Pods.
 type PodList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Pod `json:"items" yaml:"items,omitempty"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []Pod `json:"items" yaml:"items" description:"list of pods"`
 }
 
-// Pod is a collection of containers, used as either input (create, update) or as output (list, get)
+// Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
-	JSONBase     `json:",inline" yaml:",inline"`
-	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
+	TypeMeta     `json:",inline" yaml:",inline"`
+	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
+	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty" description:"specification of the desired state of the pod"`
+	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty" description:"current state of the pod"`
+	// NodeSelector is a selector which must be true for the pod to fit on a node
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
 }
 
-// ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get)
+// ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get).
 type ReplicationControllerState struct {
-	Replicas        int               `json:"replicas" yaml:"replicas"`
-	ReplicaSelector map[string]string `json:"replicaSelector,omitempty" yaml:"replicaSelector,omitempty"`
-	PodTemplate     PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty"`
+	Replicas        int               `json:"replicas" yaml:"replicas" description:"number of replicas (desired or observed, as appropriate)"`
+	ReplicaSelector map[string]string `json:"replicaSelector,omitempty" yaml:"replicaSelector,omitempty" description:"label keys and values that must match in order to be controlled by this replication controller"`
+	PodTemplate     PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty" description:"template for pods to be created by this replication controller when the observed number of replicas is less than the desired number of replicas"`
 }
 
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []ReplicationController `json:"items" yaml:"items" description:"list of replication controllers"`
 }
 
-// ReplicationController represents the configuration of a replication controller
+// ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	JSONBase     `json:",inline" yaml:",inline"`
-	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
+	TypeMeta     `json:",inline" yaml:",inline"`
+	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty" description:"specification of the desired state of the replication controller"`
+	CurrentState ReplicationControllerState `json:"currentState,omitempty" yaml:"currentState,omitempty" description:"current state of the replication controller"`
+	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize replication controllers"`
 }
 
-// PodTemplate holds the information used for creating pods
+// PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
-	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
+	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
 }
 
-// ServiceList holds a list of services
+// ServiceList holds a list of services.
 type ServiceList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Service `json:"items" yaml:"items"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []Service `json:"items" yaml:"items" description:"list of services"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Port     int `json:"port,omitempty" yaml:"port,omitempty"`
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Required.
+	Port int `json:"port" yaml:"port" description:"port exposed by the service"`
+	// Optional: Defaults to "TCP".
+	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty" description:"protocol for port; must be UDP or TCP; TCP if unspecified"`
 
 	// This service's labels.
-	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize services"`
 
 	// This service will route traffic to pods having labels matching this selector.
-	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
-	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
+	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty" description:"label keys and values that must match in order to receive traffic for this service"`
+	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
+	// PublicIPs are used by external load balancers.
+	PublicIPs []string `json:"publicIPs,omitempty" yaml:"publicIPs,omitempty" description:"externally visible IPs from which to select the address for the external load balancer"`
 
 	// ContainerPort is the name of the port on the container to direct traffic to.
 	// Optional, if unspecified use the first port on the container.
-	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
+	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty" description:"number or name of the port to access on the containers belonging to pods targeted by the service"`
+
+	// PortalIP is usually assigned by the master.  If specified by the user
+	// we will try to respect it or else fail the request.  This field can
+	// not be changed by updates.
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty" description:"IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated"`
+
+	// ProxyPort is assigned by the master.  If specified by the user it will be ignored.
+	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty" description:"if non-zero, a pre-allocated host port used for this service by the proxy on each node; assigned by the master and ignored on input"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	JSONBase  `json:",inline" yaml:",inline"`
-	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
+	TypeMeta  `json:",inline" yaml:",inline"`
+	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
 }
 
+// EndpointsList is a list of endpoints.
+type EndpointsList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []Endpoints `json:"items" yaml:"items" description:"list of service endpoint lists"`
+}
+
+// NodeResources represents resources on a Kubernetes system node
+// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+type NodeResources struct {
+	// Capacity represents the available resources.
+	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty" description:"resource capacity of a node represented as a map of resource name to quantity of resource"`
+}
+
+type ResourceName string
+
+type ResourceList map[ResourceName]util.IntOrString
+
 // Minion is a worker node in Kubernetenes.
-// The name of the minion according to etcd is in JSONBase.ID.
+// The name of the minion according to etcd is in ID.
 type Minion struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	// Queried from cloud provider, if available.
-	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
+	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty" description:"IP address of the node"`
+	// Resources available on the node
+	NodeResources NodeResources `json:"resources,omitempty" yaml:"resources,omitempty" description:"characterization of node resources"`
+	// Labels for the node
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize minions; labels of a minion assigned by the scheduler must match the scheduled pod's nodeSelector"`
 }
 
 // MinionList is a list of minions.
 type MinionList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	// DEPRECATED: the below Minions is due to a naming mistake and
+	// will be replaced with Items in the future.
+	Minions []Minion `json:"minions,omitempty" yaml:"minions,omitempty" description:"list of nodes; deprecated"`
+	Items   []Minion `json:"items" yaml:"items" description:"list of nodes"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
 type Binding struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	PodID    string `json:"podID" yaml:"podID"`
-	Host     string `json:"host" yaml:"host"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	PodID    string `json:"podID" yaml:"podID" description:"name of the pod to bind"`
+	Host     string `json:"host" yaml:"host" description:"host to which to bind the specified pod"`
 }
 
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
 type Status struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	// One of: "success", "failure", "working" (for operations not yet completed)
-	Status string `json:"status,omitempty" yaml:"status,omitempty"`
-	// A human readable description of the status of this operation.
-	Message string `json:"message,omitempty" yaml:"message,omitempty"`
-	// A machine readable description of why this operation is in the
-	// "failure" or "working" status. If this value is empty there
+	TypeMeta `json:",inline" yaml:",inline"`
+	// One of: "Success", "Failure", "Working" (for operations not yet completed)
+	Status string `json:"status,omitempty" yaml:"status,omitempty" description:"status of the operation; either Working (not yet completed), Success, or Failure"`
+	// A human-readable description of the status of this operation.
+	Message string `json:"message,omitempty" yaml:"message,omitempty" description:"human-readable description of the status of this operation"`
+	// A machine-readable description of why this operation is in the
+	// "Failure" or "Working" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
-	Reason ReasonType `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Reason StatusReason `json:"reason,omitempty" yaml:"reason,omitempty" description:"machine-readable description of why this operation is in the 'Failure' or 'Working' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"`
 	// Extended data associated with the reason.  Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
-	Details *StatusDetails `json:"details,omitempty" yaml:"details,omitempty"`
+	Details *StatusDetails `json:"details,omitempty" yaml:"details,omitempty" description:"extended data associated with the reason; each reason may define its own extended details; this field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type"`
 	// Suggested HTTP return code for this status, 0 if not set.
-	Code int `json:"code,omitempty" yaml:"code,omitempty"`
+	Code int `json:"code,omitempty" yaml:"code,omitempty" description:"suggested HTTP return code for this status; 0 if not set"`
 }
 
 // StatusDetails is a set of additional properties that MAY be set by the
@@ -378,34 +566,37 @@ type Status struct {
 // and should assume that any attribute may be empty, invalid, or under
 // defined.
 type StatusDetails struct {
-	// The ID attribute of the resource associated with the status ReasonType
+	// The ID attribute of the resource associated with the status StatusReason
 	// (when there is a single ID which can be described).
-	ID string `json:"id,omitempty" yaml:"id,omitempty"`
-	// The kind attribute of the resource associated with the status ReasonType.
+	ID string `json:"id,omitempty" yaml:"id,omitempty" description:"the ID attribute of the resource associated with the status StatusReason (when there is a single ID which can be described)"`
+	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
-	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Kind string `json:"kind,omitempty" yaml:"kind,omitempty" description:"the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind"`
+	// The Causes array includes more details associated with the StatusReason
+	// failure. Not all StatusReasons may provide detailed causes.
+	Causes []StatusCause `json:"causes,omitempty" yaml:"causes,omitempty" description:"the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"`
 }
 
 // Values of Status.Status
 const (
-	StatusSuccess = "success"
-	StatusFailure = "failure"
-	StatusWorking = "working"
+	StatusSuccess = "Success"
+	StatusFailure = "Failure"
+	StatusWorking = "Working"
 )
 
-// ReasonType is an enumeration of possible failure causes.  Each ReasonType
+// StatusReason is an enumeration of possible failure causes.  Each StatusReason
 // must map to a single HTTP status code, but multiple reasons may map
 // to the same HTTP status code.
 // TODO: move to apiserver
-type ReasonType string
+type StatusReason string
 
 const (
-	// ReasonTypeUnknown means the server has declined to indicate a specific reason.
+	// StatusReasonUnknown means the server has declined to indicate a specific reason.
 	// The details field may contain other information about this error.
 	// Status code 500.
-	ReasonTypeUnknown ReasonType = ""
+	StatusReasonUnknown StatusReason = ""
 
-	// ReasonTypeWorking means the server is processing this request and will complete
+	// StatusReasonWorking means the server is processing this request and will complete
 	// at a future time.
 	// Details (optional):
 	//   "kind" string - the name of the resource being referenced ("operation" today)
@@ -415,9 +606,9 @@ const (
 	//   "Location" - HTTP header populated with a URL that can retrieved the final
 	//                status of this operation.
 	// Status code 202
-	ReasonTypeWorking ReasonType = "working"
+	StatusReasonWorking StatusReason = "Working"
 
-	// ResourceTypeNotFound means one or more resources required for this operation
+	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the missing resource
@@ -425,49 +616,167 @@ const (
 	//                   resource.
 	//   "id"   string - the identifier of the missing resource
 	// Status code 404
-	ReasonTypeNotFound ReasonType = "not_found"
+	StatusReasonNotFound StatusReason = "NotFound"
 
-	// ReasonTypeAlreadyExists means the resource you are creating already exists.
+	// StatusReasonAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the conflicting resource
 	//   "id"   string - the identifier of the conflicting resource
 	// Status code 409
-	ReasonTypeAlreadyExists ReasonType = "already_exists"
+	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
 
-	// ResourceTypeConflict means the requested update operation cannot be completed
+	// StatusReasonConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
 	// Each resource may define custom details that indicate the nature of the
 	// conflict.
 	// Status code 409
-	ReasonTypeConflict ReasonType = "conflict"
+	StatusReasonConflict StatusReason = "Conflict"
+)
+
+// StatusCause provides more information about an api.Status failure, including
+// cases when multiple errors are encountered.
+type StatusCause struct {
+	// A machine-readable description of the cause of the error. If this value is
+	// empty there is no information available.
+	Type CauseType `json:"reason,omitempty" yaml:"reason,omitempty" description:"machine-readable description of the cause of the error; if this value is empty there is no information available"`
+	// A human-readable description of the cause of the error.  This field may be
+	// presented as-is to a reader.
+	Message string `json:"message,omitempty" yaml:"message,omitempty" description:"human-readable description of the cause of the error; this field may be presented as-is to a reader"`
+	// The field of the resource that has caused this error, as named by its JSON
+	// serialization. May include dot and postfix notation for nested attributes.
+	// Arrays are zero-indexed.  Fields may appear more than once in an array of
+	// causes due to fields having multiple errors.
+	// Optional.
+	//
+	// Examples:
+	//   "name" - the field "name" on the current resource
+	//   "items[0].name" - the field "name" on the first array entry in "items"
+	Field string `json:"field,omitempty" yaml:"field,omitempty" description:"field of the resource that has caused this error, as named by its JSON serialization; may include dot and postfix notation for nested attributes; arrays are zero-indexed; fields may appear more than once in an array of causes due to fields having multiple errors"`
+}
+
+// CauseType is a machine readable value providing more detail about what
+// occured in a status response. An operation may have multiple causes for a
+// status (whether Failure, Success, or Working).
+type CauseType string
+
+const (
+	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
+	// (e.g. looking up an ID).
+	CauseTypeFieldValueNotFound CauseType = "FieldValueNotFound"
+	// CauseTypeFieldValueRequired is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	CauseTypeFieldValueRequired CauseType = "FieldValueRequired"
+	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	CauseTypeFieldValueDuplicate CauseType = "FieldValueDuplicate"
+	// CauseTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match).
+	CauseTypeFieldValueInvalid CauseType = "FieldValueInvalid"
+	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
+	// values that can not be handled (e.g. an enumerated string).
+	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
 )
 
 // ServerOp is an operation delivered to API clients.
 type ServerOp struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 }
 
 // ServerOpList is a list of operations, as delivered to API clients.
 type ServerOpList struct {
-	JSONBase `yaml:",inline" json:",inline"`
-	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
+	TypeMeta `yaml:",inline" json:",inline"`
+	Items    []ServerOp `yaml:"items" json:"items" description:"list of operations"`
 }
 
-// WatchEvent objects are streamed from the api server in response to a watch request.
-type WatchEvent struct {
-	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType
+// ObjectReference contains enough information to let you inspect or modify the referred object.
+type ObjectReference struct {
+	Kind            string `json:"kind,omitempty" yaml:"kind,omitempty" description:"kind of the referent"`
+	Namespace       string `json:"namespace,omitempty" yaml:"namespace,omitempty" description:"namespace of the referent"`
+	ID              string `json:"name,omitempty" yaml:"name,omitempty" description:"id of the referent"`
+	UID             string `json:"uid,omitempty" yaml:"uid,omitempty" description:"uid of the referent"`
+	APIVersion      string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" description:"API version of the referent"`
+	ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any"`
 
-	// For added or modified objects, this is the new object; for deleted objects,
-	// it's the state of the object immediately prior to its deletion.
-	Object APIObject
+	// Optional. If referring to a piece of an object instead of an entire object, this string
+	// should contain a valid field access statement. For example,
+	// if the object reference is to a container within a pod, this would take on a value like:
+	// "desiredState.manifest.containers[2]". Such statements are valid language constructs in
+	// both go and JavaScript. This is syntax is chosen only to have some well-defined way of
+	// referencing a part of an object.
+	// TODO: this design is not final and this field is subject to change in the future.
+	FieldPath string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty" description:"if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"`
 }
 
-// APIObject has appropriate encoder and decoder functions, such that on the wire, it's
-// stored as a []byte, but in memory, the contained object is accessable as an interface{}
-// via the Get() function. Only objects having a JSONBase may be stored via APIObject.
-// The purpose of this is to allow an API object of type known only at runtime to be
-// embedded within other API objects.
-type APIObject struct {
-	Object interface{}
+// Event is a report of an event somewhere in the cluster.
+// TODO: Decide whether to store these separately or with the object they apply to.
+type Event struct {
+	TypeMeta `yaml:",inline" json:",inline"`
+
+	// Required. The object that this event is about.
+	InvolvedObject ObjectReference `json:"involvedObject,omitempty" yaml:"involvedObject,omitempty" description:"object that this event is about"`
+
+	// Should be a short, machine understandable string that describes the current status
+	// of the referred object. This should not give the reason for being in this state.
+	// Examples: "running", "cantStart", "cantSchedule", "deleted".
+	// It's OK for components to make up statuses to report here, but the same string should
+	// always be used for the same status.
+	// TODO: define a way of making sure these are consistent and don't collide.
+	// TODO: provide exact specification for format.
+	Status string `json:"status,omitempty" yaml:"status,omitempty" description:"short, machine understandable string that describes the current status of the referred object"`
+
+	// Optional; this should be a short, machine understandable string that gives the reason
+	// for the transition into the object's current status. For example, if ObjectStatus is
+	// "cantStart", StatusReason might be "imageNotFound".
+	// TODO: provide exact specification for format.
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty" description:"short, machine understandable string that gives the reason for the transition into the object's current status"`
+
+	// Optional. A human-readable description of the status of this operation.
+	// TODO: decide on maximum length.
+	Message string `json:"message,omitempty" yaml:"message,omitempty" description:"human-readable description of the status of this operation"`
+
+	// Optional. The component reporting this event. Should be a short machine understandable string.
+	// TODO: provide exact specification for format.
+	Source string `json:"source,omitempty" yaml:"source,omitempty" description:"component reporting this event; short machine understandable string"`
+
+	// The time at which the client recorded the event. (Time of server receipt is in TypeMeta.)
+	Timestamp util.Time `json:"timestamp,omitempty" yaml:"timestamp,omitempty" description:"time at which the client recorded the event"`
+}
+
+// EventList is a list of events.
+type EventList struct {
+	TypeMeta `yaml:",inline" json:",inline"`
+	Items    []Event `yaml:"items" json:"items" description:"list of events"`
+}
+
+// Backported from v1beta3 to replace ContainerManifest
+
+// PodSpec is a description of a pod
+type PodSpec struct {
+	Volumes       []Volume      `json:"volumes" yaml:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
+	Containers    []Container   `json:"containers" yaml:"containers" description:"list of containers belonging to the pod"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
+	// NodeSelector is a selector which must be true for the pod to fit on a node
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
+}
+
+// BoundPod is a collection of containers that should be run on a host. A BoundPod
+// defines how a Pod may change after a Binding is created. A Pod is a request to
+// execute a pod, whereas a BoundPod is the specification that would be run on a server.
+type BoundPod struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Spec defines the behavior of a pod.
+	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty" description:"specification of the desired state of containers and volumes comprising the pod"`
+}
+
+// BoundPods is a list of Pods bound to a common server. The resource version of
+// the pod list is guaranteed to only change when the list of bound pods changes.
+type BoundPods struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Host is the name of a node that these pods were bound to.
+	Host string `json:"host" yaml:"host" description:"name of a node that these pods were bound to"`
+
+	// Items is the list of all pods bound to a given host.
+	Items []BoundPod `json:"items" yaml:"items" description:"list of all pods bound to a given host"`
 }

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Fake an ifup/ifdown event
+export IFACE=eth0
+
+if-down.d/static-routes || true
+if-up.d/static-routes || true

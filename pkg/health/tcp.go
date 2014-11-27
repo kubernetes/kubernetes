@@ -28,7 +28,7 @@ import (
 
 type TCPHealthChecker struct{}
 
-// Get the components of a TCP connection address.  For testability.
+// getTCPAddrParts parses the components of a TCP connection address.  For testability.
 func getTCPAddrParts(currentState api.PodState, container api.Container) (string, int, error) {
 	params := container.LivenessProbe.TCPSocket
 	if params == nil {
@@ -74,10 +74,14 @@ func DoTCPCheck(addr string) (Status, error) {
 	return Healthy, nil
 }
 
-func (t *TCPHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
+func (t *TCPHealthChecker) HealthCheck(podFullName, podUUID string, currentState api.PodState, container api.Container) (Status, error) {
 	host, port, err := getTCPAddrParts(currentState, container)
 	if err != nil {
 		return Unknown, err
 	}
 	return DoTCPCheck(net.JoinHostPort(host, strconv.Itoa(port)))
+}
+
+func (t *TCPHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return probe.TCPSocket != nil
 }

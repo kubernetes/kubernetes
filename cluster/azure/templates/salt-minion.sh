@@ -14,14 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+mkdir -p /etc/openvpn
+umask=$(umask)
+umask 0066
+echo "$CA_CRT" > /etc/openvpn/ca.crt
+echo "$CLIENT_CRT" > /etc/openvpn/client.crt
+echo "$CLIENT_KEY" > /etc/openvpn/client.key
+umask $umask
+
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-# Turn on debugging for salt-minion
-# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
 
 hostnamef=$(hostname -f)
+apt-get install -y ipcalc
+netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
+network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')
+cbrstring="$network $netmask"
 
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
@@ -31,10 +45,13 @@ grains:
   cbr-cidr: $MINION_IP_RANGE
   cloud: azure
   hostnamef: $hostnamef
+  cbr-string: $cbrstring
 EOF
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-curl -L http://bootstrap.saltstack.com | sh -s -- -X
+install-salt
+
+# Wait a few minutes and trigger another Salt run to better recover from
+# any transient errors.
+echo "Sleeping 180"
+sleep 180
+salt-call state.highstate || true

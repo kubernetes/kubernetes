@@ -79,3 +79,8 @@ func (s StringSet) List() []string {
 	sort.StringSlice(res).Sort()
 	return res
 }
+
+// Len returns the size of the set.
+func (s StringSet) Len() int {
+	return len(s)
+}

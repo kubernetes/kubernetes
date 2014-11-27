@@ -18,168 +18,460 @@ package proxy
 
 import (
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
 )
 
-func waitForClosedPort(p *Proxier, proxyPort string) error {
+func joinHostPort(host string, port int) string {
+	return net.JoinHostPort(host, fmt.Sprintf("%d", port))
+}
+
+func waitForClosedPortTCP(p *Proxier, proxyPort int) error {
 	for i := 0; i < 50; i++ {
-		_, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+		conn, err := net.Dial("tcp", joinHostPort("", proxyPort))
 		if err != nil {
 			return nil
 		}
+		conn.Close()
 		time.Sleep(1 * time.Millisecond)
 	}
-	return fmt.Errorf("port %s still open", proxyPort)
+	return fmt.Errorf("port %d still open", proxyPort)
 }
 
-// a simple echoServer that only accepts one connection. Returns port actually
-// being listened on, or an error.
-func echoServer(t *testing.T, addr string) (string, error) {
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return "", fmt.Errorf("failed to start echo service: %v", err)
-	}
-	go func() {
-		defer l.Close()
-		conn, err := l.Accept()
+func waitForClosedPortUDP(p *Proxier, proxyPort int) error {
+	for i := 0; i < 50; i++ {
+		conn, err := net.Dial("udp", joinHostPort("", proxyPort))
 		if err != nil {
-			t.Errorf("failed to accept new conn to echo service: %v", err)
+			return nil
 		}
-		io.Copy(conn, conn)
+		conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+		// To detect a closed UDP port write, then read.
+		_, err = conn.Write([]byte("x"))
+		if err != nil {
+			if e, ok := err.(net.Error); ok && !e.Timeout() {
+				return nil
+			}
+		}
+		var buf [4]byte
+		_, err = conn.Read(buf[0:])
+		if err != nil {
+			if e, ok := err.(net.Error); ok && !e.Timeout() {
+				return nil
+			}
+		}
 		conn.Close()
-	}()
-	_, port, err := net.SplitHostPort(l.Addr().String())
-	return port, err
+		time.Sleep(1 * time.Millisecond)
+	}
+	return fmt.Errorf("port %d still open", proxyPort)
 }
 
-func testEchoConnection(t *testing.T, address, port string) {
-	conn, err := net.Dial("tcp", net.JoinHostPort(address, port))
+// The iptables logic has to be tested in a proper end-to-end test, so this just stubs everything out.
+type fakeIptables struct{}
+
+func (fake *fakeIptables) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
+	return false, nil
+}
+
+func (fake *fakeIptables) FlushChain(table iptables.Table, chain iptables.Chain) error {
+	return nil
+}
+
+func (fake *fakeIptables) EnsureRule(table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
+	return false, nil
+}
+
+func (fake *fakeIptables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
+	return nil
+}
+
+func (fake *fakeIptables) IsIpv6() bool {
+	return false
+}
+
+var tcpServerPort string
+var udpServerPort string
+
+func init() {
+	// Don't handle panics
+	util.ReallyCrash = true
+
+	// TCP setup.
+	tcp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(r.URL.Path[1:]))
+	}))
+	u, err := url.Parse(tcp.URL)
 	if err != nil {
-		t.Fatalf("error connecting to proxy: %v", err)
+		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	magic := "aaaaa"
-	if _, err := conn.Write([]byte(magic)); err != nil {
-		t.Fatalf("error writing to proxy: %v", err)
+	_, tcpServerPort, err = net.SplitHostPort(u.Host)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	buf := make([]byte, 5)
-	if _, err := conn.Read(buf); err != nil {
-		t.Fatalf("error reading from proxy: %v", err)
+
+	// UDP setup.
+	udp, err := newUDPEchoServer()
+	if err != nil {
+		panic(fmt.Sprintf("failed to make a UDP server: %v", err))
 	}
-	if string(buf) != magic {
-		t.Fatalf("bad echo from proxy: got: %q, expected %q", string(buf), magic)
+	_, udpServerPort, err = net.SplitHostPort(udp.LocalAddr().String())
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse: %v", err))
+	}
+	go udp.Loop()
+}
+
+func testEchoTCP(t *testing.T, address string, port int) {
+	path := "aaaaa"
+	res, err := http.Get("http://" + address + ":" + fmt.Sprintf("%d", port) + "/" + path)
+	if err != nil {
+		t.Fatalf("error connecting to server: %v", err)
+	}
+	defer res.Body.Close()
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Errorf("error reading data: %v %v", err, string(data))
+	}
+	if string(data) != path {
+		t.Errorf("expected: %s, got %s", path, string(data))
 	}
 }
 
-func TestProxy(t *testing.T) {
-	port, err := echoServer(t, "127.0.0.1:0")
+func testEchoUDP(t *testing.T, address string, port int) {
+	data := "abc123"
+
+	conn, err := net.Dial("udp", joinHostPort(address, port))
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("error connecting to server: %v", err)
 	}
+	if _, err := conn.Write([]byte(data)); err != nil {
+		t.Fatalf("error sending to server: %v", err)
+	}
+	var resp [1024]byte
+	n, err := conn.Read(resp[0:])
+	if err != nil {
+		t.Errorf("error receiving data: %v", err)
+	}
+	if string(resp[0:n]) != data {
+		t.Errorf("expected: %s, got %s", data, string(resp[0:n]))
+	}
+}
+
+func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
-		{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
-	testEchoConnection(t, "127.0.0.1", proxyPort)
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 }
 
-func TestProxyStop(t *testing.T) {
-	port, err := echoServer(t, "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestUDPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+		},
+	})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
-	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
+}
+
+// Helper: Stops the proxy for the named service.
+func stopProxyByName(proxier *Proxier, service string) error {
+	info, found := proxier.getServiceInfo(service)
+	if !found {
+		return fmt.Errorf("unknown service: %s", service)
+	}
+	return proxier.stopProxy(service, info)
+}
+
+func TestTCPProxyStop(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
+
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+
+	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	conn, err := net.Dial("tcp", joinHostPort("", svcInfo.proxyPort))
 	if err != nil {
 		t.Fatalf("error connecting to proxy: %v", err)
 	}
 	conn.Close()
 
-	p.StopProxy("echo")
+	stopProxyByName(p, "echo")
 	// Wait for the port to really close.
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
 }
 
-func TestProxyUpdateDelete(t *testing.T) {
-	port, err := echoServer(t, "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestUDPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+		},
+	})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
-	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	conn, err := net.Dial("udp", joinHostPort("", svcInfo.proxyPort))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	conn.Close()
+
+	stopProxyByName(p, "echo")
+	// Wait for the port to really close.
+	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+}
+
+func TestTCPProxyUpdateDelete(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
+
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+
+	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	conn, err := net.Dial("tcp", joinHostPort("", svcInfo.proxyPort))
 	if err != nil {
 		t.Fatalf("error connecting to proxy: %v", err)
 	}
 	conn.Close()
 
 	p.OnUpdate([]api.Service{})
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
 }
 
-func TestProxyUpdatePort(t *testing.T) {
-	port, err := echoServer(t, "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+		},
+	})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	conn, err := net.Dial("udp", joinHostPort("", svcInfo.proxyPort))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	conn.Close()
+
+	p.OnUpdate([]api.Service{})
+	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+}
+
+func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
+
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+
+	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	conn, err := net.Dial("tcp", joinHostPort("", svcInfo.proxyPort))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	conn.Close()
+
+	p.OnUpdate([]api.Service{})
+	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", ProxyPort: svcInfo.proxyPort}, Status: api.ServiceStatus{}},
+	})
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
+}
+
+func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+		},
+	})
+
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+
+	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	conn, err := net.Dial("udp", joinHostPort("", svcInfo.proxyPort))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	conn.Close()
+
+	p.OnUpdate([]api.Service{})
+	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "UDP", ProxyPort: svcInfo.proxyPort}, Status: api.ServiceStatus{}},
+	})
+	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
+}
+
+func TestTCPProxyUpdatePort(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
+
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+
+	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
 
 	// add a new dummy listener in order to get a port that is free
 	l, _ := net.Listen("tcp", ":0")
-	_, port, _ = net.SplitHostPort(l.Addr().String())
-	portNum, _ := strconv.Atoi(port)
+	_, newPortStr, _ := net.SplitHostPort(l.Addr().String())
+	newPort, _ := strconv.Atoi(newPortStr)
 	l.Close()
 
 	// Wait for the socket to actually get free.
-	if err := waitForClosedPort(p, port); err != nil {
+	if err := waitForClosedPortTCP(p, newPort); err != nil {
 		t.Fatalf(err.Error())
+	}
+	if svcInfo.proxyPort == newPort {
+		t.Errorf("expected difference, got %d %d", newPort, svcInfo.proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPort, Protocol: "TCP", ProxyPort: newPort}, Status: api.ServiceStatus{}},
 	})
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
-	testEchoConnection(t, "127.0.0.1", port)
+	testEchoTCP(t, "127.0.0.1", newPort)
+
+	// Ensure the old port is released and re-usable.
+	l, err = net.Listen("tcp", joinHostPort("", svcInfo.proxyPort))
+	if err != nil {
+		t.Fatalf("can't claim released port: %s", err)
+	}
+	l.Close()
 }
+
+func TestUDPProxyUpdatePort(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "echo"},
+			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+		},
+	})
+
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+
+	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+
+	// add a new dummy listener in order to get a port that is free
+	pc, _ := net.ListenPacket("udp", ":0")
+	_, newPortStr, _ := net.SplitHostPort(pc.LocalAddr().String())
+	newPort, _ := strconv.Atoi(newPortStr)
+	pc.Close()
+
+	// Wait for the socket to actually get free.
+	if err := waitForClosedPortUDP(p, newPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	if svcInfo.proxyPort == newPort {
+		t.Errorf("expected difference, got %d %d", newPort, svcInfo.proxyPort)
+	}
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPort, Protocol: "UDP", ProxyPort: newPort}, Status: api.ServiceStatus{}},
+	})
+	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	testEchoUDP(t, "127.0.0.1", newPort)
+
+	// Ensure the old port is released and re-usable.
+	pc, err = net.ListenPacket("udp", joinHostPort("", svcInfo.proxyPort))
+	if err != nil {
+		t.Fatalf("can't claim released port: %s", err)
+	}
+	pc.Close()
+}
+
+// TODO: Test UDP timeouts.

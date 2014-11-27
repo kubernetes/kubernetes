@@ -81,3 +81,57 @@ func TestFIFO_addUpdate(t *testing.T) {
 		t.Errorf("item did not get removed")
 	}
 }
+
+func TestFIFO_addReplace(t *testing.T) {
+	f := NewFIFO()
+	f.Add("foo", 10)
+	f.Replace(map[string]interface{}{"foo": 15})
+	got := make(chan int, 2)
+	go func() {
+		for {
+			got <- f.Pop().(int)
+		}
+	}()
+
+	first := <-got
+	if e, a := 15, first; e != a {
+		t.Errorf("Didn't get updated value (%v), got %v", e, a)
+	}
+	select {
+	case unexpected := <-got:
+		t.Errorf("Got second value %v", unexpected)
+	case <-time.After(50 * time.Millisecond):
+	}
+	_, exists := f.Get("foo")
+	if exists {
+		t.Errorf("item did not get removed")
+	}
+}
+
+func TestFIFO_detectLineJumpers(t *testing.T) {
+	f := NewFIFO()
+
+	f.Add("foo", 10)
+	f.Add("bar", 1)
+	f.Add("foo", 11)
+	f.Add("foo", 13)
+	f.Add("zab", 30)
+
+	if e, a := 13, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+
+	f.Add("foo", 14) // ensure foo doesn't jump back in line
+
+	if e, a := 1, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+
+	if e, a := 30, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+
+	if e, a := 14, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+}

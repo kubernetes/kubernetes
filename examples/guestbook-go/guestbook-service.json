@@ -1,0 +1,9 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "Service",
+  "id": "guestbook",
+  "port": 3000,
+  "containerPort": "http-server",
+  "selector": { "name": "guestbook" },
+  "createExternalLoadBalancer": true
+}

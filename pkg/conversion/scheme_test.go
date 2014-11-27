@@ -21,10 +21,13 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/google/gofuzz"
+	"gopkg.in/v1/yaml"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
@@ -63,34 +66,28 @@ type TestType2 struct {
 	B int    `yaml:"B,omitempty" json:"B,omitempty"`
 }
 
-// We depend on the name of the external and internal types matching. Ordinarily,
-// we'd accomplish this with an additional package, but since this is a test, we
-// can just enclose stuff in a function to simulate that.
-func externalTypeReturn() interface{} {
-	type TestType2 struct {
-		A string `yaml:"A,omitempty" json:"A,omitempty"`
-		B int    `yaml:"B,omitempty" json:"B,omitempty"`
-	}
-	type TestType1 struct {
-		MyWeirdCustomEmbeddedVersionKindField `json:",inline" yaml:",inline"`
-		A                                     string               `yaml:"A,omitempty" json:"A,omitempty"`
-		B                                     int                  `yaml:"B,omitempty" json:"B,omitempty"`
-		C                                     int8                 `yaml:"C,omitempty" json:"C,omitempty"`
-		D                                     int16                `yaml:"D,omitempty" json:"D,omitempty"`
-		E                                     int32                `yaml:"E,omitempty" json:"E,omitempty"`
-		F                                     int64                `yaml:"F,omitempty" json:"F,omitempty"`
-		G                                     uint                 `yaml:"G,omitempty" json:"G,omitempty"`
-		H                                     uint8                `yaml:"H,omitempty" json:"H,omitempty"`
-		I                                     uint16               `yaml:"I,omitempty" json:"I,omitempty"`
-		J                                     uint32               `yaml:"J,omitempty" json:"J,omitempty"`
-		K                                     uint64               `yaml:"K,omitempty" json:"K,omitempty"`
-		L                                     bool                 `yaml:"L,omitempty" json:"L,omitempty"`
-		M                                     map[string]int       `yaml:"M,omitempty" json:"M,omitempty"`
-		N                                     map[string]TestType2 `yaml:"N,omitempty" json:"N,omitempty"`
-		O                                     *TestType2           `yaml:"O,omitempty" json:"O,omitempty"`
-		P                                     []TestType2          `yaml:"Q,omitempty" json:"Q,omitempty"`
-	}
-	return TestType1{}
+type ExternalTestType2 struct {
+	A string `yaml:"A,omitempty" json:"A,omitempty"`
+	B int    `yaml:"B,omitempty" json:"B,omitempty"`
+}
+type ExternalTestType1 struct {
+	MyWeirdCustomEmbeddedVersionKindField `json:",inline" yaml:",inline"`
+	A                                     string                       `yaml:"A,omitempty" json:"A,omitempty"`
+	B                                     int                          `yaml:"B,omitempty" json:"B,omitempty"`
+	C                                     int8                         `yaml:"C,omitempty" json:"C,omitempty"`
+	D                                     int16                        `yaml:"D,omitempty" json:"D,omitempty"`
+	E                                     int32                        `yaml:"E,omitempty" json:"E,omitempty"`
+	F                                     int64                        `yaml:"F,omitempty" json:"F,omitempty"`
+	G                                     uint                         `yaml:"G,omitempty" json:"G,omitempty"`
+	H                                     uint8                        `yaml:"H,omitempty" json:"H,omitempty"`
+	I                                     uint16                       `yaml:"I,omitempty" json:"I,omitempty"`
+	J                                     uint32                       `yaml:"J,omitempty" json:"J,omitempty"`
+	K                                     uint64                       `yaml:"K,omitempty" json:"K,omitempty"`
+	L                                     bool                         `yaml:"L,omitempty" json:"L,omitempty"`
+	M                                     map[string]int               `yaml:"M,omitempty" json:"M,omitempty"`
+	N                                     map[string]ExternalTestType2 `yaml:"N,omitempty" json:"N,omitempty"`
+	O                                     *ExternalTestType2           `yaml:"O,omitempty" json:"O,omitempty"`
+	P                                     []ExternalTestType2          `yaml:"Q,omitempty" json:"Q,omitempty"`
 }
 
 type ExternalInternalSame struct {
@@ -124,34 +121,38 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *Scheme {
 	s := NewScheme()
-	s.AddKnownTypes("", TestType1{}, ExternalInternalSame{})
-	s.AddKnownTypes("v1", externalTypeReturn(), ExternalInternalSame{})
-	s.ExternalVersion = "v1"
+	// Ordinarily, we wouldn't add TestType2, but because this is a test and
+	// both types are from the same package, we need to get it into the system
+	// so that converter will match it with ExternalType2.
+	s.AddKnownTypes("", &TestType1{}, &TestType2{}, &ExternalInternalSame{})
+	s.AddKnownTypes("v1", &ExternalInternalSame{})
+	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName("v1", "TestType2", &ExternalTestType2{})
+	s.AddKnownTypeWithName("", "TestType3", &TestType1{})
+	s.AddKnownTypeWithName("v1", "TestType3", &ExternalTestType1{})
 	s.InternalVersion = ""
-	s.MetaInsertionFactory = testMetaInsertionFactory{}
+	s.MetaFactory = testMetaFactory{}
 	return s
 }
 
-type testMetaInsertionFactory struct {
-	MyWeirdCustomEmbeddedVersionKindField struct {
+type testMetaFactory struct{}
+
+func (testMetaFactory) Interpret(data []byte) (version, kind string, err error) {
+	findKind := struct {
 		APIVersion string `json:"myVersionKey,omitempty" yaml:"myVersionKey,omitempty"`
 		ObjectKind string `json:"myKindKey,omitempty" yaml:"myKindKey,omitempty"`
-	} `json:",inline" yaml:",inline"`
+	}{}
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, &findKind)
+	if err != nil {
+		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+	}
+	return findKind.APIVersion, findKind.ObjectKind, nil
 }
 
-// Create returns a new testMetaInsertionFactory with the version and kind fields set.
-func (testMetaInsertionFactory) Create(version, kind string) interface{} {
-	m := testMetaInsertionFactory{}
-	m.MyWeirdCustomEmbeddedVersionKindField.APIVersion = version
-	m.MyWeirdCustomEmbeddedVersionKindField.ObjectKind = kind
-	return &m
-}
-
-// Interpret returns the version and kind information from in, which must be
-// a testMetaInsertionFactory pointer object.
-func (testMetaInsertionFactory) Interpret(in interface{}) (version, kind string) {
-	m := in.(*testMetaInsertionFactory)
-	return m.MyWeirdCustomEmbeddedVersionKindField.APIVersion, m.MyWeirdCustomEmbeddedVersionKindField.ObjectKind
+func (testMetaFactory) Update(version, kind string, obj interface{}) error {
+	return UpdateVersionAndKind(nil, "APIVersion", version, "ObjectKind", kind, obj)
 }
 
 func objDiff(a, b interface{}) string {
@@ -168,10 +169,10 @@ func objDiff(a, b interface{}) string {
 	// An alternate diff attempt, in case json isn't showing you
 	// the difference. (reflect.DeepEqual makes a distinction between
 	// nil and empty slices, for example.)
-	return util.StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
-	)
+	//return util.StringDiff(
+	//	fmt.Sprintf("%#v", a),
+	//	fmt.Sprintf("%#v", b),
+	//)
 }
 
 func runTest(t *testing.T, source interface{}) {
@@ -179,7 +180,7 @@ func runTest(t *testing.T, source interface{}) {
 	TestObjectFuzzer.Fuzz(source)
 
 	s := GetTestScheme()
-	data, err := s.Encode(source)
+	data, err := s.EncodeToVersion(source, "v1")
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
@@ -218,11 +219,71 @@ func TestTypes(t *testing.T) {
 	}
 }
 
+func TestMultipleNames(t *testing.T) {
+	s := GetTestScheme()
+
+	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	internal := obj.(*TestType1)
+	if internal.A != "value" {
+		t.Fatalf("unexpected decoded object: %#v", internal)
+	}
+
+	out, err := s.EncodeToVersion(internal, "v1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(out), `"myKindKey":"TestType1"`) {
+		t.Errorf("unexpected encoded output: %s", string(out))
+	}
+}
+
+func TestKnownTypes(t *testing.T) {
+	s := GetTestScheme()
+	if len(s.KnownTypes("v2")) != 0 {
+		t.Errorf("should have no known types for v2")
+	}
+
+	types := s.KnownTypes("v1")
+	for _, s := range []string{"TestType1", "TestType2", "TestType3", "ExternalInternalSame"} {
+		if _, ok := types[s]; !ok {
+			t.Errorf("missing type %q", s)
+		}
+	}
+}
+
+func TestConvertToVersion(t *testing.T) {
+	s := GetTestScheme()
+	tt := &TestType1{A: "I'm not a pointer object"}
+	other, err := s.ConvertToVersion(tt, "v1")
+	if err != nil {
+		t.Fatalf("Failure: %v", err)
+	}
+	converted, ok := other.(*ExternalTestType1)
+	if !ok {
+		t.Fatalf("Got wrong type")
+	}
+	if tt.A != converted.A {
+		t.Fatalf("Failed to convert object correctly: %#v", converted)
+	}
+}
+
+func TestConvertToVersionErr(t *testing.T) {
+	s := GetTestScheme()
+	tt := TestType1{A: "I'm not a pointer object"}
+	_, err := s.ConvertToVersion(tt, "v1")
+	if err == nil {
+		t.Fatalf("unexpected non-error")
+	}
+}
+
 func TestEncode_NonPtr(t *testing.T) {
 	s := GetTestScheme()
 	tt := TestType1{A: "I'm not a pointer object"}
 	obj := interface{}(tt)
-	data, err := s.Encode(obj)
+	data, err := s.EncodeToVersion(obj, "v1")
 	obj2, err2 := s.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
@@ -239,7 +300,7 @@ func TestEncode_Ptr(t *testing.T) {
 	s := GetTestScheme()
 	tt := &TestType1{A: "I am a pointer object"}
 	obj := interface{}(tt)
-	data, err := s.Encode(obj)
+	data, err := s.EncodeToVersion(obj, "v1")
 	obj2, err2 := s.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
@@ -256,9 +317,28 @@ func TestBadJSONRejection(t *testing.T) {
 	s := GetTestScheme()
 	badJSONs := [][]byte{
 		[]byte(`{"myVersionKey":"v1"}`),                          // Missing kind
-		[]byte(`{"myKindKey":"TestType1"}`),                      // Missing version
 		[]byte(`{"myVersionKey":"v1","myKindKey":"bar"}`),        // Unknown kind
 		[]byte(`{"myVersionKey":"bar","myKindKey":"TestType1"}`), // Unknown version
+	}
+	for _, b := range badJSONs {
+		if _, err := s.Decode(b); err == nil {
+			t.Errorf("Did not reject bad json: %s", string(b))
+		}
+	}
+	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
+	if err := s.DecodeInto(badJSONKindMismatch, &TestType1{}); err == nil {
+		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
+	}
+	if err := s.DecodeInto([]byte(``), &TestType1{}); err == nil {
+		t.Errorf("Did not give error for empty data")
+	}
+}
+
+func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
+	s := GetTestScheme()
+	s.InternalVersion = "v1"
+	badJSONs := [][]byte{
+		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
 	}
 	for _, b := range badJSONs {
 		if _, err := s.Decode(b); err == nil {

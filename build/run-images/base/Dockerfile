@@ -14,10 +14,10 @@
 
 # This file creates a minimal container for running Kubernetes binaries
 
-FROM google/debian:wheezy 
+FROM google/debian:wheezy
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 WORKDIR /kubernetes
 
-# Upload Kubernetes
+# Upload Kubernetes server binaries
 ADD kube-bins.tar.gz /kubernetes

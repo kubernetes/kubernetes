@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2014 Google Inc. All rights reserved.
 
@@ -16,9 +18,16 @@ limitations under the License.
 
 package main
 
-import "syscall"
+import (
+	"os"
+	"os/signal"
+	"syscall"
+)
 
 func main() {
-	// Halts execution, waiting on signal.
-	syscall.Pause()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
+
+	// Block until a signal is received.
+	<-c
 }

@@ -22,26 +22,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestLoadBalanceValidateWorks(t *testing.T) {
-	loadBalancer := NewLoadBalancerRR()
-	if loadBalancer.isValid("") {
+func TestValidateWorks(t *testing.T) {
+	if isValidEndpoint("") {
 		t.Errorf("Didn't fail for empty string")
 	}
-	if loadBalancer.isValid("foobar") {
+	if isValidEndpoint("foobar") {
 		t.Errorf("Didn't fail with no port")
 	}
-	if loadBalancer.isValid("foobar:-1") {
+	if isValidEndpoint("foobar:-1") {
 		t.Errorf("Didn't fail with a negative port")
 	}
-	if !loadBalancer.isValid("foobar:8080") {
+	if !isValidEndpoint("foobar:8080") {
 		t.Errorf("Failed a valid config.")
 	}
 }
 
-func TestLoadBalanceFilterWorks(t *testing.T) {
-	loadBalancer := NewLoadBalancerRR()
+func TestFilterWorks(t *testing.T) {
 	endpoints := []string{"foobar:1", "foobar:2", "foobar:-1", "foobar:3", "foobar:-2"}
-	filtered := loadBalancer.filterValidEndpoints(endpoints)
+	filtered := filterValidEndpoints(endpoints)
 
 	if len(filtered) != 3 {
 		t.Errorf("Failed to filter to the correct size")
@@ -88,8 +86,8 @@ func TestLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 	}
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
-		Endpoints: []string{"endpoint1:40"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint1:40"},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint1:40")
@@ -106,8 +104,8 @@ func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 	}
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
-		Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1")
@@ -124,8 +122,8 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	}
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
-		Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1")
@@ -135,7 +133,7 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:2")
 	// Then update the configuration with one fewer endpoints, make sure
 	// we start in the beginning again
-	endpoints[0] = api.Endpoints{JSONBase: api.JSONBase{ID: "foo"},
+	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"endpoint:8", "endpoint:9"},
 	}
 	loadBalancer.OnUpdate(endpoints)
@@ -144,7 +142,7 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:8")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:9")
 	// Clear endpoints
-	endpoints[0] = api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}}
+	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}}
 	loadBalancer.OnUpdate(endpoints)
 
 	endpoint, err = loadBalancer.NextEndpoint("foo", nil)
@@ -161,12 +159,12 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	}
 	endpoints := make([]api.Endpoints, 2)
 	endpoints[0] = api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
-		Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	endpoints[1] = api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "bar"},
-		Endpoints: []string{"endpoint:4", "endpoint:5"},
+		ObjectMeta: api.ObjectMeta{Name: "bar"},
+		Endpoints:  []string{"endpoint:4", "endpoint:5"},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1")

@@ -20,7 +20,7 @@ import (
 	"net"
 )
 
-// A LoadBalancer distributes incoming requests to service endpoints.
+// LoadBalancer is an interface for distributing incoming requests to service endpoints.
 type LoadBalancer interface {
 	// NextEndpoint returns the endpoint to handle a request for the given
 	// service and source address.

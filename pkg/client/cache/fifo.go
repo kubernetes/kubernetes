@@ -18,6 +18,8 @@ package cache
 
 import (
 	"sync"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // FIFO receives adds and updates from a Reflector, and puts them in a queue for
@@ -26,37 +28,37 @@ import (
 // processed once, and when it is processed, the most recent version will be
 // processed. This can't be done with a channel.
 type FIFO struct {
-	lock  sync.RWMutex
-	cond  sync.Cond
+	lock sync.RWMutex
+	cond sync.Cond
+	// We depend on the property that items in the set are in the queue and vice versa.
 	items map[string]interface{}
 	queue []string
 }
 
-// Add inserts an item, and puts it in the queue.
-func (f *FIFO) Add(ID string, obj interface{}) {
+// Add inserts an item, and puts it in the queue. The item is only enqueued
+// if it doesn't already exist in the set.
+func (f *FIFO) Add(id string, obj interface{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.items[ID] = obj
-	f.queue = append(f.queue, ID)
+	if _, exists := f.items[id]; !exists {
+		f.queue = append(f.queue, id)
+	}
+	f.items[id] = obj
 	f.cond.Broadcast()
 }
 
-// Update updates an item, and adds it to the queue.
-func (f *FIFO) Update(ID string, obj interface{}) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.items[ID] = obj
-	f.queue = append(f.queue, ID)
-	f.cond.Broadcast()
+// Update is the same as Add in this implementation.
+func (f *FIFO) Update(id string, obj interface{}) {
+	f.Add(id, obj)
 }
 
 // Delete removes an item. It doesn't add it to the queue, because
 // this implementation assumes the consumer only cares about the objects,
 // not the order in which they were created/added.
-func (f *FIFO) Delete(ID string, obj interface{}) {
+func (f *FIFO) Delete(id string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	delete(f.items, ID)
+	delete(f.items, id)
 }
 
 // List returns a list of all the items.
@@ -70,11 +72,24 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
+// ContainedIDs returns a util.StringSet containing all IDs of the stored items.
+// This is a snapshot of a moment in time, and one should keep in mind that
+// other go routines can add or remove items after you call this.
+func (c *FIFO) ContainedIDs() util.StringSet {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	set := util.StringSet{}
+	for id := range c.items {
+		set.Insert(id)
+	}
+	return set
+}
+
 // Get returns the requested item, or sets exists=false.
-func (f *FIFO) Get(ID string) (item interface{}, exists bool) {
+func (f *FIFO) Get(id string) (item interface{}, exists bool) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	item, exists = f.items[ID]
+	item, exists = f.items[id]
 	return item, exists
 }
 
@@ -98,6 +113,23 @@ func (f *FIFO) Pop() interface{} {
 		}
 		delete(f.items, id)
 		return item
+	}
+}
+
+// Replace will delete the contents of 'f', using instead the given map.
+// 'f' takes ownersip of the map, you should not reference the map again
+// after calling this function. f's queue is reset, too; upon return, it
+// will contain the items in the map, in no particular order.
+func (f *FIFO) Replace(idToObj map[string]interface{}) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.items = idToObj
+	f.queue = f.queue[:0]
+	for id := range idToObj {
+		f.queue = append(f.queue, id)
+	}
+	if len(f.queue) > 0 {
+		f.cond.Broadcast()
 	}
 }
 

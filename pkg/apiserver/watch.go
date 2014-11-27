@@ -17,24 +17,44 @@ limitations under the License.
 package apiserver
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
-	"strconv"
+	"path"
+	"regexp"
+	"strings"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+
+	"github.com/golang/glog"
+	"golang.org/x/net/websocket"
 )
 
 type WatchHandler struct {
-	storage map[string]RESTStorage
-	codec   Codec
+	storage         map[string]RESTStorage
+	codec           runtime.Codec
+	canonicalPrefix string
+	selfLinker      runtime.SelfLinker
 }
 
-func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion uint64) {
+// setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
+func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) error {
+	name, err := h.selfLinker.Name(obj)
+	if err != nil {
+		return err
+	}
+	newURL := *req.URL
+	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
+	newURL.RawQuery = ""
+	newURL.Fragment = ""
+	return h.selfLinker.SetSelfLink(obj, newURL.String())
+}
+
+func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string) {
 	if s, err := labels.ParseSelector(query.Get("labels")); err != nil {
 		label = labels.Everything()
 	} else {
@@ -45,14 +65,23 @@ func getWatchParams(query url.Values) (label, field labels.Selector, resourceVer
 	} else {
 		field = s
 	}
-	if rv, err := strconv.ParseUint(query.Get("resourceVersion"), 10, 64); err == nil {
-		resourceVersion = rv
-	}
-	return label, field, resourceVersion
+	resourceVersion = query.Get("resourceVersion")
+	return
 }
 
-// handleWatch processes a watch request
+var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
+
+func isWebsocketRequest(req *http.Request) bool {
+	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
+}
+
+// ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := api.NewContext()
+	namespace := req.URL.Query().Get("namespace")
+	if len(namespace) > 0 {
+		ctx = api.WithNamespace(ctx, namespace)
+	}
 	parts := splitPath(req.URL.Path)
 	if len(parts) < 1 || req.Method != "GET" {
 		notFound(w, req)
@@ -65,7 +94,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
 		label, field, resourceVersion := getWatchParams(req.URL.Query())
-		watching, err := watcher.Watch(label, field, resourceVersion)
+		watching, err := watcher.Watch(ctx, label, field, resourceVersion)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -73,8 +102,12 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		// TODO: This is one watch per connection. We want to multiplex, so that
 		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching}
-		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
+		watchServer := &WatchServer{watching, h.codec, func(obj runtime.Object) {
+			if err := h.setSelfLinkAddName(obj, req); err != nil {
+				glog.Errorf("Failed to set self link for object %#v", obj)
+			}
+		}}
+		if isWebsocketRequest(req) {
 			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
 		} else {
 			watchServer.ServeHTTP(w, req)
@@ -88,6 +121,8 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	watching watch.Interface
+	codec    runtime.Codec
+	fixup    func(runtime.Object)
 }
 
 // HandleWS implements a websocket handler.
@@ -110,11 +145,14 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			err := websocket.JSON.Send(ws, &api.WatchEvent{
-				Type:   event.Type,
-				Object: api.APIObject{event.Object},
-			})
+			w.fixup(event.Object)
+			obj, err := watchjson.Object(w.codec, &event)
 			if err != nil {
+				// Client disconnect.
+				w.watching.Stop()
+				return
+			}
+			if err := websocket.JSON.Send(ws, obj); err != nil {
 				// Client disconnect.
 				w.watching.Stop()
 				return
@@ -126,27 +164,27 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 // ServeHTTP serves a series of JSON encoded events via straight HTTP with
 // Transfer-Encoding: chunked.
 func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	loggedW := httplog.LogOf(w)
+	loggedW := httplog.LogOf(req, w)
 	w = httplog.Unlogged(w)
 
 	cn, ok := w.(http.CloseNotifier)
 	if !ok {
 		loggedW.Addf("unable to get CloseNotifier")
-		http.NotFound(loggedW, req)
+		http.NotFound(w, req)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		loggedW.Addf("unable to get Flusher")
-		http.NotFound(loggedW, req)
+		http.NotFound(w, req)
 		return
 	}
 
-	loggedW.Header().Set("Transfer-Encoding", "chunked")
-	loggedW.WriteHeader(http.StatusOK)
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	encoder := json.NewEncoder(w)
+	encoder := watchjson.NewEncoder(w, self.codec)
 	for {
 		select {
 		case <-cn.CloseNotify():
@@ -157,11 +195,8 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			err := encoder.Encode(&api.WatchEvent{
-				Type:   event.Type,
-				Object: api.APIObject{event.Object},
-			})
-			if err != nil {
+			self.fixup(event.Object)
+			if err := encoder.Encode(&event); err != nil {
 				// Client disconnect.
 				self.watching.Stop()
 				return

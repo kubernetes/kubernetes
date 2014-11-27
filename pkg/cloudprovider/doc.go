@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cloudprovider supplies interfaces and implementations for cloud service providers
+// Package cloudprovider supplies interfaces and implementations for cloud service providers.
 package cloudprovider
-
-import ()

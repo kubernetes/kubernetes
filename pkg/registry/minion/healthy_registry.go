@@ -17,9 +17,8 @@ limitations under the License.
 package minion
 
 import (
-	"fmt"
-	"net/http"
-
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 
 	"github.com/golang/glog"
@@ -27,63 +26,63 @@ import (
 
 type HealthyRegistry struct {
 	delegate Registry
-	client   health.HTTPGetInterface
-	port     int
+	client   client.KubeletHealthChecker
 }
 
-func NewHealthyRegistry(delegate Registry, client *http.Client) Registry {
+func NewHealthyRegistry(delegate Registry, client client.KubeletHealthChecker) Registry {
 	return &HealthyRegistry{
 		delegate: delegate,
 		client:   client,
-		port:     10250,
 	}
 }
 
-func (r *HealthyRegistry) Contains(minion string) (bool, error) {
-	contains, err := r.delegate.Contains(minion)
-	if err != nil {
-		return false, err
+func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
+	minion, err := r.delegate.GetMinion(ctx, minionID)
+	if minion == nil {
+		return nil, ErrDoesNotExist
 	}
-	if !contains {
-		return false, nil
-	}
-	status, err := health.DoHTTPCheck(r.makeMinionURL(minion), r.client)
 	if err != nil {
-		return false, err
+		return nil, err
+	}
+	status, err := r.client.HealthCheck(minionID)
+	if err != nil {
+		return nil, err
 	}
 	if status == health.Unhealthy {
-		return false, nil
+		return nil, ErrNotHealty
 	}
-	return true, nil
+	return minion, nil
 }
 
-func (r *HealthyRegistry) Delete(minion string) error {
-	return r.delegate.Delete(minion)
+func (r *HealthyRegistry) DeleteMinion(ctx api.Context, minionID string) error {
+	return r.delegate.DeleteMinion(ctx, minionID)
 }
 
-func (r *HealthyRegistry) Insert(minion string) error {
-	return r.delegate.Insert(minion)
+func (r *HealthyRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+	return r.delegate.CreateMinion(ctx, minion)
 }
 
-func (r *HealthyRegistry) List() (currentMinions []string, err error) {
-	var result []string
-	list, err := r.delegate.List()
+func (r *HealthyRegistry) UpdateMinion(ctx api.Context, minion *api.Minion) error {
+	return r.delegate.UpdateMinion(ctx, minion)
+}
+
+func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.MinionList, err error) {
+	result := &api.MinionList{}
+	list, err := r.delegate.ListMinions(ctx)
 	if err != nil {
 		return result, err
 	}
-	for _, minion := range list {
-		status, err := health.DoHTTPCheck(r.makeMinionURL(minion), r.client)
+	for _, minion := range list.Items {
+		status, err := r.client.HealthCheck(minion.Name)
 		if err != nil {
-			glog.Errorf("%s failed health check with error: %s", minion, err)
+			glog.V(1).Infof("%#v failed health check with error: %v", minion, err)
 			continue
 		}
 		if status == health.Healthy {
-			result = append(result, minion)
+			result.Items = append(result.Items, minion)
+		} else {
+			glog.Errorf("%#v failed a health check, ignoring.", minion)
 		}
 	}
 	return result, nil
-}
-
-func (r *HealthyRegistry) makeMinionURL(minion string) string {
-	return fmt.Sprintf("http://%s:%d/healthz", minion, r.port)
 }

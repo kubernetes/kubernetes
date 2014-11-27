@@ -17,90 +17,156 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
-// Store is a generic object storage interface. Reflector knows how to watch a server
-// and update a store. A generic store is provided, which allows Reflector to be used
-// as a local caching system, and an LRU store, which allows Reflector to work like a
-// queue of items yet to be processed.
-type Store interface {
-	Add(ID string, obj interface{})
-	Update(ID string, obj interface{})
-	Delete(ID string, obj interface{})
-	List() []interface{}
-	Get(ID string) (item interface{}, exists bool)
+// ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
+type ListerWatcher interface {
+	// List should return a list type object; the Items field will be extracted, and the
+	// ResourceVersion field will be used to start the watch in the right place.
+	List() (runtime.Object, error)
+	// Watch should begin a watch at the specified version.
+	Watch(resourceVersion string) (watch.Interface, error)
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
-	kubeClient   *client.Client
-	resource     string
+	// The type of object we expect to place in the store.
 	expectedType reflect.Type
-	store        Store
+	// The destination to sync up with the watch source
+	store Store
+	// listerWatcher is used to perform lists and watches.
+	listerWatcher ListerWatcher
+	// period controls timing between one watch ending and
+	// the beginning of the next one.
+	period time.Duration
 }
 
-// NewReflector makes a new Reflector object which will keep the given store up to
+// NewReflector creates a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
 // only put things in the store that have the type of expectedType.
-// TODO: define a query so you only locally cache a subset of items.
-func NewReflector(resource string, kubeClient *client.Client, expectedType interface{}, store Store) *Reflector {
-	gc := &Reflector{
-		resource:     resource,
-		kubeClient:   kubeClient,
-		store:        store,
-		expectedType: reflect.TypeOf(expectedType),
+func NewReflector(lw ListerWatcher, expectedType interface{}, store Store) *Reflector {
+	r := &Reflector{
+		listerWatcher: lw,
+		store:         store,
+		expectedType:  reflect.TypeOf(expectedType),
+		period:        time.Second,
 	}
-	return gc
+	return r
 }
 
-func (gc *Reflector) Run() {
-	go util.Forever(func() {
-		w, err := gc.startWatch()
+// Run starts a watch and handles watch events. Will restart the watch if it is closed.
+// Run starts a goroutine and returns immediately.
+func (r *Reflector) Run() {
+	go util.Forever(func() { r.listAndWatch() }, r.period)
+}
+
+func (r *Reflector) listAndWatch() {
+	var resourceVersion string
+
+	list, err := r.listerWatcher.List()
+	if err != nil {
+		glog.Errorf("Failed to list %v: %v", r.expectedType, err)
+		return
+	}
+	meta, err := meta.Accessor(list)
+	if err != nil {
+		glog.Errorf("Unable to understand list result %#v", list)
+		return
+	}
+	resourceVersion = meta.ResourceVersion()
+	items, err := runtime.ExtractList(list)
+	if err != nil {
+		glog.Errorf("Unable to understand list result %#v (%v)", list, err)
+		return
+	}
+	err = r.syncWith(items)
+	if err != nil {
+		glog.Errorf("Unable to sync list result: %v", err)
+		return
+	}
+
+	for {
+		w, err := r.listerWatcher.Watch(resourceVersion)
 		if err != nil {
-			glog.Errorf("failed to watch %v: %v", gc.resource, err)
+			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
 			return
 		}
-		gc.watchHandler(w)
-	}, 5*time.Second)
+		if err := r.watchHandler(w, &resourceVersion); err != nil {
+			glog.Errorf("watch of %v ended with error: %v", r.expectedType, err)
+			return
+		}
+	}
 }
 
-func (gc *Reflector) startWatch() (watch.Interface, error) {
-	return gc.kubeClient.Get().Path(gc.resource).Path("watch").Watch()
+// syncWith replaces the store's items with the given list.
+func (r *Reflector) syncWith(items []runtime.Object) error {
+	found := map[string]interface{}{}
+	for _, item := range items {
+		meta, err := meta.Accessor(item)
+		if err != nil {
+			return fmt.Errorf("unexpected item in list: %v", err)
+		}
+		found[meta.Name()] = item
+	}
+
+	r.store.Replace(found)
+	return nil
 }
 
-func (gc *Reflector) watchHandler(w watch.Interface) {
+// watchHandler watches w and keeps *resourceVersion up to date.
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) error {
+	start := time.Now()
+	eventCount := 0
 	for {
 		event, ok := <-w.ResultChan()
 		if !ok {
-			glog.Errorf("unexpected watch close")
-			return
+			break
 		}
-		if e, a := gc.expectedType, reflect.TypeOf(event.Object); e != a {
+		if event.Type == watch.Error {
+			return apierrs.FromObject(event.Object)
+		}
+		if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
 			continue
 		}
-		jsonBase, err := api.FindJSONBase(event.Object)
+		meta, err := meta.Accessor(event.Object)
 		if err != nil {
 			glog.Errorf("unable to understand watch event %#v", event)
 			continue
 		}
 		switch event.Type {
 		case watch.Added:
-			gc.store.Add(jsonBase.ID(), event.Object)
+			r.store.Add(meta.Name(), event.Object)
 		case watch.Modified:
-			gc.store.Update(jsonBase.ID(), event.Object)
+			r.store.Update(meta.Name(), event.Object)
 		case watch.Deleted:
-			gc.store.Delete(jsonBase.ID(), event.Object)
+			// TODO: Will any consumers need access to the "last known
+			// state", which is passed in event.Object? If so, may need
+			// to change this.
+			r.store.Delete(meta.Name())
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
+		*resourceVersion = meta.ResourceVersion()
+		eventCount++
 	}
+
+	watchDuration := time.Now().Sub(start)
+	if watchDuration < 1*time.Second && eventCount == 0 {
+		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
+		return errors.New("very short watch")
+	}
+	glog.V(4).Infof("watch close - %v total items received", eventCount)
+	return nil
 }
