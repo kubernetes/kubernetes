@@ -9,8 +9,6 @@ coreos:
       content: |
         [Unit]
         Description=fleet daemon
-        Wants=etcd.service
-        After=etcd.service
         Wants=fleet.socket
         After=fleet.socket
 
