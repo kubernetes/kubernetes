@@ -20,6 +20,7 @@
 # config-default.sh.
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
 
+export AWS_DEFAULT_REGION=${ZONE}
 AWS_CMD="aws --output json ec2"
 
 function json_val {
@@ -421,7 +422,6 @@ EOF
 }
 
 function kube-down {
-  AWS_CMD="aws --output json ec2"
   instance_ids=$($AWS_CMD describe-instances | get_instance_ids)
   $AWS_CMD terminate-instances --instance-ids $instance_ids > /dev/null
   echo "Waiting for instances deleted"
