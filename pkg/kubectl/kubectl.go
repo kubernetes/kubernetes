@@ -95,8 +95,8 @@ func formatLabels(labelMap map[string]string) string {
 		l = "<none>"
 	}
 	return l
-}
 
+}
 func listOfImages(spec *api.PodSpec) []string {
 	var images []string
 	for _, container := range spec.Containers {

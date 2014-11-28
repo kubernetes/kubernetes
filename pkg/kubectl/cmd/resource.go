@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -30,9 +31,23 @@ import (
 // the fields necessary to uniquely locate a resource. Displays a usageError if that contract is
 // not satisfied, or a generic error if any other problems occur.
 func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string) {
-	// If command line args are passed in, use those preferentially.
-	if len(args) > 0 && len(args) != 2 {
-		usageError(cmd, "If passing in command line parameters, must be resource and name")
+
+	if len(args) == 1 {
+		resource := kubectl.ExpandResourceShortcut(args[0])
+		if len(resource) == 0 {
+			usageError(cmd, "Must provide resource or a resource and name as command line params")
+		}
+		namespace = getKubeNamespace(cmd)
+
+		version, kind, err := mapper.VersionAndKindForResource(resource)
+		if err != nil {
+			// The error returned by mapper is "no resource defined", which is a usage error
+			usageError(cmd, err.Error())
+		}
+
+		mapping, err = mapper.RESTMapping(version, kind)
+		checkErr(err)
+		return
 	}
 
 	if len(args) == 2 {
@@ -70,6 +85,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 // to uniquely locate a resource. Displays a usageError if that contract is not satisfied, or
 // a generic error if any other problems occur.
 func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string) {
+
 	if len(args) != 2 {
 		usageError(cmd, "Must provide resource and name command line params")
 	}
@@ -161,4 +177,31 @@ func CompareNamespaceFromFile(cmd *cobra.Command, namespace string) error {
 		}
 	}
 	return nil
+}
+
+// Extract and expand comman sepearted args.
+func ExtractAndExpandCommaSeparatedArgs(args []string) []string {
+	var extractedArgs []string
+	isComma := func(c rune) bool {
+		return c == ','
+	}
+	for _, arg := range args {
+		if arg == "all" {
+			extractedArgs = append(extractedArgs, GetAllResources()...)
+			continue
+		}
+		for _, value := range strings.FieldsFunc(arg, isComma) {
+			extractedArgs = append(extractedArgs, value)
+		}
+	}
+
+	RemoveDuplicates(&extractedArgs)
+	return extractedArgs
+}
+
+// GetAllResources will return the full list of handled resources.
+// TODO: Combine with RESTMapper stuff to provide a general solution
+// to this problem.
+func GetAllResources() []string {
+	return []string{"pods", "replicationcontrollers", "services", "minions", "events"}
 }
