@@ -63,9 +63,9 @@ func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.
 	})
 }
 
-func (r *PodRegistry) WatchPods(ctx api.Context, resourceVersion string, filter func(*api.Pod) bool) (watch.Interface, error) {
-	// TODO: wire filter down into the broadcaster; it needs access to current and previous state :(
+func (r *PodRegistry) WatchPods(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return r.broadcaster.Watch(), nil
+
 }
 
 func (r *PodRegistry) GetPod(ctx api.Context, podId string) (*api.Pod, error) {

@@ -137,7 +137,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return pod, err
 }
 
-func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
+func PodToSelectableFields(pod *api.Pod) labels.Set {
 
 	// TODO we are populating both Status and DesiredState because selectors are not aware of API versions
 	// see https://github.com/GoogleCloudPlatform/kubernetes/pull/2503
@@ -158,7 +158,7 @@ func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 // ListPods & WatchPods.
 func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
 	return func(pod *api.Pod) bool {
-		fields := rs.podToSelectableFields(pod)
+		fields := PodToSelectableFields(pod)
 		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
 	}
 }
@@ -184,7 +184,8 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 
 // Watch begins watching for new, changed, or deleted pods.
 func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPods(ctx, resourceVersion, rs.filterFunc(label, field))
+	// TODO: Add pod status to watch command
+	return rs.registry.WatchPods(ctx, label, field, resourceVersion)
 }
 
 func (*REST) New() runtime.Object {

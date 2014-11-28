@@ -18,6 +18,7 @@ package registrytest
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -47,6 +48,6 @@ func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error 
 	return r.Err
 }
 
-func (r *ControllerRegistry) WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
+func (r *ControllerRegistry) WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return nil, r.Err
 }
