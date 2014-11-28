@@ -82,6 +82,10 @@ func (fake *fakeIptables) EnsureChain(table iptables.Table, chain iptables.Chain
 	return false, nil
 }
 
+func (fake *fakeIptables) DeleteChain(table iptables.Table, chain iptables.Chain) error {
+	return nil
+}
+
 func (fake *fakeIptables) FlushChain(table iptables.Table, chain iptables.Chain) error {
 	return nil
 }
@@ -176,7 +180,7 @@ func TestTCPProxy(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
@@ -194,7 +198,7 @@ func TestUDPProxy(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
@@ -221,7 +225,7 @@ func TestTCPProxyStop(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
@@ -249,7 +253,7 @@ func TestUDPProxyStop(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
@@ -277,7 +281,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
@@ -304,7 +308,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
@@ -331,7 +335,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
@@ -362,7 +366,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
@@ -393,7 +397,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
 	if err != nil {
@@ -438,7 +442,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("127.0.0.1"), &fakeIptables{})
+	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
 	if err != nil {
