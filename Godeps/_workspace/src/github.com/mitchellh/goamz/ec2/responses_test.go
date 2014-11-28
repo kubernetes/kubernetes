@@ -766,6 +766,137 @@ var AllocateAddressExample = `
 </AllocateAddressResponse>
 `
 
+// http://goo.gl/DFySJY
+var DescribeInstanceStatusExample = `
+<DescribeInstanceStatusResponse xmlns="http://ec2.amazonaws.com/doc/2014-06-15/">
+    <requestId>3be1508e-c444-4fef-89cc-0b1223c4f02fEXAMPLE</requestId>
+    <instanceStatusSet>
+        <item>
+            <instanceId>i-1a2b3c4d</instanceId>
+            <availabilityZone>us-east-1d</availabilityZone>
+            <instanceState>
+                <code>16</code>
+                <name>running</name>
+            </instanceState>
+            <systemStatus>
+                <status>impaired</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>failed</status>
+                        <impairedSince>YYYY-MM-DDTHH:MM:SS.000Z</impairedSince>
+                    </item>
+                </details>
+            </systemStatus>
+            <instanceStatus>
+                <status>impaired</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>failed</status>
+                        <impairedSince>YYYY-MM-DDTHH:MM:SS.000Z</impairedSince>
+                    </item>
+                </details>
+            </instanceStatus>
+            <eventsSet>
+              <item>
+                <code>instance-retirement</code>
+                <description>The instance is running on degraded hardware</description>
+                <notBefore>YYYY-MM-DDTHH:MM:SS+0000</notBefore>
+                <notAfter>YYYY-MM-DDTHH:MM:SS+0000</notAfter>
+              </item>
+            </eventsSet>
+        </item>
+        <item>
+            <instanceId>i-2a2b3c4d</instanceId>
+            <availabilityZone>us-east-1d</availabilityZone>
+            <instanceState>
+                <code>16</code>
+                <name>running</name>
+            </instanceState>
+            <systemStatus>
+                <status>ok</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>passed</status>
+                    </item>
+                </details>
+            </systemStatus>
+            <instanceStatus>
+                <status>ok</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>passed</status>
+                    </item>
+                </details>
+            </instanceStatus>
+            <eventsSet>
+              <item>
+                <code>instance-reboot</code>
+                <description>The instance is scheduled for a reboot</description>
+                <notBefore>YYYY-MM-DDTHH:MM:SS+0000</notBefore>
+                <notAfter>YYYY-MM-DDTHH:MM:SS+0000</notAfter>
+              </item>
+            </eventsSet>
+        </item>
+        <item>
+            <instanceId>i-3a2b3c4d</instanceId>
+            <availabilityZone>us-east-1c</availabilityZone>
+            <instanceState>
+                <code>16</code>
+                <name>running</name>
+            </instanceState>
+            <systemStatus>
+                <status>ok</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>passed</status>
+                    </item>
+                </details>
+            </systemStatus>
+            <instanceStatus>
+                <status>ok</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>passed</status>
+                    </item>
+                </details>
+            </instanceStatus>
+        </item>
+        <item>
+            <instanceId>i-4a2b3c4d</instanceId>
+            <availabilityZone>us-east-1c</availabilityZone>
+            <instanceState>
+                <code>16</code>
+                <name>running</name>
+            </instanceState>
+            <systemStatus>
+                <status>ok</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>passed</status>
+                    </item>
+                </details>
+            </systemStatus>
+            <instanceStatus>
+                <status>insufficient-data</status>
+                <details>
+                    <item>
+                        <name>reachability</name>
+                        <status>insufficient-data</status>
+                    </item>
+                </details>
+            </instanceStatus>
+         </item>
+    </instanceStatusSet>
+</DescribeInstanceStatusResponse>
+`
+
 // http://goo.gl/3Q0oCc
 var ReleaseAddressExample = `
 <ReleaseAddressResponse xmlns="http://ec2.amazonaws.com/doc/2013-10-15/">
@@ -845,10 +976,74 @@ var CreateSubnetExample = `
 </CreateSubnetResponse>
 `
 
+// http://goo.gl/tu2Kxm
+var ModifySubnetAttributeExample = `
+<ModifySubnetAttributeResponse xmlns="http://ec2.amazonaws.com/doc/2014-06-15/">
+   <requestId>59dbff89-35bd-4eac-99ed-be587EXAMPLE</requestId>
+   <return>true</return>
+</ModifySubnetAttributeResponse>
+`
+
 // http://goo.gl/r6ZCPm
 var ResetImageAttributeExample = `
 <ResetImageAttributeResponse xmlns="http://ec2.amazonaws.com/doc/2014-06-15/">
   <requestId>59dbff89-35bd-4eac-99ed-be587EXAMPLE</requestId>
   <return>true</return>
 </ResetImageAttributeResponse>
+`
+
+// http://goo.gl/ylxT4R
+var DescribeAvailabilityZonesExample1 = `
+<DescribeAvailabilityZonesResponse xmlns="http://ec2.amazonaws.com/doc/2014-05-01/">
+   <requestId>59dbff89-35bd-4eac-99ed-be587EXAMPLE</requestId> 
+   <availabilityZoneInfo>
+   <item>
+      <zoneName>us-east-1a</zoneName>
+      <zoneState>available</zoneState>
+      <regionName>us-east-1</regionName>
+      <messageSet/>
+   </item>
+   <item>
+      <zoneName>us-east-1b</zoneName>
+      <zoneState>available</zoneState>
+      <regionName>us-east-1</regionName>
+      <messageSet/>
+   </item>
+   <item>
+      <zoneName>us-east-1c</zoneName>
+      <zoneState>available</zoneState>
+      <regionName>us-east-1</regionName>
+      <messageSet/>
+   </item>
+   <item>
+      <zoneName>us-east-1d</zoneName>
+      <zoneState>available</zoneState>
+      <regionName>us-east-1</regionName>
+      <messageSet/>
+   </item>
+   </availabilityZoneInfo>
+</DescribeAvailabilityZonesResponse>
+`
+
+// http://goo.gl/ylxT4R
+var DescribeAvailabilityZonesExample2 = `
+<DescribeAvailabilityZonesResponse xmlns="http://ec2.amazonaws.com/doc/2014-05-01/">
+   <requestId>59dbff89-35bd-4eac-99ed-be587EXAMPLE</requestId> 
+   <availabilityZoneInfo>
+   <item>
+      <zoneName>us-east-1a</zoneName>
+      <zoneState>impaired</zoneState>
+      <regionName>us-east-1</regionName>
+      <messageSet/>
+   </item>
+   <item>
+      <zoneName>us-east-1b</zoneName>
+      <zoneState>unavailable</zoneState>
+      <regionName>us-east-1</regionName>
+      <messageSet>
+         <item>us-east-1b is currently down for maintenance.</item>
+      </messageSet>
+   </item>
+   </availabilityZoneInfo>
+</DescribeAvailabilityZonesResponse>
 `
