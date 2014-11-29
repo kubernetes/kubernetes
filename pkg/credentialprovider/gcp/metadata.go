@@ -37,7 +37,7 @@ const (
 	storageScopePrefix = "https://www.googleapis.com/auth/devstorage"
 )
 
-var containerRegistryUrls = []string{"container.cloud.google.com"}
+var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io"}
 
 var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
