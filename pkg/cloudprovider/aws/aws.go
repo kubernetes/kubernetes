@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"strings"
 	"sync"
 
 	"code.google.com/p/gcfg"
@@ -43,6 +44,9 @@ type EC2 interface {
 	DescribeSubnets(subnetIds []string, filter *ec2.Filter) (resp *ec2.SubnetsResp, err error)
 }
 
+type AwsMetadata interface {
+	GetInstanceAz() (string, error)
+}
 
 type Filter struct {
 	predicates []*FilterPredicate
@@ -89,14 +93,22 @@ func removeDuplicates(in []string) ([]string) {
 type AWSCloud struct {
 	auth aws.Auth
 	ec2  EC2
+	metadata AwsMetadata
 	elbClients map[string]*elb.ELB
 	cfg *AWSCloudConfig
+	availabilityZone string
+	region *aws.Region
 
 	mutex sync.Mutex
 }
 
 // awsCloudLoadBalancer is an implementation of TCPLoadBalancer for Amazon Web Services.
 type awsCloudLoadBalancer struct {
+	awsCloud *AWSCloud
+}
+
+// awsZones is an implementation of Zones for Amazon Web Services.
+type awsZones struct {
 	awsCloud *AWSCloud
 }
 
@@ -110,7 +122,7 @@ type AuthFunc func() (auth aws.Auth, err error)
 
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
-			return newAWSCloud(config, getAuth)
+			return newAWSCloud(config, &instanceMetadata{}, getAuth)
 		})
 }
 
@@ -131,8 +143,6 @@ func readAWSCloudConfig(config io.Reader) (*AWSCloudConfig, error) {
 	}
 
 	if cfg.Global.Region == "" {
-		// TODO: We can get this from curl http://169.254.169.254/latest/meta-data/placement/availability-zone
-		// (that is the AZ; but we can strip the last character/prefix match to get the region)
 		return nil, fmt.Errorf("no region specified in configuration file")
 	}
 
@@ -140,7 +150,7 @@ func readAWSCloudConfig(config io.Reader) (*AWSCloudConfig, error) {
 }
 
 // newAWSCloud creates a new instance of AWSCloud.
-func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
+func newAWSCloud(config io.Reader, metadata AwsMetadata, authFunc AuthFunc) (*AWSCloud, error) {
 	cfg, err := readAWSCloudConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
@@ -151,6 +161,13 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 		return nil, err
 	}
 
+	availabilityZone, err := metadata.GetInstanceAz()
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: We should just extract this from availabilityZone
+	// We can strip the last character/prefix match to get the region
 	region, ok := aws.Regions[cfg.Global.Region]
 	if !ok {
 		return nil, fmt.Errorf("not a valid AWS region: %s", cfg.Global.Region)
@@ -159,6 +176,9 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 	ec2 := ec2.New(auth, region)
 	return &AWSCloud{
 		auth: auth,
+		metadata: &instanceMetadata{},
+		availabilityZone: availabilityZone,
+		region: &region,
 		ec2: ec2,
 		cfg: cfg,
 	}, nil
@@ -182,7 +202,9 @@ func (aws *AWSCloud) Instances() (cloudprovider.Instances, bool) {
 
 // Zones returns an implementation of Zones for Amazon Web Services.
 func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
-	return nil, false
+	zones := &awsZones{}
+	zones.awsCloud = aws
+	return zones, true
 }
 
 // IPAddress is an implementation of Instances.IPAddress.
@@ -403,6 +425,10 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 	zones := []string{}
 	for _, subnet := range subnets.Subnets {
 		subnetIds = append(subnetIds, subnet.SubnetId)
+		if !strings.HasPrefix(subnet.AvailabilityZone, region) {
+			glog.Error("found AZ that did not match region", subnet.AvailabilityZone, " vs ", region)
+			return "", fmt.Errorf("invalid AZ for region")
+		}
 		zones = append(zones, subnet.AvailabilityZone)
 	}
 
@@ -537,4 +563,27 @@ func (self *awsCloudLoadBalancer) DeleteTCPLoadBalancer(name, region string) err
 		return err
 	}
 	return nil
+}
+
+type instanceMetadata struct {
+}
+
+func (self*instanceMetadata) GetInstanceAz() (az string, err error) {
+	path := "placement/availability-zone"
+
+	data, err := aws.GetMetaData(path)
+	if err != nil {
+		glog.Error("unable to fetch az from EC2 metadata", err)
+		return "", err
+	}
+
+	return string(data), nil
+}
+
+
+func (self *awsZones) GetZone() (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{
+		FailureDomain: self.awsCloud.availabilityZone,
+		Region:        self.awsCloud.region.Name,
+	}, nil
 }

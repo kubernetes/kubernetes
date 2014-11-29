@@ -26,6 +26,14 @@ import (
 	"github.com/mitchellh/goamz/ec2"
 )
 
+type mockAwsMetadata struct {
+	az string
+}
+
+func (self*mockAwsMetadata) GetInstanceAz() (az string, err error) {
+	return az, nil
+}
+
 func TestReadAWSCloudConfig(t *testing.T) {
 	_, err1 := readAWSCloudConfig(nil)
 	if err1 == nil {
@@ -56,20 +64,26 @@ func TestNewAWSCloud(t *testing.T) {
 		return aws.Auth{"", "", ""}, nil
 	}
 
-	_, err1 := newAWSCloud(nil, fakeAuthFunc)
+	mockMetadata := &mockAwsMetadata{}
+
+	_, err1 := newAWSCloud(nil, mockMetadata, fakeAuthFunc)
 	if err1 == nil {
 		t.Errorf("Should error when no config reader is given")
 	}
 
+	mockMetadata.az = "blahongac"
 	_, err2 := newAWSCloud(strings.NewReader(
 		"[global]\nregion = blahonga"),
+		mockMetadata,
 		fakeAuthFunc)
 	if err2 == nil {
 		t.Errorf("Should error when config specifies invalid region")
 	}
 
+	mockMetadata.az = "eu-west-1a"
 	_, err3 := newAWSCloud(
 		strings.NewReader("[global]\nregion = eu-west-1"),
+		mockMetadata,
 		fakeAuthFunc)
 	if err3 != nil {
 		t.Errorf("Should succeed when a valid region is specified: %s", err3)
