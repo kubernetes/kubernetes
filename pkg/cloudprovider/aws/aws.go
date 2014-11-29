@@ -364,13 +364,16 @@ func (self *awsCloudLoadBalancer) describeLoadBalancer(client *elb.ELB, name str
 	request.Names = []string { name }
 	response, err := client.DescribeLoadBalancers(request)
 	if err != nil {
+		glog.Error("error describing load balancer", err)
 		return nil, err
 	}
 
+	var ret *elb.LoadBalancer
 	for _, loadBalancer := range response.LoadBalancers {
-		return &loadBalancer, nil
+		// assert ret == nil
+		ret = &loadBalancer
 	}
-	return nil, nil
+	return ret, nil
 }
 
 // TCPLoadBalancerExists is an implementation of TCPLoadBalancer.TCPLoadBalancerExists.
@@ -498,18 +501,9 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 
 	var loadBalancerName, dnsName string
 	{
-		request := &elb.DescribeLoadBalancer{}
-		request.Names = []string{ name }
-		response, err := client.DescribeLoadBalancers(request)
+		loadBalancer, err := self.describeLoadBalancer(client, name)
 		if err != nil {
-			glog.Error("error finding load balancer", err)
 			return "", err
-		}
-
-		var loadBalancer *elb.LoadBalancer
-		for _, lb := range response.LoadBalancers {
-			//assert loadBalancer == nil
-			loadBalancer = &lb
 		}
 
 		if loadBalancer == nil {
