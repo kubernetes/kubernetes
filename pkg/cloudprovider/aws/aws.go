@@ -319,6 +319,28 @@ func (self *AWSCloud) findVpc() (*ec2.VPC, error) {
 	return &vpcs[0], nil
 }
 
+// Find the EC2 instance for a given k8s name
+// TODO: This is a _bad_ idea.  The internal ID can be recycled, for one.
+// We should the AWS instance id
+func (self *AWSCloud) findInstance(privateDnsName string) (*ec2.Instance, error) {
+	client := self.ec2
+
+	filter := NewFilter().Where("private-dns-name", privateDnsName)
+
+	response, err := client.Instances(nil, filter.toAws())
+	if err != nil {
+		glog.Error("error listing instances", err)
+		return nil, err
+	}
+
+	for _, reservation := range response.Reservations {
+		for _, instance := range reservation.Instances {
+			return &instance, nil
+		}
+	}
+	return nil, nil
+}
+
 func (self *AWSCloud) describeSubnets(subnetIds []string, filter *Filter) (*ec2.SubnetsResp, error) {
 	client := self.ec2
 
@@ -409,8 +431,36 @@ func (self *AWSCloud) createTags(resourceId string, tags []ec2.Tag) (error) {
 	return nil
 }
 
+func (self*awsCloudLoadBalancer) hostsToInstances(hosts []string) ([]*ec2.Instance, error) {
+	instances := []*ec2.Instance{}
+	for _, host := range hosts {
+		instance, err := self.awsCloud.findInstance(host)
+		if err != nil {
+			return nil, err
+		}
+		if instance == nil {
+			return nil, fmt.Errorf("unable to find instance "+host)
+		}
+		instances = append(instances, instance)
+	}
+	return instances, nil
+}
+
+func mapToInstanceIds(instances []*ec2.Instance) ([]string) {
+	ids := []string{}
+	for _, instance := range instances {
+		ids = append(ids, instance.InstanceId)
+	}
+	return ids
+}
+
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (string, error) {
+	instances, err := self.hostsToInstances(hosts)
+	if err != nil {
+		return "", err
+	}
+
 	client, err := self.getElbClient(region)
 	if err != nil {
 		return "", err
@@ -498,7 +548,7 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 
 	registerRequest := &elb.RegisterInstancesWithLoadBalancer{}
 	registerRequest.LoadBalancerName = name
-	registerRequest.Instances = hosts
+	registerRequest.Instances = mapToInstanceIds(instances)
 
 	registerResponse, err := client.RegisterInstancesWithLoadBalancer(registerRequest)
 	if err != nil {
@@ -514,6 +564,11 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
 func (self *awsCloudLoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+	instances, err := self.hostsToInstances(hosts)
+	if err != nil {
+		return err
+	}
+
 	client, err := self.getElbClient(region)
 	if err != nil {
 		return err
@@ -533,9 +588,9 @@ func (self *awsCloudLoadBalancer) UpdateTCPLoadBalancer(name, region string, hos
 		existingInstances[instance.InstanceId] = &instance
 	}
 
-	wantInstances := map[string]string{}
-	for _, host := range hosts {
-		wantInstances[host] = host
+	wantInstances := map[string]*ec2.Instance{}
+	for _, instance := range instances {
+		wantInstances[instance.InstanceId] = instance
 	}
 
 	addInstances := []string{}
