@@ -76,24 +76,24 @@ func (self*Filter) Where(name string, value string) (*Filter) {
 	return self
 }
 
-func removeDuplicates(in []string) ([]string) {
-	out := []string{}
-	done := map[string]string{}
-	for _, s := range in {
-		if done[s] != "" {
-			continue
-		}
-		out = append(out, s)
-		done[s] = s
-	}
-	return out
-}
+//func removeDuplicates(in []string) ([]string) {
+//	out := []string{}
+//	done := map[string]string{}
+//	for _, s := range in {
+//		if done[s] != "" {
+//			continue
+//		}
+//		out = append(out, s)
+//		done[s] = s
+//	}
+//	return out
+//}
 
 // AWSCloud is an implementation of Interface and Instances for Amazon Web Services.
 type AWSCloud struct {
-	auth aws.Auth
-	ec2  EC2
-	metadata AwsMetadata
+	auth             aws.Auth
+	ec2              EC2
+	metadata         AwsMetadata
 	elbClients map[string]*elb.ELB
 	cfg *AWSCloudConfig
 	availabilityZone string
@@ -423,14 +423,14 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 	}
 
 	subnetIds := []string{}
-	zones := []string{}
+	//	zones := []string{}
 	for _, subnet := range subnets.Subnets {
 		subnetIds = append(subnetIds, subnet.SubnetId)
 		if !strings.HasPrefix(subnet.AvailabilityZone, region) {
 			glog.Error("found AZ that did not match region", subnet.AvailabilityZone, " vs ", region)
 			return "", fmt.Errorf("invalid AZ for region")
 		}
-		zones = append(zones, subnet.AvailabilityZone)
+		//		zones = append(zones, subnet.AvailabilityZone)
 	}
 
 	createRequest := &elb.CreateLoadBalancer{}
@@ -446,8 +446,10 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 	//	createRequest.Tags = []Tag { nameTag }
 
 	//	zones := []string{"us-east-1a"}
-	createRequest.AvailZone = removeDuplicates(zones)
+	//	createRequest.AvailZone = removeDuplicates(zones)
 
+	// We are supposed to specify one subnet per AZ.
+	// TODO: What happens if we have more than one subnet per AZ?
 	createRequest.Subnets = subnetIds
 
 	sgName := "k8s-elb-" + name
