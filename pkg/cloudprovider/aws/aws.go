@@ -450,8 +450,8 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 
 	createRequest.Subnets = subnetIds
 
-	sgName := "sg-elb-" + name
-	sgDescription := "Security group for ELB " + name
+	sgName := "k8s-elb-" + name
+	sgDescription := "Security group for Kubernetes ELB " + name
 	securityGroupId, err := self.awsCloud.createSecurityGroup(vpc.VpcId, sgName, sgDescription)
 	if err != nil {
 		return "", err
