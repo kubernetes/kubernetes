@@ -19,6 +19,8 @@ package kubelet
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -75,6 +77,40 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 func verifyBoolean(t *testing.T, expected, value bool) {
 	if expected != value {
 		t.Errorf("Unexpected boolean.  Expected %t.  Found %t", expected, value)
+	}
+}
+
+func TestKubeletDirs(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+	root := kubelet.rootDirectory
+	if err := os.MkdirAll(root, 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+
+	var exp, got string
+
+	got = kubelet.GetPodsDir()
+	exp = root
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodDir("abc123")
+	exp = path.Join(root, "abc123")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodVolumesDir("abc123")
+	exp = path.Join(root, "abc123/volumes")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodContainerDir("abc123", "def456")
+	exp = path.Join(root, "abc123/def456")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
 	}
 }
 
@@ -196,6 +232,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
+				UID:         "0123-45-67-89ab-cdef",
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -216,10 +253,11 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 
 	fakeDocker.Lock()
 	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
-	if fakeDocker.Container.HostConfig == nil ||
-		!matchString(t, "/tmp/kubelet/foo/bar/k8s_bar\\.[a-f0-9]", parts[0]) ||
-		parts[1] != "/dev/somepath" {
-		t.Errorf("Unexpected containers created %v", fakeDocker.Container)
+	if !matchString(t, kubelet.GetPodContainerDir("0123-45-67-89ab-cdef", "bar")+"/k8s_bar\\.[a-f0-9]", parts[0]) {
+		t.Errorf("Unexpected host path: %s", parts[0])
+	}
+	if parts[1] != "/dev/somepath" {
+		t.Errorf("Unexpected container path: %s", parts[1])
 	}
 	fakeDocker.Unlock()
 }

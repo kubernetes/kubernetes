@@ -145,6 +145,42 @@ type Kubelet struct {
 	maxContainerCount int
 }
 
+// GetRootDir returns the full path to the directory under which kubelet can
+// store data.  These functions are useful to pass interfaces to other modules
+// that may need to know where to write data without getting a whole kubelet
+// instance.
+func (kl *Kubelet) GetRootDir() string {
+	return kl.rootDirectory
+}
+
+// GetPodsDir returns the full path to the directory under which pod
+// directories are created.
+// TODO(thockin): For now, this is the same as the root because that is assumed
+// in other code.  Will fix.
+func (kl *Kubelet) GetPodsDir() string {
+	return kl.GetRootDir()
+}
+
+// GetPodDir returns the full path to the per-pod data directory for the
+// specified pod.  This directory may not exist if the pod does not exist.
+func (kl *Kubelet) GetPodDir(podUID string) string {
+	return path.Join(kl.GetRootDir(), podUID)
+}
+
+// GetPodVolumesDir returns the full path to the per-pod data directory under
+// which volumes are created for the specified pod.  This directory may not
+// exist if the pod does not exist.
+func (kl *Kubelet) GetPodVolumesDir(podUID string) string {
+	return path.Join(kl.GetPodDir(podUID), "volumes")
+}
+
+// GetPodContainerDir returns the full path to the per-pod data directory under
+// which container data is held for the specified pod.  This directory may not
+// exist if the pod or container does not exist.
+func (kl *Kubelet) GetPodContainerDir(podUID, ctrName string) string {
+	return path.Join(kl.GetPodDir(podUID), ctrName)
+}
+
 type ByCreated []*docker.Container
 
 func (a ByCreated) Len() int           { return len(a) }
@@ -477,7 +513,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	}
 
 	if len(container.TerminationMessagePath) != 0 {
-		p := path.Join(kl.rootDirectory, pod.Name, container.Name)
+		p := kl.GetPodContainerDir(pod.UID, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			glog.Errorf("Error on creating %s: %v", p, err)
 		} else {
