@@ -181,6 +181,7 @@ func newAWSCloud(config io.Reader, metadata AwsMetadata, authFunc AuthFunc) (*AW
 		region: &region,
 		ec2: ec2,
 		cfg: cfg,
+		elbClients: map[string]*elb.ELB{},
 	}, nil
 }
 
