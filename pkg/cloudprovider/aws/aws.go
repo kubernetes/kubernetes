@@ -476,78 +476,106 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 		return "", fmt.Errorf("Unable to find vpc")
 	}
 
-	subnets, err := self.awsCloud.describeSubnets(nil, NewFilter().Where("vpc-id", vpc.VpcId))
-	if err != nil {
-		glog.Error("error listing subnets", err)
-		return "", err
-	}
 
 	subnetIds := []string{}
-	//	zones := []string{}
-	for _, subnet := range subnets.Subnets {
-		subnetIds = append(subnetIds, subnet.SubnetId)
-		if !strings.HasPrefix(subnet.AvailabilityZone, region) {
-			glog.Error("found AZ that did not match region", subnet.AvailabilityZone, " vs ", region)
-			return "", fmt.Errorf("invalid AZ for region")
-		}
-		//		zones = append(zones, subnet.AvailabilityZone)
-	}
-
-	createRequest := &elb.CreateLoadBalancer{}
-	createRequest.LoadBalancerName = name
-
-	listener := elb.Listener{}
-	listener.InstancePort = int64(port)
-	listener.LoadBalancerPort = int64(port)
-	listener.Protocol = "tcp"
-	listener.InstanceProtocol = "tcp"
-	createRequest.Listeners = []elb.Listener{ listener }
-	//	nameTag := &elb.Tag{ Key: "Name", Value: name}
-	//	createRequest.Tags = []Tag { nameTag }
-
-	//	zones := []string{"us-east-1a"}
-	//	createRequest.AvailZone = removeDuplicates(zones)
-
-	// We are supposed to specify one subnet per AZ.
-	// TODO: What happens if we have more than one subnet per AZ?
-	createRequest.Subnets = subnetIds
-
-	sgName := "k8s-elb-" + name
-	sgDescription := "Security group for Kubernetes ELB " + name
-
 	{
-		filter := NewFilter().Where("vpc-id", vpc.VpcId).Where("group-name", sgName)
-		// TODO: Should we do something more reliable ?? .Where("tag:kubernetes-id", kubernetesId)
-		securityGroups, err := self.awsCloud.findSecurityGroups(filter)
+		subnets, err := self.awsCloud.describeSubnets(nil, NewFilter().Where("vpc-id", vpc.VpcId))
 		if err != nil {
+			glog.Error("error listing subnets", err)
 			return "", err
 		}
-		var securityGroupId string
-		for _, securityGroup := range securityGroups {
-			securityGroupId = securityGroup.Id
+
+		//	zones := []string{}
+		for _, subnet := range subnets.Subnets {
+			subnetIds = append(subnetIds, subnet.SubnetId)
+			if !strings.HasPrefix(subnet.AvailabilityZone, region) {
+				glog.Error("found AZ that did not match region", subnet.AvailabilityZone, " vs ", region)
+				return "", fmt.Errorf("invalid AZ for region")
+			}
+			//		zones = append(zones, subnet.AvailabilityZone)
 		}
-		if securityGroupId == "" {
-			securityGroupId, err = self.awsCloud.createSecurityGroup(vpc.VpcId, sgName, sgDescription)
+	}
+
+	var loadBalancerName, dnsName string
+	{
+		request := &elb.DescribeLoadBalancer{}
+		request.Names = []string{ name }
+		response, err := client.DescribeLoadBalancers(request)
+		if err != nil {
+			glog.Error("error finding load balancer", err)
+			return "", err
+		}
+
+		var loadBalancer *elb.LoadBalancer
+		for _, lb := range response.LoadBalancers {
+			//assert loadBalancer == nil
+			loadBalancer = &lb
+		}
+
+		if loadBalancer == nil {
+			createRequest := &elb.CreateLoadBalancer{}
+			createRequest.LoadBalancerName = name
+
+			listener := elb.Listener{}
+			listener.InstancePort = int64(port)
+			listener.LoadBalancerPort = int64(port)
+			listener.Protocol = "tcp"
+			listener.InstanceProtocol = "tcp"
+			createRequest.Listeners = []elb.Listener{ listener }
+			//	nameTag := &elb.Tag{ Key: "Name", Value: name}
+			//	createRequest.Tags = []Tag { nameTag }
+
+			//	zones := []string{"us-east-1a"}
+			//	createRequest.AvailZone = removeDuplicates(zones)
+
+			// We are supposed to specify one subnet per AZ.
+			// TODO: What happens if we have more than one subnet per AZ?
+			createRequest.Subnets = subnetIds
+
+			sgName := "k8s-elb-" + name
+			sgDescription := "Security group for Kubernetes ELB " + name
+
+			{
+				filter := NewFilter().Where("vpc-id", vpc.VpcId).Where("group-name", sgName)
+				// TODO: Should we do something more reliable ?? .Where("tag:kubernetes-id", kubernetesId)
+				securityGroups, err := self.awsCloud.findSecurityGroups(filter)
+				if err != nil {
+					return "", err
+				}
+				var securityGroupId string
+				for _, securityGroup := range securityGroups {
+					securityGroupId = securityGroup.Id
+				}
+				if securityGroupId == "" {
+					securityGroupId, err = self.awsCloud.createSecurityGroup(vpc.VpcId, sgName, sgDescription)
+					if err != nil {
+						return "", err
+					}
+				}
+				createRequest.SecurityGroups = []string { securityGroupId }
+			}
+
+			if len(externalIP) > 0 {
+				return "", fmt.Errorf("External IP cannot be specified for AWS ELB")
+			}
+
+			createResponse, err := client.CreateLoadBalancer(createRequest)
 			if err != nil {
 				return "", err
 			}
+
+			dnsName = createResponse.DNSName
+			loadBalancerName = name
+		} else {
+			// TODO: Verify that load balancer configuration matches?
+
+			loadBalancerName = loadBalancer.LoadBalancerName
+			dnsName = loadBalancer.DNSName
 		}
-		createRequest.SecurityGroups = []string { securityGroupId }
 	}
-
-	if len(externalIP) > 0 {
-		return "", fmt.Errorf("External IP cannot be specified for AWS ELB")
-	}
-
-	createResponse, err := client.CreateLoadBalancer(createRequest)
-	if err != nil {
-		return "", err
-	}
-
-	dnsName := createResponse.DNSName
 
 	registerRequest := &elb.RegisterInstancesWithLoadBalancer{}
-	registerRequest.LoadBalancerName = name
+	registerRequest.LoadBalancerName = loadBalancerName
 	registerRequest.Instances = mapToInstanceIds(instances)
 
 	registerResponse, err := client.RegisterInstancesWithLoadBalancer(registerRequest)
