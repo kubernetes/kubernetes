@@ -170,16 +170,30 @@ func (kl *Kubelet) GetRootDir() string {
 
 // GetPodsDir returns the full path to the directory under which pod
 // directories are created.
-// TODO(thockin): For now, this is the same as the root because that is assumed
-// in other code.  Will fix.
 func (kl *Kubelet) GetPodsDir() string {
-	return kl.GetRootDir()
+	return path.Join(kl.GetRootDir(), "pods")
 }
 
 // GetPodDir returns the full path to the per-pod data directory for the
 // specified pod.  This directory may not exist if the pod does not exist.
 func (kl *Kubelet) GetPodDir(podUID string) string {
-	return path.Join(kl.GetRootDir(), podUID)
+	// Backwards compat.  The "old" stuff should be removed before 1.0
+	// release.  The thinking here is this:
+	//     !old && !new = use new
+	//     !old && new  = use new
+	//     old && !new  = use old
+	//     old && new   = use new (but warn)
+	oldPath := path.Join(kl.GetRootDir(), podUID)
+	oldExists := dirExists(oldPath)
+	newPath := path.Join(kl.GetPodsDir(), podUID)
+	newExists := dirExists(newPath)
+	if oldExists && !newExists {
+		return oldPath
+	}
+	if oldExists {
+		glog.Warningf("Data dir for pod %q exists in both old and new form, using new", podUID)
+	}
+	return newPath
 }
 
 // GetPodVolumesDir returns the full path to the per-pod data directory under
@@ -193,7 +207,31 @@ func (kl *Kubelet) GetPodVolumesDir(podUID string) string {
 // which container data is held for the specified pod.  This directory may not
 // exist if the pod or container does not exist.
 func (kl *Kubelet) GetPodContainerDir(podUID, ctrName string) string {
-	return path.Join(kl.GetPodDir(podUID), ctrName)
+	// Backwards compat.  The "old" stuff should be removed before 1.0
+	// release.  The thinking here is this:
+	//     !old && !new = use new
+	//     !old && new  = use new
+	//     old && !new  = use old
+	//     old && new   = use new (but warn)
+	oldPath := path.Join(kl.GetPodDir(podUID), ctrName)
+	oldExists := dirExists(oldPath)
+	newPath := path.Join(kl.GetPodDir(podUID), "containers", ctrName)
+	newExists := dirExists(newPath)
+	if oldExists && !newExists {
+		return oldPath
+	}
+	if oldExists {
+		glog.Warningf("Data dir for pod %q, container %q exists in both old and new form, using new", podUID, ctrName)
+	}
+	return newPath
+}
+
+func dirExists(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
 }
 
 type ByCreated []*docker.Container
