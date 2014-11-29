@@ -130,21 +130,21 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 			if err != nil {
 				return nil, err
 			}
-			var ip net.IP
+			var endpoint string
 			if len(service.Spec.PublicIPs) > 0 {
 				for _, publicIP := range service.Spec.PublicIPs {
-					ip, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts))
+					endpoint, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts))
 					if err != nil {
 						break
 					}
 				}
 			} else {
-				ip, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts))
+				endpoint, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts))
 			}
 			if err != nil {
 				return nil, err
 			}
-			service.Spec.PublicIPs = []string{ip.String()}
+			service.Spec.PublicIPs = []string{endpoint}
 		}
 		err := rs.registry.CreateService(ctx, service)
 		if err != nil {

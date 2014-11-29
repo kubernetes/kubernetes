@@ -84,9 +84,9 @@ func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (net.IP, error) {
+func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (string, error) {
 	f.addCall("create")
-	return f.ExternalIP, f.Err
+	return f.ExternalIP.String(), f.Err
 }
 
 // UpdateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.

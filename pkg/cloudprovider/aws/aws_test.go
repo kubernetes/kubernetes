@@ -17,6 +17,7 @@ limitations under the License.
 package aws_cloud
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -83,15 +84,30 @@ func (ec2 *FakeEC2) Instances(instanceIds []string, filter *ec2.Filter) (resp *e
 	return ec2.instances(instanceIds, filter)
 }
 
+func (ec2 *FakeEC2) CreateSecurityGroup(group ec2.SecurityGroup) (resp *ec2.CreateSecurityGroupResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+func (ec2 *FakeEC2) CreateTags(resourceIds []string, tags []ec2.Tag) (resp *ec2.SimpleResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
+func (ec2 *FakeEC2) DescribeVpcs(vpcIds []string, filter *ec2.Filter) (resp *ec2.VpcsResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
+func (ec2 *FakeEC2) DescribeSubnets(subnetIds []string, filter *ec2.Filter) (resp *ec2.SubnetsResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	return &AWSCloud{
-		&FakeEC2{
-			func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
+		ec2: &FakeEC2{
+			instances: func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
 				return &ec2.InstancesResp{"",
 					[]ec2.Reservation{
 						{"", "", "", nil, instances}}}, nil
 			}},
-		nil}
+		}
 }
 
 func TestList(t *testing.T) {
