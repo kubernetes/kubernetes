@@ -26,11 +26,6 @@ type typePair struct {
 	dest   reflect.Type
 }
 
-type typeNamePair struct {
-	fieldType reflect.Type
-	fieldName string
-}
-
 // DebugLogger allows you to get debugging messages if necessary.
 type DebugLogger interface {
 	Logf(format string, args ...interface{})
@@ -42,14 +37,13 @@ type Converter struct {
 	// do the conversion.
 	funcs map[typePair]reflect.Value
 
-	// This is a map from a source field type and name, to a list of destination
-	// field type and name.
-	structFieldDests map[typeNamePair][]typeNamePair
+	// This is a map from a source field type and name, to a list of copies
+	// that might need to be made from that field.
+	structFieldDests map[TypePathElem][]correspondence
 
-	// Allows for the opposite lookup of structFieldDests. So that SourceFromDest
-	// copy flag also works. So this is a map of destination field name, to potential
-	// source field name and type to look for.
-	structFieldSources map[typeNamePair][]typeNamePair
+	// This is a map from a destination field type and name, to a list of copies
+	// that might need to be made to that field.
+	structFieldSources map[TypePathElem][]correspondence
 
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
@@ -65,8 +59,8 @@ func NewConverter() *Converter {
 	return &Converter{
 		funcs:              map[typePair]reflect.Value{},
 		NameFunc:           func(t reflect.Type) string { return t.Name() },
-		structFieldDests:   map[typeNamePair][]typeNamePair{},
-		structFieldSources: map[typeNamePair][]typeNamePair{},
+		structFieldDests:   map[TypePathElem][]TypePathElem{},
+		structFieldSources: map[TypePathElem][]TypePathElem{},
 	}
 }
 
@@ -241,19 +235,45 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 }
 
 // SetStructFieldCopy registers a correspondence. Whenever a struct field is encountered
-// which has a type and name matching srcFieldType and srcFieldName, it wil be copied
-// into the field in the destination struct matching destFieldType & Name, if such a
-// field exists.
+// which has a type and name matching srcField, it will be copied into the field in the
+// destination struct matching destPath, if the field exists. destPath is interpreted
+// as relative to the field that contains srcField.
+//
+// Example:
+//
+// type A struct {
+// 	Foo string
+// }
+//
+// type B struct {
+// 	Inner Inner
+// }
+//
+// type Inner struct {
+// 	Foo string
+// }
+//
+// c.SetStructFieldCopy(E("", "Foo"), TypePath{E(Inner{}, "Inner"), E("", "Foo")})
+//
+// Will cause A.Foo to be copied to B.Inner.Foo by the converter automatically.
+// The special value ParentType can be used to indicate a copy in the opposite
+// direction:
+//
+// c.SetStructFieldCopy(E("", "Foo"), TypePath{ParentType, E("", "Foo")})
+//
 // May be called multiple times, even for the same source field & type--all applicable
 // copies will be performed.
-func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
-	st := reflect.TypeOf(srcFieldType)
-	dt := reflect.TypeOf(destFieldType)
-	srcKey := typeNamePair{st, srcFieldName}
-	destKey := typeNamePair{dt, destFieldName}
-	c.structFieldDests[srcKey] = append(c.structFieldDests[srcKey], destKey)
-	c.structFieldSources[destKey] = append(c.structFieldSources[destKey], srcKey)
+func (c *Converter) SetStructFieldCopy(srcPath TypePath, destPath TypePath) error {
+	cor := &correspondence{srcPath, destPath}
+	srcKey = srcPath[len(srcPath)-1]
+	destKey = destPath[len(destPath)-1]
+	c.structFieldDests[srcKey] = append(c.structFieldDests[srcKey], cor)
+	c.structFieldSources[destKey] = append(c.structFieldSources[destKey], cor)
 	return nil
+}
+
+type correspondence struct {
+	srcPath, destPath TypePath
 }
 
 // FieldMatchingFlags contains a list of ways in which struct fields could be
@@ -418,6 +438,7 @@ func toKVValue(v reflect.Value) kvValue {
 
 // kvValue lets us write the same conversion logic to work with both maps
 // and structs. Only maps with string keys make sense for this.
+// TODO: write map adaptor.
 type kvValue interface {
 	// returns all keys, as a []string.
 	keys() []string
@@ -517,7 +538,7 @@ func (c *Converter) checkField(fieldName string, skv, dkv kvValue, scope *scope)
 		if !df.IsValid() {
 			return false, nil
 		}
-		destKey := typeNamePair{df.Type(), fieldName}
+		destKey := TypePathElem{df.Type(), fieldName}
 		// Check each of the potential source (type, name) pairs to see if they're
 		// present in sv.
 		for _, potentialSourceKey := range c.structFieldSources[destKey] {
@@ -543,24 +564,25 @@ func (c *Converter) checkField(fieldName string, skv, dkv kvValue, scope *scope)
 	if !sf.IsValid() {
 		return false, nil
 	}
-	srcKey := typeNamePair{sf.Type(), fieldName}
+	srcKey := TypePathElem{sf.Type(), fieldName}
 	// Check each of the potential dest (type, name) pairs to see if they're
 	// present in dv.
-	for _, potentialDestKey := range c.structFieldDests[srcKey] {
-		df := dkv.value(potentialDestKey.fieldName)
+	for _, cor := range c.structFieldDests[srcKey] {
+		if !scope.srcStack.Matches(cor.srcPath) {
+			continue
+		}
+		df := scope.destStack.find(cor.destPath)
 		if !df.IsValid() {
 			continue
 		}
-		if df.Type() == potentialDestKey.fieldType {
-			// Both the dest's name and type matched, so copy.
-			scope.srcStack.top().key = fieldName
-			scope.destStack.top().key = potentialDestKey.fieldName
-			if err := c.convert(sf, df, scope); err != nil {
-				return true, err
-			}
-			dkv.confirmSet(potentialDestKey.fieldName, df)
-			replacementMade = true
+		// Both the dest's name and type matched, so copy.
+		scope.srcStack.top().key = fieldName
+		scope.destStack.top().key = potentialDestKey.fieldName
+		if err := c.convert(sf, df, scope); err != nil {
+			return true, err
 		}
+		dkv.confirmSet(potentialDestKey.fieldName, df)
+		replacementMade = true
 	}
 	return replacementMade, nil
 }
