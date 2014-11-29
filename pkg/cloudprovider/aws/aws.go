@@ -131,6 +131,8 @@ func readAWSCloudConfig(config io.Reader) (*AWSCloudConfig, error) {
 	}
 
 	if cfg.Global.Region == "" {
+		// TODO: We can get this from curl http://169.254.169.254/latest/meta-data/placement/availability-zone
+		// (that is the AZ; but we can strip the last character/prefix match to get the region)
 		return nil, fmt.Errorf("no region specified in configuration file")
 	}
 
