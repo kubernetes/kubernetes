@@ -38,9 +38,8 @@ type EC2 interface {
 	Instances(instIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error)
 	CreateSecurityGroup(group ec2.SecurityGroup) (resp *ec2.CreateSecurityGroupResp, err error)
 	CreateTags(resourceIds []string, tags []ec2.Tag) (resp *ec2.SimpleResp, err error)
-
 	DescribeVpcs(vpcIds []string, filter *ec2.Filter) (resp *ec2.VpcsResp, err error)
-
+	SecurityGroups(groups []ec2.SecurityGroup, filter *ec2.Filter) (resp *ec2.SecurityGroupsResp, err error)
 	DescribeSubnets(subnetIds []string, filter *ec2.Filter) (resp *ec2.SubnetsResp, err error)
 }
 
@@ -386,6 +385,17 @@ func (self *AWSCloud) createSecurityGroup(vpcId, name, description string) (stri
 	return response.Id, nil
 }
 
+// Finds security groups
+func (self *AWSCloud) findSecurityGroups(filter *Filter) ([]ec2.SecurityGroupInfo, error) {
+	client := self.ec2
+	response, err := client.SecurityGroups([]ec2.SecurityGroup{}, filter.toAws())
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Groups, nil
+}
+
 func (self *AWSCloud) createTags(resourceId string, tags []ec2.Tag) (error) {
 	client := self.ec2
 
@@ -454,11 +464,26 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 
 	sgName := "k8s-elb-" + name
 	sgDescription := "Security group for Kubernetes ELB " + name
-	securityGroupId, err := self.awsCloud.createSecurityGroup(vpc.VpcId, sgName, sgDescription)
-	if err != nil {
-		return "", err
+
+	{
+		filter := NewFilter().Where("vpc-id", vpc.VpcId).Where("group-name", sgName)
+		// TODO: Should we do something more reliable ?? .Where("tag:kubernetes-id", kubernetesId)
+		securityGroups, err := self.awsCloud.findSecurityGroups(filter)
+		if err != nil {
+			return "", err
+		}
+		var securityGroupId string
+		for _, securityGroup := range securityGroups {
+			securityGroupId = securityGroup.Id
+		}
+		if securityGroupId == "" {
+			securityGroupId, err = self.awsCloud.createSecurityGroup(vpc.VpcId, sgName, sgDescription)
+			if err != nil {
+				return "", err
+			}
+		}
+		createRequest.SecurityGroups = []string { securityGroupId }
 	}
-	createRequest.SecurityGroups = []string { securityGroupId }
 
 	if len(externalIP) > 0 {
 		return "", fmt.Errorf("External IP cannot be specified for AWS ELB")

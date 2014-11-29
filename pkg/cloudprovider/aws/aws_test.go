@@ -113,6 +113,10 @@ func (ec2 *FakeEC2) DescribeSubnets(subnetIds []string, filter *ec2.Filter) (res
 	return nil, fmt.Errorf("Not implemented by FakeEC2")
 }
 
+func (ec2 *FakeEC2) SecurityGroups(groups []ec2.SecurityGroup, filter *ec2.Filter) (resp *ec2.SecurityGroupsResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	return &AWSCloud{
 		ec2: &FakeEC2{
@@ -121,7 +125,7 @@ func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 					[]ec2.Reservation{
 						{"", "", "", nil, instances}}}, nil
 			}},
-		}
+	}
 }
 
 func TestList(t *testing.T) {
