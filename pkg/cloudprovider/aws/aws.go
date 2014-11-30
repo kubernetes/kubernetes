@@ -122,8 +122,8 @@ type AuthFunc func() (auth aws.Auth, err error)
 
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
-			return newAWSCloud(config, &instanceMetadata{}, getAuth)
-		})
+		return newAWSCloud(config, &instanceMetadata{}, getAuth)
+	})
 }
 
 func getAuth() (auth aws.Auth, err error) {
@@ -394,7 +394,6 @@ func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp
 	return true, nil
 }
 
-
 func (self *AWSCloud) describeSubnets(subnetIds []string, filter *Filter) (*ec2.SubnetsResp, error) {
 	client := self.ec2
 
@@ -501,7 +500,7 @@ func (self *awsCloudLoadBalancer) hostsToInstances(hosts []string) ([]*ec2.Insta
 			return nil, err
 		}
 		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance "+host)
+			return nil, fmt.Errorf("unable to find instance " + host)
 		}
 		instances = append(instances, instance)
 	}
