@@ -364,7 +364,12 @@ func (self *awsCloudLoadBalancer) describeLoadBalancer(client *elb.ELB, name str
 	request.Names = []string { name }
 	response, err := client.DescribeLoadBalancers(request)
 	if err != nil {
-		glog.Error("error describing load balancer", err)
+		elbError, ok := err.(*elb.Error)
+		if ok && elbError.Code == "LoadBalancerNotFound" {
+			// Not found
+			return nil, nil
+		}
+		glog.Error("error describing load balancer: ", err)
 		return nil, err
 	}
 
