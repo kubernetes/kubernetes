@@ -609,7 +609,7 @@ func iptablesIpToNetmask(ip net.IP) iptableNetworkSpec {
 		ipLength = 32
 	}
 
-	self.network = net.IPNet{IP: ip, Mask: net.CIDRMask(ipLength, 0)}
+	self.network = net.IPNet{IP: ip, Mask: net.CIDRMask(ipLength, ipLength)}
 	return self
 }
 
