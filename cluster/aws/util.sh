@@ -29,7 +29,7 @@ function json_val {
 # TODO (ayurchuk) Refactor the get_* functions to use filters
 # TODO (bburns) Parameterize this for multiple cluster per project
 function get_instance_ids {
-  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance["Tags"] if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
+  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance.get("Tags", []) if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
 }
 
 function get_vpc_id {
