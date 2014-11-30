@@ -727,6 +727,8 @@ func (self *awsCloudLoadBalancer) DeleteTCPLoadBalancer(name, region string) err
 		return err
 	}
 
+	// TODO: Delete security group
+
 	request := &elb.DeleteLoadBalancer{}
 	request.LoadBalancerName = name
 	_, err = client.DeleteLoadBalancer(request)
