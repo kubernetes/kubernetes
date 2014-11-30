@@ -622,7 +622,7 @@ func (self *awsCloudLoadBalancer) UpdateTCPLoadBalancer(name, region string, hos
 	}
 
 	addInstances := []string{}
-	for key, _ := range wantInstances {
+	for key := range wantInstances {
 		_, found := existingInstances[key]
 		if !found {
 			addInstances = append(addInstances, key)
@@ -630,7 +630,7 @@ func (self *awsCloudLoadBalancer) UpdateTCPLoadBalancer(name, region string, hos
 	}
 
 	removeInstances := []string{}
-	for key, _ := range existingInstances {
+	for key := range existingInstances {
 		_, found := wantInstances[key]
 		if !found {
 			removeInstances = append(removeInstances, key)
