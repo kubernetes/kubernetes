@@ -30,7 +30,7 @@ type mockAwsMetadata struct {
 	az string
 }
 
-func (self*mockAwsMetadata) GetInstanceAz() (az string, err error) {
+func (self *mockAwsMetadata) GetInstanceAz() (az string, err error) {
 	return az, nil
 }
 

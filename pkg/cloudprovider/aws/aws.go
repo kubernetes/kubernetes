@@ -25,10 +25,10 @@ import (
 	"sync"
 
 	"code.google.com/p/gcfg"
+	"github.com/golang/glog"
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/ec2"
 	"github.com/mitchellh/goamz/elb"
-	"github.com/golang/glog"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -56,11 +56,11 @@ type FilterPredicate struct {
 	Values []string
 }
 
-func NewFilter() (*Filter) {
+func NewFilter() *Filter {
 	return &Filter{}
 }
 
-func (self*Filter) toAws() (filter *ec2.Filter) {
+func (self *Filter) toAws() (filter *ec2.Filter) {
 	awsFilter := ec2.NewFilter()
 	for _, predicate := range self.predicates {
 		awsFilter.Add(predicate.Name, predicate.Values...)
@@ -68,7 +68,7 @@ func (self*Filter) toAws() (filter *ec2.Filter) {
 	return awsFilter
 }
 
-func (self*Filter) Where(name string, value string) (*Filter) {
+func (self *Filter) Where(name string, value string) *Filter {
 	values := []string{value}
 	predicate := &FilterPredicate{Name: name, Values: values}
 	self.predicates = append(self.predicates, predicate)
@@ -93,10 +93,10 @@ type AWSCloud struct {
 	auth             aws.Auth
 	ec2              EC2
 	metadata         AwsMetadata
-	elbClients map[string]*elb.ELB
-	cfg *AWSCloudConfig
+	elbClients       map[string]*elb.ELB
+	cfg              *AWSCloudConfig
 	availabilityZone string
-	region *aws.Region
+	region           *aws.Region
 
 	mutex sync.Mutex
 }
@@ -121,8 +121,8 @@ type AuthFunc func() (auth aws.Auth, err error)
 
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
-			return newAWSCloud(config, &instanceMetadata{}, getAuth)
-		})
+		return newAWSCloud(config, &instanceMetadata{}, getAuth)
+	})
 }
 
 func getAuth() (auth aws.Auth, err error) {
@@ -174,13 +174,13 @@ func newAWSCloud(config io.Reader, metadata AwsMetadata, authFunc AuthFunc) (*AW
 
 	ec2 := ec2.New(auth, region)
 	return &AWSCloud{
-		auth: auth,
-		metadata: &instanceMetadata{},
+		auth:             auth,
+		metadata:         &instanceMetadata{},
 		availabilityZone: availabilityZone,
-		region: &region,
-		ec2: ec2,
-		cfg: cfg,
-		elbClients: map[string]*elb.ELB{},
+		region:           &region,
+		ec2:              ec2,
+		cfg:              cfg,
+		elbClients:       map[string]*elb.ELB{},
 	}, nil
 }
 
@@ -361,7 +361,7 @@ func (self *awsCloudLoadBalancer) getElbClient(region string) (*elb.ELB, error) 
 // Gets the current load balancer state
 func (self *awsCloudLoadBalancer) describeLoadBalancer(client *elb.ELB, name string) (*elb.LoadBalancer, error) {
 	request := &elb.DescribeLoadBalancer{}
-	request.Names = []string { name }
+	request.Names = []string{name}
 	response, err := client.DescribeLoadBalancers(request)
 	if err != nil {
 		elbError, ok := err.(*elb.Error)
@@ -426,10 +426,10 @@ func (self *AWSCloud) findSecurityGroups(filter *Filter) ([]ec2.SecurityGroupInf
 	return response.Groups, nil
 }
 
-func (self *AWSCloud) createTags(resourceId string, tags []ec2.Tag) (error) {
+func (self *AWSCloud) createTags(resourceId string, tags []ec2.Tag) error {
 	client := self.ec2
 
-	resourceIds := []string { resourceId }
+	resourceIds := []string{resourceId}
 
 	_, err := client.CreateTags(resourceIds, tags)
 	if err != nil {
@@ -439,7 +439,7 @@ func (self *AWSCloud) createTags(resourceId string, tags []ec2.Tag) (error) {
 	return nil
 }
 
-func (self*awsCloudLoadBalancer) hostsToInstances(hosts []string) ([]*ec2.Instance, error) {
+func (self *awsCloudLoadBalancer) hostsToInstances(hosts []string) ([]*ec2.Instance, error) {
 	instances := []*ec2.Instance{}
 	for _, host := range hosts {
 		instance, err := self.awsCloud.findInstance(host)
@@ -447,14 +447,14 @@ func (self*awsCloudLoadBalancer) hostsToInstances(hosts []string) ([]*ec2.Instan
 			return nil, err
 		}
 		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance "+host)
+			return nil, fmt.Errorf("unable to find instance " + host)
 		}
 		instances = append(instances, instance)
 	}
 	return instances, nil
 }
 
-func mapToInstanceIds(instances []*ec2.Instance) ([]string) {
+func mapToInstanceIds(instances []*ec2.Instance) []string {
 	ids := []string{}
 	for _, instance := range instances {
 		ids = append(ids, instance.InstanceId)
@@ -483,7 +483,6 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 	if vpc == nil {
 		return nil, fmt.Errorf("Unable to find vpc")
 	}
-
 
 	subnetIds := []string{}
 	{
@@ -520,7 +519,7 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 			listener.LoadBalancerPort = int64(port)
 			listener.Protocol = "tcp"
 			listener.InstanceProtocol = "tcp"
-			createRequest.Listeners = []elb.Listener{ listener }
+			createRequest.Listeners = []elb.Listener{listener}
 			//	nameTag := &elb.Tag{ Key: "Name", Value: name}
 			//	createRequest.Tags = []Tag { nameTag }
 
@@ -551,7 +550,7 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 						return nil, err
 					}
 				}
-				createRequest.SecurityGroups = []string { securityGroupId }
+				createRequest.SecurityGroups = []string{securityGroupId}
 			}
 
 			if len(externalIP) > 0 {
@@ -680,7 +679,7 @@ func (self *awsCloudLoadBalancer) DeleteTCPLoadBalancer(name, region string) err
 type instanceMetadata struct {
 }
 
-func (self*instanceMetadata) GetInstanceAz() (az string, err error) {
+func (self *instanceMetadata) GetInstanceAz() (az string, err error) {
 	path := "placement/availability-zone"
 
 	data, err := aws.GetMetaData(path)
@@ -691,7 +690,6 @@ func (self*instanceMetadata) GetInstanceAz() (az string, err error) {
 
 	return string(data), nil
 }
-
 
 func (self *awsZones) GetZone() (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{

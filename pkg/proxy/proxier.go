@@ -467,8 +467,8 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		if service.Spec.CreateExternalLoadBalancer {
 			publicIPs := service.Spec.PublicIPs
 			if len(publicIPs) == 0 {
-				glog.Info("Using instance IP for load balancer: ", proxier.listenAddress);
-				publicIPs = []string{ proxier.listenAddress.String() }
+				glog.Info("Using instance IP for load balancer: ", proxier.listenAddress)
+				publicIPs = []string{proxier.listenAddress.String()}
 			}
 			glog.Info("Load balancer public ips: ", publicIPs)
 			info.publicIP = publicIPs

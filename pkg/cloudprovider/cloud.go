@@ -45,7 +45,7 @@ type Clusters interface {
 // LoadBalancerInfo describes a load balancer, in particular how inbound traffic is presented
 type LoadBalancerInfo struct {
 	// If DestIP is not specified, traffic is assumed to reach the instance primary IP
-	DestIP              net.IP
+	DestIP net.IP
 
 	// Populated by AWS, not currently used
 	ExternalDnsName string
