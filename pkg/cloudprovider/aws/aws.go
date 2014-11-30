@@ -41,6 +41,7 @@ type EC2 interface {
 	DescribeVpcs(vpcIds []string, filter *ec2.Filter) (resp *ec2.VpcsResp, err error)
 	SecurityGroups(groups []ec2.SecurityGroup, filter *ec2.Filter) (resp *ec2.SecurityGroupsResp, err error)
 	DescribeSubnets(subnetIds []string, filter *ec2.Filter) (resp *ec2.SubnetsResp, err error)
+	AuthorizeSecurityGroup(group ec2.SecurityGroup, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error)
 }
 
 type AwsMetadata interface {
@@ -121,8 +122,8 @@ type AuthFunc func() (auth aws.Auth, err error)
 
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
-		return newAWSCloud(config, &instanceMetadata{}, getAuth)
-	})
+			return newAWSCloud(config, &instanceMetadata{}, getAuth)
+		})
 }
 
 func getAuth() (auth aws.Auth, err error) {
@@ -341,6 +342,59 @@ func (self *AWSCloud) findInstance(privateDnsName string) (*ec2.Instance, error)
 	return nil, nil
 }
 
+func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp string, protocol string, fromPort, toPort int) (bool, error) {
+	client := self.ec2
+
+	groupSpec := ec2.SecurityGroup{Id: securityGroupId}
+	findGroups := []ec2.SecurityGroup{groupSpec}
+	response, err := client.SecurityGroups(findGroups, nil)
+	if err != nil {
+		glog.Warning("error retrieving security group", err)
+		return false, err
+	}
+
+	if len(response.Groups) == 0 {
+		return false, fmt.Errorf("security group not found")
+	}
+
+	group := response.Groups[0]
+
+	for _, permission := range group.IPPerms {
+		if permission.FromPort != fromPort {
+			continue
+		}
+		if permission.ToPort != toPort {
+			continue
+		}
+		if permission.Protocol != protocol {
+			continue
+		}
+		if len(permission.SourceIPs) != 1 {
+			continue
+		}
+		if permission.SourceIPs[0] != sourceIp {
+			continue
+		}
+		return false, nil
+	}
+
+	newPermission := ec2.IPPerm{}
+	newPermission.FromPort = fromPort
+	newPermission.ToPort = toPort
+	newPermission.SourceIPs = []string{sourceIp}
+	newPermission.Protocol = protocol
+
+	newPermissions := []ec2.IPPerm{newPermission}
+	_, err = client.AuthorizeSecurityGroup(groupSpec, newPermissions)
+	if err != nil {
+		glog.Warning("error authorizing security group ingress", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
+
 func (self *AWSCloud) describeSubnets(subnetIds []string, filter *Filter) (*ec2.SubnetsResp, error) {
 	client := self.ec2
 
@@ -447,7 +501,7 @@ func (self *awsCloudLoadBalancer) hostsToInstances(hosts []string) ([]*ec2.Insta
 			return nil, err
 		}
 		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance " + host)
+			return nil, fmt.Errorf("unable to find instance "+host)
 		}
 		instances = append(instances, instance)
 	}
@@ -520,6 +574,8 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 			listener.Protocol = "tcp"
 			listener.InstanceProtocol = "tcp"
 			createRequest.Listeners = []elb.Listener{listener}
+
+			// TODO: Should we use a better identifier (the kubernetes uuid?)
 			//	nameTag := &elb.Tag{ Key: "Name", Value: name}
 			//	createRequest.Tags = []Tag { nameTag }
 
@@ -549,6 +605,10 @@ func (self *awsCloudLoadBalancer) CreateTCPLoadBalancer(name, region string, ext
 					if err != nil {
 						return nil, err
 					}
+				}
+				_, err = self.awsCloud.ensureSecurityGroupIngess(securityGroupId, "0.0.0.0/0", "tcp", port, port)
+				if err != nil {
+					return nil, err
 				}
 				createRequest.SecurityGroups = []string{securityGroupId}
 			}

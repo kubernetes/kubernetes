@@ -117,6 +117,10 @@ func (ec2 *FakeEC2) SecurityGroups(groups []ec2.SecurityGroup, filter *ec2.Filte
 	return nil, fmt.Errorf("Not implemented by FakeEC2")
 }
 
+func (ec2 *FakeEC2) AuthorizeSecurityGroup(group ec2.SecurityGroup, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	return &AWSCloud{
 		ec2: &FakeEC2{
