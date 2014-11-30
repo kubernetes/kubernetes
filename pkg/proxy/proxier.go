@@ -226,6 +226,10 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 		if err != nil {
 			return nil, err
 		}
+		if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
+			glog.Errorf("SetDeadline failed: %v", err)
+			return nil, err
+		}
 		activeClients.clients[cliAddr.String()] = svrConn
 		go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
 			defer util.HandleCrash()
