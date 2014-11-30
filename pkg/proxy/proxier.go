@@ -306,13 +306,14 @@ type Proxier struct {
 	mu            sync.Mutex // protects serviceMap
 	serviceMap    map[string]*serviceInfo
 	listenAddress net.IP
+	serviceNet    net.IPNet
 	iptables      iptables.Interface
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine.
-func NewProxier(loadBalancer LoadBalancer, listenAddress net.IP, iptables iptables.Interface) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, listenAddress net.IP, serviceNet *net.IPNet, iptables iptables.Interface) *Proxier {
 	glog.Infof("Initializing iptables")
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
@@ -330,6 +331,7 @@ func NewProxier(loadBalancer LoadBalancer, listenAddress net.IP, iptables iptabl
 		serviceMap:    make(map[string]*serviceInfo),
 		listenAddress: listenAddress,
 		iptables:      iptables,
+		serviceNet:    *serviceNet,
 	}
 }
 
@@ -496,7 +498,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 }
 
 func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
-	args := iptablesPortalArgs(info.portalIP, info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
+	args := iptablesPortalArgs(iptablesIpToNetmask(info.portalIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesProxyChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesProxyChain, service)
@@ -513,7 +515,13 @@ func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
 
 func (proxier *Proxier) openExternalPortal(service string, info *serviceInfo) error {
 	for _, publicIP := range info.publicIP {
-		args := iptablesPortalArgs(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
+		destIp := net.ParseIP(publicIP)
+		dest := iptablesIpToNetmask(destIp)
+		if destIp.Equal(zeroIPv4) {
+			dest.network = proxier.serviceNet
+			dest.invert = true
+		}
+		args := iptablesPortalArgs(dest, info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 		existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesProxyChain, args...)
 		if err != nil {
 			glog.Errorf("Failed to install iptables %s rule for service %q", iptablesProxyChain, service)
@@ -527,7 +535,7 @@ func (proxier *Proxier) openExternalPortal(service string, info *serviceInfo) er
 }
 
 func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
-	args := iptablesPortalArgs(info.portalIP, info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
+	args := iptablesPortalArgs(iptablesIpToNetmask(info.portalIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesProxyChain, args...); err != nil {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesProxyChain, service)
 		return err
@@ -541,7 +549,13 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 
 func (proxier *Proxier) closeExternalPortal(service string, info *serviceInfo) error {
 	for _, publicIP := range info.publicIP {
-		args := iptablesPortalArgs(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
+		destIp := net.ParseIP(publicIP)
+		dest := iptablesIpToNetmask(destIp)
+		if destIp.Equal(zeroIPv4) {
+			dest.network = proxier.serviceNet
+			dest.invert = true
+		}
+		args := iptablesPortalArgs(dest, info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesProxyChain, args...); err != nil {
 			glog.Errorf("Failed to delete external iptables %s rule for service %q", iptablesProxyChain, service)
 			return err
@@ -582,8 +596,25 @@ var localhostIPv4 = net.ParseIP("127.0.0.1")
 var zeroIPv6 = net.ParseIP("::0")
 var localhostIPv6 = net.ParseIP("::1")
 
+type iptableNetworkSpec struct {
+	network net.IPNet
+	invert  bool
+}
+
+func iptablesIpToNetmask(ip net.IP) iptableNetworkSpec {
+	self := iptableNetworkSpec{}
+
+	ipLength := 128
+	if ip.To4() != nil {
+		ipLength = 32
+	}
+
+	self.network = net.IPNet{IP: ip, Mask: net.CIDRMask(ipLength, 0)}
+	return self
+}
+
 // Build a slice of iptables args for a portal rule.
-func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
+func iptablesPortalArgs(destNet iptableNetworkSpec, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
 	// This list needs to include all fields as they are eventually spit out
 	// by iptables-save.  This is because some systems do not support the
 	// 'iptables -C' arg, and so fall back on parsing iptables-save output.
@@ -597,9 +628,13 @@ func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, prox
 		"--comment", service,
 		"-p", strings.ToLower(string(protocol)),
 		"-m", strings.ToLower(string(protocol)),
-		"-d", fmt.Sprintf("%s/32", destIP.String()),
-		"--dport", fmt.Sprintf("%d", destPort),
 	}
+	if destNet.invert {
+		args = append(args, "!")
+	}
+	args = append(args, "-d", destNet.network.String())
+	args = append(args, "--dport", strconv.Itoa(destPort))
+
 	// This is tricky.  If the proxy is bound (see Proxier.listenAddress)
 	// to 0.0.0.0 ("any interface") or 127.0.0.1, we can use REDIRECT,
 	// which will bring packets back to the host's loopback interface.  If
