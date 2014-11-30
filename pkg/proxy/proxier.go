@@ -669,7 +669,7 @@ func iptablesPortalArgs(destNet iptableNetworkSpec, destPort int, protocol api.P
 		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	}
 
-	glog.Info("Built iptables args", args, "for dest", dest)
-	
+	glog.Info("Built iptables args", args, "for dest", destNet)
+
 	return args
 }
