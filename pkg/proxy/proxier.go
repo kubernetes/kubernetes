@@ -613,6 +613,14 @@ func iptablesIpToNetmask(ip net.IP) iptableNetworkSpec {
 	return self
 }
 
+func (self iptableNetworkSpec) String() string {
+	invertString := ""
+	if self.invert {
+		invertString = "!"
+	}
+	return fmt.Sprintf("iptableNetworkSpec: %v %v", invertString, self.network)
+}
+
 // Build a slice of iptables args for a portal rule.
 func iptablesPortalArgs(destNet iptableNetworkSpec, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
 	// This list needs to include all fields as they are eventually spit out
@@ -660,5 +668,8 @@ func iptablesPortalArgs(destNet iptableNetworkSpec, destPort int, protocol api.P
 		// TODO: Can we DNAT with IPv6?
 		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	}
+
+	glog.Info("Built iptables args", args, "for dest", dest)
+	
 	return args
 }
