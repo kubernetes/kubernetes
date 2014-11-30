@@ -465,7 +465,11 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info.portalIP = serviceIP
 		info.portalPort = service.Spec.Port
 		if service.Spec.CreateExternalLoadBalancer {
-			info.publicIP = service.Spec.PublicIPs
+			publicIPs := service.Spec.PublicIPs
+			if len(publicIPs) == 0 {
+				publicIPs = []string{ proxier.listenAddress.String() }
+			}
+			info.publicIP = publicIPs
 		}
 		err = proxier.openPortal(service.Name, info)
 		if err != nil {

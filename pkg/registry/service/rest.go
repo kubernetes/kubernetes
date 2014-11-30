@@ -130,21 +130,28 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 			if err != nil {
 				return nil, err
 			}
-			var endpoint string
+			var loadBalancerInfo *cloudprovider.LoadBalancerInfo
 			if len(service.Spec.PublicIPs) > 0 {
 				for _, publicIP := range service.Spec.PublicIPs {
-					endpoint, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts))
+					loadBalancerInfo, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts))
 					if err != nil {
 						break
 					}
+					// TODO: What if there is more than one PublicIPs?
 				}
 			} else {
-				endpoint, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts))
+				loadBalancerInfo, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts))
 			}
 			if err != nil {
 				return nil, err
 			}
-			service.Spec.PublicIPs = []string{endpoint}
+			if loadBalancerInfo != nil {
+				service.Spec.PublicIPs = []string{}
+				if loadBalancerInfo.DestIP != nil {
+					service.Spec.PublicIPs = append(service.Spec.PublicIPs, loadBalancerInfo.DestIP.String())
+				}
+			}
+
 		}
 		err := rs.registry.CreateService(ctx, service)
 		if err != nil {

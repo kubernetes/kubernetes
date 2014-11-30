@@ -42,13 +42,22 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
+// LoadBalancerInfo describes a load balancer, in particular how inbound traffic is presented
+type LoadBalancerInfo struct {
+	// If DestIP is not specified, traffic is assumed to reach the instance primary IP
+	DestIP              net.IP
+
+	// Populated by AWS, not currently used
+	ExternalDnsName string
+}
+
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
 type TCPLoadBalancer interface {
 	// TCPLoadBalancerExists returns whether the specified load balancer exists.
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	TCPLoadBalancerExists(name, region string) (bool, error)
 	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the DNS name or IP address of the balancer
-	CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (string, error)
+	CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (*LoadBalancerInfo, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// DeleteTCPLoadBalancer deletes a specified load balancer.
