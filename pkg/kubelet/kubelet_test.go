@@ -873,6 +873,12 @@ func (c *mockCadvisorClient) ContainerInfo(name string, req *info.ContainerInfoR
 	return args.Get(0).(*info.ContainerInfo), args.Error(1)
 }
 
+// DockerContainer is a mock implementation of CadvisorInterface.DockerContainer.
+func (c *mockCadvisorClient) DockerContainer(name string, req *info.ContainerInfoRequest) (info.ContainerInfo, error) {
+	args := c.Called(name, req)
+	return args.Get(0).(info.ContainerInfo), args.Error(1)
+}
+
 // MachineInfo is a mock implementation of CadvisorInterface.MachineInfo.
 func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
 	args := c.Called()
@@ -882,7 +888,7 @@ func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
 func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := &info.ContainerInfo{
+	containerInfo := info.ContainerInfo{
 		ContainerReference: info.ContainerReference{
 			Name: containerPath,
 		},
@@ -890,7 +896,7 @@ func TestGetContainerInfo(t *testing.T) {
 
 	mockCadvisor := &mockCadvisorClient{}
 	cadvisorReq := &info.ContainerInfoRequest{}
-	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
+	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet, _, fakeDocker := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
@@ -961,13 +967,12 @@ func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
 
 func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
-	containerPath := fmt.Sprintf("/docker/%v", containerID)
 
-	containerInfo := &info.ContainerInfo{}
+	containerInfo := info.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
 	cadvisorReq := &info.ContainerInfoRequest{}
 	expectedErr := fmt.Errorf("some error")
-	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, expectedErr)
+	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, expectedErr)
 
 	kubelet, _, fakeDocker := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor

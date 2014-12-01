@@ -31,8 +31,6 @@ func GenerateRandomStats(numStats, numCores int, duration time.Duration) []*info
 	}
 	for i := 0; i < numStats; i++ {
 		stats := new(info.ContainerStats)
-		stats.Cpu = new(info.CpuStats)
-		stats.Memory = new(info.MemoryStats)
 		stats.Timestamp = currentTime
 		currentTime = currentTime.Add(duration)
 

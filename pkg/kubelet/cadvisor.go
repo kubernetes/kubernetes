@@ -25,6 +25,7 @@ import (
 
 // cadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type cadvisorInterface interface {
+	DockerContainer(name string, req *cadvisor.ContainerInfoRequest) (cadvisor.ContainerInfo, error)
 	ContainerInfo(name string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error)
 	MachineInfo() (*cadvisor.MachineInfo, error)
 }
@@ -41,6 +42,16 @@ func (kl *Kubelet) statsFromContainerPath(cc cadvisorInterface, containerPath st
 	return cinfo, nil
 }
 
+// This method takes a Docker container's ID and returns the stats for the
+// container.
+func (kl *Kubelet) statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+	cinfo, err := cc.DockerContainer(containerId, req)
+	if err != nil {
+		return nil, err
+	}
+	return &cinfo, nil
+}
+
 // GetContainerInfo returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
 	cc := kl.GetCadvisorClient()
@@ -55,7 +66,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req
 	if !found {
 		return nil, fmt.Errorf("couldn't find container")
 	}
-	return kl.statsFromContainerPath(cc, fmt.Sprintf("/docker/%s", dockerContainer.ID), req)
+	return kl.statsFromDockerContainer(cc, dockerContainer.ID, req)
 }
 
 // GetRootInfo returns stats (from Cadvisor) of current machine (root container).

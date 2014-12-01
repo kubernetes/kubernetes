@@ -57,7 +57,7 @@ func cadvisorTestClient(path string, expectedPostObj, expectedPostObjEmpty, repl
 			}
 			encoder := json.NewEncoder(w)
 			encoder.Encode(replyObj)
-		} else if r.URL.Path == "/api/v1.1/machine" {
+		} else if r.URL.Path == "/api/v1.2/machine" {
 			fmt.Fprint(w, `{"num_cores":8,"memory_capacity":31625871360}`)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
@@ -79,7 +79,7 @@ func TestGetMachineinfo(t *testing.T) {
 		NumCores:       8,
 		MemoryCapacity: 31625871360,
 	}
-	client, server, err := cadvisorTestClient("/api/v1.1/machine", nil, nil, minfo, t)
+	client, server, err := cadvisorTestClient("/api/v1.2/machine", nil, nil, minfo, t)
 	if err != nil {
 		t.Fatalf("unable to get a client %v", err)
 	}
@@ -101,7 +101,7 @@ func TestGetContainerInfo(t *testing.T) {
 	}
 	containerName := "/some/container"
 	cinfo := itest.GenerateRandomContainerInfo(containerName, 4, query, 1*time.Second)
-	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.1/containers%v", containerName), query, &info.ContainerInfoRequest{}, cinfo, t)
+	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.2/containers%v", containerName), query, &info.ContainerInfoRequest{}, cinfo, t)
 	if err != nil {
 		t.Fatalf("unable to get a client %v", err)
 	}
@@ -129,7 +129,7 @@ func TestGetSubcontainersInfo(t *testing.T) {
 		*cinfo1,
 		*cinfo2,
 	}
-	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.1/subcontainers%v", containerName), query, &info.ContainerInfoRequest{}, response, t)
+	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.2/subcontainers%v", containerName), query, &info.ContainerInfoRequest{}, response, t)
 	if err != nil {
 		t.Fatalf("unable to get a client %v", err)
 	}
