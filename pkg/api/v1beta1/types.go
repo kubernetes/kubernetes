@@ -80,6 +80,14 @@ type Volume struct {
 	Source *VolumeSource `yaml:"source" json:"source" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"`
 }
 
+func (v *Volume) ApplyDefaults() {
+	if v.Source == nil {
+		v.Source = &VolumeSource{
+			EmptyDir: &EmptyDir{},
+		}
+	}
+}
+
 // VolumeSource represents the source location of a valume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
@@ -161,6 +169,12 @@ type Port struct {
 	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty" description:"host IP to bind the port to"`
 }
 
+func (p *Port) ApplyDefaults() {
+	if p.Protocol == "" {
+		p.Protocol = ProtocolTCP
+	}
+}
+
 // VolumeMount describes a mounting of a Volume within a container.
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
@@ -177,6 +191,15 @@ type VolumeMount struct {
 	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty" description:"LOCAL or HOST; defaults to LOCAL; deprecated"`
 }
 
+func (vm *VolumeMount) ApplyDefaults() {
+	if vm.MountPath == "" {
+		vm.MountPath = vm.Path
+	}
+	if vm.MountPath != "" {
+		vm.Path = ""
+	}
+}
+
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
@@ -186,6 +209,15 @@ type EnvVar struct {
 	Key  string `yaml:"key,omitempty" json:"key,omitempty" description:"name of the environment variable; must be a C_IDENTIFIER; deprecated - use name instead"`
 	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty" description:"value of the environment variable; defaults to empty string"`
+}
+
+func (ev *EnvVar) ApplyDefaults() {
+	if ev.Name == "" {
+		ev.Name = ev.Key
+	}
+	if ev.Name != "" {
+		ev.Key = ""
+	}
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
@@ -267,6 +299,13 @@ type Container struct {
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" yaml:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise"`
 }
 
+func (c *Container) ApplyDefaults() {
+	if c.TerminationMessagePath == "" {
+		c.TerminationMessagePath = "/dev/termination-log"
+	}
+	//FIXME: should we capture the PullPolicy stuff here?  I think yes.
+}
+
 // Handler defines a specific action that should be taken
 // TODO: merge this with liveness probing?
 // TODO: pass structured data to these actions, and document that data here.
@@ -307,6 +346,12 @@ type TypeMeta struct {
 	// external tooling. They are not queryable and should be preserved when modifying
 	// objects.
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"`
+}
+
+func (tm *TypeMeta) ApplyDefaults() {
+	if tm.Namespace == "" {
+		tm.Namespace = "default" //FIXME: is this a constant somewhere?
+	}
 }
 
 // PodStatus represents a status of a pod.
@@ -384,6 +429,12 @@ type RestartPolicy struct {
 	Always    *RestartPolicyAlways    `json:"always,omitempty" yaml:"always,omitempty" description:"always restart the container after termination"`
 	OnFailure *RestartPolicyOnFailure `json:"onFailure,omitempty" yaml:"onFailure,omitempty" description:"restart the container if it fails for any reason, but not if it succeeds (exit 0)"`
 	Never     *RestartPolicyNever     `json:"never,omitempty" yaml:"never,omitempty" description:"never restart the container"`
+}
+
+func (rp *RestartPolicy) ApplyDefaults() {
+	if rp.Always == nil && rp.OnFailure == nil && rp.Never == nil {
+		rp.Always = &RestartPolicyAlways{}
+	}
 }
 
 // PodState is the state of a pod, used as either input (desired state) or output (current state).
