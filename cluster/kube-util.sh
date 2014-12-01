@@ -29,40 +29,45 @@ function detect-minions {
 
 # Verify prereqs on host machine
 function verify-prereqs {
-	echo "TODO"
+	echo "TODO verify-prereqs"
 }
 
 # Instantiate a kubernetes cluster
 function kube-up {
-	echo "TODO"
+	echo "TODO kube-up"
 }
 
 # Delete a kubernetes cluster
 function kube-down {
-	echo "TODO"
+	echo "TODO kube-down"
 }
 
 # Update a kubernetes cluster with latest source
 function kube-push {
-	echo "TODO"
+	echo "TODO kube-push"
 }
 
 # Execute prior to running tests to build a release if required for env
 function test-build-release {
-	echo "TODO"
+	echo "TODO test-build-release"
 }
 
 # Execute prior to running tests to initialize required structure
 function test-setup {
-	echo "TODO"
+	echo "TODO test-setup"
 }
 
 # Execute after running tests to perform any required clean-up
 function test-teardown {
-	echo "TODO"
+	echo "TODO test-teardown"
 }
 
 # Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
 function get-password {
-	echo "TODO"
+	echo "TODO get-password"
+}
+
+# Perform preparations required to run e2e tests
+function prepare-e2e() {
+	echo "TODO prepare-e2e"
 }

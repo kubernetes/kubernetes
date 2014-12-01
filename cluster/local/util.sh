@@ -14,6 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+. "${KUBE_ROOT}/cluster/kube-util.sh"
+
 function detect-master () {
   echo "Running locally"
+  KUBE_MASTER=127.0.0.1
+  KUBE_MASTER_IP=127.0.0.1
+}
+
+function test-build-release {
+  # Make a release
+  "${KUBE_ROOT}/build/release.sh"
+}
+
+function kube-up {
+  ("${KUBE_ROOT}/hack/local-up-cluster.sh" &)
+}
+
+function kube-down {
+  ps -ef | grep local-up-cluster.sh | awk '{print $2}' | xargs kill
+}
+
+function prepare-e2e() {
+  echo "Running e2e locally"
 }
