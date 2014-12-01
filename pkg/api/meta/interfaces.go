@@ -46,6 +46,10 @@ type Interface interface {
 	SetResourceVersion(version string)
 	SelfLink() string
 	SetSelfLink(selfLink string)
+	Labels() map[string]string
+	SetLabels(labels map[string]string)
+	Annotations() map[string]string
+	SetAnnotations(annotations map[string]string)
 }
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
@@ -72,6 +76,12 @@ type MetadataAccessor interface {
 
 	SelfLink(obj runtime.Object) (string, error)
 	SetSelfLink(obj runtime.Object, selfLink string) error
+
+	Labels(obj runtime.Object) (map[string]string, error)
+	SetLabels(obj runtime.Object, labels map[string]string) error
+
+	Annotations(obj runtime.Object) (map[string]string, error)
+	SetAnnotations(obj runtime.Object, annotations map[string]string) error
 
 	runtime.ResourceVersioner
 }
