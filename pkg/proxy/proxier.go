@@ -40,8 +40,7 @@ type serviceInfo struct {
 	timeout    time.Duration
 	mu         sync.Mutex // protects active
 	active     bool
-	// TODO: make this an net.IP address
-	publicIP []string
+	publicIP   []string // TODO: make this a []net.IP
 }
 
 func (si *serviceInfo) isActive() bool {
@@ -449,7 +448,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		if exists && info.isActive() && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) {
 			continue
 		}
-		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP) || service.Spec.CreateExternalLoadBalancer != (len(info.publicIP) > 0)) {
+		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP) || !ipsEqual(service.Spec.PublicIPs, info.publicIP)) {
 			glog.V(4).Infof("Something changed for service %q: stopping it", service.Name)
 			err := proxier.closePortal(service.Name, info)
 			if err != nil {
@@ -468,9 +467,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		}
 		info.portalIP = serviceIP
 		info.portalPort = service.Spec.Port
-		if service.Spec.CreateExternalLoadBalancer {
-			info.publicIP = service.Spec.PublicIPs
-		}
+		info.publicIP = service.Spec.PublicIPs
 		err = proxier.openPortal(service.Name, info)
 		if err != nil {
 			glog.Errorf("Failed to open portal for %q: %v", service.Name, err)
@@ -491,6 +488,18 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 		}
 	}
+}
+
+func ipsEqual(lhs, rhs []string) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for i := range lhs {
+		if lhs[i] != rhs[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
