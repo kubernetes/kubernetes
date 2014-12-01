@@ -58,6 +58,8 @@ func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (str
 	return g.selectHost(priorityList)
 }
 
+// This method takes a prioritized list of minions and sorts them in reverse order based on scores
+// and then picks one randomly from the minions that had the highest score
 func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, error) {
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
@@ -72,6 +74,8 @@ func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, er
 	return hosts[ix], nil
 }
 
+// Filters the minions to find the ones that fit based on the given predicate functions
+// Each minion is passed through the predicate functions to determine if it is a fit
 func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes api.MinionList) (api.MinionList, error) {
 	filtered := []api.Minion{}
 	machineToPods, err := MapPodsToMachines(podLister)
@@ -97,21 +101,28 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicat
 	return api.MinionList{Items: filtered}, nil
 }
 
+// Prioritizes the minions by running the individual priority functions sequentially.
+// Each priority function is expected to set a score of 0-10
+// 0 is the lowest priority score (least preferred minion) and 10 is the highest
+// Each priority function can also have its own weight
+// The minion scores returned by the priority function are multiplied by the weights to get weighted scores
+// All scores are finally combined (added) to get the total weighted scores of all minions
 func prioritizeNodes(pod api.Pod, podLister PodLister, priorities []PriorityConfig, minionLister MinionLister) (HostPriorityList, error) {
 	result := HostPriorityList{}
 	combinedScores := map[string]int{}
 	for _, priority := range priorities {
 		weight := priority.Weight
 		// skip the priority function if the weight is specified as 0
-		if weight > 0 {
-			priorityFunc := priority.Function
-			prioritizedList, err := priorityFunc(pod, podLister, minionLister)
-			if err != nil {
-				return HostPriorityList{}, err
-			}
-			for _, hostEntry := range prioritizedList {
-				combinedScores[hostEntry.host] += hostEntry.score * weight
-			}
+		if weight == 0 {
+			continue
+		}
+		priorityFunc := priority.Function
+		prioritizedList, err := priorityFunc(pod, podLister, minionLister)
+		if err != nil {
+			return HostPriorityList{}, err
+		}
+		for _, hostEntry := range prioritizedList {
+			combinedScores[hostEntry.host] += hostEntry.score * weight
 		}
 	}
 	for host, score := range combinedScores {

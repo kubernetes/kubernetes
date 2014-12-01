@@ -37,8 +37,8 @@ import (
 	"github.com/golang/glog"
 )
 
-// configFactory knows how to fill out a scheduler config with its support functions.
-type configFactory struct {
+// ConfigFactory knows how to fill out a scheduler config with its support functions.
+type ConfigFactory struct {
 	Client *client.Client
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
@@ -55,9 +55,9 @@ type configFactory struct {
 }
 
 // NewConfigFactory initializes the factory.
-func NewConfigFactory(client *client.Client) *configFactory {
+func NewConfigFactory(client *client.Client) *ConfigFactory {
 	// initialize the factory struct
-	factory := &configFactory{Client: client,
+	factory := &ConfigFactory{Client: client,
 		PodQueue:     cache.NewFIFO(),
 		PodLister:    &storeToPodLister{cache.NewStore()},
 		MinionLister: &storeToMinionLister{cache.NewStore()},
@@ -72,7 +72,7 @@ func NewConfigFactory(client *client.Client) *configFactory {
 }
 
 // Create creates a scheduler and all support functions.
-func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*scheduler.Config, error) {
+func (factory *ConfigFactory) Create(predicateKeys, priorityKeys []string) (*scheduler.Config, error) {
 	if predicateKeys == nil {
 		glog.V(2).Infof("Custom predicates list not provided, using default predicates")
 		predicateKeys = []string{"PodFitsPorts", "PodFitsResources", "NoDiskConflict", "MatchNodeSelector"}
@@ -129,7 +129,7 @@ func (factory *configFactory) Create(predicateKeys, priorityKeys []string) (*sch
 	}, nil
 }
 
-func (factory *configFactory) getPredicateFunctions(keys []string) ([]algorithm.FitPredicate, error) {
+func (factory *ConfigFactory) getPredicateFunctions(keys []string) ([]algorithm.FitPredicate, error) {
 	predicates := []algorithm.FitPredicate{}
 	for _, key := range keys {
 		function, ok := factory.PredicateMap[key]
@@ -141,7 +141,7 @@ func (factory *configFactory) getPredicateFunctions(keys []string) ([]algorithm.
 	return predicates, nil
 }
 
-func (factory *configFactory) getPriorityConfigs(keys []string) ([]algorithm.PriorityConfig, error) {
+func (factory *ConfigFactory) getPriorityConfigs(keys []string) ([]algorithm.PriorityConfig, error) {
 	configs := []algorithm.PriorityConfig{}
 	for _, key := range keys {
 		config, ok := factory.PriorityMap[key]
@@ -153,28 +153,35 @@ func (factory *configFactory) getPriorityConfigs(keys []string) ([]algorithm.Pri
 	return configs, nil
 }
 
-func (factory *configFactory) addDefaultPredicates() {
+func (factory *ConfigFactory) addDefaultPredicates() {
+	// Fit is defined based on the absence of port conflicts.
 	factory.AddPredicate("PodFitsPorts", algorithm.PodFitsPorts)
+	// Fit is determined by resource availability
 	factory.AddPredicate("PodFitsResources", algorithm.NewResourceFitPredicate(factory.MinionLister))
+	// Fit is determined by non-conflicting disk volumes
 	factory.AddPredicate("NoDiskConflict", algorithm.NoDiskConflict)
+	// Fit is determined by node selector query
 	factory.AddPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(factory.MinionLister))
 }
 
-func (factory *configFactory) AddPredicate(key string, function algorithm.FitPredicate) {
+func (factory *ConfigFactory) AddPredicate(key string, function algorithm.FitPredicate) {
 	factory.PredicateMap[key] = function
 }
 
-func (factory *configFactory) addDefaultPriorities() {
+func (factory *ConfigFactory) addDefaultPriorities() {
+	// Prioritize nodes by least requested utilization.
 	factory.AddPriority("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1)
+	// spreads pods by minimizing the number of pods on the same minion with the same labels.
 	factory.AddPriority("SpreadingPriority", algorithm.CalculateSpreadPriority, 1)
+	// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
 	factory.AddPriority("EqualPriority", algorithm.EqualPriority, 0)
 }
 
-func (factory *configFactory) AddPriority(key string, function algorithm.PriorityFunction, weight int) {
+func (factory *ConfigFactory) AddPriority(key string, function algorithm.PriorityFunction, weight int) {
 	factory.PriorityMap[key] = algorithm.PriorityConfig{Function: function, Weight: weight}
 }
 
-func (factory *configFactory) SetWeight(key string, weight int) {
+func (factory *ConfigFactory) SetWeight(key string, weight int) {
 	config, ok := factory.PriorityMap[key]
 	if !ok {
 		glog.Errorf("Invalid priority key %s specified - no corresponding function found", key)
@@ -210,7 +217,7 @@ func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
 
 // createUnassignedPodLW returns a listWatch that finds all pods that need to be
 // scheduled.
-func (factory *configFactory) createUnassignedPodLW() *listWatch {
+func (factory *ConfigFactory) createUnassignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
 		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
@@ -228,7 +235,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 
 // createAssignedPodLW returns a listWatch that finds all pods that are
 // already scheduled.
-func (factory *configFactory) createAssignedPodLW() *listWatch {
+func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
 		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
@@ -237,7 +244,7 @@ func (factory *configFactory) createAssignedPodLW() *listWatch {
 }
 
 // createMinionLW returns a listWatch that gets all changes to minions.
-func (factory *configFactory) createMinionLW() *listWatch {
+func (factory *ConfigFactory) createMinionLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
 		fieldSelector: parseSelectorOrDie(""),
@@ -246,7 +253,7 @@ func (factory *configFactory) createMinionLW() *listWatch {
 }
 
 // pollMinions lists all minions and returns an enumerator for cache.Poller.
-func (factory *configFactory) pollMinions() (cache.Enumerator, error) {
+func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	list := &api.MinionList{}
 	err := factory.Client.Get().Path("minions").Do().Into(list)
 	if err != nil {
@@ -255,7 +262,7 @@ func (factory *configFactory) pollMinions() (cache.Enumerator, error) {
 	return &minionEnumerator{list}, nil
 }
 
-func (factory *configFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
+func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
 		glog.Errorf("Error scheduling %v: %v; retrying", pod.Name, err)
 		backoff.gc()
