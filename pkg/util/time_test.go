@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 type TimeHolder struct {
@@ -34,7 +34,7 @@ func TestTimeMarshalYAML(t *testing.T) {
 		input  Time
 		result string
 	}{
-		{Time{}, "t: \"null\"\n"},
+		{Time{}, "t: null\n"},
 		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
 		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
 	}
@@ -56,7 +56,7 @@ func TestTimeUnmarshalYAML(t *testing.T) {
 		input  string
 		result Time
 	}{
-		{"t: \"null\"\n", Time{}},
+		{"t: null\n", Time{}},
 		{"t: 1998-05-05T05:05:05Z\n", Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC)},
 	}
 

@@ -37,7 +37,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	dockerclient "github.com/fsouza/go-dockerclient"
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 const usage = "usage: podex [-json|-yaml] [-id PODNAME] IMAGES"

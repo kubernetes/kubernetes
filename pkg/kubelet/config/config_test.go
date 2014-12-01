@@ -59,10 +59,13 @@ func CreateValidPod(name, namespace, source string) api.BoundPod {
 }
 
 func CreatePodUpdate(op kubelet.PodOperation, pods ...api.BoundPod) kubelet.PodUpdate {
-	if len(pods) == 0 {
-		return kubelet.PodUpdate{Op: op}
-	}
+	// We deliberately return an empty slice instead of a nil pointer here
+	// because reflect.DeepEqual differentiates between the two and we need to
+	// pick one for consistency.
 	newPods := make([]api.BoundPod, len(pods))
+	if len(pods) == 0 {
+		return kubelet.PodUpdate{newPods, op}
+	}
 	for i := range pods {
 		newPods[i] = pods[i]
 	}

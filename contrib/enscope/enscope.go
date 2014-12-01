@@ -23,8 +23,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
 const usage = "usage: enscope specFilename configFilename"

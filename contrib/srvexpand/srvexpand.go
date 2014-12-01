@@ -45,8 +45,8 @@ import (
 	// it should be possible to specify the version for the whole map.
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
 const usage = "usage: srvexpand filename"

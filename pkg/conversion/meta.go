@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 // MetaFactory is used to store and retrieve the version and kind

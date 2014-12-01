@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func TestParseBadStorage(t *testing.T) {

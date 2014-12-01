@@ -19,7 +19,7 @@ package runtime
 import (
 	"errors"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
