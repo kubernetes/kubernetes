@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"net"
 	"net/http"
@@ -222,6 +223,11 @@ func main() {
 			ReadTimeout:    5 * time.Minute,
 			WriteTimeout:   5 * time.Minute,
 			MaxHeaderBytes: 1 << 20,
+			TLSConfig: &tls.Config{
+				// Populate PeerCertificates in requests, but don't reject connections without certificates
+				// This allows certificates to be validated by authenticators, while still allowing other auth types
+				ClientAuth: tls.RequestClientCert,
+			},
 		}
 		glog.Infof("Serving securely on %s", secureLocation)
 		go func() {
