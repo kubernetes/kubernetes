@@ -45,3 +45,6 @@ ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
 
 ENABLE_CLUSTER_MONITORING=false
+
+# Don't require https for registries in our local RFC1918 network
+EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"

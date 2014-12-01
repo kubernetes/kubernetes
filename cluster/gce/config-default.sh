@@ -48,3 +48,6 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+
+# Don't require https for registries in our local RFC1918 network
+EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"

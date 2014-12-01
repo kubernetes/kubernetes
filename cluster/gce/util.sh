@@ -318,6 +318,7 @@ function kube-up {
       echo "ZONE='${ZONE}'"
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+      echo "EXTRA_DOCKER_OPTS='${EXTRA_DOCKER_OPTS}'"
       echo "ENABLE_DOCKER_REGISTRY_CACHE='${ENABLE_DOCKER_REGISTRY_CACHE:-false}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-minion.sh"
