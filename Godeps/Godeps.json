@@ -1,8 +1,8 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.3.3",
 	"Packages": [
-		"./..."
+		"github.com/GoogleCloudPlatform/kubernetes/..."
 	],
 	"Deps": [
 		{
@@ -82,11 +82,15 @@
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/aws",
-			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
+			"Rev": "60c9ebf94137ed87197518512a5c7bc298c45059"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/ec2",
-			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
+			"Rev": "60c9ebf94137ed87197518512a5c7bc298c45059"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/elb",
+			"Rev": "60c9ebf94137ed87197518512a5c7bc298c45059"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",

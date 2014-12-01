@@ -192,7 +192,7 @@ func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 }
 
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (net.IP, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (*cloudprovider.LoadBalancerInfo, error) {
 	pool, err := gce.makeTargetPool(name, region, hosts)
 	if err != nil {
 		return nil, err
@@ -218,7 +218,9 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 	if err != nil {
 		return nil, err
 	}
-	return net.ParseIP(fwd.IPAddress), nil
+	loadBalancerInfo := &cloudprovider.LoadBalancerInfo{}
+	loadBalancerInfo.DestIP = net.ParseIP(fwd.IPAddress)
+	return loadBalancerInfo, nil
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.

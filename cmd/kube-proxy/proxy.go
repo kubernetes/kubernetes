@@ -42,6 +42,7 @@ var (
 	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
 	clientConfig   = &client.Config{}
 	healthz_port   = flag.Int("healthz_port", 10249, "The port to bind the health check server. Use 0 to disable.")
+	serviceCidr    = flag.String("service_net", "10.0.0.0/8", "The CIDR for the service network")
 )
 
 func init() {
@@ -59,6 +60,11 @@ func main() {
 
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
+
+	_, serviceNet, err := net.ParseCIDR(*serviceCidr)
+	if err != nil {
+		glog.Fatalf("Invalid service_net: %v", err)
+	}
 
 	// define api config source
 	if clientConfig.Host != "" {
@@ -118,7 +124,7 @@ func main() {
 		protocol = iptables.ProtocolIpv6
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), iptables.New(exec.New(), protocol))
+	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), serviceNet, iptables.New(exec.New(), protocol))
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services

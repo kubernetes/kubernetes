@@ -448,6 +448,11 @@ function kube-down {
   $AWS_CMD detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id > /dev/null
   $AWS_CMD delete-internet-gateway --internet-gateway-id $igw_id > /dev/null
   $AWS_CMD delete-security-group --group-id $sec_group_id > /dev/null
-  $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > /dev/null
+
+  has_zero_route=$($AWS_CMD describe-route-tables --route-table-id $route_table_id --filter Name=route.destination-cidr-block,Values=0.0.0.0/0 | get_route_table_id $vpc_id)
+  if [[ ! -z ${has_zero_route} ]]; then
+    $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > /dev/null
+  fi
+
   $AWS_CMD delete-vpc --vpc-id $vpc_id > /dev/null
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package aws_cloud
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -24,6 +25,14 @@ import (
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/ec2"
 )
+
+type mockAwsMetadata struct {
+	az string
+}
+
+func (self *mockAwsMetadata) GetInstanceAz() (az string, err error) {
+	return az, nil
+}
 
 func TestReadAWSCloudConfig(t *testing.T) {
 	_, err1 := readAWSCloudConfig(nil)
@@ -55,20 +64,26 @@ func TestNewAWSCloud(t *testing.T) {
 		return aws.Auth{"", "", ""}, nil
 	}
 
-	_, err1 := newAWSCloud(nil, fakeAuthFunc)
+	mockMetadata := &mockAwsMetadata{}
+
+	_, err1 := newAWSCloud(nil, mockMetadata, fakeAuthFunc)
 	if err1 == nil {
 		t.Errorf("Should error when no config reader is given")
 	}
 
+	mockMetadata.az = "blahongac"
 	_, err2 := newAWSCloud(strings.NewReader(
 		"[global]\nregion = blahonga"),
+		mockMetadata,
 		fakeAuthFunc)
 	if err2 == nil {
 		t.Errorf("Should error when config specifies invalid region")
 	}
 
+	mockMetadata.az = "eu-west-1a"
 	_, err3 := newAWSCloud(
 		strings.NewReader("[global]\nregion = eu-west-1"),
+		mockMetadata,
 		fakeAuthFunc)
 	if err3 != nil {
 		t.Errorf("Should succeed when a valid region is specified: %s", err3)
@@ -83,15 +98,38 @@ func (ec2 *FakeEC2) Instances(instanceIds []string, filter *ec2.Filter) (resp *e
 	return ec2.instances(instanceIds, filter)
 }
 
+func (ec2 *FakeEC2) CreateSecurityGroup(group ec2.SecurityGroup) (resp *ec2.CreateSecurityGroupResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+func (ec2 *FakeEC2) CreateTags(resourceIds []string, tags []ec2.Tag) (resp *ec2.SimpleResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
+func (ec2 *FakeEC2) DescribeVpcs(vpcIds []string, filter *ec2.Filter) (resp *ec2.VpcsResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
+func (ec2 *FakeEC2) DescribeSubnets(subnetIds []string, filter *ec2.Filter) (resp *ec2.SubnetsResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
+func (ec2 *FakeEC2) SecurityGroups(groups []ec2.SecurityGroup, filter *ec2.Filter) (resp *ec2.SecurityGroupsResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
+func (ec2 *FakeEC2) AuthorizeSecurityGroup(group ec2.SecurityGroup, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error) {
+	return nil, fmt.Errorf("Not implemented by FakeEC2")
+}
+
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	return &AWSCloud{
-		&FakeEC2{
-			func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
+		ec2: &FakeEC2{
+			instances: func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
 				return &ec2.InstancesResp{"",
 					[]ec2.Reservation{
 						{"", "", "", nil, instances}}}, nil
 			}},
-		nil}
+	}
 }
 
 func TestList(t *testing.T) {
