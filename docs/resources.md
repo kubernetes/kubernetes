@@ -1,3 +1,5 @@
+**Note that the model described in this document has not yet been implemented. The tracking issue for implementation of this model is [#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168). Currently, only memory and cpu limits on containers (not pods) are supported. "memory" is in bytes and "cpu" is in milli-cores.**
+
 # The Kubernetes resource model
 
 To do good pod placement, Kubernetes needs to know how big pods are, as well as the sizes of the nodes onto which they are being placed.  The definition of "how big" is given by the Kubernetes resource model - the subject of this document.
