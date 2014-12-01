@@ -17,13 +17,13 @@ $ simplegen http://some.blog.site.com/k8s-example.yaml
 ### Schema
 ```
 // Optional: Defaults to image base name if not specified
-Name string `yaml:"name,omitempty" json:"name,omitempty"`
+Name string `json:"name,omitempty"`
 // Required.
-Image string `yaml:"image" json:"image"`
+Image string `json:"image"`
 // Optional: Defaults to one
-Replicas int `yaml:"replicas,omitempty" json:"replicas,omitempty"`
+Replicas int `json:"replicas,omitempty"`
 // Optional: Creates a service if specified: servicePort:containerPort
-PortSpec string `yaml:"portSpec,omitempty" json:"portSpec,omitempty"`
+PortSpec string `json:"portSpec,omitempty"`
 ```
 
 ### Example

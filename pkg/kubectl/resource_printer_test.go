@@ -33,12 +33,12 @@ import (
 )
 
 type testStruct struct {
-	api.TypeMeta   `yaml:",inline" json:",inline"`
-	api.ObjectMeta `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Key            string         `yaml:"Key" json:"Key"`
-	Map            map[string]int `yaml:"Map" json:"Map"`
-	StringList     []string       `yaml:"StringList" json:"StringList"`
-	IntList        []int          `yaml:"IntList" json:"IntList"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+	Key            string         `json:"Key"`
+	Map            map[string]int `json:"Map"`
+	StringList     []string       `json:"StringList"`
+	IntList        []int          `json:"IntList"`
 }
 
 func (ts *testStruct) IsAnAPIObject() {}

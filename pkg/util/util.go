@@ -88,34 +88,6 @@ func NewIntOrStringFromString(val string) IntOrString {
 	return IntOrString{Kind: IntstrString, StrVal: val}
 }
 
-// SetYAML implements the yaml.Setter interface.
-func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
-	switch v := value.(type) {
-	case int:
-		intstr.Kind = IntstrInt
-		intstr.IntVal = v
-		return true
-	case string:
-		intstr.Kind = IntstrString
-		intstr.StrVal = v
-		return true
-	}
-	return false
-}
-
-// GetYAML implements the yaml.Getter interface.
-func (intstr IntOrString) GetYAML() (tag string, value interface{}) {
-	switch intstr.Kind {
-	case IntstrInt:
-		value = intstr.IntVal
-	case IntstrString:
-		value = intstr.StrVal
-	default:
-		panic("impossible IntOrString.Kind")
-	}
-	return
-}
-
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	if value[0] == '"' {

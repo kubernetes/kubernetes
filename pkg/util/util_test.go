@@ -54,7 +54,7 @@ func TestNewIntOrStringFromString(t *testing.T) {
 }
 
 type IntOrStringHolder struct {
-	IOrS IntOrString `json:"val" yaml:"val"`
+	IOrS IntOrString `json:"val"`
 }
 
 func TestIntOrStringUnmarshalYAML(t *testing.T) {

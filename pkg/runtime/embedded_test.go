@@ -28,17 +28,17 @@ var scheme = runtime.NewScheme()
 var Codec = runtime.CodecFor(scheme, "v1test")
 
 type EmbeddedTest struct {
-	runtime.TypeMeta `yaml:",inline" json:",inline"`
-	ID               string                 `yaml:"id,omitempty" json:"id,omitempty"`
-	Object           runtime.EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      runtime.EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ID               string                 `json:"id,omitempty"`
+	Object           runtime.EmbeddedObject `json:"object,omitempty"`
+	EmptyObject      runtime.EmbeddedObject `json:"emptyObject,omitempty"`
 }
 
 type EmbeddedTestExternal struct {
-	runtime.TypeMeta `yaml:",inline" json:",inline"`
-	ID               string               `yaml:"id,omitempty" json:"id,omitempty"`
-	Object           runtime.RawExtension `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      runtime.RawExtension `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ID               string               `json:"id,omitempty"`
+	Object           runtime.RawExtension `json:"object,omitempty"`
+	EmptyObject      runtime.RawExtension `json:"emptyObject,omitempty"`
 }
 
 func (*EmbeddedTest) IsAnAPIObject()         {}

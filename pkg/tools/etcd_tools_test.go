@@ -36,9 +36,9 @@ type fakeClientGetSet struct {
 }
 
 type TestResource struct {
-	api.TypeMeta   `json:",inline" yaml:",inline"`
-	api.ObjectMeta `json:"metadata" yaml:"metadata"`
-	Value          int `json:"value" yaml:"value,omitempty"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata"`
+	Value          int `json:"value"`
 }
 
 func (*TestResource) IsAnAPIObject() {}

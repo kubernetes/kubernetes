@@ -121,9 +121,9 @@ func TestParseController(t *testing.T) {
 }
 
 type TestParseType struct {
-	api.TypeMeta   `json:",inline" yaml:",inline"`
-	api.ObjectMeta `json:"metadata" yaml:"metadata"`
-	Data           string `json:"data" yaml:"data"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata"`
+	Data           string `json:"data"`
 }
 
 func (*TestParseType) IsAnAPIObject() {}

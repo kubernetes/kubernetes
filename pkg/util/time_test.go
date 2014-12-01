@@ -26,7 +26,7 @@ import (
 )
 
 type TimeHolder struct {
-	T Time `json:"t" yaml:"t"`
+	T Time `json:"t"`
 }
 
 func TestTimeMarshalYAML(t *testing.T) {

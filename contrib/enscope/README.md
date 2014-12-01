@@ -16,8 +16,8 @@ $ enscope specFilename configFilename
 ## Scope schema
 ```
 type EnscopeSpec struct {
-	NameSuffix string            `json:"nameSuffix,omitempty" yaml:"nameSuffix,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	NameSuffix string            `json:"nameSuffix,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
 }
 ```
 

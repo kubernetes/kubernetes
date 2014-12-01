@@ -22,5 +22,5 @@ package api
 // version negotiation. APIVersions isn't just an unnamed array of
 // strings in order to allow for future evolution, though unversioned
 type APIVersions struct {
-	Versions []string `json:"versions" yaml:"versions"`
+	Versions []string `json:"versions"`
 }

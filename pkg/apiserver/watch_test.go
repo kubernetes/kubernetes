@@ -32,8 +32,8 @@ import (
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event
 type watchJSON struct {
-	Type   watch.EventType `json:"type,omitempty" yaml:"type,omitempty"`
-	Object json.RawMessage `json:"object,omitempty" yaml:"object,omitempty"`
+	Type   watch.EventType `json:"type,omitempty"`
+	Object json.RawMessage `json:"object,omitempty"`
 }
 
 var watchTestTable = []struct {

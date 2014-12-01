@@ -55,8 +55,8 @@ type SimpleMetaFactory struct {
 // encoding of an object, or an error.
 func (SimpleMetaFactory) Interpret(data []byte) (version, kind string, err error) {
 	findKind := struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
 	}{}
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.

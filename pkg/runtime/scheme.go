@@ -40,7 +40,7 @@ func (self *Scheme) fromScope(s conversion.Scope) (inVersion, outVersion string,
 
 // emptyPlugin is used to copy the Kind field to and from plugin objects.
 type emptyPlugin struct {
-	PluginBase `json:",inline" yaml:",inline"`
+	PluginBase `json:",inline"`
 }
 
 // embeddedObjectToRawExtension does the conversion you would expect from the name, using the information

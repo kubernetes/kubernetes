@@ -25,18 +25,18 @@ import (
 )
 
 type TypeMeta struct {
-	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty"`
 }
 
 type InternalSimple struct {
-	TypeMeta   `json:",inline" yaml:",inline"`
-	TestString string `json:"testString" yaml:"testString"`
+	TypeMeta   `json:",inline"`
+	TestString string `json:"testString"`
 }
 
 type ExternalSimple struct {
-	TypeMeta   `json:",inline" yaml:",inline"`
-	TestString string `json:"testString" yaml:"testString"`
+	TypeMeta   `json:",inline"`
+	TestString string `json:"testString"`
 }
 
 func (*InternalSimple) IsAnAPIObject() {}
@@ -157,23 +157,23 @@ func TestBadJSONRejection(t *testing.T) {
 }
 
 type ExtensionA struct {
-	runtime.PluginBase `json:",inline" yaml:",inline"`
-	TestString         string `json:"testString" yaml:"testString"`
+	runtime.PluginBase `json:",inline"`
+	TestString         string `json:"testString"`
 }
 
 type ExtensionB struct {
-	runtime.PluginBase `json:",inline" yaml:",inline"`
-	TestString         string `json:"testString" yaml:"testString"`
+	runtime.PluginBase `json:",inline"`
+	TestString         string `json:"testString"`
 }
 
 type ExternalExtensionType struct {
-	TypeMeta  `json:",inline" yaml:",inline"`
-	Extension runtime.RawExtension `json:"extension" yaml:"extension"`
+	TypeMeta  `json:",inline"`
+	Extension runtime.RawExtension `json:"extension"`
 }
 
 type InternalExtensionType struct {
-	TypeMeta  `json:",inline" yaml:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension" yaml:"extension"`
+	TypeMeta  `json:",inline"`
+	Extension runtime.EmbeddedObject `json:"extension"`
 }
 
 func (*ExtensionA) IsAnAPIObject()            {}

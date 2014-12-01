@@ -38,8 +38,8 @@ func checkErr(err error) {
 // TODO: If name suffix is not specified, deterministically generate it by hashing the labels.
 
 type EnscopeSpec struct {
-	NameSuffix string            `json:"nameSuffix,omitempty" yaml:"nameSuffix,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	NameSuffix string            `json:"nameSuffix,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
 }
 
 func main() {
