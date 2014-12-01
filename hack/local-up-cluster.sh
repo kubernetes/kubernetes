@@ -17,6 +17,9 @@
 # This command builds and runs a local kubernetes cluster. It's just like
 # local-up.sh, but this one launches the three separate binaries.
 # You may need to run this as root to allow kubelet to open docker's socket.
+DOCKER_OPTS=${DOCKER_OPTS:-""}
+DOCKER_NATIVE=${DOCKER_NATIVE:-""}
+DOCKER=(docker ${DOCKER_OPTS})
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -27,7 +30,7 @@ set -e
 source "${KUBE_ROOT}/hack/lib/init.sh"
 "${KUBE_ROOT}/hack/build-go.sh"
 
-docker ps 2> /dev/null 1> /dev/null
+${DOCKER[@]} ps 2> /dev/null 1> /dev/null
 if [ "$?" != "0" ]; then
   echo "Failed to successfully run 'docker ps', please verify that docker is installed and \$DOCKER_HOST is set correctly."
   exit 1
