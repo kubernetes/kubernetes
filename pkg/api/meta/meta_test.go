@@ -388,7 +388,7 @@ func TestGenericListMeta(t *testing.T) {
 }
 
 type MyAPIObject struct {
-	runtime.TypeMeta `yaml:",inline" json:",inline"`
+	TypeMeta InternalTypeMeta `json:",inline" yaml:",inline"`
 }
 
 func (*MyAPIObject) IsAnAPIObject() {}
@@ -405,8 +405,8 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 	testCases := map[string]T{
 		"empty api object":                   {&MyAPIObject{}, ""},
-		"api object with version":            {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
-		"pointer to api object with version": {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
+		"api object with version":            {&MyAPIObject{TypeMeta: InternalTypeMeta{ResourceVersion: "1"}}, "1"},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: InternalTypeMeta{ResourceVersion: "1"}}, "1"},
 	}
 	versioning := NewAccessor()
 	for key, testCase := range testCases {
@@ -436,7 +436,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		runtime.Object
 		Expected string
 	}{
-		"pointer to api object with version": {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: InternalTypeMeta{ResourceVersion: "1"}}, "1"},
 	}
 	for key, testCase := range setCases {
 		if err := versioning.SetResourceVersion(testCase.Object, "5"); err != nil {
@@ -460,7 +460,7 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 		succeed bool
 	}{
 		"normal": {
-			obj:     &MyAPIObject{TypeMeta: runtime.TypeMeta{SelfLink: "foobar"}},
+			obj:     &MyAPIObject{TypeMeta: InternalTypeMeta{SelfLink: "foobar"}},
 			expect:  "foobar",
 			try:     "newbar",
 			succeed: true,
