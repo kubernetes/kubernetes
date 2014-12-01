@@ -45,7 +45,7 @@ You can now use any of the cluster/kubecfg.sh commands to interact with your loc
 cluster/kubecfg.sh list /pods
 cluster/kubecfg.sh list /services
 cluster/kubecfg.sh list /replicationControllers
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 1 myNginx
+cluster/kubecfg.sh -p 8081:80 run dockerfile/nginx 1 myNginx
 
 
 ## begin wait for provision to complete, you can monitor the docker pull by opening a new terminal
