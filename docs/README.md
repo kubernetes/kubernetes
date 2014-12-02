@@ -24,6 +24,6 @@ Kubernetes documentation is organized into several categories.
     - Hands on introduction and example config files
   - **API documentation**
     - in [the API conventions doc](api-conventions.md)
-    - and automatically generated API documentation served by the master
+    - and automatically generated API documentation served by the master at `/swaggerapi/api/v1beta1` (generated from [pkg/api/v1beta1/types.go](../pkg/api/v1beta1/types.go))
   - **Wiki**
     - in [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
