@@ -293,7 +293,7 @@ func main() {
 		TestKubernetesROService,
 		TestKubeletSendsEvent,
 		TestImportantURLs,
-		// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
+		TestPodUpdate,
 	}
 
 	passed := true
