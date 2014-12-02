@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -74,12 +75,18 @@ var (
 	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	authPath                = flag.String("auth_path", "", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	apiServerList           util.StringList
+	joinCluster             = flag.Bool("join_cluster", false, "If true, attempt to join an existing Kubernetes cluster using a cloud clustering api")
+	clusterToJoin           = flag.String("cluster_to_join", "", "The name of the cluster to join. Only used if -join_cluster is true.  Empty string to join any existing cluster")
+	clientConfig            = &client.Config{}
+	cloudProvider           = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	cloudConfigFile         = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 )
 
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
 	flag.Var(&apiServerList, "api_servers", "List of Kubernetes API servers to publish events to. (ip:port), comma separated.")
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
 }
 
 func getDockerEndpoint() string {
@@ -150,6 +157,15 @@ func main() {
 		}
 	}
 
+	var kubeClient *client.Client
+	if len(clientConfig.Host) > 0 {
+		var err error
+		kubeClient, err = client.New(clientConfig)
+		if err != nil {
+			glog.Fatalf("Invalid API configuration: %v", err)
+		}
+	}
+
 	etcd.SetLogger(util.NewLogger("etcd "))
 
 	// Make an API client if possible.
@@ -217,6 +233,11 @@ func main() {
 		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), etcdClient, cfg.Channel("etcd"))
 	}
 
+	var cloud cloudprovider.Interface
+	if len(*cloudProvider) > 0 {
+		cloud = cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
+	}
+
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -224,6 +245,8 @@ func main() {
 		getHostname(),
 		dockerClient,
 		etcdClient,
+		kubeClient,
+		cloud,
 		*rootDirectory,
 		*networkContainerImage,
 		*syncFrequency,
@@ -231,6 +254,12 @@ func main() {
 		*registryBurst,
 		*minimumGCAge,
 		*maxContainerCount)
+
+	if *joinCluster {
+		if err := k.JoinCluster(*clusterToJoin); err != nil {
+			glog.Fatalf("Failed to join cluster: %s", err)
+		}
+	}
 
 	k.BirthCry()
 
