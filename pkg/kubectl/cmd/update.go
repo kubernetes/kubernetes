@@ -49,8 +49,12 @@ Examples:
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			err = CompareNamespaceFromFile(cmd, namespace)
-			checkErr(err)
+			// use the default namespace if not specified, or check for conflict with the file's namespace
+			if len(namespace) == 0 {
+				namespace = GetKubeNamespace(cmd)
+				err = CompareNamespaceFromFile(cmd, namespace)
+				checkErr(err)
+			}
 
 			err = kubectl.NewRESTHelper(client, mapping).Update(namespace, name, true, data)
 			checkErr(err)
