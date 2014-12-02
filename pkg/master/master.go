@@ -40,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/boundpods"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
@@ -96,7 +97,7 @@ type Config struct {
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
-	// "Inputs", Copied from Config
+	// registries for retrieving data
 	podRegistry        pod.Registry
 	controllerRegistry controller.Registry
 	serviceRegistry    service.Registry
@@ -104,13 +105,17 @@ type Master struct {
 	minionRegistry     minion.Registry
 	bindingRegistry    binding.Registry
 	eventRegistry      generic.Registry
-	storage            map[string]apiserver.RESTStorage
-	client             *client.Client
-	portalNet          *net.IPNet
+	boundPodsRegistry  boundpods.Registry
 
-	mux                   apiserver.Mux
-	handlerContainer      *restful.Container
-	rootWebService        *restful.WebService
+	// API server web objects
+	storage          map[string]apiserver.RESTStorage
+	mux              apiserver.Mux
+	handlerContainer *restful.Container
+	rootWebService   *restful.WebService
+
+	// "Inputs", Copied from Config
+	client                *client.Client
+	portalNet             *net.IPNet
 	enableLogsSupport     bool
 	enableUISupport       bool
 	enableSwaggerSupport  bool
@@ -238,6 +243,7 @@ func New(c *Config) *Master {
 		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:        minionRegistry,
+		boundPodsRegistry:     boundpods.NewEtcdRegistry(c.EtcdHelper),
 		client:                c.Client,
 		portalNet:             c.PortalNet,
 		rootWebService:        new(restful.WebService),
@@ -344,6 +350,8 @@ func (m *Master) init(c *Config) {
 		"minions":                nodeRESTStorage,
 		"nodes":                  nodeRESTStorage,
 		"events":                 event.NewREST(m.eventRegistry),
+
+		"boundPods": boundpods.NewREST(m.boundPodsRegistry),
 
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
