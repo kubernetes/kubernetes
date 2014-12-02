@@ -54,17 +54,21 @@ func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request)
 	return h.selfLinker.SetSelfLink(obj, newURL.String())
 }
 
-func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string) {
-	if s, err := labels.ParseSelector(query.Get("labels")); err != nil {
-		label = labels.Everything()
-	} else {
-		label = s
+func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string, err error) {
+	s, perr := labels.ParseSelector(query.Get("labels"))
+	if perr != nil {
+		err = perr
+		return
 	}
-	if s, err := labels.ParseSelector(query.Get("fields")); err != nil {
-		field = labels.Everything()
-	} else {
-		field = s
+	label = s
+
+	s, perr = labels.ParseSelector(query.Get("fields"))
+	if perr != nil {
+		err = perr
+		return
 	}
+	field = s
+
 	resourceVersion = query.Get("resourceVersion")
 	return
 }
@@ -95,7 +99,11 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
-		label, field, resourceVersion := getWatchParams(req.URL.Query())
+		label, field, resourceVersion, err := getWatchParams(req.URL.Query())
+		if err != nil {
+			errorJSON(err, h.codec, w)
+			return
+		}
 		watching, err := watcher.Watch(ctx, label, field, resourceVersion)
 		if err != nil {
 			errorJSON(err, h.codec, w)
