@@ -199,21 +199,21 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 		return false
 	}
 
-	_, err = podClient.Get(pod.Name)
+	podWithUid, err := podClient.Get(pod.Name)
 	if err != nil {
 		glog.Errorf("Failed to get pod: %v", err)
 		return false
 	}
 
 	// Check for scheduler event about the pod.
+	glog.Infof("%+v", podWithUid)
 	events, err := c.Events(api.NamespaceDefault).List(
 		labels.Everything(),
 		labels.Set{
-			"involvedObject.name":      pod.Name,
 			"involvedObject.kind":      "Pod",
+			"involvedObject.uid":       podWithUid.UID,
 			"involvedObject.namespace": api.NamespaceDefault,
 			"source":                   "scheduler",
-			"time":                     value,
 		}.AsSelector(),
 	)
 	if err != nil {
@@ -230,7 +230,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	events, err = c.Events(api.NamespaceDefault).List(
 		labels.Everything(),
 		labels.Set{
-			"involvedObject.name":      pod.Name,
+			"involvedObject.uid":       podWithUid.UID,
 			"involvedObject.kind":      "BoundPod",
 			"involvedObject.namespace": api.NamespaceDefault,
 			"source":                   "kubelet",
