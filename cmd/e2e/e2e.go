@@ -172,7 +172,7 @@ func TestPodUpdate(c *client.Client) bool {
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
 	provider := os.Getenv("KUBERNETES_PROVIDER")
-	if provider != "gce" {
+	if len(provider) > 0 && provider != "gce" {
 		glog.Infof("skipping TestKubeletSendsEvent on cloud provider %s", provider)
 		return true
 	}
