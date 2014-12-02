@@ -48,7 +48,59 @@ function do_teardown() {
 function start_service() {
   echo "Starting service '$1' on port $2 with $3 replicas"
   svcs_to_clean+=("$1")
-  ${KUBECFG} -s "$2" -p 9376 run kubernetes/serve_hostname "$3" "$1"
+  ${KUBECTL} create -f - << __EOF__
+      {
+          "kind": "ReplicationController",
+          "apiVersion": "v1beta1",
+          "id": "$1",
+          "namespace": "default",
+          "desiredState": {
+              "replicas": $3,
+              "replicaSelector": {
+                  "name": "$1"
+              },
+              "podTemplate": {
+                  "desiredState": {
+                      "manifest": {
+                          "version": "v1beta2",
+                          "containers": [
+                              {
+                                  "name": "$1",
+                                  "image": "kubernetes/serve_hostname",
+                                  "ports": [
+                                      {
+                                          "containerPort": 9376,
+                                          "protocol": "TCP"
+                                      }
+                                  ],
+                              }
+                          ],
+                      }
+                  },
+                  "labels": {
+                      "name": "$1"
+                  }
+              }
+          }
+      }
+__EOF__
+  ${KUBECTL} create -f - << __EOF__
+      {
+          "kind": "Service",
+          "apiVersion": "v1beta1",
+          "id": "$1",
+          "namespace": "default",
+          "port": $2,
+          "protocol": "TCP",
+          "labels": {
+              "name": "$1"
+          },
+          "selector": {
+              "name": "$1"
+          },
+          "containerPort": 9376,
+      }
+__EOF__
 }
 
 # Args:
