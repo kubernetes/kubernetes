@@ -20,20 +20,23 @@ import (
 	"flag"
 	"net"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/onramp"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/onramp"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
 var (
 	etcdServerList util.StringList
+	kubeApiServer  util.StringList
 	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
 )
 
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional). Mutually exclusive with -etcd_config")
+	flag.Var(&kubeApiServer, "master", "List of Kube api servers to watch (http://ip:port), comma separated (optional).")
 }
 
 func main() {
@@ -44,6 +47,7 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	var etcdClient *etcd.Client
+	var kubeClient *client.Client
 
 	// Set up etcd client
 	if len(etcdServerList) > 0 {
@@ -52,13 +56,17 @@ func main() {
 		etcdClient = etcd.NewClient(etcdServerList)
 	}
 
+	if len(kubeApiServer) > 0 {
+		kubeClient = client.NewOrDie(&client.Config{Host: kubeApiServer[0], Version: "v1beta1"})
+	}
+
 	if etcdClient != nil {
 		glog.Infof("Watching for etcd configs at %v", etcdClient.GetCluster())
-        }
+	}
 
-	Onrmp := onramp.NewOnramp(etcdClient)
+	Onrmp := onramp.NewOnramp(etcdClient, kubeClient)
 	// Start watching for work to do
 	go util.Forever(func() { Onrmp.Run() }, 0)
 
-	select { }
+	select {}
 }

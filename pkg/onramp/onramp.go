@@ -14,35 +14,50 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package onramp 
+package onramp
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/golang/glog"
 )
 
-// New creates a new Kubelet for use in main
-func NewOnramp(ec tools.EtcdClient) *Onramp {
+func NewOnramp(ec tools.EtcdClient, ac *client.Client) *Onramp {
 	return &Onramp{
-		etcdClient:            ec,
+		etcdClient: ec,
+		kubeClient: ac,
 	}
 }
 
-// Kubelet is the main kubelet implementation.
 type Onramp struct {
 	etcdClient tools.EtcdClient
+	kubeClient *client.Client
 }
 
+func scanPod(onrmp *Onramp) {
+	pdi := onrmp.kubeClient.Pods("")
+	pods, err := pdi.List(labels.Everything())
+	if err != nil {
+		return
+	}
+	for m := range pods.Items {
+		glog.Infof("pod name %s\n", pods.Items[m])
+	}
+}
 
 // Run starts the kubelet reacting to config updates
 func (onrmp *Onramp) Run() {
 
-	glog.Infof("In Onramp RUN!\n")
-	_, err := onrmp.etcdClient.Watch("/v2/keys/registry/pods/default/", 1, false, nil, nil)
-
-	if (err == nil) {
+	response, err := onrmp.etcdClient.Watch("/registry/pods/default/", 0, true, nil, nil)
+	glog.Infof("Done with watch\n")
+	if err != nil {
 		glog.Infof("Error on etcd watch: %s\n", err)
 		return
+	}
+
+	if response.Action == "create" {
+		scanPod(onrmp)
 	}
 
 }
