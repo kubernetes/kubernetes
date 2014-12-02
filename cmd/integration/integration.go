@@ -23,7 +23,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -40,12 +39,11 @@ import (
 	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/standalone"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -56,6 +54,7 @@ import (
 )
 
 const testRootDir = "/tmp/kubelet"
+const testRootDir2 = "/tmp/kubelet2"
 
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
@@ -187,26 +186,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	minionController.Run(10 * time.Second)
 
 	// Kubelet (localhost)
-	os.MkdirAll(testRootDir, 0750)
-	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
-	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, cfg1.Channel("etcd"))
-	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
-	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], testRootDir, &fakeDocker1)
-	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
-	go util.Forever(func() {
-		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), net.ParseIP("127.0.0.1"), 10250, true)
-	}, 0)
-
+	standalone.SimpleRunKubelet(etcdClient, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
-	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, cfg2.Channel("etcd"))
-	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], testRootDir, &fakeDocker2)
-	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
-	go util.Forever(func() {
-		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), net.ParseIP("127.0.0.1"), 10251, true)
-	}, 0)
+	standalone.SimpleRunKubelet(etcdClient, &fakeDocker2, machineList[1], testRootDir2, "", "127.0.0.1", 10251)
 
 	return apiServer.URL
 }
