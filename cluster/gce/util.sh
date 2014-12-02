@@ -297,7 +297,7 @@ function kube-up {
     echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
     # For logging to GCP we need to enable some minion scopes.
     if [[ "${LOGGING_DESTINATION-}" == "gcp" ]]; then
-      MINION_SCOPES="${MINION_SCOPES}, https://www.googleapis.com/auth/logging.write"
+      MINION_SCOPES=(${MINION_SCOPES[@]} "https://www.googleapis.com/auth/logging.write")
     fi
   fi
 
