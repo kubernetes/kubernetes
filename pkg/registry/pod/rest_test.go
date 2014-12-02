@@ -518,7 +518,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels: map[string]string{
-				"invalid-label-to-cause-validation-failure": "bar",
+				"invalid/label/to/cause/validation/failure": "bar",
 			},
 		},
 	}

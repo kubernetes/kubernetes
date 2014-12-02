@@ -43,6 +43,10 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 }
 
 func makeEnvVariableName(str string) string {
+	// TODO: If we simplify to "all names are DNS1123Subdomains" this
+	// will need two tweaks:
+	//   1) Handle leading digits
+	//   2) Handle dots
 	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
 }
 

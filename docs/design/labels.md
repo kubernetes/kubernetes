@@ -18,9 +18,17 @@ Label selectors may also be used to associate policies with sets of objects.
 
 We also [plan](https://github.com/GoogleCloudPlatform/kubernetes/issues/560) to make labels available inside pods and [lifecycle hooks](container-environment.md).
 
-[Namespacing of label keys](https://github.com/GoogleCloudPlatform/kubernetes/issues/1491) is under discussion.
+Valid label keys are comprised of two segments - prefix and name - separated
+by a slash (`/`).  The name segment is required and must be a DNS label: 63
+characters or less, all lowercase, beginning and ending with an alphanumeric
+character (`[a-z0-9]`), with dashes (`-`) and alphanumerics between.  The
+prefix and slash are optional.  If specified, the prefix must be a DNS
+subdomain (a series of DNS labels separated by dots (`.`), not longer than 253
+characters in total.
 
-Valid labels follow a slightly modified RFC952 format:  24 characters or less, all lowercase, begins with alpha, dashes (-) are allowed, and ends with alphanumeric.
+If the prefix is omitted, the label key is presumed to be private to the user.
+System components which use labels must specify a prefix.  The `kubernetes.io`
+prefix is reserved for kubernetes core components.
 
 ## Motivation
 

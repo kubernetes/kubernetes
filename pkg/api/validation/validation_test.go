@@ -35,6 +35,43 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ValidationErrorList) 
 	}
 }
 
+func TestValidateLabels(t *testing.T) {
+	successCases := []map[string]string{
+		{"simple": "bar"},
+		{"now-with-dashes": "bar"},
+		{"1-starts-with-num": "bar"},
+		{"1234": "bar"},
+		{"simple/simple": "bar"},
+		{"now-with-dashes/simple": "bar"},
+		{"now-with-dashes/now-with-dashes": "bar"},
+		{"now.with.dots/simple": "bar"},
+		{"now-with.dashes-and.dots/simple": "bar"},
+		{"1-num.2-num/3-num": "bar"},
+		{"1234/5678": "bar"},
+		{"1.2.3.4/5678": "bar"},
+	}
+	for i := range successCases {
+		errs := validateLabels(successCases[i], "field")
+		if len(errs) != 0 {
+			t.Errorf("case[%d] expected success, got %#v", i, errs)
+		}
+	}
+
+	errorCases := []map[string]string{
+		{"NoUppercase123": "bar"},
+		{"nospecialchars^=@": "bar"},
+		{"cantendwithadash-": "bar"},
+		{"only/one/slash": "bar"},
+		{strings.Repeat("a", 254): "bar"},
+	}
+	for i := range errorCases {
+		errs := validateLabels(errorCases[i], "field")
+		if len(errs) != 1 {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
@@ -412,19 +449,14 @@ func TestValidatePod(t *testing.T) {
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 			Labels: map[string]string{
-				"123cantbeginwithnumber":          "bar", //invalid
-				"NoUppercase123":                  "bar", //invalid
-				"nospecialchars^=@":               "bar", //invalid
-				"cantendwithadash-":               "bar", //invalid
-				"rfc952-mustbe24charactersorless": "bar", //invalid
-				"rfc952-dash-nodots-lower":        "bar", //good label
-				"rfc952-24chars-orless":           "bar", //good label
+				"1/2/3/4/5": "bar", // invalid
+				"valid":     "bar", // good
 			},
 		},
 		Spec: api.PodSpec{},
 	})
-	if len(errs) != 5 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
 	}
 }
 
@@ -1003,8 +1035,8 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "spec.template" &&
 				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.replicas" &&
-				field != "spec.template.label" &&
-				field != "label" {
+				field != "spec.template.labels" &&
+				field != "labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1080,7 +1112,7 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if field != "name" &&
-				field != "label" {
+				field != "labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
