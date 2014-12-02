@@ -12,7 +12,7 @@ At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. En
 
 #### etcd
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your root PATH, please make sure it is installed and in your root ``$PATH``.
 
 #### go
 
