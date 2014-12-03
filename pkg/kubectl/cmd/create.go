@@ -49,7 +49,7 @@ Examples:
 
 			// use the default namespace if not specified, or check for conflict with the file's namespace
 			if len(namespace) == 0 {
-				namespace = getKubeNamespace(cmd)
+				namespace = GetKubeNamespace(cmd)
 			} else {
 				err = CompareNamespaceFromFile(cmd, namespace)
 				checkErr(err)
