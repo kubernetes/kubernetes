@@ -169,6 +169,32 @@ func TestPodUpdate(c *client.Client) bool {
 	return true
 }
 
+// TestImportantURLs validates that URLs that people depend on haven't moved.
+// ***IMPORTANT*** Do *not* fix this test just by changing the path.  If you moved a URL
+// you can break upstream dependencies.
+func TestImportantURLs(c *client.Client) bool {
+	tests := []struct {
+		path string
+	}{
+		{path: "/validate"},
+		{path: "/healthz"},
+		// TODO: test proxy links here
+	}
+	ok := true
+	for _, test := range tests {
+		glog.Infof("testing: %s", test.path)
+		data, err := c.RESTClient.Get().
+			AbsPath(test.path).
+			Do().
+			Raw()
+		if err != nil {
+			glog.Errorf("Failed: %v\nBody: %s", err, string(data))
+			ok = false
+		}
+	}
+	return ok
+}
+
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
 	provider := os.Getenv("KUBERNETES_PROVIDER")
@@ -266,6 +292,7 @@ func main() {
 	tests := []func(c *client.Client) bool{
 		TestKubernetesROService,
 		TestKubeletSendsEvent,
+		TestImportantURLs,
 		// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
 	}
 
