@@ -185,8 +185,7 @@ func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
 // add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
-		err := s.converter.Register(f)
-		if err != nil {
+		if err := s.converter.Register(f); err != nil {
 			return err
 		}
 	}
