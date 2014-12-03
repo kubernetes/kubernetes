@@ -50,11 +50,11 @@ func TestEmbeddedObject(t *testing.T) {
 	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
 
 	outer := &EmbeddedTest{
-		TypeMeta: runtime.TypeMeta{Name: "outer"},
+		TypeMeta: runtime.TypeMeta{},
 		ID:       "outer",
 		Object: runtime.EmbeddedObject{
 			&EmbeddedTest{
-				TypeMeta: runtime.TypeMeta{Name: "inner"},
+				TypeMeta: runtime.TypeMeta{},
 				ID:       "inner",
 			},
 		},
@@ -83,7 +83,7 @@ func TestEmbeddedObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
-	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.Name != "outer" {
+	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
 		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
 	}
 	if !reflect.DeepEqual(externalViaJSON.EmptyObject.RawJSON, []byte("null")) || len(externalViaJSON.Object.RawJSON) == 0 {
