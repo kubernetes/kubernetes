@@ -94,3 +94,83 @@ id: testpd
 kind: Pod
 ```
 
+### GitVolume
+A git volume automatically downloads the contents of a git repository at a particular commit, and populates the contents of the volume with the contents of that repository. The life-span of this volume is tied to the lifespan of the pod
+
+A GitVolume essentially combines an EmptyDir volume and an automatic git download.  It is _not_ dynamic, it does not re-sync the git repository after the initial download.
+
+#### Example Git configuration
+```
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    containers:
+      - image: kubernetes/pause
+        name: testpd
+        volumeMounts:
+          - mountPath: "/testgit"
+            name: "testgit"
+    id: testgit
+    version: v1beta1
+    volumes:
+      - name: testgit
+        source:
+          gitRepo:
+            repository: "http://github.com/some/repo.git"
+            revision: "revisionHashGoesHere"
+id: testgit
+kind: Pod
+```
+
+### HTTP Volumes
+An HTTP volume downloads a file from an HTTP source, and optionally unpacks it into the volume directory.  The lifespan of the volume is tied to the lifespan of the pod.
+
+An HTTP volume combines an EmptyDir volume and an automatic download of a file, with optional extraction.  The volume does not currently validate a checksum on the file, so it is recommended that you use https and trusted sources.
+
+#### Example HTTP File configuration
+This example downloads a single file into the volume.  The file name is either the "Content-Disposition" header or the file name in the URL's path, if that header is missing.
+
+```
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    containers:
+      - image: kubernetes/pause
+        name: testpd
+        volumeMounts:
+          - mountPath: "/testhttp"
+            name: "testhttp"
+    id: testhttp
+    version: v1beta1
+    volumes:
+      - name: testhttp
+        source:
+          httpSource:
+            url: "http://something.com/path/to/file.txt"
+id: testhttp
+kind: Pod
+```
+
+#### Example HTTP Archive configuration
+This example downloads a tarball archive and unpacks it into the volume.  The archive itself is deleted.  The kubelet uses either the ```Content-type``` header or the file extension to determine what time of archive this is.  Currently supported archives are ```zip``` and ```tgz```.
+```
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    containers:
+      - image: kubernetes/pause
+        name: testpd
+        volumeMounts:
+          - mountPath: "/testhttp"
+            name: "testhttp"
+    id: testhttp
+    version: v1beta1
+    volumes:
+      - name: testhttp
+        source:
+          httpSource:
+            url: "http://something.com/path/to/archive.tgz"
+            archive: true
+id: testhttp
+kind: Pod
+```

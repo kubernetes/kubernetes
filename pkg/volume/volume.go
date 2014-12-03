@@ -17,12 +17,18 @@ limitations under the License.
 package volume
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
@@ -149,15 +155,7 @@ func (g *GitDir) GetPath() string {
 
 // TearDown simply deletes everything in the directory.
 func (g *GitDir) TearDown() error {
-	tmpDir, err := renameDirectory(g.GetPath(), g.Name+"~deleting")
-	if err != nil {
-		return err
-	}
-	err = os.RemoveAll(tmpDir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return deleteDir(g.GetPath(), g.Name)
 }
 
 // EmptyDir volumes are temporary directories exposed to the pod.
@@ -192,7 +190,11 @@ func renameDirectory(oldPath, newName string) (string, error) {
 
 // TearDown simply deletes everything in the directory.
 func (emptyDir *EmptyDir) TearDown() error {
-	tmpDir, err := renameDirectory(emptyDir.GetPath(), emptyDir.Name+".deleting~")
+	return deleteDir(emptyDir.GetPath(), emptyDir.Name)
+}
+
+func deleteDir(path, name string) error {
+	tmpDir, err := renameDirectory(path, name+".deleting~")
 	if err != nil {
 		return err
 	}
@@ -354,6 +356,8 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 		}
 	} else if source.GitRepo != nil {
 		vol = newGitRepo(volume, podID, rootDir)
+	} else if source.HTTPSource != nil {
+		vol = &httpDir{source.HTTPSource.URL, source.HTTPSource.Archive, volume.Name, podID, rootDir}
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -378,6 +382,8 @@ func CreateVolumeCleaner(kind string, name string, podID string, rootDir string)
 			PodID:   podID,
 			RootDir: rootDir,
 		}, nil
+	case "http":
+		return &httpDir{name: name, podID: podID, rootDir: rootDir}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -427,4 +433,147 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 		}
 	}
 	return currentVolumes
+}
+
+type httpDir struct {
+	url     string
+	archive bool
+	name    string
+	podID   string
+	rootDir string
+}
+
+func (h *httpDir) SetUp() error {
+	urlObj, err := url.Parse(h.url)
+	if err != nil {
+		return err
+	}
+
+	if urlObj.Scheme != "http" && urlObj.Scheme != "https" {
+		return fmt.Errorf("Invalid URL: %s. Only http and https schemes are allowed.", h.url)
+	}
+
+	resp, err := http.Get(h.url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Unexpected return code: %d", resp.StatusCode)
+	}
+
+	fileName := resp.Header.Get("Content-Disposition")
+	if len(fileName) == 0 {
+		fileIx := strings.LastIndex(urlObj.Path, "/") + 1
+		fileName = urlObj.Path[fileIx:]
+	}
+
+	dirPath := h.GetPath()
+	err = os.MkdirAll(dirPath, 0750)
+	if err != nil {
+		return err
+	}
+	fullFile := path.Join(h.GetPath(), fileName)
+	file, err := os.Create(fullFile)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		return err
+	}
+	if err = file.Close(); err != nil {
+		return err
+	}
+	if h.archive {
+		err = h.extract(fullFile, resp.Header.Get("Content-type"))
+		if err != nil {
+			return err
+		}
+		return os.Remove(fullFile)
+	}
+	return nil
+}
+
+func isTarball(fileName, contentType string) bool {
+	return contentType == "application/x-compressed" ||
+		strings.HasSuffix(fileName, ".tgz") ||
+		strings.HasSuffix(fileName, ".tar.gz")
+}
+
+func isZip(fileName, contentType string) bool {
+	return contentType == "application/zip" || strings.HasSuffix(fileName, ".zip")
+}
+
+func (h *httpDir) extract(fileName, contentType string) error {
+	if isTarball(fileName, contentType) {
+		return h.extractTarball(fileName)
+	} else if isZip(fileName, contentType) {
+		return h.extractZip(fileName)
+	} else {
+		return fmt.Errorf("unknown archive contentType: %s and suffix: %s", contentType, fileName)
+	}
+}
+
+func (h *httpDir) extractTarball(fileName string) error {
+	file, err := os.Open(fileName)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+	reader := tar.NewReader(file)
+	header, err := reader.Next()
+	for err == nil {
+		if outFile, err := os.Create(path.Join(h.GetPath(), header.Name)); err == nil {
+			if _, err := io.Copy(outFile, reader); err != nil {
+				outFile.Close()
+				return err
+			}
+			outFile.Close()
+		} else {
+			return err
+		}
+		header, err = reader.Next()
+	}
+	if err != io.EOF {
+		return err
+	}
+	return nil
+}
+
+func (h *httpDir) extractZip(fileName string) error {
+	reader, err := zip.OpenReader(fileName)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	for _, file := range reader.File {
+		input, err := file.Open()
+		if err != nil {
+			return err
+		}
+		output, err := os.Create(path.Join(h.GetPath(), file.Name))
+		if err != nil {
+			input.Close()
+			return err
+		}
+		if _, err := io.Copy(output, input); err != nil {
+			input.Close()
+			output.Close()
+			return err
+		}
+		input.Close()
+		output.Close()
+	}
+	return nil
+}
+
+func (h *httpDir) GetPath() string {
+	return path.Join(h.rootDir, h.podID, "volumes", "http", h.name)
+}
+
+func (h *httpDir) TearDown() error {
+	return deleteDir(h.GetPath(), h.name)
 }
