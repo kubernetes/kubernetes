@@ -65,10 +65,21 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 	return readDockerConfigFileFromBytes(contents)
 }
 
+// HttpError wraps a non-StatusOK error code as an error.
+type HttpError struct {
+	StatusCode int
+	Url        string
+}
+
+// Error implements error
+func (he *HttpError) Error() string {
+	return fmt.Sprintf("http status code: %d while fetching url %s",
+		he.StatusCode, he.Url)
+}
+
 func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		glog.Errorf("while creating request to read %s: %v", url, err)
 		return nil, err
 	}
 	if header != nil {
@@ -76,21 +87,20 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		glog.Errorf("while trying to read %s: %v", url, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("http status code: %d while fetching url %s", resp.StatusCode, url)
-		glog.Errorf("while trying to read %s: %v", url, err)
 		glog.V(2).Infof("body of failing http response: %v", resp.Body)
-		return nil, err
+		return nil, &HttpError{
+			StatusCode: resp.StatusCode,
+			Url:        url,
+		}
 	}
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		glog.Errorf("while trying to read %s: %v", url, err)
 		return nil, err
 	}
 
