@@ -140,15 +140,77 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	return nil
 }
 
+// runtimeObjectToRawExtensionArray takes a list of objects and encodes them as RawExtension in the output version
+// defined by the conversion.Scope. If objects must be encoded to different schema versions you should set them as
+// runtime.Unknown in the internal version instead.
+func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExtension, s conversion.Scope) error {
+	src := *in
+	dest := make([]RawExtension, len(src))
+
+	_, outVersion, scheme := self.fromScope(s)
+
+	for i := range src {
+		switch t := src[i].(type) {
+		case *Unknown:
+			dest[i].RawJSON = t.RawJSON
+		default:
+			data, err := scheme.EncodeToVersion(src[i], outVersion)
+			if err != nil {
+				return err
+			}
+			dest[i].RawJSON = data
+		}
+	}
+	*out = dest
+	return nil
+}
+
+// rawExtensionToRuntimeObjectArray attempts to decode objects from the array - if they are unrecognized objects,
+// they are added as Unknown.
+func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]Object, s conversion.Scope) error {
+	src := *in
+	dest := make([]Object, len(src))
+
+	_, _, scheme := self.fromScope(s)
+
+	for i := range src {
+		data := src[i].RawJSON
+		obj, err := scheme.Decode(data)
+		if err != nil {
+			if !IsNotRegisteredError(err) {
+				return err
+			}
+			version, kind, err := scheme.raw.DataVersionAndKind(data)
+			if err != nil {
+				return err
+			}
+			obj = &Unknown{
+				TypeMeta: TypeMeta{
+					APIVersion: version,
+					Kind:       kind,
+				},
+				RawJSON: data,
+			}
+		}
+		dest[i] = obj
+	}
+	*out = dest
+	return nil
+}
+
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
 	s := &Scheme{conversion.NewScheme()}
 	s.raw.InternalVersion = ""
 	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
-	s.raw.AddConversionFuncs(
+	if err := s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
-	)
+		s.runtimeObjectToRawExtensionArray,
+		s.rawExtensionToRuntimeObjectArray,
+	); err != nil {
+		panic(err)
+	}
 	return s
 }
 
