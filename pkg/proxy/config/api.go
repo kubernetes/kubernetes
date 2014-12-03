@@ -112,7 +112,22 @@ func handleServicesWatch(resourceVersion *string, ch <-chan watch.Event, updates
 				return
 			}
 
-			service := event.Object.(*api.Service)
+			if event.Object == nil {
+				glog.Errorf("Got nil over WatchServices channel")
+				return
+			}
+			var service *api.Service
+			switch obj := event.Object.(type) {
+			case *api.Service:
+				service = obj
+			case *api.Status:
+				glog.Warningf("Got error status on WatchServices channel: %+v", obj)
+				return
+			default:
+				glog.Errorf("Got unexpected object over WatchServices channel: %+v", obj)
+				return
+			}
+
 			*resourceVersion = service.ResourceVersion
 
 			switch event.Type {
@@ -161,7 +176,21 @@ func handleEndpointsWatch(resourceVersion *string, ch <-chan watch.Event, update
 				return
 			}
 
-			endpoints := event.Object.(*api.Endpoints)
+			if event.Object == nil {
+				glog.Errorf("Got nil over WatchEndpoints channel")
+				return
+			}
+			var endpoints *api.Endpoints
+			switch obj := event.Object.(type) {
+			case *api.Endpoints:
+				endpoints = obj
+			case *api.Status:
+				glog.Warningf("Got error status on WatchEndpoints channel: %+v", obj)
+				return
+			default:
+				glog.Errorf("Got unexpected object over WatchEndpoints channel: %+v", obj)
+				return
+			}
 			*resourceVersion = endpoints.ResourceVersion
 
 			switch event.Type {
