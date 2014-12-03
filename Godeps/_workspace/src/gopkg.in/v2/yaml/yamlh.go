@@ -294,6 +294,10 @@ const (
 	yaml_SEQ_TAG = "tag:yaml.org,2002:seq" // The tag !!seq is used to denote sequences.
 	yaml_MAP_TAG = "tag:yaml.org,2002:map" // The tag !!map is used to denote mapping.
 
+	// Not in original libyaml.
+	yaml_BINARY_TAG = "tag:yaml.org,2002:binary"
+	yaml_MERGE_TAG = "tag:yaml.org,2002:merge"
+
 	yaml_DEFAULT_SCALAR_TAG   = yaml_STR_TAG // The default scalar tag is !!str.
 	yaml_DEFAULT_SEQUENCE_TAG = yaml_SEQ_TAG // The default sequence tag is !!seq.
 	yaml_DEFAULT_MAPPING_TAG  = yaml_MAP_TAG // The default mapping tag is !!map.

@@ -29,8 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
 type sourceURL struct {

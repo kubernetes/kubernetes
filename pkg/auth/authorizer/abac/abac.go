@@ -37,7 +37,7 @@ import (
 // body.Namespace, if we want to add that feature, without affecting the
 // meta.Namespace.
 type policy struct {
-	User string `json:"user,omitempty" yaml:"user,omitempty"`
+	User string `json:"user,omitempty"`
 	// TODO: add support for groups as well as users.
 	// TODO: add support for robot accounts as well as human user accounts.
 	// TODO: decide how to namespace user names when multiple authentication
@@ -51,9 +51,9 @@ type policy struct {
 	// the API, we don't have to add lots of policy?
 
 	// TODO: make this a proper REST object with its own registry.
-	Readonly  bool   `json:"readonly,omitempty" yaml:"readonly,omitempty"`
-	Kind      string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Readonly  bool   `json:"readonly,omitempty"`
+	Kind      string `json:"kind,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 
 	// TODO: "expires" string in RFC3339 format.
 

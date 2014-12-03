@@ -33,8 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
 type sourceFile struct {
@@ -97,12 +97,13 @@ func extractFromDir(name string) ([]api.BoundPod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
+
+	pods := make([]api.BoundPod, 0)
 	if len(dirents) == 0 {
-		return nil, nil
+		return pods, nil
 	}
 
 	sort.Strings(dirents)
-	pods := []api.BoundPod{}
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {

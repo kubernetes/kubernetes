@@ -45,8 +45,8 @@ import (
 	// it should be possible to specify the version for the whole map.
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
 const usage = "usage: srvexpand filename"
@@ -62,9 +62,9 @@ const usage = "usage: srvexpand filename"
 
 type HierarchicalController struct {
 	// Optional: Defaults to one
-	Replicas int `yaml:"replicas,omitempty" json:"replicas,omitempty"`
+	Replicas int `json:"replicas,omitempty"`
 	// Spec defines the behavior of a pod.
-	Spec v1beta3.PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Spec v1beta3.PodSpec `json:"spec,omitempty"`
 }
 
 type ControllerMap map[string]HierarchicalController
@@ -72,9 +72,9 @@ type ControllerMap map[string]HierarchicalController
 type HierarchicalService struct {
 	// Optional: Creates a service if specified: servicePort:containerPort
 	// TODO: Support multiple protocols
-	PortSpec string `yaml:"portSpec,omitempty" json:"portSpec,omitempty"`
+	PortSpec string `json:"portSpec,omitempty"`
 	// Map of replication controllers to create
-	ControllerMap ControllerMap `json:"controllers,omitempty" yaml:"controllers,omitempty"`
+	ControllerMap ControllerMap `json:"controllers,omitempty"`
 }
 
 type ServiceMap map[string]HierarchicalService

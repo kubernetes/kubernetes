@@ -26,15 +26,15 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func TestYAMLPrinterPrint(t *testing.T) {
 	type testStruct struct {
-		Key        string         `yaml:"Key" json:"Key"`
-		Map        map[string]int `yaml:"Map" json:"Map"`
-		StringList []string       `yaml:"StringList" json:"StringList"`
-		IntList    []int          `yaml:"IntList" json:"IntList"`
+		Key        string         `json:"Key"`
+		Map        map[string]int `json:"Map"`
+		StringList []string       `json:"StringList"`
+		IntList    []int          `json:"IntList"`
 	}
 	testData := testStruct{
 		"testValue",

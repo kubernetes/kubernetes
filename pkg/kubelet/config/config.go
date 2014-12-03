@@ -287,7 +287,7 @@ func (s *podStorage) Sync() {
 func (s *podStorage) MergedState() interface{} {
 	s.podLock.RLock()
 	defer s.podLock.RUnlock()
-	var pods []api.BoundPod
+	pods := make([]api.BoundPod, 0)
 	for _, sourcePods := range s.pods {
 		for _, podRef := range sourcePods {
 			pod, err := api.Scheme.Copy(podRef)

@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func TestParseBadStorage(t *testing.T) {
@@ -121,9 +121,9 @@ func TestParseController(t *testing.T) {
 }
 
 type TestParseType struct {
-	api.TypeMeta   `json:",inline" yaml:",inline"`
-	api.ObjectMeta `json:"metadata" yaml:"metadata"`
-	Data           string `json:"data" yaml:"data"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata"`
+	Data           string `json:"data"`
 }
 
 func (*TestParseType) IsAnAPIObject() {}

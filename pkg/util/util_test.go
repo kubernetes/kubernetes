@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func TestHandleCrash(t *testing.T) {
@@ -54,7 +54,7 @@ func TestNewIntOrStringFromString(t *testing.T) {
 }
 
 type IntOrStringHolder struct {
-	IOrS IntOrString `json:"val" yaml:"val"`
+	IOrS IntOrString `json:"val"`
 }
 
 func TestIntOrStringUnmarshalYAML(t *testing.T) {

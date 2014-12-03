@@ -35,9 +35,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
-	"gopkg.in/v1/yaml"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.

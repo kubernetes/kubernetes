@@ -48,14 +48,14 @@ A *Namespace* is a DNS compatible subdomain.
 ```
 // TypeMeta is shared by all objects sent to, or returned from the client
 type TypeMeta struct {
-  Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-  Uid               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
-  CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-  SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-  ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-  APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-  Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-  Name              string    `json:"name,omitempty" yaml:"name,omitempty"` 
+  Kind              string    `json:"kind,omitempty"`
+  Uid               string    `json:"uid,omitempty"`
+  CreationTimestamp util.Time `json:"creationTimestamp,omitempty"`
+  SelfLink          string    `json:"selfLink,omitempty"`
+  ResourceVersion   uint64    `json:"resourceVersion,omitempty"`
+  APIVersion        string    `json:"apiVersion,omitempty"`
+  Namespace         string    `json:"namespace,omitempty"`
+  Name              string    `json:"name,omitempty"` 
 }
 ```
 

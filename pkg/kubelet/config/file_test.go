@@ -29,7 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {

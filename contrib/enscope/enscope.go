@@ -23,8 +23,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
 )
 
 const usage = "usage: enscope specFilename configFilename"
@@ -38,8 +38,8 @@ func checkErr(err error) {
 // TODO: If name suffix is not specified, deterministically generate it by hashing the labels.
 
 type EnscopeSpec struct {
-	NameSuffix string            `json:"nameSuffix,omitempty" yaml:"nameSuffix,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	NameSuffix string            `json:"nameSuffix,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
 }
 
 func main() {

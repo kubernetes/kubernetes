@@ -95,17 +95,17 @@ func init() {
 }
 
 type Simple struct {
-	api.TypeMeta   `yaml:",inline" json:",inline"`
-	api.ObjectMeta `yaml:"metadata" json:"metadata"`
-	Other          string `yaml:"other,omitempty" json:"other,omitempty"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata"`
+	Other          string `json:"other,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
 
 type SimpleList struct {
-	api.TypeMeta `yaml:",inline" json:",inline"`
-	api.ListMeta `yaml:"metadata,inline" json:"metadata,inline"`
-	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,inline"`
+	Items        []Simple `json:"items,omitempty"`
 }
 
 func (*SimpleList) IsAnAPIObject() {}

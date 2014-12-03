@@ -15,9 +15,9 @@ $ srvexpand myservice.yaml
 ```
 type HierarchicalController struct {
 	// Optional: Defaults to one
-	Replicas int `yaml:"replicas,omitempty" json:"replicas,omitempty"`
+	Replicas int `json:"replicas,omitempty"`
 	// Spec defines the behavior of a pod.
-	Spec v1beta3.PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Spec v1beta3.PodSpec `json:"spec,omitempty"`
 }
 
 type ControllerMap map[string]HierarchicalController
@@ -25,9 +25,9 @@ type ControllerMap map[string]HierarchicalController
 type HierarchicalService struct {
 	// Optional: Creates a service if specified: servicePort:containerPort
 	// TODO: Support multiple protocols
-	PortSpec string `yaml:"portSpec,omitempty" json:"portSpec,omitempty"`
+	PortSpec string `json:"portSpec,omitempty"`
 	// Map of replication controllers to create
-	ControllerMap ControllerMap `json:"controllers,omitempty" yaml:"controllers,omitempty"`
+	ControllerMap ControllerMap `json:"controllers,omitempty"`
 }
 
 type ServiceMap map[string]HierarchicalService

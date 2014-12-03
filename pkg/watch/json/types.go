@@ -29,12 +29,12 @@ import (
 // These are not API objects and are unversioned today.
 type watchEvent struct {
 	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType `json:"type,omitempty" yaml:"type,omitempty"`
+	Type watch.EventType `json:"type,omitempty"`
 
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
 	// For errors, it's an api.Status.
-	Object runtime.RawExtension `json:"object,omitempty" yaml:"object,omitempty"`
+	Object runtime.RawExtension `json:"object,omitempty"`
 }
 
 // Object converts a watch.Event into an appropriately serializable JSON object

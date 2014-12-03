@@ -19,6 +19,8 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 // StringDiff diffs a and b and returns a human readable diff.
@@ -56,13 +58,19 @@ func ObjectDiff(a, b interface{}) string {
 	return StringDiff(string(ab), string(bb))
 }
 
-// ObjectGoPrintDiff is like ObjectDiff, but uses go's %#v formatter to print the
-// objects, in case json isn't showing you the difference. (reflect.DeepEqual makes
-// a distinction between nil and empty slices, for example, even though nothing else
-// really does.)
+// ObjectGoPrintDiff is like ObjectDiff, but uses go-spew to print the objects,
+// which shows absolutely everything by recursing into every single pointer
+// (go's %#v formatters OTOH stop at a certain point). This is needed when you
+// can't figure out why reflect.DeepEqual is returning false and nothing is
+// showing you differences. This will.
 func ObjectGoPrintDiff(a, b interface{}) string {
+	s := spew.ConfigState{
+		Indent: " ",
+		// Extra deep spew.
+		DisableMethods: true,
+	}
 	return StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
+		s.Sdump(a),
+		s.Sdump(b),
 	)
 }
