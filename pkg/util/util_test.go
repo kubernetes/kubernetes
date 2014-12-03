@@ -24,6 +24,26 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+func TestUntil(t *testing.T) {
+	ch := make(chan struct{})
+	close(ch)
+	Until(func() {
+		t.Fatal("should not have been invoked")
+	}, 0, ch)
+
+	ch = make(chan struct{})
+	called := make(chan struct{})
+	go func() {
+		Until(func() {
+			called <- struct{}{}
+		}, 0, ch)
+		close(called)
+	}()
+	<-called
+	close(ch)
+	<-called
+}
+
 func TestHandleCrash(t *testing.T) {
 	count := 0
 	expect := 10
