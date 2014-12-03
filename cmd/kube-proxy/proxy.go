@@ -60,6 +60,21 @@ func main() {
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
 
+	protocol := iptables.ProtocolIpv4
+	if net.IP(bindAddress).To4() == nil {
+		protocol = iptables.ProtocolIpv6
+	}
+	loadBalancer := proxy.NewLoadBalancerRR()
+	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), iptables.New(exec.New(), protocol))
+	// Wire proxier to handle changes to services
+	serviceConfig.RegisterHandler(proxier)
+	// And wire loadBalancer to handle changes to endpoints to services
+	endpointsConfig.RegisterHandler(loadBalancer)
+
+	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
+	// only notify on changes, and the initial update (on process start) may be lost if no handlers
+	// are registered yet.
+
 	// define api config source
 	if clientConfig.Host != "" {
 		glog.Infof("Using api calls to get config %v", clientConfig.Host)
@@ -112,17 +127,6 @@ func main() {
 			}
 		}, 5*time.Second)
 	}
-
-	protocol := iptables.ProtocolIpv4
-	if net.IP(bindAddress).To4() == nil {
-		protocol = iptables.ProtocolIpv6
-	}
-	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), iptables.New(exec.New(), protocol))
-	// Wire proxier to handle changes to services
-	serviceConfig.RegisterHandler(proxier)
-	// And wire loadBalancer to handle changes to endpoints to services
-	endpointsConfig.RegisterHandler(loadBalancer)
 
 	// Just loop forever for now...
 	proxier.SyncLoop()
