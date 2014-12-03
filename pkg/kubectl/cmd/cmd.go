@@ -123,7 +123,10 @@ func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
 }
 
-func getKubeNamespace(cmd *cobra.Command) string {
+// GetKubeNamespace returns the value of the namespace a
+// user provided on the command line or use the default
+// namespace.
+func GetKubeNamespace(cmd *cobra.Command) string {
 	result := api.NamespaceDefault
 	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
 		result = ns
@@ -140,10 +143,10 @@ func getKubeNamespace(cmd *cobra.Command) string {
 	return result
 }
 
-// getExplicitKubeNamespace returns the value of the namespace a
+// GetExplicitKubeNamespace returns the value of the namespace a
 // user explicitly provided on the command line, or false if no
 // such namespace was specified.
-func getExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
+func GetExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
 	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
 		return ns, true
 	}

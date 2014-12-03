@@ -17,8 +17,9 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"io"
+
+	"github.com/spf13/cobra"
 )
 
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
@@ -30,7 +31,7 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 				usageError(cmd, "<pod> and <container> are required for log")
 			}
 
-			namespace := getKubeNamespace(cmd)
+			namespace := GetKubeNamespace(cmd)
 
 			client, err := f.ClientBuilder.Client()
 			checkErr(err)

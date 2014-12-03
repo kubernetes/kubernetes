@@ -37,7 +37,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 
 	if len(args) == 2 {
 		resource := kubectl.ExpandResourceShortcut(args[0])
-		namespace = getKubeNamespace(cmd)
+		namespace = GetKubeNamespace(cmd)
 		name = args[1]
 		if len(name) == 0 || len(resource) == 0 {
 			usageError(cmd, "Must specify filename or command line params")
@@ -75,7 +75,7 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper)
 	}
 
 	resource := kubectl.ExpandResourceShortcut(args[0])
-	namespace = getKubeNamespace(cmd)
+	namespace = GetKubeNamespace(cmd)
 	name = args[1]
 	if len(name) == 0 || len(resource) == 0 {
 		usageError(cmd, "Must provide resource and name command line params")
@@ -102,7 +102,7 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}
 
-	namespace = getKubeNamespace(cmd)
+	namespace = GetKubeNamespace(cmd)
 	if len(args) == 2 {
 		name = args[1]
 		if len(name) == 0 {
@@ -154,7 +154,7 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 // or via the default namespace file does not match the namespace of an input file. This
 // prevents a user from unintentionally updating the wrong namespace.
 func CompareNamespaceFromFile(cmd *cobra.Command, namespace string) error {
-	defaultNamespace := getKubeNamespace(cmd)
+	defaultNamespace := GetKubeNamespace(cmd)
 	if len(namespace) > 0 {
 		if defaultNamespace != namespace {
 			return fmt.Errorf("the namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)
