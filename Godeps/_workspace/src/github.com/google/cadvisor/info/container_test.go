@@ -15,7 +15,6 @@
 package info
 
 import (
-	"reflect"
 	"testing"
 	"time"
 )
@@ -69,10 +68,7 @@ func TestStatsEndTime(t *testing.T) {
 }
 
 func createStats(cpuUsage, memUsage uint64, timestamp time.Time) *ContainerStats {
-	stats := &ContainerStats{
-		Cpu:    &CpuStats{},
-		Memory: &MemoryStats{},
-	}
+	stats := &ContainerStats{}
 	stats.Cpu.Usage.PerCpu = []uint64{cpuUsage}
 	stats.Cpu.Usage.Total = cpuUsage
 	stats.Cpu.Usage.System = 0
@@ -80,22 +76,4 @@ func createStats(cpuUsage, memUsage uint64, timestamp time.Time) *ContainerStats
 	stats.Memory.Usage = memUsage
 	stats.Timestamp = timestamp
 	return stats
-}
-
-func TestContainerStatsCopy(t *testing.T) {
-	stats := createStats(100, 101, time.Now())
-	shadowStats := stats.Copy(nil)
-	if !reflect.DeepEqual(stats, shadowStats) {
-		t.Errorf("Copy() returned different object")
-	}
-	stats.Cpu.Usage.PerCpu[0] = shadowStats.Cpu.Usage.PerCpu[0] + 1
-	stats.Cpu.Load = shadowStats.Cpu.Load + 1
-	stats.Memory.Usage = shadowStats.Memory.Usage + 1
-	if reflect.DeepEqual(stats, shadowStats) {
-		t.Errorf("Copy() did not deeply copy the object")
-	}
-	stats = shadowStats.Copy(stats)
-	if !reflect.DeepEqual(stats, shadowStats) {
-		t.Errorf("Copy() returned different object")
-	}
 }

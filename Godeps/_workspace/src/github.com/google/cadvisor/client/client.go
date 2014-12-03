@@ -39,7 +39,7 @@ func NewClient(url string) (*Client, error) {
 	}
 
 	return &Client{
-		baseUrl: fmt.Sprintf("%sapi/v1.1/", url),
+		baseUrl: fmt.Sprintf("%sapi/v1.2/", url),
 	}, nil
 }
 
@@ -80,6 +80,38 @@ func (self *Client) SubcontainersInfo(name string, query *info.ContainerInfoRequ
 	return response, nil
 }
 
+// Returns the JSON container information for the specified
+// Docker container and request.
+func (self *Client) DockerContainer(name string, query *info.ContainerInfoRequest) (cinfo info.ContainerInfo, err error) {
+	u := self.dockerInfoUrl(name)
+	ret := make(map[string]info.ContainerInfo)
+	if err = self.httpGetJsonData(&ret, query, u, fmt.Sprintf("Docker container info for %q", name)); err != nil {
+		return
+	}
+	if len(ret) != 1 {
+		err = fmt.Errorf("expected to only receive 1 Docker container: %+v", ret)
+		return
+	}
+	for _, cont := range ret {
+		cinfo = cont
+	}
+	return
+}
+
+// Returns the JSON container information for all Docker containers.
+func (self *Client) AllDockerContainers(query *info.ContainerInfoRequest) (cinfo []info.ContainerInfo, err error) {
+	u := self.dockerInfoUrl("/")
+	ret := make(map[string]info.ContainerInfo)
+	if err = self.httpGetJsonData(&ret, query, u, "all Docker containers info"); err != nil {
+		return
+	}
+	cinfo = make([]info.ContainerInfo, 0, len(ret))
+	for _, cont := range ret {
+		cinfo = append(cinfo, cont)
+	}
+	return
+}
+
 func (self *Client) machineInfoUrl() string {
 	return self.baseUrl + path.Join("machine")
 }
@@ -90,6 +122,10 @@ func (self *Client) containerInfoUrl(name string) string {
 
 func (self *Client) subcontainersInfoUrl(name string) string {
 	return self.baseUrl + path.Join("subcontainers", name)
+}
+
+func (self *Client) dockerInfoUrl(name string) string {
+	return self.baseUrl + path.Join("docker", name)
 }
 
 func (self *Client) httpGetJsonData(data, postData interface{}, url, infoName string) error {
@@ -106,17 +142,19 @@ func (self *Client) httpGetJsonData(data, postData interface{}, url, infoName st
 		resp, err = http.Get(url)
 	}
 	if err != nil {
-		err = fmt.Errorf("unable to get %v: %v", infoName, err)
-		return err
+		return fmt.Errorf("unable to get %q: %v", infoName, err)
+	}
+	if resp == nil {
+		return fmt.Errorf("received empty response from %q", infoName)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		err = fmt.Errorf("unable to read all %v: %v", infoName, err)
+		err = fmt.Errorf("unable to read all %q: %v", infoName, err)
 		return err
 	}
 	if err = json.Unmarshal(body, data); err != nil {
-		err = fmt.Errorf("unable to unmarshal %v (%v): %v", infoName, string(body), err)
+		err = fmt.Errorf("unable to unmarshal %q (%v): %v", infoName, string(body), err)
 		return err
 	}
 	return nil

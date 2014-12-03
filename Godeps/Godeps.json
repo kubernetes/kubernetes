@@ -72,13 +72,13 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
-			"Comment": "0.5.0",
-			"Rev": "8c4f650e62f096710da794e536de86e34447fca9"
+			"Comment": "0.6.2",
+			"Rev": "89088df70eca64cf9d6b9a23a3d2bc21a30916d6"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info",
-			"Comment": "0.5.0",
-			"Rev": "8c4f650e62f096710da794e536de86e34447fca9"
+			"Comment": "0.6.2",
+			"Rev": "89088df70eca64cf9d6b9a23a3d2bc21a30916d6"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
