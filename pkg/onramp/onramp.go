@@ -17,6 +17,7 @@ limitations under the License.
 package onramp
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -36,7 +37,11 @@ type Onramp struct {
 }
 
 func scanPod(onrmp *Onramp) {
-	pdi := onrmp.kubeClient.Pods("")
+	ns := api.NamespaceAll
+	pdi := onrmp.kubeClient.Pods(ns)
+	if pdi == nil {
+		return
+	}
 	pods, err := pdi.List(labels.Everything())
 	if err != nil {
 		return

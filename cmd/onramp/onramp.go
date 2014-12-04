@@ -59,6 +59,12 @@ func main() {
 	if len(kubeApiServer) > 0 {
 		kubeClient = client.NewOrDie(&client.Config{Host: kubeApiServer[0], Version: "v1beta1"})
 	}
+	if kubeClient != nil {
+		glog.Infof("Established api client to %s\n", kubeApiServer[0])
+	} else {
+		glog.Infof("Error in establishing api client\n")
+		return
+	}
 
 	if etcdClient != nil {
 		glog.Infof("Watching for etcd configs at %v", etcdClient.GetCluster())
