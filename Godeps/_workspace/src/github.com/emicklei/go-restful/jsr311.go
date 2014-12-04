@@ -135,11 +135,10 @@ func (r RouterJSR311) selectRoutes(dispatcher *WebService, pathRemainder string)
 func (r RouterJSR311) detectDispatcher(requestPath string, dispatchers []*WebService) (*WebService, string, error) {
 	filtered := &sortableDispatcherCandidates{}
 	for _, each := range dispatchers {
-		pathExpr := each.compiledPathExpression()
-		matches := pathExpr.Matcher.FindStringSubmatch(requestPath)
+		matches := each.pathExpr.Matcher.FindStringSubmatch(requestPath)
 		if matches != nil {
 			filtered.candidates = append(filtered.candidates,
-				dispatcherCandidate{each, matches[len(matches)-1], len(matches), pathExpr.LiteralCount, pathExpr.VarCount})
+				dispatcherCandidate{each, matches[len(matches)-1], len(matches), each.pathExpr.LiteralCount, each.pathExpr.VarCount})
 		}
 	}
 	if len(filtered.candidates) == 0 {

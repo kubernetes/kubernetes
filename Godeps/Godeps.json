@@ -54,8 +54,8 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.1.2-38-gab99062",
-			"Rev": "ab990627e3546d3c6c8ab45c4d887a3d66b1b6ab"
+			"Comment": "v1.1.2-50-g692a500",
+			"Rev": "692a50017a7049b26cf7ea4ccfc0d8c77369a793"
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",

@@ -1,5 +1,8 @@
 Change history of go-restful
 =
+2014-11-27
+- (api add) PrettyPrint per response. (as proposed in #167)
+
 2014-11-12
 - (api add) ApiVersion(.) for documentation in Swagger UI
 

@@ -121,7 +121,7 @@ func (c CurlyRouter) detectWebService(requestTokens []string, webServices []*Web
 	var best *WebService
 	score := -1
 	for _, each := range webServices {
-		matches, eachScore := c.computeWebserviceScore(requestTokens, each.compiledPathExpression().tokens)
+		matches, eachScore := c.computeWebserviceScore(requestTokens, each.pathExpr.tokens)
 		if matches && (eachScore > score) {
 			best = each
 			score = eachScore

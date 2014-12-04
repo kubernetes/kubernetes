@@ -84,7 +84,7 @@ func (b *RouteBuilder) Doc(documentation string) *RouteBuilder {
 func (b *RouteBuilder) Reads(sample interface{}) *RouteBuilder {
 	b.readSample = sample
 	typeAsName := reflect.TypeOf(sample).String()
-	bodyParameter := &Parameter{&ParameterData{Name: typeAsName}}
+	bodyParameter := &Parameter{&ParameterData{Name: "body"}}
 	bodyParameter.beBody()
 	bodyParameter.Required(true)
 	bodyParameter.DataType(typeAsName)
