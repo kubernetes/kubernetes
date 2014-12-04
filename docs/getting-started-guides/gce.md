@@ -47,7 +47,7 @@ field values:
 
 ### Running a container (simple version)
 
-Once you have your instances up and running, the `build-go.sh` script sets up
+Once you have your instances up and running, the `hack/build-go.sh` script sets up
 your Go workspace and builds the Go components.
 
 The `kubecfg.sh` line below spins up two containers running
@@ -75,10 +75,9 @@ cluster/kubecfg.sh rm myNginx
 Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`, you
 can create a pod like this:
 
-
 ```bash
 cd kubernetes
-cluster/kubecfg.sh -c api/examples/pod.json create /pods
+cluster/kubectl.sh create -f api/examples/pod.json
 ```
 
 Where pod.json contains something like:
@@ -120,13 +119,13 @@ Where pod.json contains something like:
 You can see your cluster's pods:
 
 ```bash
-cluster/kubecfg.sh list pods
+cluster/kubectl.sh get pods
 ```
 
 and delete the pod you just created:
 
 ```bash
-cluster/kubecfg.sh delete pods/php
+cluster/kubectl.sh delete pods php
 ```
 
 Look in `examples/` for more examples
