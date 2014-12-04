@@ -81,7 +81,6 @@ func resolvableTag(tag string) bool {
 }
 
 func resolve(tag string, in string) (rtag string, out interface{}) {
-	//fmt.Printf("yv2 resolve tag: %s, in: %s\n", tag, in)
 	if !resolvableTag(tag) {
 		return tag, in
 	}
@@ -132,6 +131,10 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 					return yaml_INT_TAG, intv
 				}
 			}
+			uintv, err := strconv.ParseUint(plain, 0, 64)
+			if err == nil {
+				return yaml_INT_TAG, uintv
+			}
 			floatv, err := strconv.ParseFloat(plain, 64)
 			if err == nil {
 				return yaml_FLOAT_TAG, floatv
@@ -139,12 +142,24 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 			if strings.HasPrefix(plain, "0b") {
 				intv, err := strconv.ParseInt(plain[2:], 2, 64)
 				if err == nil {
-					return yaml_INT_TAG, int(intv)
+					if intv == int64(int(intv)) {
+						return yaml_INT_TAG, int(intv)
+					} else {
+						return yaml_INT_TAG, intv
+					}
+				}
+				uintv, err := strconv.ParseUint(plain[2:], 2, 64)
+				if err == nil {
+					return yaml_INT_TAG, uintv
 				}
 			} else if strings.HasPrefix(plain, "-0b") {
 				intv, err := strconv.ParseInt(plain[3:], 2, 64)
 				if err == nil {
-					return yaml_INT_TAG, -int(intv)
+					if intv == int64(int(intv)) {
+						return yaml_INT_TAG, -int(intv)
+					} else {
+						return yaml_INT_TAG, -intv
+					}
 				}
 			}
 			// XXX Handle timestamps here.

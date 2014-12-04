@@ -40,10 +40,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	},
 	func(j *internal.ObjectMeta, c fuzz.Continue) {
 		j.Name = c.RandString()
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
@@ -52,10 +49,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
 	},
 	func(j *internal.ListMeta, c fuzz.Continue) {
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 		j.SelfLink = c.RandString()
 	},
 	func(j *internal.ObjectReference, c fuzz.Continue) {
@@ -65,10 +59,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		j.Kind = c.RandString()
 		j.Namespace = c.RandString()
 		j.Name = c.RandString()
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 		j.FieldPath = c.RandString()
 	},
 	func(j *internal.PodPhase, c fuzz.Continue) {
@@ -103,10 +94,6 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 			intstr.IntVal = 0
 			intstr.StrVal = c.RandString()
 		}
-	},
-	func(u64 *uint64, c fuzz.Continue) {
-		// TODO: uint64's are NOT handled right.
-		*u64 = c.RandUint64() >> 8
 	},
 	func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
 		// This is necessary because keys with nil values get omitted.

@@ -63,11 +63,8 @@ func (e *encoder) marshal(tag string, in reflect.Value) {
 		e.nilv()
 		return
 	}
-	//fmt.Printf("marshal 1 in: %s\n", in)
 	iface := in.Interface()
-	//fmt.Printf("marshal 1 iface: %s\n", iface)
 	if m, ok := iface.(Marshaler); ok {
-		//fmt.Printf("marshal 1 calling MarshalYAML\n")
 		v, err := m.MarshalYAML()
 		if err != nil {
 			fail(err)
@@ -77,20 +74,16 @@ func (e *encoder) marshal(tag string, in reflect.Value) {
 			return
 		}
 		in = reflect.ValueOf(v)
-	} else if m, ok := iface.(encoding.TextMarshaler); ok {
+	}
+	if m, ok := iface.(encoding.TextMarshaler); ok {
 		text, err := m.MarshalText()
 		if err != nil {
 			fail(err)
 		}
 		in = reflect.ValueOf(string(text))
 	}
-	//fmt.Printf("marshal 2 in: %s\n", in)
-	//fmt.Printf("marshal 2 in string: %s\n", in.String())
-	//fmt.Printf("marshal 2 in Kind: %s\n", in.Kind())
-	//fmt.Printf("marshal 2.5 in Kind: %s\n", in.Kind())
 	switch in.Kind() {
 	case reflect.Interface:
-		//fmt.Printf("marshal 3\n")
 		if in.IsNil() {
 			e.nilv()
 		} else {
@@ -99,14 +92,12 @@ func (e *encoder) marshal(tag string, in reflect.Value) {
 	case reflect.Map:
 		e.mapv(tag, in)
 	case reflect.Ptr:
-		//fmt.Printf("marshal 4\n")
 		if in.IsNil() {
 			e.nilv()
 		} else {
 			e.marshal(tag, in.Elem())
 		}
 	case reflect.Struct:
-		//fmt.Printf("marshal 5\n")
 		e.structv(tag, in)
 	case reflect.Slice:
 		if in.Type().Elem() == mapItemType {
@@ -115,7 +106,6 @@ func (e *encoder) marshal(tag string, in reflect.Value) {
 			e.slicev(tag, in)
 		}
 	case reflect.String:
-		//fmt.Printf("marshal 6 in.String: \n", in.String())
 		e.stringv(tag, in)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if in.Type() == durationType {
@@ -173,7 +163,6 @@ func (e *encoder) structv(tag string, in reflect.Value) {
 			}
 			e.marshal("", reflect.ValueOf(info.Key))
 			e.flow = info.Flow
-			//fmt.Printf("structv mappingv value: %s\n", value)
 			e.marshal("", value)
 		}
 	})
@@ -233,17 +222,13 @@ func isBase60Float(s string) (result bool) {
 var base60float = regexp.MustCompile(`^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?$`)
 
 func (e *encoder) stringv(tag string, in reflect.Value) {
-	//fmt.Printf("stringv 1\n")
 	var style yaml_scalar_style_t
 	s := in.String()
-	//fmt.Printf("stringv 1 s: %s\n", s)
 	rtag, rs := resolve("", s)
 	if rtag == yaml_BINARY_TAG {
-		//fmt.Printf("stringv 2\n")
 		if tag == "" || tag == yaml_STR_TAG {
 			tag = rtag
 			s = rs.(string)
-			//fmt.Printf("stringv 3 s: %s\n", s)
 		} else if tag == yaml_BINARY_TAG {
 			failf("explicitly tagged !!binary data must be base64-encoded")
 		} else {
@@ -257,7 +242,6 @@ func (e *encoder) stringv(tag string, in reflect.Value) {
 	} else {
 		style = yaml_PLAIN_SCALAR_STYLE
 	}
-	//fmt.Printf("stringv 4 style: %s\n", style)
 	e.emitScalar(s, "", tag, style)
 }
 

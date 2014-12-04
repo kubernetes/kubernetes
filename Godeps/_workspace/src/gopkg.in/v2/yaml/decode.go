@@ -4,8 +4,8 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
+	"math"
 	"reflect"
-	"runtime/debug"
 	"strconv"
 	"time"
 )
@@ -32,9 +32,9 @@ type node struct {
 // Parser, produces a node tree out of a libyaml event stream.
 
 type parser struct {
-	parser yaml_parser_t
-	event  yaml_event_t
-	doc    *node
+	parser  yaml_parser_t
+	event   yaml_event_t
+	doc     *node
 }
 
 func newParser(b []byte) *parser {
@@ -194,10 +194,10 @@ type decoder struct {
 }
 
 var (
-	mapItemType    = reflect.TypeOf(MapItem{})
-	durationType   = reflect.TypeOf(time.Duration(0))
+	mapItemType = reflect.TypeOf(MapItem{})
+	durationType = reflect.TypeOf(time.Duration(0))
 	defaultMapType = reflect.TypeOf(map[interface{}]interface{}{})
-	ifaceType      = defaultMapType.Elem()
+	ifaceType = defaultMapType.Elem()
 )
 
 func newDecoder() *decoder {
@@ -207,7 +207,6 @@ func newDecoder() *decoder {
 }
 
 func (d *decoder) terror(n *node, tag string, out reflect.Value) {
-	debug.PrintStack()
 	if n.tag != "" {
 		tag = n.tag
 	}
@@ -252,20 +251,13 @@ func (d *decoder) callUnmarshaler(n *node, u Unmarshaler) (good bool) {
 //
 // If n holds a null value, prepare returns before doing anything.
 func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unmarshaled, good bool) {
-	//fmt.Printf("yv2 prepare: out.Kind(): %s\n", out.Kind())
-	//fmt.Printf("yv2 prepare: n.tag: %s\n", n.tag)
-	//fmt.Printf("yv2 prepare: n.value: %s\n", n.value)
-	//fmt.Printf("yv2 prepare: n.kind: %s\n", n.kind)
-	if (n.tag == yaml_NULL_TAG) || (n.kind == scalarNode && n.tag == "" && (n.value == "" && n.implicit)) {
-		//fmt.Printf("yv2 prepare: return immediately\n")
+	if n.tag == yaml_NULL_TAG || n.kind == scalarNode && n.tag == "" && (n.value == "null" || n.value == "") {
 		return out, false, false
 	}
-	//fmt.Printf("yv2 prepare: continue\n")
 	again := true
 	for again {
 		again = false
 		if out.Kind() == reflect.Ptr {
-			//fmt.Printf("yv2 prepare: hit Ptr %s\n", out.Kind())
 			if out.IsNil() {
 				out.Set(reflect.New(out.Type().Elem()))
 			}
@@ -338,18 +330,12 @@ func resetMap(out reflect.Value) {
 }
 
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
-	//fmt.Printf("yv2 1 tag: %s, implicit: %v, out.Type(): %s\n", n.tag, n.implicit, out.Type())
-	//fmt.Printf("yv2 n.value: %v\n", n.value)
-	//fmt.Printf("yv2 n.kind: %v\n", n.kind)
-	//fmt.Printf("yv2 n.tag: %v\n", n.tag)
 	var tag string
 	var resolved interface{}
 	if n.tag == "" && !n.implicit {
-		//fmt.Printf("yv2 2\n")
 		tag = yaml_STR_TAG
 		resolved = n.value
 	} else {
-		//fmt.Printf("yv2 3\n")
 		tag, resolved = resolve(n.tag, n.value)
 		if tag == yaml_BINARY_TAG {
 			data, err := base64.StdEncoding.DecodeString(resolved.(string))
@@ -359,9 +345,7 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			resolved = string(data)
 		}
 	}
-	//fmt.Printf("yv2 4\n")
 	if resolved == nil {
-		//fmt.Printf("yv2 5\n")
 		if out.Kind() == reflect.Map && !out.CanAddr() {
 			resetMap(out)
 		} else {
@@ -370,7 +354,6 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 		return true
 	}
 	if s, ok := resolved.(string); ok && out.CanAddr() {
-		//fmt.Printf("yv2 6")
 		if u, ok := out.Addr().Interface().(encoding.TextUnmarshaler); ok {
 			err := u.UnmarshalText([]byte(s))
 			if err != nil {
@@ -379,9 +362,6 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			return true
 		}
 	}
-	//fmt.Printf("yv2 resolved tag: %v\n", tag)
-	//fmt.Printf("yv2 resolved: %v\n", resolved)
-	//fmt.Printf("yv2 resolved type: %v\n", reflect.TypeOf(resolved))
 	switch out.Kind() {
 	case reflect.String:
 		if tag == yaml_BINARY_TAG {
@@ -410,8 +390,13 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 				out.SetInt(resolved)
 				good = true
 			}
+		case uint64:
+			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
 		case float64:
-			if resolved < 1<<63-1 && !out.OverflowInt(int64(resolved)) {
+			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
 				out.SetInt(int64(resolved))
 				good = true
 			}
@@ -427,17 +412,22 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		switch resolved := resolved.(type) {
 		case int:
-			if resolved >= 0 {
+			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
 				out.SetUint(uint64(resolved))
 				good = true
 			}
 		case int64:
-			if resolved >= 0 {
+			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case uint64:
+			if !out.OverflowUint(uint64(resolved)) {
 				out.SetUint(uint64(resolved))
 				good = true
 			}
 		case float64:
-			if resolved < 1<<64-1 && !out.OverflowUint(uint64(resolved)) {
+			if resolved <= math.MaxUint64 && !out.OverflowUint(uint64(resolved)) {
 				out.SetUint(uint64(resolved))
 				good = true
 			}
@@ -454,6 +444,9 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			out.SetFloat(float64(resolved))
 			good = true
 		case int64:
+			out.SetFloat(float64(resolved))
+			good = true
+		case uint64:
 			out.SetFloat(float64(resolved))
 			good = true
 		case float64:
@@ -509,6 +502,8 @@ func (d *decoder) sequence(n *node, out reflect.Value) (good bool) {
 	}
 	return true
 }
+
+
 
 func (d *decoder) mapping(n *node, out reflect.Value) (good bool) {
 	switch out.Kind() {

@@ -104,18 +104,6 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 		j.ObjectKind = ""
 		j.ID = c.RandString()
 	},
-	func(u *uint64, c fuzz.Continue) {
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		*u = c.RandUint64() >> 8
-	},
-	func(u *uint, c fuzz.Continue) {
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		*u = uint(c.RandUint64() >> 8)
-	},
 )
 
 // Returns a new Scheme set up with the test objects.
