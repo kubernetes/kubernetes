@@ -118,7 +118,7 @@ func GetEvents(f func(*api.Event)) watch.Interface {
 
 const queueLen = 1000
 
-var events = watch.NewMux(queueLen)
+var events = watch.NewBroadcaster(queueLen)
 
 // Event constructs an event from the given information and puts it in the queue for sending.
 // 'object' is the object this event is about. Event will make a reference-- or you may also
