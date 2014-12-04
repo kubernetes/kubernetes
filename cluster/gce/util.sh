@@ -143,7 +143,7 @@ function upload-server-tars() {
 function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    local minion_ip=$(gcloud compute instances describe --zone "${ZONE}" \
+    local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${MINION_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
     if [[ -z "${minion_ip-}" ]] ; then
@@ -168,9 +168,10 @@ function detect-minions () {
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master () {
+  detect-project
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(gcloud compute instances describe --zone "${ZONE}" \
+    KUBE_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${MASTER_NAME}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
   fi
@@ -243,14 +244,14 @@ function kube-up {
   local htpasswd
   htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
-  if ! gcloud compute networks describe "${NETWORK}" &>/dev/null; then
+  if ! gcloud compute networks describe --project ${PROJECT} "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
-    gcloud compute networks create "${NETWORK}" --range "10.240.0.0/16"
+    gcloud compute networks create --project ${PROJECT} "${NETWORK}" --range "10.240.0.0/16"
   fi
 
-  if ! gcloud compute firewall-rules describe "${NETWORK}-default-internal" &>/dev/null; then
+  if ! gcloud compute firewall-rules describe --project ${PROJECT} "${NETWORK}-default-internal" &>/dev/null; then
     gcloud compute firewall-rules create "${NETWORK}-default-internal" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
@@ -258,7 +259,7 @@ function kube-up {
       --allow "tcp:1-65535" "udp:1-65535" "icmp" &
   fi
 
-  if ! gcloud compute firewall-rules describe "${NETWORK}-default-ssh" &>/dev/null; then
+  if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
     gcloud compute firewall-rules create "${NETWORK}-default-ssh" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
@@ -391,7 +392,7 @@ function kube-up {
   local rc # Capture return code without exiting because of errexit bash option
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
       # Make sure docker is installed
-      gcloud compute ssh --zone "$ZONE" "${MINION_NAMES[$i]}" --command "which docker" >/dev/null || {
+      gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MINION_NAMES[$i]}" --command "which docker" >/dev/null || {
         echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
         echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
         echo "cluster. (sorry!)" >&2
@@ -414,9 +415,9 @@ function kube-up {
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
   (umask 077
-   gcloud compute ssh --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${HOME}/${kube_cert}" 2>/dev/null
-   gcloud compute ssh --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${HOME}/${kube_key}" 2>/dev/null
-   gcloud compute ssh --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${HOME}/${ca_cert}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${HOME}/${kube_cert}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${HOME}/${kube_key}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${HOME}/${ca_cert}" 2>/dev/null
 
    cat << EOF > ~/.kubernetes_auth
 {
@@ -554,7 +555,7 @@ function test-teardown {
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
-  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --zone="${ZONE}" "${node}" --command "${cmd}"
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project ${PROJECT} --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
@@ -564,10 +565,11 @@ function restart-kube-proxy {
 
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring {
+  detect-project
   if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     echo "Setting up cluster monitoring using Heapster."
 
-    if ! gcloud compute firewall-rules describe monitoring-heapster &>/dev/null; then
+    if ! gcloud compute firewall-rules describe --project ${PROJECT} monitoring-heapster &>/dev/null; then
       if ! gcloud compute firewall-rules create monitoring-heapster \
           --project "${PROJECT}" \
           --target-tags="${MINION_TAG}" \
@@ -609,7 +611,7 @@ function teardown-monitoring {
     "${kubectl}" delete pods heapster &> /dev/null || true
     "${kubectl}" delete pods influx-grafana &> /dev/null || true
     "${kubectl}" delete services influx-master &> /dev/null || true
-    if gcloud compute firewall-rules describe monitoring-heapster &> /dev/null; then
+    if gcloud compute firewall-rules describe --project ${PROJECT} monitoring-heapster &> /dev/null; then
       gcloud compute firewall-rules delete \
           --project "${PROJECT}" \
           --quiet \
