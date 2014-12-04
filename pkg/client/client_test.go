@@ -578,6 +578,29 @@ func TestGetServerVersion(t *testing.T) {
 	}
 }
 
+func TestGetServerAPIVersions(t *testing.T) {
+	versions := []string{"v1", "v2", "v3"}
+	expect := api.APIVersions{Versions: versions}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		output, err := json.Marshal(expect)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client := NewOrDie(&Config{Host: server.URL})
+	got, err := client.ServerAPIVersions()
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+	if e, a := expect, *got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
 func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions"},
