@@ -187,7 +187,8 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 }
 
 // Executes the rule check without using the "-C" flag, instead parsing iptables-save.
-// Present for compatibility with <1.4.11 versions of iptables.
+// Present for compatibility with <1.4.11 versions of iptables.  This is full
+// of hack and half-measures.  We should nix this ASAP.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
 	glog.V(1).Infof("running iptables-save -t %s", string(table))
 	out, err := runner.exec.Command("iptables-save", "-t", string(table)).CombinedOutput()
@@ -195,23 +196,44 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
 
-	argset := util.NewStringSet(args...)
+	// Sadly, iptables has inconsistent quoting rules for comments.
+	// Just unquote any arg that is wrapped in quotes.
+	argsCopy := make([]string, len(args))
+	copy(argsCopy, args)
+	for i := range argsCopy {
+		unquote(&argsCopy[i])
+	}
+	argset := util.NewStringSet(argsCopy...)
 
 	for _, line := range strings.Split(string(out), "\n") {
 		var fields = strings.Fields(line)
 
 		// Check that this is a rule for the correct chain, and that it has
 		// the correct number of argument (+2 for "-A <chain name>")
-		if strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) && len(fields) == len(args)+2 {
-			// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
-			if util.NewStringSet(fields...).IsSuperset(argset) {
-				return true, nil
-			}
-			glog.V(5).Infof("DBG: fields is not a superset of args: fields=%v  args=%v", fields, args)
+		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(args)+2 {
+			continue
 		}
+
+		// Sadly, iptables has inconsistent quoting rules for comments.
+		// Just unquote any arg that is wrapped in quotes.
+		for i := range fields {
+			unquote(&fields[i])
+		}
+
+		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
+		if util.NewStringSet(fields...).IsSuperset(argset) {
+			return true, nil
+		}
+		glog.V(5).Infof("DBG: fields is not a superset of args: fields=%v  args=%v", fields, args)
 	}
 
 	return false, nil
+}
+
+func unquote(strp *string) {
+	if len(*strp) >= 2 && (*strp)[0] == '"' && (*strp)[len(*strp)-1] == '"' {
+		*strp = strings.TrimPrefix(strings.TrimSuffix(*strp, `"`), `"`)
+	}
 }
 
 // Executes the rule check using the "-C" flag
