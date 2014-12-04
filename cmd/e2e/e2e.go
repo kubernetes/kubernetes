@@ -209,8 +209,6 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	podClient := c.Pods(api.NamespaceDefault)
 
 	pod := loadPodOrDie("./cmd/e2e/pod.json")
-	value := strconv.Itoa(time.Now().Nanosecond())
-	pod.Labels["time"] = value
 
 	_, err := podClient.Create(pod)
 	if err != nil {
@@ -219,7 +217,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	}
 	defer podClient.Delete(pod.Name)
 	waitForPodRunning(c, pod.Name)
-	pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+	pods, err := podClient.List(labels.Everything())
 	if len(pods.Items) != 1 {
 		glog.Errorf("Failed to find the correct pod")
 		return false
@@ -274,6 +272,58 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	return true
 }
 
+// cleanupBetweenTests deletes objects that were produced by a test so that they don't affect
+// the next test.
+func cleanupBetweenTests(c *client.Client) {
+	// Assume all tests use either namespace "default" or "other".
+	// Delete all object types created by tests in both those namespaces.
+	for _, ns := range []string{api.NamespaceDefault, "other"} {
+		// Delete any pods.
+		podList, err := c.Pods(ns).List(labels.Everything())
+		if err != nil {
+			glog.Fatalf("Unable to cleanup between tests.")
+		}
+		for _, pod := range podList.Items {
+			err := c.Services(ns).Delete(pod.Name)
+			if err != nil {
+				glog.Fatalf("Unable to cleanup between tests.")
+			}
+		}
+		// Delete any services except the builtin ones.
+		serviceList, err := c.Services(ns).List(labels.Everything())
+		if err != nil {
+			glog.Fatalf("Unable to cleanup between tests.")
+		}
+		for _, svc := range serviceList.Items {
+			if svc.Name == "kubernetes-ro" || svc.Name == "kubernetes" {
+				continue
+			}
+			err := c.Services(ns).Delete(svc.Name)
+			if err != nil {
+				glog.Fatalf("Unable to cleanup between tests.")
+			}
+		}
+		// Delete any events.
+		// TODO: event cleanup might be racy since they could be created by other
+		// system components at any time.
+		eventList, err := c.Events(ns).List(labels.Everything(), labels.Everything())
+		if err != nil {
+			glog.Fatalf("Unable to cleanup between tests.")
+		}
+		for _, event := range eventList.Items {
+			err := c.Delete().
+				Namespace(ns).
+				Path("events").
+				Path(event.Name).
+				Do().
+				Error()
+			if err != nil {
+				glog.Fatalf("Unable to cleanup between tests.")
+			}
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -302,8 +352,7 @@ func main() {
 		if !testPassed {
 			passed = false
 		}
-		// TODO: clean up objects created during a test after the test, so cases
-		// are independent.
+		cleanupBetweenTests(c)
 	}
 	if !passed {
 		glog.Fatalf("Tests failed")
