@@ -110,30 +110,30 @@ func (f ListenerFunc) OnUpdate(instance interface{}) {
 	f(instance)
 }
 
-type Watcher struct {
+type Broadcaster struct {
 	// Listeners for changes and their lock.
 	listenerLock sync.RWMutex
 	listeners    []Listener
 }
 
-// NewWatcher registers a set of listeners that support the Listener interface
-// and notify them on changes.
-func NewWatcher() *Watcher {
-	return &Watcher{}
+// NewBroadcaster registers a set of listeners that support the Listener interface
+// and notifies them all on changes.
+func NewBroadcaster() *Broadcaster {
+	return &Broadcaster{}
 }
 
 // Add registers listener to receive updates of changes.
-func (m *Watcher) Add(listener Listener) {
-	m.listenerLock.Lock()
-	defer m.listenerLock.Unlock()
-	m.listeners = append(m.listeners, listener)
+func (b *Broadcaster) Add(listener Listener) {
+	b.listenerLock.Lock()
+	defer b.listenerLock.Unlock()
+	b.listeners = append(b.listeners, listener)
 }
 
 // Notify notifies all listeners.
-func (m *Watcher) Notify(instance interface{}) {
-	m.listenerLock.RLock()
-	listeners := m.listeners
-	m.listenerLock.RUnlock()
+func (b *Broadcaster) Notify(instance interface{}) {
+	b.listenerLock.RLock()
+	listeners := b.listeners
+	b.listenerLock.RUnlock()
 	for _, listener := range listeners {
 		listener.OnUpdate(instance)
 	}
