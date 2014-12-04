@@ -116,12 +116,12 @@ cluster/kube-push.sh
 Interact with the cluster
 
 ```
-cluster/kubecfg.sh
+cluster/kubectl.sh
 ```
 
 ### Authenticating with your master
 
-When using the vagrant provider in Kubernetes, the `cluster/kubecfg.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
+When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
 
 ```
 cat ~/.kubernetes_vagrant_auth
@@ -129,10 +129,10 @@ cat ~/.kubernetes_vagrant_auth
   "Password": "vagrant"}
 ```
 
-You should now be set to use the `cluster/kubecfg.sh` script. For example try to list the minions that you have started with:
+You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
 
 ```
-cluster/kubecfg.sh list minions
+cluster/kubectl.sh get minions
 ```
 
 ### Running containers
@@ -140,12 +140,13 @@ cluster/kubecfg.sh list minions
 Your cluster is running, you can list the minions in your cluster:
 
 ```
-$ cluster/kubecfg.sh list /minions
-Minion identifier    Labels
-----------           ----------
+$ cluster/kubectl.sh get minions
+
+NAME                 LABELS
 10.245.2.4           <none>
 10.245.2.3           <none>
 10.245.2.2           <none>
+
 ```
 
 Now start running some containers!
@@ -154,20 +155,18 @@ You can now use any of the cluster/kube-*.sh commands to interact with your VM m
 Before starting a container there will be no pods, services and replication controllers.
 
 ```
-$ cluster/kubecfg.sh list /pods
-ID                  Image(s)            Host                Labels              Status
-----------          ----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get pods
+NAME   IMAGE(S)   HOST   LABELS   STATUS
 
-$ cluster/kubecfg.sh list /services
-ID                  Labels              Selector            Port
-----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get services
+NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubecfg.sh list /replicationControllers
-ID                  Image(s)            Selector            Replicas
-----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get replicationControllers
+NAME   IMAGE(S   SELECTOR   REPLICAS
 ```
 
-Start a container running nginx with a replication controller and three replicas:
+Start a container running nginx with a replication controller and three replicas
+(note that this step uses the `kubecfg.sh` command instead of `kubectl.sh`):
 
 ```
 $ cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
@@ -176,12 +175,11 @@ $ cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
 When listing the pods, you will see that three containers have been started and are in Waiting state:
 
 ```
-$ cluster/kubecfg.sh list /pods
-ID                                     Image(s)            Host                    Labels                          Status
-----------                             ----------          ----------              ----------                      ----------
-781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   replicationController=myNginx   Waiting
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Waiting
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Waiting
+$ cluster/kubectl.sh get pods
+NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
+781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Waiting
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Waiting
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Waiting
 ```
 
 You need to wait for the provisioning to complete, you can monitor the minions by doing:
@@ -210,34 +208,30 @@ kubernetes-minion-1:
 Going back to listing the pods, services and replicationControllers, you now have:
 
 ```
-$ cluster/kubecfg.sh list /pods
-ID                                     Image(s)            Host                    Labels                          Status
-----------                             ----------          ----------              ----------                      ----------
-781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   replicationController=myNginx   Running
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Running
+$ cluster/kubectl.sh get pods
+NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
+781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Running
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
 
-$ cluster/kubecfg.sh list /services
-ID                  Labels              Selector            Port
-----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get services
+NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubecfg.sh list /replicationControllers
-ID                  Image(s)            Selector                        Replicas
-----------          ----------          ----------                      ----------
-myNginx             dockerfile/nginx    replicationController=myNginx   3
+$ cluster/kubectl.sh get replicationControllers
+NAME      IMAGE(S            SELECTOR       REPLICAS
+myNginx   dockerfile/nginx   name=myNginx   3
 ```
 
-We did not start any services, hence there is none listed. But we see three replicas displayed properly.
+We did not start any services, hence there are none listed. But we see three replicas displayed properly.
 Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
 You can already play with resizing the replicas with:
 
 ```
 $ cluster/kubecfg.sh resize myNginx 2
-$ cluster/kubecfg.sh list /pods
-ID                                     Image(s)            Host                    Labels                          Status
-----------                             ----------          ----------              ----------                      ----------
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Running
+$ cluster/kubectl.sh get pods
+NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
 ```
 
 Congratulations!
