@@ -2,16 +2,13 @@ package yaml_test
 
 import (
 	"errors"
-	"fmt"
+	. "gopkg.in/check.v1"
+	"gopkg.in/yaml.v2"
 	"math"
 	"net"
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
-	. "gopkg.in/check.v1"
-	"gopkg.in/v2/yaml"
 )
 
 var unmarshalIntTest = 123
@@ -270,6 +267,114 @@ var unmarshalTests = []struct {
 		map[string]uint64{},
 	},
 
+	// int
+	{
+		"int_max: 2147483647",
+		map[string]int{"int_max": math.MaxInt32},
+	},
+	{
+		"int_min: -2147483648",
+		map[string]int{"int_min": math.MinInt32},
+	},
+	{
+		"int_overflow: 9223372036854775808", // math.MaxInt64 + 1
+		map[string]int{},
+	},
+
+	// int64
+	{
+		"int64_max: 9223372036854775807",
+		map[string]int64{"int64_max": math.MaxInt64},
+	},
+	{
+		"int64_max_base2: 0b111111111111111111111111111111111111111111111111111111111111111",
+		map[string]int64{"int64_max_base2": math.MaxInt64},
+	},
+	{
+		"int64_min: -9223372036854775808",
+		map[string]int64{"int64_min": math.MinInt64},
+	},
+	{
+		"int64_neg_base2: -0b111111111111111111111111111111111111111111111111111111111111111",
+		map[string]int64{"int64_neg_base2": -math.MaxInt64},
+	},
+	{
+		"int64_overflow: 9223372036854775808", // math.MaxInt64 + 1
+		map[string]int64{},
+	},
+
+	// uint
+	{
+		"uint_min: 0",
+		map[string]uint{"uint_min": 0},
+	},
+	{
+		"uint_max: 4294967295",
+		map[string]uint{"uint_max": math.MaxUint32},
+	},
+	{
+		"uint_underflow: -1",
+		map[string]uint{},
+	},
+
+	// uint64
+	{
+		"uint64_min: 0",
+		map[string]uint{"uint64_min": 0},
+	},
+	{
+		"uint64_max: 18446744073709551615",
+		map[string]uint64{"uint64_max": math.MaxUint64},
+	},
+	{
+		"uint64_max_base2: 0b1111111111111111111111111111111111111111111111111111111111111111",
+		map[string]uint64{"uint64_max_base2": math.MaxUint64},
+	},
+	{
+		"uint64_maxint64: 9223372036854775807",
+		map[string]uint64{"uint64_maxint64": math.MaxInt64},
+	},
+	{
+		"uint64_underflow: -1",
+		map[string]uint64{},
+	},
+
+	// float32
+	{
+		"float32_max: 3.40282346638528859811704183484516925440e+38",
+		map[string]float32{"float32_max": math.MaxFloat32},
+	},
+	{
+		"float32_nonzero: 1.401298464324817070923729583289916131280e-45",
+		map[string]float32{"float32_nonzero": math.SmallestNonzeroFloat32},
+	},
+	{
+		"float32_maxuint64: 18446744073709551615",
+		map[string]float32{"float32_maxuint64": float32(math.MaxUint64)},
+	},
+	{
+		"float32_maxuint64+1: 18446744073709551616",
+		map[string]float32{"float32_maxuint64+1": float32(math.MaxUint64 + 1)},
+	},
+
+	// float64
+	{
+		"float64_max: 1.797693134862315708145274237317043567981e+308",
+		map[string]float64{"float64_max": math.MaxFloat64},
+	},
+	{
+		"float64_nonzero: 4.940656458412465441765687928682213723651e-324",
+		map[string]float64{"float64_nonzero": math.SmallestNonzeroFloat64},
+	},
+	{
+		"float64_maxuint64: 18446744073709551615",
+		map[string]float64{"float64_maxuint64": float64(math.MaxUint64)},
+	},
+	{
+		"float64_maxuint64+1: 18446744073709551616",
+		map[string]float64{"float64_maxuint64+1": float64(math.MaxUint64 + 1)},
+	},
+
 	// Overflow cases.
 	{
 		"v: 4294967297",
@@ -462,13 +567,7 @@ func (s *S) TestUnmarshal(c *C) {
 		if t.Kind() == reflect.String {
 			c.Assert(*value.(*string), Equals, item.value)
 		} else {
-			if !c.Check(value, DeepEquals, item.value) {
-				fmt.Printf("Spew:\n")
-				spew.Dump(item.data)
-				spew.Dump(item.value)
-				spew.Dump(value)
-				return
-			}
+			c.Assert(value, DeepEquals, item.value)
 		}
 	}
 }
@@ -771,61 +870,6 @@ func (s *S) TestUnmarshalNull(c *C) {
 			c.Assert(reflect.ValueOf(item).Elem().Interface(), DeepEquals, zero)
 		}
 	}
-}
-
-type StringStructContainer struct {
-	Val StringStruct
-}
-
-type StringStruct struct {
-	StrVal          string
-	UnmarshalCalled bool // to be able to check that UnmarshalYAML was actually called
-}
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (s *StringStruct) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var value *string
-	if err := unmarshal(&value); err != nil {
-		return err
-	}
-	s.StrVal = *value
-	s.UnmarshalCalled = true
-	return nil
-}
-
-// If a node value is a literal empty string (i.e.: "") but the corresponding
-// object to Unmarshal to is a struct or a pointer to a struct, the struct must
-// have UnmarshalYAML() called on it with an empty string.
-func (s *S) TestUnmarshalEmptyStringToStruct(c *C) {
-	//j := []byte(`{"val": "null"}`)
-	// Literal empty string should call UnmarshalYAML.
-	j := []byte("val: \"\"\n")
-	v := new(StringStructContainer)
-	err := yaml.Unmarshal(j, v)
-	c.Assert(err, IsNil)
-	c.Assert(v.Val.StrVal, Equals, "")
-	c.Assert(v.Val.UnmarshalCalled, Equals, true)
-}
-
-func (s *S) TestUnmarshalNullStringToStruct(c *C) {
-	// "null" string should not call UnmarshalYAML, but instead produce a zero object.
-	j := []byte("val: null\n")
-	v := new(StringStructContainer)
-	err := yaml.Unmarshal(j, v)
-	c.Assert(err, IsNil)
-	c.Assert(v.Val.StrVal, Equals, "")
-	c.Assert(v.Val.UnmarshalCalled, Equals, false)
-}
-
-// "Implicit" document ending should not call UnmarshalYAML, but instead produce a blank object.
-func (s *S) TestUnmarshalImplicitEndingToStruct(c *C) {
-	// "null" string should not call UnmarshalYAML, but instead produce a zero object.
-	j := []byte("val: \n")
-	v := new(StringStructContainer)
-	err := yaml.Unmarshal(j, v)
-	c.Assert(err, IsNil)
-	c.Assert(v.Val.StrVal, Equals, "")
-	c.Assert(v.Val.UnmarshalCalled, Equals, false)
 }
 
 //var data []byte
