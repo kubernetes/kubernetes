@@ -98,6 +98,10 @@ func (c *Container) Add(service *WebService) *Container {
 			log.Fatalf("[restful] WebService with duplicate root path detected:['%v']", each)
 		}
 	}
+	// if rootPath was not set then lazy initialize it
+	if len(service.rootPath) == 0 {
+		service.Path("/")
+	}
 	c.webServices = append(c.webServices, service)
 	return c
 }
@@ -230,7 +234,7 @@ func (c Container) computeAllowedMethods(req *Request) []string {
 	methods := []string{}
 	requestPath := req.Request.URL.Path
 	for _, ws := range c.RegisteredWebServices() {
-		matches := ws.compiledPathExpression().Matcher.FindStringSubmatch(requestPath)
+		matches := ws.pathExpr.Matcher.FindStringSubmatch(requestPath)
 		if matches != nil {
 			finalMatch := matches[len(matches)-1]
 			for _, rt := range ws.Routes() {

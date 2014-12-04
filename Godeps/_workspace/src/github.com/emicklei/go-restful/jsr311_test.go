@@ -34,6 +34,11 @@ func TestDetectDispatcher(t *testing.T) {
 	ws7 := new(WebService).Path("/{p}/q")
 	var dispatchers = []*WebService{ws1, ws2, ws3, ws4, ws5, ws6, ws7}
 
+	wc := NewContainer()
+	for _, each := range dispatchers {
+		wc.Add(each)
+	}
+
 	router := RouterJSR311{}
 
 	ok := true
