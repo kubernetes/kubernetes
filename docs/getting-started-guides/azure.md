@@ -59,7 +59,7 @@ You can create a pod like this:
 
 ```
 cd kubernetes
-cluster/kubecfg.sh -c api/examples/pod.json create /pods
+cluster/kubectl.sh create -f api/examples/pod.json
 ```
 
 Where pod.json contains something like:
@@ -101,19 +101,18 @@ Where pod.json contains something like:
 You can see your cluster's pods:
 
 ```
-cluster/kubecfg.sh list pods
+cluster/kubectl.sh get pods
 ```
 
 and delete the pod you just created:
 
 ```
-cluster/kubecfg.sh delete pods/php
+cluster/kubectl.sh delete pods php
 ```
 
 Look in `api/examples/` for more examples
 
 ### Tearing down the cluster
 ```
-cd kubernetes
 cluster/kube-down.sh
 ```
