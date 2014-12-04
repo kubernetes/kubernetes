@@ -257,7 +257,7 @@ func TestRESTWatch(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	go func() {
-		reg.Mux.Action(watch.Added, eventA)
+		reg.Broadcaster.Action(watch.Added, eventA)
 	}()
 	got := <-wi.ResultChan()
 	if e, a := eventA, got.Object; !reflect.DeepEqual(e, a) {

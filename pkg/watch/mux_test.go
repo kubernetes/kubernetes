@@ -30,7 +30,7 @@ type myType struct {
 
 func (*myType) IsAnAPIObject() {}
 
-func TestMux(t *testing.T) {
+func TestBroadcaster(t *testing.T) {
 	table := []Event{
 		{Added, &myType{"foo", "hello world 1"}},
 		{Added, &myType{"bar", "hello world 2"}},
@@ -38,8 +38,8 @@ func TestMux(t *testing.T) {
 		{Deleted, &myType{"bar", "hello world 4"}},
 	}
 
-	// The mux we're testing
-	m := NewMux(0)
+	// The broadcaster we're testing
+	m := NewBroadcaster(0)
 
 	// Add a bunch of watchers
 	const testWatchers = 2
@@ -76,8 +76,8 @@ func TestMux(t *testing.T) {
 	wg.Wait()
 }
 
-func TestMuxWatcherClose(t *testing.T) {
-	m := NewMux(0)
+func TestBroadcasterWatcherClose(t *testing.T) {
+	m := NewBroadcaster(0)
 	w := m.Watch()
 	w2 := m.Watch()
 	w.Stop()
@@ -93,11 +93,11 @@ func TestMuxWatcherClose(t *testing.T) {
 	w2.Stop()
 }
 
-func TestMuxWatcherStopDeadlock(t *testing.T) {
+func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 	done := make(chan bool)
-	m := NewMux(0)
+	m := NewBroadcaster(0)
 	go func(w0, w1 Interface) {
-		// We know Mux is in the distribute loop once one watcher receives
+		// We know Broadcaster is in the distribute loop once one watcher receives
 		// an event. Stop the other watcher while distribute is trying to
 		// send to it.
 		select {
