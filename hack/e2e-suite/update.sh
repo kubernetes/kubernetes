@@ -72,9 +72,8 @@ function validate() {
           exit -1
         fi
       }
-
-      if [[ "$current_status" != "0001-01-01T00:00:00Z" ]]; then
-        echo "  $id is created but not running"
+      if [[ "$current_status" == "<no value>" ]]; then
+        echo "  $id is created but not running ${current_status}"
         continue
       fi
 
