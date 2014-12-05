@@ -24,6 +24,24 @@ import (
 	"github.com/golang/glog"
 )
 
+// The onramp router structure
+type Onramp struct {
+	etcdClient tools.EtcdClient
+	kubeClient *client.Client
+}
+
+// The key/value encoding to claim an ExternalName for a container by an onramp
+// router.  The key stored on etcd is the ExternalName from the container, and
+// the contents of the structure below is the value
+type OnrampRouterClaim struct {
+	ExternalIP   string   `json:"externalIP" yaml:"externalIP"`
+	InternalIP   string   `json:"internalIP" yaml:"internalIP"`
+	ContainerIPS []string `json:"containerIPS" yaml:"containerIPS"`
+}
+
+// Helper structs to allow use of foreign types
+type Container api.Container
+
 func NewOnramp(ec tools.EtcdClient, ac *client.Client) *Onramp {
 	return &Onramp{
 		etcdClient: ec,
@@ -31,12 +49,18 @@ func NewOnramp(ec tools.EtcdClient, ac *client.Client) *Onramp {
 	}
 }
 
-type Onramp struct {
-	etcdClient tools.EtcdClient
-	kubeClient *client.Client
+func (onrmp *Onramp) claimExternalName(container Container) {
+
 }
 
-func scanPod(onrmp *Onramp) {
+func (onrmp *Onramp) scanContainer(container Container) {
+	if container.ExternalName != "" {
+		glog.Infof("Container needs external IP access for %s!\n", container.ExternalName)
+		onrmp.claimExternalName(container)
+	}
+}
+
+func (onrmp *Onramp) scanPods() {
 	ns := api.NamespaceAll
 	pdi := onrmp.kubeClient.Pods(ns)
 	if pdi == nil {
@@ -47,7 +71,11 @@ func scanPod(onrmp *Onramp) {
 		return
 	}
 	for m := range pods.Items {
-		glog.Infof("pod name %s\n", pods.Items[m])
+		var containers = pods.Items[m].CurrentState.Manifest.Containers
+
+		for n := range containers {
+			onrmp.scanContainer(Container(containers[n]))
+		}
 	}
 }
 
@@ -55,14 +83,13 @@ func scanPod(onrmp *Onramp) {
 func (onrmp *Onramp) Run() {
 
 	response, err := onrmp.etcdClient.Watch("/registry/pods/default/", 0, true, nil, nil)
-	glog.Infof("Done with watch\n")
 	if err != nil {
 		glog.Infof("Error on etcd watch: %s\n", err)
 		return
 	}
 
 	if response.Action == "create" {
-		scanPod(onrmp)
+		onrmp.scanPods()
 	}
 
 }
