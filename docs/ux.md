@@ -39,5 +39,5 @@ go get github.com/jteeuwen/go-bindata/...
 To rebuild the UX, run the following:
 
 ```sh
-go-bindata -o pkg/ui/datafile.go -prefix ${PWD} -pkg ui www/...
+hack/build-ui.sh
 ```
