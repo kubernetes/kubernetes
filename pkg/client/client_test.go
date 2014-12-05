@@ -610,6 +610,15 @@ func TestListMinions(t *testing.T) {
 	c.Validate(t, response, err)
 }
 
+func TestGetMinion(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "GET", Path: "/minions/1"},
+		Response: Response{StatusCode: 200, Body: &api.Minion{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
+	}
+	response, err := c.Setup().Minions().Get("1")
+	c.Validate(t, response, err)
+}
+
 func TestCreateMinion(t *testing.T) {
 	requestMinion := &api.Minion{
 		ObjectMeta: api.ObjectMeta{
