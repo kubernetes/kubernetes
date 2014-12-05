@@ -255,6 +255,9 @@ type DockerContainers map[DockerID]*docker.APIContainers
 
 func (c DockerContainers) FindPodContainer(podFullName, uuid, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
+		if len(dockerContainer.Names) == 0 {
+			continue
+		}
 		// TODO(proppy): build the docker container name and do a map lookup instead?
 		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
 		if dockerManifestID == podFullName &&
@@ -271,6 +274,9 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 	containers := make(map[string]*docker.APIContainers)
 
 	for _, dockerContainer := range c {
+		if len(dockerContainer.Names) == 0 {
+			continue
+		}
 		dockerManifestID, _, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
 		if dockerManifestID == podFullName {
 			containers[dockerContainerName] = dockerContainer
@@ -289,6 +295,9 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 	}
 	for i := range containers {
 		container := &containers[i]
+		if len(container.Names) == 0 {
+			continue
+		}
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
 		// TODO(dchen1107): Remove the old separator "--" by end of Oct
@@ -442,6 +451,9 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName,
 	}
 
 	for _, value := range containers {
+		if len(value.Names) == 0 {
+			continue
+		}
 		dockerManifestID, dockerUUID, dockerContainerName, _ := ParseDockerName(value.Names[0])
 		if dockerManifestID != podFullName {
 			continue
