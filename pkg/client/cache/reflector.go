@@ -19,6 +19,7 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"time"
 
@@ -99,7 +100,14 @@ func (r *Reflector) listAndWatch() {
 	for {
 		w, err := r.listerWatcher.Watch(resourceVersion)
 		if err != nil {
-			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
+			switch err {
+			case io.EOF:
+				// watch closed normally
+			case io.ErrUnexpectedEOF:
+				glog.V(1).Infof("Watch for %v closed with unexpected EOF: %v", r.expectedType, err)
+			default:
+				glog.Errorf("Failed to watch %v: %v", r.expectedType, err)
+			}
 			return
 		}
 		if err := r.watchHandler(w, &resourceVersion); err != nil {
@@ -167,6 +175,6 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) err
 		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
 		return errors.New("very short watch")
 	}
-	glog.V(4).Infof("watch close - %v total items received", eventCount)
+	glog.V(4).Infof("Watch close - %v total %v items received", r.expectedType, eventCount)
 	return nil
 }
