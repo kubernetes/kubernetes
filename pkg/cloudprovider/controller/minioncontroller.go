@@ -54,7 +54,11 @@ func NewMinionController(
 // Run starts syncing instances from cloudprovider periodically, or create initial minion list.
 func (s *MinionController) Run(period time.Duration) {
 	if s.cloud != nil && len(s.matchRE) > 0 {
-		go util.Forever(func() { s.SyncCloud() }, period)
+		go util.Forever(func() {
+			if err := s.SyncCloud(); err != nil {
+				glog.Errorf("Error syncing cloud: %v", err)
+			}
+		}, period)
 	} else {
 		go s.SyncStatic(period)
 	}
