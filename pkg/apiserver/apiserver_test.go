@@ -316,7 +316,8 @@ func TestSimpleList(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/prefix/version/simple",
+		namespace:   "other",
+		expectedSet: "/prefix/version/simple?namespace=other",
 	}
 	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
@@ -360,8 +361,9 @@ func TestNonEmptyList(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []Simple{
 			{
-				TypeMeta: api.TypeMeta{Kind: "Simple"},
-				Other:    "foo",
+				TypeMeta:   api.TypeMeta{Kind: "Simple"},
+				ObjectMeta: api.ObjectMeta{Namespace: "other"},
+				Other:      "foo",
 			},
 		},
 	}
@@ -393,6 +395,10 @@ func TestNonEmptyList(t *testing.T) {
 	}
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
+	}
+	expectedSelfLink := "/prefix/version/simple?namespace=other"
+	if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
+		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
 	}
 }
 
@@ -651,11 +657,13 @@ type setTestSelfLinker struct {
 	t           *testing.T
 	expectedSet string
 	name        string
+	namespace   string
 	called      bool
 }
 
-func (s *setTestSelfLinker) Name(runtime.Object) (string, error)   { return s.name, nil }
-func (*setTestSelfLinker) SelfLink(runtime.Object) (string, error) { return "", nil }
+func (s *setTestSelfLinker) Namespace(runtime.Object) (string, error) { return s.namespace, nil }
+func (s *setTestSelfLinker) Name(runtime.Object) (string, error)      { return s.name, nil }
+func (*setTestSelfLinker) SelfLink(runtime.Object) (string, error)    { return "", nil }
 func (s *setTestSelfLinker) SetSelfLink(obj runtime.Object, selfLink string) error {
 	if e, a := s.expectedSet, selfLink; e != a {
 		s.t.Errorf("expected '%v', got '%v'", e, a)
@@ -674,7 +682,8 @@ func TestSyncCreate(t *testing.T) {
 	selfLinker := &setTestSelfLinker{
 		t:           t,
 		name:        "bar",
-		expectedSet: "/prefix/version/foo/bar",
+		namespace:   "other",
+		expectedSet: "/prefix/version/foo/bar?namespace=other",
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
