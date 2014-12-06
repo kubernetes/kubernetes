@@ -143,6 +143,12 @@ func (s *MinionController) cloudMinions() (*api.MinionList, error) {
 	}
 	for i := range matches {
 		result.Items[i].Name = matches[i]
+		hostIP, err := instances.IPAddress(matches[i])
+		if err != nil {
+			glog.Errorf("error getting instance ip address for %s: %v", matches[i], err)
+		} else {
+			result.Items[i].Status.HostIP = hostIP.String()
+		}
 		resources, err := instances.GetNodeResources(matches[i])
 		if err != nil {
 			return nil, err
