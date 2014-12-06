@@ -157,3 +157,18 @@ func ReadConfigDataFromLocation(location string) ([]byte, error) {
 		return data, nil
 	}
 }
+
+// RemoveDuplicates will modify the slice of strings removing all duplicates (if any).
+// Order is preserved
+func RemoveDuplicates(xs *[]string) {
+	found := make(map[string]bool)
+	j := 0
+	for i, x := range *xs {
+		if !found[x] {
+			found[x] = true
+			(*xs)[j] = (*xs)[i]
+			j++
+		}
+	}
+	*xs = (*xs)[:j]
+}
