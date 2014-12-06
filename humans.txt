@@ -1,0 +1,26 @@
+/* TEAM */
+    Developer: Tim Garrison
+    Twitter: @mitnosirrag
+    GitHub: @mitnosirrag
+    From: Seattle, WA
+
+    Designer: Jessica Cunningham
+    From: Seattle, WA
+
+    Project Manager: Jamie Malsam
+    From: Seattle, WA
+
+    Agency: Plexipixel
+    Twitter: @Plexipixel
+    GitHub: @Plexipixel
+    From: Seattle, WA
+
+/* THANKS */
+    Client: Kubernetes team at Google
+    From: Seattle, WA
+
+/* SITE */
+    Last update: 2014/11/17
+    Language: English
+    Doctype: HTML5
+    IDE: Vim, Git, SVN, Photoshop, Illustrator

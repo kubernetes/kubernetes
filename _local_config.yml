@@ -1,4 +1,5 @@
 url: "" # run from whatever URL they are accessing, good for testing in office
+google_analytics: ""
 
 sass:
     style: :nested

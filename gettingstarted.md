@@ -11,6 +11,9 @@ hero:
     img: /img/desktop/getting_started/hero_icon.svg
 
 steps:
+  - title: Hosted Services
+    text: "Don't want to go through the hassle of setting up your own cluster and the infrastructure associated with it? These services offer managed Kubernetes to make it that much easier to get going."
+    slug: hosted_services
   - title: Installation
     text: "First, lets get you up and running by starting our first Kubernetes cluster. Kubernetes can run almost anywhere so choose the configuration you're most comfortable with:"
     slug: installation
@@ -22,6 +25,10 @@ steps:
   - title: Technical Details
     text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
     slug: technical
+
+hostedservices: 
+  - label: Google Container Engine
+    url: https://cloud.google.com/container-engine/
 
 installguides: 
   - label: Google Compute Engine

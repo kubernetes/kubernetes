@@ -35,6 +35,16 @@ layout: default
         </div>
        </div>
       </div>
+    {% elsif 'hosted_services' == step.slug %}
+      <div class="row">
+       <div class="col-xs-11">
+        <div class="button-group">
+        {% for service in page.hostedservices %}
+         <a href="{{service.url}}" class="button small dynamic">{{service.label}}</a>
+        {% endfor %}
+        </div>
+       </div>
+      </div>
     {% elsif 'first_app' == step.slug %}
       <div class="row">
        <div class="col-lg-3 col-md-3 col-sm-3">
