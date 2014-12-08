@@ -274,25 +274,18 @@ func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 	return addr.String()
 }
 
-func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodPhase, error) {
+func getPodStatus(pod *api.Pod, nodes client.NodeInterface) (api.PodPhase, error) {
 	if pod.Status.Host == "" {
 		return api.PodPending, nil
 	}
-	if minions != nil {
-		res, err := minions.List()
+	if nodes != nil {
+		_, err := nodes.Get(pod.Status.Host)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				return api.PodFailed, nil
+			}
 			glog.Errorf("Error listing minions: %v", err)
 			return "", err
-		}
-		found := false
-		for _, minion := range res.Items {
-			if minion.Name == pod.Status.Host {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return api.PodFailed, nil
 		}
 	} else {
 		glog.Errorf("Unexpected missing minion interface, status may be in-accurate")
