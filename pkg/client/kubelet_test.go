@@ -18,6 +18,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -108,4 +109,28 @@ func TestHTTPKubeletClientNotFound(t *testing.T) {
 	if err != ErrPodInfoNotAvailable {
 		t.Errorf("Expected %#v, Got %#v", ErrPodInfoNotAvailable, err)
 	}
+}
+
+func TestNewKubeletClient(t *testing.T) {
+	config := &KubeletConfig{
+		Port:        9000,
+		EnableHttps: false,
+	}
+	client, err := NewKubeletClient(config)
+	if err != nil {
+		t.Errorf("Error %#v while trying to create a client.", err)
+	}
+
+	if client == nil {
+		t.Errorf("%#v client is nil.", client)
+	}
+	host := "127.0.0.1"
+	healthStatus, err := client.HealthCheck(host)
+	if !(fmt.Sprintf("%v", healthStatus) == "unknown") {
+		t.Errorf("Expected %v and got %v.", "unknown", healthStatus)
+	}
+	if err == nil {
+		t.Errorf("%#v", "Expected a non nil error")
+	}
+
 }

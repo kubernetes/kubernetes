@@ -18,10 +18,12 @@ package client
 
 import (
 	"net/url"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestEventSearch(t *testing.T) {
@@ -46,4 +48,54 @@ func TestEventSearch(t *testing.T) {
 		},
 	)
 	c.Validate(t, eventList, err)
+}
+
+func TestEventCreate(t *testing.T) {
+	objReference := &api.ObjectReference{
+		Kind:            "foo",
+		Namespace:       "nm",
+		Name:            "objref1",
+		UID:             "uid",
+		APIVersion:      "apiv1",
+		ResourceVersion: "1",
+	}
+	timeStamp := util.Now()
+	event := &api.Event{
+		//namespace: namespace{"default"},
+		Status:         "running",
+		InvolvedObject: *objReference,
+		Timestamp:      timeStamp,
+	}
+	c := &testClient{
+		Request: testRequest{
+			Method: "POST",
+			Path:   "/events",
+			Body:   event,
+		},
+		Response: Response{StatusCode: 200, Body: event},
+	}
+
+	response, err := c.Setup().Events("").Create(event)
+
+	if err != nil {
+		t.Errorf("%#v should be nil.", err)
+	}
+	if !reflect.DeepEqual(response.InvolvedObject.Kind, objReference.Kind) {
+		t.Errorf("%#v != %#v.", response.InvolvedObject.Kind, objReference.Kind)
+	}
+	if !reflect.DeepEqual(response.InvolvedObject.Name, objReference.Name) {
+		t.Errorf("%#v != %#v.", response.InvolvedObject.Name, objReference.Name)
+	}
+	if !reflect.DeepEqual(response.InvolvedObject.UID, objReference.UID) {
+		t.Errorf("%#v != %#v.", response.InvolvedObject.UID, objReference.UID)
+	}
+	if !reflect.DeepEqual(response.InvolvedObject.APIVersion, objReference.APIVersion) {
+		t.Errorf("%#v != %#v.", response.InvolvedObject.APIVersion, objReference.APIVersion)
+	}
+	if !reflect.DeepEqual(response.InvolvedObject.ResourceVersion, objReference.ResourceVersion) {
+		t.Errorf("%#v != %#v.", response.InvolvedObject.ResourceVersion, objReference.ResourceVersion)
+	}
+	if !reflect.DeepEqual(response.InvolvedObject.FieldPath, objReference.FieldPath) {
+		t.Errorf("%#v != %#v.", response.InvolvedObject.FieldPath, objReference.FieldPath)
+	}
 }
