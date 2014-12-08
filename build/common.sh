@@ -241,6 +241,17 @@ function kube::build::short_hash() {
   echo ${short_hash:0:5}
 }
 
+# Pedantically kill, wait-on and remove a container. The -f -v options
+# to rm don't actually seem to get the job done, so force kill the
+# container, wait to ensure it's stopped, then try the remove. This is
+# a workaround for bug https://github.com/docker/docker/issues/3968.
+function kube::build::destroy_container() {
+  "${DOCKER[@]}" kill "$1" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" wait "$1" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -f -v "$1" >/dev/null 2>&1 || true
+}
+
+
 # ---------------------------------------------------------------------------
 # Building
 
@@ -417,14 +428,10 @@ function kube::build::run_build_command() {
   local -ra docker_cmd=(
     "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
 
-  # Remove the container if it is left over from some previous aborted run
-  "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  # Clean up container from any previous run
+  kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
   "${docker_cmd[@]}" "$@"
-
-  # Remove the container after we run.  '--rm' might be appropriate but it
-  # appears that sometimes it fails. See
-  # https://github.com/docker/docker/issues/3968
-  "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
 }
 
 # Test if the output directory is remote (and can only be accessed through
@@ -460,8 +467,7 @@ function kube::build::copy_output() {
     rm -rf "${LOCAL_OUTPUT_BINPATH}"
     mkdir -p "${LOCAL_OUTPUT_BINPATH}"
 
-    # Remove the container if it is left over from some previous aborted run
-    "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
     "${docker_cmd[@]}" bash -c "cp -r ${REMOTE_OUTPUT_BINPATH} /tmp/bin;touch /tmp/finished;rm /tmp/bin/test_for_remote;/bin/sleep 600" > /dev/null 2>&1
 
     # Wait until binaries have finished coppying
