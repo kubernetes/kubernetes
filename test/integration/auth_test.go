@@ -72,7 +72,14 @@ func TestWhoAmI(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -81,9 +88,6 @@ func TestWhoAmI(t *testing.T) {
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
-
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 
 	// TODO: also test TLS, using e.g NewUnsafeTLSTransport() and NewClientCertTLSTransport() (see pkg/client/helper.go)
 	transport := http.DefaultTransport
@@ -363,7 +367,14 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -372,8 +383,6 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
@@ -408,7 +417,14 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -417,8 +433,6 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
@@ -467,7 +481,14 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -477,8 +498,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		Authorizer:        allowAliceAuthorizer{},
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
@@ -499,6 +518,8 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
 			}
 		}()
 	}
@@ -519,7 +540,14 @@ func TestBobIsForbidden(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -529,8 +557,6 @@ func TestBobIsForbidden(t *testing.T) {
 		Authorizer:        allowAliceAuthorizer{},
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
@@ -573,7 +599,14 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -583,8 +616,6 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		Authorizer:        allowAliceAuthorizer{},
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
@@ -645,7 +676,15 @@ func TestNamespaceAuthorization(t *testing.T) {
 
 	a := newAuthorizerWithContents(t, `{"namespace": "foo"}
 `)
-	m := master.New(&master.Config{
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -655,8 +694,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 		Authorizer:        a,
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -699,6 +736,8 @@ func TestNamespaceAuthorization(t *testing.T) {
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
 			}
 		}()
 	}
@@ -720,7 +759,15 @@ func TestKindAuthorization(t *testing.T) {
 
 	a := newAuthorizerWithContents(t, `{"kind": "services"}
 `)
-	m := master.New(&master.Config{
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -730,8 +777,6 @@ func TestKindAuthorization(t *testing.T) {
 		Authorizer:        a,
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -768,6 +813,8 @@ func TestKindAuthorization(t *testing.T) {
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
 			}
 		}
 	}
@@ -789,7 +836,15 @@ func TestReadOnlyAuthorization(t *testing.T) {
 
 	a := newAuthorizerWithContents(t, `{"readonly": true}
 `)
-	m := master.New(&master.Config{
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
+		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -799,8 +854,6 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		Authorizer:        a,
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -831,6 +884,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
 			}
 		}()
 	}
