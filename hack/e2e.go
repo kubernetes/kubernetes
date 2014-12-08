@@ -43,6 +43,7 @@ var (
 	orderseed        = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
 	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
 	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
+	times            = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
@@ -64,6 +65,13 @@ func absOrDie(path string) string {
 	}
 	return out
 }
+
+type TestResult struct {
+	Pass int
+	Fail int
+}
+
+type ResultsByTest map[string]TestResult
 
 func main() {
 	flag.Parse()
@@ -118,10 +126,7 @@ func main() {
 	case *ctlCmd != "":
 		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
 	case *tests != "":
-		failed, passed := Test()
-		log.Printf("Passed tests: %v", passed)
-		log.Printf("Failed tests: %v", failed)
-		failure = len(failed) > 0
+		failure = PrintResults(Test())
 	}
 
 	if *down {
@@ -163,7 +168,7 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 	}
 }
 
-func Test() (failed, passed []string) {
+func Test() (results ResultsByTest) {
 	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
 
 	if !IsUp() {
@@ -203,23 +208,76 @@ func Test() (failed, passed []string) {
 		*orderseed = time.Now().UnixNano() & (1<<32 - 1)
 	}
 	sort.Strings(toRun)
+	if *times != 1 {
+		if *times <= 0 {
+			log.Fatal("Invalid --times (negative or no testing requested)!")
+		}
+		newToRun := make([]string, 0, *times*len(toRun))
+		for i := 0; i < *times; i++ {
+			newToRun = append(newToRun, toRun...)
+		}
+		toRun = newToRun
+	}
 	shuffleStrings(toRun, rand.New(rand.NewSource(*orderseed)))
 	log.Printf("Running tests matching %v shuffled with seed %#x: %v", *tests, *orderseed, toRun)
-	for _, name := range toRun {
+	results = ResultsByTest{}
+	for i, name := range toRun {
 		absName := filepath.Join(*root, "hack", "e2e-suite", name)
-		log.Printf("Starting test %v.", name)
+		log.Printf("Starting test [%v/%v]: %v", i+1, len(toRun), name)
+		testResult := results[name]
 		if runBash(name, absName) {
 			log.Printf("%v passed", name)
-			passed = append(passed, name)
+			testResult.Pass++
 		} else {
 			log.Printf("%v failed", name)
-			failed = append(failed, name)
+			testResult.Fail++
 		}
+		results[name] = testResult
 	}
 
-	sort.Strings(passed)
-	sort.Strings(failed)
 	return
+}
+
+func PrintResults(results ResultsByTest) bool {
+	failures := 0
+
+	passed := []string{}
+	flaky := []string{}
+	failed := []string{}
+	for test, result := range results {
+		if result.Pass > 0 && result.Fail == 0 {
+			passed = append(passed, test)
+		} else if result.Pass > 0 && result.Fail > 0 {
+			flaky = append(flaky, test)
+			failures += result.Fail
+		} else {
+			failed = append(failed, test)
+			failures += result.Fail
+		}
+	}
+	sort.Strings(passed)
+	sort.Strings(flaky)
+	sort.Strings(failed)
+	printSubreport("Passed", passed, results)
+	printSubreport("Flaky", flaky, results)
+	printSubreport("Failed", failed, results)
+	if failures > 0 {
+		log.Printf("%v test(s) failed.", failures)
+	} else {
+		log.Printf("Success!")
+	}
+
+	return failures > 0
+}
+
+func printSubreport(title string, tests []string, results ResultsByTest) {
+	report := title + " tests:"
+
+	for _, test := range tests {
+		result := results[test]
+		report += fmt.Sprintf(" %v[%v/%v]", test, result.Pass, result.Pass+result.Fail)
+	}
+	log.Printf(report)
 }
 
 // All nonsense below is temporary until we have go versions of these things.
