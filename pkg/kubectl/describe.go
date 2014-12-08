@@ -176,7 +176,7 @@ type MinionDescriber struct {
 }
 
 func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
-	mc := d.Minions()
+	mc := d.Nodes()
 	minion, err := mc.Get(name)
 	if err != nil {
 		return "", err

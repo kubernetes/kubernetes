@@ -48,7 +48,7 @@ type ClientNodeInfo struct {
 }
 
 func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
-	return nodes.Minions().Get(nodeID)
+	return nodes.Nodes().Get(nodeID)
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {

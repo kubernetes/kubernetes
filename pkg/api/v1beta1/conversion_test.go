@@ -141,7 +141,7 @@ func TestMinionListConversionToNew(t *testing.T) {
 	oldMinion := func(id string) current.Minion {
 		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
 	}
-	newMinion := func(id string) newer.Node {
+	newNode := func(id string) newer.Node {
 		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
 	}
 	oldMinions := []current.Minion{
@@ -149,8 +149,8 @@ func TestMinionListConversionToNew(t *testing.T) {
 		oldMinion("bar"),
 	}
 	newMinions := []newer.Node{
-		newMinion("foo"),
-		newMinion("bar"),
+		newNode("foo"),
+		newNode("bar"),
 	}
 
 	table := []struct {
@@ -188,7 +188,7 @@ func TestMinionListConversionToOld(t *testing.T) {
 	oldMinion := func(id string) current.Minion {
 		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
 	}
-	newMinion := func(id string) newer.Node {
+	newNode := func(id string) newer.Node {
 		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
 	}
 	oldMinions := []current.Minion{
@@ -196,8 +196,8 @@ func TestMinionListConversionToOld(t *testing.T) {
 		oldMinion("bar"),
 	}
 	newMinions := []newer.Node{
-		newMinion("foo"),
-		newMinion("bar"),
+		newNode("foo"),
+		newNode("bar"),
 	}
 
 	newML := &newer.NodeList{Items: newMinions}

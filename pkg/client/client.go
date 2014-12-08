@@ -32,7 +32,7 @@ type Interface interface {
 	ServicesNamespacer
 	EndpointsNamespacer
 	VersionInterface
-	MinionsInterface
+	NodesInterface
 	EventNamespacer
 }
 
@@ -40,8 +40,8 @@ func (c *Client) ReplicationControllers(namespace string) ReplicationControllerI
 	return newReplicationControllers(c, namespace)
 }
 
-func (c *Client) Minions() MinionInterface {
-	return newMinions(c)
+func (c *Client) Nodes() NodeInterface {
+	return newNodes(c, c.preV1Beta3)
 }
 
 func (c *Client) Events(namespace string) EventInterface {
@@ -75,6 +75,9 @@ type APIStatus interface {
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
+
+	// preV1Beta3 is true for v1beta1 and v1beta2
+	preV1Beta3 bool
 }
 
 // ServerVersion retrieves and parses the server's version.

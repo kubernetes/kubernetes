@@ -49,8 +49,8 @@ func (c *Fake) ReplicationControllers(namespace string) ReplicationControllerInt
 	return &FakeReplicationControllers{Fake: c, Namespace: namespace}
 }
 
-func (c *Fake) Minions() MinionInterface {
-	return &FakeMinions{Fake: c}
+func (c *Fake) Nodes() NodeInterface {
+	return &FakeNodes{Fake: c}
 }
 
 func (c *Fake) Events(namespace string) EventInterface {

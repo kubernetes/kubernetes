@@ -87,7 +87,9 @@ func New(c *Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{client}, nil
+	version := defaultVersionFor(&config)
+	isPreV1Beta3 := (version == "v1beta1" || version == "v1beta2")
+	return &Client{client, isPreV1Beta3}, nil
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.

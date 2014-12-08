@@ -26,13 +26,13 @@ import (
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 )
 
-func newMinion(name string) *api.Node {
+func newNode(name string) *api.Node {
 	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
 }
 
 type FakeMinionHandler struct {
 	client.Fake
-	client.FakeMinions
+	client.FakeNodes
 
 	// Input: Hooks determine if request is valid or not
 	CreateHook func(*FakeMinionHandler, *api.Node) bool
@@ -44,7 +44,7 @@ type FakeMinionHandler struct {
 	RequestCount   int
 }
 
-func (c *FakeMinionHandler) Minions() client.MinionInterface {
+func (c *FakeMinionHandler) Nodes() client.NodeInterface {
 	return c
 }
 
@@ -75,7 +75,7 @@ func (m *FakeMinionHandler) List() (*api.NodeList, error) {
 }
 
 func (m *FakeMinionHandler) Delete(id string) error {
-	m.DeletedMinions = append(m.DeletedMinions, newMinion(id))
+	m.DeletedMinions = append(m.DeletedMinions, newNode(id))
 	m.RequestCount++
 	return nil
 }
@@ -129,7 +129,7 @@ func TestSyncStaticCreateMinionWithError(t *testing.T) {
 
 func TestSyncCloudCreateMinion(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		Existing: []*api.Node{newMinion("minion0")},
+		Existing: []*api.Node{newNode("minion0")},
 	}
 	instances := []string{"minion0", "minion1"}
 	fakeCloud := fake_cloud.FakeCloud{
@@ -153,7 +153,7 @@ func TestSyncCloudCreateMinion(t *testing.T) {
 
 func TestSyncCloudDeleteMinion(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		Existing: []*api.Node{newMinion("minion0"), newMinion("minion1")},
+		Existing: []*api.Node{newNode("minion0"), newNode("minion1")},
 	}
 	instances := []string{"minion0"}
 	fakeCloud := fake_cloud.FakeCloud{
@@ -177,7 +177,7 @@ func TestSyncCloudDeleteMinion(t *testing.T) {
 
 func TestSyncCloudRegexp(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		Existing: []*api.Node{newMinion("minion0")},
+		Existing: []*api.Node{newNode("minion0")},
 	}
 	instances := []string{"minion0", "minion1", "node0"}
 	fakeCloud := fake_cloud.FakeCloud{

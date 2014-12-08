@@ -73,7 +73,7 @@ func (s *MinionController) SyncStatic(period time.Duration) error {
 			if registered.Has(minionID) {
 				continue
 			}
-			_, err := s.kubeClient.Minions().Create(&api.Node{
+			_, err := s.kubeClient.Nodes().Create(&api.Node{
 				ObjectMeta: api.ObjectMeta{Name: minionID},
 				Spec: api.NodeSpec{
 					Capacity: s.staticResources.Capacity,
@@ -97,7 +97,7 @@ func (s *MinionController) SyncCloud() error {
 	if err != nil {
 		return err
 	}
-	minions, err := s.kubeClient.Minions().List()
+	minions, err := s.kubeClient.Nodes().List()
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (s *MinionController) SyncCloud() error {
 	for _, minion := range matches.Items {
 		if _, ok := minionMap[minion.Name]; !ok {
 			glog.Infof("Create minion in registry: %s", minion.Name)
-			_, err = s.kubeClient.Minions().Create(&minion)
+			_, err = s.kubeClient.Nodes().Create(&minion)
 			if err != nil {
 				glog.Errorf("Create minion error: %s", minion.Name)
 			}
@@ -120,7 +120,7 @@ func (s *MinionController) SyncCloud() error {
 
 	for minionID := range minionMap {
 		glog.Infof("Delete minion from registry: %s", minionID)
-		err = s.kubeClient.Minions().Delete(minionID)
+		err = s.kubeClient.Nodes().Delete(minionID)
 		if err != nil {
 			glog.Errorf("Delete minion error: %s", minionID)
 		}

@@ -60,7 +60,7 @@ type REST struct {
 	podInfoGetter client.PodInfoGetter
 	podPollPeriod time.Duration
 	registry      Registry
-	minions       client.MinionInterface
+	nodes         client.NodeInterface
 	ipCache       ipCache
 	clock         clock
 }
@@ -70,7 +70,7 @@ type RESTConfig struct {
 	PodCache      client.PodInfoGetter
 	PodInfoGetter client.PodInfoGetter
 	Registry      Registry
-	Minions       client.MinionInterface
+	Nodes         client.NodeInterface
 }
 
 // NewREST returns a new REST.
@@ -81,7 +81,7 @@ func NewREST(config *RESTConfig) *REST {
 		podInfoGetter: config.PodInfoGetter,
 		podPollPeriod: time.Second * 10,
 		registry:      config.Registry,
-		minions:       config.Minions,
+		nodes:         config.Nodes,
 		ipCache:       ipCache{},
 		clock:         realClock{},
 	}
@@ -125,7 +125,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	}
 	if rs.podCache != nil || rs.podInfoGetter != nil {
 		rs.fillPodInfo(pod)
-		status, err := getPodStatus(pod, rs.minions)
+		status, err := getPodStatus(pod, rs.nodes)
 		if err != nil {
 			return pod, err
 		}
@@ -169,7 +169,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 		for i := range pods.Items {
 			pod := &pods.Items[i]
 			rs.fillPodInfo(pod)
-			status, err := getPodStatus(pod, rs.minions)
+			status, err := getPodStatus(pod, rs.nodes)
 			if err != nil {
 				return pod, err
 			}

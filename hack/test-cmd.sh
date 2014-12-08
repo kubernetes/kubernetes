@@ -126,6 +126,10 @@ kube::log::status "Testing kubectl(minions)"
 "${kube_cmd[@]}" get minions "${kube_flags[@]}"
 "${kube_cmd[@]}" get minions 127.0.0.1 "${kube_flags[@]}"
 
+kube::log::status "Testing kubectl(nodes)"
+"${kube_cmd[@]}" get nodes "${kube_flags[@]}"
+"${kube_cmd[@]}" describe nodes 127.0.0.1 "${kube_flags[@]}"
+
 kube::log::status "TEST PASSED"
 
 # Start proxy
