@@ -21,7 +21,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ "$KUBERNETES_PROVIDER" != "gce" ]]; then
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+if [[ "${KUBERNETES_PROVIDER}" != "gce" ]]; then
   echo "Skipping certs test on non-gce provider."
   exit 0
 fi
