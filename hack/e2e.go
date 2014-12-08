@@ -38,6 +38,7 @@ var (
 	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
 	up               = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
+	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	orderseed        = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
 	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
@@ -89,6 +90,17 @@ func main() {
 		}
 	}
 
+	if *pushup {
+		if IsUp() {
+			log.Printf("e2e cluster is up, pushing.")
+			*up = false
+			*push = true
+		} else {
+			log.Printf("e2e cluster is down, creating.")
+			*up = true
+			*push = false
+		}
+	}
 	if *up {
 		if !Up() {
 			log.Fatal("Error starting e2e cluster. Aborting.")
