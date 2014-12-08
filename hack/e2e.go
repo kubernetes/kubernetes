@@ -22,12 +22,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 )
 
 var (
@@ -36,6 +39,7 @@ var (
 	up               = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
+	orderseed        = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
 	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
 	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
@@ -139,6 +143,14 @@ func tryUp() bool {
 	return runBash("up", path.Join(*root, "/cluster/kube-up.sh; test-setup;"))
 }
 
+// Fisher-Yates shuffle using the given RNG r
+func shuffleStrings(strings []string, r *rand.Rand) {
+	for i := len(strings) - 1; i > 0; i-- {
+		j := r.Intn(i + 1)
+		strings[i], strings[j] = strings[j], strings[i]
+	}
+}
+
 func Test() (failed, passed []string) {
 	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
 
@@ -157,6 +169,7 @@ func Test() (failed, passed []string) {
 		log.Fatal("Couldn't read names in e2e-suite dir")
 	}
 
+	toRun := make([]string, 0, len(names))
 	for i := range names {
 		name := names[i]
 		if name == "." || name == ".." {
@@ -165,8 +178,24 @@ func Test() (failed, passed []string) {
 		if match, err := path.Match(*tests, name); !match && err == nil {
 			continue
 		}
+		if err != nil {
+			log.Fatal("Bad test pattern: %v", tests)
+		}
+		toRun = append(toRun, name)
+	}
+
+	if *orderseed == 0 {
+		// Use low order bits of NanoTime as the default seed. (Using
+		// all the bits makes for a long, very similar looking seed
+		// between runs.)
+		*orderseed = time.Now().UnixNano() & (1<<32 - 1)
+	}
+	sort.Strings(toRun)
+	shuffleStrings(toRun, rand.New(rand.NewSource(*orderseed)))
+	log.Printf("Running tests matching %v shuffled with seed %#x: %v", *tests, *orderseed, toRun)
+	for _, name := range toRun {
 		absName := filepath.Join(*root, "hack", "e2e-suite", name)
-		log.Printf("%v matches %v. Starting test.", name, *tests)
+		log.Printf("Starting test %v.", name)
 		if runBash(name, absName) {
 			log.Printf("%v passed", name)
 			passed = append(passed, name)
@@ -176,6 +205,8 @@ func Test() (failed, passed []string) {
 		}
 	}
 
+	sort.Strings(passed)
+	sort.Strings(failed)
 	return
 }
 
