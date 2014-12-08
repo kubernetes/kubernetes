@@ -27,14 +27,14 @@ import (
 )
 
 type NodeInfo interface {
-	GetNodeInfo(nodeID string) (*api.Minion, error)
+	GetNodeInfo(nodeID string) (*api.Node, error)
 }
 
 type StaticNodeInfo struct {
-	*api.MinionList
+	*api.NodeList
 }
 
-func (nodes StaticNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
+func (nodes StaticNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
 	for ix := range nodes.Items {
 		if nodes.Items[ix].Name == nodeID {
 			return &nodes.Items[ix], nil
@@ -47,7 +47,7 @@ type ClientNodeInfo struct {
 	*client.Client
 }
 
-func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
+func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
 	return nodes.Minions().Get(nodeID)
 }
 

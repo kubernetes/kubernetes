@@ -145,10 +145,10 @@ func TestCreateWatches(t *testing.T) {
 
 func TestPollMinions(t *testing.T) {
 	table := []struct {
-		minions []api.Minion
+		minions []api.Node
 	}{
 		{
-			minions: []api.Minion{
+			minions: []api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 				{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 			},
@@ -156,7 +156,7 @@ func TestPollMinions(t *testing.T) {
 	}
 
 	for _, item := range table {
-		ml := &api.MinionList{Items: item.minions}
+		ml := &api.NodeList{Items: item.minions}
 		handler := util.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: runtime.EncodeOrDie(latest.Codec, ml),
@@ -225,9 +225,9 @@ func TestStoreToMinionLister(t *testing.T) {
 	store := cache.NewStore()
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(id, &api.Minion{ObjectMeta: api.ObjectMeta{Name: id}})
+		store.Add(id, &api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
-	sml := storeToMinionLister{store}
+	sml := storeToNodeLister{store}
 
 	gotNodes, err := sml.List()
 	if err != nil {
@@ -273,14 +273,14 @@ func TestStoreToPodLister(t *testing.T) {
 }
 
 func TestMinionEnumerator(t *testing.T) {
-	testList := &api.MinionList{
-		Items: []api.Minion{
+	testList := &api.NodeList{
+		Items: []api.Node{
 			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 			{ObjectMeta: api.ObjectMeta{Name: "baz"}},
 		},
 	}
-	me := minionEnumerator{testList}
+	me := nodeEnumerator{testList}
 
 	if e, a := 3, me.Len(); e != a {
 		t.Fatalf("expected %v, got %v", e, a)

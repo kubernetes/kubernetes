@@ -45,7 +45,7 @@ type ConfigFactory struct {
 	// a means to list all scheduled pods
 	PodLister *storeToPodLister
 	// a means to list all minions
-	MinionLister *storeToMinionLister
+	MinionLister *storeToNodeLister
 	// map of strings to predicate functions to be used
 	// to filter the minions for scheduling pods
 	PredicateMap map[string]algorithm.FitPredicate
@@ -61,7 +61,7 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		Client:       client,
 		PodQueue:     cache.NewFIFO(),
 		PodLister:    &storeToPodLister{cache.NewStore()},
-		MinionLister: &storeToMinionLister{cache.NewStore()},
+		MinionLister: &storeToNodeLister{cache.NewStore()},
 		PredicateMap: make(map[string]algorithm.FitPredicate),
 		PriorityMap:  make(map[string]algorithm.PriorityConfig),
 	}
@@ -103,7 +103,7 @@ func (factory *ConfigFactory) Create(predicateKeys, priorityKeys []string) (*sch
 	// Minions may be listed frequently, so provide a local up-to-date cache.
 	if false {
 		// Disable this code until minions support watches.
-		cache.NewReflector(factory.createMinionLW(), &api.Minion{}, factory.MinionLister.Store).Run()
+		cache.NewReflector(factory.createMinionLW(), &api.Node{}, factory.MinionLister.Store).Run()
 	} else {
 		cache.NewPoller(factory.pollMinions, 10*time.Second, factory.MinionLister.Store).Run()
 	}
@@ -255,12 +255,12 @@ func (factory *ConfigFactory) createMinionLW() *listWatch {
 
 // pollMinions lists all minions and returns an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
-	list := &api.MinionList{}
+	list := &api.NodeList{}
 	err := factory.Client.Get().Path("minions").Do().Into(list)
 	if err != nil {
 		return nil, err
 	}
-	return &minionEnumerator{list}, nil
+	return &nodeEnumerator{list}, nil
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
@@ -288,22 +288,22 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 	}
 }
 
-// storeToMinionLister turns a store into a minion lister. The store must contain (only) minions.
-type storeToMinionLister struct {
+// storeToNodeLister turns a store into a minion lister. The store must contain (only) minions.
+type storeToNodeLister struct {
 	cache.Store
 }
 
-func (s *storeToMinionLister) List() (machines api.MinionList, err error) {
+func (s *storeToNodeLister) List() (machines api.NodeList, err error) {
 	for _, m := range s.Store.List() {
-		machines.Items = append(machines.Items, *(m.(*api.Minion)))
+		machines.Items = append(machines.Items, *(m.(*api.Node)))
 	}
 	return machines, nil
 }
 
 // GetNodeInfo returns cached data for the minion 'id'.
-func (s *storeToMinionLister) GetNodeInfo(id string) (*api.Minion, error) {
+func (s *storeToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
 	if minion, ok := s.Get(id); ok {
-		return minion.(*api.Minion), nil
+		return minion.(*api.Node), nil
 	}
 	return nil, fmt.Errorf("minion '%v' is not in cache", id)
 }
@@ -323,22 +323,22 @@ func (s *storeToPodLister) ListPods(selector labels.Selector) (pods []api.Pod, e
 	return pods, nil
 }
 
-// minionEnumerator allows a cache.Poller to enumerate items in an api.PodList
-type minionEnumerator struct {
-	*api.MinionList
+// nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
+type nodeEnumerator struct {
+	*api.NodeList
 }
 
-// Len returns the number of items in the pod list.
-func (me *minionEnumerator) Len() int {
-	if me.MinionList == nil {
+// Len returns the number of items in the node list.
+func (ne *nodeEnumerator) Len() int {
+	if ne.NodeList == nil {
 		return 0
 	}
-	return len(me.Items)
+	return len(ne.Items)
 }
 
 // Get returns the item (and ID) with the particular index.
-func (me *minionEnumerator) Get(index int) (string, interface{}) {
-	return me.Items[index].Name, &me.Items[index]
+func (ne *nodeEnumerator) Get(index int) (string, interface{}) {
+	return ne.Items[index].Name, &ne.Items[index]
 }
 
 type binder struct {

@@ -31,7 +31,7 @@ func TestNodeConversion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.Minion); !ok {
+	if _, ok := obj.(*newer.Node); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
@@ -39,7 +39,7 @@ func TestNodeConversion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.MinionList); !ok {
+	if _, ok := obj.(*newer.NodeList); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
@@ -141,39 +141,39 @@ func TestMinionListConversionToNew(t *testing.T) {
 	oldMinion := func(id string) current.Minion {
 		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
 	}
-	newMinion := func(id string) newer.Minion {
-		return newer.Minion{ObjectMeta: newer.ObjectMeta{Name: id}}
+	newMinion := func(id string) newer.Node {
+		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
 	}
 	oldMinions := []current.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []newer.Minion{
+	newMinions := []newer.Node{
 		newMinion("foo"),
 		newMinion("bar"),
 	}
 
 	table := []struct {
 		oldML *current.MinionList
-		newML *newer.MinionList
+		newML *newer.NodeList
 	}{
 		{
 			oldML: &current.MinionList{Items: oldMinions},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		}, {
 			oldML: &current.MinionList{Minions: oldMinions},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		}, {
 			oldML: &current.MinionList{
 				Items:   oldMinions,
 				Minions: []current.Minion{oldMinion("baz")},
 			},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		},
 	}
 
 	for _, item := range table {
-		got := &newer.MinionList{}
+		got := &newer.NodeList{}
 		err := Convert(item.oldML, got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -188,19 +188,19 @@ func TestMinionListConversionToOld(t *testing.T) {
 	oldMinion := func(id string) current.Minion {
 		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
 	}
-	newMinion := func(id string) newer.Minion {
-		return newer.Minion{ObjectMeta: newer.ObjectMeta{Name: id}}
+	newMinion := func(id string) newer.Node {
+		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
 	}
 	oldMinions := []current.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []newer.Minion{
+	newMinions := []newer.Node{
 		newMinion("foo"),
 		newMinion("bar"),
 	}
 
-	newML := &newer.MinionList{Items: newMinions}
+	newML := &newer.NodeList{Items: newMinions}
 	oldML := &current.MinionList{
 		Items:   oldMinions,
 		Minions: oldMinions,

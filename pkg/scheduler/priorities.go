@@ -37,7 +37,7 @@ func calculateScore(requested, capacity int, node string) int {
 
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(pod api.Pod, node api.Minion, pods []api.Pod) HostPriority {
+func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority {
 	totalCPU := 0
 	totalMemory := 0
 	for _, existingPod := range pods {

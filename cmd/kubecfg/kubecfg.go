@@ -79,7 +79,7 @@ var parser = kubecfg.NewParser(map[string]runtime.Object{
 	"pods":                   &api.Pod{},
 	"services":               &api.Service{},
 	"replicationControllers": &api.ReplicationController{},
-	"minions":                &api.Minion{},
+	"minions":                &api.Node{},
 	"events":                 &api.Event{},
 })
 

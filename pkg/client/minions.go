@@ -23,9 +23,9 @@ type MinionsInterface interface {
 }
 
 type MinionInterface interface {
-	Get(id string) (result *api.Minion, err error)
-	Create(minion *api.Minion) (*api.Minion, error)
-	List() (*api.MinionList, error)
+	Get(id string) (result *api.Node, err error)
+	Create(minion *api.Node) (*api.Node, error)
+	List() (*api.NodeList, error)
 	Delete(id string) error
 }
 
@@ -40,22 +40,22 @@ func newMinions(c *Client) *minions {
 }
 
 // Create creates a new minion.
-func (c *minions) Create(minion *api.Minion) (*api.Minion, error) {
-	result := &api.Minion{}
+func (c *minions) Create(minion *api.Node) (*api.Node, error) {
+	result := &api.Node{}
 	err := c.r.Post().Path("minions").Body(minion).Do().Into(result)
 	return result, err
 }
 
 // List lists all the minions in the cluster.
-func (c *minions) List() (*api.MinionList, error) {
-	result := &api.MinionList{}
+func (c *minions) List() (*api.NodeList, error) {
+	result := &api.NodeList{}
 	err := c.r.Get().Path("minions").Do().Into(result)
 	return result, err
 }
 
 // Get gets an existing minion
-func (c *minions) Get(id string) (*api.Minion, error) {
-	result := &api.Minion{}
+func (c *minions) Get(id string) (*api.Node, error) {
+	result := &api.Node{}
 	err := c.r.Get().Path("minions").Path(id).Do().Into(result)
 	return result, err
 }

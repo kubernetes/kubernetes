@@ -370,8 +370,8 @@ func TestGetPodCloud(t *testing.T) {
 
 func TestMakePodStatus(t *testing.T) {
 	fakeClient := client.Fake{
-		MinionsList: api.MinionList{
-			Items: []api.Minion{
+		MinionsList: api.NodeList{
+			Items: []api.Node{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "machine"},
 				},

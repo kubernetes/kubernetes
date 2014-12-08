@@ -83,9 +83,9 @@ func reverseNumericPriority(pod api.Pod, podLister PodLister, minionLister Minio
 	return reverseResult, nil
 }
 
-func makeMinionList(nodeNames []string) api.MinionList {
-	result := api.MinionList{
-		Items: make([]api.Minion, len(nodeNames)),
+func makeMinionList(nodeNames []string) api.NodeList {
+	result := api.NodeList{
+		Items: make([]api.Node, len(nodeNames)),
 	}
 	for ix := range nodeNames {
 		result.Items[ix].Name = nodeNames[ix]

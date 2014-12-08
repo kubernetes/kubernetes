@@ -672,10 +672,9 @@ type ResourceName string
 
 type ResourceList map[ResourceName]util.IntOrString
 
-// Minion is a worker node in Kubernetenes
-// The name of the minion according to etcd is in ObjectMeta.Name.
-// TODO: Rename to Node
-type Minion struct {
+// Node is a worker node in Kubernetenes
+// The name of the node according to etcd is in ObjectMeta.Name.
+type Node struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
@@ -686,12 +685,12 @@ type Minion struct {
 	Status NodeStatus `json:"status,omitempty"`
 }
 
-// MinionList is a list of minions.
-type MinionList struct {
+// NodeList is a list of minions.
+type NodeList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
 
-	Items []Minion `json:"items"`
+	Items []Node `json:"items"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.

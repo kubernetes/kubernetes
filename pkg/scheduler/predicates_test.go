@@ -25,10 +25,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type FakeNodeInfo api.Minion
+type FakeNodeInfo api.Node
 
-func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*api.Minion, error) {
-	node := api.Minion(n)
+func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
+	node := api.Node(n)
 	return &node, nil
 }
 
@@ -111,7 +111,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Minion{Spec: api.NodeSpec{Capacity: makeResources(10, 20).Capacity}}
+		node := api.Node{Spec: api.NodeSpec{Capacity: makeResources(10, 20).Capacity}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
@@ -335,7 +335,7 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Minion{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
+		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 
 		fit := NodeSelector{FakeNodeInfo(node)}
 		fits, err := fit.PodSelectorMatches(test.pod, []api.Pod{}, "machine")

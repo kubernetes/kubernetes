@@ -39,7 +39,7 @@ type Fake struct {
 	Ctrl          api.ReplicationController
 	ServiceList   api.ServiceList
 	EndpointsList api.EndpointsList
-	MinionsList   api.MinionList
+	MinionsList   api.NodeList
 	EventsList    api.EventList
 	Err           error
 	Watch         watch.Interface

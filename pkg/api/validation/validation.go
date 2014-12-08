@@ -550,7 +550,7 @@ func ValidateBoundPod(pod *api.BoundPod) (errors []error) {
 }
 
 // ValidateMinion tests if required fields in the minion are set.
-func ValidateMinion(minion *api.Minion) errs.ValidationErrorList {
+func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(minion.Namespace) != 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace, ""))
@@ -563,7 +563,7 @@ func ValidateMinion(minion *api.Minion) errs.ValidationErrorList {
 }
 
 // ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
-func ValidateMinionUpdate(oldMinion *api.Minion, minion *api.Minion) errs.ValidationErrorList {
+func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	oldMinion.Labels = minion.Labels
 	if !reflect.DeepEqual(oldMinion, minion) {

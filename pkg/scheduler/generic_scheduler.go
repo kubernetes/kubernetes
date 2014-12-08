@@ -76,18 +76,18 @@ func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, er
 
 // Filters the minions to find the ones that fit based on the given predicate functions
 // Each minion is passed through the predicate functions to determine if it is a fit
-func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes api.MinionList) (api.MinionList, error) {
-	filtered := []api.Minion{}
+func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes api.NodeList) (api.NodeList, error) {
+	filtered := []api.Node{}
 	machineToPods, err := MapPodsToMachines(podLister)
 	if err != nil {
-		return api.MinionList{}, err
+		return api.NodeList{}, err
 	}
 	for _, node := range nodes.Items {
 		fits := true
 		for _, predicate := range predicates {
 			fit, err := predicate(pod, machineToPods[node.Name], node.Name)
 			if err != nil {
-				return api.MinionList{}, err
+				return api.NodeList{}, err
 			}
 			if !fit {
 				fits = false
@@ -98,7 +98,7 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicat
 			filtered = append(filtered, node)
 		}
 	}
-	return api.MinionList{Items: filtered}, nil
+	return api.NodeList{Items: filtered}, nil
 }
 
 // Prioritizes the minions by running the individual priority functions sequentially.

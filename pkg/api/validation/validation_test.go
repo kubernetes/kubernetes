@@ -1077,7 +1077,7 @@ func TestValidateBoundPodNoName(t *testing.T) {
 func TestValidateMinion(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	successCases := []api.Minion{
+	successCases := []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "abc",
@@ -1100,7 +1100,7 @@ func TestValidateMinion(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]api.Minion{
+	errorCases := map[string]api.Node{
 		"zero-length Name": {
 			ObjectMeta: api.ObjectMeta{
 				Name:   "",
@@ -1134,45 +1134,45 @@ func TestValidateMinion(t *testing.T) {
 
 func TestValidateMinionUpdate(t *testing.T) {
 	tests := []struct {
-		oldMinion api.Minion
-		minion    api.Minion
+		oldMinion api.Node
+		minion    api.Node
 		valid     bool
 	}{
-		{api.Minion{}, api.Minion{}, true},
-		{api.Minion{
+		{api.Node{}, api.Node{}, true},
+		{api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo"}},
-			api.Minion{
+			api.Node{
 				ObjectMeta: api.ObjectMeta{
 					Name: "bar"},
 			}, false},
-		{api.Minion{
+		{api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "bar"},
 			},
-		}, api.Minion{
+		}, api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
-		{api.Minion{
+		{api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo",
 			},
-		}, api.Minion{
+		}, api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
-		{api.Minion{
+		{api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
 			},
-		}, api.Minion{
+		}, api.Node{
 			ObjectMeta: api.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},

@@ -60,7 +60,7 @@ func TestNodeConversion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.Minion); !ok {
+	if _, ok := obj.(*newer.Node); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
@@ -68,7 +68,7 @@ func TestNodeConversion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.MinionList); !ok {
+	if _, ok := obj.(*newer.NodeList); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 

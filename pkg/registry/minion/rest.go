@@ -47,7 +47,7 @@ var ErrDoesNotExist = errors.New("The requested resource does not exist.")
 var ErrNotHealty = errors.New("The requested minion is not healthy.")
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	minion, ok := obj.(*api.Minion)
+	minion, ok := obj.(*api.Node)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
@@ -93,11 +93,11 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 }
 
 func (rs *REST) New() runtime.Object {
-	return &api.Minion{}
+	return &api.Node{}
 }
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	minion, ok := obj.(*api.Minion)
+	minion, ok := obj.(*api.Node)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
@@ -121,8 +121,8 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}), nil
 }
 
-func (rs *REST) toApiMinion(name string) *api.Minion {
-	return &api.Minion{ObjectMeta: api.ObjectMeta{Name: name}}
+func (rs *REST) toApiMinion(name string) *api.Node {
+	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified minion.

@@ -25,8 +25,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func makeMinion(node string, cpu, memory int) api.Minion {
-	return api.Minion{
+func makeMinion(node string, cpu, memory int) api.Node {
+	return api.Node{
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Spec: api.NodeSpec{
 			Capacity: api.ResourceList{
@@ -70,7 +70,7 @@ func TestLeastRequested(t *testing.T) {
 	tests := []struct {
 		pod          api.Pod
 		pods         []api.Pod
-		nodes        []api.Minion
+		nodes        []api.Node
 		expectedList HostPriorityList
 		test         string
 	}{
@@ -87,7 +87,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (10 + 10) / 2 = 10
 			*/
 			pod:          api.Pod{Spec: noResources},
-			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
+			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled, nothing requested",
 		},
@@ -104,7 +104,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (5 + 5) / 2 = 5
 			*/
 			pod:          api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 6000, 10000)},
+			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 6000, 10000)},
 			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 5}},
 			test:         "nothing scheduled, resources requested, differently sized machines",
 		},
@@ -121,7 +121,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (10 + 10) / 2 = 10
 			*/
 			pod:          api.Pod{Spec: noResources},
-			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
+			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested, pods scheduled",
 			pods: []api.Pod{
@@ -144,7 +144,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (4 + 7.5) / 2 = 5
 			*/
 			pod:          api.Pod{Spec: noResources},
-			nodes:        []api.Minion{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
+			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
 			expectedList: []HostPriority{{"machine1", 7}, {"machine2", 5}},
 			test:         "no resources requested, pods scheduled with resources",
 			pods: []api.Pod{
@@ -167,7 +167,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (4 + 5) / 2 = 4
 			*/
 			pod:          api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Minion{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
+			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 4}},
 			test:         "resources requested, pods scheduled with resources",
 			pods: []api.Pod{
@@ -188,7 +188,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (4 + 8) / 2 = 6
 			*/
 			pod:          api.Pod{Spec: cpuAndMemory},
-			nodes:        []api.Minion{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 50000)},
+			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 50000)},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
 			pods: []api.Pod{
@@ -209,7 +209,7 @@ func TestLeastRequested(t *testing.T) {
 				Minion2 Score: (0 + 5) / 2 = 2
 			*/
 			pod:          api.Pod{Spec: cpuOnly},
-			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
+			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 2}},
 			test:         "requested resources exceed minion capacity",
 			pods: []api.Pod{
@@ -219,7 +219,7 @@ func TestLeastRequested(t *testing.T) {
 		},
 		{
 			pod:          api.Pod{Spec: noResources},
-			nodes:        []api.Minion{makeMinion("machine1", 0, 0), makeMinion("machine2", 0, 0)},
+			nodes:        []api.Node{makeMinion("machine1", 0, 0), makeMinion("machine2", 0, 0)},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "zero minion resources, pods scheduled with resources",
 			pods: []api.Pod{
@@ -230,7 +230,7 @@ func TestLeastRequested(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := LeastRequestedPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(api.MinionList{Items: test.nodes}))
+		list, err := LeastRequestedPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

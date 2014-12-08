@@ -604,7 +604,7 @@ func TestGetServerAPIVersions(t *testing.T) {
 func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions"},
-		Response: Response{StatusCode: 200, Body: &api.MinionList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
+		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
 	}
 	response, err := c.Setup().Minions().List()
 	c.Validate(t, response, err)
@@ -613,14 +613,14 @@ func TestListMinions(t *testing.T) {
 func TestGetMinion(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions/1"},
-		Response: Response{StatusCode: 200, Body: &api.Minion{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
 	}
 	response, err := c.Setup().Minions().Get("1")
 	c.Validate(t, response, err)
 }
 
 func TestCreateMinion(t *testing.T) {
-	requestMinion := &api.Minion{
+	requestMinion := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name: "minion-1",
 		},
