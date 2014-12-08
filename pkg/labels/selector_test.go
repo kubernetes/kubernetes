@@ -311,16 +311,16 @@ func TestSetSelectorParser(t *testing.T) {
 		Valid bool
 	}{
 		{"", &LabelSelector{Requirements: nil}, true, true},
-		{"x", &LabelSelector{Requirements: []Requirement{
+		{"\rx", &LabelSelector{Requirements: []Requirement{
 			getRequirement("x", Exists, nil, t),
 		}}, true, true},
-		{"foo in (abc)", &LabelSelector{Requirements: []Requirement{
+		{"foo  in	 (abc)", &LabelSelector{Requirements: []Requirement{
 			getRequirement("foo", In, util.NewStringSet("abc"), t),
 		}}, true, true},
-		{"x not in (abc)", &LabelSelector{Requirements: []Requirement{
+		{"x not\n\tin (abc)", &LabelSelector{Requirements: []Requirement{
 			getRequirement("x", NotIn, util.NewStringSet("abc"), t),
 		}}, true, true},
-		{"x not in (abc,def)", &LabelSelector{Requirements: []Requirement{
+		{"x  not in	\t	(abc,def)", &LabelSelector{Requirements: []Requirement{
 			getRequirement("x", NotIn, util.NewStringSet("abc", "def"), t),
 		}}, true, true},
 		{"x in (abc,def)", &LabelSelector{Requirements: []Requirement{
@@ -344,7 +344,6 @@ func TestSetSelectorParser(t *testing.T) {
 		}}, false, true},
 		{"x,,y", nil, true, false},
 		{",x,y", nil, true, false},
-		{"x, y", nil, true, false},
 		{"x nott in (y)", nil, true, false},
 		{"x not in ( )", nil, true, false},
 		{"x not in (, a)", nil, true, false},
