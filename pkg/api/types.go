@@ -158,12 +158,102 @@ type VolumeSource struct {
 	HostDir *HostDir `json:"hostDir"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDir `json:"emptyDir"`
+	// GitRepo represents a git repository at a particular revision.
+	GitRepo *GitRepo `json:"gitRepo"`
+
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk"`
-	// GitRepo represents a git repository at a particular revision.
-	GitRepo *GitRepo `json:"gitRepo"`
+
+	// IMPORTANT!  GCEPersistentDisk will be refactored into PersistentDisk.
+	// For this proposal, it is left in for compilation purposes.
+
+	// DiskSpec represents a request for persistent storage that is attached to
+	// kubelet's host machine and then exposed to the pod.
+	// The specific implementation of storage is obtained through the cloud provider.
+	PersistentDisk *PersistentDisk `json:diskSpec`
 }
+
+type PersistentDisk struct {
+	TypeMeta
+	ObjectMeta
+	Spec    DiskSpec
+	Status  DiskStatus
+}
+
+type DiskSpec struct {
+
+	// unique name of the PD resource.
+	// used to identify the disk in GCE or AWS
+	PDName				string `json: "pdName"`
+
+	// policy that specifies whether to delete a disk (or not) when a pod is deleted
+	RetentionPolicy		RetentionPolicy `json: "retentionPolicy"`
+
+	// size of the disk, in gb
+	Size        		int
+
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType				string `json:"fsType,omitempty"`
+
+	// Optional: Partition on the disk to mount.
+	// If omitted, kubelet will attempt to mount the device name.
+	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
+	Partition int `json:"partition,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+
+	// minimum performance of the disk, in IOPS.
+	// corresponds to performance attributes in GCE/AWS
+	MinimumIOPS			int
+
+	// minimum performance of the disk, in MBps.
+	// corresponds to performance attributes in GCE/AWS
+	MinimumThroughput 	int
+
+}
+
+type DiskStatus struct {
+
+	Phase			DiskPhase
+
+	// a disk can be mounted on many hosts, depending on type.
+	Mounts 			[]Mount
+
+	// used to place pods on hosts for local storage
+	// used to determine how long a disk has been orphaned
+	LastMount		Mount
+}
+
+type Mount struct {
+	Host            string
+	HostIP          string
+	MountedDate     util.Time
+	Phase			DiskPhase
+}
+
+type RetentionPolicy string
+
+const (
+	DeleteOnPodDelete	= "DeleteOnPodDeletion"
+	RetainOnPodDelete	= "RetainOnPodDelete"
+)
+
+type DiskPhase string
+
+const (
+	MountPending    	DiskPhase = "Pending"
+	Attached            DiskPhase = "Attached"
+	Formatting			DiskPhase = "Formatting"
+	Formatted			DiskPhase = "Formatted"
+	Mounted             DiskPhase = "Mounted"
+	MountFailed         DiskPhase = "Failed"
+	MountDelete     	DiskPhase = "Deleted"
+)
 
 // HostDir represents bare host directory volume.
 type HostDir struct {

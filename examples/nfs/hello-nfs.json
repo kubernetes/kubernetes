@@ -1,0 +1,28 @@
+{
+    "id": "hello-nfs-controller",
+    "kind": "ReplicationController",
+    "apiVersion": "v1beta2",
+    "desiredState": {
+        "replicas": 1,
+        "replicaSelector": {"name": "hello-nfs"},
+        "podTemplate": {
+            "desiredState": {
+                "manifest": {
+                    "version": "v1beta2",
+                    "id": "hello-nfs",
+                    "containers": [{
+                        "name": "hello-nfs",
+                        "image": "markturansky/nfs4go:v1",
+                        "ports": [{
+                            "containerPort": 12345
+                        }]
+                    }]
+                }
+            },
+            "labels": {"name": "hello-nfs"}
+        }
+    },
+    "labels": {
+        "name": "hello-nfs"
+    }
+}
