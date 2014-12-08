@@ -322,6 +322,7 @@ func (m *Master) init(c *Config) {
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                minion.NewREST(m.minionRegistry),
+		"nodes":                  minion.NewREST(m.minionRegistry),
 		"events":                 event.NewREST(m.eventRegistry),
 
 		// TODO: should appear only in scheduler API group.
