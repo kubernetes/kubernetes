@@ -57,7 +57,8 @@ type ConfigFactory struct {
 // NewConfigFactory initializes the factory.
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	// initialize the factory struct
-	factory := &ConfigFactory{Client: client,
+	factory := &ConfigFactory{
+		Client:       client,
 		PodQueue:     cache.NewFIFO(),
 		PodLister:    &storeToPodLister{cache.NewStore()},
 		MinionLister: &storeToMinionLister{cache.NewStore()},
@@ -83,7 +84,7 @@ func (factory *ConfigFactory) Create(predicateKeys, priorityKeys []string) (*sch
 	}
 
 	if priorityKeys == nil {
-		glog.V(2).Infof("Custom priority list not provided, using default priorities")
+		glog.V(2).Infof("Custom priority list not provided, using default priority: LeastRequestedPriority")
 		priorityKeys = []string{"LeastRequestedPriority"}
 	}
 	priorityConfigs, err := factory.getPriorityConfigs(priorityKeys)

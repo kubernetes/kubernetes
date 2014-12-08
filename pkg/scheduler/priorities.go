@@ -24,8 +24,12 @@ import (
 
 // the unused capacity is calculated on a scale of 0-10
 // 0 being the lowest priority and 10 being the highest
-func calculateScore(requested, capacity int) int {
+func calculateScore(requested, capacity int, node string) int {
 	if capacity == 0 {
+		return 0
+	}
+	if requested > capacity {
+		glog.Errorf("Combined requested resources from existing pods exceeds capacity on minion: %s", node)
 		return 0
 	}
 	return ((capacity - requested) * 10) / capacity
@@ -33,18 +37,24 @@ func calculateScore(requested, capacity int) int {
 
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
+func calculateOccupancy(pod api.Pod, node api.Minion, pods []api.Pod) HostPriority {
 	totalCPU := 0
 	totalMemory := 0
-	for _, pod := range pods {
-		for _, container := range pod.Spec.Containers {
+	for _, existingPod := range pods {
+		for _, container := range existingPod.Spec.Containers {
 			totalCPU += container.CPU
 			totalMemory += container.Memory
 		}
 	}
+	// Add the resources requested by the current pod being scheduled.
+	// This also helps differentiate between differently sized, but empty, minions.
+	for _, container := range pod.Spec.Containers {
+		totalCPU += container.CPU
+		totalMemory += container.Memory
+	}
 
-	cpuScore := calculateScore(totalCPU, resources.GetIntegerResource(node.Spec.Capacity, resources.CPU, 0))
-	memoryScore := calculateScore(totalMemory, resources.GetIntegerResource(node.Spec.Capacity, resources.Memory, 0))
+	cpuScore := calculateScore(totalCPU, resources.GetIntegerResource(node.Spec.Capacity, resources.CPU, 0), node.Name)
+	memoryScore := calculateScore(totalMemory, resources.GetIntegerResource(node.Spec.Capacity, resources.Memory, 0), node.Name)
 	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Score:(%d, %d)", totalCPU, totalMemory, cpuScore, memoryScore)
 
 	return HostPriority{
@@ -66,7 +76,7 @@ func LeastRequestedPriority(pod api.Pod, podLister PodLister, minionLister Minio
 
 	list := HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateOccupancy(node, podsToMachines[node.Name]))
+		list = append(list, calculateOccupancy(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
 }

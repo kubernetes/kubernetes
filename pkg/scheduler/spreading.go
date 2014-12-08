@@ -18,7 +18,6 @@ package scheduler
 
 import (
 	"math/rand"
-	"sort"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -44,18 +43,11 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 	if len(pods) > 0 {
 		for _, pod := range pods {
 			counts[pod.Status.Host]++
+			// Compute the maximum number of pods hosted on any minion
+			if counts[pod.Status.Host] > maxCount {
+				maxCount = counts[pod.Status.Host]
+			}
 		}
-
-		// doing this separately since the pod count can be much higher
-		// than the filtered minion count
-		values := make([]int, len(counts))
-		idx := 0
-		for _, count := range counts {
-			values[idx] = count
-			idx++
-		}
-		sort.Sort(sort.IntSlice(values))
-		maxCount = values[len(values)-1]
 	}
 
 	result := []HostPriority{}
