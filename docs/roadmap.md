@@ -1,65 +1,118 @@
 # Kubernetes Roadmap
 
-Updated August 28, 2014
+Updated December 6, 2014
 
-This document is intended to capture the set of features, docs, and patterns that we feel are required to call Kubernetes “feature complete” for a 1.0 release candidate.  This list does not emphasize the bug fixes and stabilization that will be required to take it all the way to production ready.  This is a living document, and is certainly open for discussion.
+This document is intended to capture the set of supported use cases, features, docs, and patterns that we feel are required to call Kubernetes “feature complete” for a 1.0 release candidate.  This list does not emphasize the bug fixes and stabilization that will be required to take it all the way to production ready.  This is a living document, and is certainly open for discussion.
+
+## Target workloads
+
+Features for 1.0 will be driven by the initial set of workloads we intend to support.
+
+Most realistic examples of production services include a load-balanced web frontend exposed to the public Internet, with a stateful backend, such as a clustered database or key-value store, so we will target such a workload for 1.0.
+
+Which exact stateful applications are TBD. Candidates include:
+* redis
+* memcache
+* mysql (using master/slave replication)
+* mongo
+* cassandra
+* etcd
+* zookeeper
 
 ## APIs
-1. ~~Versioned APIs:  Manage APIs for master components and kubelets with explicit versions, version-specific conversion routines, and component-to-component version checking.~~ **Done**
-2. Component-centric APIs:  Clarify which types belong in each component’s API and which ones are truly common.
-  1. Clarify the role of etcd in the cluster.
-3. Idempotency: Whenever possible APIs must be idempotent.
-4. Container restart policy: Policy for each pod or container stating whether and when it should be restarted upon termination.
-5. Life cycle events/hooks and notifications: Notify containers about what is happening to them.
-6. Re-think the network parts of the API: Find resolution on the the multiple issues around networking.
-  1. ~~Utility of HostPorts in ip-per-pod~~ **Done**
-  2. Services/Links/Portals/Ambassadors
-7. Durable volumes: Provide a model for data that survives some kinds of outages.
-8. Auth[nz] and ACLs: Have a plan for how the API and system will express:
+1. Consistent v1 API. [v1beta3](https://github.com/GoogleCloudPlatform/kubernetes/issues/1519) is being developed as the release candidate for the v1 API.
+2. Deprecation policy: Declare the project’s intentions with regards to expiring and removing features and interfaces, including the minimum amount of time non-beta APIs will be supported.
+3. Input validation: Validate schemas of API requests in the apiserver and, optionally, in the client.
+4. Error propagation: Report problems reliably and consistently, with documented behavior.
+5. Easy to add new controllers, such as [per-node controller](https://github.com/GoogleCloudPlatform/kubernetes/pull/2491)
+  1. Replication controller: Make replication controller a standalone entity in the master stack.
+  2. Pod templates: Proposal to make pod templates a first-class API object, rather than an artifact of replica controller [#170](https://github.com/GoogleCloudPlatform/kubernetes/issues/170)
+6. Kubelet API should be well defined and versioned.
+7. Cloud provider API for managing nodes, storage, and network resources. [#2770](https://github.com/GoogleCloudPlatform/kubernetes/issues/2770)
+
+## Scheduling and resource isolation
+1. Resource requirements and scheduling: Use knowledge of resources available and resources required to make good enough scheduling decisions such that applications can start and run. [#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168)
+
+## Images and registry
+1. Simple out-of-the box registry setup. [#1319](https://github.com/GoogleCloudPlatform/kubernetes/issues/1319)
+2. Easy to configure .dockercfg.
+3. Easy to deploy new code to Kubernetes (build and push).
+4. Predictable deployment via configuration-time image resolution. [#1697](https://github.com/GoogleCloudPlatform/kubernetes/issues/1697)
+
+## Storage
+1. Durable volumes: Provide a model for data with identity and lifetime independent of pods. [#1515](https://github.com/GoogleCloudPlatform/kubernetes/pull/1515), [#598](https://github.com/GoogleCloudPlatform/kubernetes/issues/598), [#2609](https://github.com/GoogleCloudPlatform/kubernetes/pull/2609)
+2. Pluggable volume sources and devices: Allow new kinds of data sources and/or devices as volumes. [#945](https://github.com/GoogleCloudPlatform/kubernetes/issues/945), [#2598](https://github.com/GoogleCloudPlatform/kubernetes/pull/2598)
+
+## Networking and naming
+1. DNS: Provide DNS for services, internal and external. [#2224](https://github.com/GoogleCloudPlatform/kubernetes/pull/2224), [#1261](https://github.com/GoogleCloudPlatform/kubernetes/issues/1261)
+2. External IPs: Make Kubernetes services externally reachable. [#1161](https://github.com/GoogleCloudPlatform/kubernetes/issues/1161)
+3. Re-think the network parts of the API: Clean factoring of a la carte networking functionality. [#2585](https://github.com/GoogleCloudPlatform/kubernetes/issues/2585)
+4. Out-of-the-box, kick-the-tires networking implementation. [#1307](https://github.com/GoogleCloudPlatform/kubernetes/issues/1307)
+
+## Authentication and authorization
+1. Auth[nz] and ACLs: Have a plan for how the API and system will express:
   1. Identity & authentication
   2. Authorization & access control
   3. Cluster subdivision, accounting, & isolation
+2. Support for pluggable authentication implementation and authorization polices
+3. Implemented auth[nz] for:
+   1. admin to master and/or kubelet
+   2. user to master
+   3. master component to component (e.g., controller manager to apiserver): localhost in 1.0
+   4. kubelet to master
 
-## Factoring and pluggability
-1. ~~Pluggable scheduling: Cleanly separate the scheduler from the apiserver.~~ **Done**
-2. Pluggable naming and discovery: Call-outs or hooks to enable external naming systems.
-3. Pluggable volumes: Allow new kinds of data sources as volumes.
-4. Replication controller: Make replication controller a standalone entity in the master stack.
-5. Pod templates: Proposal to make pod templates a first-class API object, rather than an artifact of replica controller
+## Usability
 
-## Cluster features
-1. ~~Minion death: Cleanly handle the loss of a minion.~~ **Done**
-2. Configure DNS: Provide DNS service for k8s running pods, containers and services. Auto-populate it with the things we know.
-3. Resource requirements and scheduling: Use knowledge of resources available and resources required to do better scheduling.
-4. ~~True IP-per-pod: Get rid of last remnants of shared port spaces for pods.~~ **Done**
-5. IP-per-service: Proposal to make services cleaner.
-6. Basic deployment tools: This includes tools for higher-level deployments configs.
-7. Standard mechanisms for deploying k8s on k8s with a clear strategy for reusing the infrastructure for self-host.
+### Documentation
+1. Documnted reference cluster architecture
+2. Accurate and complete API documentation
 
-## Node features
-1. Container termination reasons: Capture and report exit codes and other termination reasons.
-2. Garbage collect old container images: Clean up old docker images that consume local disk. Maybe a TTL on images.
-3. Container logs: Expose stdout/stderr from containers without users having to SSH into minions.  Needs a rotation policy to avoid disks getting filled.
-4. Container performance information: Capture and report performance data for each container.
-5. Host log management: Make sure we don't kill nodes with full disks.
+### Cluster turnup, scaling, management, and upgrades
+1. Easy cluster startup
+  1. Automatic node registration
+  2. Configuring k8s
+    1. Move away from flags in master
+    2. Node configuration distribution
+       1. Kubelet configuration
+       2. dockercfg
+2. Easy cluster scaling (adding/removing nodes)
+3. Kubernetes can be upgraded
+  1. master components
+  2. Kubelets
+  3. OS + kernel + Docker
 
-## Global features
-2. Input validation: Stop bad input as early as possible.
-3. Error propagation: Report problems reliably and consistently.
-4. Consistent patterns of usage of IDs and names throughout the system.
-5. Binary release: Repeatable process to produce binaries for release.
+### Workload deployment and management
+1. Kubectl fully replaces kubecfg [#2144](https://github.com/GoogleCloudPlatform/kubernetes/issues/2144)
+  1. Graceful termination. [#1535](https://github.com/GoogleCloudPlatform/kubernetes/issues/1535)
+  2. Resize. [#1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)
+  3. Config generators integrated into kubectl.
+  4. Rolling updates. [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
+2. Kubectl can perform bulk operations (e.g., delete) on streams of API objects [#1905](https://github.com/GoogleCloudPlatform/kubernetes/issues/1905)
 
-## Patterns, policies, and specifications
-1. Deprecation policy: Declare the project’s intentions with regards to expiring and removing features and interfaces.
-2. Compatibility policy: Declare the project’s intentions with regards to saved state and live upgrades of components.
-3. Naming/discovery: Demonstrate techniques for common patterns:
-  1. Master-elected services
-  2. DB replicas
-  3. Sharded services
-  4. Worker pools
-4. Health-checking: Specification for how it works and best practices.
-5. Logging: Demonstrate setting up log collection.
-6. ~~Monitoring: Demonstrate setting up cluster monitoring.~~ **Done**
-7. Rolling updates: Demo and best practices for live application upgrades.
-  1. Have a plan for how higher level deployment / update concepts should / should not fit into Kubernetes
-8. Minion requirements: Document the requirements and integrations between kubelet and minion machine environments.
+## Productionization
+1. Scalability
+  1. 100 nodes for 1.0
+  2. 1000 nodes by summer 2015
+2. HA master -- not gating 1.0
+  1. Master election
+  2. Eliminate global in-memory state
+    1. IP allocator
+    2. Operations
+  3. Sharding
+    1. Pod getter
+3. Kubelets need to coast when master down
+  1. Don’t blow away pods when master is down
+4. Testing
+  1. More/better/easier E2E
+  2. E2E integration testing w/ OpenShift
+  3. More non-E2E integration tests
+  4. Long-term soaking / stress test
+  5. Backward compatibility
+    1. API
+    2. etcd state
+5. Release cadence and artifacts
+  1. Regular stable releases on a frequent timeline (2 weeks).
+  2. Automatic generation of necessary deployment artifacts. It is still TBD if this includes deb and RPMs. Also not clear if it includes docker containers.
+6. Export monitoring metrics (instrumentation)
+7. Bounded disk space on master and kubelets
+  1. GC of unused images
