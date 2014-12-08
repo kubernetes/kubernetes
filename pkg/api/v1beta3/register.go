@@ -46,6 +46,7 @@ func init() {
 		&OperationList{},
 		&Event{},
 		&EventList{},
+		&List{},
 	)
 }
 
@@ -69,3 +70,4 @@ func (*Operation) IsAnAPIObject()                 {}
 func (*OperationList) IsAnAPIObject()             {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
+func (*List) IsAnAPIObject()                      {}

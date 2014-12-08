@@ -19,6 +19,7 @@ package v1beta3
 import (
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -556,9 +557,14 @@ type ReplicationControllerSpec struct {
 	// Selector is a label query over pods that should match the Replicas count.
 	Selector map[string]string `json:"selector,omitempty"`
 
-	// Template is a reference to an object that describes the pod that will be created if
+	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	Template ObjectReference `json:"template,omitempty"`
+	TemplateRef *ObjectReference `json:"templateRef,omitempty"`
+
+	// Template is the object that describes the pod that will be created if
+	// insufficient replicas are detected. This takes precedence over a
+	// TemplateRef.
+	Template *PodTemplateSpec `json:"template,omitempty"`
 }
 
 // ReplicationControllerStatus represents the current status of a replication
@@ -943,4 +949,12 @@ type EventList struct {
 	ListMeta `json:"metadata,omitempty"`
 
 	Items []Event `json:"items"`
+}
+
+// List holds a list of objects, which may not be known by the server.
+type List struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []runtime.RawExtension `json:"items" description:"list of objects"`
 }

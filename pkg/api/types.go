@@ -19,6 +19,7 @@ package api
 import (
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -998,4 +999,12 @@ type BoundPods struct {
 
 	// Items is the list of all pods bound to a given host.
 	Items []BoundPod `json:"items"`
+}
+
+// List holds a list of objects, which may not be known by the server.
+type List struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []runtime.Object `json:"items"`
 }
