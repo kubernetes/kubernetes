@@ -51,6 +51,9 @@ func init() {
 		&BoundPod{},
 		&BoundPods{},
 	)
+	// Future names are supported
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}

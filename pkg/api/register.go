@@ -46,6 +46,9 @@ func init() {
 		&BoundPod{},
 		&BoundPods{},
 	)
+	// Legacy names are supported
+	Scheme.AddKnownTypeWithName("", "Node", &Minion{})
+	Scheme.AddKnownTypeWithName("", "NodeList", &MinionList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
