@@ -70,7 +70,7 @@ func main() {
 
 	if *isup {
 		status := 1
-		if runBash("get status", `$KUBECFG -server_version`) {
+		if IsUp() {
 			status = 0
 			log.Printf("Cluster is UP")
 		} else {
@@ -130,12 +130,22 @@ func Up() bool {
 	return true
 }
 
+// Is the e2e cluster up?
+func IsUp() bool {
+	return runBash("get status", `$KUBECFG -server_version`)
+}
+
 func tryUp() bool {
 	return runBash("up", path.Join(*root, "/cluster/kube-up.sh; test-setup;"))
 }
 
 func Test() (failed, passed []string) {
 	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
+
+	if !IsUp() {
+		log.Fatal("Testing requested, but e2e cluster not up!")
+	}
+
 	// run tests!
 	dir, err := os.Open(filepath.Join(*root, "hack", "e2e-suite"))
 	if err != nil {
