@@ -75,10 +75,12 @@ func (s *Scheme) Log(l DebugLogger) {
 // nameFunc returns the name of the type that we wish to use for encoding. Defaults to
 // the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
-	if kind, ok := s.typeToKind[t]; ok {
-		return kind[0]
+	// find the preferred names for this type
+	names, ok := s.typeToKind[t]
+	if !ok {
+		return t.Name()
 	}
-	return t.Name()
+	return names[0]
 }
 
 // AddKnownTypes registers all types passed in 'types' as being members of version 'version.
