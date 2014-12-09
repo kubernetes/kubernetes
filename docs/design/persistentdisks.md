@@ -2,17 +2,156 @@
 
 ## Abstract
 
-This document defines persistent, cluster-scoped storage for applications that require long lived data.  A new entity
-`PersistentDisk` is introduced to provide longevity to data that outlasts pods.  PersistentDisks with mounting history
-provides an easy implementation of durable or node-specific data [[see Eric Tune's discussion of this topic]](https://github.com/GoogleCloudPlatform/kubernetes/pull/1515)
+This document defines persistent, cluster-scoped storage for applications that require long lived data.  Developers will request storage
+ as an intention ("I'd like 3gb of storage, please") and Kubernetes will use the configured cloud provider implementation to create, manage, and secure
+ that storage.  Names for storage will vary by cloud provider , but each shall be known internally to Kubernetes as a disk.  A new entity `PersistentDisk` is introduced
+ to provide longevity to data that outlasts pods.
+   
+PersistentDisks with mounting history provides a means for durable or node-specific data [[see Eric Tune's discussion of this topic]](https://github.com/GoogleCloudPlatform/kubernetes/pull/1515).
+
+Kubernetes makes no guarantees at runtime that these volumes exist or are available. High availability is left to the storage provider.
  
- Currently, all data volumes which will be exposed to pods must already exist and be formatted with the appropriate filesystem prior 
- to being attached and mounted.  Kubernetes makes no guarantees at runtime that these volumes exist or are available.  
- High availability is left to the storage provider. 
+Disks are secured by storing the username of the authorized API user who created the disk.  Any pod (or other domain object) requesting
+access to the disk must occur as the same user who created the disk.  Legacy disks are supported by administrative action. An admin can
+create the necessary objects in etcd with a named disk and username.
  
 
-    *All Names are TBD - PersistentDisk is a placeholder name
- 
+## Size and Performance -- Requesting a disk 
+
+A storage request is made using the API.  Only the intent is expressed (size and performance).  Kubernetes handles creating, managing, attaching/mounting, and deleting the disk.
+
+Different cloud providers have different types of disks that vary by performance and price.  Types of disks in cloud providers will be normalized internally to Kubernetes and the appropriate value
+used when accessing the provider.
+
+`PerformanceType: fast, faster, fastest`    or   `PerformanceType: Low, Normal, High`.     
+
+AWS EBS mapping to internal types:
+
+    fastest:    'io1' for Provisioned IOPS (SSD) volumes 
+    faster:      'gp2' for General Purpose (SSD) volumes
+    fast:       'standard' for Magnetic volumes  (default)
+
+GCE disk mapping to internal types:
+
+    fastest:    'pd-ssd' for solid-state drives
+    faster:     'pd-standard' for hard disk (defaut)
+    fast:       'pd-standard' -- there is no 3rd option for GCE
+    
+NFS disk mapping to internal types:
+
+    fastest:    'nodeLocal' for node local storage
+    faster:     'nfsShare' an NFS share on the network
+    fast:       'nfsShare' -- there is no 3rd option for NFS
+    
+    
+
+
+## Security and Disk Ownership
+
+It is important to secure disks only to those pods authorized to access them.  Disks and pods must belong to the same namespace.  Securing namespaces to users is required to keep pods from accessing disks
+that don't belong to them.  Security is implemented via an access control list whereby an administrator specifies which usernames can access which namespaces.  
+
+## <a name=schema></a>Schema
+
+* Add new top-level PersistentDisk object
+    * Reasons:
+        1. Disks are 1:N.  Normalizing the schema makes sense for this reuse.
+        2. Disks have identity. Disks outlive pods. Their IDs must be persistent for future re-mounting.
+        3. Disk identity is paired with username for security.
+        4. API required to delete old disks as a separate action from deleting pods (not all pod deletes should delete the disk)
+* Add DiskAccess object
+    * Created at runtime to store a specific disk with username.
+* Separate Spec and Status for disks
+    * DiskSpec contains one of the specific disk types (GCE, AWS, NFS, NodeLocal)
+    * Status keeps mount history for X days, allows pods to preferentially schedule onto previously used hosts
+
+
+
+### Successful Disk Creation 
+![alt text](persistent-disk-sequence.png "Successful API interaction")
+
+### Failed Disk Access
+
+![alt text](persistent-disk-failed-sequence.png "Failed attempt to access volume")
+
+```go
+
+
+struct PersistentDisk {
+
+    TypeMeta
+    ObjectMeta      //namespace will be required.  access to disks only allowed in same namespace for security
+	
+	// separating *PersistentDisk into Spec and Status like other API objects
+	Spec    DiskSpec
+	Status  DiskStatus
+}
+
+struct DiskSpec {
+
+    // size of the disk, in gb
+    Size        int
+    
+    // references various performance types in a cloud provider 
+    Type        DiskPerformanceType    
+}
+
+
+struct DiskStatus {
+
+    // PodCondition recently became PodPhase - see https://github.com/GoogleCloudPlatform/kubernetes/pull/2522
+    Condition   DiskCondition
+    
+    // a disk can be mounted on many hosts, depending on type
+    Mounts []Mount
+}
+
+struct Mount struct {
+    Host            string
+    HostIP          string
+    MountedDate     string  //RFC 3339 format (e.g, 1985-04-12T23:20:50.52Z)
+    MountCondition  DiskCondition
+}
+
+type DiskCondition string
+
+const (
+    MountPending    DiskCondition = "Pending"
+    Attached        DiskCondition = "Attached"
+    Mounted         DiskCondition = "Mounted"
+    MountFailed     DiskCondition = "Failed"
+)
+
+type DiskPerformanceType string
+
+const (
+    Fast            DiskPerformanceType = "fase"
+    Faster          DiskPerformanceType  = "faster"
+    Fastest         DiskPerformanceType  = "fastest"
+)
+
+type VolumeSource struct {
+	HostDir *HostDir
+	EmptyDir *EmptyDir 
+	
+	// changed from specific GCEPersistentDisk.
+	// selectors that can find a PersistentDisk to attach and mount
+	Selector []map[string]
+	
+	
+	// Does GitRepo fit the "disk" definition?  It would not match "intent" and instead requires specific repo/version attributes
+	GitRepo *GitRepo `json:"gitRepo"`
+	
+    // Optional: Defaults to false (read/write). 
+    // the ReadOnly setting in VolumeMounts.
+    // This allows many GCE VMs to attach a single PersistentDisk many times in read-only mode
+	ReadOnly bool
+}
+
+```
+
+
+
 ## Phased Approach
 
 Every effort will be made to break this task into discrete pieces of functionality which can be committed as individual pulls/merges.
@@ -78,160 +217,6 @@ See [Tim Hockin's new volumes framework](https://github.com/GoogleCloudPlatform/
 1. The scheduler will attempt to place a pod on the host where the NodePD lives.
 1. High availability of data is left to the cluster administrator.
 
-> ## Optional
-> 
-> ### EmptyDisk
-> 
-> 1. Refactor EmptyDir -> EmptyDisk.  All behavior remains identical.
-> 1. EmptyDisk does not have long lived identity.
-> 1. Is an EmptyDir the same as a NodeLocalDisk with w/ boolean flag for persistence?  
-
-## Security
-
-| Tables        | Are           | Cool  |
-| ------------- |:-------------:| -----:|
-| col 3 is      | right-aligned | $1600 |
-| col 2 is      | centered      |   $12 |
-| zebra stripes | are neat      |    $1 |
-
-## <a name=schema></a>Schema
-
-* Add new PersistentDisk object
-    * Two reasons to create new top-level object
-        1. Disks are 1:N.  Normalizing the schema makes sense for this reuse.
-        2. Disks have identity. Disks outlive pods. Their IDs must be persistent for future re-mounting.  
-* Separate Spec and Status for disks
-    * DiskSpec contains one of the specific disk types (GCE, AWS, NFS, NodeLocal)
-    * Status keeps mount history for X days, allows pods to preferentially schedule onto previously used hosts
-
-```go
-
-
-struct PersistentDisk {
-
-    TypeMeta
-    ObjectMeta      //namespace will be required.  access to disks only allowed in same namespace for security
-	
-	// separating *PersistentDisk into Spec and Status like other API objects
-	Spec    DiskSpec
-	Status  DiskStatus
-}
-
-struct DiskSpec {
-
-	// HostDir represents a pre-existing directory on the host machine that is directly
-	// exposed to the container. This is generally used for system agents or other privileged
-	// things that are allowed to see the host machine. Most containers will NOT need this.
-	// TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
-	// mount host directories as read/write.
-	HostDir *HostDir `json:"hostDir" yaml:"hostDir"`
-	
-	// EmptyDir represents a temporary directory that shares a pod's lifetime.
-	EmptyDir *EmptyDir `json:"emptyDir" yaml:"emptyDir"`
-	
-	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDisk `json:"gcePersistentDisk" yaml:"gcePersistentDisk"`
-	
-    // AWSPersistentDisk represents an AWS EBS volume that is attached to a
-    // kubelet's host machine and then exposed to the pod.
-	AWSPersistentDisk  *AWSPersistentDisk `json:"awsPersistentDisk" yaml:"awsPersistentDisk"`
-	
-	// GitRepo represents a git repository at a particular revision.
-	GitRepo *GitRepo `json:"gitRepo" yaml:"gitRepo"`
-	
-	// NFSPersistentDisk represents a pre-existing server on the network with ready exports
-	NFSPersistentDisk  *NFSPersistentDisk `json:"nfsPersistentDisk" yaml:"nfsPersistentDisk"`
-}
-
-
-// AWSPersistentDisk represents an Elastic Block Store in Amazon Web Services.
-//
-// A AWS PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same AWS project and zone as the kubelet.
-// A AWS PD can only be mounted once.
-type AWSPersistentDisk struct {
-
-	// Unique name of the PD resource. Used to identify the disk in GCE
-	PDName string `yaml:"pdName" json:"pdName"`
-	
-	// Required: Filesystem type to mount.
-	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
-	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	FSType string `yaml:"fsType,omitempty" json:"fsType,omitempty"`
-	
-	// Optional: Partition on the disk to mount.
-	// If omitted, kubelet will attempt to mount the device name.
-	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
-	Partition int `yaml:"partition,omitempty" json:"partition,omitempty"`
-	
-	// Optional: Defaults to false (read/write). ReadOnly here will force
-	// the ReadOnly setting in VolumeMounts.
-	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
-}
-
-// HostDir represents bare host directory volume.
-type NFSPersistentDisk struct {
-	
-	Path string `json:"path" yaml:"path"`
-	
-    // Required: Constants from sys/mount.h
-    MountFlags  uint64
-    
-    // Options understood by the file system type provided by FSTYPE, see nfs(5) for details
-    // nfs: hard,rsize=xxx,wsize=yyy,noac
-    Options     string
-    
-    // From mount(2)
-    // Required: Server hosting NFS server
-    // NFS: host name or IP address
-    Server      string
-    
-    // Required: File system to be attached
-    // NFS: path
-    Source      string
-}
-
-struct DiskStatus {
-
-    // PodCondition recently became PodPhase - see https://github.com/GoogleCloudPlatform/kubernetes/pull/2522
-    Condition   DiskCondition
-    
-    // a disk can be mounted on many hosts, depending on type
-    Mounts []Mount
-}
-
-struct Mount struct {
-    Host            string
-    HostIP          string
-    MountedDate     string  //RFC 3339 format (e.g, 1985-04-12T23:20:50.52Z)
-    MountCondition  DiskCondition
-}
-
-type DiskCondition string
-
-const (
-    MountPending    DiskCondition = "Pending"
-    Attached        DiskCondition = "Attached"
-    Mounted         DiskCondition = "Mounted"
-    MountFailed     DiskCondition = "Failed"
-)
-
-type VolumeSource struct {
-	HostDir *HostDir
-	EmptyDir *EmptyDir 
-	
-	// changed from specific GCEPersistentDisk.
-	// selectors that can find a PersistentDisk to attach and mount
-	Selector []map[string]
-	
-    // Optional: Defaults to false (read/write). ReadOnly here will force
-    // the ReadOnly setting in VolumeMounts.
-	ReadOnly bool
-}
-
-```
 
 
 
