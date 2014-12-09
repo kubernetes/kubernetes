@@ -149,7 +149,9 @@ EOF
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -N
 
   # Install salt-api
-  #
+  #  
+  # This is used to provide the network transport for salt-api
+  yum install -y python-cherrypy
   # This is used to inform the cloud provider used in the vagrant cluster
   yum install -y salt-api
   # Set log level to a level higher than "info" to prevent the message about
