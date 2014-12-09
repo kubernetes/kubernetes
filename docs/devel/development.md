@@ -115,7 +115,24 @@ Pressing control-C should result in an orderly shutdown but if something goes wr
 go run e2e.go --down
 ```
 
-See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster.
+See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster, here is an overview:
+
+```sh
+# Create a fresh cluster.  Deletes a cluster first, if it exists
+go run e2e.go --up
+
+# Test if a cluster is up.
+go run e2e.go --isup
+
+# Push code to an existing cluster
+go run e2e.go --push
+
+# Run all tests
+go run e2e.go --test
+
+# Run tests matching a glob.
+go run e2e.go --tests=...
+```
 
 ## Testing out flaky tests
 [Instructions here](docs/devel/flaky-tests.md)
