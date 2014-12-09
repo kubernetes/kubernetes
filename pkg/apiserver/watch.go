@@ -77,17 +77,19 @@ func isWebsocketRequest(req *http.Request) bool {
 
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := api.NewContext()
-	namespace := req.URL.Query().Get("namespace")
-	if len(namespace) > 0 {
-		ctx = api.WithNamespace(ctx, namespace)
-	}
-	parts := splitPath(req.URL.Path)
-	if len(parts) < 1 || req.Method != "GET" {
+	if req.Method != "GET" {
 		notFound(w, req)
 		return
 	}
-	storage := h.storage[parts[0]]
+
+	namespace, kind, _, err := KindAndNamespace(req)
+	if err != nil {
+		notFound(w, req)
+		return
+	}
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+
+	storage := h.storage[kind]
 	if storage == nil {
 		notFound(w, req)
 		return

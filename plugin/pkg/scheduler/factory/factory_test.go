@@ -192,7 +192,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	mux := http.NewServeMux()
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle("/api/"+testapi.Version()+"/pods/foo", &handler)
+	mux.Handle("/api/"+testapi.Version()+"/ns/bar/pods/foo", &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
@@ -213,7 +213,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/pods/foo?namespace=bar", "GET", nil)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/ns/bar/pods/foo", "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
