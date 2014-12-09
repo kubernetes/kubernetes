@@ -131,10 +131,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	host := minion.Status.HostIP
-	if host == "" {
-		host = minion.Name
-	}
+	host := minion.Name
 	// TODO: Minion webservers should be secure!
 	return "http://" + net.JoinHostPort(host, strconv.Itoa(ports.KubeletPort)), nil
 }
