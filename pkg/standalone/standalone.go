@@ -220,6 +220,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	EtcdClient              tools.EtcdClient
 	DockerClient            dockertools.DockerInterface
+	CAdvisorPort            uint
 	Address                 util.IP
 	AuthPath                string
 	ApiServerList           util.StringList
@@ -262,7 +263,7 @@ func createAndInitKubelet(kc *KubeletConfig) *kubelet.Kubelet {
 	k.BirthCry()
 
 	go kubelet.GarbageCollectLoop(k)
-	go kubelet.MonitorCAdvisor(k)
+	go kubelet.MonitorCAdvisor(k, kc.CAdvisorPort)
 	kubelet.InitHealthChecking(k)
 
 	return k

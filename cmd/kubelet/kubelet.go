@@ -60,6 +60,7 @@ var (
 	minimumGCAge            = flag.Duration("minimum_container_ttl_duration", 0, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	authPath                = flag.String("auth_path", "", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	cAdvisorPort            = flag.Uint("cadvisor_port", 4194, "The port of the localhost cAdvisor endpoint")
 	apiServerList           util.StringList
 )
 
@@ -110,6 +111,7 @@ func main() {
 		MaxContainerCount:       *maxContainerCount,
 		Runonce:                 *runonce,
 		Port:                    *port,
+		CAdvisorPort:            *cAdvisorPort,
 		EnableServer:            *enableServer,
 		EnableDebuggingHandlers: *enableDebuggingHandlers,
 		DockerClient:            kubelet.ConnectToDockerOrDie(*dockerEndpoint),

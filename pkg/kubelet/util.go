@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,11 +89,11 @@ func GarbageCollectLoop(k *Kubelet) {
 }
 
 // TODO: move this into the kubelet itself
-func MonitorCAdvisor(k *Kubelet) {
+func MonitorCAdvisor(k *Kubelet, cp uint) {
 	defer util.HandleCrash()
 	// TODO: Monitor this connection, reconnect if needed?
 	glog.V(1).Infof("Trying to create cadvisor client.")
-	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:4194")
+	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:" + strconv.Itoa(int(cp)))
 	if err != nil {
 		glog.Errorf("Error on creating cadvisor client: %v", err)
 		return
