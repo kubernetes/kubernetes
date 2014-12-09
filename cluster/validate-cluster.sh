@@ -33,38 +33,78 @@ detect-master > /dev/null
 detect-minions > /dev/null
 
 MINIONS_FILE=/tmp/minions
-"${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.items}}{{.id}}\n{{end}}' list minions > ${MINIONS_FILE}
+attempt=0
+while true; do
+  "${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.items}}{{.id}}\n{{end}}' list minions > "${MINIONS_FILE}"
+  found=$(grep -c . "${MINIONS_FILE}")
+  if [[ ${found} == "${NUM_MINIONS}" ]]; then
+    break
+  else
+    if (( attempt > 5 )); then
+      echo -e "${color_red}Detected ${found} nodes out of ${NUM_MINIONS}. Your cluster may not be working. ${color_norm}"
+      exit 2
+    fi
+    attempt=$((attempt+1))
+    sleep 30
+  fi
+done
+echo "Found ${found} nodes."
 
 # On vSphere, use minion IPs as their names
 if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]]; then
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    MINION_NAMES[i]=${KUBE_MINION_IP_ADDRESSES[i]}
+    MINION_NAMES[$i]=${KUBE_MINION_IP_ADDRESSES[$i]}
   done
 fi
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
-    count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
-    if [[ "$count" == "0" ]]; then
-        echo "Failed to find ${MINION_NAMES[$i]}, cluster is probably broken."
-        exit 1
-    fi
+    # Make several attempts to deal with slow cluster birth.
+    attempt=0
+    while true; do
+      echo -n "Attempt $((attempt+1)) to find ${MINION_NAMES[$i]} ..."
+      count=$(grep -c "${MINION_NAMES[$i]}" "${MINIONS_FILE}") || :
+      if [[ "${count}" == "0" ]]; then
+          if (( attempt > 5 )); then
+            echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
+            exit 1
+          fi
+      else
+        echo -e " ${color_green}[working]${color_norm}"
+        break
+      fi
+      echo -e " ${color_yellow}[not working yet]${color_norm}"
+      attempt=$((attempt+1))
+      sleep 20
+    done
 
-    NAME=${MINION_NAMES[i]}
+    name="${MINION_NAMES[$i]}"
     if [ "$KUBERNETES_PROVIDER" != "vsphere" ]; then
       # Grab fully qualified name
-      NAME=$(grep "${MINION_NAMES[i]}" ${MINIONS_FILE})
+      name=$(grep "${MINION_NAMES[$i]}\." "${MINIONS_FILE}")
     fi
 
-    # Make sure the kubelet is healthy
-    curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
-        "https://${KUBE_MASTER_IP}/api/v1beta1/proxy/minions/${NAME}/healthz")
-    if [[ "${curl_output}" != "ok" ]]; then
-        echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
-        echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
-        exit 1
-    else
-        echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
-    fi
+    # Make sure the kubelet is healthy.
+    # Make several attempts to deal with slow cluster birth.
+    attempt=0
+    while true; do
+      echo -n "Attempt $((attempt+1)) at checking Kubelet installation on node ${MINION_NAMES[$i]} ..."
+      curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
+          "https://${KUBE_MASTER_IP}/api/v1beta1/proxy/minions/${name}/healthz")
+      if [[ "${curl_output}" != "ok" ]]; then
+          if (( attempt > 5 )); then
+            echo
+            echo -e "${color_red}Kubelet failed to install on node ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
+            echo -e "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)${color_norm}"
+            exit 1
+          fi
+      else
+          echo -e " ${color_green}[working]${color_norm}"
+          break
+      fi
+      echo -e " ${color_yellow}[not working yet]${color_norm}"
+      attempt=$((attempt+1))
+      sleep 30
+    done
 done
-echo "Cluster validation succeeded"
+echo -e "${color_green}Cluster validation succeeded${color_norm}"
