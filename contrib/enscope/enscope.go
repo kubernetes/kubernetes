@@ -31,7 +31,7 @@ const usage = "usage: enscope specFilename configFilename"
 
 func checkErr(err error) {
 	if err != nil {
-		glog.Fatalf("%v", err)
+		glog.FatalDepth(1, err)
 	}
 }
 
