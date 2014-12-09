@@ -87,7 +87,6 @@ function detect-project () {
   echo "Project: $PROJECT (autodetected from gcloud config)"
 }
 
-
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
 #
@@ -435,40 +434,81 @@ EOF
   )
 }
 
-# Delete a kubernetes cluster
+# Delete a kubernetes cluster.
+#
+# Assumed vars:
+#   MASTER_NAME
+#   INSTANCE_PREFIX
+#   ZONE
+#   PROJECT
+# This function tears down cluster resources 10 at a time to avoid issuing too many
+# API calls and exceeding API quota. It is important to bring down the instances before bringing
+# down the firewall rules and routes.
 function kube-down {
   # Detect the project into $PROJECT
   detect-project
 
   echo "Bringing down cluster"
-  gcloud compute firewall-rules delete  \
+
+  # First delete the master (if it exists).
+  gcloud compute instances delete \
     --project "${PROJECT}" \
     --quiet \
-    "${MASTER_NAME}-https" &
-
-  local minion
-  for minion in "${MINION_NAMES[@]}"; do
-    gcloud compute firewall-rules delete \
-      --project "${PROJECT}" \
-      --quiet \
-      "${minion}-all" &
-
-    gcloud compute routes delete  \
-      --project "${PROJECT}" \
-      --quiet \
-      "${minion}" &
-  done
-
-  for minion in "${MASTER_NAME}" "${MINION_NAMES[@]}"; do
+    --delete-disks all \
+    --zone "${ZONE}" \
+    "${MASTER_NAME}" || true
+  # Find out what minions are running.
+  local -a minions
+  minions=( $(gcloud compute instances list \
+                --project "${PROJECT}" --zone "${ZONE}" \
+                --regexp "${INSTANCE_PREFIX}-minion-[0-9]+" \
+                | awk 'NR >= 2 { print $1 }') )
+  # If any minions are running, delete them in batches.
+  while (( "${#minions[@]}" > 0 )); do
+    echo Deleting nodes "${minions[*]::10}"
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
       --delete-disks all \
       --zone "${ZONE}" \
-      "${minion}" &
+      "${minions[@]::10}" || true
+    minions=( "${minions[@]:10}" )
   done
 
-  wait
+  # Delete firewall rule for the master.
+  gcloud compute firewall-rules delete  \
+    --project "${PROJECT}" \
+    --quiet \
+    "${MASTER_NAME}-https" || true
+
+  # Delete firewall rules for minions.
+  # TODO(satnam6502): Adjust this if we move to just one big firewall rule.\
+  local -a firewall_rules
+  firewall_rules=( $(gcloud compute firewall-rules list --project "${PROJECT}" \
+                       --regexp "${INSTANCE_PREFIX}-minion-[0-9]+-all" \
+                       | awk 'NR >= 2 { print $1 }') )
+  while (( "${#firewall_rules[@]}" > 0 )); do
+    echo Deleting firewall rules "${firewall_rules[*]::10}"
+    gcloud compute firewall-rules delete  \
+      --project "${PROJECT}" \
+      --quiet \
+      "${firewall_rules[@]::10}" || true
+    firewall_rules=( "${firewall_rules[@]:10}" )
+  done
+
+  # Delete routes.
+  local -a routes
+  routes=( $(gcloud compute routes list --project "${PROJECT}" \
+              --regexp "${INSTANCE_PREFIX}-minion-[0-9]+" | awk 'NR >= 2 { print $1 }') )
+  while (( "${#routes[@]}" > 0 )); do
+    echo Deleting routes "${routes[*]::10}"
+    gcloud compute routes delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${routes[@]::10}" || true
+    routes=( "${routes[@]:10}" )
+  done
+
 }
 
 # Update a kubernetes cluster with latest source
