@@ -12,7 +12,7 @@
            "id": "frontendController",
            "containers": [{
              "name": "php-redis",
-             "image": "brendanburns/php-redis",
+             "image": "kubernetes/example-guestbook-php-redis",
              "cpu": 100,
              "memory": 50000000,
              "ports": [{"containerPort": 80, "hostPort": 8000}]
