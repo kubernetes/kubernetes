@@ -30,12 +30,12 @@ import (
 	fuzz "github.com/google/gofuzz"
 )
 
-func LoadSchemaForTest(file string) (*Schema, error) {
+func LoadSchemaForTest(file string) (Schema, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
-	return NewSchemaFromBytes(data)
+	return NewSwaggerSchemaFromBytes(data)
 }
 
 // TODO: this is cloned from serialization_test.go, refactor to somewhere common like util
@@ -251,12 +251,63 @@ var invalidPod3 = `{
 }
 `
 
+var invalidYaml = `
+id: name
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: redis-master
+    containers:
+      - name: "master"
+        image: "dockerfile/redis"
+        command: "this is a bad command"
+labels:
+  name: "redis-master"
+`
+
 func TestInvalid(t *testing.T) {
 	schema, err := LoadSchemaForTest("v1beta1-swagger.json")
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
-	tests := []string{invalidPod, invalidPod2}
+	tests := []string{invalidPod, invalidPod2, invalidPod3, invalidYaml}
+	for _, test := range tests {
+		err = schema.ValidateBytes([]byte(test))
+		if err == nil {
+			t.Errorf("unexpected non-error\n%s", test)
+		}
+	}
+}
+
+var validYaml = `
+id: name
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: redis-master
+    containers:
+      - name: "master"
+        image: "dockerfile/redis"
+        command:
+        	- this
+        	- is
+        	- an
+        	- ok
+        	- command
+labels:
+  name: "redis-master"
+`
+
+func TestValid(t *testing.T) {
+	schema, err := LoadSchemaForTest("v1beta1-swagger.json")
+	if err != nil {
+		t.Errorf("Failed to load: %v", err)
+	}
+	tests := []string{validYaml}
 	for _, test := range tests {
 		err = schema.ValidateBytes([]byte(test))
 		if err == nil {

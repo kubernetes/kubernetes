@@ -24,6 +24,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -41,6 +43,7 @@ type Factory struct {
 	Client        func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error)
 	Describer     func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error)
 	Printer       func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
+	Validator     func(*cobra.Command) (validation.Schema, error)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -49,6 +52,17 @@ func NewFactory(clientBuilder clientcmd.Builder) *Factory {
 		ClientBuilder: clientBuilder,
 		Mapper:        latest.RESTMapper,
 		Typer:         api.Scheme,
+		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
+			if GetFlagBool(cmd, "validate") {
+				client, err := clientBuilder.Client()
+				if err != nil {
+					return nil, err
+				}
+				return &clientSwaggerSchema{client, api.Scheme}, nil
+			} else {
+				return validation.NullSchema{}, nil
+			}
+		},
 		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
 			return clientBuilder.Client()
 		},
@@ -88,6 +102,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	// to do that automatically for every subcommand.
 	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
 	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
+	cmds.PersistentFlags().Bool("validate", false, "If true, use a schema to validate the input before sending it")
 
 	cmds.AddCommand(f.NewCmdVersion(out))
 	cmds.AddCommand(f.NewCmdProxy(out))
@@ -153,4 +168,29 @@ func GetExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
 	// TODO: determine when --ns-path is set but equal to the default
 	// value and return its value and true.
 	return "", false
+}
+
+type clientSwaggerSchema struct {
+	c *client.Client
+	t runtime.ObjectTyper
+}
+
+func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
+	version, _, err := c.t.DataVersionAndKind(data)
+	if err != nil {
+		return err
+	}
+	schemaData, err := c.c.RESTClient.Get().
+		AbsPath("/swaggerapi/api").
+		Path(version).
+		Do().
+		Raw()
+	if err != nil {
+		return err
+	}
+	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData)
+	if err != nil {
+		return err
+	}
+	return schema.ValidateBytes(data)
 }
