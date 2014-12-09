@@ -87,6 +87,16 @@ if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
   auth_config=(
     "-auth" "$HOME/.kubernetes_vagrant_auth"
   )
+elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  # While KUBECFG calls remain, we manually pass the auth and cert info.
+  detect-project &> /dev/null
+  cluster_config_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
+  auth_config=(
+    "-certificate_authority=${cluster_config_dir}/ca.crt"
+    "-client_certificate=${cluster_config_dir}/kubecfg.crt"
+    "-client_key=${cluster_config_dir}/kubecfg.key"
+    "-auth=${cluster_config_dir}/kubernetes_auth"
+  )
 else
   auth_config=()
 fi
@@ -96,4 +106,5 @@ if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-"$kubecfg" "${auth_config[@]:+${auth_config[@]}}" "$@"
+echo "Running: " "${kubecfg}" "${auth_config[@]:+${auth_config[@]}}" "${@}" >&2
+"${kubecfg}" "${auth_config[@]:+${auth_config[@]}}" "${@}"

@@ -64,11 +64,19 @@ locations=(
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-# When we are using vagrant it has hard coded auth.  We repeat that here so that
-# we don't clobber auth that might be used for a publicly facing cluster.
 if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  # When we are using vagrant it has hard coded auth.  We repeat that here so that
+  # we don't clobber auth that might be used for a publicly facing cluster.
   auth_config=(
     "--auth_config=$HOME/.kubernetes_vagrant_auth"
+  )
+elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  # With GKE, our auth and certs are in gcloud's config directory.
+  detect-project &> /dev/null
+  cfg_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
+  auth_config=(
+    "--auth_config=${cfg_dir}/kubernetes_auth"
+    "--cert_dir=${cfg_dir}"
   )
 else
   auth_config=()

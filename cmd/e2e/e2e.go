@@ -37,6 +37,7 @@ import (
 
 var (
 	authConfig = flag.String("auth_config", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.")
+	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	host       = flag.String("host", "", "The host to connect to")
 	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 )
@@ -88,11 +89,18 @@ func loadClientOrDie() *client.Client {
 	config := client.Config{
 		Host: *host,
 	}
-	auth, err := clientauth.LoadFromFile(*authConfig)
+	info, err := clientauth.LoadFromFile(*authConfig)
 	if err != nil {
 		glog.Fatalf("Error loading auth: %v", err)
 	}
-	config, err = auth.MergeWithConfig(config)
+	// If the certificate directory is provided, set the cert paths to be there.
+	if *certDir != "" {
+		glog.Infof("Expecting certs in %v.", *certDir)
+		info.CAFile = filepath.Join(*certDir, "ca.crt")
+		info.CertFile = filepath.Join(*certDir, "kubecfg.crt")
+		info.KeyFile = filepath.Join(*certDir, "kubecfg.key")
+	}
+	config, err = info.MergeWithConfig(config)
 	if err != nil {
 		glog.Fatalf("Error creating client")
 	}
@@ -208,12 +216,12 @@ func TestImportantURLs(c *client.Client) bool {
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
 	provider := os.Getenv("KUBERNETES_PROVIDER")
-	if len(provider) > 0 && provider != "gce" {
+	if len(provider) > 0 && provider != "gce" && provider != "gke" {
 		glog.Infof("skipping TestKubeletSendsEvent on cloud provider %s", provider)
 		return true
 	}
 	if provider == "" {
-		glog.Info("KUBERNETES_PROVIDER is unset assuming \"gce\"")
+		glog.Info("KUBERNETES_PROVIDER is unset; assuming \"gce\"")
 	}
 
 	podClient := c.Pods(api.NamespaceDefault)
@@ -406,16 +414,23 @@ func main() {
 
 	info := []TestInfo{}
 	passed := true
-	for _, test := range tests {
+	for i, test := range tests {
+		glog.Infof("Running test %d", i+1)
 		testPassed := test.test(c)
 		if !testPassed {
+			glog.Infof("        test %d failed", i+1)
 			passed = false
-		} // TODO: clean up objects created during a test after the test, so cases
+		} else {
+			glog.Infof("        test %d passed", i+1)
+		}
+		// TODO: clean up objects created during a test after the test, so cases
 		// are independent.
 		info = append(info, TestInfo{testPassed, test})
 	}
 	outputTAPSummary(info)
 	if !passed {
-		glog.Fatalf("Tests failed")
+		glog.Fatalf("At least one test failed")
+	} else {
+		glog.Infof("All tests pass")
 	}
 }
