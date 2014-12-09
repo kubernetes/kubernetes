@@ -72,6 +72,7 @@ grains:
   network_mode: openvswitch
   networkInterfaceName: eth1
   etcd_servers: $MASTER_IP
+  api_servers: $MASTER_IP
   cloud: vagrant
   cloud_provider: vagrant
   roles:
