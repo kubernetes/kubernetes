@@ -20,7 +20,8 @@ import (
 	"flag"
 	"io/ioutil"
 	"os"
-	"runtime"
+	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -36,6 +38,7 @@ import (
 var (
 	authConfig = flag.String("auth_config", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.")
 	host       = flag.String("host", "", "The host to connect to")
+	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 )
 
 func waitForPodRunning(c *client.Client, id string) {
@@ -53,7 +56,12 @@ func waitForPodRunning(c *client.Client, id string) {
 	}
 }
 
-func loadObjectOrDie(filePath string) interface{} {
+// assetPath returns a path to the requested file; safe on all OSes.
+func assetPath(pathElements ...string) string {
+	return filepath.Join(*repoRoot, filepath.Join(pathElements...))
+}
+
+func loadObjectOrDie(filePath string) runtime.Object {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		glog.Fatalf("Failed to read pod: %v", err)
@@ -128,7 +136,7 @@ func TestKubernetesROService(c *client.Client) bool {
 func TestPodUpdate(c *client.Client) bool {
 	podClient := c.Pods(api.NamespaceDefault)
 
-	pod := loadPodOrDie("./api/examples/pod.json")
+	pod := loadPodOrDie(assetPath("api", "examples", "pod.json"))
 	value := strconv.Itoa(time.Now().Nanosecond())
 	pod.Labels["time"] = value
 
@@ -208,7 +216,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 
 	podClient := c.Pods(api.NamespaceDefault)
 
-	pod := loadPodOrDie("./cmd/e2e/pod.json")
+	pod := loadPodOrDie(assetPath("cmd", "e2e", "pod.json"))
 	value := strconv.Itoa(time.Now().Nanosecond())
 	pod.Labels["time"] = value
 
@@ -274,9 +282,78 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	return true
 }
 
+func TestNetwork(c *client.Client) bool {
+	ns := api.NamespaceDefault
+	svc, err := c.Services(ns).Create(loadObjectOrDie(assetPath(
+		"contrib", "for-tests", "network-tester", "service.json",
+	)).(*api.Service))
+	if err != nil {
+		glog.Errorf("unable to create test service: %v", err)
+		return false
+	}
+	// Clean up service
+	defer func() {
+		if err = c.Services(ns).Delete(svc.Name); err != nil {
+			glog.Errorf("unable to delete svc %v: %v", svc.Name, err)
+		}
+	}()
+
+	rc, err := c.ReplicationControllers(ns).Create(loadObjectOrDie(assetPath(
+		"contrib", "for-tests", "network-tester", "rc.json",
+	)).(*api.ReplicationController))
+	if err != nil {
+		glog.Errorf("unable to create test rc: %v", err)
+		return false
+	}
+	// Clean up rc
+	defer func() {
+		rc.Spec.Replicas = 0
+		rc, err = c.ReplicationControllers(ns).Update(rc)
+		if err != nil {
+			glog.Errorf("unable to modify replica count for rc %v: %v", rc.Name, err)
+			return
+		}
+		if err = c.ReplicationControllers(ns).Delete(rc.Name); err != nil {
+			glog.Errorf("unable to delete rc %v: %v", rc.Name, err)
+		}
+	}()
+
+	const maxAttempts = 60
+	for i := 0; i < maxAttempts; i++ {
+		time.Sleep(time.Second)
+		body, err := c.Get().Path("proxy").Path("services").Path(svc.Name).Path("status").Do().Raw()
+		if err != nil {
+			glog.Infof("Attempt %v/%v: service/pod still starting. (error: '%v')", i, maxAttempts, err)
+			continue
+		}
+		switch string(body) {
+		case "pass":
+			glog.Infof("Passed on attempt %v. Cleaning up.", i)
+			return true
+		case "running":
+			glog.Infof("Attempt %v/%v: test still running", i, maxAttempts)
+		case "fail":
+			if body, err := c.Get().Path("proxy").Path("services").Path(svc.Name).Path("read").Do().Raw(); err != nil {
+				glog.Infof("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err)
+			} else {
+				glog.Infof("Failed on attempt %v. Cleaning up. Details:\n%v", i, string(body))
+			}
+			return false
+		}
+	}
+
+	if body, err := c.Get().Path("proxy").Path("services").Path(svc.Name).Path("read").Do().Raw(); err != nil {
+		glog.Infof("Timed out. Cleaning up. Error reading details: %v", err)
+	} else {
+		glog.Infof("Timed out. Cleaning up. Details:\n%v", string(body))
+	}
+
+	return false
+}
+
 func main() {
 	flag.Parse()
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	goruntime.GOMAXPROCS(goruntime.NumCPU())
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -294,6 +371,7 @@ func main() {
 		TestKubeletSendsEvent,
 		TestImportantURLs,
 		TestPodUpdate,
+		TestNetwork,
 	}
 
 	passed := true
