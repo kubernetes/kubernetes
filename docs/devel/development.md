@@ -115,7 +115,47 @@ Pressing control-C should result in an orderly shutdown but if something goes wr
 go run e2e.go --down
 ```
 
-See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster.
+### Flag options
+See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster, here is an overview:
+
+```sh
+# Build binaries for testing
+go run e2e.go --build
+
+# Create a fresh cluster.  Deletes a cluster first, if it exists
+go run e2e.go --up
+
+# Test if a cluster is up.
+go run e2e.go --isup
+
+# Push code to an existing cluster
+go run e2e.go --push
+
+# Push to an existing cluster, or bring up a cluster if it's down.
+go run e2e.go --pushup
+
+# Run all tests
+go run e2e.go --test
+
+# Run tests matching a glob.
+go run e2e.go --tests=...
+```
+
+### Combining flags
+```sh
+# Flags can be combined, and their actions will take place in this order:
+# -build, -push|-up|-pushup, -test|-tests=..., -down
+# e.g.:
+go run e2e.go -build -pushup -test -down
+
+# -v (verbose) can be added if you want streaming output instead of only
+# seeing the output of failed commands.
+
+# -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
+# cleaning up after a failed test or viewing logs.
+go run e2e.go -ctl='get events'
+go run e2e.go -ctl='delete pod foobar'
+```
 
 ## Testing out flaky tests
 [Instructions here](docs/devel/flaky-tests.md)
