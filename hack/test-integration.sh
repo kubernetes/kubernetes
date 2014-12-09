@@ -33,7 +33,7 @@ cleanup() {
 "${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
-trap cleanup HUP INT QUIT TERM
+trap cleanup EXIT
 
 kube::etcd::start
 
