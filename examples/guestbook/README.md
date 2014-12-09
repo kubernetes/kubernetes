@@ -224,7 +224,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
            "id": "frontendController",
            "containers": [{
              "name": "php-redis",
-             "image": "brendanburns/php-redis",
+             "image": "kubernetes/example-guestbook-php-redis",
              "cpu": 100,
              "memory": 50000000,
              "ports": [{"containerPort": 80, "hostPort": 8000}]
@@ -244,23 +244,23 @@ Using this file, you can turn up your frontend with:
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/frontend-controller.json create replicationControllers
-ID                   Image(s)                 Selector            Replicas
-----------           ----------               ----------          ----------
-frontendController   brendanburns/php-redis   name=frontend       3
+ID                   Image(s)                                 Selector            Replicas
+----------           ----------                               ----------          ----------
+frontendController   kubernetes/example-guestbook-php-redis   name=frontend       3
 ```
 
 Once that's up (it may take ten to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
 ```shell
 $ cluster/kubecfg.sh list pods
-ID                                      Image(s)                   Host                                          Labels                                                                                      Status
-----------                              ----------                 ----------                                    ----------                                                                                  ----------
-redis-master                            dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master                                                                           Running
-e4469b52-70e7-11e4-9154-0800279696e1    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController,uses=redis-master                Running
-e446dfc0-70e7-11e4-9154-0800279696e1    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController,uses=redis-master                Running
-6b584847-70ee-11e4-9154-0800279696e1    brendanburns/php-redis     kubernetes-minion-3.c.briandpe-api.internal   name=frontend,replicationController=frontendController,uses=redisslave,redis-master         Running
-6b59e6d5-70ee-11e4-9154-0800279696e1    brendanburns/php-redis     kubernetes-minion-2.c.briandpe-api.internal   name=frontend,replicationController=frontendController,uses=redisslave,redis-master         Running
-6b57a25d-70ee-11e4-9154-0800279696e1    brendanburns/php-redis     kubernetes-minion-1.c.briandpe-api.internal   name=frontend,replicationController=frontendController,uses=redisslave,redis-master         Running
+ID                                      Image(s)                                   Host                                          Labels                                                                                      Status
+----------                              ----------                                 ----------                                    ----------                                                                                  ----------
+redis-master                            dockerfile/redis                           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master                                                                           Running
+e4469b52-70e7-11e4-9154-0800279696e1    brendanburns/redis-slave                   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController,uses=redis-master                Running
+e446dfc0-70e7-11e4-9154-0800279696e1    brendanburns/redis-slave                   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController,uses=redis-master                Running
+6b584847-70ee-11e4-9154-0800279696e1    kubernetes/example-guestbook-php-redis     kubernetes-minion-3.c.briandpe-api.internal   name=frontend,replicationController=frontendController,uses=redisslave,redis-master         Running
+6b59e6d5-70ee-11e4-9154-0800279696e1    kubernetes/example-guestbook-php-redis     kubernetes-minion-2.c.briandpe-api.internal   name=frontend,replicationController=frontendController,uses=redisslave,redis-master         Running
+6b57a25d-70ee-11e4-9154-0800279696e1    kubernetes/example-guestbook-php-redis     kubernetes-minion-1.c.briandpe-api.internal   name=frontend,replicationController=frontendController,uses=redisslave,redis-master         Running
 ```
 
 You will see a single redis master pod, two redis slaves, and three frontend pods.
