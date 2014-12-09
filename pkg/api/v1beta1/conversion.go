@@ -381,7 +381,7 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
-			out.Version = "v1beta2"
+			out.Version = "v1beta1"
 			return nil
 		},
 		func(in *ContainerManifest, out *newer.PodSpec, s conversion.Scope) error {
