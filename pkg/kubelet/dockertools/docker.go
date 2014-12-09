@@ -222,8 +222,7 @@ func (p throttledDockerPuller) Pull(image string) error {
 	return fmt.Errorf("pull QPS exceeded.")
 }
 
-func (p dockerPuller) IsImagePresent(name string) (bool, error) {
-	image, _ := parseImageName(name)
+func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 	_, err := p.client.InspectImage(image)
 	if err == nil {
 		return true, nil
