@@ -1,0 +1,10 @@
+{
+    "id": "nfs-frontend",
+    "kind": "Service",
+    "apiVersion": "v1beta2",
+    "port": 9999,
+    "containerPort": 12345,
+    "selector": {
+        "name": "hello-nfs"
+    }
+}
