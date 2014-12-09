@@ -153,3 +153,39 @@ func TestIsValidPortNum(t *testing.T) {
 		}
 	}
 }
+
+func TestIsQualifiedName(t *testing.T) {
+	successCases := []string{
+		"simple",
+		"now-with-dashes",
+		"1-starts-with-num",
+		"1234",
+		"simple/simple",
+		"now-with-dashes/simple",
+		"now-with-dashes/now-with-dashes",
+		"now.with.dots/simple",
+		"now-with.dashes-and.dots/simple",
+		"1-num.2-num/3-num",
+		"1234/5678",
+		"1.2.3.4/5678",
+	}
+	for i := range successCases {
+		if !IsQualifiedName(successCases[i]) {
+			t.Errorf("case[%d] expected success", i)
+		}
+	}
+
+	errorCases := []string{
+		"NoUppercase123",
+		"nospecialchars%^=@",
+		"cantendwithadash-",
+		"-cantstartwithadash",
+		"only/one/slash",
+		strings.Repeat("a", 254),
+	}
+	for i := range errorCases {
+		if IsQualifiedName(errorCases[i]) {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
