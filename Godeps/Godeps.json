@@ -64,7 +64,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "a4ad25344bbdf7fec4f4675f866b0091fb00e00e"
+			"Rev": "4fb5c728a37b361a1e971a3bb3d785fcc96b6ef5"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
