@@ -47,21 +47,21 @@ func TestSpreadPriority(t *testing.T) {
 	}{
 		{
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled",
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:         []api.Pod{{Status: machine1Status}},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no labels",
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:         []api.Pod{{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "different labels",
 		},
 		{
@@ -71,7 +71,7 @@ func TestSpreadPriority(t *testing.T) {
 				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 1}},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 0}},
 			test:         "one label match",
 		},
 		{
@@ -82,7 +82,7 @@ func TestSpreadPriority(t *testing.T) {
 				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 1}},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "two label matches on different machines",
 		},
 		{
@@ -94,7 +94,7 @@ func TestSpreadPriority(t *testing.T) {
 				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
+			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 0}},
 			test:         "three label matches",
 		},
 	}

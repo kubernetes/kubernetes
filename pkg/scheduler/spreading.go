@@ -37,18 +37,31 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 		return nil, err
 	}
 
+	var maxCount int
+	var fScore float32 = 10.0
 	counts := map[string]int{}
-	for _, pod := range pods {
-		counts[pod.Status.Host]++
+	if len(pods) > 0 {
+		for _, pod := range pods {
+			counts[pod.Status.Host]++
+			// Compute the maximum number of pods hosted on any minion
+			if counts[pod.Status.Host] > maxCount {
+				maxCount = counts[pod.Status.Host]
+			}
+		}
 	}
 
 	result := []HostPriority{}
+	//score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest
 	for _, minion := range minions.Items {
-		result = append(result, HostPriority{host: minion.Name, score: counts[minion.Name]})
+		if maxCount > 0 {
+			fScore = 10 * (float32(maxCount-counts[minion.Name]) / float32(maxCount))
+		}
+		result = append(result, HostPriority{host: minion.Name, score: int(fScore)})
 	}
 	return result, nil
 }
 
 func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
-	return NewGenericScheduler(predicates, CalculateSpreadPriority, podLister, random)
+	return NewGenericScheduler(predicates, []PriorityConfig{{Function: CalculateSpreadPriority, Weight: 1}}, podLister, random)
 }

@@ -42,12 +42,12 @@ func TestCreate(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-	factory := ConfigFactory{client}
-	factory.Create()
+	factory := NewConfigFactory(client)
+	factory.Create(nil, nil)
 }
 
 func TestCreateLists(t *testing.T) {
-	factory := ConfigFactory{nil}
+	factory := NewConfigFactory(nil)
 	table := []struct {
 		location string
 		factory  func() *listWatch
@@ -85,7 +85,7 @@ func TestCreateLists(t *testing.T) {
 }
 
 func TestCreateWatches(t *testing.T) {
-	factory := ConfigFactory{nil}
+	factory := NewConfigFactory(nil)
 	table := []struct {
 		rv       string
 		location string
@@ -136,6 +136,7 @@ func TestCreateWatches(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+
 		// This test merely tests that the correct request is made.
 		item.factory().Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -167,7 +168,7 @@ func TestPollMinions(t *testing.T) {
 		server := httptest.NewServer(mux)
 		defer server.Close()
 		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-		cf := ConfigFactory{client}
+		cf := NewConfigFactory(client)
 
 		ce, err := cf.pollMinions()
 		if err != nil {
@@ -194,7 +195,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux.Handle("/api/"+testapi.Version()+"/pods/foo", &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := ConfigFactory{client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})}
+	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
 	queue := cache.NewFIFO()
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
