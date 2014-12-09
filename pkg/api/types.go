@@ -593,8 +593,10 @@ type ServiceSpec struct {
 	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
 	Protocol Protocol `json:"protocol,omitempty"`
 
-	// This service will route traffic to pods having labels matching this selector.
-	Selector map[string]string `json:"selector,omitempty"`
+	// This service will route traffic to pods having labels matching this selector. If empty or not present,
+	// the service is assumed to have endpoints set by an external process and Kubernetes will not modify
+	// those endpoints.
+	Selector map[string]string `json:"selector"`
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can

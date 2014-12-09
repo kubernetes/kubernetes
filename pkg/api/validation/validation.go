@@ -438,9 +438,12 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
 	}
-	if labels.Set(service.Spec.Selector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("spec.selector", service.Spec.Selector))
+
+	if service.Spec.Selector != nil {
+		allErrs = append(allErrs, validateLabels(service.Spec.Selector, "spec.selector")...)
 	}
+	allErrs = append(allErrs, validateLabels(service.Labels, "labels")...)
+
 	if service.Spec.CreateExternalLoadBalancer {
 		services, err := lister.ListServices(ctx)
 		if err != nil {
@@ -456,8 +459,6 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 			}
 		}
 	}
-	allErrs = append(allErrs, validateLabels(service.Labels, "labels")...)
-	allErrs = append(allErrs, validateLabels(service.Spec.Selector, "selector")...)
 	return allErrs
 }
 

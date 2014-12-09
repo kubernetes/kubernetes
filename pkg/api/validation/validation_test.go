@@ -710,8 +710,8 @@ func TestValidateService(t *testing.T) {
 					Port: 8675,
 				},
 			},
-			// Should fail because the selector is missing.
-			numErrs: 1,
+			// Should be ok because the selector is missing.
+			numErrs: 0,
 		},
 		{
 			name: "valid 1",
@@ -825,11 +825,24 @@ func TestValidateService(t *testing.T) {
 					},
 				},
 				Spec: api.ServiceSpec{
+					Port: 8675,
+				},
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid selector",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "abc123",
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ServiceSpec{
 					Port:     8675,
 					Selector: map[string]string{"foo": "bar", "NoUppercaseOrSpecialCharsLike=Equals": "bar"},
 				},
 			},
-			numErrs: 2,
+			numErrs: 1,
 		},
 	}
 

@@ -32,6 +32,7 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 		// stop polling and start watching.
 		// TODO: add endpoints of all replicas, not just the elected master.
 		if m.readWriteServer != "" {
+			// TODO: the public port should be part of the argument here, port will not always be 443
 			if err := m.createMasterServiceIfNeeded("kubernetes", 443); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
@@ -54,6 +55,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
 		if m.readOnlyServer != "" {
+			// TODO: the public port should be part of the argument here, port will not always be 80
 			if err := m.createMasterServiceIfNeeded("kubernetes-ro", 80); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
@@ -81,14 +83,13 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      serviceName,
-			Namespace: "default",
+			Namespace: api.NamespaceDefault,
+			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
 			Port: port,
-			// We're going to add the endpoints by hand, so this selector is mainly to
-			// prevent identification of other pods. This selector will be useful when
-			// we start hosting apiserver in a pod.
-			Selector: map[string]string{"provider": "kubernetes", "component": "apiserver"},
+			// maintained by this code, not by the pod selector
+			Selector: nil,
 		},
 	}
 	// Kids, don't do this at home: this is a hack. There's no good way to call the business
@@ -113,10 +114,12 @@ func (m *Master) ensureEndpointsContain(serviceName string, endpoint string) err
 	ctx := api.NewDefaultContext()
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
-		e = &api.Endpoints{}
-		// Fill in ID if it didn't exist already
-		e.ObjectMeta.Name = serviceName
-		e.ObjectMeta.Namespace = "default"
+		e = &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:      serviceName,
+				Namespace: api.NamespaceDefault,
+			},
+		}
 	}
 	found := false
 	for i := range e.Endpoints {
