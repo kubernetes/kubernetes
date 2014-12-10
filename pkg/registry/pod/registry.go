@@ -29,7 +29,7 @@ type Registry interface {
 	// ListPodsPredicate obtains a list of pods for which filter returns true.
 	ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool) (*api.PodList, error)
 	// Watch for new/changed/deleted pods
-	WatchPods(ctx api.Context, resourceVersion string, filter func(*api.Pod) bool) (watch.Interface, error)
+	WatchPods(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 	// Get a specific pod
 	GetPod(ctx api.Context, podID string) (*api.Pod, error)
 	// Create a pod based on a specification.

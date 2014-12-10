@@ -122,20 +122,20 @@ func (r *Registry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool
 }
 
 // WatchPods begins watching for new, changed, or deleted pods.
-func (r *Registry) WatchPods(ctx api.Context, resourceVersion string, filter func(*api.Pod) bool) (watch.Interface, error) {
+func (r *Registry) WatchPods(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, "pod")
 	if err != nil {
 		return nil, err
 	}
 	key := makePodListKey(ctx)
 	return r.WatchList(key, version, func(obj runtime.Object) bool {
-		switch t := obj.(type) {
-		case *api.Pod:
-			return filter(t)
-		default:
-			// Must be an error
+		podObj, ok := obj.(*api.Pod)
+		if !ok {
+			// Must be an error: return true to propagate to upper level.
 			return true
 		}
+		fields := pod.PodToSelectableFields(podObj)
+		return label.Matches(labels.Set(podObj.Labels)) && field.Matches(fields)
 	})
 }
 
@@ -327,13 +327,28 @@ func (r *Registry) ListControllers(ctx api.Context) (*api.ReplicationControllerL
 }
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
-func (r *Registry) WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
+func (r *Registry) WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	if !field.Empty() {
+		return nil, fmt.Errorf("field selectors are not supported on replication controllers")
+	}
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, "replicationControllers")
 	if err != nil {
 		return nil, err
 	}
 	key := makeControllerListKey(ctx)
-	return r.WatchList(key, version, tools.Everything)
+	return r.WatchList(key, version, func(obj runtime.Object) bool {
+		controller, ok := obj.(*api.ReplicationController)
+		if !ok {
+			// Must be an error: return true to propagate to upper level.
+			return true
+		}
+		match := label.Matches(labels.Set(controller.Labels))
+		if match {
+			pods, _ := r.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
+			controller.Status.Replicas = len(pods.Items)
+		}
+		return match
+	})
 }
 
 // makeControllerListKey constructs etcd paths to controller directories enforcing namespace rules.
