@@ -81,13 +81,17 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 	verifyMinionFlags()
 
-	if len(clientConfig.Host) == 0 {
-		glog.Fatal("usage: controller-manager -master <master>")
-	}
-
 	kubeClient, err := client.New(clientConfig)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+
+	// TODO: adapt controller-manager to support LB over several servers
+	if len(clientConfig.ApiServerList) == 0 {
+		glog.Fatal("usage: controller-manager -api_servers=<ip:port>")
+	}
+	if len(clientConfig.ApiServerList) > 1 {
+		glog.Infof("Mulitple api servers specified.  Picking first one")
 	}
 
 	if int64(int(*nodeMilliCPU)) != *nodeMilliCPU {

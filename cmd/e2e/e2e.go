@@ -84,7 +84,7 @@ func loadPodOrDie(filePath string) *api.Pod {
 
 func loadClientOrDie() *client.Client {
 	config := client.Config{
-		Host: *host,
+		ApiServerList: util.StringList{ *host },
 	}
 	auth, err := clientauth.LoadFromFile(*authConfig)
 	if err != nil {

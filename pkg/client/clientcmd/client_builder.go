@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
@@ -126,12 +127,12 @@ func (builder *builder) Client() (*client.Client, error) {
 func (builder *builder) Config() (*client.Config, error) {
 	clientConfig := client.Config{}
 	if len(builder.apiserver) > 0 {
-		clientConfig.Host = builder.apiserver
+		clientConfig.ApiServerList = util.StringList{ builder.apiserver }
 	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
-		clientConfig.Host = os.Getenv("KUBERNETES_MASTER")
+		clientConfig.ApiServerList = util.StringList{ os.Getenv("KUBERNETES_MASTER") }
 	} else {
 		// TODO: eventually apiserver should start on 443 and be secure by default
-		clientConfig.Host = "http://localhost:8080"
+		clientConfig.ApiServerList = util.StringList{ "http://localhost:8080" }
 	}
 	clientConfig.Version = builder.apiVersion
 

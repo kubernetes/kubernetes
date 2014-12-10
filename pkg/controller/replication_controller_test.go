@@ -114,7 +114,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{ApiServerList: util.StringList{testServer.URL}, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
 
@@ -135,7 +135,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{ApiServerList: util.StringList{testServer.URL}, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
 
@@ -156,7 +156,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{ApiServerList: util.StringList{testServer.URL}, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
 
@@ -178,7 +178,7 @@ func TestCreateReplica(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{ApiServerList: util.StringList{testServer.URL}, Version: testapi.Version()})
 
 	podControl := RealPodControl{
 		kubeClient: client,
@@ -316,7 +316,7 @@ func TestSynchonize(t *testing.T) {
 	})
 	testServer := httptest.NewServer(mux)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{ApiServerList: util.StringList{testServer.URL}, Version: testapi.Version()})
 	manager := NewReplicationManager(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl

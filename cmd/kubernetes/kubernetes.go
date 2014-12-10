@@ -58,7 +58,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string
 
 func newApiClient(addr string, port int) *client.Client {
 	apiServerURL := fmt.Sprintf("http://%s:%d", addr, port)
-	cl := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
+	cl := client.NewOrDie(&client.Config{ApiServerList: util.StringList{ apiServerURL }, Version: testapi.Version()})
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 	return cl

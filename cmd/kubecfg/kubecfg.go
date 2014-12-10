@@ -67,7 +67,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&clientConfig.Host, "h", "", "The host to connect to.")
+	flag.Var(&clientConfig.ApiServerList, "h", "List of Kubernetes API servers to publish events to. (ip:port), comma separated.")
 	flag.StringVar(&clientConfig.Version, "api_version", latest.Version, "The version of the API to use against this server.")
 	flag.StringVar(&clientConfig.CAFile, "certificate_authority", "", "Path to a cert. file for the certificate authority")
 	flag.StringVar(&clientConfig.CertFile, "client_certificate", "", "Path to a client certificate for TLS.")
@@ -190,8 +190,13 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	// Initialize the client
-	if clientConfig.Host == "" {
-		clientConfig.Host = os.Getenv("KUBERNETES_MASTER")
+	if len(clientConfig.ApiServerList) == 0 {
+		clientConfig.ApiServerList = util.StringList{ os.Getenv("KUBERNETES_MASTER") }
+	}
+	if clientConfig.ApiServerList[0] == "" {
+		// TODO: eventually apiserver should start on 443 and be secure by default
+		// TODO: don't specify http or https in Host, and infer that from auth options.
+		clientConfig.ApiServerList[0] = "http://localhost:8080"
 	}
 
 	// Load namespace information for requests
@@ -207,11 +212,6 @@ func main() {
 		ctx = api.WithNamespace(ctx, nsInfo.Namespace)
 	}
 
-	if clientConfig.Host == "" {
-		// TODO: eventually apiserver should start on 443 and be secure by default
-		// TODO: don't specify http or https in Host, and infer that from auth options.
-		clientConfig.Host = "http://localhost:8080"
-	}
 	if client.IsConfigTransportTLS(clientConfig) {
 		auth, err := kubecfg.LoadClientAuthInfoOrPrompt(*authConfig, os.Stdin)
 		if err != nil {

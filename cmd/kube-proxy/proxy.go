@@ -76,8 +76,8 @@ func main() {
 	// are registered yet.
 
 	// define api config source
-	if clientConfig.Host != "" {
-		glog.Infof("Using api calls to get config %v", clientConfig.Host)
+	if len(clientConfig.ApiServerList) != 0 {
+		glog.Infof("Using api calls to get config %v", clientConfig.ApiServerList[0])
 		client, err := client.New(clientConfig)
 		if err != nil {
 			glog.Fatalf("Invalid API configuration: %v", err)
