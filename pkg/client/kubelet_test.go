@@ -18,7 +18,6 @@ package client
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -116,21 +116,21 @@ func TestNewKubeletClient(t *testing.T) {
 		Port:        9000,
 		EnableHttps: false,
 	}
+
 	client, err := NewKubeletClient(config)
 	if err != nil {
-		t.Errorf("Error %#v while trying to create a client.", err)
+		t.Errorf("Error while trying to create a client: %v", err)
+	}
+	if client == nil {
+		t.Error("client is nil.")
 	}
 
-	if client == nil {
-		t.Errorf("%#v client is nil.", client)
-	}
 	host := "127.0.0.1"
 	healthStatus, err := client.HealthCheck(host)
-	if !(fmt.Sprintf("%v", healthStatus) == "unknown") {
-		t.Errorf("Expected %v and got %v.", "unknown", healthStatus)
+	if healthStatus != health.Unknown {
+		t.Errorf("Expected %v and got %v.", health.Unknown, healthStatus)
 	}
 	if err == nil {
-		t.Errorf("%#v", "Expected a non nil error")
+		t.Error("Expected a non nil error")
 	}
-
 }
