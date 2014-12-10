@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -159,6 +160,9 @@ func getApiserverClient(authPath string, apiServerList util.StringList) (*client
 	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
 	if err != nil {
 		return nil, err
+	}
+	if len(apiServerList) < 1 {
+		return nil, fmt.Errorf("no apiservers specified.")
 	}
 	// TODO: adapt Kube client to support LB over several servers
 	if len(apiServerList) > 1 {
