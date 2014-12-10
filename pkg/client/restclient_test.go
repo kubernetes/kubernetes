@@ -43,7 +43,7 @@ func TestChecksCodec(t *testing.T) {
 		"v1beta3": {true, "", nil},
 	}
 	for version, expected := range testCases {
-		client, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: version})
+		client, err := RESTClientFor(&Config{ApiServerList: util.StringList{"127.0.0.1"}, Version: version})
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -81,7 +81,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {
-		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1"})
+		c, err := RESTClientFor(&Config{ApiServerList: util.StringList{testCase.Host}, Prefix: testCase.Prefix, Version: "v1beta1"})
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
@@ -110,7 +110,7 @@ func TestDoRequestBearer(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	request, _ := http.NewRequest("GET", testServer.URL, nil)
-	c, err := RESTClientFor(&Config{Host: testServer.URL, BearerToken: "test"})
+	c, err := RESTClientFor(&Config{ApiServerList: util.StringList{testServer.URL}, BearerToken: "test"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestDoRequestAccepted(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "test", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{ApiServerList: util.StringList{testServer.URL}, Username: "test", Version: testapi.Version()})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{ApiServerList: util.StringList{testServer.URL}, Username: "user", Password: "pass", Version: testapi.Version()})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL})
+	c, err := RESTClientFor(&Config{ApiServerList: util.StringList{testServer.URL}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestDoRequestCreated(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{ApiServerList: util.StringList{testServer.URL}, Username: "user", Password: "pass", Version: testapi.Version()})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

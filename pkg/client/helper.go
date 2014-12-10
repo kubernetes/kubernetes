@@ -24,13 +24,14 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
-	// Host must be a host string, a host:port pair, or a URL to the base of the API.
-	Host string
+	// List of addresses to the API server in <ip:port> or url format
+	ApiServerList util.StringList
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
 	Prefix string
@@ -235,9 +236,9 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
 	defaultTLS := config.CertFile != "" || config.Insecure
-	host := config.Host
-	if host == "" {
-		host = "localhost"
+	host := "localhost"
+	if len(config.ApiServerList) > 0 {
+		host = config.ApiServerList[0]
 	}
 	return DefaultServerURL(host, config.Prefix, version, defaultTLS)
 }

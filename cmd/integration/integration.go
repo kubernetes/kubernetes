@@ -133,7 +133,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
+	cl := client.NewOrDie(&client.Config{ApiServerList: util.StringList{ apiServer.URL }, Version: testapi.Version()})
 	cl.PollPeriod = time.Millisecond * 100
 	cl.Sync = true
 
@@ -567,7 +567,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
+	kubeClient := client.NewOrDie(&client.Config{ApiServerList: util.StringList{ apiServerURL }, Version: testapi.Version()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

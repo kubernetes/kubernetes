@@ -19,6 +19,8 @@ package client
 import (
 	"net/http"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestTransportFor(t *testing.T) {
@@ -58,27 +60,27 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		},
 		{
 			Config: &Config{
-				Host: "https://localhost",
+				ApiServerList: util.StringList{"https://localhost"},
 			},
 			TransportTLS: true,
 		},
 		{
 			Config: &Config{
-				Host:     "localhost",
+				ApiServerList: util.StringList{"localhost"},
 				CertFile: "foo",
 			},
 			TransportTLS: true,
 		},
 		{
 			Config: &Config{
-				Host:     "///:://localhost",
+				ApiServerList: util.StringList{"///:://localhost"},
 				CertFile: "foo",
 			},
 			TransportTLS: false,
 		},
 		{
 			Config: &Config{
-				Host:     "1.2.3.4:567",
+				ApiServerList: util.StringList{"1.2.3.4:567"},
 				Insecure: true,
 			},
 			TransportTLS: true,

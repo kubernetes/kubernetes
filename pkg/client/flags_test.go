@@ -61,7 +61,7 @@ func TestBindClientConfigFlags(t *testing.T) {
 	flags := &fakeFlagSet{t, util.StringSet{}}
 	config := &Config{}
 	BindClientConfigFlags(flags, config)
-	if len(flags.set) != 6 {
+	if len(flags.set) != 5 {
 		t.Errorf("unexpected flag set: %#v", flags)
 	}
 }

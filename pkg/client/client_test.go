@@ -84,7 +84,7 @@ func (c *testClient) Setup() *testClient {
 			version = testapi.Version()
 		}
 		c.Client = NewOrDie(&Config{
-			Host:    c.server.URL,
+			ApiServerList:    util.StringList{ c.server.URL },
 			Version: version,
 		})
 	}
@@ -573,7 +573,7 @@ func TestGetServerVersion(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&Config{ApiServerList: util.StringList{server.URL}})
 
 	got, err := client.ServerVersion()
 	if err != nil {
@@ -597,7 +597,7 @@ func TestGetServerAPIVersions(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	client := NewOrDie(&Config{Host: server.URL})
+	client := NewOrDie(&Config{ApiServerList: util.StringList{server.URL}})
 	got, err := client.ServerAPIVersions()
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)

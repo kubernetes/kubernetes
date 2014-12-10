@@ -39,7 +39,7 @@ func NewProxyServer(filebase string, cfg *client.Config, port int) (*ProxyServer
 	if prefix == "" {
 		prefix = "/api"
 	}
-	target, err := url.Parse(singleJoiningSlash(cfg.Host, prefix))
+	target, err := url.Parse(singleJoiningSlash(cfg.ApiServerList[0], prefix))
 	if err != nil {
 		return nil, err
 	}

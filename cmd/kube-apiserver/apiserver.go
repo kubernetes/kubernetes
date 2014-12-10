@@ -136,7 +136,7 @@ func main() {
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(address.String(), strconv.Itoa(int(*port))),
+		ApiServerList:    util.StringList{ net.JoinHostPort(address.String(), strconv.Itoa(int(*port))) },
 		Version: *storageVersion,
 	}
 	client, err := client.New(clientConfig)

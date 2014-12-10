@@ -60,7 +60,7 @@ func TestSetAllArgumentsOnly(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(args.server, clientConfig.Host, t)
+	matchStringArg(args.server, clientConfig.ApiServerList[0], t)
 	matchStringArg(args.apiVersion, clientConfig.Version, t)
 	matchStringArg(args.certFile, clientConfig.CertFile, t)
 	matchStringArg(args.keyFile, clientConfig.KeyFile, t)
@@ -82,7 +82,7 @@ func TestSetInsecureArgumentsOnly(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(args.server, clientConfig.Host, t)
+	matchStringArg(args.server, clientConfig.ApiServerList[0], t)
 	matchStringArg(args.apiVersion, clientConfig.Version, t)
 
 	// all security related params should be empty in the resulting config even though we set them because we're using http transport
@@ -123,7 +123,7 @@ func TestReadAuthFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(args.server, clientConfig.Host, t)
+	matchStringArg(args.server, clientConfig.ApiServerList[0], t)
 	matchStringArg(args.apiVersion, clientConfig.Version, t)
 	matchStringArg("delta", clientConfig.CertFile, t)
 	matchStringArg("echo", clientConfig.KeyFile, t)
@@ -164,7 +164,7 @@ func TestAuthFileOverridden(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(args.server, clientConfig.Host, t)
+	matchStringArg(args.server, clientConfig.ApiServerList[0], t)
 	matchStringArg(args.apiVersion, clientConfig.Version, t)
 	matchStringArg(args.certFile, clientConfig.CertFile, t)
 	matchStringArg(args.keyFile, clientConfig.KeyFile, t)

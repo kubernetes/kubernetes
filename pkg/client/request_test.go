@@ -285,7 +285,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{ApiServerList: util.StringList{testServer.URL}, Version: "v1beta2", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -319,7 +319,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{ApiServerList: util.StringList{testServer.URL}, Version: "v1beta1", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -355,7 +355,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{ApiServerList: util.StringList{testServer.URL}, Version: "v1beta2", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -404,7 +404,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{ApiServerList: util.StringList{testServer.URL}, Version: "v1beta1", Username: "user", Password: "pass"})
 	wasCreated := true
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
@@ -447,7 +447,7 @@ func TestWasCreated(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{ApiServerList: util.StringList{testServer.URL}, Version: "v1beta1", Username: "user", Password: "pass"})
 	wasCreated := false
 	obj, err := c.Verb("PUT").
 		Path("foo/bar").
@@ -632,7 +632,7 @@ func TestPolling(t *testing.T) {
 		w.Write(data)
 	}))
 
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{ApiServerList: util.StringList{testServer.URL}, Version: "v1beta1", Username: "user", Password: "pass"})
 	c.PollPeriod = 1 * time.Millisecond
 	trials := []func(){
 		func() {
@@ -737,7 +737,7 @@ func TestWatch(t *testing.T) {
 	}))
 
 	s, err := New(&Config{
-		Host:     testServer.URL,
+		ApiServerList: util.StringList{testServer.URL},
 		Version:  "v1beta1",
 		Username: "user",
 		Password: "pass",
@@ -787,7 +787,7 @@ func TestStream(t *testing.T) {
 	}))
 
 	s, err := New(&Config{
-		Host:     testServer.URL,
+		ApiServerList: util.StringList{testServer.URL},
 		Version:  "v1beta1",
 		Username: "user",
 		Password: "pass",
