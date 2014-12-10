@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -78,6 +79,16 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 	v, err := strconv.Atoi(f.Value.String())
 	// This is likely not a sufficiently friendly error message, but cobra
 	// should prevent non-integer values from reaching here.
+	checkErr(err)
+	return v
+}
+
+func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
+	f := cmd.Flags().Lookup(flag)
+	if f == nil {
+		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+	}
+	v, err := time.ParseDuration(f.Value.String())
 	checkErr(err)
 	return v
 }

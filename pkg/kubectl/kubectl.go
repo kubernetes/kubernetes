@@ -34,6 +34,8 @@ import (
 
 var apiVersionToUse = "v1beta1"
 
+const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
+
 func GetKubeClient(config *client.Config, matchVersion bool) (*client.Client, error) {
 	// TODO: get the namespace context when kubectl ns is completed
 	c, err := client.New(config)
