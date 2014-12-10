@@ -224,6 +224,8 @@ func main() {
 			WriteTimeout:   5 * time.Minute,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
+				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
+				MinVersion: tls.VersionTLS10,
 				// Populate PeerCertificates in requests, but don't reject connections without certificates
 				// This allows certificates to be validated by authenticators, while still allowing other auth types
 				ClientAuth: tls.RequestClientCert,
