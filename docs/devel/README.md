@@ -2,18 +2,18 @@
 
 Docs in this directory relate to developing Kubernetes.
 
-*  **On Collaborative Development** ([collab.md](collab.md)): info on pull requests and code reviews.
+* **On Collaborative Development** ([collab.md](collab.md)): info on pull requests and code reviews.
 
-* development.md - **Development Guide**: Setting up your environment; tests.
+* **Development Guide** ([development.md](development.md)): Setting up your environment; tests.
 
-* flaky-tests.md - **Hunting flaky tests**: We have a goal of 99.9% flake free tests. Here's how to run
-  your tests many times with little effort.
+* **Hunting flaky tests** ([flaky-tests.md](flaky-tests.md)): We have a goal of 99.9% flake free tests.
+  Here's how to run your tests many times.
 
-* issues.md - **GitHub Issues**: How incoming issues are reviewed and prioritized.
+* **GitHub Issues** ([issues.md](issues.md)): How incoming issues are reviewed and prioritized.
 
-* logging.md - **Logging Conventions**: Glog levels.
+* **Logging Conventions** ([logging.md](logging.md)]: Glog levels.
 
-* pull-requests.md - **Pull Request Process**: Pull requests older than 2 weeks will be closed.
+* **Pull Request Process** ([pull-requests.md](pull-requests.md)): When and why pull requests are closed.
 
-* releasing.md - **Releasing Kubernetes**: How to create a Kubernetes release (as in version) and how
-  the version information gets embedded into the built binaries.
+* **Releasing Kubernetes** ([releasing.md](releasing.md)): How to create a Kubernetes release (as in version)
+  and how the version information gets embedded into the built binaries.
