@@ -40,7 +40,7 @@
 {% set token_auth_file = "-token_auth_file=/dev/null" -%}
 
 {% if grains.cloud is defined -%}
-{% if grains.cloud == 'gce' -%}
+{% if grains.cloud == 'gce' or grains.cloud == 'vagrant' -%}
     # TODO: generate and distribute tokens for other cloud providers.
     {% set token_auth_file = "-token_auth_file=/srv/kubernetes/known_tokens.csv" -%}
 {% endif -%}
