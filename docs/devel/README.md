@@ -2,7 +2,7 @@
 
 Docs in this directory relate to developing Kubernetes.
 
-* collab.md - **On Collaborative Development**: info on pull requests and code reviews.
+*  **On Collaborative Development** ([collab.md](collab.md)): info on pull requests and code reviews.
 
 * development.md - **Development Guide**: Setting up your environment; tests.
 
