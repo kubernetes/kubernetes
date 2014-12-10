@@ -59,8 +59,6 @@ that don't belong to them.  Security is implemented via an access control list w
         2. Disks have identity. Disks outlive pods. Their IDs must be persistent for future re-mounting.
         3. Disk identity is paired with username for security.
         4. API required to delete old disks as a separate action from deleting pods (not all pod deletes should delete the disk)
-* Add DiskAccess object
-    * Created at runtime to store a specific disk with username.
 * Separate Spec and Status for disks
     * DiskSpec contains one of the specific disk types (GCE, AWS, NFS, NodeLocal)
     * Status keeps mount history for X days, allows pods to preferentially schedule onto previously used hosts
