@@ -425,7 +425,7 @@ func (kl *Kubelet) runHandler(podFullName, uuid string, container *api.Container
 func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
 	for i := range pod.Spec.Containers {
 		here := &pod.Spec.Containers[i]
-		if here == container {
+		if here.Name == container.Name {
 			return fmt.Sprintf("spec.containers[%d]", i), nil
 		}
 	}

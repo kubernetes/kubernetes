@@ -901,6 +901,42 @@ func TestCheckHostPortConflicts(t *testing.T) {
 	}
 }
 
+func TestFieldPath(t *testing.T) {
+	pod := &api.BoundPod{Spec: api.PodSpec{Containers: []api.Container{
+		{Name: "foo"},
+		{Name: "bar"},
+		{Name: "baz"},
+	}}}
+	table := map[string]struct {
+		pod       *api.BoundPod
+		container *api.Container
+		path      string
+		success   bool
+	}{
+		"basic":            {pod, &api.Container{Name: "foo"}, "spec.containers[0]", true},
+		"basic2":           {pod, &api.Container{Name: "baz"}, "spec.containers[2]", true},
+		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers[0]", true},
+		"missing":          {pod, &api.Container{Name: "qux"}, "", false},
+	}
+
+	for name, item := range table {
+		res, err := fieldPath(item.pod, item.container)
+		if item.success == false {
+			if err == nil {
+				t.Errorf("%v: unexpected non-error", name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", name, err)
+			continue
+		}
+		if e, a := item.path, res; e != a {
+			t.Errorf("%v: wanted %v, got %v", name, e, a)
+		}
+	}
+}
+
 type mockCadvisorClient struct {
 	mock.Mock
 }
