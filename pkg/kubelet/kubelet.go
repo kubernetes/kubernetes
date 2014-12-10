@@ -96,7 +96,6 @@ func NewIntegrationTestKubelet(hn string, rd string, dc dockertools.DockerInterf
 		networkContainerImage: NetworkContainerImage,
 		resyncInterval:        3 * time.Second,
 		podWorkers:            newPodWorkers(),
-		dockerIDToRef:         map[dockertools.DockerID]*api.ObjectReference{},
 	}
 }
 
@@ -456,6 +455,9 @@ func containerRef(pod *api.BoundPod, container *api.Container) (*api.ObjectRefer
 func (kl *Kubelet) setRef(id dockertools.DockerID, ref *api.ObjectReference) {
 	kl.refLock.Lock()
 	defer kl.refLock.Unlock()
+	if kl.dockerIDToRef == nil {
+		kl.dockerIDToRef = map[dockertools.DockerID]*api.ObjectReference{}
+	}
 	kl.dockerIDToRef[id] = ref
 }
 

@@ -40,6 +40,11 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func init() {
+	api.ForTesting_ReferencesAllowBlankSelfLinks = true
+	util.ReallyCrash = true
+}
+
 func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools.FakeDockerClient) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeDocker := &dockertools.FakeDockerClient{}
