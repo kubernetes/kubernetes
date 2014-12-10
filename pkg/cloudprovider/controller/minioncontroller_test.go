@@ -26,29 +26,29 @@ import (
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 )
 
-func newMinion(name string) *api.Minion {
-	return &api.Minion{ObjectMeta: api.ObjectMeta{Name: name}}
+func newNode(name string) *api.Node {
+	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
 }
 
 type FakeMinionHandler struct {
 	client.Fake
-	client.FakeMinions
+	client.FakeNodes
 
 	// Input: Hooks determine if request is valid or not
-	CreateHook func(*FakeMinionHandler, *api.Minion) bool
-	Existing   []*api.Minion
+	CreateHook func(*FakeMinionHandler, *api.Node) bool
+	Existing   []*api.Node
 
 	// Output
-	CreatedMinions []*api.Minion
-	DeletedMinions []*api.Minion
+	CreatedMinions []*api.Node
+	DeletedMinions []*api.Node
 	RequestCount   int
 }
 
-func (c *FakeMinionHandler) Minions() client.MinionInterface {
+func (c *FakeMinionHandler) Nodes() client.NodeInterface {
 	return c
 }
 
-func (m *FakeMinionHandler) Create(minion *api.Minion) (*api.Minion, error) {
+func (m *FakeMinionHandler) Create(minion *api.Node) (*api.Node, error) {
 	defer func() { m.RequestCount++ }()
 	if m.CreateHook == nil || m.CreateHook(m, minion) {
 		m.CreatedMinions = append(m.CreatedMinions, minion)
@@ -58,9 +58,9 @@ func (m *FakeMinionHandler) Create(minion *api.Minion) (*api.Minion, error) {
 	}
 }
 
-func (m *FakeMinionHandler) List() (*api.MinionList, error) {
+func (m *FakeMinionHandler) List() (*api.NodeList, error) {
 	defer func() { m.RequestCount++ }()
-	minions := []api.Minion{}
+	minions := []api.Node{}
 	for i := 0; i < len(m.Existing); i++ {
 		if !contains(m.Existing[i], m.DeletedMinions) {
 			minions = append(minions, *m.Existing[i])
@@ -71,18 +71,18 @@ func (m *FakeMinionHandler) List() (*api.MinionList, error) {
 			minions = append(minions, *m.CreatedMinions[i])
 		}
 	}
-	return &api.MinionList{Items: minions}, nil
+	return &api.NodeList{Items: minions}, nil
 }
 
 func (m *FakeMinionHandler) Delete(id string) error {
-	m.DeletedMinions = append(m.DeletedMinions, newMinion(id))
+	m.DeletedMinions = append(m.DeletedMinions, newNode(id))
 	m.RequestCount++
 	return nil
 }
 
 func TestSyncStaticCreateMinion(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		CreateHook: func(fake *FakeMinionHandler, minion *api.Minion) bool {
+		CreateHook: func(fake *FakeMinionHandler, minion *api.Node) bool {
 			return true
 		},
 	}
@@ -104,7 +104,7 @@ func TestSyncStaticCreateMinion(t *testing.T) {
 
 func TestSyncStaticCreateMinionWithError(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		CreateHook: func(fake *FakeMinionHandler, minion *api.Minion) bool {
+		CreateHook: func(fake *FakeMinionHandler, minion *api.Node) bool {
 			if fake.RequestCount == 0 {
 				return false
 			}
@@ -129,7 +129,7 @@ func TestSyncStaticCreateMinionWithError(t *testing.T) {
 
 func TestSyncCloudCreateMinion(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		Existing: []*api.Minion{newMinion("minion0")},
+		Existing: []*api.Node{newNode("minion0")},
 	}
 	instances := []string{"minion0", "minion1"}
 	fakeCloud := fake_cloud.FakeCloud{
@@ -153,7 +153,7 @@ func TestSyncCloudCreateMinion(t *testing.T) {
 
 func TestSyncCloudDeleteMinion(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		Existing: []*api.Minion{newMinion("minion0"), newMinion("minion1")},
+		Existing: []*api.Node{newNode("minion0"), newNode("minion1")},
 	}
 	instances := []string{"minion0"}
 	fakeCloud := fake_cloud.FakeCloud{
@@ -177,7 +177,7 @@ func TestSyncCloudDeleteMinion(t *testing.T) {
 
 func TestSyncCloudRegexp(t *testing.T) {
 	fakeMinionHandler := &FakeMinionHandler{
-		Existing: []*api.Minion{newMinion("minion0")},
+		Existing: []*api.Node{newNode("minion0")},
 	}
 	instances := []string{"minion0", "minion1", "node0"}
 	fakeCloud := fake_cloud.FakeCloud{
@@ -199,7 +199,7 @@ func TestSyncCloudRegexp(t *testing.T) {
 	}
 }
 
-func contains(minion *api.Minion, minions []*api.Minion) bool {
+func contains(minion *api.Node, minions []*api.Node) bool {
 	for i := 0; i < len(minions); i++ {
 		if minion.Name == minions[i].Name {
 			return true

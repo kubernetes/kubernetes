@@ -574,26 +574,26 @@ func makeMinionKey(minionID string) string {
 	return "/registry/minions/" + minionID
 }
 
-func (r *Registry) ListMinions(ctx api.Context) (*api.MinionList, error) {
-	minions := &api.MinionList{}
+func (r *Registry) ListMinions(ctx api.Context) (*api.NodeList, error) {
+	minions := &api.NodeList{}
 	err := r.ExtractToList("/registry/minions", minions)
 	return minions, err
 }
 
-func (r *Registry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+func (r *Registry) CreateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
 	err := r.CreateObj(makeMinionKey(minion.Name), minion, 0)
 	return etcderr.InterpretCreateError(err, "minion", minion.Name)
 }
 
-func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Minion) error {
+func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
 	err := r.SetObj(makeMinionKey(minion.Name), minion)
 	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
 }
 
-func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
-	var minion api.Minion
+func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
+	var minion api.Node
 	key := makeMinionKey(minionID)
 	err := r.ExtractObj(key, &minion, false)
 	if err != nil {

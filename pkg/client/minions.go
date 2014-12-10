@@ -18,49 +18,58 @@ package client
 
 import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 
-type MinionsInterface interface {
-	Minions() MinionInterface
+type NodesInterface interface {
+	Nodes() NodeInterface
 }
 
-type MinionInterface interface {
-	Get(id string) (result *api.Minion, err error)
-	Create(minion *api.Minion) (*api.Minion, error)
-	List() (*api.MinionList, error)
+type NodeInterface interface {
+	Get(id string) (result *api.Node, err error)
+	Create(minion *api.Node) (*api.Node, error)
+	List() (*api.NodeList, error)
 	Delete(id string) error
 }
 
-// minions implements Minions interface
-type minions struct {
-	r *Client
+// nodes implements NodesInterface
+type nodes struct {
+	r          *Client
+	preV1Beta3 bool
 }
 
-// newMinions returns a minions
-func newMinions(c *Client) *minions {
-	return &minions{c}
+// newNodes returns a nodes object. Uses "minions" as the
+// URL resource name for v1beta1 and v1beta2.
+func newNodes(c *Client, isPreV1Beta3 bool) *nodes {
+	return &nodes{c, isPreV1Beta3}
+}
+
+func (c *nodes) resourceName() string {
+	if c.preV1Beta3 {
+		return "minions"
+	}
+	return "nodes"
 }
 
 // Create creates a new minion.
-func (c *minions) Create(minion *api.Minion) (*api.Minion, error) {
-	result := &api.Minion{}
-	err := c.r.Post().Path("minions").Body(minion).Do().Into(result)
+func (c *nodes) Create(minion *api.Node) (*api.Node, error) {
+	result := &api.Node{}
+	err := c.r.Post().Path(c.resourceName()).Body(minion).Do().Into(result)
 	return result, err
 }
 
-// List lists all the minions in the cluster.
-func (c *minions) List() (*api.MinionList, error) {
-	result := &api.MinionList{}
-	err := c.r.Get().Path("minions").Do().Into(result)
+// List lists all the nodes in the cluster.
+func (c *nodes) List() (*api.NodeList, error) {
+	result := &api.NodeList{}
+	err := c.r.Get().Path(c.resourceName()).Do().Into(result)
 	return result, err
 }
 
 // Get gets an existing minion
-func (c *minions) Get(id string) (*api.Minion, error) {
-	result := &api.Minion{}
-	err := c.r.Get().Path("minions").Path(id).Do().Into(result)
+func (c *nodes) Get(id string) (*api.Node, error) {
+	result := &api.Node{}
+	err := c.r.Get().Path(c.resourceName()).Path(id).Do().Into(result)
 	return result, err
 }
 
 // Delete deletes an existing minion.
-func (c *minions) Delete(id string) error {
-	return c.r.Delete().Path("minions").Path(id).Do().Error()
+func (c *nodes) Delete(id string) error {
+	return c.r.Delete().Path(c.resourceName()).Path(id).Do().Error()
 }

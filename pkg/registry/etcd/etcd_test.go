@@ -1579,12 +1579,12 @@ func TestEtcdListMinions(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Node{
 							ObjectMeta: api.ObjectMeta{Name: "foo"},
 						}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Node{
 							ObjectMeta: api.ObjectMeta{Name: "bar"},
 						}),
 					},
@@ -1608,7 +1608,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.CreateMinion(ctx, &api.Minion{
+	err := registry.CreateMinion(ctx, &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	})
 	if err != nil {
@@ -1620,7 +1620,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	var minion api.Minion
+	var minion api.Node
 	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &minion)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1634,7 +1634,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 func TestEtcdGetMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	minion, err := registry.GetMinion(ctx, "foo")
 	if err != nil {

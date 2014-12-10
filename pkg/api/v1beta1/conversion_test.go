@@ -21,13 +21,36 @@ import (
 	"testing"
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 )
 
 var Convert = newer.Scheme.Convert
 
+func TestNodeConversion(t *testing.T) {
+	obj, err := current.Codec.Decode([]byte(`{"kind":"Node","apiVersion":"v1beta1"}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := obj.(*newer.Node); !ok {
+		t.Errorf("unexpected type: %#v", obj)
+	}
+
+	obj, err = current.Codec.Decode([]byte(`{"kind":"NodeList","apiVersion":"v1beta1"}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := obj.(*newer.NodeList); !ok {
+		t.Errorf("unexpected type: %#v", obj)
+	}
+
+	obj = &newer.Node{}
+	if err := current.Codec.DecodeInto([]byte(`{"kind":"Node","apiVersion":"v1beta1"}`), obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestEnvConversion(t *testing.T) {
-	nonCanonical := []v1beta1.EnvVar{
+	nonCanonical := []current.EnvVar{
 		{Key: "EV"},
 		{Key: "EV", Name: "EX"},
 	}
@@ -48,7 +71,7 @@ func TestEnvConversion(t *testing.T) {
 
 	// Test conversion the other way, too.
 	for i := range canonical {
-		var got v1beta1.EnvVar
+		var got current.EnvVar
 		err := Convert(&canonical[i], &got)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -65,15 +88,15 @@ func TestEnvConversion(t *testing.T) {
 func TestVolumeMountConversionToOld(t *testing.T) {
 	table := []struct {
 		in  newer.VolumeMount
-		out v1beta1.VolumeMount
+		out current.VolumeMount
 	}{
 		{
 			in:  newer.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
-			out: v1beta1.VolumeMount{Name: "foo", MountPath: "/dev/foo", Path: "/dev/foo", ReadOnly: true},
+			out: current.VolumeMount{Name: "foo", MountPath: "/dev/foo", Path: "/dev/foo", ReadOnly: true},
 		},
 	}
 	for _, item := range table {
-		got := v1beta1.VolumeMount{}
+		got := current.VolumeMount{}
 		err := Convert(&item.in, &got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -87,17 +110,17 @@ func TestVolumeMountConversionToOld(t *testing.T) {
 
 func TestVolumeMountConversionToNew(t *testing.T) {
 	table := []struct {
-		in  v1beta1.VolumeMount
+		in  current.VolumeMount
 		out newer.VolumeMount
 	}{
 		{
-			in:  v1beta1.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
+			in:  current.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
 			out: newer.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
 		}, {
-			in:  v1beta1.VolumeMount{Name: "foo", MountPath: "/dev/foo", Path: "/dev/bar", ReadOnly: true},
+			in:  current.VolumeMount{Name: "foo", MountPath: "/dev/foo", Path: "/dev/bar", ReadOnly: true},
 			out: newer.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
 		}, {
-			in:  v1beta1.VolumeMount{Name: "foo", Path: "/dev/bar", ReadOnly: true},
+			in:  current.VolumeMount{Name: "foo", Path: "/dev/bar", ReadOnly: true},
 			out: newer.VolumeMount{Name: "foo", MountPath: "/dev/bar", ReadOnly: true},
 		},
 	}
@@ -115,42 +138,42 @@ func TestVolumeMountConversionToNew(t *testing.T) {
 }
 
 func TestMinionListConversionToNew(t *testing.T) {
-	oldMinion := func(id string) v1beta1.Minion {
-		return v1beta1.Minion{TypeMeta: v1beta1.TypeMeta{ID: id}}
+	oldMinion := func(id string) current.Minion {
+		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
 	}
-	newMinion := func(id string) newer.Minion {
-		return newer.Minion{ObjectMeta: newer.ObjectMeta{Name: id}}
+	newNode := func(id string) newer.Node {
+		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
 	}
-	oldMinions := []v1beta1.Minion{
+	oldMinions := []current.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []newer.Minion{
-		newMinion("foo"),
-		newMinion("bar"),
+	newMinions := []newer.Node{
+		newNode("foo"),
+		newNode("bar"),
 	}
 
 	table := []struct {
-		oldML *v1beta1.MinionList
-		newML *newer.MinionList
+		oldML *current.MinionList
+		newML *newer.NodeList
 	}{
 		{
-			oldML: &v1beta1.MinionList{Items: oldMinions},
-			newML: &newer.MinionList{Items: newMinions},
+			oldML: &current.MinionList{Items: oldMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		}, {
-			oldML: &v1beta1.MinionList{Minions: oldMinions},
-			newML: &newer.MinionList{Items: newMinions},
+			oldML: &current.MinionList{Minions: oldMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		}, {
-			oldML: &v1beta1.MinionList{
+			oldML: &current.MinionList{
 				Items:   oldMinions,
-				Minions: []v1beta1.Minion{oldMinion("baz")},
+				Minions: []current.Minion{oldMinion("baz")},
 			},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		},
 	}
 
 	for _, item := range table {
-		got := &newer.MinionList{}
+		got := &newer.NodeList{}
 		err := Convert(item.oldML, got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -162,28 +185,28 @@ func TestMinionListConversionToNew(t *testing.T) {
 }
 
 func TestMinionListConversionToOld(t *testing.T) {
-	oldMinion := func(id string) v1beta1.Minion {
-		return v1beta1.Minion{TypeMeta: v1beta1.TypeMeta{ID: id}}
+	oldMinion := func(id string) current.Minion {
+		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
 	}
-	newMinion := func(id string) newer.Minion {
-		return newer.Minion{ObjectMeta: newer.ObjectMeta{Name: id}}
+	newNode := func(id string) newer.Node {
+		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
 	}
-	oldMinions := []v1beta1.Minion{
+	oldMinions := []current.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []newer.Minion{
-		newMinion("foo"),
-		newMinion("bar"),
+	newMinions := []newer.Node{
+		newNode("foo"),
+		newNode("bar"),
 	}
 
-	newML := &newer.MinionList{Items: newMinions}
-	oldML := &v1beta1.MinionList{
+	newML := &newer.NodeList{Items: newMinions}
+	oldML := &current.MinionList{
 		Items:   oldMinions,
 		Minions: oldMinions,
 	}
 
-	got := &v1beta1.MinionList{}
+	got := &current.MinionList{}
 	err := Convert(newML, got)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -195,7 +218,7 @@ func TestMinionListConversionToOld(t *testing.T) {
 
 func TestServiceEmptySelector(t *testing.T) {
 	// Nil map should be preserved
-	svc := &v1beta1.Service{Selector: nil}
+	svc := &current.Service{Selector: nil}
 	data, err := newer.Scheme.EncodeToVersion(svc, "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -210,7 +233,7 @@ func TestServiceEmptySelector(t *testing.T) {
 	}
 
 	// Empty map should be preserved
-	svc2 := &v1beta1.Service{Selector: map[string]string{}}
+	svc2 := &current.Service{Selector: map[string]string{}}
 	data, err = newer.Scheme.EncodeToVersion(svc2, "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

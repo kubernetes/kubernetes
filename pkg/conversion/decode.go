@@ -97,9 +97,6 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		// correct type.
 		dataKind = objKind
 	}
-	if dataKind != objKind {
-		return fmt.Errorf("data of kind '%v', obj of type '%v'", dataKind, objKind)
-	}
 	if dataVersion == "" {
 		// Assume objects with unset Version fields are being unmarshalled into the
 		// correct type.

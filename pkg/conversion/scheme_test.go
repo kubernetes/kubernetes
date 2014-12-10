@@ -228,6 +228,43 @@ func TestMultipleNames(t *testing.T) {
 	}
 }
 
+func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
+	s := NewScheme()
+	// create two names internally, with TestType1 being preferred
+	s.AddKnownTypeWithName("", "TestType1", &TestType1{})
+	s.AddKnownTypeWithName("", "OtherType1", &TestType1{})
+	// create two names externally, with TestType1 being preferred
+	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName("v1", "OtherType1", &ExternalTestType1{})
+	s.MetaFactory = testMetaFactory{}
+
+	ext := &ExternalTestType1{}
+	ext.APIVersion = "v1"
+	ext.ObjectKind = "OtherType1"
+	ext.A = "test"
+	data, err := json.Marshal(ext)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expect := &TestType1{A: "test"}
+
+	obj, err := s.Decode(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(expect, obj) {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+
+	into := &TestType1{}
+	if err := s.DecodeInto(data, into); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(expect, obj) {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+}
+
 func TestKnownTypes(t *testing.T) {
 	s := GetTestScheme()
 	if len(s.KnownTypes("v2")) != 0 {

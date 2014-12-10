@@ -88,7 +88,7 @@ func TestScheduler(t *testing.T) {
 		var gotBinding *api.Binding
 		c := &Config{
 			MinionLister: scheduler.FakeMinionLister(
-				api.MinionList{Items: []api.Minion{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
+				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 			),
 			Algorithm: item.algo,
 			Binder: fakeBinder{func(b *api.Binding) error {

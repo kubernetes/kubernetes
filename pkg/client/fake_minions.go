@@ -18,30 +18,36 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 )
 
-// FakeMinions implements MinionInterface. Meant to be embedded into a struct to get a default
+// FakeNodes implements MinionInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
-type FakeMinions struct {
+type FakeNodes struct {
 	Fake *Fake
 }
 
-func (c *FakeMinions) Get(name string) (*api.Minion, error) {
+func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-minion", Value: name})
-	return &api.Minion{}, nil
+	for i := range c.Fake.MinionsList.Items {
+		if c.Fake.MinionsList.Items[i].Name == name {
+			return &c.Fake.MinionsList.Items[i], nil
+		}
+	}
+	return nil, errors.NewNotFound("Minions", name)
 }
 
-func (c *FakeMinions) List() (*api.MinionList, error) {
+func (c *FakeNodes) List() (*api.NodeList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-minions", Value: nil})
 	return &c.Fake.MinionsList, nil
 }
 
-func (c *FakeMinions) Create(minion *api.Minion) (*api.Minion, error) {
+func (c *FakeNodes) Create(minion *api.Node) (*api.Node, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-minion", Value: minion})
-	return &api.Minion{}, nil
+	return &api.Node{}, nil
 }
 
-func (c *FakeMinions) Delete(id string) error {
+func (c *FakeNodes) Delete(id string) error {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-minion", Value: id})
 	return nil
 }

@@ -31,8 +31,8 @@ func init() {
 		&ReplicationController{},
 		&ServiceList{},
 		&Service{},
-		&MinionList{},
-		&Minion{},
+		&NodeList{},
+		&Node{},
 		&Status{},
 		&ServerOpList{},
 		&ServerOp{},
@@ -46,6 +46,9 @@ func init() {
 		&BoundPod{},
 		&BoundPods{},
 	)
+	// Legacy names are supported
+	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
+	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
@@ -56,8 +59,8 @@ func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}
 func (*EndpointsList) IsAnAPIObject()             {}
-func (*Minion) IsAnAPIObject()                    {}
-func (*MinionList) IsAnAPIObject()                {}
+func (*Node) IsAnAPIObject()                      {}
+func (*NodeList) IsAnAPIObject()                  {}
 func (*Binding) IsAnAPIObject()                   {}
 func (*Status) IsAnAPIObject()                    {}
 func (*ServerOp) IsAnAPIObject()                  {}

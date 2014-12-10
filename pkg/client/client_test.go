@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -59,6 +60,7 @@ type testClient struct {
 	Response Response
 	Error    bool
 	Created  bool
+	Version  string
 	server   *httptest.Server
 	handler  *util.FakeHandler
 	// For query args, an optional function to validate the contents
@@ -77,9 +79,13 @@ func (c *testClient) Setup() *testClient {
 	}
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
+		version := c.Version
+		if len(version) == 0 {
+			version = testapi.Version()
+		}
 		c.Client = NewOrDie(&Config{
 			Host:    c.server.URL,
-			Version: "v1beta1",
+			Version: version,
 		})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
@@ -604,23 +610,23 @@ func TestGetServerAPIVersions(t *testing.T) {
 func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions"},
-		Response: Response{StatusCode: 200, Body: &api.MinionList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
+		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup().Minions().List()
+	response, err := c.Setup().Nodes().List()
 	c.Validate(t, response, err)
 }
 
 func TestGetMinion(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions/1"},
-		Response: Response{StatusCode: 200, Body: &api.Minion{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
 	}
-	response, err := c.Setup().Minions().Get("1")
+	response, err := c.Setup().Nodes().Get("1")
 	c.Validate(t, response, err)
 }
 
 func TestCreateMinion(t *testing.T) {
-	requestMinion := &api.Minion{
+	requestMinion := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name: "minion-1",
 		},
@@ -641,7 +647,7 @@ func TestCreateMinion(t *testing.T) {
 			Body:       requestMinion,
 		},
 	}
-	receivedMinion, err := c.Setup().Minions().Create(requestMinion)
+	receivedMinion, err := c.Setup().Nodes().Create(requestMinion)
 	c.Validate(t, receivedMinion, err)
 }
 
@@ -650,6 +656,17 @@ func TestDeleteMinion(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/minions/foo"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Minions().Delete("foo")
+	err := c.Setup().Nodes().Delete("foo")
+	c.Validate(t, nil, err)
+}
+
+func TestNewMinionPath(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: "/nodes/foo"},
+		Response: Response{StatusCode: 200},
+	}
+	cl := c.Setup()
+	cl.preV1Beta3 = false
+	err := cl.Nodes().Delete("foo")
 	c.Validate(t, nil, err)
 }

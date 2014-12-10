@@ -154,7 +154,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}), nil
 }
 
-func hostsFromMinionList(list *api.MinionList) []string {
+func hostsFromMinionList(list *api.NodeList) []string {
 	result := make([]string, len(list.Items))
 	for ix := range list.Items {
 		result[ix] = list.Items[ix].Name

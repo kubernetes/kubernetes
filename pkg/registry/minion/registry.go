@@ -20,9 +20,9 @@ import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 
 // MinionRegistry is an interface for things that know how to store minions.
 type Registry interface {
-	ListMinions(ctx api.Context) (*api.MinionList, error)
-	CreateMinion(ctx api.Context, minion *api.Minion) error
-	UpdateMinion(ctx api.Context, minion *api.Minion) error
-	GetMinion(ctx api.Context, minionID string) (*api.Minion, error)
+	ListMinions(ctx api.Context) (*api.NodeList, error)
+	CreateMinion(ctx api.Context, minion *api.Node) error
+	UpdateMinion(ctx api.Context, minion *api.Node) error
+	GetMinion(ctx api.Context, minionID string) (*api.Node, error)
 	DeleteMinion(ctx api.Context, minionID string) error
 }

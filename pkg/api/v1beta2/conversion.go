@@ -374,7 +374,7 @@ func init() {
 			return nil
 		},
 
-		func(in *newer.Minion, out *Minion, s conversion.Scope) error {
+		func(in *newer.Node, out *Minion, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
@@ -388,7 +388,7 @@ func init() {
 			out.HostIP = in.Status.HostIP
 			return s.Convert(&in.Spec.Capacity, &out.NodeResources.Capacity, 0)
 		},
-		func(in *Minion, out *newer.Minion, s conversion.Scope) error {
+		func(in *Minion, out *newer.Node, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}

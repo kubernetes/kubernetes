@@ -370,8 +370,8 @@ func TestGetPodCloud(t *testing.T) {
 
 func TestMakePodStatus(t *testing.T) {
 	fakeClient := client.Fake{
-		MinionsList: api.MinionList{
-			Items: []api.Minion{
+		MinionsList: api.NodeList{
+			Items: []api.Node{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "machine"},
 				},
@@ -499,7 +499,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status, err := getPodStatus(test.pod, fakeClient.Minions()); status != test.status {
+		if status, err := getPodStatus(test.pod, fakeClient.Nodes()); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 			if err != nil {
 				t.Errorf("In test %s, unexpected error: %v", test.test, err)

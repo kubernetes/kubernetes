@@ -73,7 +73,7 @@ func (s *MinionController) SyncStatic(period time.Duration) error {
 			if registered.Has(minionID) {
 				continue
 			}
-			_, err := s.kubeClient.Minions().Create(&api.Minion{
+			_, err := s.kubeClient.Nodes().Create(&api.Node{
 				ObjectMeta: api.ObjectMeta{Name: minionID},
 				Spec: api.NodeSpec{
 					Capacity: s.staticResources.Capacity,
@@ -97,11 +97,11 @@ func (s *MinionController) SyncCloud() error {
 	if err != nil {
 		return err
 	}
-	minions, err := s.kubeClient.Minions().List()
+	minions, err := s.kubeClient.Nodes().List()
 	if err != nil {
 		return err
 	}
-	minionMap := make(map[string]*api.Minion)
+	minionMap := make(map[string]*api.Node)
 	for _, minion := range minions.Items {
 		minionMap[minion.Name] = &minion
 	}
@@ -110,7 +110,7 @@ func (s *MinionController) SyncCloud() error {
 	for _, minion := range matches.Items {
 		if _, ok := minionMap[minion.Name]; !ok {
 			glog.Infof("Create minion in registry: %s", minion.Name)
-			_, err = s.kubeClient.Minions().Create(&minion)
+			_, err = s.kubeClient.Nodes().Create(&minion)
 			if err != nil {
 				glog.Errorf("Create minion error: %s", minion.Name)
 			}
@@ -120,7 +120,7 @@ func (s *MinionController) SyncCloud() error {
 
 	for minionID := range minionMap {
 		glog.Infof("Delete minion from registry: %s", minionID)
-		err = s.kubeClient.Minions().Delete(minionID)
+		err = s.kubeClient.Nodes().Delete(minionID)
 		if err != nil {
 			glog.Errorf("Delete minion error: %s", minionID)
 		}
@@ -128,8 +128,8 @@ func (s *MinionController) SyncCloud() error {
 	return nil
 }
 
-// cloudMinions constructs and returns api.MinionList from cloudprovider.
-func (s *MinionController) cloudMinions() (*api.MinionList, error) {
+// cloudMinions constructs and returns api.NodeList from cloudprovider.
+func (s *MinionController) cloudMinions() (*api.NodeList, error) {
 	instances, ok := s.cloud.Instances()
 	if !ok {
 		return nil, fmt.Errorf("cloud doesn't support instances")
@@ -138,8 +138,8 @@ func (s *MinionController) cloudMinions() (*api.MinionList, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := &api.MinionList{
-		Items: make([]api.Minion, len(matches)),
+	result := &api.NodeList{
+		Items: make([]api.Node, len(matches)),
 	}
 	for i := range matches {
 		result.Items[i].Name = matches[i]

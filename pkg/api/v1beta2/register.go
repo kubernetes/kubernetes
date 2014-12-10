@@ -25,6 +25,10 @@ import (
 var Codec = runtime.CodecFor(api.Scheme, "v1beta2")
 
 func init() {
+	// Future names are supported, and declared first so they take precedence
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
+
 	api.Scheme.AddKnownTypes("v1beta2",
 		&Pod{},
 		&PodList{},
@@ -47,6 +51,9 @@ func init() {
 		&BoundPod{},
 		&BoundPods{},
 	)
+	// Future names are supported
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
