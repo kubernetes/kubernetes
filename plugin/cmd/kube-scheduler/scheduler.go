@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 	"github.com/golang/glog"
 )
@@ -61,7 +62,7 @@ func main() {
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 
 	configFactory := factory.NewConfigFactory(kubeClient)
-	config, err := configFactory.Create(nil, nil)
+	config, err := configFactory.Create()
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}

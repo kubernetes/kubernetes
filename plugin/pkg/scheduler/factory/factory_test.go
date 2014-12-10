@@ -43,7 +43,7 @@ func TestCreate(t *testing.T) {
 	defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 	factory := NewConfigFactory(client)
-	factory.Create(nil, nil)
+	factory.Create()
 }
 
 func TestCreateLists(t *testing.T) {

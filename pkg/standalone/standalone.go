@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
@@ -105,7 +106,7 @@ func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, p
 func RunScheduler(cl *client.Client) {
 	// Scheduler
 	schedulerConfigFactory := factory.NewConfigFactory(cl)
-	schedulerConfig, err := schedulerConfigFactory.Create(nil, nil)
+	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		glog.Fatal("Couldn't create scheduler config: %v", err)
 	}
