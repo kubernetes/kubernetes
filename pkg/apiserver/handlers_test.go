@@ -65,42 +65,45 @@ func TestReadOnly(t *testing.T) {
 
 func TestKindAndNamespace(t *testing.T) {
 	successCases := []struct {
+		method            string
 		url               string
 		expectedNamespace string
 		expectedKind      string
 		expectedParts     []string
 	}{
 		// resource paths
-		{"/ns/other/pods", "other", "pods", []string{"pods"}},
-		{"/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"/pods/foo?namespace=other", "other", "pods", []string{"pods", "foo"}},
-		{"/pods?namespace=other", "other", "pods", []string{"pods"}},
+		{"GET", "/ns/other/pods", "other", "pods", []string{"pods"}},
+		{"GET", "/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
+		{"GET", "/pods", api.NamespaceAll, "pods", []string{"pods"}},
+		{"POST", "/pods", api.NamespaceDefault, "pods", []string{"pods"}},
+		{"GET", "/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
+		{"GET", "/pods/foo?namespace=other", "other", "pods", []string{"pods", "foo"}},
+		{"GET", "/pods?namespace=other", "other", "pods", []string{"pods"}},
 
 		// special verbs
-		{"/proxy/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"/proxy/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"/redirect/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"/redirect/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"/watch/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"/watch/ns/other/pods", "other", "pods", []string{"pods"}},
+		{"GET", "/proxy/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
+		{"GET", "/proxy/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
+		{"GET", "/redirect/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
+		{"GET", "/redirect/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
+		{"GET", "/watch/pods", api.NamespaceAll, "pods", []string{"pods"}},
+		{"GET", "/watch/ns/other/pods", "other", "pods", []string{"pods"}},
 
-		// full-qualified paths
-		{"/api/v1beta1/ns/other/pods", "other", "pods", []string{"pods"}},
-		{"/api/v1beta1/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"/api/v1beta1/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"/api/v1beta1/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"/api/v1beta1/pods/foo?namespace=other", "other", "pods", []string{"pods", "foo"}},
-		{"/api/v1beta1/pods?namespace=other", "other", "pods", []string{"pods"}},
-		{"/api/v1beta1/proxy/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"/api/v1beta1/redirect/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"/api/v1beta1/watch/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"/api/v1beta1/watch/ns/other/pods", "other", "pods", []string{"pods"}},
+		// fully-qualified paths
+		{"GET", "/api/v1beta1/ns/other/pods", "other", "pods", []string{"pods"}},
+		{"GET", "/api/v1beta1/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods", api.NamespaceAll, "pods", []string{"pods"}},
+		{"POST", "/api/v1beta1/pods", api.NamespaceDefault, "pods", []string{"pods"}},
+		{"GET", "/api/v1beta1/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods/foo?namespace=other", "other", "pods", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods?namespace=other", "other", "pods", []string{"pods"}},
+		{"GET", "/api/v1beta1/proxy/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/redirect/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/watch/pods", api.NamespaceAll, "pods", []string{"pods"}},
+		{"GET", "/api/v1beta1/watch/ns/other/pods", "other", "pods", []string{"pods"}},
 	}
 
 	for _, successCase := range successCases {
-		req, _ := http.NewRequest("GET", successCase.url, nil)
+		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
 		namespace, kind, parts, err := KindAndNamespace(req)
 		if err != nil {
 			t.Errorf("Unexpected error for url: %s", successCase.url)
