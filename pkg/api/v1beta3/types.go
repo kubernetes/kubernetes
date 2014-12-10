@@ -17,8 +17,6 @@ limitations under the License.
 package v1beta3
 
 import (
-	"time"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -393,7 +391,7 @@ type ContainerStateWaiting struct {
 }
 
 type ContainerStateRunning struct {
-	StartedAt time.Time `json:"startedAt,omitempty"`
+	StartedAt util.Time `json:"startedAt,omitempty"`
 }
 
 type ContainerStateTerminated struct {
@@ -401,8 +399,8 @@ type ContainerStateTerminated struct {
 	Signal     int       `json:"signal,omitempty"`
 	Reason     string    `json:"reason,omitempty"`
 	Message    string    `json:"message,omitempty"`
-	StartedAt  time.Time `json:"startedAt,omitempty"`
-	FinishedAt time.Time `json:"finishedAt,omitempty"`
+	StartedAt  util.Time `json:"startedAt,omitempty"`
+	FinishedAt util.Time `json:"finishedAt,omitempty"`
 }
 
 // ContainerState holds a possible state of container.

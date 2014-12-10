@@ -28,6 +28,11 @@ type Time struct {
 	time.Time
 }
 
+// NewTime returns a wrapped instance of the provided time
+func NewTime(time time.Time) Time {
+	return Time{time}
+}
+
 // Date returns the Time corresponding to the supplied parameters
 // by wrapping time.Date.
 func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) Time {
