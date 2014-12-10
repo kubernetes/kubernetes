@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	gce_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 )
 
 const partitionRegex = "[a-z][a-z]*(?P<partition>[0-9][0-9]*)?"
