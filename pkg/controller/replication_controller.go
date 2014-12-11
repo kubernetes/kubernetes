@@ -140,7 +140,8 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 	}
 }
 
-func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
+// Helper function. Also used in pkg/registry/controller, for now.
+func FilterActivePods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
 		if api.PodSucceeded != value.Status.Phase &&
@@ -157,7 +158,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 	if err != nil {
 		return err
 	}
-	filteredList := rm.filterActivePods(podList.Items)
+	filteredList := FilterActivePods(podList.Items)
 	diff := len(filteredList) - controller.Spec.Replicas
 	if diff < 0 {
 		diff *= -1

@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	rc "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -149,6 +150,7 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 	return rs.registry.WatchControllers(ctx, label, field, resourceVersion)
 }
 
+// TODO #2726: The controller should populate the current state, not the apiserver
 func (rs *REST) fillCurrentState(ctx api.Context, controller *api.ReplicationController) error {
 	if rs.podLister == nil {
 		return nil
@@ -157,6 +159,6 @@ func (rs *REST) fillCurrentState(ctx api.Context, controller *api.ReplicationCon
 	if err != nil {
 		return err
 	}
-	controller.Status.Replicas = len(list.Items)
+	controller.Status.Replicas = len(rc.FilterActivePods(list.Items))
 	return nil
 }
