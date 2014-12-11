@@ -57,6 +57,7 @@ type builder struct {
 	cmdAuthInfo     cmdAuthInfo
 	authPath        string
 	apiserver       string
+	apiServerList	StringListFlag
 	apiVersion      string
 	matchApiVersion bool
 }
@@ -74,6 +75,7 @@ func NewBuilder(authLoader AuthLoader) Builder {
 
 const (
 	FlagApiServer       = "server"
+	FlagApiServerList   = "api_servers"
 	FlagMatchApiVersion = "match-server-version"
 	FlagApiVersion      = "api-version"
 	FlagAuthPath        = "auth-path"
@@ -90,6 +92,7 @@ func (builder *builder) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&builder.matchApiVersion, FlagMatchApiVersion, false, "Require server version to match client version")
 	flags.StringVar(&builder.apiVersion, FlagApiVersion, latest.Version, "The API version to use when talking to the server")
 	flags.StringVarP(&builder.authPath, FlagAuthPath, "a", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
+	flags.Var(&builder.apiServerList, FlagApiServerList, "List of addresses of Kubernetes API server, <ip:port>, comma seperated.")
 	flags.Var(&builder.cmdAuthInfo.Insecure, FlagInsecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 	flags.Var(&builder.cmdAuthInfo.CertFile, FlagCertFile, "Path to a client key file for TLS.")
 	flags.Var(&builder.cmdAuthInfo.KeyFile, FlagKeyFile, "Path to a client key file for TLS.")
@@ -126,11 +129,17 @@ func (builder *builder) Client() (*client.Client, error) {
 // Config implements Builder
 func (builder *builder) Config() (*client.Config, error) {
 	clientConfig := client.Config{}
+
+	clientConfig.ApiServerList = builder.apiServerList.Value
+	if len(builder.apiserver) > 0 && builder.apiServerList.Provided() {
+		return nil, fmt.Errorf("Both -server= and -api_servers= specified, but are mututally exclusive\n")
+	}
+
 	if len(builder.apiserver) > 0 {
 		clientConfig.ApiServerList = util.StringList{ builder.apiserver }
 	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
 		clientConfig.ApiServerList = util.StringList{ os.Getenv("KUBERNETES_MASTER") }
-	} else {
+	} else if len(clientConfig.ApiServerList) == 0 {
 		// TODO: eventually apiserver should start on 443 and be secure by default
 		clientConfig.ApiServerList = util.StringList{ "http://localhost:8080" }
 	}

@@ -19,7 +19,9 @@ package clientcmd
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/pflag"
 )
 
@@ -60,6 +62,34 @@ func (flag *StringFlag) Provided() bool {
 
 func (flag *StringFlag) String() string {
 	return flag.Value
+}
+
+type StringListFlag struct {
+	Default		util.StringList
+	Value		util.StringList
+	WasProvided	bool
+}
+
+func (flag *StringListFlag) SetDefault(value string) {
+	flag.Value = nil
+	flag.WasProvided = false
+}
+
+func (flag *StringListFlag) Set(value string) error {
+	flag.WasProvided = true
+	return flag.Value.Set(value)
+}
+
+func (flag *StringListFlag) Type() string {
+	return "stringlist"
+}
+
+func (flag *StringListFlag) Provided() bool {
+	return flag.WasProvided
+}
+
+func (flag *StringListFlag) String() string {
+	return strings.Join(flag.Value, ",")
 }
 
 // BoolFlag implements FlagProvider
