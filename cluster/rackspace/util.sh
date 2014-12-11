@@ -151,7 +151,7 @@ rax-boot-master() {
 
 # Copy cloud-config to KUBE_TEMP and work some sed magic
   sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
-      -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\&}|" \
+      -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
       -e "s|KUBE_USER|${KUBE_USER}|" \
       -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
       -e "s|PORTAL_NET|${PORTAL_NET}|" \
@@ -183,7 +183,7 @@ rax-boot-minions() {
 
     sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
         -e "s|INDEX|$((i + 1))|g" \
-        -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\&}|" \
+        -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
         -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
