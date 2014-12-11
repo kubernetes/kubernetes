@@ -376,6 +376,21 @@ func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
 	_, err = gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
+	if err != nil {
+		// Check if the disk is already attached to this instance.  We do this only
+		// in the error case, since it is expected to be exceptional.
+		instance, err := gce.service.Instances.Get(gce.projectID, gce.zone, gce.instanceID).Do()
+		if err != nil {
+			return err
+		}
+		for _, disk := range instance.Disks {
+			if disk.InitializeParams.DiskName == diskName {
+				// Disk is already attached, we're good to go.
+				return nil
+			}
+		}
+
+	}
 	return err
 }
 
