@@ -4,12 +4,6 @@ This is a getting started guide for Fedora.  It is a manual configuration so you
 
 This guide will only get ONE minion working.  Multiple minions requires a functional [networking configuration](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
 
-The guide is broken into 3 sections:
-
-1. Prepare the hosts.
-2. Configuring the two hosts, a master and a minion.
-3. Basic functionality test.
-
 The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, fed-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, fed-minion will be the minion and run kubelet, proxy, cadvisor and docker.
 
 **System Information:**
@@ -20,16 +14,6 @@ fed-master = 192.168.121.9
 fed-minion = 192.168.121.65
 ```
 
-Versions:
-
-```
-Fedora release 20 (Heisenbug)
-
-etcd-0.4.6-6.fc20.x86_64
-kubernetes-0.4-0.2.gitd5377e4.fc22.x86_64
-```
-
-  
 **Prepare the hosts:**
     
 * Install kubernetes on all hosts - fed-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
@@ -45,21 +29,9 @@ echo "192.168.121.9	fed-master
 192.168.121.65	fed-minion" >> /etc/hosts
 ```
 
-* Edit /etc/kubernetes/config which will be the same on all hosts
+* Edit /etc/kubernetes/config which will be the same on all hosts to contain:
 
 ```
-###
-# kubernetes system config
-#
-# The following values are used to configure various aspects of all
-# kubernetes services, including
-#
-#   kube-apiserver.service
-#   kube-controller-manager.service
-#   kube-scheduler.service
-#   kubelet.service
-#   kube-proxy.service
-
 # Comma seperated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
 
@@ -82,17 +54,9 @@ systemctl stop iptables-services firewalld
 
 **Configure the kubernetes services on the master.**
 
-***For this you need to configure the kube-apiserver. The kube-apiserver, kube-controller-manager, and kube-scheduler along with the etcd, will need to be started***
-
 * Edit /etc/kubernetes/apiserver to appear as such:
 
 ```       
-###
-# kubernetes system config
-#
-# The following values are used to configure the kube-apiserver
-#
-
 # The address on the local server to listen to.
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
@@ -114,12 +78,6 @@ KUBE_API_ARGS=""
 
 * Edit /etc/kubernetes/controller-manager to appear as such:
 ```
-###
-# kubernetes system config
-#
-# The following values are used to configure the kube-controller-manager
-#
-
 # Comma seperated list of minions
 KUBELET_ADDRESSES="--machines=fed-minion"
 ```
@@ -134,28 +92,6 @@ for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do
 done
 ```
 
-* Take a look at what ports the services are running on.
-
-```       
-# netstat -tulnp | grep -E "(kube)|(etcd)"
-```       
-
-* Test etcd on the master (fed-master)
-
-```       
-curl -s -L http://fed-master:4001/version
-curl -s -L http://fed-master:4001/v2/keys/mykey -XPUT -d value="this is awesome" | python -mjson.tool
-curl -s -L http://fed-master:4001/v2/keys/mykey | python -mjson.tool
-curl -s -L http://fed-master:4001/v2/keys/mykey -XDELETE | python -mjson.tool
-```       
-
-* Poke the kube-apiserver just a bit
-```
-curl -s -L http://fed-master:8080/version | python -mjson.tool
-curl -s -L http://fed-master:8080/api/v1beta1/pods | python -mjson.tool
-curl -s -L http://fed-master:8080/api/v1beta1/minions | python -mjson.tool
-curl -s -L http://fed-master:8080/api/v1beta1/services | python -mjson.tool
-```
 **Configure the kubernetes services on the minion.**
 
 ***We need to configure the kubelet and start the kubelet and proxy***
@@ -163,9 +99,6 @@ curl -s -L http://fed-master:8080/api/v1beta1/services | python -mjson.tool
 * Edit /etc/kubernetes/kubelet to appear as such:
 
 ```       
-###
-# kubernetes kubelet (minion) config
-
 # The address for the info server to serve on
 KUBELET_ADDRESS="--address=0.0.0.0"
 
@@ -189,11 +122,7 @@ for SERVICES in kube-proxy kubelet docker; do
 done
 ```
 
-* Take a look at what ports the services are running on.
-
-```       
-netstat -tulnp | grep -E "(kube)|(docker)|(cadvisor)"
-```       
+*You should be finished!*
 
 * Check to make sure the cluster can see the minion (on fed-master)
 
