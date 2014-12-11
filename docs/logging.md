@@ -6,7 +6,7 @@ Kubernetes components, such as kubelet and apiserver, use the [glog](https://god
 ## Logging in Containers
 There are no Kubernetes-specific requirements for logging from within containers.  A
 [search](https://www.google.com/?q=docker+container+logging) will turn up any number of articles about logging and
-Docker containers.  However, we do provide an example of how to collect, index, and view pod logs [using Elasicsearch and Kibana](./getting-started-guides/logging.md)
+Docker containers.  However, we do provide an example of how to collect, index, and view pod logs [using Fluentd, Elasticsearch, and Kibana](./getting-started-guides/logging.md)
 
 
 
