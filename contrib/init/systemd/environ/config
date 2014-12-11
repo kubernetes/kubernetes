@@ -10,6 +10,9 @@
 #   kubelet.service
 #   kube-proxy.service
 
+# Comma seperated list of machines running the apiserver
+KUBE_API_SERVERS="--api_servers=http://127.0.0.1:8080"
+
 # Comma seperated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
