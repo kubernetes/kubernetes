@@ -45,6 +45,7 @@ var (
 	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
 	times            = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
+	tap              = flag.Bool("tap", false, "Enable Test Anything Protocol (TAP) output (disables --verbose, only failure output recorded)")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -76,6 +77,17 @@ type ResultsByTest map[string]TestResult
 func main() {
 	flag.Parse()
 	signal.Notify(signals, os.Interrupt)
+
+	if *tap {
+		fmt.Printf("TAP version 13\n")
+		log.SetPrefix("# ")
+
+		// TODO: this limitation is fixable by moving runBash to
+		// outputing to temp files, which still lets people check on
+		// stuck things interactively. The current stdout/stderr
+		// approach isn't really going to work with TAP, though.
+		*verbose = false
+	}
 
 	if *test {
 		*tests = "*"
@@ -221,15 +233,20 @@ func Test() (results ResultsByTest) {
 	shuffleStrings(toRun, rand.New(rand.NewSource(*orderseed)))
 	log.Printf("Running tests matching %v shuffled with seed %#x: %v", *tests, *orderseed, toRun)
 	results = ResultsByTest{}
+	if *tap {
+		fmt.Printf("1..%v\n", len(toRun))
+	}
 	for i, name := range toRun {
 		absName := filepath.Join(*root, "hack", "e2e-suite", name)
 		log.Printf("Starting test [%v/%v]: %v", i+1, len(toRun), name)
 		testResult := results[name]
-		if runBash(name, absName) {
-			log.Printf("%v passed", name)
+		res, stdout, stderr := runBashWithOutputs(name, absName)
+		if res {
+			fmt.Printf("ok %v - %v\n", i+1, name)
 			testResult.Pass++
 		} else {
-			log.Printf("%v failed", name)
+			fmt.Printf("not ok %v - %v\n", i+1, name)
+			printBashOutputs("  ", "    ", stdout, stderr)
 			testResult.Fail++
 		}
 		results[name] = testResult
@@ -282,13 +299,18 @@ func printSubreport(title string, tests []string, results ResultsByTest) {
 
 // All nonsense below is temporary until we have go versions of these things.
 
-func runBash(stepName, bashFragment string) bool {
+func runBashWithOutputs(stepName, bashFragment string) (bool, string, string) {
 	cmd := exec.Command("bash", "-s")
 	if *trace_bash {
 		cmd.Args = append(cmd.Args, "-x")
 	}
 	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
 	return finishRunning(stepName, cmd)
+}
+
+func runBash(stepName, bashFragment string) bool {
+	result, _, _ := runBashWithOutputs(stepName, bashFragment)
+	return result
 }
 
 // call the returned anonymous function to stop.
@@ -304,16 +326,17 @@ func runBashUntil(stepName, bashFragment string) func() {
 	}
 	return func() {
 		cmd.Process.Signal(os.Interrupt)
-		fmt.Printf("%v stdout:\n------\n%v\n------\n", stepName, string(stdout.Bytes()))
-		fmt.Printf("%v stderr:\n------\n%v\n------\n", stepName, string(stderr.Bytes()))
+		headerprefix := stepName + " "
+		lineprefix := "  "
+		if *tap {
+			headerprefix = "# " + headerprefix
+			lineprefix = "# " + lineprefix
+		}
+		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()))
 	}
 }
 
-func run(stepName, cmdPath string) bool {
-	return finishRunning(stepName, exec.Command(filepath.Join(*root, cmdPath)))
-}
-
-func finishRunning(stepName string, cmd *exec.Cmd) bool {
+func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
 	log.Printf("Running: %v", stepName)
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 	if *verbose {
@@ -340,12 +363,31 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
 		if !*verbose {
-			fmt.Printf("stdout:\n------\n%v\n------\n", string(stdout.Bytes()))
-			fmt.Printf("stderr:\n------\n%v\n------\n", string(stderr.Bytes()))
+			return false, string(stdout.Bytes()), string(stderr.Bytes())
+		} else {
+			return false, "", ""
 		}
-		return false
 	}
-	return true
+	return true, "", ""
+}
+
+func printBashOutputs(headerprefix, lineprefix, stdout, stderr string) {
+	// The |'s (plus appropriate prefixing) are to make this look
+	// "YAMLish" to the Jenkins TAP plugin
+	if stdout != "" {
+		fmt.Printf("%vstdout: |\n", headerprefix)
+		printPrefixedLines(lineprefix, stdout)
+	}
+	if stderr != "" {
+		fmt.Printf("%vstderr: |\n", headerprefix)
+		printPrefixedLines(lineprefix, stderr)
+	}
+}
+
+func printPrefixedLines(prefix, s string) {
+	for _, line := range strings.Split(s, "\n") {
+		fmt.Printf("%v%v\n", prefix, line)
+	}
 }
 
 // returns either "", or a list of args intended for appending with the
