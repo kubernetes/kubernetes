@@ -90,8 +90,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	id := parts[1]
 	rest := ""
-	if len(parts) == 3 {
-		rest = parts[2]
+	if len(parts) > 2 {
+		proxyParts := parts[2:]
+		rest = strings.Join(proxyParts, "/")
 	}
 	storage, ok := r.storage[kind]
 	if !ok {

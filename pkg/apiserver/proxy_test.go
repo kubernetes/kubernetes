@@ -154,6 +154,9 @@ func TestProxy(t *testing.T) {
 			if e, a := item.reqBody, string(gotBody); e != a {
 				t.Errorf("%v - expected %v, got %v", item.method, e, a)
 			}
+			if e, a := item.path, req.URL.Path; e != a {
+				t.Errorf("%v - expected %v, got %v", item.method, e, a)
+			}
 			fmt.Fprint(w, item.respBody)
 		}))
 		defer proxyServer.Close()

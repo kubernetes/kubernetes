@@ -100,7 +100,7 @@ func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, kinds map[string]reflect.Type, h restful.RouteFunction) {
+func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, kinds map[string]reflect.Type, h restful.RouteFunction, namespaceScope bool) {
 	glog.V(3).Infof("Installing /%s/%s\n", version, path)
 	object := storage.New()
 	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
@@ -118,6 +118,11 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 
 	// See github.com/emicklei/go-restful/blob/master/jsr311.go for routing logic
 	// and status-code behavior
+	if namespaceScope {
+		path = "ns/{namespace}/" + path
+		ws.Param(ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string"))
+	}
+	glog.V(3).Infof("Installing version=/%s, kind=/%s, path=/%s\n", version, kind, path)
 
 	ws.Route(ws.POST(path).To(h).
 		Doc("create a " + kind).
@@ -221,8 +226,10 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 	}
 
 	for path, storage := range g.handler.storage {
-		registerResourceHandlers(ws, version, path, storage, kinds, h)
-		registerResourceHandlers(ws, version, "ns/{namespace}/"+path, storage, kinds, h)
+		// register legacy patterns where namespace is optional in path
+		registerResourceHandlers(ws, version, path, storage, kinds, h, false)
+		// register pattern where namespace is required in path
+		registerResourceHandlers(ws, version, path, storage, kinds, h, true)
 	}
 
 	// TODO: port the rest of these. Sadly, if we don't, we'll have inconsistent
