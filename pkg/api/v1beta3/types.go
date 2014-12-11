@@ -423,6 +423,7 @@ type ContainerStatus struct {
 	RestartCount int `json:"restartCount"`
 	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
 	// TODO(dchen1107): Which image the container is running with?
+	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
 }
 
 // PodInfo contains one entry for every container with available info.

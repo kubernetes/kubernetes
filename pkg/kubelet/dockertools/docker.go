@@ -389,7 +389,8 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 
 	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
 	containerStatus := api.ContainerStatus{
-		Image: inspectResult.Config.Image,
+		Image:       inspectResult.Config.Image,
+		ContainerID: "docker://" + dockerID,
 	}
 
 	waiting := true

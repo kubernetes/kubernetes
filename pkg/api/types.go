@@ -405,7 +405,8 @@ type ContainerStatus struct {
 	// not just PodInfo. Now we need this to remove docker.Container from API
 	PodIP string `json:"podIP,omitempty"`
 	// TODO(dchen1107): Need to decide how to represent this in v1beta3
-	Image string `json:"image"`
+	Image       string `json:"image"`
+	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
 }
 
 // PodInfo contains one entry for every container with available info.
