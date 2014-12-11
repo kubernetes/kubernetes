@@ -33,3 +33,7 @@ func (sl *StringList) Set(value string) error {
 	}
 	return nil
 }
+
+func (*StringList) Type() string {
+	return "stringList"
+}
