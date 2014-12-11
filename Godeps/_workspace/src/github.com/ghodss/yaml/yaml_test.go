@@ -1,18 +1,17 @@
 package yaml
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 )
 
 type MarshalTest struct {
-	A int
+	A string
 }
 
-func TestMarshalYAML(t *testing.T) {
-	s := MarshalTest{1}
-	e := []byte("A: 1\n")
+func TestMarshal(t *testing.T) {
+	s := MarshalTest{"a"}
+	e := []byte("A: a\n")
 
 	y, err := Marshal(s)
 	if err != nil {
@@ -21,16 +20,50 @@ func TestMarshalYAML(t *testing.T) {
 
 	if !reflect.DeepEqual(y, e) {
 		t.Errorf("marshal YAML was unsuccessful, expected: %#v, got: %#v",
-			string(y), string(e))
+			string(e), string(y))
 	}
 }
 
-func TestUnmarshal(t *testing.T) {
-	y := []byte(`a: 1`)
-	s := MarshalTest{}
-	e := MarshalTest{1}
+type UnmarshalString struct {
+	A string
+}
 
-	err := Unmarshal(y, &s)
+type UnmarshalNestedString struct {
+	A NestedString
+}
+
+type NestedString struct {
+	A string
+}
+
+type UnmarshalSlice struct {
+	A []NestedSlice
+}
+
+type NestedSlice struct {
+	B string
+	C *string
+}
+
+func TestUnmarshal(t *testing.T) {
+	y := []byte("a: 1")
+	s1 := UnmarshalString{}
+	e1 := UnmarshalString{"1"}
+	unmarshal(t, y, &s1, &e1)
+
+	y = []byte("a:\n  a: 1")
+	s2 := UnmarshalNestedString{}
+	e2 := UnmarshalNestedString{NestedString{"1"}}
+	unmarshal(t, y, &s2, &e2)
+
+	y = []byte("a:\n  - b: abc\n    c: def\n  - b: 123\n    c: 456\n")
+	s3 := UnmarshalSlice{}
+	e3 := UnmarshalSlice{[]NestedSlice{NestedSlice{"abc", strPtr("def")}, NestedSlice{"123", strPtr("456")}}}
+	unmarshal(t, y, &s3, &e3)
+}
+
+func unmarshal(t *testing.T, y []byte, s, e interface{}) {
+	err := Unmarshal(y, s)
 	if err != nil {
 		t.Errorf("error unmarshaling YAML: %v", err)
 	}
@@ -170,7 +203,7 @@ func runCases(t *testing.T, runType RunType, cases []Case) {
 
 	for _, c := range cases {
 		// Convert the string.
-		fmt.Printf("converting %s\n", c.input)
+		t.Logf("converting %s\n", c.input)
 		output, err := f([]byte(c.input))
 		if err != nil {
 			t.Errorf("Failed to convert %s, input: `%s`, err: %v", msg, c.input, err)
