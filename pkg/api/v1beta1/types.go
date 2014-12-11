@@ -171,7 +171,7 @@ type VolumeMount struct {
 	// Required.
 	// Exactly one of the following must be set.  If both are set, prefer MountPath.
 	// DEPRECATED: Path will be removed in a future version of the API.
-	MountPath string `json:"mountPath,omitempty" description:"path within the container at which the volume should be mounted; overrides path"`
+	MountPath string `json:"mountPath" description:"path within the container at which the volume should be mounted; overrides path"`
 	Path      string `json:"path,omitempty" description:"path within the container at which the volume should be mounted; deprecated"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
 	// DEPRECATED: MountType will be removed in a future version of the API.

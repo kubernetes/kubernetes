@@ -145,7 +145,7 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `json:"readOnly,omitempty" description:"mounted read-only if true, read-write otherwise (false or unspecified)"`
 	// Required.
-	MountPath string `json:"mountPath,omitempty" description:"path within the container at which the volume should be mounted"`
+	MountPath string `json:"mountPath" description:"path within the container at which the volume should be mounted"`
 }
 
 // EnvVar represents an environment variable present in a Container.
