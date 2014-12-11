@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -59,6 +60,10 @@ func (c *replicationControllers) List(selector labels.Selector) (result *api.Rep
 
 // Get returns information about a particular replication controller.
 func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
+	if len(name) == 0 {
+		return nil, errors.New("name is required parameter to Get")
+	}
+
 	result = &api.ReplicationController{}
 	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Into(result)
 	return

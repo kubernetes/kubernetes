@@ -16,17 +16,21 @@ limitations under the License.
 
 package client
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+import (
+	"errors"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
 
 type NodesInterface interface {
 	Nodes() NodeInterface
 }
 
 type NodeInterface interface {
-	Get(id string) (result *api.Node, err error)
+	Get(name string) (result *api.Node, err error)
 	Create(minion *api.Node) (*api.Node, error)
 	List() (*api.NodeList, error)
-	Delete(id string) error
+	Delete(name string) error
 }
 
 // nodes implements NodesInterface
@@ -63,13 +67,17 @@ func (c *nodes) List() (*api.NodeList, error) {
 }
 
 // Get gets an existing minion
-func (c *nodes) Get(id string) (*api.Node, error) {
+func (c *nodes) Get(name string) (*api.Node, error) {
+	if len(name) == 0 {
+		return nil, errors.New("name is required parameter to Get")
+	}
+
 	result := &api.Node{}
-	err := c.r.Get().Path(c.resourceName()).Path(id).Do().Into(result)
+	err := c.r.Get().Path(c.resourceName()).Path(name).Do().Into(result)
 	return result, err
 }
 
 // Delete deletes an existing minion.
-func (c *nodes) Delete(id string) error {
-	return c.r.Delete().Path(c.resourceName()).Path(id).Do().Error()
+func (c *nodes) Delete(name string) error {
+	return c.r.Delete().Path(c.resourceName()).Path(name).Do().Error()
 }

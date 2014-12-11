@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -33,7 +34,7 @@ type EndpointsNamespacer interface {
 type EndpointsInterface interface {
 	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
 	List(selector labels.Selector) (*api.EndpointsList, error)
-	Get(id string) (*api.Endpoints, error)
+	Get(name string) (*api.Endpoints, error)
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -64,9 +65,13 @@ func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, e
 }
 
 // Get returns information about the endpoints for a particular service.
-func (c *endpoints) Get(id string) (result *api.Endpoints, err error) {
+func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
+	if len(name) == 0 {
+		return nil, errors.New("name is required parameter to Get")
+	}
+
 	result = &api.Endpoints{}
-	err = c.r.Get().Namespace(c.ns).Path("endpoints").Path(id).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Path("endpoints").Path(name).Do().Into(result)
 	return
 }
 
