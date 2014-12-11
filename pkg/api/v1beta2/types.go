@@ -461,6 +461,58 @@ type EndpointsList struct {
 	Items    []Endpoints `json:"items" description:"list of service endpoint lists"`
 }
 
+// NodeStatus is information about the current status of a node.
+type NodeStatus struct {
+	// NodePhase is the current lifecycle phase of the node.
+	Phase NodePhase `json:"phase,omitempty" description:"node phase is the current lifecycle phase of the node"`
+	// Conditions is an array of current node conditions.
+	Conditions []NodeCondition `json:"conditions,omitempty" description:"conditions is an array of current node conditions"`
+}
+
+type NodePhase string
+
+// These are the valid phases of node.
+const (
+	// NodePending means the node has been created/added by the system, but not configured.
+	NodePending NodePhase = "Pending"
+	// NodeRunning means the node has been configured and has Kubernetes components running.
+	NodeRunning NodePhase = "Running"
+	// NodeTerminated means the node has been removed from the cluster.
+	NodeTerminated NodePhase = "Terminated"
+)
+
+type NodeConditionKind string
+
+// These are valid conditions of node. Currently, we don't have enough information to decide
+// node condition. In the future, we will add more. The proposed set of conditions are:
+// NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
+const (
+	// NodeReachable means the node can be reached (in the sense of HTTP connection) from node controller.
+	NodeReachable NodeConditionKind = "Reachable"
+	// NodeReady means the node returns StatusOK for HTTP health check.
+	NodeReady NodeConditionKind = "Ready"
+)
+
+type NodeConditionStatus string
+
+// These are valid condition status. "ConditionFull" means node is in the condition;
+// "ConditionNone" means node is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if node is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionFull    NodeConditionStatus = "Full"
+	ConditionNone    NodeConditionStatus = "None"
+	ConditionUnknown NodeConditionStatus = "Unknown"
+)
+
+type NodeCondition struct {
+	Kind               NodeConditionKind   `json:"kind" description:"kind of the condition, one of reachable, ready"`
+	Status             NodeConditionStatus `json:"status" description:"status of the condition, one of full, none, unknown"`
+	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
+	Reason             string              `json:"reason,omitempty" description:"(brief) reason for the condition's last transition"`
+	Message            string              `json:"message,omitempty" description:"human readable message indicating details about last transition"`
+}
+
 // NodeResources represents resources on a Kubernetes system node
 // see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
 type NodeResources struct {
@@ -480,6 +532,8 @@ type Minion struct {
 	HostIP string `json:"hostIP,omitempty" description:"IP address of the node"`
 	// Resources available on the node
 	NodeResources NodeResources `json:"resources,omitempty" description:"characterization of node resources"`
+	// Status describes the current status of a node
+	Status NodeStatus `json:"status,omitempty" description:"current status of node"`
 	// Labels for the node
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize minions; labels of a minion assigned by the scheduler must match the scheduled pod's nodeSelector"`
 }

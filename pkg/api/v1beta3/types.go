@@ -678,6 +678,54 @@ type NodeSpec struct {
 type NodeStatus struct {
 	// Queried from cloud provider, if available.
 	HostIP string `json:"hostIP,omitempty"`
+	// NodePhase is the current lifecycle phase of the node.
+	Phase NodePhase `json:"phase,omitempty"`
+	// Conditions is an array of current node conditions.
+	Conditions []NodeCondition `json:"conditions,omitempty"`
+}
+
+type NodePhase string
+
+// These are the valid phases of node.
+const (
+	// NodePending means the node has been created/added by the system, but not configured.
+	NodePending NodePhase = "Pending"
+	// NodeRunning means the node has been configured and has Kubernetes components running.
+	NodeRunning NodePhase = "Running"
+	// NodeTerminated means the node has been removed from the cluster.
+	NodeTerminated NodePhase = "Terminated"
+)
+
+type NodeConditionKind string
+
+// These are valid conditions of node. Currently, we don't have enough information to decide
+// node condition. In the future, we will add more. The proposed set of conditions are:
+// NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
+const (
+	// NodeReachable means the node can be reached (in the sense of HTTP connection) from node controller.
+	NodeReachable NodeConditionKind = "Reachable"
+	// NodeReady means the node returns StatusOK for HTTP health check.
+	NodeReady NodeConditionKind = "Ready"
+)
+
+type NodeConditionStatus string
+
+// These are valid condition status. "ConditionFull" means node is in the condition;
+// "ConditionNone" means node is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if node is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionFull    NodeConditionStatus = "Full"
+	ConditionNone    NodeConditionStatus = "None"
+	ConditionUnknown NodeConditionStatus = "Unknown"
+)
+
+type NodeCondition struct {
+	Kind               NodeConditionKind   `json:"kind"`
+	Status             NodeConditionStatus `json:"status"`
+	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty"`
+	Reason             string              `json:"reason,omitempty"`
+	Message            string              `json:"message,omitempty"`
 }
 
 type ResourceName string

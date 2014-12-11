@@ -384,6 +384,12 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Status.Phase, &out.Status.Phase, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status.Conditions, &out.Status.Conditions, 0); err != nil {
+				return err
+			}
 
 			out.HostIP = in.Status.HostIP
 			return s.Convert(&in.Spec.Capacity, &out.NodeResources.Capacity, 0)
@@ -396,6 +402,12 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status.Phase, &out.Status.Phase, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status.Conditions, &out.Status.Conditions, 0); err != nil {
 				return err
 			}
 
