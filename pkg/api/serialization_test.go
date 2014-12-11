@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -136,14 +135,6 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		pm[c.RandString()] = docker.PortMapping{
 			c.RandString(): c.RandString(),
 		}
-	},
-	func(t *time.Time, c fuzz.Continue) {
-		// This is necessary because the standard fuzzed time.Time object is
-		// completely nil, but when JSON unmarshals dates it fills in the
-		// unexported loc field with the time.UTC object, resulting in
-		// reflect.DeepEqual returning false in the round trip tests. We solve it
-		// by using a date that will be identical to the one JSON unmarshals.
-		*t = time.Date(2000, 1, 1, 1, 1, 1, 0, time.UTC)
 	},
 )
 
