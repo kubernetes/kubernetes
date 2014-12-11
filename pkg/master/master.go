@@ -339,8 +339,7 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallSupport(m.handlerContainer, m.rootWebService)
 
 	// TODO: use go-restful
-	serversToValidate := m.getServersToValidate(c)
-	apiserver.InstallValidator(m.mux, serversToValidate)
+	apiserver.InstallValidator(m.mux, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.mux)
 	}
@@ -430,7 +429,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		glog.Errorf("Failed to list minions: %v", err)
 	}
 	for ix, node := range nodes.Items {
-		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Status.HostIP, Port: 10250, Path: "/healthz"}
+		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: 10250, Path: "/healthz"}
 	}
 	return serversToValidate
 }

@@ -41,7 +41,7 @@ type Server struct {
 // validator is responsible for validating the cluster and serving
 type validator struct {
 	// a list of servers to health check
-	servers map[string]Server
+	servers func() map[string]Server
 	client  httpGet
 }
 
@@ -72,7 +72,7 @@ type ServerStatus struct {
 
 func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reply := []ServerStatus{}
-	for name, server := range v.servers {
+	for name, server := range v.servers() {
 		status, msg, err := server.check(v.client)
 		var errorMsg string
 		if err != nil {
@@ -93,7 +93,7 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewValidator creates a validator for a set of servers.
-func NewValidator(servers map[string]Server) (http.Handler, error) {
+func NewValidator(servers func() map[string]Server) (http.Handler, error) {
 	return &validator{
 		servers: servers,
 		client:  &http.Client{},
@@ -114,7 +114,7 @@ func makeTestValidator(servers map[string]string, get httpGet) (http.Handler, er
 		result[name] = Server{Addr: host, Port: val, Path: "/healthz"}
 	}
 
-	v, e := NewValidator(result)
+	v, e := NewValidator(func() map[string]Server { return result })
 	if e == nil {
 		v.(*validator).client = get
 	}
