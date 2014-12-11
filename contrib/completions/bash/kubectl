@@ -43,7 +43,7 @@ __has_resource()
 __kubectl_parse_get()
 {
     local kubectl_output out
-    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
+    if kubectl_output=$(kubectl get --no_headers "$1" 2>/dev/null); then
         out=($(echo "${kubectl_output}" | awk '{print $1}'))
         COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
     fi
@@ -64,32 +64,32 @@ __kubectl_get_containers()
 __kubectl_pre_command()
 {
     local flags=(
-            --api-version=
+            --api_version=
             -a
-            --auth-path=
-            --certificate-authority=
-            --client-certificate=
-            --client-key=
-            --insecure-skip-tls-verify=
-            --match-server-version=
+            --auth_path=
+            --certificate_authority=
+            --client_certificate=
+            --client_key=
+            --insecure_skip_tls_verify=
+            --match_server_version=
             -n
             --namespace=
-            --ns-path=
+            --ns_path=
             -s
             --server=
     )
     local api_versions=(v1beta1 v1beta2 v1beta3)
 
     case $prev in
-        --api-version)
+        --api_version)
             COMPREPLY=( $(compgen -W "${api_versions[*]}" -- "$cur") )
             return 0
             ;;
-        -a | --auth-path | --certificate-authority | --client-certificate | --client-key | --ns-path)
+        -a | --auth_path | --certificate_authority | --client_certificate | --client_key | --ns_path)
             _filedir
             return 0
             ;;
-        --insecure-skip-tls-verify | --match-server-version)
+        --insecure_skip_tls_verify | --match_server_version)
             COMPREPLY=( $(compgen -W "true false" -- "$cur") )
             return 0
             ;;

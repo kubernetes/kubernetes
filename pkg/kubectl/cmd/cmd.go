@@ -100,7 +100,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
-	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
+	cmds.PersistentFlags().String("ns_path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
 	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
 	cmds.PersistentFlags().Bool("validate", false, "If true, use a schema to validate the input before sending it")
 
@@ -147,7 +147,7 @@ func GetKubeNamespace(cmd *cobra.Command) string {
 		result = ns
 		glog.V(2).Infof("Using namespace from -ns flag")
 	} else {
-		nsPath := GetFlagString(cmd, "ns-path")
+		nsPath := GetFlagString(cmd, "ns_path")
 		nsInfo, err := kubectl.LoadNamespaceInfo(nsPath)
 		if err != nil {
 			glog.Fatalf("Error loading current namespace: %v", err)
@@ -165,7 +165,7 @@ func GetExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
 	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
 		return ns, true
 	}
-	// TODO: determine when --ns-path is set but equal to the default
+	// TODO: determine when --ns_path is set but equal to the default
 	// value and return its value and true.
 	return "", false
 }

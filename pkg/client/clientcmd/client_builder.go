@@ -73,13 +73,13 @@ func NewBuilder(authLoader AuthLoader) Builder {
 
 const (
 	FlagApiServer       = "server"
-	FlagMatchApiVersion = "match-server-version"
-	FlagApiVersion      = "api-version"
-	FlagAuthPath        = "auth-path"
-	FlagInsecure        = "insecure-skip-tls-verify"
-	FlagCertFile        = "client-certificate"
-	FlagKeyFile         = "client-key"
-	FlagCAFile          = "certificate-authority"
+	FlagMatchApiVersion = "match_server_version"
+	FlagApiVersion      = "api_version"
+	FlagAuthPath        = "auth_path"
+	FlagInsecure        = "insecure_skip_tls_verify"
+	FlagCertFile        = "client_certificate"
+	FlagKeyFile         = "client_key"
+	FlagCAFile          = "certificate_authority"
 	FlagBearerToken     = "token"
 )
 
