@@ -28,7 +28,7 @@ For example, if you try to create a node from the following content:
   "id": "10.1.2.3",
   "kind": "Minion",
   "apiVersion": "v1beta1",
-  "spec": {
+  "resources": {
     "capacity": {
       "cpu": 1000,
       "memory": 1073741824
