@@ -151,7 +151,7 @@ rax-boot-master() {
 
 # Copy cloud-config to KUBE_TEMP and work some sed magic
   sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
-      -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\&}|" \
+      -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
       -e "s|KUBE_USER|${KUBE_USER}|" \
       -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
       -e "s|PORTAL_NET|${PORTAL_NET}|" \
