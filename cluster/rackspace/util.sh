@@ -183,7 +183,7 @@ rax-boot-minions() {
 
     sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
         -e "s|INDEX|$((i + 1))|g" \
-        -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\&}|" \
+        -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
         -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
