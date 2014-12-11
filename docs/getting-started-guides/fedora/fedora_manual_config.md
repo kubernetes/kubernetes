@@ -167,7 +167,7 @@ curl -s -L http://fed-master:8080/api/v1beta1/services | python -mjson.tool
 # kubernetes kubelet (minion) config
 
 # The address for the info server to serve on
-KUBELET_ADDRESS="--address=fed-minion"
+KUBELET_ADDRESS="--address=0.0.0.0"
 
 # The port for the info server to serve on
 KUBELET_PORT="--port=10250"
