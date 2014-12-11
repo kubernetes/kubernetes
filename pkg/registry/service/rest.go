@@ -114,6 +114,10 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 			if rs.cloud == nil {
 				return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
 			}
+			if service.Spec.Protocol != api.ProtocolTCP {
+				// TODO: Support UDP here too.
+				return nil, fmt.Errorf("external load balancers for non TCP services are not currently supported.")
+			}
 			balancer, ok := rs.cloud.TCPLoadBalancer()
 			if !ok {
 				return nil, fmt.Errorf("the cloud provider does not support external TCP load balancers.")
