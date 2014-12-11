@@ -112,7 +112,7 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	} else {
 		external, err := s.NewObject(dataVersion, dataKind)
 		if err != nil {
-			return fmt.Errorf("unable to create new object of type ('%s', '%s')", dataVersion, dataKind)
+			return err
 		}
 		// yaml is a superset of json, so we use it to decode here. That way,
 		// we understand both.

@@ -25,7 +25,9 @@ import (
 	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	docker "github.com/fsouza/go-dockerclient"
 	fuzz "github.com/google/gofuzz"
 )
@@ -82,6 +84,26 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	func(j *internal.ReplicationControllerStatus, c fuzz.Continue) {
 		// only replicas round trips
 		j.Replicas = int(c.RandUint64())
+	},
+	func(j *internal.List, c fuzz.Continue) {
+		c.Fuzz(&j.ListMeta)
+		c.Fuzz(&j.Items)
+		if j.Items == nil {
+			j.Items = []runtime.Object{}
+		}
+	},
+	func(j *runtime.Object, c fuzz.Continue) {
+		if c.RandBool() {
+			*j = &runtime.Unknown{
+				TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown"},
+				RawJSON:  []byte(`{"apiVersion":"unknown","kind":"Something","someKey":"someValue"}`),
+			}
+		} else {
+			types := []runtime.Object{&internal.Pod{}, &internal.ReplicationController{}}
+			t := types[c.Rand.Intn(len(types))]
+			c.Fuzz(t)
+			*j = t
+		}
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.

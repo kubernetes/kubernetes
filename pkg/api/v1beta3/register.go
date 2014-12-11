@@ -46,6 +46,7 @@ func init() {
 		&OperationList{},
 		&Event{},
 		&EventList{},
+		&List{},
 	)
 	// Legacy names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta3", "Minion", &Node{})
@@ -72,3 +73,4 @@ func (*Operation) IsAnAPIObject()                 {}
 func (*OperationList) IsAnAPIObject()             {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
+func (*List) IsAnAPIObject()                      {}

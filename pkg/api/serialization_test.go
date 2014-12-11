@@ -48,15 +48,6 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
-
-		j.Name = c.RandString()
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-		j.SelfLink = c.RandString()
-
-		var sec, nsec int64
-		c.Fuzz(&sec)
-		c.Fuzz(&nsec)
-		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
 	},
 	func(j *api.TypeMeta, c fuzz.Continue) {
 		// We have to customize the randomization of TypeMetas because their
@@ -98,6 +89,26 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
 		// only replicas round trips
 		j.Replicas = int(c.RandUint64())
+	},
+	func(j *api.List, c fuzz.Continue) {
+		c.Fuzz(&j.ListMeta)
+		c.Fuzz(&j.Items)
+		if j.Items == nil {
+			j.Items = []runtime.Object{}
+		}
+	},
+	func(j *runtime.Object, c fuzz.Continue) {
+		if c.RandBool() {
+			*j = &runtime.Unknown{
+				TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown"},
+				RawJSON:  []byte(`{"apiVersion":"unknown","kind":"Something","someKey":"someValue"}`),
+			}
+		} else {
+			types := []runtime.Object{&api.Pod{}, &api.ReplicationController{}}
+			t := types[c.Rand.Intn(len(types))]
+			c.Fuzz(t)
+			*j = t
+		}
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
@@ -154,7 +165,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 
 	obj2, err := codec.Decode(data)
 	if err != nil {
-		t.Errorf("%v: %v", name, err)
+		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), source)
 		return
 	}
 	if !reflect.DeepEqual(source, obj2) {
@@ -188,7 +199,21 @@ func TestSpecificKind(t *testing.T) {
 	api.Scheme.Log(nil)
 }
 
+func TestList(t *testing.T) {
+	api.Scheme.Log(t)
+	kind := "List"
+	item, err := api.Scheme.New("", kind)
+	if err != nil {
+		t.Errorf("Couldn't make a %v? %v", kind, err)
+		return
+	}
+	runTest(t, v1beta1.Codec, item)
+	runTest(t, v1beta2.Codec, item)
+	api.Scheme.Log(nil)
+}
+
 var nonRoundTrippableTypes = util.NewStringSet("ContainerManifest")
+var nonInternalRoundTrippableTypes = util.NewStringSet("List")
 
 func TestRoundTripTypes(t *testing.T) {
 	for kind := range api.Scheme.KnownTypes("") {
@@ -206,7 +231,9 @@ func TestRoundTripTypes(t *testing.T) {
 			}
 			runTest(t, v1beta1.Codec, item)
 			runTest(t, v1beta2.Codec, item)
-			runTest(t, api.Codec, item)
+			if !nonInternalRoundTrippableTypes.Has(kind) {
+				runTest(t, api.Codec, item)
+			}
 		}
 	}
 }

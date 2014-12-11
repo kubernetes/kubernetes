@@ -14,20 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package runtime_test
 
-import "errors"
+import (
+	"encoding/json"
+	"testing"
 
-func (re *RawExtension) UnmarshalJSON(in []byte) error {
-	if re == nil {
-		return errors.New("runtime.RawExtension: UnmarshalJSON on nil pointer")
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+)
+
+func TestEmbeddedRawExtensionMarshal(t *testing.T) {
+	type test struct {
+		Ext runtime.RawExtension
 	}
-	re.RawJSON = append(re.RawJSON[0:0], in...)
-	return nil
-}
 
-// Marshal may get called on pointers or values, so implement MarshalJSON on value.
-// http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
-func (re RawExtension) MarshalJSON() ([]byte, error) {
-	return re.RawJSON, nil
+	extension := test{Ext: runtime.RawExtension{RawJSON: []byte(`{"foo":"bar"}`)}}
+	data, err := json.Marshal(extension)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(data) != `{"Ext":{"foo":"bar"}}` {
+		t.Errorf("unexpected data: %s", string(data))
+	}
 }

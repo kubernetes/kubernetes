@@ -145,14 +145,14 @@ func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
 
 // NewObject returns a new object of the given version and name,
 // or an error if it hasn't been registered.
-func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
+func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
 	if types, ok := s.versionMap[versionName]; ok {
-		if t, ok := types[typeName]; ok {
+		if t, ok := types[kind]; ok {
 			return reflect.New(t).Interface(), nil
 		}
-		return nil, fmt.Errorf("no type '%v' for version '%v'", typeName, versionName)
+		return nil, &notRegisteredErr{kind: kind, version: versionName}
 	}
-	return nil, fmt.Errorf("no version '%v'", versionName)
+	return nil, &notRegisteredErr{kind: kind, version: versionName}
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given
@@ -187,8 +187,7 @@ func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
 // add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
-		err := s.converter.Register(f)
-		if err != nil {
+		if err := s.converter.Register(f); err != nil {
 			return err
 		}
 	}
@@ -286,7 +285,7 @@ func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string,
 	version, vOK := s.typeToVersion[t]
 	kinds, kOK := s.typeToKind[t]
 	if !vOK || !kOK {
-		return "", "", fmt.Errorf("unregistered type: %v", t)
+		return "", "", &notRegisteredErr{t: t}
 	}
 	apiVersion = version
 	kind = kinds[0]

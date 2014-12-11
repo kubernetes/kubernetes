@@ -16,18 +16,12 @@ limitations under the License.
 
 package runtime
 
-import "errors"
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+)
 
-func (re *RawExtension) UnmarshalJSON(in []byte) error {
-	if re == nil {
-		return errors.New("runtime.RawExtension: UnmarshalJSON on nil pointer")
-	}
-	re.RawJSON = append(re.RawJSON[0:0], in...)
-	return nil
-}
-
-// Marshal may get called on pointers or values, so implement MarshalJSON on value.
-// http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
-func (re RawExtension) MarshalJSON() ([]byte, error) {
-	return re.RawJSON, nil
+// IsNotRegisteredError returns true if the error indicates the provided
+// object or input data is not registered.
+func IsNotRegisteredError(err error) bool {
+	return conversion.IsNotRegisteredError(err)
 }
