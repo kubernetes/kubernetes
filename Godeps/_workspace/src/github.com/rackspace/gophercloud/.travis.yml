@@ -6,7 +6,7 @@ go:
   - 1.2
   - tip
 after_success:
-  - go get code.google.com/p/go.tools/cmd/cover
+  - go get godoc.org/golang.org/x/tools/cmd/cover
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
   - export PATH=$PATH:$HOME/gopath/bin/
