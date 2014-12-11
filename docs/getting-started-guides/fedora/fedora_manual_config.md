@@ -60,6 +60,9 @@ echo "192.168.121.9	fed-master
 #   kubelet.service
 #   kube-proxy.service
 
+# Comma seperated list of apiservers in the cluster
+KUBE_API_SERVERS="--api_servers=http://fed-master:8080"
+
 # Comma seperated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
 
@@ -98,9 +101,6 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 
 # The port on the local server to listen on.
 KUBE_API_PORT="--port=8080"
-
-# How the replication controller and scheduler find the kube-apiserver
-KUBE_MASTER="--master=fed-master:8080"
 
 # Port minions listen on
 KUBELET_PORT="--kubelet_port=10250"
