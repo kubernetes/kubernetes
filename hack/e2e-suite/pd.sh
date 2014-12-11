@@ -46,7 +46,7 @@ trap "teardown" EXIT
 
 perl -p -e "s/%.*%/${disk_name}/g" ${KUBE_ROOT}/examples/gce-pd/testpd.yaml > ${config}
 
-# Create and mount the disk.
+# Create and format the disk.
 gcloud compute disks create --zone="${ZONE}" --size=10GB "${disk_name}"
 gcloud compute instances attach-disk --zone="${ZONE}" --disk="${disk_name}" \
   --device-name temp-data "${MASTER_NAME}"
@@ -56,13 +56,62 @@ gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo /usr/share/
 gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo umount /mnt/tmp"
 gcloud compute instances detach-disk --zone="${ZONE}" --disk "${disk_name}" "${MASTER_NAME}"
 
+# Create a pod that uses the PD
 ${KUBECFG} -c ${config} create pods
 
 pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=testpd list pods)
 # Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
 for i in $(seq 1 24); do
-  echo "Waiting for pods to come up."
+  echo "Waiting for pod to come up."
+  sleep 5
+  all_running=1
+  for id in $pod_id_list; do
+    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+    if [[ "$current_status" != "Running" ]]; then
+      all_running=0
+      break
+    fi
+  done
+  if [[ "${all_running}" == 1 ]]; then
+    break
+  fi
+done
+if [[ "${all_running}" == 0 ]]; then
+  echo "Pods did not come up in time"
+  exit 1
+fi
+
+# Delete the pod this should unmount the PD
+${KUBECFG} delete pods/testpd
+for i in $(seq 1 24); do
+  echo "Waiting for pod to be deleted."
+  sleep 5
+  all_running=0
+  for id in $pod_id_list; do
+    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+    if [[ "$current_status" == "Running" ]]; then
+      all_running=1
+      break
+    fi
+  done
+  if [[ "${all_running}" == 0 ]]; then
+    break
+  fi
+done
+if [[ "${all_running}" == 1 ]]; then
+  echo "Pods did not delete in time"
+  exit 1
+fi
+
+# Recreate the pod, this should re-mount the PD
+${KUBECFG} -c ${config} create pods
+
+pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=testpd list pods)
+# Pod turn up on a clean cluster can take a while for the docker image pull.
+all_running=0
+for i in $(seq 1 24); do
+  echo "Waiting for pod to come up."
   sleep 5
   all_running=1
   for id in $pod_id_list; do
