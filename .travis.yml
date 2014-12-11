@@ -5,7 +5,7 @@ go:
   - 1.2
 
 install:
-  - go get code.google.com/p/go.tools/cmd/cover
+  - go get godoc.org/golang.org/x/tools/cmd/cover
   - ./hack/travis/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
