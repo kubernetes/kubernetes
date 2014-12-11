@@ -43,7 +43,9 @@ var (
 	orderseed        = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
 	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
 	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
+	times            = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
+	tap              = flag.Bool("tap", false, "Enable Test Anything Protocol (TAP) output (disables --verbose, only failure output recorded)")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -65,9 +67,27 @@ func absOrDie(path string) string {
 	return out
 }
 
+type TestResult struct {
+	Pass int
+	Fail int
+}
+
+type ResultsByTest map[string]TestResult
+
 func main() {
 	flag.Parse()
 	signal.Notify(signals, os.Interrupt)
+
+	if *tap {
+		fmt.Printf("TAP version 13\n")
+		log.SetPrefix("# ")
+
+		// TODO: this limitation is fixable by moving runBash to
+		// outputing to temp files, which still lets people check on
+		// stuck things interactively. The current stdout/stderr
+		// approach isn't really going to work with TAP, though.
+		*verbose = false
+	}
 
 	if *test {
 		*tests = "*"
@@ -118,10 +138,7 @@ func main() {
 	case *ctlCmd != "":
 		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
 	case *tests != "":
-		failed, passed := Test()
-		log.Printf("Passed tests: %v", passed)
-		log.Printf("Failed tests: %v", failed)
-		failure = len(failed) > 0
+		failure = PrintResults(Test())
 	}
 
 	if *down {
@@ -163,7 +180,7 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 	}
 }
 
-func Test() (failed, passed []string) {
+func Test() (results ResultsByTest) {
 	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
 
 	if !IsUp() {
@@ -203,34 +220,97 @@ func Test() (failed, passed []string) {
 		*orderseed = time.Now().UnixNano() & (1<<32 - 1)
 	}
 	sort.Strings(toRun)
+	if *times != 1 {
+		if *times <= 0 {
+			log.Fatal("Invalid --times (negative or no testing requested)!")
+		}
+		newToRun := make([]string, 0, *times*len(toRun))
+		for i := 0; i < *times; i++ {
+			newToRun = append(newToRun, toRun...)
+		}
+		toRun = newToRun
+	}
 	shuffleStrings(toRun, rand.New(rand.NewSource(*orderseed)))
 	log.Printf("Running tests matching %v shuffled with seed %#x: %v", *tests, *orderseed, toRun)
-	for _, name := range toRun {
+	results = ResultsByTest{}
+	if *tap {
+		fmt.Printf("1..%v\n", len(toRun))
+	}
+	for i, name := range toRun {
 		absName := filepath.Join(*root, "hack", "e2e-suite", name)
-		log.Printf("Starting test %v.", name)
-		if runBash(name, absName) {
-			log.Printf("%v passed", name)
-			passed = append(passed, name)
+		log.Printf("Starting test [%v/%v]: %v", i+1, len(toRun), name)
+		testResult := results[name]
+		res, stdout, stderr := runBashWithOutputs(name, absName)
+		if res {
+			fmt.Printf("ok %v - %v\n", i+1, name)
+			testResult.Pass++
 		} else {
-			log.Printf("%v failed", name)
-			failed = append(failed, name)
+			fmt.Printf("not ok %v - %v\n", i+1, name)
+			printBashOutputs("  ", "    ", stdout, stderr)
+			testResult.Fail++
 		}
+		results[name] = testResult
 	}
 
-	sort.Strings(passed)
-	sort.Strings(failed)
 	return
+}
+
+func PrintResults(results ResultsByTest) bool {
+	failures := 0
+
+	passed := []string{}
+	flaky := []string{}
+	failed := []string{}
+	for test, result := range results {
+		if result.Pass > 0 && result.Fail == 0 {
+			passed = append(passed, test)
+		} else if result.Pass > 0 && result.Fail > 0 {
+			flaky = append(flaky, test)
+			failures += result.Fail
+		} else {
+			failed = append(failed, test)
+			failures += result.Fail
+		}
+	}
+	sort.Strings(passed)
+	sort.Strings(flaky)
+	sort.Strings(failed)
+	printSubreport("Passed", passed, results)
+	printSubreport("Flaky", flaky, results)
+	printSubreport("Failed", failed, results)
+	if failures > 0 {
+		log.Printf("%v test(s) failed.", failures)
+	} else {
+		log.Printf("Success!")
+	}
+
+	return failures > 0
+}
+
+func printSubreport(title string, tests []string, results ResultsByTest) {
+	report := title + " tests:"
+
+	for _, test := range tests {
+		result := results[test]
+		report += fmt.Sprintf(" %v[%v/%v]", test, result.Pass, result.Pass+result.Fail)
+	}
+	log.Printf(report)
 }
 
 // All nonsense below is temporary until we have go versions of these things.
 
-func runBash(stepName, bashFragment string) bool {
+func runBashWithOutputs(stepName, bashFragment string) (bool, string, string) {
 	cmd := exec.Command("bash", "-s")
 	if *trace_bash {
 		cmd.Args = append(cmd.Args, "-x")
 	}
 	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
 	return finishRunning(stepName, cmd)
+}
+
+func runBash(stepName, bashFragment string) bool {
+	result, _, _ := runBashWithOutputs(stepName, bashFragment)
+	return result
 }
 
 // call the returned anonymous function to stop.
@@ -246,16 +326,17 @@ func runBashUntil(stepName, bashFragment string) func() {
 	}
 	return func() {
 		cmd.Process.Signal(os.Interrupt)
-		fmt.Printf("%v stdout:\n------\n%v\n------\n", stepName, string(stdout.Bytes()))
-		fmt.Printf("%v stderr:\n------\n%v\n------\n", stepName, string(stderr.Bytes()))
+		headerprefix := stepName + " "
+		lineprefix := "  "
+		if *tap {
+			headerprefix = "# " + headerprefix
+			lineprefix = "# " + lineprefix
+		}
+		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()))
 	}
 }
 
-func run(stepName, cmdPath string) bool {
-	return finishRunning(stepName, exec.Command(filepath.Join(*root, cmdPath)))
-}
-
-func finishRunning(stepName string, cmd *exec.Cmd) bool {
+func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
 	log.Printf("Running: %v", stepName)
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 	if *verbose {
@@ -282,12 +363,31 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
 		if !*verbose {
-			fmt.Printf("stdout:\n------\n%v\n------\n", string(stdout.Bytes()))
-			fmt.Printf("stderr:\n------\n%v\n------\n", string(stderr.Bytes()))
+			return false, string(stdout.Bytes()), string(stderr.Bytes())
+		} else {
+			return false, "", ""
 		}
-		return false
 	}
-	return true
+	return true, "", ""
+}
+
+func printBashOutputs(headerprefix, lineprefix, stdout, stderr string) {
+	// The |'s (plus appropriate prefixing) are to make this look
+	// "YAMLish" to the Jenkins TAP plugin
+	if stdout != "" {
+		fmt.Printf("%vstdout: |\n", headerprefix)
+		printPrefixedLines(lineprefix, stdout)
+	}
+	if stderr != "" {
+		fmt.Printf("%vstderr: |\n", headerprefix)
+		printPrefixedLines(lineprefix, stderr)
+	}
+}
+
+func printPrefixedLines(prefix, s string) {
+	for _, line := range strings.Split(s, "\n") {
+		fmt.Printf("%v%v\n", prefix, line)
+	}
 }
 
 // returns either "", or a list of args intended for appending with the
