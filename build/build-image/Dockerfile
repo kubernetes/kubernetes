@@ -23,7 +23,7 @@ ENV GOOS    linux
 ENV GOARCH  amd64
 
 # Get the code coverage tool and godep
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
+RUN go get golang.org/x/tools/cmd/cover github.com/tools/godep
 
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`
