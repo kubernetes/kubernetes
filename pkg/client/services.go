@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -59,6 +60,10 @@ func (c *services) List(selector labels.Selector) (result *api.ServiceList, err 
 
 // Get returns information about a particular service.
 func (c *services) Get(name string) (result *api.Service, err error) {
+	if len(name) == 0 {
+		return nil, errors.New("name is required parameter to Get")
+	}
+
 	result = &api.Service{}
 	err = c.r.Get().Namespace(c.ns).Path("services").Path(name).Do().Into(result)
 	return

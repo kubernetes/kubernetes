@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -60,6 +61,10 @@ func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 
 // GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
 func (c *pods) Get(name string) (result *api.Pod, err error) {
+	if len(name) == 0 {
+		return nil, errors.New("name is required parameter to Get")
+	}
+
 	result = &api.Pod{}
 	err = c.r.Get().Namespace(c.ns).Path("pods").Path(name).Do().Into(result)
 	return

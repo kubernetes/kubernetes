@@ -38,6 +38,7 @@ import (
 
 // TODO: Move this to a common place, it's needed in multiple tests.
 const apiPath = "/api/v1beta1"
+const nameRequiredError = "name is required parameter to Get"
 
 type testRequest struct {
 	Method  string
@@ -255,6 +256,17 @@ func TestGetPod(t *testing.T) {
 	c.Validate(t, receivedPod, err)
 }
 
+func TestGetPodWithNoName(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{Error: true}
+	receivedPod, err := c.Setup().Pods(ns).Get("")
+	if (err != nil) && (err.Error() != nameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	}
+
+	c.Validate(t, receivedPod, err)
+}
+
 func TestDeletePod(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: "/pods/foo"},
@@ -359,6 +371,17 @@ func TestGetController(t *testing.T) {
 	}
 	receivedController, err := c.Setup().ReplicationControllers(api.NamespaceDefault).Get("foo")
 	c.Validate(t, receivedController, err)
+}
+
+func TestGetControllerWithNoName(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{Error: true}
+	receivedPod, err := c.Setup().ReplicationControllers(ns).Get("")
+	if (err != nil) && (err.Error() != nameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	}
+
+	c.Validate(t, receivedPod, err)
 }
 
 func TestUpdateController(t *testing.T) {
@@ -502,6 +525,17 @@ func TestGetService(t *testing.T) {
 	c.Validate(t, response, err)
 }
 
+func TestGetServiceWithNoName(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{Error: true}
+	receivedPod, err := c.Setup().Services(ns).Get("")
+	if (err != nil) && (err.Error() != nameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	}
+
+	c.Validate(t, receivedPod, err)
+}
+
 func TestCreateService(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
@@ -555,6 +589,17 @@ func TestGetEndpoints(t *testing.T) {
 	}
 	response, err := c.Setup().Endpoints(api.NamespaceDefault).Get("endpoint-1")
 	c.Validate(t, response, err)
+}
+
+func TestGetEndpointWithNoName(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{Error: true}
+	receivedPod, err := c.Setup().Endpoints(ns).Get("")
+	if (err != nil) && (err.Error() != nameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	}
+
+	c.Validate(t, receivedPod, err)
 }
 
 func TestGetServerVersion(t *testing.T) {
@@ -623,6 +668,16 @@ func TestGetMinion(t *testing.T) {
 	}
 	response, err := c.Setup().Nodes().Get("1")
 	c.Validate(t, response, err)
+}
+
+func TestGetMinionWithNoName(t *testing.T) {
+	c := &testClient{Error: true}
+	receivedPod, err := c.Setup().Nodes().Get("")
+	if (err != nil) && (err.Error() != nameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	}
+
+	c.Validate(t, receivedPod, err)
 }
 
 func TestCreateMinion(t *testing.T) {

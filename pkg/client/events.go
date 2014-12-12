@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -34,7 +35,7 @@ type EventNamespacer interface {
 type EventInterface interface {
 	Create(event *api.Event) (*api.Event, error)
 	List(label, field labels.Selector) (*api.EventList, error)
-	Get(id string) (*api.Event, error)
+	Get(name string) (*api.Event, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
@@ -86,11 +87,15 @@ func (e *events) List(label, field labels.Selector) (*api.EventList, error) {
 }
 
 // Get returns the given event, or an error.
-func (e *events) Get(id string) (*api.Event, error) {
+func (e *events) Get(name string) (*api.Event, error) {
+	if len(name) == 0 {
+		return nil, errors.New("name is required parameter to Get")
+	}
+
 	result := &api.Event{}
 	err := e.client.Get().
 		Path("events").
-		Path(id).
+		Path(name).
 		Namespace(e.namespace).
 		Do().
 		Into(result)
