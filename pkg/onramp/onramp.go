@@ -18,6 +18,7 @@ package onramp
 
 import (
 	"sync"
+	"time"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -28,6 +29,7 @@ import (
 type podNameIP struct {
 	PodName string
 	PodIP	string
+	NewPod	int
 }
 
 // The onramp router structure
@@ -36,6 +38,7 @@ type Onramp struct {
 	kubeClient *client.Client
 	podNameList []podNameIP
 	podNameLock *sync.Mutex
+	podMonitor	int
 }
 
 // The key/value encoding to claim an ExternalName for a container by an onramp
@@ -55,6 +58,7 @@ func NewOnramp(ec tools.EtcdClient, ac *client.Client) *Onramp {
 		etcdClient: ec,
 		kubeClient: ac,
 		podNameLock: &sync.Mutex{},
+		podMonitor: 0,
 	}
 }
 
@@ -75,8 +79,7 @@ func (onrmp *Onramp) scanContainer(podName string, container Container) {
 			return
 		}
 
-		glog.Infof("PodIP is %s\n", pod.CurrentState.PodIP)
-		newPod := podNameIP{ PodName: podName, PodIP: pod.CurrentState.PodIP}
+		newPod := podNameIP{ PodName: podName, PodIP: pod.CurrentState.PodIP, NewPod: 1}
 		onrmp.podNameLock.Lock()
 		onrmp.podNameList = append(onrmp.podNameList, newPod)
 		onrmp.podNameLock.Unlock()
@@ -103,6 +106,40 @@ func (onrmp *Onramp) scanPods() {
 	}
 }
 
+func (onrmp *Onramp) monitorPods() {
+
+	ns := api.NamespaceAll
+	pdi := onrmp.kubeClient.Pods(ns)
+	for {
+		time.Sleep(10)
+		// Note: This is racy, fix it
+		if (onrmp.podMonitor == 0) {
+			return
+		}	
+		onrmp.podNameLock.Lock()
+		defer onrmp.podNameLock.Unlock()
+
+		for m := range onrmp.podNameList {
+			pod, err := pdi.Get(onrmp.podNameList[m].PodName)
+			if (err != nil) {
+				glog.Infof("Could not get Pod for %s\n", onrmp.podNameList[m].PodName)
+				continue;
+			}
+
+			if (onrmp.podNameList[m].NewPod == 1) {
+				glog.Infof("Pod %s has been added\n", onrmp.podNameList[m].PodName)
+				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
+				// Insert callout for add here
+			}
+
+			if (pod.CurrentState.PodIP != onrmp.podNameList[m].PodIP) {
+				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
+				// Insert callout for update here
+			}
+		}
+	}
+}
+
 // Run starts the kubelet reacting to config updates
 func (onrmp *Onramp) Run() {
 
@@ -116,4 +153,12 @@ func (onrmp *Onramp) Run() {
 		onrmp.scanPods()
 	}
 
+	onrmp.podNameLock.Lock()
+	if ((len(onrmp.podNameList) != 0) && (onrmp.podMonitor == 0)){
+		onrmp.podMonitor = 1
+		go onrmp.monitorPods()
+	} else {
+		onrmp.podMonitor = 0
+	}
+	onrmp.podNameLock.Unlock()
 }
