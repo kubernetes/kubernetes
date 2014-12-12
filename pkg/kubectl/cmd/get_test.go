@@ -21,9 +21,13 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
@@ -47,6 +51,34 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected object: %#v", actual)
 	}
 	if buf.String() != fmt.Sprintf("%#v", expected) {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+// Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
+func TestGetSchemaObject(t *testing.T) {
+	f, tf, _ := NewTestFactory()
+	f.Mapper = latest.RESTMapper
+	f.Typer = api.Scheme
+	codec := latest.Codec
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
+	}
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := f.NewCmdGet(buf)
+	cmd.Flags().String("api-version", "v1beta3", "")
+	cmd.Flags().String("namespace", "test", "")
+	cmd.Run(cmd, []string{"replicationcontrollers", "foo"})
+
+	expected := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}, Spec: api.ReplicationControllerSpec{Template: &api.PodTemplateSpec{}}}
+	actual := tf.Printer.(*testPrinter).Obj
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %s", util.ObjectGoPrintDiff(expected, actual))
+	}
+	if !strings.Contains(buf.String(), "\"foo\"") {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
