@@ -18,10 +18,12 @@ package client
 
 import (
 	"net/url"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestEventSearch(t *testing.T) {
@@ -46,4 +48,40 @@ func TestEventSearch(t *testing.T) {
 		},
 	)
 	c.Validate(t, eventList, err)
+}
+
+func TestEventCreate(t *testing.T) {
+	objReference := &api.ObjectReference{
+		Kind:            "foo",
+		Namespace:       "nm",
+		Name:            "objref1",
+		UID:             "uid",
+		APIVersion:      "apiv1",
+		ResourceVersion: "1",
+	}
+	timeStamp := util.Now()
+	event := &api.Event{
+		//namespace: namespace{"default"},
+		Status:         "running",
+		InvolvedObject: *objReference,
+		Timestamp:      timeStamp,
+	}
+	c := &testClient{
+		Request: testRequest{
+			Method: "POST",
+			Path:   "/events",
+			Body:   event,
+		},
+		Response: Response{StatusCode: 200, Body: event},
+	}
+
+	response, err := c.Setup().Events("").Create(event)
+
+	if err != nil {
+		t.Errorf("%#v should be nil.", err)
+	}
+
+	if e, a := *objReference, response.InvolvedObject; !reflect.DeepEqual(e, a) {
+		t.Errorf("%#v != %#v.", e, a)
+	}
 }
