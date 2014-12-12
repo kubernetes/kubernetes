@@ -418,8 +418,13 @@ type ContainerStatus struct {
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount"`
 	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
-	// TODO(dchen1107): Which image the container is running with?
 	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
+	// The IP of the Pod
+	// PodIP is deprecated and will be removed from v1beta3 once it becomes possible for the Kubelet to report PodStatus.
+	PodIP string `json:"podIP,omitempty"`
+	// TODO(dchen1107): Which image the container is running with?
+	// The image the container is running
+	Image string `json:"image"`
 }
 
 // PodInfo contains one entry for every container with available info.
