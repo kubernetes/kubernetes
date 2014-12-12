@@ -28,11 +28,11 @@ type FakePodInfoGetter struct {
 	host      string
 	id        string
 	namespace string
-	data      api.PodInfo
+	data      api.PodContainerInfo
 	err       error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, namespace, id string) (api.PodInfo, error) {
+func (f *FakePodInfoGetter) GetPodInfo(host, namespace, id string) (api.PodContainerInfo, error) {
 	f.host = host
 	f.id = id
 	f.namespace = namespace
@@ -42,11 +42,15 @@ func (f *FakePodInfoGetter) GetPodInfo(host, namespace, id string) (api.PodInfo,
 func TestPodCacheGetDifferentNamespace(t *testing.T) {
 	cache := NewPodCache(nil, nil)
 
-	expectedDefault := api.PodInfo{
-		"foo": api.ContainerStatus{},
+	expectedDefault := api.PodContainerInfo{
+		ContainerInfo: api.PodInfo{
+			"foo": api.ContainerStatus{},
+		},
 	}
-	expectedOther := api.PodInfo{
-		"bar": api.ContainerStatus{},
+	expectedOther := api.PodContainerInfo{
+		ContainerInfo: api.PodInfo{
+			"bar": api.ContainerStatus{},
+		},
 	}
 
 	cache.podInfo[makePodCacheKey(api.NamespaceDefault, "foo")] = expectedDefault
@@ -72,8 +76,10 @@ func TestPodCacheGetDifferentNamespace(t *testing.T) {
 func TestPodCacheGet(t *testing.T) {
 	cache := NewPodCache(nil, nil)
 
-	expected := api.PodInfo{
-		"foo": api.ContainerStatus{},
+	expected := api.PodContainerInfo{
+		ContainerInfo: api.PodInfo{
+			"foo": api.ContainerStatus{},
+		},
 	}
 	cache.podInfo[makePodCacheKey(api.NamespaceDefault, "foo")] = expected
 
@@ -93,14 +99,16 @@ func TestPodCacheGetMissing(t *testing.T) {
 	if err == nil {
 		t.Errorf("Unexpected non-error: %#v", err)
 	}
-	if info != nil {
+	if !reflect.DeepEqual(info, api.PodContainerInfo{}) {
 		t.Errorf("Unexpected info: %#v", info)
 	}
 }
 
 func TestPodGetPodInfoGetter(t *testing.T) {
-	expected := api.PodInfo{
-		"foo": api.ContainerStatus{},
+	expected := api.PodContainerInfo{
+		ContainerInfo: api.PodInfo{
+			"foo": api.ContainerStatus{},
+		},
 	}
 	fake := FakePodInfoGetter{
 		data: expected,
@@ -133,8 +141,10 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	pods := []api.Pod{pod}
 	mockRegistry := registrytest.NewPodRegistry(&api.PodList{Items: pods})
 
-	expected := api.PodInfo{
-		"foo": api.ContainerStatus{},
+	expected := api.PodContainerInfo{
+		ContainerInfo: api.PodInfo{
+			"foo": api.ContainerStatus{},
+		},
 	}
 	fake := FakePodInfoGetter{
 		data: expected,
