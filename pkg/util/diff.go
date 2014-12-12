@@ -17,8 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -64,13 +67,54 @@ func ObjectDiff(a, b interface{}) string {
 // can't figure out why reflect.DeepEqual is returning false and nothing is
 // showing you differences. This will.
 func ObjectGoPrintDiff(a, b interface{}) string {
+	return StringDiff(
+		spew.Sprintf("%#v", a),
+		spew.Sprintf("%#v", b),
+	)
+}
+
+// ObjectGoPrintSideBySide prints a and b as textual dumps side by side,
+// enabling easy visual scanning for mismatches.
+func ObjectGoPrintSideBySide(a, b interface{}) string {
 	s := spew.ConfigState{
 		Indent: " ",
 		// Extra deep spew.
 		DisableMethods: true,
 	}
-	return StringDiff(
-		s.Sdump(a),
-		s.Sdump(b),
-	)
+	sA := s.Sdump(a)
+	sB := s.Sdump(b)
+
+	linesA := strings.Split(sA, "\n")
+	linesB := strings.Split(sB, "\n")
+	width := 0
+	for _, s := range linesA {
+		l := len(s)
+		if l > width {
+			width = l
+		}
+	}
+	for _, s := range linesB {
+		l := len(s)
+		if l > width {
+			width = l
+		}
+	}
+	buf := &bytes.Buffer{}
+	w := tabwriter.NewWriter(buf, width, 0, 1, ' ', 0)
+	max := len(linesA)
+	if len(linesB) > max {
+		max = len(linesB)
+	}
+	for i := 0; i < max; i++ {
+		var a, b string
+		if i < len(linesA) {
+			a = linesA[i]
+		}
+		if i < len(linesB) {
+			b = linesB[i]
+		}
+		fmt.Fprintf(w, "%s\t%s\n", a, b)
+	}
+	w.Flush()
+	return buf.String()
 }
