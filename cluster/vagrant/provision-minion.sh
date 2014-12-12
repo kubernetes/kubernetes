@@ -16,10 +16,6 @@
 
 # exit on any error
 set -e
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
-
-MINION_IP=$4
 
 # Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
@@ -28,10 +24,9 @@ if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
 fi
 
 # Setup hosts file to support ping by hostname to each minion in the cluster
-minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   minion=${MINION_NAMES[$i]}
-  ip=${minion_ip_array[$i]}
+  ip=${MINION_IPS[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
@@ -42,6 +37,11 @@ done
 mkdir -p /etc/salt/minion.d
 cat <<EOF >/etc/salt/minion.d/master.conf
 master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+EOF
+
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
 EOF
 
 # Our minions will have a pool role to distinguish them from the master.
@@ -56,7 +56,7 @@ grains:
   roles:
     - kubernetes-pool
     - kubernetes-pool-vagrant
-  cbr-cidr: '$(echo "$MINION_IP_RANGE" | sed -e "s/'/''/g")'
+  cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   minion_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF
 
@@ -64,7 +64,8 @@ EOF
 if ! which salt-minion >/dev/null 2>&1; then
   # Install Salt
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+else
+  # Sometimes the minion gets wedged when it comes up along with the master.
+  # Restarting it here un-wedges it.
+  systemctl restart salt-minion.service
 fi
-
-# run the networking setup
-"${KUBE_ROOT}/cluster/vagrant/provision-network.sh" $@

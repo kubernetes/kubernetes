@@ -16,27 +16,35 @@
 
 ## Contains configuration values for interacting with the Vagrant cluster
 
-# NUMBER OF MINIONS IN THE CLUSTER
-NUM_MINIONS=${KUBERNETES_NUM_MINIONS-"3"}
+# Number of minions in the cluster
+NUM_MINIONS=${NUM_MINIONS-"3"}
+export NUM_MINIONS
 
-# IP LOCATIONS FOR INTERACTING WITH THE MASTER
-export KUBE_MASTER_IP="10.245.1.2"
+# The IP of the master
+export MASTER_IP="10.245.1.2"
 
-INSTANCE_PREFIX=kubernetes
-MASTER_NAME="${INSTANCE_PREFIX}-master"
-MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
-# Unable to use hostnames yet because DNS is not in cluster, so we revert external look-up name to use the minion IP
-#MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+export INSTANCE_PREFIX=kubernetes
+export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
-# IP LOCATIONS FOR INTERACTING WITH THE MINIONS
-MINION_IP_BASE="10.245.2."
+# Map out the IPs, names and container subnets of each minion
+export MINION_IP_BASE="10.245.1."
+MINION_CONTAINER_SUBNET_BASE="10.246"
+CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.0/16"
 for ((i=0; i < NUM_MINIONS; i++)) do
-  KUBE_MINION_IP_ADDRESSES[$i]="${MINION_IP_BASE}$[$i+2]"
-  MINION_IP[$i]="${MINION_IP_BASE}$[$i+2]"
-  MINION_NAMES[$i]="${MINION_IP[$i]}"
-  VAGRANT_MINION_NAMES[$i]="minion-$[$i+1]"
+  MINION_IPS[$i]="${MINION_IP_BASE}$((i+3))"
+  MINION_NAMES[$i]="${INSTANCE_PREFIX}-minion-$((i+1))"
+  MINION_CONTAINER_SUBNETS[$i]="${MINION_CONTAINER_SUBNET_BASE}.${i}.1/24"
+  MINION_CONTAINER_ADDRS[$i]="${MINION_CONTAINER_SUBNET_BASE}.${i}.1"
+  MINION_CONTAINER_NETMASKS[$i]="255.255.255.0"
+  VAGRANT_MINION_NAMES[$i]="minion-$((i+1))"
 done
+
+PORTAL_NET=10.247.0.0/16
+
+# Since this isn't exposed on the network, default to a simple user/passwd
+MASTER_USER=vagrant
+MASTER_PASSWD=vagrant
+
 
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING=true
@@ -44,3 +52,7 @@ ENABLE_NODE_MONITORING=true
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch
+
+# Extra options to set on the Docker command line.  This is useful for setting
+# --insecure-registry for local registries.
+DOCKER_OPTS=""

@@ -13,9 +13,11 @@ By default, the Vagrant setup will create a single kubernetes-master and 3 kuber
 ```
 cd kubernetes
 
-# kubernetes will download box from s3 by default (see details in Vagrantfile), unless a box url env is provided.
-KUBERNETES_BOX_URL=path_of_your_kuber_box vagrant up
+export KUBERNETES_PROVIDER=vagrant
+cluster/kube-up.sh
 ```
+
+The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
 
@@ -73,13 +75,11 @@ vagrant destroy
 ```
 
 Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubecfg.sh` script.
-Set the `KUBERNETES_PROVIDER` environment variable and try to list the minions:
 
 You may need to build the binaries first, you can do this with ```make```
 
 ```
-$ export KUBERNETES_PROVIDER=vagrant
-$ ./cluster/kubecfg.sh list /minions
+./cluster/kubecfg.sh list /minions
 Minion identifier    Labels
 ----------           ----------
 10.245.2.4           <none>
@@ -248,6 +248,17 @@ hack/e2e-test.sh
 
 ### Troubleshooting
 
+#### I keep downloading the same (large) box all the time!
+
+By default the Vagrantfile will download the box from S3.  You can change this (and cache the box locally) by providing an alternate URL when calling `kube-up.sh`
+
+```bash
+export KUBERNETES_BOX_URL=path_of_your_kuber_box
+export KUBERNETES_PROVIDER=vagrant
+cluster/kube-up.sh
+```
+
+
 #### I just created the cluster, but I am getting authorization errors!
 
 You probably have an incorrect ~/.kubernetes_vagrant_auth file for the cluster you are attempting to contact.
@@ -281,11 +292,11 @@ Are you sure you built a release first? Did you install `net-tools`? For more cl
 
 #### I want to change the number of minions !
 
-You can control the number of minions that are instantiated via the environment variable `KUBERNETES_NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `KUBERNETES_NUM_MINIONS` to 1 like so:
+You can control the number of minions that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
 
 #### I ran vagrant suspend and nothing works!
 ```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
 
 ```
-export KUBERNETES_NUM_MINIONS=1
+export NUM_MINIONS=1
 ```

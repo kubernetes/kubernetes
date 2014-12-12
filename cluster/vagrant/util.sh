@@ -20,15 +20,18 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vagrant/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 function detect-master () {
+  KUBE_MASTER_IP=$MASTER_IP
   echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}"
 }
 
 # Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
 function detect-minions {
   echo "Minions already detected"
+  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
-# Verify prereqs on host machine
+# Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
+# that our Vagrantfile doesn't error out.
 function verify-prereqs {
   for x in vagrant virtualbox; do
     if ! which "$x" >/dev/null; then
@@ -36,37 +39,59 @@ function verify-prereqs {
       exit 1
     fi
   done
+
+  export USING_KUBE_SCRIPTS=true
 }
 
-# Instantiate a kubernetes cluster
-function kube-up {
-  get-password
-  vagrant up
-
-  local kube_cert=".kubecfg.vagrant.crt"
-  local kube_key=".kubecfg.vagrant.key"
-  local ca_cert=".kubernetes.vagrant.ca.crt"
-
-  (umask 077
-   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-   vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
-
-   cat << EOF > ~/.kubernetes_vagrant_auth
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+function ensure-temp-dir {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    export KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  fi
 }
-EOF
 
-   chmod 0600 ~/.kubernetes_vagrant_auth "${HOME}/${kube_cert}" \
-     "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
-  )
+# Create a set of provision scripts for the master and each of the minions
+function create-provision-scripts {
+  ensure-temp-dir
 
-  echo "Each machine instance has been created."
+  (
+    echo "#! /bin/bash"
+    echo "KUBE_ROOT=/vagrant"
+    echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
+    echo "MASTER_IP='${MASTER_IP}'"
+    echo "MINION_NAMES=(${MINION_NAMES[@]})"
+    echo "MINION_IPS=(${MINION_IPS[@]})"
+    echo "PORTAL_NET='${PORTAL_NET}'"
+    echo "MASTER_USER='${MASTER_USER}'"
+    echo "MASTER_PASSWD='${MASTER_PASSWD}'"
+    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
+  ) > "${KUBE_TEMP}/master-start.sh"
+
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    (
+      echo "#! /bin/bash"
+      echo "MASTER_NAME='${MASTER_NAME}'"
+      echo "MASTER_IP='${MASTER_IP}'"
+      echo "MINION_NAMES=(${MINION_NAMES[@]})"
+      echo "MINION_IPS=(${MINION_IPS[@]})"
+      echo "MINION_IP='${MINION_IPS[$i]}'"
+      echo "MINION_ID='$i'"
+      echo "MINION_CONTAINER_ADDR='${MINION_CONTAINER_ADDRS[$i]}'"
+      echo "MINION_CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
+      echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
+      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
+      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
+      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+  done
+}
+
+function verify-cluster {
+  echo "Each machine instance has been created/updated."
   echo "  Now waiting for the Salt provisioning process to complete on each machine."
   echo "  This can take some time based on your network, disk, and cpu speed."
   echo "  It is possible for an error to occur during Salt provision of cluster and this could loop forever."
@@ -110,13 +135,13 @@ EOF
 
   echo
   echo "Waiting for each minion to be registered with cloud provider"
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    local machine="${MINION_NAMES[$i]}"
+  for (( i=0; i<${#MINION_IPS[@]}; i++)); do
+    local machine="${MINION_IPS[$i]}"
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
       minions=$("${KUBE_ROOT}/cluster/kubecfg.sh" -template '{{range.items}}{{.id}}:{{end}}' list minions)
-      count=$(echo $minions | grep -c "${MINION_NAMES[i]}") || {
+      count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
         printf "."
         sleep 2
         count="0"
@@ -125,14 +150,46 @@ EOF
   done
 
   echo
-  echo "Kubernetes cluster created."
-  echo
   echo "Kubernetes cluster is running.  The master is running at:"
   echo
-  echo "  https://${KUBE_MASTER_IP}"
+  echo "  https://${MASTER_IP}"
   echo
   echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
   echo
+}
+
+
+# Instantiate a kubernetes cluster
+function kube-up {
+  get-password
+  create-provision-scripts
+
+  vagrant up
+
+  local kube_cert=".kubecfg.vagrant.crt"
+  local kube_key=".kubecfg.vagrant.key"
+  local ca_cert=".kubernetes.vagrant.ca.crt"
+
+  (umask 077
+   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+
+   cat <<EOF >"${HOME}/.kubernetes_vagrant_auth"
+{
+  "User": "$KUBE_USER",
+  "Password": "$KUBE_PASSWORD",
+  "CAFile": "$HOME/$ca_cert",
+  "CertFile": "$HOME/$kube_cert",
+  "KeyFile": "$HOME/$kube_key"
+}
+EOF
+
+   chmod 0600 ~/.kubernetes_vagrant_auth "${HOME}/${kube_cert}" \
+     "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+  )
+
+  verify-cluster
 }
 
 # Delete a kubernetes cluster
@@ -142,6 +199,8 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
+  get-password
+  create-provision-scripts
   vagrant provision
 }
 

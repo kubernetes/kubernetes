@@ -51,10 +51,8 @@ done
 echo "Found ${found} nodes."
 
 # On vSphere, use minion IPs as their names
-if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]]; then
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    MINION_NAMES[$i]=${KUBE_MINION_IP_ADDRESSES[$i]}
-  done
+if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]]; then
+  MINION_NAMES=("${KUBE_MINION_IP_ADDRESSES[@]}")
 fi
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
