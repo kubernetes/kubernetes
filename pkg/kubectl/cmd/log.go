@@ -32,6 +32,10 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 				usageError(cmd, "<pod> is required for log")
 			}
 
+			if len(args) > 2 {
+				usageError(cmd, "log <pod> [<container>]")
+			}
+
 			namespace := GetKubeNamespace(cmd)
 			client, err := f.ClientBuilder.Client()
 			checkErr(err)
@@ -43,12 +47,12 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 
 			var container string
 			if len(args) == 1 {
-				if len(pod.Spec.Containers) == 1 {
-					// Get logs for the only container in the pod
-					container = pod.Spec.Containers[0].Name
-				} else {
+				if len(pod.Spec.Containers) != 1 {
 					usageError(cmd, "<container> is required for pods with multiple containers")
 				}
+
+				// Get logs for the only container in the pod
+				container = pod.Spec.Containers[0].Name
 			} else {
 				container = args[1]
 			}
