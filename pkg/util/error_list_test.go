@@ -22,24 +22,24 @@ import (
 )
 
 func TestErrorList(t *testing.T) {
-	errList := ErrorList{}
-	err := errList.ToError()
+	var errList []error
+	err := SliceToError(errList)
 	if err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
-	if a := errorListInternal(errList).Error(); a != "" {
+	if a := errorList(errList).Error(); a != "" {
 		t.Errorf("expected empty string, got %q", a)
 	}
 
 	testCases := []struct {
-		errs     ErrorList
+		errs     []error
 		expected string
 	}{
-		{ErrorList{fmt.Errorf("abc")}, "abc"},
-		{ErrorList{fmt.Errorf("abc"), fmt.Errorf("123")}, "[abc, 123]"},
+		{[]error{fmt.Errorf("abc")}, "abc"},
+		{[]error{fmt.Errorf("abc"), fmt.Errorf("123")}, "[abc, 123]"},
 	}
 	for _, testCase := range testCases {
-		err := testCase.errs.ToError()
+		err := SliceToError(testCase.errs)
 		if err == nil {
 			t.Errorf("expected an error, got nil: %v", testCase)
 			continue

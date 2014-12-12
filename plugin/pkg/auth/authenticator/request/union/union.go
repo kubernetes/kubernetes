@@ -35,7 +35,7 @@ func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
 // AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.  The first
 // success returns that identity.  Errors are only returned if no matches are found.
 func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	var errors util.ErrorList
+	var errors []error
 	for _, currAuthRequestHandler := range authHandler {
 		info, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
 		if err != nil {
@@ -48,5 +48,5 @@ func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request
 		}
 	}
 
-	return nil, false, errors.ToError()
+	return nil, false, util.SliceToError(errors)
 }

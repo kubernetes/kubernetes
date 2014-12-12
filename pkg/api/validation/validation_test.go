@@ -851,7 +851,7 @@ func TestValidateService(t *testing.T) {
 		registry.List = tc.existing
 		errs := ValidateService(&tc.svc, registry, api.NewDefaultContext())
 		if len(errs) != tc.numErrs {
-			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToError())
+			t.Errorf("Unexpected error list for case %q: %v", tc.name, util.SliceToError(errs))
 		}
 	}
 
