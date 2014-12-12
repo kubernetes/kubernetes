@@ -17,6 +17,7 @@ limitations under the License.
 package onramp
 
 import (
+	"sync"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -24,10 +25,17 @@ import (
 	"github.com/golang/glog"
 )
 
+type podNameIP struct {
+	PodName string
+	PodIP	string
+}
+
 // The onramp router structure
 type Onramp struct {
 	etcdClient tools.EtcdClient
 	kubeClient *client.Client
+	podNameList []podNameIP
+	podNameLock *sync.Mutex
 }
 
 // The key/value encoding to claim an ExternalName for a container by an onramp
@@ -46,16 +54,32 @@ func NewOnramp(ec tools.EtcdClient, ac *client.Client) *Onramp {
 	return &Onramp{
 		etcdClient: ec,
 		kubeClient: ac,
+		podNameLock: &sync.Mutex{},
 	}
 }
 
 func (onrmp *Onramp) claimExternalName(container Container) {
-
+	// Need to put code here to mark this router as being the owner of this external path
 }
 
-func (onrmp *Onramp) scanContainer(container Container) {
+func (onrmp *Onramp) scanContainer(podName string, container Container) {
 	if container.ExternalName != "" {
 		glog.Infof("Container needs external IP access for %s!\n", container.ExternalName)
+		ns := api.NamespaceAll
+		pdi := onrmp.kubeClient.Pods(ns)
+
+		pod, err := pdi.Get(podName)
+
+		if (err != nil) {
+			glog.Infof("Error getting pod: %s\n", err)
+			return
+		}
+
+		glog.Infof("PodIP is %s\n", pod.CurrentState.PodIP)
+		newPod := podNameIP{ PodName: podName, PodIP: pod.CurrentState.PodIP}
+		onrmp.podNameLock.Lock()
+		onrmp.podNameList = append(onrmp.podNameList, newPod)
+		onrmp.podNameLock.Unlock()
 		onrmp.claimExternalName(container)
 	}
 }
@@ -71,10 +95,10 @@ func (onrmp *Onramp) scanPods() {
 		return
 	}
 	for m := range pods.Items {
-		var containers = pods.Items[m].CurrentState.Manifest.Containers
+		var containers = pods.Items[m].DesiredState.Manifest.Containers
 
 		for n := range containers {
-			onrmp.scanContainer(Container(containers[n]))
+			onrmp.scanContainer(pods.Items[m].Name, Container(containers[n]))
 		}
 	}
 }
