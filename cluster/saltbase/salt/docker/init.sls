@@ -46,6 +46,7 @@ purge-old-docker:
       - lxc-docker-1.2.0
       - lxc-docker-1.3.0
       - lxc-docker-1.3.1
+      - lxc-docker-1.3.2
 
 {{ environment_file }}:
   file.managed:
@@ -72,9 +73,9 @@ purge-old-docker:
 # 7. Add the old version to purge-old-docker above.
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
-{% set deb='lxc-docker-1.3.2_1.3.2_amd64.deb' %}
-{% set deb_hash='sha1=e271afeba8156fda9c6e7527c21ae237974a8c51' %}
-{% set docker_ver='1.3.2' %}
+{% set deb='lxc-docker-1.3.3_1.3.3_amd64.deb' %}
+{% set deb_hash='sha1=7c0f4a8016dae234e66f13f922f24987db3d3ba4' %}
+{% set docker_ver='1.3.3' %}
 
 /var/cache/docker-install/{{ deb }}:
   file.managed:
