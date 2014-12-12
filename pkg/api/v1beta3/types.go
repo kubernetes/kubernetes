@@ -291,8 +291,6 @@ type ExecAction struct {
 // LivenessProbe describes how to probe a container for liveness.
 // TODO: pass structured data to the actions, and document that data here.
 type LivenessProbe struct {
-	// Type of liveness probe.  Current legal values "HTTP", "TCP", "Exec"
-	Type string `json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'HTTP'
 	HTTPGet *HTTPGetAction `json:"httpGet,omitempty"`
 	// TCPSocketProbe parameter, required if Type == 'TCP'
