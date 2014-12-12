@@ -78,6 +78,7 @@ kube::log::status "Starting kube-apiserver"
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): "
 
 # Start controller manager
 kube::log::status "Starting CONTROLLER-MANAGER"
@@ -112,8 +113,7 @@ for version in "${kube_api_versions[@]}"; do
   "${kube_cmd[@]}" delete pod redis-master "${kube_flags[@]}"
   before="$("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}")"
   echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
-  after="$("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}")"
-  [[ "$((${after} - ${before}))" -eq 1 ]]
+  [[ "$("${kube_cmd[@]}" get pods -o template -t \"{{ len .items - ${before}}}\" "${kube_flags[@]}")" -eq 1 ]]
   "${kube_cmd[@]}" get pods -o yaml "${kube_flags[@]}" | grep -q "id: redis-master"
   "${kube_cmd[@]}" describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
   "${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
