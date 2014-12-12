@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -41,19 +42,43 @@ type Etcd struct {
 	EndpointName string
 
 	// Used for listing/watching; should not include trailing "/"
-	KeyRoot string
+	KeyRoot func(ctx api.Context) string
 
 	// Called for Create/Update/Get/Delete
-	KeyFunc func(id string) string
+	KeyFunc func(ctx api.Context, id string) (string, error)
 
 	// Used for all etcd access functions
 	Helper tools.EtcdHelper
 }
 
+// MakeEtcdListKey constructs etcd paths to resource directories enforcing namespace rules
+func MakeEtcdListKey(ctx api.Context, prefix string) string {
+	key := prefix
+	ns, ok := api.NamespaceFrom(ctx)
+	if ok && len(ns) > 0 {
+		key = key + "/" + ns
+	}
+	return key
+}
+
+// MakeEtcdItemKey constructs etcd paths to a resource relative to prefix enforcing namespace rules.  If no namespace is on context, it errors.
+func MakeEtcdItemKey(ctx api.Context, prefix string, id string) (string, error) {
+	key := MakeEtcdListKey(ctx, prefix)
+	ns, ok := api.NamespaceFrom(ctx)
+	if !ok || len(ns) == 0 {
+		return "", kubeerr.NewBadRequest("Namespace parameter required.")
+	}
+	if len(id) == 0 {
+		return "", kubeerr.NewBadRequest("Namespace parameter required.")
+	}
+	key = key + "/" + id
+	return key, nil
+}
+
 // List returns a list of all the items matching m.
 func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
-	err := e.Helper.ExtractToList(e.KeyRoot, list)
+	err := e.Helper.ExtractToList(e.KeyRoot(ctx), list)
 	if err != nil {
 		return nil, err
 	}
@@ -62,21 +87,33 @@ func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) 
 
 // Create inserts a new item.
 func (e *Etcd) Create(ctx api.Context, id string, obj runtime.Object) error {
-	err := e.Helper.CreateObj(e.KeyFunc(id), obj, 0)
+	key, err := e.KeyFunc(ctx, id)
+	if err != nil {
+		return err
+	}
+	err = e.Helper.CreateObj(key, obj, 0)
 	return etcderr.InterpretCreateError(err, e.EndpointName, id)
 }
 
 // Update updates the item.
 func (e *Etcd) Update(ctx api.Context, id string, obj runtime.Object) error {
+	key, err := e.KeyFunc(ctx, id)
+	if err != nil {
+		return err
+	}
 	// TODO: verify that SetObj checks ResourceVersion before succeeding.
-	err := e.Helper.SetObj(e.KeyFunc(id), obj)
+	err = e.Helper.SetObj(key, obj)
 	return etcderr.InterpretUpdateError(err, e.EndpointName, id)
 }
 
 // Get retrieves the item from etcd.
 func (e *Etcd) Get(ctx api.Context, id string) (runtime.Object, error) {
 	obj := e.NewFunc()
-	err := e.Helper.ExtractObj(e.KeyFunc(id), obj, false)
+	key, err := e.KeyFunc(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	err = e.Helper.ExtractObj(key, obj, false)
 	if err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, id)
 	}
@@ -85,7 +122,11 @@ func (e *Etcd) Get(ctx api.Context, id string) (runtime.Object, error) {
 
 // Delete removes the item from etcd.
 func (e *Etcd) Delete(ctx api.Context, id string) error {
-	err := e.Helper.Delete(e.KeyFunc(id), false)
+	key, err := e.KeyFunc(ctx, id)
+	if err != nil {
+		return err
+	}
+	err = e.Helper.Delete(key, false)
 	return etcderr.InterpretDeleteError(err, e.EndpointName, id)
 }
 
@@ -96,7 +137,7 @@ func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion string)
 	if err != nil {
 		return nil, err
 	}
-	return e.Helper.WatchList(e.KeyRoot, version, func(obj runtime.Object) bool {
+	return e.Helper.WatchList(e.KeyRoot(ctx), version, func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		return err == nil && matches
 	})

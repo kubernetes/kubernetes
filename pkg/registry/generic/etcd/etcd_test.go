@@ -41,9 +41,9 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 		NewFunc:      func() runtime.Object { return &api.Pod{} },
 		NewListFunc:  func() runtime.Object { return &api.PodList{} },
 		EndpointName: "pods",
-		KeyRoot:      "/registry/pods",
-		KeyFunc: func(id string) string {
-			return path.Join("/registry/pods", id)
+		KeyRoot:      func(ctx api.Context) string { return "/registry/pods" },
+		KeyFunc: func(ctx api.Context, id string) (string, error) {
+			return path.Join("/registry/pods", id), nil
 		},
 		Helper: h,
 	}
@@ -139,7 +139,7 @@ func TestEtcdList(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
-		fakeClient.Data[registry.KeyRoot] = item.in
+		fakeClient.Data[registry.KeyRoot(api.NewContext())] = item.in
 		list, err := registry.List(api.NewContext(), item.m)
 		if e, a := item.succeed, err == nil; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
