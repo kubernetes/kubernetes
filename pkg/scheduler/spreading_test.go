@@ -18,12 +18,13 @@ package scheduler
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestSpreadPriority(t *testing.T) {
+func TestServiceSpreadPriority(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
 		"baz": "blah",
@@ -32,16 +33,17 @@ func TestSpreadPriority(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	machine1Status := api.PodStatus{
+	zone1Status := api.PodStatus{
 		Host: "machine1",
 	}
-	machine2Status := api.PodStatus{
+	zone2Status := api.PodStatus{
 		Host: "machine2",
 	}
 	tests := []struct {
 		pod          api.Pod
 		pods         []api.Pod
 		nodes        []string
+		services     []api.Service
 		expectedList HostPriorityList
 		test         string
 	}{
@@ -52,55 +54,72 @@ func TestSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{Status: machine1Status}},
+			pods:         []api.Pod{{Status: zone1Status}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
-			test:         "no labels",
+			test:         "no services",
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pods:         []api.Pod{{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
+			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
-			test:         "different labels",
+			test:         "different services",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
+			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 0}},
-			test:         "one label match",
+			test:         "two pods, one service pod",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
+			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
-			test:         "two label matches on different machines",
+			test:         "three pods, two service pods on different machines",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
+			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 0}},
-			test:         "three label matches",
+			test:         "four pods, three service pods",
+		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 5}},
+			test:         "service with partial pod label matches",
 		},
 	}
 
 	for _, test := range tests {
-		list, err := CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeMinionList(test.nodes)))
+		serviceSpread := ServiceSpread{serviceLister: FakeServiceLister(test.services)}
+		list, err := serviceSpread.CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeMinionList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -108,4 +127,167 @@ func TestSpreadPriority(t *testing.T) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
 		}
 	}
+}
+
+func TestZoneSpreadPriority(t *testing.T) {
+	labels1 := map[string]string{
+		"foo": "bar",
+		"baz": "blah",
+	}
+	labels2 := map[string]string{
+		"bar": "foo",
+		"baz": "blah",
+	}
+	zone1 := map[string]string{
+		"zone": "zone1",
+	}
+	zone2 := map[string]string{
+		"zone": "zone2",
+	}
+	nozone := map[string]string{
+		"name": "value",
+	}
+	zone0Status := api.PodStatus{
+		Host: "machine01",
+	}
+	zone1Status := api.PodStatus{
+		Host: "machine11",
+	}
+	zone2Status := api.PodStatus{
+		Host: "machine21",
+	}
+	labeledNodes := map[string]map[string]string{
+		"machine01": nozone, "machine02": nozone,
+		"machine11": zone1, "machine12": zone1,
+		"machine21": zone2, "machine22": zone2,
+	}
+	tests := []struct {
+		pod          api.Pod
+		pods         []api.Pod
+		nodes        map[string]map[string]string
+		services     []api.Service
+		expectedList HostPriorityList
+		test         string
+	}{
+		{
+			nodes: labeledNodes,
+			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
+				{"machine21", 10}, {"machine22", 10},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "nothing scheduled",
+		},
+		{
+			pod:   api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:  []api.Pod{{Status: zone1Status}},
+			nodes: labeledNodes,
+			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
+				{"machine21", 10}, {"machine22", 10},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "no services",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:     []api.Pod{{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			nodes:    labeledNodes,
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
+			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
+				{"machine21", 10}, {"machine22", 10},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "different services",
+		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{Status: zone0Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    labeledNodes,
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
+				{"machine21", 0}, {"machine22", 0},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "three pods, one service pod",
+		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    labeledNodes,
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			expectedList: []HostPriority{{"machine11", 5}, {"machine12", 5},
+				{"machine21", 5}, {"machine22", 5},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "three pods, two service pods on different machines",
+		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    labeledNodes,
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			expectedList: []HostPriority{{"machine11", 6}, {"machine12", 6},
+				{"machine21", 3}, {"machine22", 3},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "four pods, three service pods",
+		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    labeledNodes,
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			expectedList: []HostPriority{{"machine11", 3}, {"machine12", 3},
+				{"machine21", 6}, {"machine22", 6},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "service with partial pod label matches",
+		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{Status: zone0Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			},
+			nodes:    labeledNodes,
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			expectedList: []HostPriority{{"machine11", 7}, {"machine12", 7},
+				{"machine21", 5}, {"machine22", 5},
+				{"machine01", 0}, {"machine02", 0}},
+			test: "service pod on non-zoned minion",
+		},
+	}
+
+	for _, test := range tests {
+		zoneSpread := ZoneSpread{serviceLister: FakeServiceLister(test.services), zoneLabel: "zone"}
+		list, err := zoneSpread.ZoneSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeLabeledMinionList(test.nodes)))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		// sort the two lists to avoid failures on account of different ordering
+		sort.Sort(test.expectedList)
+		sort.Sort(list)
+		if !reflect.DeepEqual(test.expectedList, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		}
+	}
+}
+
+func makeLabeledMinionList(nodeMap map[string]map[string]string) (result api.NodeList) {
+	nodes := []api.Node{}
+	for nodeName, labels := range nodeMap {
+		nodes = append(nodes, api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName, Labels: labels}})
+	}
+	return api.NodeList{Items: nodes}
 }

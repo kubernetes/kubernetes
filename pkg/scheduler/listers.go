@@ -17,6 +17,8 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -51,4 +53,39 @@ func (f FakePodLister) List(s labels.Selector) (selected []api.Pod, err error) {
 		}
 	}
 	return selected, nil
+}
+
+// ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
+type ServiceLister interface {
+	// Lists all the services
+	ListServices() (api.ServiceList, error)
+	// Gets the service for the given pod
+	GetPodService(api.Pod) (api.Service, error)
+}
+
+// FakeServiceLister implements ServiceLister on []api.Service for test purposes.
+type FakeServiceLister []api.Service
+
+// FakeServiceLister returns api.ServiceList, the list of all services.
+func (f FakeServiceLister) ListServices() (api.ServiceList, error) {
+	return api.ServiceList{Items: f}, nil
+}
+
+// GetPodService gets the service that has the selector that can match the labels on the given pod
+// We are assuming a single service per pod.
+// In case of multiple services per pod, the first service found is returned
+func (f FakeServiceLister) GetPodService(pod api.Pod) (service api.Service, err error) {
+	var selector labels.Selector
+
+	for _, service := range f {
+		// consider only services that are in the same namespace as the pod
+		if service.Namespace != pod.Namespace {
+			continue
+		}
+		selector = labels.Set(service.Spec.Selector).AsSelector()
+		if selector.Matches(labels.Set(pod.Labels)) {
+			return service, nil
+		}
+	}
+	return service, fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 }

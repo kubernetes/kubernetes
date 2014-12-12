@@ -35,8 +35,9 @@ import (
 )
 
 var (
-	PodLister    = &cache.StoreToPodLister{cache.NewStore()}
-	MinionLister = &cache.StoreToNodeLister{cache.NewStore()}
+	PodLister     = &cache.StoreToPodLister{cache.NewStore()}
+	MinionLister  = &cache.StoreToNodeLister{cache.NewStore()}
+	ServiceLister = &cache.StoreToServiceLister{cache.NewStore()}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -48,15 +49,18 @@ type ConfigFactory struct {
 	PodLister *cache.StoreToPodLister
 	// a means to list all minions
 	MinionLister *cache.StoreToNodeLister
+	// a means to list all services
+	ServiceLister *cache.StoreToServiceLister
 }
 
 // NewConfigFactory initializes the factory.
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
-		Client:       client,
-		PodQueue:     cache.NewFIFO(),
-		PodLister:    PodLister,
-		MinionLister: MinionLister,
+		Client:        client,
+		PodQueue:      cache.NewFIFO(),
+		PodLister:     PodLister,
+		MinionLister:  MinionLister,
+		ServiceLister: ServiceLister,
 	}
 }
 
@@ -104,6 +108,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	} else {
 		cache.NewPoller(f.pollMinions, 10*time.Second, f.MinionLister.Store).Run()
 	}
+
+	// Watch and cache all service objects. Scheduler needs to find all pods
+	// created by the same service, so that it can spread them correctly.
+	// Cache this locally.
+	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store).Run()
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -178,6 +187,15 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &nodeEnumerator{list}, nil
 }
 
+// createServiceLW returns a listWatch that gets all changes to services.
+func (factory *ConfigFactory) createServiceLW() *listWatch {
+	return &listWatch{
+		client:        factory.Client,
+		fieldSelector: parseSelectorOrDie(""),
+		resource:      "services",
+	}
+}
+
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
 		glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
@@ -206,6 +224,35 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 // nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
 type nodeEnumerator struct {
 	*api.NodeList
+}
+
+// storeToServiceLister turns a store into a service lister. The store must contain (only) services.
+type storeToServiceLister struct {
+	cache.Store
+}
+
+func (s *storeToServiceLister) ListServices() (services api.ServiceList, err error) {
+	for _, m := range s.List() {
+		services.Items = append(services.Items, *(m.(*api.Service)))
+	}
+	return services, nil
+}
+
+func (s *storeToServiceLister) GetPodService(pod api.Pod) (service api.Service, err error) {
+	var selector labels.Selector
+
+	for _, m := range s.List() {
+		service = *m.(*api.Service)
+		// consider only services that are in the same namespace as the pod
+		if service.Namespace != pod.Namespace {
+			continue
+		}
+		selector = labels.Set(service.Spec.Selector).AsSelector()
+		if selector.Matches(labels.Set(pod.Labels)) {
+			return service, nil
+		}
+	}
+	return service, fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 }
 
 // Len returns the number of items in the node list.
