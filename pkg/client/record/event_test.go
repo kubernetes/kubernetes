@@ -69,8 +69,8 @@ func TestEventf(t *testing.T) {
 	}{
 		{
 			obj:        testRef,
-			status:     "running",
-			reason:     "started",
+			status:     "Running",
+			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &api.Event{
@@ -86,17 +86,17 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1beta1",
 					FieldPath:  "desiredState.manifest.containers[2]",
 				},
-				Status:  "running",
-				Reason:  "started",
-				Message: "some verbose message: 1",
-				Source:  "eventTest",
+				Condition: "Running",
+				Reason:    "Started",
+				Message:   "some verbose message: 1",
+				Source:    "eventTest",
 			},
-			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): status: 'running', reason: 'started' some verbose message: 1`,
+			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): status: 'Running', reason: 'Started' some verbose message: 1`,
 		},
 		{
 			obj:        testPod,
-			status:     "running",
-			reason:     "started",
+			status:     "Running",
+			reason:     "Started",
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &api.Event{
@@ -111,12 +111,12 @@ func TestEventf(t *testing.T) {
 					UID:        "bar",
 					APIVersion: "v1beta1",
 				},
-				Status:  "running",
-				Reason:  "started",
-				Message: "some verbose message: 1",
-				Source:  "eventTest",
+				Condition: "Running",
+				Reason:    "Started",
+				Message:   "some verbose message: 1",
+				Source:    "eventTest",
 			},
-			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:""}): status: 'running', reason: 'started' some verbose message: 1`,
+			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:""}): status: 'Running', reason: 'Started' some verbose message: 1`,
 		},
 	}
 

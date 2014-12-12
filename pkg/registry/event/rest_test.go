@@ -143,9 +143,9 @@ func TestRESTgetAttrs(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
-		Source: "test",
+		Condition: "Tested",
+		Reason:    "ForTesting",
+		Source:    "test",
 	}
 	label, field, err := rest.getAttrs(eventA)
 	if err != nil {
@@ -162,8 +162,9 @@ func TestRESTgetAttrs(t *testing.T) {
 		"involvedObject.apiVersion":      testapi.Version(),
 		"involvedObject.resourceVersion": "0",
 		"involvedObject.fieldPath":       "",
-		"status":                         "tested",
-		"reason":                         "forTesting",
+		"condition":                      "Tested",
+		"status":                         "Tested",
+		"reason":                         "ForTesting",
 		"source":                         "test",
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
@@ -196,8 +197,8 @@ func TestRESTList(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
+		Condition: "Tested",
+		Reason:    "ForTesting",
 	}
 	eventB := &api.Event{
 		InvolvedObject: api.ObjectReference{
@@ -208,8 +209,8 @@ func TestRESTList(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
+		Condition: "Tested",
+		Reason:    "ForTesting",
 	}
 	eventC := &api.Event{
 		InvolvedObject: api.ObjectReference{
@@ -220,13 +221,13 @@ func TestRESTList(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "untested",
-		Reason: "forTesting",
+		Condition: "Untested",
+		Reason:    "ForTesting",
 	}
 	reg.ObjectList = &api.EventList{
 		Items: []api.Event{*eventA, *eventB, *eventC},
 	}
-	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Set{"status": "tested"}.AsSelector())
+	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Set{"status": "Tested"}.AsSelector())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -248,8 +249,8 @@ func TestRESTWatch(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
+		Condition: "Tested",
+		Reason:    "ForTesting",
 	}
 	reg, rest := NewTestREST()
 	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), "0")

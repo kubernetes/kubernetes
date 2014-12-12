@@ -34,6 +34,10 @@ func init() {
 	newer.Scheme.AddStructFieldConversion(newer.ObjectMeta{}, "ObjectMeta", TypeMeta{}, "TypeMeta")
 	newer.Scheme.AddStructFieldConversion(newer.ListMeta{}, "ListMeta", TypeMeta{}, "TypeMeta")
 
+	// TODO: scope this to a specific type once that becomes available and remove the Event conversion functions below
+	// newer.Scheme.AddStructFieldConversion(string(""), "Status", string(""), "Condition")
+	// newer.Scheme.AddStructFieldConversion(string(""), "Condition", string(""), "Status")
+
 	newer.Scheme.AddConversionFuncs(
 		// TypeMeta must be split into two objects
 		func(in *newer.TypeMeta, out *TypeMeta, s conversion.Scope) error {
@@ -438,6 +442,37 @@ func init() {
 			out.ResourceVersion = in.ResourceVersion
 			out.FieldPath = in.FieldPath
 			return nil
+		},
+
+		// Event Status -> Condition
+		// TODO: remove this when it becomes possible to specify a field name conversion on a specific type
+		func(in *newer.Event, out *Event, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			out.Status = in.Condition
+			out.Reason = in.Reason
+			out.Message = in.Message
+			out.Source = in.Source
+			out.Timestamp = in.Timestamp
+			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
+		},
+		func(in *Event, out *newer.Event, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			out.Condition = in.Status
+			out.Reason = in.Reason
+			out.Message = in.Message
+			out.Source = in.Source
+			out.Timestamp = in.Timestamp
+			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
 		},
 	)
 }
