@@ -129,6 +129,8 @@ const (
 	NamespaceDefault string = "default"
 	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
 	NamespaceAll string = ""
+	// NamespaceNone is the argument for a context when there is no namespace.
+	NamespaceNone string = ""
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )

@@ -101,6 +101,13 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
+	// This is hacky, but minions don't really have a namespace, but kubectl currently automatically
+	// stuffs one in there.  Fix it here temporarily until we fix kubectl
+	if minion.Namespace == api.NamespaceDefault {
+		minion.Namespace = api.NamespaceNone
+	}
+	// Clear out the self link, if specified, since it's not in the registry either.
+	minion.SelfLink = ""
 
 	// TODO: GetMinion will health check the minion, but we shouldn't require the minion to be
 	// running for updating labels.
