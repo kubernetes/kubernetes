@@ -40,7 +40,7 @@ type Interface interface {
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
-	return newReplicationControllers(c, namespace, c.preV1Beta3)
+	return newReplicationControllers(c, namespace)
 }
 
 func (c *Client) Nodes() NodeInterface {

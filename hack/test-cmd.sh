@@ -78,7 +78,6 @@ kube::log::status "Starting kube-apiserver"
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): "
 
 # Start controller manager
 kube::log::status "Starting CONTROLLER-MANAGER"
@@ -88,6 +87,7 @@ kube::log::status "Starting CONTROLLER-MANAGER"
 CTLRMGR_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): "
 
 kube_cmd=(
   "${KUBE_OUTPUT_HOSTBIN}/kubectl"
