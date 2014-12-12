@@ -196,6 +196,18 @@ func init() {
 			out.PodIP = in.PodIP
 			return nil
 		},
+		func(in *newer.PodSpec, out *PodState, s conversion.Scope) error {
+			if err := s.Convert(&in, &out.Manifest, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PodState, out *newer.PodSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Manifest, &out, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 
 		// Convert all to the new PodPhase constants
 		func(in *newer.PodPhase, out *PodStatus, s conversion.Scope) error {
