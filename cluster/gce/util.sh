@@ -148,6 +148,9 @@ function upload-server-tars() {
 # Vars set:
 #   KUBE_MINION_IP_ADDRESS (array)
 function detect-minions () {
+  if [[ -z "${PROJECT-}" ]]; then
+    detect-project
+  fi
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
