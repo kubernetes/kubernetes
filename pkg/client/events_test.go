@@ -80,22 +80,9 @@ func TestEventCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
 	}
-	if !reflect.DeepEqual(response.InvolvedObject.Kind, objReference.Kind) {
-		t.Errorf("%#v != %#v.", response.InvolvedObject.Kind, objReference.Kind)
+
+	if e, a := *objReference, response.InvolvedObject; !reflect.DeepEqual(e, a) {
+		t.Errorf("%#v != %#v.", e, a)
 	}
-	if !reflect.DeepEqual(response.InvolvedObject.Name, objReference.Name) {
-		t.Errorf("%#v != %#v.", response.InvolvedObject.Name, objReference.Name)
-	}
-	if !reflect.DeepEqual(response.InvolvedObject.UID, objReference.UID) {
-		t.Errorf("%#v != %#v.", response.InvolvedObject.UID, objReference.UID)
-	}
-	if !reflect.DeepEqual(response.InvolvedObject.APIVersion, objReference.APIVersion) {
-		t.Errorf("%#v != %#v.", response.InvolvedObject.APIVersion, objReference.APIVersion)
-	}
-	if !reflect.DeepEqual(response.InvolvedObject.ResourceVersion, objReference.ResourceVersion) {
-		t.Errorf("%#v != %#v.", response.InvolvedObject.ResourceVersion, objReference.ResourceVersion)
-	}
-	if !reflect.DeepEqual(response.InvolvedObject.FieldPath, objReference.FieldPath) {
-		t.Errorf("%#v != %#v.", response.InvolvedObject.FieldPath, objReference.FieldPath)
-	}
+
 }
