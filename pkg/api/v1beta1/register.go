@@ -28,6 +28,8 @@ func init() {
 	// Future names are supported, and declared first so they take precedence
 	api.Scheme.AddKnownTypeWithName("v1beta1", "Node", &Minion{})
 	api.Scheme.AddKnownTypeWithName("v1beta1", "NodeList", &MinionList{})
+	api.Scheme.AddKnownTypeWithName("v1beta1", "Operation", &ServerOp{})
+	api.Scheme.AddKnownTypeWithName("v1beta1", "OperationList", &ServerOpList{})
 
 	api.Scheme.AddKnownTypes("v1beta1",
 		&Pod{},

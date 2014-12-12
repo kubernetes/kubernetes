@@ -51,6 +51,8 @@ func init() {
 	// Legacy names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta3", "Minion", &Node{})
 	api.Scheme.AddKnownTypeWithName("v1beta3", "MinionList", &NodeList{})
+	api.Scheme.AddKnownTypeWithName("v1beta3", "ServerOp", &Operation{})
+	api.Scheme.AddKnownTypeWithName("v1beta3", "ServerOpList", &OperationList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}

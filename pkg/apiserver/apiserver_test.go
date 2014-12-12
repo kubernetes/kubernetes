@@ -70,15 +70,15 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 func init() {
 	// Certain API objects are returned regardless of the contents of storage:
 	// api.Status is returned in errors
-	// api.ServerOp/api.ServerOpList are returned by /operations
+	// api.Operation/api.OperationList are returned by /operations
 
 	// "internal" version
 	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{},
-		&api.Status{}, &api.ServerOp{}, &api.ServerOpList{})
+		&api.Status{}, &api.Operation{}, &api.OperationList{})
 	// "version" version
 	// TODO: Use versioned api objects?
 	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{},
-		&api.Status{}, &api.ServerOp{}, &api.ServerOpList{})
+		&api.Status{}, &api.Operation{}, &api.OperationList{})
 
 	defMapper := meta.NewDefaultRESTMapper(
 		versions,

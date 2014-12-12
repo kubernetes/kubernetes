@@ -115,7 +115,7 @@ func (ops *Operations) insert(op *Operation) {
 }
 
 // List lists operations for an API client.
-func (ops *Operations) List() *api.ServerOpList {
+func (ops *Operations) List() *api.OperationList {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 
@@ -124,9 +124,9 @@ func (ops *Operations) List() *api.ServerOpList {
 		ids = append(ids, id)
 	}
 	sort.StringSlice(ids).Sort()
-	ol := &api.ServerOpList{}
+	ol := &api.OperationList{}
 	for _, id := range ids {
-		ol.Items = append(ol.Items, api.ServerOp{ObjectMeta: api.ObjectMeta{Name: id}})
+		ol.Items = append(ol.Items, api.Operation{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
 	return ol
 }
