@@ -757,8 +757,8 @@ type Binding struct {
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
 type Status struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
 
 	// One of: "Success", "Failure", "Working" (for operations not yet completed)
 	Status string `json:"status,omitempty"`
