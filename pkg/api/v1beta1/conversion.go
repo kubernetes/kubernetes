@@ -498,7 +498,6 @@ func init() {
 			return nil
 		},
 		func(in *newer.ObjectReference, out *ObjectReference, s conversion.Scope) error {
-			out.ID = in.Name
 			out.Kind = in.Kind
 			out.Namespace = in.Namespace
 			out.ID = in.Name
