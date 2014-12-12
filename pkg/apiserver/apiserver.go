@@ -19,6 +19,7 @@ package apiserver
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -283,16 +284,14 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
 	if err != nil {
-		// Note: If codec is broken, this results in an infinite recursion
-		errorJSON(err, codec, w)
+		errorJSONFatal(err, codec, w)
 		return
 	}
 	// PR #2243: Pretty-print JSON by default.
 	formatted := &bytes.Buffer{}
 	err = json.Indent(formatted, output, "", "  ")
 	if err != nil {
-		// Note: If codec is broken, this results in an infinite recursion
-		errorJSON(err, codec, w)
+		errorJSONFatal(err, codec, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -304,6 +303,20 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
 	status := errToAPIStatus(err)
 	writeJSON(status.Code, codec, status, w)
+}
+
+// errorJSONFatal renders an error to the response, and if codec fails will render plaintext
+func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) {
+	status := errToAPIStatus(err)
+	output, err := codec.Encode(status)
+	if err != nil {
+		w.WriteHeader(status.Code)
+		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status.Code)
+	w.Write(output)
 }
 
 // writeRawJSON writes a non-API object in JSON.
