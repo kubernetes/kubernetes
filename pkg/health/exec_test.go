@@ -67,7 +67,7 @@ func TestExec(t *testing.T) {
 	for _, test := range tests {
 		fake.out = test.output
 		fake.err = test.err
-		status, err := checker.HealthCheck("test", "", api.PodState{}, api.Container{LivenessProbe: test.probe})
+		status, err := checker.HealthCheck("test", "", api.PodStatus{}, api.Container{LivenessProbe: test.probe})
 		if status != test.expectedStatus {
 			t.Errorf("expected %v, got %v", test.expectedStatus, status)
 		}

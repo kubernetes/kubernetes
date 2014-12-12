@@ -46,7 +46,7 @@ func TestGetURLParts(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		state := api.PodState{PodIP: "127.0.0.1"}
+		state := api.PodStatus{PodIP: "127.0.0.1"}
 		container := api.Container{
 			Ports: []api.Port{{Name: "found", HostPort: 93}},
 			LivenessProbe: &api.LivenessProbe{
@@ -123,7 +123,7 @@ func TestHTTPHealthChecker(t *testing.T) {
 			params.Port = util.NewIntOrStringFromString(port)
 			params.Host = host
 		}
-		health, err := hc.HealthCheck("test", "", api.PodState{PodIP: host}, container)
+		health, err := hc.HealthCheck("test", "", api.PodStatus{PodIP: host}, container)
 		if test.health == Unknown && err == nil {
 			t.Errorf("Expected error")
 		}

@@ -29,7 +29,7 @@ import (
 type TCPHealthChecker struct{}
 
 // getTCPAddrParts parses the components of a TCP connection address.  For testability.
-func getTCPAddrParts(currentState api.PodState, container api.Container) (string, int, error) {
+func getTCPAddrParts(status api.PodStatus, container api.Container) (string, int, error) {
 	params := container.LivenessProbe.TCPSocket
 	if params == nil {
 		return "", -1, fmt.Errorf("error, no TCP parameters specified: %v", container)
@@ -51,11 +51,11 @@ func getTCPAddrParts(currentState api.PodState, container api.Container) (string
 	if port == -1 {
 		return "", -1, fmt.Errorf("unknown port: %v", params.Port)
 	}
-	if len(currentState.PodIP) == 0 {
+	if len(status.PodIP) == 0 {
 		return "", -1, fmt.Errorf("no host specified.")
 	}
 
-	return currentState.PodIP, port, nil
+	return status.PodIP, port, nil
 }
 
 // DoTCPCheck checks that a TCP socket to the address can be opened.
@@ -74,8 +74,8 @@ func DoTCPCheck(addr string) (Status, error) {
 	return Healthy, nil
 }
 
-func (t *TCPHealthChecker) HealthCheck(podFullName, podUUID string, currentState api.PodState, container api.Container) (Status, error) {
-	host, port, err := getTCPAddrParts(currentState, container)
+func (t *TCPHealthChecker) HealthCheck(podFullName, podUUID string, status api.PodStatus, container api.Container) (Status, error) {
+	host, port, err := getTCPAddrParts(status, container)
 	if err != nil {
 		return Unknown, err
 	}
