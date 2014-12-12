@@ -72,19 +72,23 @@ func (util *GCEDiskUtil) AttachDisk(GCEPD *GCEPersistentDisk) error {
 	}
 	globalPDPath := makeGlobalPDName(GCEPD.RootDir, GCEPD.PDName, GCEPD.ReadOnly)
 	// Only mount the PD globally once.
-	_, err = os.Stat(globalPDPath)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(globalPDPath, 0750)
-		if err != nil {
+	mountpoint, err := isMountPoint(globalPDPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+				return err
+			}
+			mountpoint = false
+		} else {
 			return err
 		}
+	}
+	if !mountpoint {
 		err = GCEPD.mounter.Mount(devicePath, globalPDPath, GCEPD.FSType, flags, "")
 		if err != nil {
 			os.RemoveAll(globalPDPath)
 			return err
 		}
-	} else if err != nil {
-		return err
 	}
 	return nil
 }

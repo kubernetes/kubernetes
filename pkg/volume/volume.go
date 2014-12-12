@@ -235,11 +235,15 @@ func (PD *GCEPersistentDisk) GetPath() string {
 // Attaches the disk and bind mounts to the volume path.
 func (PD *GCEPersistentDisk) SetUp() error {
 	// TODO: handle failed mounts here.
-	if _, err := os.Stat(PD.GetPath()); !os.IsNotExist(err) {
+	mountpoint, err := isMountPoint(PD.GetPath())
+	glog.V(4).Infof("PersistentDisk set up: %s %v %v", PD.GetPath(), mountpoint, err)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if mountpoint {
 		return nil
 	}
-	err := PD.util.AttachDisk(PD)
-	if err != nil {
+	if err := PD.util.AttachDisk(PD); err != nil {
 		return err
 	}
 	flags := uintptr(0)
@@ -265,6 +269,13 @@ func (PD *GCEPersistentDisk) SetUp() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (PD *GCEPersistentDisk) TearDown() error {
+	mountpoint, err := isMountPoint(PD.GetPath())
+	if err != nil {
+		return err
+	}
+	if !mountpoint {
+		return os.RemoveAll(PD.GetPath())
+	}
 	devicePath, refCount, err := PD.mounter.RefCount(PD)
 	if err != nil {
 		return err
@@ -274,9 +285,6 @@ func (PD *GCEPersistentDisk) TearDown() error {
 	}
 	refCount--
 	if err := os.RemoveAll(PD.GetPath()); err != nil {
-		return err
-	}
-	if err != nil {
 		return err
 	}
 	// If refCount is 1, then all bind mounts have been removed, and the
