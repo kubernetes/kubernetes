@@ -295,6 +295,7 @@ func init() {
 			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
 				return err
 			}
+			out.Message = in.Message
 			out.Host = in.Host
 			out.HostIP = in.HostIP
 			out.PodIP = in.PodIP
@@ -307,6 +308,7 @@ func init() {
 			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
 				return err
 			}
+			out.Message = in.Message
 			out.Host = in.Host
 			out.HostIP = in.HostIP
 			out.PodIP = in.PodIP

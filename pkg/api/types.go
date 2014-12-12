@@ -469,6 +469,9 @@ type PodSpec struct {
 type PodStatus struct {
 	Phase PodPhase `json:"phase,omitempty"`
 
+	// A human readable message indicating details about why the pod is in this state.
+	Message string `json:"message,omitempty"`
+
 	// Host is the name of the node that this Pod is currently bound to, or empty if no
 	// assignment has been done.
 	Host   string `json:"host,omitempty"`
