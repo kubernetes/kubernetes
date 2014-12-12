@@ -373,8 +373,6 @@ func (m *Master) init(c *Config) {
 	if authenticator != nil {
 		handler = handlers.NewRequestAuthenticator(userContexts, authenticator, handlers.Unauthorized, handler)
 	}
-	// TODO: Remove temporary _whoami handler
-	m.rootWebService.Route(m.rootWebService.GET("/_whoami").To(handleWhoAmI(authenticator)))
 
 	// Install root web services
 	m.handlerContainer.Add(m.rootWebService)
