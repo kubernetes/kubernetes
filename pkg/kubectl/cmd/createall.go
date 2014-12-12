@@ -44,7 +44,7 @@ func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (resul
 			continue
 		}
 
-		mapping, err := m.RESTMapping(version, kind)
+		mapping, err := m.RESTMapping(kind, version)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("item[%d] mapping: %v", i, err))
 			continue

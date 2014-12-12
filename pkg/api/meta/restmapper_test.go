@@ -122,31 +122,39 @@ func TestKindToResource(t *testing.T) {
 
 func TestRESTMapperRESTMapping(t *testing.T) {
 	testCases := []struct {
-		Kind, APIVersion string
-		MixedCase        bool
+		Kind            string
+		APIVersions     []string
+		MixedCase       bool
+		DefaultVersions []string
 
 		Resource string
 		Version  string
 		Err      bool
 	}{
-		{Kind: "Unknown", APIVersion: "", Err: true},
+		{Kind: "Unknown", Err: true},
+		{Kind: "InternalObject", Err: true},
 
-		{Kind: "InternalObject", APIVersion: "test", Resource: "internalobjects"},
-		{Kind: "InternalObject", APIVersion: "test", Resource: "internalobjects"},
-		{Kind: "InternalObject", APIVersion: "", Resource: "internalobjects", Version: "test"},
+		{DefaultVersions: []string{"test"}, Kind: "Unknown", Err: true},
 
-		{Kind: "InternalObject", APIVersion: "test", Resource: "internalobjects"},
-		{Kind: "InternalObject", APIVersion: "test", MixedCase: true, Resource: "internalObjects"},
+		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
+		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
+
+		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
+
+		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{}, Resource: "internalobjects", Version: "test"},
+
+		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, Resource: "internalobjects"},
+		{DefaultVersions: []string{"test"}, Kind: "InternalObject", APIVersions: []string{"test"}, MixedCase: true, Resource: "internalObjects"},
 
 		// TODO: add test for a resource that exists in one version but not another
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]string{"test"}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
 		scheme := runtime.NewScheme()
 		scheme.AddKnownTypes("test", &InternalObject{})
 		mapper.Add(scheme, testCase.MixedCase, "test")
 
-		mapping, err := mapper.RESTMapping(testCase.APIVersion, testCase.Kind)
+		mapping, err := mapper.RESTMapping(testCase.Kind, testCase.APIVersions...)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
@@ -159,7 +167,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		}
 		version := testCase.Version
 		if version == "" {
-			version = testCase.APIVersion
+			version = testCase.APIVersions[0]
 		}
 		if mapping.APIVersion != version {
 			t.Errorf("%d: unexpected version: %#v", i, mapping)
@@ -179,36 +187,50 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	mapper.Add(scheme, false, "test1", "test2")
 
 	// pick default matching object kind based on search order
-	mapping, err := mapper.RESTMapping("", "OtherObject")
+	mapping, err := mapper.RESTMapping("OtherObject")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if mapping.Resource != "otherobjects" || mapping.APIVersion != "test2" {
 		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 
-	mapping, err = mapper.RESTMapping("", "InternalObject")
+	mapping, err = mapper.RESTMapping("InternalObject")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if mapping.Resource != "internalobjects" || mapping.APIVersion != "test1" {
 		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 
 	// mismatch of version
-	mapping, err = mapper.RESTMapping("test2", "InternalObject")
+	mapping, err = mapper.RESTMapping("InternalObject", "test2")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	mapping, err = mapper.RESTMapping("test1", "OtherObject")
+	mapping, err = mapper.RESTMapping("OtherObject", "test1")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// not in the search versions
-	mapping, err = mapper.RESTMapping("test3", "OtherObject")
+	mapping, err = mapper.RESTMapping("OtherObject", "test3")
 	if err == nil {
 		t.Errorf("unexpected non-error")
+	}
+
+	// explicit search order
+	mapping, err = mapper.RESTMapping("OtherObject", "test3", "test1")
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	mapping, err = mapper.RESTMapping("OtherObject", "test3", "test2")
+	if err != nil {
+		t.Fatalf("unexpected non-error")
+	}
+	if mapping.Resource != "otherobjects" || mapping.APIVersion != "test2" {
+		t.Errorf("unexpected mapping: %#v", mapping)
 	}
 }
 
@@ -218,7 +240,7 @@ func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 	scheme.AddKnownTypes("test1", &InternalObject{})
 	mapper.Add(scheme, false, "test1")
 
-	_, err := mapper.RESTMapping("test1", "InternalObject")
+	_, err := mapper.RESTMapping("InternalObject", "test1")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}

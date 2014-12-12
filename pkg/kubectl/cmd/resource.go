@@ -201,13 +201,13 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 			usageError(cmd, "Must specify filename or command line params")
 		}
 
-		version, kind, err := mapper.VersionAndKindForResource(resource)
+		defaultVersion, kind, err := mapper.VersionAndKindForResource(resource)
 		if err != nil {
 			// The error returned by mapper is "no resource defined", which is a usage error
 			usageError(cmd, err.Error())
 		}
-
-		mapping, err = mapper.RESTMapping(version, kind)
+		version := GetFlagString(cmd, "api-version")
+		mapping, err = mapper.RESTMapping(kind, version, defaultVersion)
 		checkErr(err)
 		return
 	}
@@ -242,7 +242,7 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper)
 	version, kind, err := mapper.VersionAndKindForResource(resource)
 	checkErr(err)
 
-	mapping, err = mapper.RESTMapping(version, kind)
+	mapping, err = mapper.RESTMapping(kind, version)
 	checkErr(err)
 	return
 }
@@ -268,10 +268,11 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 		}
 	}
 
-	version, kind, err := mapper.VersionAndKindForResource(resource)
+	defaultVersion, kind, err := mapper.VersionAndKindForResource(resource)
 	checkErr(err)
 
-	mapping, err = mapper.RESTMapping(version, kind)
+	version := GetFlagString(cmd, "api-version")
+	mapping, err = mapper.RESTMapping(kind, version, defaultVersion)
 	checkErr(err)
 
 	return
@@ -296,7 +297,7 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 	err = schema.ValidateBytes(data)
 	checkErr(err)
 
-	mapping, err = mapper.RESTMapping(version, kind)
+	mapping, err = mapper.RESTMapping(kind, version)
 	checkErr(err)
 
 	obj, err := mapping.Codec.Decode(data)
