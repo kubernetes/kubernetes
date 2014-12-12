@@ -469,7 +469,7 @@ function kube-down {
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
-      --delete-disks all \
+      --delete-disks boot \
       --zone "${ZONE}" \
       "${minions[@]::10}" || true
     minions=( "${minions[@]:10}" )
