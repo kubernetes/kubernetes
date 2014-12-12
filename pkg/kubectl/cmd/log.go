@@ -24,27 +24,46 @@ import (
 
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log <pod> <container>",
-		Short: "Print the logs for a container in a pod",
+		Use:   "log <pod> [<container>]",
+		Short: "Print the logs for a container in a pod.",
+		Long:  "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 2 {
-				usageError(cmd, "<pod> and <container> are required for log")
+			if len(args) == 0 {
+				usageError(cmd, "<pod> is required for log")
+			}
+
+			if len(args) > 2 {
+				usageError(cmd, "log <pod> [<container>]")
 			}
 
 			namespace := GetKubeNamespace(cmd)
-
 			client, err := f.ClientBuilder.Client()
 			checkErr(err)
-			pod, err := client.Pods(namespace).Get(args[0])
+
+			podID := args[0]
+
+			pod, err := client.Pods(namespace).Get(podID)
 			checkErr(err)
+
+			var container string
+			if len(args) == 1 {
+				if len(pod.Spec.Containers) != 1 {
+					usageError(cmd, "<container> is required for pods with multiple containers")
+				}
+
+				// Get logs for the only container in the pod
+				container = pod.Spec.Containers[0].Name
+			} else {
+				container = args[1]
+			}
 
 			data, err := client.RESTClient.Get().
 				Path("proxy/minions").
 				Path(pod.Status.Host).
 				Path("containerLogs").
 				Path(namespace).
-				Path(args[0]).
-				Path(args[1]).
+				Path(podID).
+				Path(container).
 				Do().
 				Raw()
 			checkErr(err)
