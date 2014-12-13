@@ -269,13 +269,15 @@ type imageTrackingDockerClient struct {
 	*FakeDockerClient
 	imageName string
 }
+
 func (f *imageTrackingDockerClient) InspectImage(name string) (image *docker.Image, err error) {
 	image, err = f.FakeDockerClient.InspectImage(name)
 	f.imageName = name
 	return
 }
+
 func TestIsImagePresent(t *testing.T) {
-	cl := &imageTrackingDockerClient{&FakeDockerClient{},""}
+	cl := &imageTrackingDockerClient{&FakeDockerClient{}, ""}
 	puller := &dockerPuller{
 		client: cl,
 	}
