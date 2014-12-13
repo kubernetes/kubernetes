@@ -16,14 +16,14 @@ desiredState:
         volumeMounts:
           - name: es-persistent-storage
             mountPath: /data
-    volumes:
-      - name: es-persistent-storage
-        source:
-          emptyDir: {}
       - name: kibana-image
         image: kubernetes/kibana
         ports:
           - name: kibana-port
             containerPort: 80
+    volumes:
+      - name: es-persistent-storage
+        source:
+          emptyDir: {}
 labels:
   app: elasticsearch-kibana

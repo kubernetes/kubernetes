@@ -9,14 +9,14 @@ down:	logger-down es-kibana-down
 
 
 es-kibana-up:	
-	-${KUBECTL} create -f es-kibana-pod.yml
 	-${KUBECTL} create -f es-service.yml
+	-${KUBECTL} create -f es-kibana-pod.yml
 	-${KUBECTL} create -f kibana-service.yml
 
 es-kibana-down:
 	-${KUBECTL} delete pods elasticsearch-kibana-pod
 	-${KUBECTL} delete service kibana-colo
-	-${KUBECTL} delete service elasticsearch-colo
+	-${KUBECTL} delete service elasticsearch
 
 update:	
 	-${KUBECTL} delete pods elasticsearch-kibana-pod
@@ -33,7 +33,7 @@ get:
 	${KUBECTL} get services
 
 net:	
-	gcutil getforwardingrule elasticsearch-colo
+	gcutil getforwardingrule elasticsearch
 	gcutil getforwardingrule kibana-colo
 
 firewall:	

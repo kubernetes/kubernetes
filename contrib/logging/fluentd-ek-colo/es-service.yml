@@ -1,6 +1,6 @@
 apiVersion: v1beta1
 kind: Service
-id: elasticsearch-colo
+id: elasticsearch
 containerPort: es-port
 port: 9200
 selector:
