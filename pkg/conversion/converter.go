@@ -300,7 +300,7 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 	if err != nil {
 		return err
 	}
-	if !dv.CanAddr() {
+	if !dv.CanAddr() && !dv.CanSet() {
 		return fmt.Errorf("can't write to dest")
 	}
 	sv, err := EnforcePtr(src)
@@ -318,6 +318,35 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 	return c.convert(sv, dv, s)
 }
 
+// callCustom calls 'custom' with sv & dv. custom must be a conversion function.
+func (c *Converter) callCustom(sv, dv, custom reflect.Value, scope *scope) error {
+	if !sv.CanAddr() {
+		sv2 := reflect.New(sv.Type())
+		sv2.Elem().Set(sv)
+		sv = sv2
+	} else {
+		sv = sv.Addr()
+	}
+	if !dv.CanAddr() {
+		if !dv.CanSet() {
+			return scope.error("can't addr or set dest.")
+		}
+		dvOrig := dv
+		dv := reflect.New(dvOrig.Type())
+		defer func() { dvOrig.Set(dv) }()
+	} else {
+		dv = dv.Addr()
+	}
+	args := []reflect.Value{sv, dv, reflect.ValueOf(scope)}
+	ret := custom.Call(args)[0].Interface()
+	// This convolution is necessary because nil interfaces won't convert
+	// to errors.
+	if ret == nil {
+		return nil
+	}
+	return ret.(error)
+}
+
 // convert recursively copies sv into dv, calling an appropriate conversion function if
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
@@ -326,14 +355,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
-		args := []reflect.Value{sv.Addr(), dv.Addr(), reflect.ValueOf(scope)}
-		ret := fv.Call(args)[0].Interface()
-		// This convolution is necessary because nil interfaces won't convert
-		// to errors.
-		if ret == nil {
-			return nil
-		}
-		return ret.(error)
+		return c.callCustom(sv, dv, fv, scope)
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {

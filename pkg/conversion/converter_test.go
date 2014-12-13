@@ -19,6 +19,7 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/google/gofuzz"
@@ -134,6 +135,52 @@ func TestConverter_fuzz(t *testing.T) {
 	}
 }
 
+func TestConverter_MapElemAddr(t *testing.T) {
+	type Foo struct {
+		A map[int]int
+	}
+	type Bar struct {
+		A map[string]string
+	}
+	c := NewConverter()
+	c.Debug = t
+	err := c.Register(
+		func(in *int, out *string, s Scope) error {
+			*out = fmt.Sprintf("%v", *in)
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	err = c.Register(
+		func(in *string, out *int, s Scope) error {
+			if str, err := strconv.Atoi(*in); err != nil {
+				return err
+			} else {
+				*out = str
+				return nil
+			}
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	f := fuzz.New().NilChance(0).NumElements(3, 3)
+	first := Foo{}
+	second := Bar{}
+	f.Fuzz(&first)
+	err = c.Convert(&first, &second, AllowDifferentFieldTypeNames, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	third := Foo{}
+	err = c.Convert(&second, &third, AllowDifferentFieldTypeNames, nil)
+	if e, a := first, third; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected diff: %v", objDiff(e, a))
+	}
+}
+
 func TestConverter_tags(t *testing.T) {
 	type Foo struct {
 		A string `test:"foo"`
@@ -157,7 +204,10 @@ func TestConverter_tags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	c.Convert(&Foo{}, &Bar{}, 0, nil)
+	err = c.Convert(&Foo{}, &Bar{}, AllowDifferentFieldTypeNames, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 }
 
 func TestConverter_meta(t *testing.T) {
