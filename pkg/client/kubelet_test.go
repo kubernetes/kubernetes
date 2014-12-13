@@ -31,10 +31,8 @@ import (
 )
 
 func TestHTTPKubeletClient(t *testing.T) {
-	expectObj := api.PodContainerInfo{
-		ContainerInfo: map[string]api.ContainerStatus{
-			"myID": {},
-		},
+	expectObj := api.PodInfo{
+		"myID": api.ContainerStatus{},
 	}
 	body, err := json.Marshal(expectObj)
 	if err != nil {
@@ -70,16 +68,14 @@ func TestHTTPKubeletClient(t *testing.T) {
 	}
 
 	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
-	if len(gotObj.ContainerInfo) != len(expectObj.ContainerInfo) {
+	if len(gotObj) != len(expectObj) {
 		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }
 
 func TestHTTPKubeletClientNotFound(t *testing.T) {
-	expectObj := api.PodContainerInfo{
-		ContainerInfo: map[string]api.ContainerStatus{
-			"myID": {},
-		},
+	expectObj := api.PodInfo{
+		"myID": api.ContainerStatus{},
 	}
 	_, err := json.Marshal(expectObj)
 	if err != nil {

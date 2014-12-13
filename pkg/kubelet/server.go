@@ -35,7 +35,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
@@ -92,8 +91,7 @@ func NewServer(host HostInterface, updates chan<- interface{}, enableDebuggingHa
 // InstallDefaultHandlers registers the default set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.mux)
-	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
-	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
+	s.mux.HandleFunc("/podInfo", s.handlePodInfo)
 	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
@@ -251,16 +249,8 @@ func (s *Server) handleBoundPods(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
-func (s *Server) handlePodInfoOld(w http.ResponseWriter, req *http.Request) {
-	s.handlePodInfo(w, req, false)
-}
-
-func (s *Server) handlePodInfoVersioned(w http.ResponseWriter, req *http.Request) {
-	s.handlePodInfo(w, req, true)
-}
-
 // handlePodInfo handles podInfo requests against the Kubelet
-func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request, versioned bool) {
+func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		s.error(w, err)
@@ -296,7 +286,7 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request, version
 		s.error(w, err)
 		return
 	}
-	data, err := exportPodInfo(info, versioned)
+	data, err := json.Marshal(info)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -446,24 +436,4 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 	return
-}
-
-func exportPodInfo(info api.PodInfo, versioned bool) ([]byte, error) {
-	if versioned {
-		// TODO: support arbitrary versions here
-		codec, err := findCodec("v1beta1")
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(&api.PodContainerInfo{ContainerInfo: info})
-	}
-	return json.Marshal(info)
-}
-
-func findCodec(version string) (runtime.Codec, error) {
-	versions, err := latest.InterfacesFor(version)
-	if err != nil {
-		return nil, err
-	}
-	return versions.Codec, nil
 }
