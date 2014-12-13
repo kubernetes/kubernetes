@@ -62,7 +62,7 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
+func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error) {
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
 	var c client.PodInfoGetter

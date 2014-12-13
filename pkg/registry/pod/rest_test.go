@@ -566,8 +566,8 @@ type FakePodInfoGetter struct {
 	err  error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodInfo, error) {
-	return f.info, f.err
+func (f *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodContainerInfo, error) {
+	return api.PodContainerInfo{ContainerInfo: f.info}, f.err
 }
 
 func TestFillPodInfo(t *testing.T) {
