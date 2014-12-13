@@ -31,7 +31,6 @@ func init() {
 
 	api.Scheme.AddKnownTypes("v1beta2",
 		&Pod{},
-		&PodContainerInfo{},
 		&PodList{},
 		&ReplicationController{},
 		&ReplicationControllerList{},
@@ -59,7 +58,6 @@ func init() {
 }
 
 func (*Pod) IsAnAPIObject()                       {}
-func (*PodContainerInfo) IsAnAPIObject()          {}
 func (*PodList) IsAnAPIObject()                   {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}

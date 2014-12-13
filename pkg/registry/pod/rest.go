@@ -230,8 +230,8 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 				return
 			}
 		}
-		pod.Status.Info = info.ContainerInfo
-		netContainerInfo, ok := pod.Status.Info["net"]
+		pod.Status.Info = info
+		netContainerInfo, ok := info["net"]
 		if ok {
 			if netContainerInfo.PodIP != "" {
 				pod.Status.PodIP = netContainerInfo.PodIP
