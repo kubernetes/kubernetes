@@ -33,7 +33,7 @@ type PodCache struct {
 	containerInfo client.PodInfoGetter
 	pods          pod.Registry
 	// This is a map of pod id to a map of container name to the
-	podInfo map[string]api.PodInfo
+	podInfo map[string]api.PodContainerInfo
 	podLock sync.Mutex
 }
 
@@ -42,7 +42,7 @@ func NewPodCache(info client.PodInfoGetter, pods pod.Registry) *PodCache {
 	return &PodCache{
 		containerInfo: info,
 		pods:          pods,
-		podInfo:       map[string]api.PodInfo{},
+		podInfo:       map[string]api.PodContainerInfo{},
 	}
 }
 
@@ -54,12 +54,12 @@ func makePodCacheKey(podNamespace, podID string) string {
 // GetPodInfo implements the PodInfoGetter.GetPodInfo.
 // The returned value should be treated as read-only.
 // TODO: Remove the host from this call, it's totally unnecessary.
-func (p *PodCache) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
+func (p *PodCache) GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	value, ok := p.podInfo[makePodCacheKey(podNamespace, podID)]
 	if !ok {
-		return nil, client.ErrPodInfoNotAvailable
+		return api.PodContainerInfo{}, client.ErrPodInfoNotAvailable
 	}
 	return value, nil
 }

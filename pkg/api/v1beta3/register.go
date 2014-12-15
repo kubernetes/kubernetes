@@ -26,6 +26,7 @@ var Codec = runtime.CodecFor(api.Scheme, "v1beta3")
 
 func init() {
 	api.Scheme.AddKnownTypes("v1beta3",
+		&PodContainerInfo{},
 		&Pod{},
 		&PodList{},
 		&PodTemplate{},
@@ -53,6 +54,7 @@ func init() {
 	api.Scheme.AddKnownTypeWithName("v1beta3", "MinionList", &NodeList{})
 }
 
+func (*PodContainerInfo) IsAnAPIObject()          {}
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
 func (*PodTemplate) IsAnAPIObject()               {}
