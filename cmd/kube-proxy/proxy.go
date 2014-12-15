@@ -66,6 +66,9 @@ func main() {
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
 	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), iptables.New(exec.New(), protocol))
+	if proxier == nil {
+		glog.Fatalf("failed to create proxier, aborting")
+	}
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services
