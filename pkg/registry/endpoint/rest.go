@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -30,6 +31,7 @@ import (
 // REST adapts endpoints into apiserver's RESTStorage model.
 type REST struct {
 	registry Registry
+	store    registry.Store
 }
 
 // NewREST returns a new apiserver.RESTStorage implementation for endpoints
@@ -39,9 +41,24 @@ func NewREST(registry Registry) *REST {
 	}
 }
 
+func NewRESTv2(store registry.Store) *REST {
+	return &REST{
+		store: store,
+	}
+}
+
 // Get satisfies the RESTStorage interface.
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	return rs.registry.GetEndpoints(ctx, id)
+	if rs.registry != nil {
+		// Old way.
+		return rs.registry.GetEndpoints(ctx, id)
+	}
+	// New way.
+	endpoints := &api.Endpoints{}
+	if err := rs.store.Get(ctx, id, endpoints); err != nil {
+		return nil, err
+	}
+	return endpoints, nil
 }
 
 // List satisfies the RESTStorage interface.
@@ -49,17 +66,29 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	if !label.Empty() || !field.Empty() {
 		return nil, errors.NewBadRequest("label/field selectors are not supported on endpoints")
 	}
-	return rs.registry.ListEndpoints(ctx)
+	if rs.registry != nil {
+		// Old way.
+		return rs.registry.ListEndpoints(ctx)
+	}
+	// New way.
+	list := &api.EndpointsList{}
+	err := rs.store.List(ctx, list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 // Watch returns Endpoint events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
 func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	// Old way.
 	return rs.registry.WatchEndpoints(ctx, label, field, resourceVersion)
 }
 
 // Create satisfies the RESTStorage interface.
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+	// Old way.
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
@@ -87,12 +116,25 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
 	}
+	if rs.registry != nil {
+		// Old way.
+		return apiserver.MakeAsync(func() (runtime.Object, error) {
+			err := rs.registry.UpdateEndpoints(ctx, endpoints)
+			if err != nil {
+				return nil, err
+			}
+			return rs.registry.GetEndpoints(ctx, endpoints.Name)
+		}), nil
+	}
+	// New way.
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateEndpoints(ctx, endpoints)
-		if err != nil {
+		if err := rs.store.Update(ctx, endpoints.Name, endpoints); err != nil {
 			return nil, err
 		}
-		return rs.registry.GetEndpoints(ctx, endpoints.Name)
+		if err := rs.store.Get(ctx, endpoints.Name, endpoints); err != nil {
+			return nil, err
+		}
+		return endpoints, nil
 	}), nil
 }
 

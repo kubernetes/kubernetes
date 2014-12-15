@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -39,6 +40,7 @@ type REST struct {
 	cloud     cloudprovider.Interface
 	machines  minion.Registry
 	portalMgr *ipAllocator
+	store     registry.Store
 }
 
 // NewREST returns a new REST.
@@ -55,6 +57,12 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 		cloud:     cloud,
 		machines:  machines,
 		portalMgr: ipa,
+	}
+}
+
+func NewRESTv2(store registry.Store) *REST {
+	return &REST{
+		store: store,
 	}
 }
 

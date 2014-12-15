@@ -51,6 +51,7 @@ const (
 type Registry struct {
 	tools.EtcdHelper
 	boundPodFactory pod.BoundPodFactory
+	path            string
 }
 
 // NewRegistry creates an etcd registry.
@@ -60,6 +61,13 @@ func NewRegistry(helper tools.EtcdHelper, boundPodFactory pod.BoundPodFactory) *
 	}
 	registry.boundPodFactory = boundPodFactory
 	return registry
+}
+
+// New way.
+func NewRegistry2(helper tools.EtcdHelper, path string, boundPodFactory pod.BoundPodFactory) *Registry {
+	reg := NewRegistry(helper, boundPodFactory)
+	reg.path = path
+	return reg
 }
 
 // MakeEtcdListKey constructs etcd paths to resource directories enforcing namespace rules
@@ -610,3 +618,40 @@ func (r *Registry) DeleteMinion(ctx api.Context, minionID string) error {
 	}
 	return nil
 }
+
+// New way.
+func (r *Registry) List(ctx api.Context, out runtime.Object) error {
+	key := MakeEtcdListKey(ctx, r.path)
+	return r.ExtractToList(key, out)
+}
+func (r *Registry) Get(ctx api.Context, name string, out runtime.Object) error {
+	key, err := MakeEtcdItemKey(ctx, r.path, name)
+	if err != nil {
+		return err
+	}
+	err = r.ExtractObj(key, out, false)
+	if err != nil {
+		return etcderr.InterpretGetError(err, r.path, name)
+	}
+	return nil
+}
+func (r *Registry) Update(ctx api.Context, name string, obj runtime.Object) error {
+	key, err := MakeEtcdItemKey(ctx, r.path, name)
+	if err != nil {
+		return err
+	}
+	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
+	err = r.AtomicUpdate(key, obj,
+		func(input runtime.Object) (runtime.Object, error) {
+			// TODO: racy - label query is returning different results for two simultaneous updaters
+			return obj, nil
+		})
+	return etcderr.InterpretUpdateError(err, r.path, name)
+}
+
+/* FIXME: not done yet
+func (r *Registry) Watch(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error) {
+	//FIXME:
+	panic("GenericWatch")
+}
+*/

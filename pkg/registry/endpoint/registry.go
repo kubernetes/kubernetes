@@ -18,7 +18,9 @@ package endpoint
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -28,4 +30,26 @@ type Registry interface {
 	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
 	WatchEndpoints(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
+}
+
+// New way.
+type plugin struct{}
+
+var _ registry.Plugin = &plugin{}
+
+func (p plugin) Name() string {
+	return "endpoints2"
+}
+
+func (p plugin) Path() string {
+	return "services/endpoints"
+}
+
+func (p plugin) New(store registry.Store) (apiserver.RESTStorage, error) {
+	return NewRESTv2(store), nil
+}
+
+func init() {
+	// Register as a plugin.  This is just a proof-of-concept, so use a different API endpoint.
+	registry.RegisterPlugin(&plugin{})
 }

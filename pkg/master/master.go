@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	rt "runtime"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
@@ -328,6 +330,20 @@ func (m *Master) init(c *Config) {
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
 	}
+
+	// Load all registry plugins.
+	//FIXME: too many callbacks?
+	registry.ForEachPlugin(func(plugin registry.Plugin) {
+		name := plugin.Name()
+		store := etcd.NewRegistry2(c.EtcdHelper, path.Join("/registry", plugin.Path()), nil)
+		//FIXME: need to pass, cloud, minionreg, portalnet for services.
+		rest, err := plugin.New(store)
+		if err != nil {
+			glog.Fatalf("Unable to instantiate registry plugin %q: %v", name, err)
+		}
+		m.storage[name] = rest
+		glog.Infof("Loaded registry plugin %q", name)
+	})
 
 	apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1")
 	apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2")
