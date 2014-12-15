@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -116,7 +115,6 @@ func (c *HTTPKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.Po
 		return info, err
 	}
 	// Check that this data can be unmarshalled
-	log.Printf("FOOO: %s", string(body))
 	err = latest.Codec.DecodeInto(body, &info)
 	if err != nil {
 		return info, err
