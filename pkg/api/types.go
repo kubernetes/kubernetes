@@ -435,25 +435,6 @@ type RestartPolicy struct {
 	Never     *RestartPolicyNever     `json:"never,omitempty"`
 }
 
-// PodState is the state of a pod, used as either input (desired state) or output (current state).
-type PodState struct {
-	Manifest ContainerManifest `json:"manifest,omitempty"`
-	Status   PodPhase          `json:"status,omitempty"`
-	// A human readable message indicating details about why the pod is in this state.
-	Message string `json:"message,omitempty"`
-	Host    string `json:"host,omitempty"`
-	HostIP  string `json:"hostIP,omitempty"`
-	PodIP   string `json:"podIP,omitempty"`
-
-	// The key of this map is the *name* of the container within the manifest; it has one
-	// entry per container in the manifest. The value of this map is currently the output
-	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon.
-	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
-	// when we have done this.
-	Info PodInfo `json:"info,omitempty"`
-}
-
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline"`

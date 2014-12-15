@@ -348,11 +348,6 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ValidationErro
 	return allErrors
 }
 
-func ValidatePodState(podState *api.PodState) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList(ValidateManifest(&podState.Manifest)).Prefix("manifest")
-	return allErrs
-}
-
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}

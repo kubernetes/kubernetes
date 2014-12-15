@@ -703,14 +703,14 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		return err
 	}
 
-	podState := api.PodState{}
+	podStatus := api.PodStatus{}
 	info, err := kl.GetPodInfo(podFullName, uuid)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %s and uuid %s info, health checks may be invalid", podFullName, uuid)
 	}
 	netInfo, found := info[networkContainerName]
 	if found {
-		podState.PodIP = netInfo.PodIP
+		podStatus.PodIP = netInfo.PodIP
 	}
 
 	for _, container := range pod.Spec.Containers {
@@ -722,7 +722,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			// look for changes in the container.
 			if hash == 0 || hash == expectedHash {
 				// TODO: This should probably be separated out into a separate goroutine.
-				healthy, err := kl.healthy(podFullName, uuid, podState, container, dockerContainer)
+				healthy, err := kl.healthy(podFullName, uuid, podStatus, container, dockerContainer)
 				if err != nil {
 					glog.V(1).Infof("health check errored: %v", err)
 					containersToKeep[containerID] = empty{}
@@ -1042,7 +1042,7 @@ func (kl *Kubelet) GetPodInfo(podFullName, uuid string) (api.PodInfo, error) {
 	return dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uuid)
 }
 
-func (kl *Kubelet) healthy(podFullName, podUUID string, currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
+func (kl *Kubelet) healthy(podFullName, podUUID string, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
 		return health.Healthy, nil
@@ -1053,7 +1053,7 @@ func (kl *Kubelet) healthy(podFullName, podUUID string, currentState api.PodStat
 	if kl.healthChecker == nil {
 		return health.Healthy, nil
 	}
-	return kl.healthChecker.HealthCheck(podFullName, podUUID, currentState, container)
+	return kl.healthChecker.HealthCheck(podFullName, podUUID, status, container)
 }
 
 // Returns logs of current machine.

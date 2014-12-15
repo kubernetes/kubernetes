@@ -44,7 +44,7 @@ func TestGetTCPAddrParts(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		state := api.PodState{PodIP: "1.2.3.4"}
+		state := api.PodStatus{PodIP: "1.2.3.4"}
 		container := api.Container{
 			Ports: []api.Port{{Name: "found", HostPort: 93}},
 			LivenessProbe: &api.LivenessProbe{
@@ -101,7 +101,7 @@ func TestTcpHealthChecker(t *testing.T) {
 		if params != nil && test.expectedStatus == Healthy {
 			params.Port = util.NewIntOrStringFromString(port)
 		}
-		status, err := checker.HealthCheck("test", "", api.PodState{PodIP: host}, container)
+		status, err := checker.HealthCheck("test", "", api.PodStatus{PodIP: host}, container)
 		if status != test.expectedStatus {
 			t.Errorf("expected: %v, got: %v", test.expectedStatus, status)
 		}
