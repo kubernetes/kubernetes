@@ -4,4 +4,4 @@
 {% endif -%}
 {% set master="-master=127.0.0.1:8080" -%}
 
-DAEMON_ARGS="{{daemon_args}} {{master}}"
+DAEMON_ARGS="{{daemon_args}} {{master}} {{pillar['log_level']}}"
