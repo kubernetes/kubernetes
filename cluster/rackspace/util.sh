@@ -238,7 +238,20 @@ detect-minions() {
 detect-master() {
   KUBE_MASTER=${MASTER_NAME}
 
+  echo "Waiting for ${MASTER_NAME} IP Address."
+  echo
+  echo "  This will continually check to see if the master node has an IP address."
+  echo
+
   KUBE_MASTER_IP=$(nova show $KUBE_MASTER --minimal | grep accessIPv4 | awk '{print $4}')
+
+  while [ "${KUBE_MASTER_IP-|}" == "|" ]; do
+    KUBE_MASTER_IP=$(nova show $KUBE_MASTER --minimal | grep accessIPv4 | awk '{print $4}')
+    printf "."
+    sleep 2
+  done
+
+  echo "${KUBE_MASTER} IP Address is ${KUBE_MASTER_IP}"
 }
 
 # $1 should be the network you would like to get an IP address for
