@@ -47,14 +47,14 @@ trap "teardown" EXIT
 perl -p -e "s/%.*%/${disk_name}/g" ${KUBE_ROOT}/examples/gce-pd/testpd.yaml > ${config}
 
 # Create and format the disk.
-gcloud compute disks create --zone="${ZONE}" --size=10GB "${disk_name}"
-gcloud compute instances attach-disk --zone="${ZONE}" --disk="${disk_name}" \
+"${GCLOUD}" compute disks create --zone="${ZONE}" --size=10GB "${disk_name}"
+"${GCLOUD}" compute instances attach-disk --zone="${ZONE}" --disk="${disk_name}" \
   --device-name temp-data "${MASTER_NAME}"
-gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo rm -rf /mnt/tmp"
-gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo mkdir -p /mnt/tmp"
-gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
-gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo umount /mnt/tmp"
-gcloud compute instances detach-disk --zone="${ZONE}" --disk "${disk_name}" "${MASTER_NAME}"
+"${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo rm -rf /mnt/tmp"
+"${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo mkdir -p /mnt/tmp"
+"${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
+"${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo umount /mnt/tmp"
+"${GCLOUD}" compute instances detach-disk --zone="${ZONE}" --disk "${disk_name}" "${MASTER_NAME}"
 
 # Create a pod that uses the PD
 ${KUBECFG} -c ${config} create pods
