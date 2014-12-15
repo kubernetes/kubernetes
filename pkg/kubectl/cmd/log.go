@@ -18,15 +18,22 @@ package cmd
 
 import (
 	"io"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
 
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log <pod> [<container>]",
+		Use:   "log [-f] <pod> [<container>]",
 		Short: "Print the logs for a container in a pod.",
-		Long:  "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
+		Long: `Print the logs for a container in a pod. If the pod has only one container, the container name is optional
+Examples:
+  $ kubectl log 123456-7890 ruby-container
+  <returns snapshot of ruby-container logs from pod 123456-7890>
+
+  $ kubectl log -f 123456-7890 ruby-container
+  <starts streaming of ruby-container logs from pod 123456-7890>`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				usageError(cmd, "<pod> is required for log")
@@ -57,19 +64,27 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 				container = args[1]
 			}
 
-			data, err := client.RESTClient.Get().
+			follow := false
+			if GetFlagBool(cmd, "follow") {
+				follow = true
+			}
+
+			readCloser, err := client.RESTClient.Get().
 				Path("proxy/minions").
 				Path(pod.Status.Host).
 				Path("containerLogs").
 				Path(namespace).
 				Path(podID).
 				Path(container).
-				Do().
-				Raw()
+				Param("follow", strconv.FormatBool(follow)).
+				Stream()
 			checkErr(err)
-			out.Write(data)
 
+			defer readCloser.Close()
+			_, err = io.Copy(out, readCloser)
+			checkErr(err)
 		},
 	}
+	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	return cmd
 }
