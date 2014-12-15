@@ -51,7 +51,7 @@ func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
 			NewFunc:      func() runtime.Object { return &api.Event{} },
 			NewListFunc:  func() runtime.Object { return &api.EventList{} },
 			EndpointName: "events",
-			KeyRoot: func(ctx api.Context) string {
+			KeyRootFunc: func(ctx api.Context) string {
 				return "/registry/events"
 			},
 			KeyFunc: func(ctx api.Context, id string) (string, error) {

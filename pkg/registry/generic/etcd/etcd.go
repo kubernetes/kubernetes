@@ -42,7 +42,7 @@ type Etcd struct {
 	EndpointName string
 
 	// Used for listing/watching; should not include trailing "/"
-	KeyRoot func(ctx api.Context) string
+	KeyRootFunc func(ctx api.Context) string
 
 	// Called for Create/Update/Get/Delete
 	KeyFunc func(ctx api.Context, id string) (string, error)
@@ -51,8 +51,8 @@ type Etcd struct {
 	Helper tools.EtcdHelper
 }
 
-// MakeEtcdListKey constructs etcd paths to resource directories enforcing namespace rules
-func MakeEtcdListKey(ctx api.Context, prefix string) string {
+// NamespaceKeyRootFunc is the default function for constructing etcd paths to resource directories enforcing namespace rules.
+func NamespaceKeyRootFunc(ctx api.Context, prefix string) string {
 	key := prefix
 	ns, ok := api.NamespaceFrom(ctx)
 	if ok && len(ns) > 0 {
@@ -61,9 +61,10 @@ func MakeEtcdListKey(ctx api.Context, prefix string) string {
 	return key
 }
 
-// MakeEtcdItemKey constructs etcd paths to a resource relative to prefix enforcing namespace rules.  If no namespace is on context, it errors.
-func MakeEtcdItemKey(ctx api.Context, prefix string, id string) (string, error) {
-	key := MakeEtcdListKey(ctx, prefix)
+// NamespaceKeyFunc is the default function for constructing etcd paths to a resource relative to prefix enforcing namespace rules.
+// If no namespace is on context, it errors.
+func NamespaceKeyFunc(ctx api.Context, prefix string, id string) (string, error) {
+	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := api.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
 		return "", kubeerr.NewBadRequest("Namespace parameter required.")
@@ -78,7 +79,7 @@ func MakeEtcdItemKey(ctx api.Context, prefix string, id string) (string, error) 
 // List returns a list of all the items matching m.
 func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
-	err := e.Helper.ExtractToList(e.KeyRoot(ctx), list)
+	err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion string)
 	if err != nil {
 		return nil, err
 	}
-	return e.Helper.WatchList(e.KeyRoot(ctx), version, func(obj runtime.Object) bool {
+	return e.Helper.WatchList(e.KeyRootFunc(ctx), version, func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		return err == nil && matches
 	})
