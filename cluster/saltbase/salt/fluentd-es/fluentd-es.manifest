@@ -9,11 +9,18 @@ containers:
       - name: hosts
         mountPath: /outerhost
         readOnly: true
+      - name: varlog
+        mountPath: /varlog
+volumes:
 volumes:
   - name: containers
     source:
       hostDir:
         path: /var/lib/docker/containers
+  - name: varlog
+    source:
+      hostDir:
+        path: /var/log
   - name: hosts
     source:
       hostDir:

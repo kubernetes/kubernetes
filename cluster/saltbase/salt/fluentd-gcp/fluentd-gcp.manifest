@@ -6,8 +6,14 @@ containers:
     volumeMounts:
       - name: containers
         mountPath: /var/lib/docker/containers
+      - name: varlog
+        mountPath: /varlog
 volumes:
   - name: containers
     source:
       hostDir:
         path: /var/lib/docker/containers
+  - name: varlog
+    source:
+      hostDir:
+        path: /var/log
