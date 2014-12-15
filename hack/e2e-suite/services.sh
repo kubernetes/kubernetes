@@ -200,6 +200,7 @@ function wait_for_pods() {
 #   $5: pod IDs
 function wait_for_service_up() {
   local i
+  local found_pods
   for i in $(seq 1 20); do
     results=($(ssh-to-node "${test_node}" "
         set -e;
@@ -207,7 +208,9 @@ function wait_for_service_up() {
           curl -s --connect-timeout 1 http://$2:$3;
         done | sort | uniq
         "))
+
     found_pods=$(sort_args "${results[@]:+${results[@]}}")
+    echo "Checking if ${found_pods} == ${5}"
     if [[ "${found_pods}" == "$5" ]]; then
       break
     fi
@@ -299,6 +302,7 @@ fi
 #
 # Test 1: Prove that the service portal is alive.
 #
+echo "Test 1: Prove that the service portal is alive."
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc1_name}" "${svc1_ip}" "${svc1_port}" \
     "${svc1_count}" "${svc1_pods}"
@@ -321,6 +325,7 @@ verify_from_container "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
 #
 # Test 2: Bounce the proxy and make sure the portal comes back.
 #
+echo "Test 2: Bounce the proxy and make sure the portal comes back."
 echo "Restarting kube-proxy"
 restart-kube-proxy "${test_node}"
 echo "Verifying the portals from the host"
@@ -337,6 +342,7 @@ verify_from_container "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
 #
 # Test 3: Stop one service and make sure it is gone.
 #
+echo "Test 3: Stop one service and make sure it is gone."
 stop_service "${svc1_name}"
 wait_for_service_down "${svc1_name}" "${svc1_ip}" "${svc1_port}"
 
@@ -344,6 +350,7 @@ wait_for_service_down "${svc1_name}" "${svc1_ip}" "${svc1_port}"
 # Test 4: Bring up another service.
 # TODO: Actually add a test to force re-use.
 #
+echo "Test 4: Bring up another service."
 svc3_name="service3"
 svc3_port=80
 svc3_count=3
@@ -369,6 +376,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 # Test 5: Remove the iptables rules, make sure they come back.
 #
+echo "Test 5: Remove the iptables rules, make sure they come back."
 echo "Manually removing iptables rules"
 ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PROXY"
 echo "Verifying the portals from the host"
@@ -381,6 +389,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 # Test 6: Restart the master, make sure portals come back.
 #
+echo "Test 6: Restart the master, make sure portals come back."
 echo "Restarting the master"
 ssh-to-node "${master}" "sudo /etc/init.d/kube-apiserver restart"
 sleep 5
@@ -394,6 +403,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 # Test 7: Bring up another service, make sure it does not re-use Portal IPs.
 #
+echo "Test 7: Bring up another service, make sure it does not re-use Portal IPs."
 svc4_name="service4"
 svc4_port=80
 svc4_count=3

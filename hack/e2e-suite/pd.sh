@@ -25,9 +25,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-if [[ "$KUBERNETES_PROVIDER" != "gce" ]]; then
-    echo "PD test is only run for GCE"
-    return 0
+if [[ "$KUBERNETES_PROVIDER" != "gce" ]] && [[ "$KUBERNETES_PROVIDER" != "gke" ]]; then
+  echo "WARNING: Skipping pd.sh for cloud provider: ${KUBERNETES_PROVIDER}."
+  exit 0
 fi
 
 disk_name="e2e-$(date +%H-%M-%s)"

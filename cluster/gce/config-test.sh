@@ -15,6 +15,8 @@
 # limitations under the License.
 
 # TODO(jbeda): Provide a way to override project
+# gcloud multiplexing for shared GCE/GKE tests.
+GCLOUD=gcloud
 ZONE=us-central1-b
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small

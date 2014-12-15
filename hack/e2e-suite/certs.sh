@@ -25,14 +25,18 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-if [[ "${KUBERNETES_PROVIDER}" != "gce" ]]; then
-  echo "Skipping certs test on non-gce provider."
+if [[ "${KUBERNETES_PROVIDER}" != "gce" ]] && [[ "${KUBERNETES_PROVIDER}" != "gke" ]]; then
+  echo "WARNING: Skipping certs.sh for cloud provider: ${KUBERNETES_PROVIDER}."
   exit 0
 fi
+
+# Set KUBE_MASTER
+detect-master
 
 # IMPORTANT: there are upstream things that rely on these files.
 # Do *not* fix this test by changing this path, unless you _really_ know
 # what you are doing.
 for file in kubecfg.key kubecfg.crt ca.crt; do
-  gcloud compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "ls /srv/kubernetes/${file}"
+  echo "Checking for ${file}"
+  "${GCLOUD}" compute ssh --zone="${ZONE}" "${KUBE_MASTER}" --command "ls /srv/kubernetes/${file}"
 done

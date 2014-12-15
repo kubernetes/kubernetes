@@ -165,7 +165,7 @@ func Up() bool {
 
 // Is the e2e cluster up?
 func IsUp() bool {
-	return runBash("get status", `$KUBECFG -server_version`)
+	return runBash("get status", `$KUBECTL version`)
 }
 
 func tryUp() bool {

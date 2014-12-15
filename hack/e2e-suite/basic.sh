@@ -25,10 +25,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-# Launch some pods.
-num_pods=2
-$KUBECFG -p 8080:9376 run kubernetes/serve_hostname ${num_pods} my-hostname
-
 function teardown() {
   echo "Cleaning up test artifacts"
   $KUBECFG stop my-hostname
@@ -37,7 +33,21 @@ function teardown() {
 
 trap "teardown" EXIT
 
-pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l replicationController=my-hostname list pods)
+# Determine which pod image to launch (e.g. private.sh launches a different one).
+pod_img_srv="${POD_IMG_SRV:-kubernetes/serve_hostname}"
+
+# Launch some pods.
+num_pods=2
+$KUBECFG -p 8080:9376 run "${pod_img_srv}" ${num_pods} my-hostname
+
+# List the pods.
+pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l name=my-hostname list pods)
+echo "pod_id_list: ${pod_id_list}"
+if [[ -z "${pod_id_list:-}" ]]; then
+  echo "Pod ID list is empty. It should have a set of pods to verify."
+  exit 1
+fi
+
 # Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
 for i in $(seq 1 24); do
@@ -45,7 +55,7 @@ for i in $(seq 1 24); do
   sleep 5
   all_running=1
   for id in $pod_id_list; do
-    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+    current_status=$($KUBECFG '-template={{.currentState.status}}' get pods/$id) || true
     if [[ "$current_status" != "Running" ]]; then
       all_running=0
       break
@@ -60,22 +70,28 @@ if [[ "${all_running}" == 0 ]]; then
   exit 1
 fi
 
-# Get minion IP addresses
-detect-minions
-
 # let images stabilize
 echo "Letting images stabilize"
 sleep 5
 
 # Verify that something is listening.
 for id in ${pod_id_list}; do
-  ip=$($KUBECFG -template '{{.currentState.hostIP}}' get pods/$id)
+  ip=$($KUBECFG '-template={{.currentState.hostIP}}' get pods/$id)
   echo "Trying to reach server that should be running at ${ip}:8080..."
-  ok=0
+  server_running=0
   for i in $(seq 1 5); do
-    curl --connect-timeout 1 "http://${ip}:8080" >/dev/null 2>&1 && ok=1 && break
+    echo "--- trial ${i}"
+    output=$(curl -s -connect-timeout 1 "http://${ip}:8080" || true)
+    if echo $output | grep "${id}" &> /dev/null; then
+      server_running=1
+      break
+    fi
     sleep 2
   done
+  if [[ "${server_running}" -ne 1 ]]; then
+    echo "Server never running at ${ip}:8080..."
+    exit 1
+  fi
 done
 
 exit 0

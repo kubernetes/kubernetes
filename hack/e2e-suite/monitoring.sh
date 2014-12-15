@@ -26,22 +26,29 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
+if [[ "${KUBERNETES_PROVIDER}" != "gce" ]] && [[ "${KUBERNETES_PROVIDER}" != "gke" ]]; then
+  echo "WARNING: Skipping monitoring.sh for cloud provider: ${KUBERNETES_PROVIDER}."
+  exit 0
+fi
+
 MONITORING="${KUBE_ROOT}/examples/monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 MONITORING_FIREWALL_RULE="monitoring-test"
 
 function setup {
   detect-project
-  if ! gcloud compute firewall-rules describe $MONITORING_FIREWALL_RULE &>/dev/null; then
-    if ! gcloud compute firewall-rules create $MONITORING_FIREWALL_RULE \
+
+  if ! "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
+    if ! "${GCLOUD}" compute firewall-rules create $MONITORING_FIREWALL_RULE \
       --project "${PROJECT}" \
-      --network "e2e" \
+      --network "${NETWORK}" \
       --quiet \
       --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
       echo "Failed to set up firewall for monitoring" && false
     fi
   fi
-  "${KUBECTL}" create -f "${MONITORING}/influx-grafana-pod.json" 
+
+  "${KUBECTL}" create -f "${MONITORING}/influx-grafana-pod.json"
   "${KUBECTL}" create -f "${MONITORING}/influx-grafana-service.json"
   "${KUBECTL}" create -f "${MONITORING}/heapster-pod.json"
 }
@@ -51,8 +58,8 @@ function cleanup {
   "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-pod.json" || true
   "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-service.json" || true
   "${KUBECTL}" delete -f "${MONITORING}/heapster-pod.json" || true
-  if gcloud compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
-    gcloud compute firewall-rules delete \
+  if "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
+    "${GCLOUD}" compute firewall-rules delete \
       --project "${PROJECT}" \
       --quiet \
       $MONITORING_FIREWALL_RULE || true
@@ -71,7 +78,7 @@ function influx-data-exists {
 
 function wait-for-pods {
   local running=false
-  for i in `seq 1 20`; do   
+  for i in `seq 1 20`; do
     sleep 20
     if "${KUBECTL}" get pods influx-grafana | grep Running &> /dev/null \
       && "${KUBECTL}" get pods heapster | grep Running &> /dev/null; then
