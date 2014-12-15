@@ -116,3 +116,8 @@ Which exact stateful applications are TBD. Candidates include:
 6. Export monitoring metrics (instrumentation)
 7. Bounded disk space on master and kubelets
   1. GC of unused images
+
+### Performance Improvement Work Items
+We are currently collating pain points and work items for improving the performance of Kubernetes.
+Please contribute material to the Google Document [Kubernetes Performance](https://docs.google.com/document/d/1-Oefi_zQCNAAysZpSkz4V4H_uQIGf90ZMj79Qevy4zE/edit#).
+Once we have enough material the content of the document will be transplanted into this markdown document.
