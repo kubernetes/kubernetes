@@ -110,14 +110,17 @@ func (onrmp *Onramp) monitorPods() {
 
 	ns := api.NamespaceAll
 	pdi := onrmp.kubeClient.Pods(ns)
+	glog.Infof("Starting to monitor pods\n")
 	for {
-		time.Sleep(10)
+		glog.Infof("Sleeping\n")
+		time.Sleep(10 * time.Second)
+		glog.Infof("Checknig podMonitor\n")
 		// Note: This is racy, fix it
 		if (onrmp.podMonitor == 0) {
 			return
 		}	
+		glog.Infof("Continuing monitor\n")
 		onrmp.podNameLock.Lock()
-		defer onrmp.podNameLock.Unlock()
 
 		for m := range onrmp.podNameList {
 			pod, err := pdi.Get(onrmp.podNameList[m].PodName)
@@ -126,17 +129,21 @@ func (onrmp *Onramp) monitorPods() {
 				continue;
 			}
 
+			glog.Infof("Checking pod %s\n", onrmp.podNameList[m].PodName)
 			if (onrmp.podNameList[m].NewPod == 1) {
 				glog.Infof("Pod %s has been added\n", onrmp.podNameList[m].PodName)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
+				onrmp.podNameList[m].NewPod = 0
 				// Insert callout for add here
 			}
 
 			if (pod.CurrentState.PodIP != onrmp.podNameList[m].PodIP) {
-				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
+				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodName, onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
+				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				// Insert callout for update here
 			}
 		}
+		onrmp.podNameLock.Unlock()
 	}
 }
 
