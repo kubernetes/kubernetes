@@ -9,4 +9,4 @@
   {% set api_servers = "-master=http://" + ips[0][0] + ":7080" -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{pillar['log_level']}}"
