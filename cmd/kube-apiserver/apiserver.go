@@ -171,6 +171,7 @@ func main() {
 		PortalNet:             &n,
 		EnableLogsSupport:     *enableLogsSupport,
 		EnableUISupport:       true,
+		EnableSwaggerSupport:  true,
 		APIPrefix:             *apiPrefix,
 		CorsAllowedOriginList: corsAllowedOriginList,
 		ReadOnlyPort:          *readOnlyPort,

@@ -69,10 +69,14 @@ type Config struct {
 	PortalNet             *net.IPNet
 	EnableLogsSupport     bool
 	EnableUISupport       bool
+	EnableSwaggerSupport  bool
 	APIPrefix             string
 	CorsAllowedOriginList util.StringList
 	Authenticator         authenticator.Request
 	Authorizer            authorizer.Authorizer
+
+	// If specified, all web services will be registered into this container
+	RestfulContainer *restful.Container
 
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
@@ -92,21 +96,23 @@ type Config struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	podRegistry           pod.Registry
-	controllerRegistry    controller.Registry
-	serviceRegistry       service.Registry
-	endpointRegistry      endpoint.Registry
-	minionRegistry        minion.Registry
-	bindingRegistry       binding.Registry
-	eventRegistry         generic.Registry
-	storage               map[string]apiserver.RESTStorage
-	client                *client.Client
-	portalNet             *net.IPNet
+	podRegistry        pod.Registry
+	controllerRegistry controller.Registry
+	serviceRegistry    service.Registry
+	endpointRegistry   endpoint.Registry
+	minionRegistry     minion.Registry
+	bindingRegistry    binding.Registry
+	eventRegistry      generic.Registry
+	storage            map[string]apiserver.RESTStorage
+	client             *client.Client
+	portalNet          *net.IPNet
+
 	mux                   apiserver.Mux
 	handlerContainer      *restful.Container
 	rootWebService        *restful.WebService
 	enableLogsSupport     bool
 	enableUISupport       bool
+	enableSwaggerSupport  bool
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
 	authenticator         authenticator.Request
@@ -222,7 +228,7 @@ func New(c *Config) *Master {
 	if c.KubeletClient == nil {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
-	mx := http.NewServeMux()
+
 	m := &Master{
 		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
@@ -233,11 +239,10 @@ func New(c *Config) *Master {
 		minionRegistry:        minionRegistry,
 		client:                c.Client,
 		portalNet:             c.PortalNet,
-		mux:                   mx,
-		handlerContainer:      NewHandlerContainer(mx),
 		rootWebService:        new(restful.WebService),
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
+		enableSwaggerSupport:  c.EnableSwaggerSupport,
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
@@ -247,6 +252,16 @@ func New(c *Config) *Master {
 		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
 		readWriteServer: net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
 	}
+
+	if c.RestfulContainer != nil {
+		m.mux = c.RestfulContainer.ServeMux
+		m.handlerContainer = c.RestfulContainer
+	} else {
+		mux := http.NewServeMux()
+		m.mux = mux
+		m.handlerContainer = NewHandlerContainer(mux)
+	}
+
 	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
 	m.init(c)
 	return m
@@ -377,7 +392,22 @@ func (m *Master) init(c *Config) {
 	// Install root web services
 	m.handlerContainer.Add(m.rootWebService)
 
-	// TODO: Make this optional?
+	// TODO: Make this optional?  Consumers of master depend on this currently.
+	m.Handler = handler
+
+	if m.enableSwaggerSupport {
+		m.InstallSwaggerAPI()
+	}
+
+	// TODO: Attempt clean shutdown?
+	m.masterServices.Start()
+}
+
+// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
+// and traversal.  It is optional to allow consumers of the Kubernetes master to
+// register their own web services into the Kubernetes mux prior to initialization
+// of swagger, so that other resource types show up in the documentation.
+func (m *Master) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
 		WebServices: m.handlerContainer.RegisteredWebServices(),
@@ -388,11 +418,6 @@ func (m *Master) init(c *Config) {
 		//SwaggerFilePath: "/srv/apiserver/swagger/dist"
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
-
-	m.Handler = handler
-
-	// TODO: Attempt clean shutdown?
-	m.masterServices.Start()
 }
 
 func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
