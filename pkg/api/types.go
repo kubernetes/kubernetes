@@ -476,6 +476,9 @@ type PodSpec struct {
 type PodStatus struct {
 	Phase PodPhase `json:"phase,omitempty"`
 
+	// A human readable message indicating details about why the pod is in this state.
+	Message string `json:"message,omitempty"`
+
 	// Host is the name of the node that this Pod is currently bound to, or empty if no
 	// assignment has been done.
 	Host   string `json:"host,omitempty"`
@@ -761,8 +764,8 @@ type Binding struct {
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
 type Status struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
 
 	// One of: "Success", "Failure", "Working" (for operations not yet completed)
 	Status string `json:"status,omitempty"`
@@ -927,18 +930,18 @@ const (
 	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
 )
 
-// ServerOp is an operation delivered to API clients.
-type ServerOp struct {
+// Operation is an operation delivered to API clients.
+type Operation struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 }
 
-// ServerOpList is a list of operations, as delivered to API clients.
-type ServerOpList struct {
+// OperationList is a list of operations, as delivered to API clients.
+type OperationList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
 
-	Items []ServerOp `json:"items"`
+	Items []Operation `json:"items"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.

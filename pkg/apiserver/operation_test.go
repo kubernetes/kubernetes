@@ -149,7 +149,7 @@ func TestOperationsList(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	oplist, ok := obj.(*api.ServerOpList)
+	oplist, ok := obj.(*api.OperationList)
 	if !ok {
 		t.Fatalf("expected ServerOpList, got %#v", obj)
 	}
