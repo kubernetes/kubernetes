@@ -79,7 +79,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     done
 
     name="${MINION_NAMES[$i]}"
-    if [ "$KUBERNETES_PROVIDER" != "vsphere" ]; then
+    if [ "$KUBERNETES_PROVIDER" != "vsphere" ] && [ "$KUBERNETES_PROVIDER" != "vagrant" ]; then
       # Grab fully qualified name
       name=$(grep "${MINION_NAMES[$i]}\." "${MINIONS_FILE}")
     fi
