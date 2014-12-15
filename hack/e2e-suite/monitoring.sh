@@ -26,25 +26,22 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-if [[ "${KUBERNETES_PROVIDER}" != "gce" ]] && [[ "${KUBERNETES_PROVIDER}" != "gke" ]]; then
-  echo "WARNING: Skipping monitoring.sh for cloud provider: ${KUBERNETES_PROVIDER}."
-  exit 0
-fi
-
 MONITORING="${KUBE_ROOT}/examples/monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 MONITORING_FIREWALL_RULE="monitoring-test"
 
 function setup {
-  detect-project
-
-  if ! "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
-    if ! "${GCLOUD}" compute firewall-rules create $MONITORING_FIREWALL_RULE \
-      --project "${PROJECT}" \
-      --network "${NETWORK}" \
-      --quiet \
-      --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
-      echo "Failed to set up firewall for monitoring" && false
+  # This only has work to do on gce and gke
+  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    detect-project
+    if ! "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
+      if ! "${GCLOUD}" compute firewall-rules create $MONITORING_FIREWALL_RULE \
+        --project "${PROJECT}" \
+        --network "${NETWORK}" \
+        --quiet \
+        --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
+        echo "Failed to set up firewall for monitoring" && false
+      fi
     fi
   fi
 
@@ -54,15 +51,19 @@ function setup {
 }
 
 function cleanup {
-  detect-project
   "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-pod.json" || true
   "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-service.json" || true
   "${KUBECTL}" delete -f "${MONITORING}/heapster-pod.json" || true
-  if "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
-    "${GCLOUD}" compute firewall-rules delete \
-      --project "${PROJECT}" \
-      --quiet \
-      $MONITORING_FIREWALL_RULE || true
+  
+  # This only has work to do on gce and gke
+  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    detect-project
+    if "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
+      "${GCLOUD}" compute firewall-rules delete \
+        --project "${PROJECT}" \
+        --quiet \
+        $MONITORING_FIREWALL_RULE || true
+    fi
   fi
 }
 
