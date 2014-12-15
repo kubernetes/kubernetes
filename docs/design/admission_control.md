@@ -4,6 +4,7 @@
 
 | Topic | Link |
 | ----- | ---- |
+| Separate validation from RESTStorage | https://github.com/GoogleCloudPlatform/kubernetes/issues/2977 |
 
 ## Background
 
@@ -12,24 +13,16 @@ High level goals:
 * Enable an easy-to-use mechanism to provide admission control to cluster
 * Enable a provider to support multiple admission control strategies or author their own
 * Ensure any rejected request can propagate errors back to the caller with why the request failed
-* Enable usage of cluster resources to satisfy admission control criteria
-* Enable admission controller criteria to change without requiring restart of kube-apiserver
 
-Policy is focused on answering if a user is authorized to perform an action.
+Authorization via policy is focused on answering if a user is authorized to perform an action.
 
 Admission Control is focused on if the system will accept an authorized action.
 
-The Kubernetes cluster may choose to dismiss an authorized action based on any number of admission control strategies they choose to author and deploy:
+Kubernetes may choose to dismiss an authorized action based on any number of admission control strategies.
 
-1. Quota enforcement of allocated desired usage
-2. Pod black-lister to restrict running specific images on the cluster
-3. Privileged container checker
-4. Host port reservation
-5. Volume validation - e.g. may or may not use hostDir, etc.
-6. Min/max constraint checker for pod requested resources
-7. ...
+This proposal documents the basic design, and describes how any number of admission control plug-ins could be injected.
 
-This proposal therefore attempts to enumerate the basic design, and describe how any number of admission controllers could be injected.
+Implementation of specific admission control strategies are handled in separate documents.
 
 ## kube-apiserver
 
@@ -37,109 +30,51 @@ The kube-apiserver takes the following OPTIONAL arguments to enable admission co
 
 | Option | Behavior |
 | ------ | -------- |
-| admission_controllers | List of addresses (ip:port, dns name) to invoke for admission control |
-| admission_controller_service | Service label selector to resolve for admission control (namespace/labelKey/labelValue) |
+| admission_control | Comma-delimited, ordered list of admission control choices to invoke prior to modifying or deleting an object. |
+| admission_control_config_file | File with admission control configuration parameters to boot-strap plug-in. |
 
-If the list of addresses to invoke for admission control are provided as a label selector, the kube-apiserver will update the list 
-of admission control services at a regular interval. 
+An **AdmissionControl** plug-in is an implementation of the following interface:
 
-Upon an incoming request, the kube-apiserver performs the following basic flow:
+```
+package admission
 
-1. Authorize the request, if authorized, continue
-2. Invoke the Admission Control REST API for each defined address, if all return true, continue
-3. RESTStorage processes request
-4. Data is persisted in store
+// Attributes is an interface used by a plug-in to make an admission decision on a individual request.
+type Attributes interface {
+  GetClient() client.Interface
+  GetNamespace() string
+  GetKind() string
+  GetOperation() string
+  GetObject() runtime.Object
+}
 
-If there is no configured admission control address, then by default, all requests are admitted.
+// Interface is an abstract, pluggable interface for Admission Control decisions.
+type Interface interface {
+  // Admit makes an admission decision based on the request attributes
+  // An error is returned if it denies the request.
+  Admit(a Attributes) (err error)
+}
+```
 
-Admission control is enforced on POST/PUT operations, but is ignored on GET/DELETE operations.
+A **plug-in** must be compiled with the binary, and is registered as an available option by providing a name, and implementation
+of admission.Interface.
 
-## Admission Control REST API
+```
+func init() {
+  admission.RegisterPlugin("AlwaysDeny", func(config io.Reader) (admission.Interface, error) { return NewAlwaysDeny(), nil })
+}
+```
 
-An admission controller satisfies a stable REST API invoked by the kube-apiserver to satisfy requests.
+Invocation of admission control is handled by the **APIServer** and not individual **RESTStorage** implementations.
 
-| Action | HTTP Verb | Path | Description |
-| ---- | ---- | ---- | ---- |
-| CREATE | POST | /admissionController | Send a request for admission to evaluate for admittance or denial |
+This design assumes that **Issue 297** is adopted, and as a consequence, the general framework of the APIServer request/response flow
+will ensure the following:
 
-The message body to the admissionController includes the following:
+1. Incoming request
+2. Authenticate user
+3. Authorize user
+4. If operation=create|update, then validate(object)
+5. If operation=create|update|delete, then admissionControl.AdmissionControl(requestAttributes)
+  a. invoke each admission.Interface object in sequence
+6. Object is persisted
 
-1. requesting user identity
-2. action to perform
-3. proposed resource to create/modify (if any)
-
-If the request for admission is satisfied, return a HTTP 200.
-
-If the request for admission is denied, return a HTTP 403, the response must include a reason for why the response failed.
-
-## System Design
-
-The following demonstrates potential cluster setups using an external list of admission control endpoints.
-
-                                 Request
-                                    +
-                                    |
-                                    |
-                    +---------------|----------+
-                    | API Server    |          |
-                    |---------------|----------|
-                    |               v          |
-                    |        +--------+        |
-                    |        | Policy |        |       +---------------------+---+
-                    |        ++-------+        |       |Endpoints                |
-    +---------+     |         |                |       |-------------------------|
-    |Scheduler|<---+|         v                |       |E1. Quota Enforcer       |
-    +---------+     | +----------------------+ |       |E2. Capacity Planner     |
-                    | | Admission Controller +-------->|E3. White-lister         |
-                    | +----+-----------------+ |       |...                      |
-                    |      |                   |       +-------------------------+
-                    |     +v-------------+     |
-                    |     | REST Storage |     |
-                    |     +--------------+     |
-                    +----------------+---------+
-                                     |
-                                     v
-                          +--------------+
-                          |  Data Store  |
-                          |--------------|
-                          |              |
-                          |              |
-                          |              |
-                          +--------------+
-
-The following demonstrates potential cluster setup that uses services to fulfill admission control.
-
-In this context, the cluster itself is used to provide HA admission control, and pods may choose to
-invoke the API Server to determine if a request is or is not admissible.
-
-
-                                 Request                    +--------+
-                                    +                       |Pods... |
-                                    |                       |--------|
-                                    |                       |        <-------+
-                    +---------------|----------+            |        |       |
-                    | API Server    |          |            |        |       |
-                    |---------------|----------|            +---+----+       |
-                    |               v          |                |            |
-                    |        +--------+        |<---------------+            |
-                    |        | Policy |        |       +-------------------------------------+
-                    |        ++-------+        |       |Service (ns=infra, labelKey=admitter)|
-    +---------+     |         |                |       |-------------------------------------|
-    |Scheduler|<---+|         v                |       |Service1                             |
-    +---------+     | +----------------------+ |       |Service2                             |
-                    | | Admission Controller +-------->|Service3                             |
-                    | +----+-----------------+ |       |...                                  |
-                    |      |                   |       +-------------------------------------+
-                    |     +v-------------+     |
-                    |     | REST Storage |     |
-                    |     +--------------+     |
-                    +----------------+---------+
-                                     |
-                                     v
-                          +--------------+
-                          |  Data Store  |
-                          |--------------|
-                          |              |
-                          |              |
-                          |              |
-                          +--------------+
+If at any step, there is an error, the request is canceled.
