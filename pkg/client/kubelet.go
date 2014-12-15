@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +25,7 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 )
 
@@ -48,7 +48,7 @@ type KubeletHealthChecker interface {
 type PodInfoGetter interface {
 	// GetPodInfo returns information about all containers which are part
 	// Returns an api.PodInfo, or an error if one occurs.
-	GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error)
+	GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error)
 }
 
 // HTTPKubeletClient is the default implementation of PodInfoGetter and KubeletHealthchecker, accesses the kubelet over HTTP.
@@ -89,35 +89,35 @@ func (c *HTTPKubeletClient) url(host string) string {
 }
 
 // GetPodInfo gets information about the specified pod.
-func (c *HTTPKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
+func (c *HTTPKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error) {
 	request, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf(
-			"%s/podInfo?podID=%s&podNamespace=%s",
+			"%s/api/v1beta1/podInfo?podID=%s&podNamespace=%s",
 			c.url(host),
 			podID,
 			podNamespace),
 		nil)
+	info := api.PodContainerInfo{}
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 	response, err := c.Client.Do(request)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
-		return nil, ErrPodInfoNotAvailable
+		return info, ErrPodInfoNotAvailable
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 	// Check that this data can be unmarshalled
-	info := api.PodInfo{}
-	err = json.Unmarshal(body, &info)
+	err = latest.Codec.DecodeInto(body, &info)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 	return info, nil
 }
@@ -132,8 +132,8 @@ func (c *HTTPKubeletClient) HealthCheck(host string) (health.Status, error) {
 type FakeKubeletClient struct{}
 
 // GetPodInfo is a fake implementation of PodInfoGetter.GetPodInfo.
-func (c FakeKubeletClient) GetPodInfo(host, podNamespace string, podID string) (api.PodInfo, error) {
-	return api.PodInfo{}, errors.New("Not Implemented")
+func (c FakeKubeletClient) GetPodInfo(host, podNamespace string, podID string) (api.PodContainerInfo, error) {
+	return api.PodContainerInfo{}, errors.New("Not Implemented")
 }
 
 func (c FakeKubeletClient) HealthCheck(host string) (health.Status, error) {

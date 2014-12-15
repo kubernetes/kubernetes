@@ -366,6 +366,12 @@ type ContainerStatus struct {
 // PodInfo contains one entry for every container with available info.
 type PodInfo map[string]ContainerStatus
 
+// PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
+type PodContainerInfo struct {
+	TypeMeta      `json:",inline"`
+	ContainerInfo PodInfo `json:"containerInfo" description:"information about each container in this pod"`
+}
+
 type RestartPolicyAlways struct{}
 
 // TODO(dchen1107): Define what kinds of failures should restart
