@@ -92,8 +92,8 @@ type dockerContainerCommandRunner struct {
 	client DockerInterface
 }
 
-// The first version of docker that supports exec natively is 1.1.3
-var dockerVersionWithExec = []uint{1, 1, 3}
+// The first version of docker that supports exec natively is 1.3.0
+var dockerVersionWithExec = []uint{1, 3, 0}
 
 // Returns the major and minor version numbers of docker server.
 func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) {

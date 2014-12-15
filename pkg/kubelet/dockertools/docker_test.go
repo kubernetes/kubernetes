@@ -143,7 +143,7 @@ func TestGetDockerServerVersion(t *testing.T) {
 }
 
 func TestExecSupportExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.3.0", "Server API version=1.15"}}
 	runner := dockerContainerCommandRunner{fakeDocker}
 	useNativeExec, err := runner.nativeExecSupportExists()
 	if err != nil {
