@@ -108,7 +108,7 @@ KUBELET_PORT="--port=10250"
 # You may leave this blank to use the actual hostname
 KUBELET_HOSTNAME="--hostname_override=fed-minion"
 
-# Add your won!
+# Add your own!
 KUBELET_ARGS=""
 ```       
 
