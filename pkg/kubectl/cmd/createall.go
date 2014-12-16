@@ -23,14 +23,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
 // DataToObjects converts the raw JSON data into API objects
-func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (result []runtime.Object, errors util.ErrorList) {
+func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (result []runtime.Object, errors []error) {
 	configObj := []runtime.RawExtension{}
 
 	if err := yaml.Unmarshal(data, &configObj); err != nil {

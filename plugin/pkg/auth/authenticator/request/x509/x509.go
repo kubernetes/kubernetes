@@ -55,7 +55,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	var errors util.ErrorList
+	var errors []error
 	for _, cert := range req.TLS.PeerCertificates {
 		chains, err := cert.Verify(a.opts)
 		if err != nil {
@@ -75,7 +75,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 			}
 		}
 	}
-	return nil, false, errors.ToError()
+	return nil, false, util.SliceToError(errors)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

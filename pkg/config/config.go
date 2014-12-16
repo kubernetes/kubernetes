@@ -23,7 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type RESTClientPoster interface {
@@ -37,8 +36,8 @@ type ClientPosterFunc func(mapping *meta.RESTMapping) (RESTClientPoster, error)
 // be valid API type. It requires ObjectTyper to parse the Version and Kind and
 // RESTMapper to get the resource URI and REST client that knows how to create
 // given type
-func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientPosterFunc, objects []runtime.Object) util.ErrorList {
-	allErrors := util.ErrorList{}
+func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientPosterFunc, objects []runtime.Object) []error {
+	var allErrors []error
 	for i, obj := range objects {
 		version, kind, err := typer.ObjectVersionAndKind(obj)
 		if err != nil {

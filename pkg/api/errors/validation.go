@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -121,18 +120,7 @@ func NewFieldNotFound(field string, value interface{}) *ValidationError {
 	return &ValidationError{ValidationErrorTypeNotFound, field, value, ""}
 }
 
-// ValidationErrorList is a collection of ValidationErrors.  This does not
-// implement the error interface to avoid confusion where an empty
-// ValidationErrorList would still be an error (non-nil).  To produce a single
-// error instance from a ValidationErrorList, use the ToError() method, which
-// will return nil for an empty ValidationErrorList.
-type ValidationErrorList util.ErrorList
-
-// ToError converts a ValidationErrorList into a "normal" error, or nil if the
-// list is empty.
-func (list ValidationErrorList) ToError() error {
-	return util.ErrorList(list).ToError()
-}
+type ValidationErrorList []error
 
 // Prefix adds a prefix to the Field of every ValidationError in the list.
 // Returns the list for convenience.

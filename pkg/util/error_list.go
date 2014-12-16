@@ -20,18 +20,17 @@ import (
 	"fmt"
 )
 
-// ErrorList is a collection of errors.  This does not implement the error
-// interface to avoid confusion where an empty ErrorList would still be an
-// error (non-nil).  To produce a single error instance from an ErrorList, use
-// the ToError() method, which will return nil for an empty ErrorList.
-type ErrorList []error
+// []error is a collection of errors. This does not implement the error
+// interface to avoid confusion where an empty []error would still be an
+// error (non-nil).  To produce a single error instance from an []error, use
+// the SliceToError() method, which will return nil for an empty []error.
 
-// This helper implements the error interface for ErrorList, but prevents
-// accidental conversion of ErrorList to error.
-type errorListInternal ErrorList
+// This helper implements the error interface for []error, but prevents
+// accidental conversion of []error to error.
+type errorList []error
 
 // Error is part of the error interface.
-func (list errorListInternal) Error() string {
+func (list errorList) Error() string {
 	if len(list) == 0 {
 		return ""
 	}
@@ -46,10 +45,10 @@ func (list errorListInternal) Error() string {
 	return result
 }
 
-// ToError converts an ErrorList into a "normal" error, or nil if the list is empty.
-func (list ErrorList) ToError() error {
-	if len(list) == 0 {
+// SliceToError converts an []error into a "normal" error, or nil if the slice is empty.
+func SliceToError(errs []error) error {
+	if len(errs) == 0 {
 		return nil
 	}
-	return errorListInternal(list)
+	return errorList(errs)
 }
