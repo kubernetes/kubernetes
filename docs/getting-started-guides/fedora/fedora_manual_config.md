@@ -33,16 +33,16 @@ echo "192.168.121.9	fed-master
 
 ```
 # Comma seperated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
+KUBE_ETCD_SERVERS="http://fed-master:4001"
 
 # logging to stderr means we get it in the systemd journal
-KUBE_LOGTOSTDERR="--logtostderr=true"
+KUBE_LOGTOSTDERR="true"
 
 # journal message level, 0 is debug
-KUBE_LOG_LEVEL="--v=0"
+KUBE_LOG_LEVEL="0"
 
 # Should this cluster be allowed to run privleged docker containers
-KUBE_ALLOW_PRIV="--allow_privileged=false"
+KUBE_ALLOW_PRIV="false"
 ```
 
 * Disable the firewall on both the master and minon, as docker does not play well with other firewall rule managers
@@ -58,19 +58,19 @@ systemctl stop iptables-services firewalld
 
 ```       
 # The address on the local server to listen to.
-KUBE_API_ADDRESS="--address=0.0.0.0"
+KUBE_API_ADDRESS="0.0.0.0"
 
 # The port on the local server to listen on.
-KUBE_API_PORT="--port=8080"
+KUBE_API_PORT="8080"
 
 # How the replication controller and scheduler find the kube-apiserver
-KUBE_MASTER="--master=fed-master:8080"
+KUBE_MASTER="fed-master:8080"
 
 # Port minions listen on
-KUBELET_PORT="--kubelet_port=10250"
+KUBELET_PORT="10250"
 
 # Address range to use for services
-KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
+KUBE_SERVICE_ADDRESSES="10.254.0.0/16"
 
 # Add you own!
 KUBE_API_ARGS=""
@@ -79,7 +79,7 @@ KUBE_API_ARGS=""
 * Edit /etc/kubernetes/controller-manager to appear as such:
 ```
 # Comma seperated list of minions
-KUBELET_ADDRESSES="--machines=fed-minion"
+KUBELET_ADDRESSES="fed-minion"
 ```
 
 * Start the appropriate services on master:
@@ -100,13 +100,13 @@ done
 
 ```       
 # The address for the info server to serve on
-KUBELET_ADDRESS="--address=0.0.0.0"
+KUBELET_ADDRESS="0.0.0.0"
 
 # The port for the info server to serve on
-KUBELET_PORT="--port=10250"
+KUBELET_PORT="10250"
 
 # You may leave this blank to use the actual hostname
-KUBELET_HOSTNAME="--hostname_override=fed-minion"
+KUBELET_HOSTNAME="fed-minion"
 
 # Add your own!
 KUBELET_ARGS=""
