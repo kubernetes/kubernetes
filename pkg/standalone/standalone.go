@@ -87,15 +87,15 @@ func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, p
 			Client: http.DefaultClient,
 			Port:   10250,
 		},
-		EnableLogsSupport: false,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		EnableLogsSupport:    false,
+		EnableSwaggerSupport: true,
+		APIPrefix:            "/api",
+		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
 
 		ReadWritePort: port,
 		ReadOnlyPort:  port,
 		PublicAddress: addr,
 	})
-
 	handler.delegate = m.InsecureHandler
 
 	go http.ListenAndServe(fmt.Sprintf("%s:%d", addr, port), &handler)
