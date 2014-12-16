@@ -48,13 +48,49 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 ### Using godep
-Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace.  You can use `godep` in three ways:
+Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace. Here is the recommended way to set up your system. There are other ways that may work, but this is the easiest one I know of.
 
-1. Use `godep` to call your `go` commands.  For example: `godep go test ./...`
-2. Use `godep` to modify your `$GOPATH` so that other tools know where to find the dependencies.  Specifically: `export GOPATH=$GOPATH:$(godep path)`
-3. Use `godep` to copy the saved versions of packages into your `$GOPATH`.  This is done with `godep restore`.
+1. Devote a directory to this endeavor:
 
-We recommend using options #1 or #2.
+```
+export KPATH=$HOME/code/kubernetes
+mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+git clone https://path/to/your/fork .
+# Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
+```
+
+2. Set up your GOPATH.
+
+```
+# Option A: this will let your builds see packages that exist elsewhere on your system.
+export GOPATH=$KPATH:$GOPATH
+# Option B: This will *not* let your local builds see packages that exist elsewhere on your system.
+export GOPATH=$KPATH
+# Option B is recommended if you're going to mess with the dependencies.
+```
+
+3. Populate your new $GOPATH.
+
+```
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+godep restore
+```
+
+4. To add a dependency, you can do ```go get path/to/dependency``` as usual.
+
+5. To package up a dependency, do
+
+```
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+godep save ./...
+# Sanity check that your Godeps.json file is ok by re-restoring:
+godep restore
+```
+
+I (lavalamp) have sometimes found it expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
+
+Please send dependency updates in separate commits within your PR, for easier reviewing.
 
 ## Hooks
 
