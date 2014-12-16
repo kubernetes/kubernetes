@@ -18,7 +18,9 @@ package apiserver
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
@@ -225,17 +227,40 @@ func (t *proxyTransport) scan(n *html.Node, f func(*html.Node)) {
 
 // fixLinks modifies links in an HTML file such that they will be redirected through the proxy if needed.
 func (t *proxyTransport) fixLinks(req *http.Request, resp *http.Response) (*http.Response, error) {
-	defer resp.Body.Close()
+	origBody := resp.Body
+	defer origBody.Close()
 
-	doc, err := html.Parse(resp.Body)
+	newContent := &bytes.Buffer{}
+	var reader io.Reader = origBody
+	var writer io.Writer = newContent
+	encoding := resp.Header.Get("Content-Encoding")
+	switch encoding {
+	case "gzip":
+		var err error
+		reader, err = gzip.NewReader(reader)
+		if err != nil {
+			return nil, fmt.Errorf("errorf making gzip reader: %v", err)
+		}
+		gzw := gzip.NewWriter(writer)
+		defer gzw.Close()
+		writer = gzw
+	// TODO: support flate, other encodings.
+	case "":
+		// This is fine
+	default:
+		// Some encoding we don't understand-- don't try to parse this
+		glog.Errorf("Proxy encountered encoding %v for text/html; can't understand this so not fixing links.", encoding)
+		return resp, nil
+	}
+
+	doc, err := html.Parse(reader)
 	if err != nil {
 		glog.Errorf("Parse failed: %v", err)
 		return resp, err
 	}
 
-	newContent := &bytes.Buffer{}
 	t.scan(doc, func(n *html.Node) { t.updateURLs(n, req.URL) })
-	if err := html.Render(newContent, doc); err != nil {
+	if err := html.Render(writer, doc); err != nil {
 		glog.Errorf("Failed to render: %v", err)
 	}
 
