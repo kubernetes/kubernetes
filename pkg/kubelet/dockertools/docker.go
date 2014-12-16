@@ -403,10 +403,18 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 		}
 		waiting = false
 	} else if !inspectResult.State.FinishedAt.IsZero() {
-		// TODO(dchen1107): Integrate with event to provide a better reason
+		reason := ""
+		// Note: An application might handle OOMKilled gracefully.
+		// In that case, the container is oom killed, but the exit
+		// code could be 0.
+		if inspectResult.State.OOMKilled {
+			reason = "OOM Killed"
+		} else {
+			reason = inspectResult.State.Error
+		}
 		containerStatus.State.Termination = &api.ContainerStateTerminated{
 			ExitCode:   inspectResult.State.ExitCode,
-			Reason:     "",
+			Reason:     reason,
 			StartedAt:  util.NewTime(inspectResult.State.StartedAt),
 			FinishedAt: util.NewTime(inspectResult.State.FinishedAt),
 		}
