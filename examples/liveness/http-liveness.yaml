@@ -1,0 +1,19 @@
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    containers:
+      - image: kubernetes/liveness
+        name: liveness
+        livenessProbe:
+          httpGet:
+            path: "/healthz"
+            port: 8080
+          initialDelaySeconds: 15
+        command:
+          - /server
+    id: liveness-http
+    version: v1beta1
+id: liveness-http
+kind: Pod
+labels:
+  test: liveness
