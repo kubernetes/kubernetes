@@ -145,18 +145,15 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Comment": "null-214",
-			"Rev": "c043f0dc72e4cdd23ae039470ea9d63e6680a1b2"
+			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
 		{
 			"ImportPath": "golang.org/x/net/html",
-			"Comment": "null-214",
-			"Rev": "c043f0dc72e4cdd23ae039470ea9d63e6680a1b2"
+			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
 		{
 			"ImportPath": "golang.org/x/net/websocket",
-			"Comment": "null-214",
-			"Rev": "c043f0dc72e4cdd23ae039470ea9d63e6680a1b2"
+			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
 		{
 			"ImportPath": "gopkg.in/v2/yaml",
