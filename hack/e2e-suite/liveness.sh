@@ -28,6 +28,7 @@ source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 function teardown() {
   echo "Cleaning up test artifacts"
   ${KUBECFG} delete pods/liveness-http
+  ${KUBECFG} delete pods/liveness-exec
 }
 
 function waitForNotPending() {
@@ -57,26 +58,30 @@ function waitForNotPending() {
 
 trap "teardown" EXIT
 
-${KUBECFG} -c ${KUBE_ROOT}/examples/liveness/http-liveness.yaml create pods
-waitForNotPending
+for test in http exec; do
+  echo "Liveness test: ${test}"
+  ${KUBECFG} -c ${KUBE_ROOT}/examples/liveness/${test}-liveness.yaml create pods
+  waitForNotPending
 
-before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-http)
+  before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+  echo "Waiting for restarts."
+  for i in $(seq 1 24); do
+    sleep 10 
+    after=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+    echo "Restarts: ${after} > ${before}"
+    if [[ "${after}" > "${before}" ]]; then
+      break
+    fi
+  done
 
-echo "Waiting for restarts."
-for i in $(seq 1 24); do
-  sleep 10 
-  after=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-http)
-  echo "Restarts: ${after} > ${before}"
-  if [[ "${after}" > "${before}" ]]; then
-    break
+  if [[ "${before}" < "${after}" ]]; then
+    continue
   fi
+
+  echo "Unexpected absence of failures in ${test}"
+  echo "Restarts before: ${before}."
+  echo "Restarts after: ${after}"
+  exit 1
 done
 
-if [[ "${before}" < "${after}" ]]; then
-  exit 0
-fi
-
-echo "Unexpected absence of failures."
-echo "Restarts before: ${before}."
-echo "Restarts after: ${after}"
-exit 1
+exit 0

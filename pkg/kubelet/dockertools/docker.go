@@ -92,8 +92,8 @@ type dockerContainerCommandRunner struct {
 	client DockerInterface
 }
 
-// The first version of docker that supports exec natively is 1.3.0
-var dockerVersionWithExec = []uint{1, 3, 0}
+// The first version of docker that supports exec natively is 1.3.0 == API 1.15
+var dockerAPIVersionWithExec = []uint{1, 15}
 
 // Returns the major and minor version numbers of docker server.
 func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) {
@@ -103,7 +103,7 @@ func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) 
 	}
 	version := []uint{}
 	for _, entry := range *env {
-		if strings.Contains(strings.ToLower(entry), "server version") {
+		if strings.Contains(strings.ToLower(entry), "apiversion") || strings.Contains(strings.ToLower(entry), "api version") {
 			elems := strings.Split(strings.Split(entry, "=")[1], ".")
 			for _, elem := range elems {
 				val, err := strconv.ParseUint(elem, 10, 32)
@@ -123,10 +123,10 @@ func (d *dockerContainerCommandRunner) nativeExecSupportExists() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if len(dockerVersionWithExec) != len(version) {
-		return false, fmt.Errorf("unexpected docker version format. Expecting %v format, got %v", dockerVersionWithExec, version)
+	if len(dockerAPIVersionWithExec) != len(version) {
+		return false, fmt.Errorf("unexpected docker version format. Expecting %v format, got %v", dockerAPIVersionWithExec, version)
 	}
-	for idx, val := range dockerVersionWithExec {
+	for idx, val := range dockerAPIVersionWithExec {
 		if version[idx] < val {
 			return false, nil
 		}
