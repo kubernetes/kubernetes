@@ -249,6 +249,7 @@ function wait-for-jobs {
 # Robustly try to create a firewall rule.
 # $1: The name of firewall rule.
 # $2: IP ranges.
+# $3: Target tags for this firewall rule.
 function create-firewall-rule {
   local attempt=0
   while true; do
@@ -256,6 +257,7 @@ function create-firewall-rule {
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "$2" \
+      --target-tags "$3" \
       --allow tcp udp icmp esp ah sctp; then 
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}"
@@ -416,16 +418,9 @@ function kube-up {
     --scopes "storage-ro" "compute-rw" \
     --metadata-from-file "startup-script=${KUBE_TEMP}/master-start.sh" &
 
-  # Create the firewall rules, 10 at a time.
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    create-firewall-rule "${MINION_NAMES[$i]}-all" "${MINION_IP_RANGES[$i]}" &
+  # Create a single firewall rule for all minions.
+  create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
 
-    if [ $i -ne 0 ] && [ $((i%10)) -eq 0 ]; then
-      echo Waiting for a batch of firewall rules at $i...
-      wait-for-jobs
-    fi
-
-  done
   # Wait for last batch of jobs.
   wait-for-jobs
 
@@ -613,20 +608,11 @@ function kube-down {
     --quiet \
     "${MASTER_NAME}-https" || true
 
-  # Delete firewall rules for minions.
-  # TODO(satnam6502): Adjust this if we move to just one big firewall rule.\
-  local -a firewall_rules
-  firewall_rules=( $(gcloud compute firewall-rules list --project "${PROJECT}" \
-                       --regexp "${INSTANCE_PREFIX}-minion-[0-9]+-all" \
-                       | awk 'NR >= 2 { print $1 }') )
-  while (( "${#firewall_rules[@]}" > 0 )); do
-    echo Deleting firewall rules "${firewall_rules[*]::10}"
-    gcloud compute firewall-rules delete  \
-      --project "${PROJECT}" \
-      --quiet \
-      "${firewall_rules[@]::10}" || true
-    firewall_rules=( "${firewall_rules[@]:10}" )
-  done
+  # Delete firewall rule for minions.
+  gcloud compute firewall-rules delete  \
+    --project "${PROJECT}" \
+    --quiet \
+    "${MINION_TAG}-all" || true
 
   # Delete routes.
   local -a routes

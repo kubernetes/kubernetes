@@ -32,6 +32,7 @@ MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+CLUSTER_IP_RANGE="10.245.0.0/16"
 MINION_IP_RANGES=($(eval echo "10.245.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=("storage-ro" "compute-rw")
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
