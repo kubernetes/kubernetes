@@ -264,3 +264,25 @@ func TestDockerKeyringLookup(t *testing.T) {
 		}
 	}
 }
+
+type imageTrackingDockerClient struct {
+	*FakeDockerClient
+	imageName string
+}
+
+func (f *imageTrackingDockerClient) InspectImage(name string) (image *docker.Image, err error) {
+	image, err = f.FakeDockerClient.InspectImage(name)
+	f.imageName = name
+	return
+}
+
+func TestIsImagePresent(t *testing.T) {
+	cl := &imageTrackingDockerClient{&FakeDockerClient{}, ""}
+	puller := &dockerPuller{
+		client: cl,
+	}
+	_, _ = puller.IsImagePresent("abc:123")
+	if cl.imageName != "abc:123" {
+		t.Errorf("expected inspection of image abc:123, instead inspected image %v", cl.imageName)
+	}
+}
