@@ -138,3 +138,42 @@ func TestNewKubeletClient(t *testing.T) {
 		t.Error("Expected a non nil error")
 	}
 }
+
+func TestNewKubeletClientTLSInvalid(t *testing.T) {
+	config := &KubeletConfig{
+		Port:        9000,
+		EnableHttps: true,
+		//Invalid certificate and key path
+		CertFile: "./testdata/mycertinvalid.cer",
+		KeyFile:  "./testdata/mycertinvalid.key",
+		CAFile:   "./testdata/myCA.cer",
+	}
+
+	client, err := NewKubeletClient(config)
+	if err == nil {
+		t.Errorf("Expected an error")
+	}
+	if client != nil {
+		t.Error("client should be nil as we provided invalid cert file")
+	}
+}
+
+func TestNewKubeletClientTLSValid(t *testing.T) {
+	config := &KubeletConfig{
+		Port:        9000,
+		EnableHttps: true,
+		CertFile:    "./testdata/mycertvalid.cer",
+		// TLS Configuration, only applies if EnableHttps is true.
+		KeyFile: "./testdata/mycertvalid.key",
+		// TLS Configuration, only applies if EnableHttps is true.
+		CAFile: "./testdata/myCA.cer",
+	}
+
+	client, err := NewKubeletClient(config)
+	if err != nil {
+		t.Errorf("Not expecting an error #%v", err)
+	}
+	if client == nil {
+		t.Error("client should not be nil")
+	}
+}
