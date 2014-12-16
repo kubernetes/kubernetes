@@ -205,10 +205,10 @@ func describeEvents(el *api.EventList, w io.Writer) {
 		return
 	}
 	sort.Sort(sortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\nFrom\tSubobjectPath\tStatus\tReason\tMessage\n")
+	fmt.Fprint(w, "Events:\nFrom\tSubobjectPath\tCondition\tReason\tMessage\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
-			e.Source, e.InvolvedObject.FieldPath, e.Status, e.Reason, e.Message)
+			e.Source, e.InvolvedObject.FieldPath, e.Condition, e.Reason, e.Message)
 	}
 }
 

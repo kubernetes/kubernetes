@@ -62,7 +62,8 @@ func TestEventCreate(t *testing.T) {
 	}
 	timeStamp := util.Now()
 	event := &api.Event{
-		Status:         "running",
+		//namespace: namespace{"default"},
+		Condition:      "Running",
 		InvolvedObject: *objReference,
 		Timestamp:      timeStamp,
 	}
@@ -97,7 +98,7 @@ func TestEventGet(t *testing.T) {
 	}
 	timeStamp := util.Now()
 	event := &api.Event{
-		Status:         "running",
+		Condition:      "Running",
 		InvolvedObject: *objReference,
 		Timestamp:      timeStamp,
 	}
@@ -135,7 +136,7 @@ func TestEventList(t *testing.T) {
 	eventList := &api.EventList{
 		Items: []api.Event{
 			{
-				Status:         "running",
+				Condition:      "Running",
 				InvolvedObject: *objReference,
 				Timestamp:      timeStamp,
 			},

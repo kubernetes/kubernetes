@@ -776,7 +776,7 @@ type Event struct {
 
 	// Should be a short, machine understandable string that describes the current status
 	// of the referred object. This should not give the reason for being in this state.
-	// Examples: "running", "cantStart", "cantSchedule", "deleted".
+	// Examples: "Running", "CantStart", "CantSchedule", "Deleted".
 	// It's OK for components to make up statuses to report here, but the same string should
 	// always be used for the same status.
 	// TODO: define a way of making sure these are consistent and don't collide.
@@ -785,7 +785,7 @@ type Event struct {
 
 	// Optional; this should be a short, machine understandable string that gives the reason
 	// for the transition into the object's current status. For example, if ObjectStatus is
-	// "cantStart", StatusReason might be "imageNotFound".
+	// "CantStart", Reason might be "ImageNotFound".
 	// TODO: provide exact specification for format.
 	Reason string `json:"reason,omitempty" description:"short, machine understandable string that gives the reason for the transition into the object's current status"`
 

@@ -106,7 +106,8 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, e
 		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
 		"involvedObject.resourceVersion": fmt.Sprintf("%s", event.InvolvedObject.ResourceVersion),
 		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
-		"status":                         event.Status,
+		"condition":                      event.Condition,
+		"status":                         event.Condition, // TODO: remove me when we version fields
 		"reason":                         event.Reason,
 		"source":                         event.Source,
 	}, nil

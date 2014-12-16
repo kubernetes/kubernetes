@@ -973,18 +973,18 @@ type Event struct {
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty"`
 
-	// Should be a short, machine understandable string that describes the current status
+	// Should be a short, machine understandable string that describes the current condition
 	// of the referred object. This should not give the reason for being in this state.
 	// Examples: "Running", "CantStart", "CantSchedule", "Deleted".
-	// It's OK for components to make up statuses to report here, but the same string should
-	// always be used for the same status.
+	// It's OK for components to make up conditions to report here, but the same string should
+	// always be used for the same conditions.
 	// TODO: define a way of making sure these are consistent and don't collide.
 	// TODO: provide exact specification for format.
 	Condition string `json:"condition,omitempty"`
 
 	// Optional; this should be a short, machine understandable string that gives the reason
-	// for the transition into the object's current status. For example, if ObjectStatus is
-	// "cantStart", StatusReason might be "imageNotFound".
+	// for the transition into the object's current condition. For example, if ObjectCondition is
+	// "CantStart", StatusReason might be "ImageNotFound".
 	// TODO: provide exact specification for format.
 	Reason string `json:"reason,omitempty"`
 
