@@ -23,6 +23,7 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
@@ -329,4 +330,40 @@ func TestPrinters(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestPrintEventsResultSorted(t *testing.T) {
+	// Arrange
+	printer := NewHumanReadablePrinter(false /* noHeaders */)
+
+	obj := api.EventList{
+		Items: []api.Event{
+			{
+				Source:    "kubelet",
+				Message:   "Item 1",
+				Timestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+			{
+				Source:    "scheduler",
+				Message:   "Item 2",
+				Timestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+			},
+			{
+				Source:    "kubelet",
+				Message:   "Item 3",
+				Timestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+	}
+	buffer := &bytes.Buffer{}
+
+	// Act
+	err := printer.PrintObj(&obj, buffer)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("An error occurred printing the EventList: %#v", err)
+	}
+	out := buffer.String()
+	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "  " /* columnDelimiter */, t)
 }
