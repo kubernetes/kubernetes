@@ -351,6 +351,33 @@ func TestNetwork(c *client.Client) bool {
 	return false
 }
 
+type TestSpec struct {
+	// The test to run
+	test func(c *client.Client) bool
+	// The human readable name of this test
+	name string
+	// The id for this test.  It should be constant for the life of the test.
+	id int
+}
+
+type TestInfo struct {
+	passed bool
+	spec   TestSpec
+}
+
+// Output a summary in the TAP (test anything protocol) format for automated processing.
+// See http://testanything.org/ for more info
+func outputTAPSummary(infoList []TestInfo) {
+	glog.Infof("1..%d", len(infoList))
+	for _, info := range infoList {
+		if info.passed {
+			glog.Infof("ok %d - %s", info.spec.id, info.spec.name)
+		} else {
+			glog.Infof("not ok %d - %s", info.spec.id, info.spec.name)
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
@@ -366,23 +393,26 @@ func main() {
 
 	c := loadClientOrDie()
 
-	tests := []func(c *client.Client) bool{
-		TestKubernetesROService,
-		TestKubeletSendsEvent,
-		TestImportantURLs,
-		TestPodUpdate,
-		TestNetwork,
+	// Define the tests.  Important: for a clean test grid, please keep ids for a test constant.
+	tests := []TestSpec{
+		{TestKubernetesROService, "TestKubernetesROService", 1},
+		{TestKubeletSendsEvent, "TestKubeletSendsEvent", 2},
+		{TestImportantURLs, "TestImportantURLs", 3},
+		{TestPodUpdate, "TestPodUpdate", 4},
+		{TestNetwork, "TestNetwork", 5},
 	}
 
+	info := []TestInfo{}
 	passed := true
 	for _, test := range tests {
-		testPassed := test(c)
+		testPassed := test.test(c)
 		if !testPassed {
 			passed = false
-		}
-		// TODO: clean up objects created during a test after the test, so cases
+		} // TODO: clean up objects created during a test after the test, so cases
 		// are independent.
+		info = append(info, TestInfo{testPassed, test})
 	}
+	outputTAPSummary(info)
 	if !passed {
 		glog.Fatalf("Tests failed")
 	}
