@@ -12,7 +12,9 @@ By default, the Vagrant setup will create a single kubernetes-master and 3 kuber
 
 ```
 cd kubernetes
-vagrant up
+
+# kubernetes will download box from s3 by default (see details in Vagrantfile), unless a box url env is provided.
+KUBERNETES_BOX_URL=path_of_your_kuber_box vagrant up
 ```
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.

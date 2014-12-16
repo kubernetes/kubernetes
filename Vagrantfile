@@ -19,11 +19,14 @@ $minion_ips_str = $minion_ips.join(",")
 # Determine the OS platform to use
 $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
+# Check if we already have kube box
+$kube_box_url = ENV['KUBERNETES_BOX_URL'] || "http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box"
+
 # OS platform to box information
 $kube_box = {
   "fedora" => {
     "name" => "fedora20",
-    "box_url" => "http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box"
+    "box_url" => $kube_box_url 
   }
 }
 
