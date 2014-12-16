@@ -64,7 +64,7 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 KUBE_API_PORT="--port=8080"
 
 # How the replication controller and scheduler find the kube-apiserver
-KUBE_MASTER="--master=fed-master:8080"
+KUBE_MASTER="--master=http://fed-master:8080"
 
 # Port minions listen on
 KUBELET_PORT="--kubelet_port=10250"
