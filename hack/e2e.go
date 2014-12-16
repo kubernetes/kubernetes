@@ -21,8 +21,10 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -36,6 +38,7 @@ import (
 var (
 	isup             = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
 	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
+	version          = flag.String("version", "", "The version to be tested (including the leading 'v'). An empty string defaults to the local build, but it can be set to any release (e.g. v0.4.4, v0.6.0).")
 	up               = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
@@ -57,7 +60,20 @@ var (
 	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
 )
 
-var signals = make(chan os.Signal, 100)
+const (
+	serverTarName   = "kubernetes-server-linux-amd64.tar.gz"
+	saltTarName     = "kubernetes-salt.tar.gz"
+	downloadDirName = "_output/downloads"
+	tarDirName      = "server"
+	tempDirName     = "upgrade-e2e-temp-dir"
+)
+
+var (
+	signals = make(chan os.Signal, 100)
+	// Root directory of the specified cluster version, rather than of where
+	// this script is being run from.
+	versionRoot = *root
+)
 
 func absOrDie(path string) string {
 	out, err := filepath.Abs(path)
@@ -110,6 +126,19 @@ func main() {
 		}
 	}
 
+	if *version != "" {
+		// If the desired version isn't available already, do whatever's needed
+		// to make it available. Once done, update the root directory for client
+		// tools to be the root of the release directory so that the given
+		// release's tools will be used. We can't use this new root for
+		// everything because it likely doesn't have the hack/ directory in it.
+		if newVersionRoot, err := PrepareVersion(*version); err != nil {
+			log.Fatalf("Error preparing a binary of version %s: %s. Aborting.", *version, err)
+		} else {
+			versionRoot = newVersionRoot
+		}
+	}
+
 	if *pushup {
 		if IsUp() {
 			log.Printf("e2e cluster is up, pushing.")
@@ -126,7 +155,7 @@ func main() {
 			log.Fatal("Error starting e2e cluster. Aborting.")
 		}
 	} else if *push {
-		if !runBash("push", path.Join(*root, "/cluster/kube-push.sh")) {
+		if !runBash("push", path.Join(versionRoot, "/cluster/kube-push.sh")) {
 			log.Fatal("Error pushing e2e cluster. Aborting.")
 		}
 	}
@@ -169,7 +198,55 @@ func IsUp() bool {
 }
 
 func tryUp() bool {
-	return runBash("up", path.Join(*root, "/cluster/kube-up.sh; test-setup;"))
+	return runBash("up", path.Join(versionRoot, "/cluster/kube-up.sh; test-setup;"))
+}
+
+// PrepareVersion makes sure that the specified release version is locally
+// available and ready to be used by kube-up or kube-push. Returns the director
+// path of the release.
+func PrepareVersion(version string) (string, error) {
+	if version == "" {
+		// Assume that the build flag already handled building a local binary.
+		return *root, nil
+	}
+
+	// If the version isn't a local build, try fetching the release from Google
+	// Cloud Storage.
+	downloadDir := filepath.Join(*root, downloadDirName)
+	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+		return "", err
+	}
+	localReleaseDir := filepath.Join(downloadDir, version)
+	if err := os.MkdirAll(localReleaseDir, 0755); err != nil {
+		return "", err
+	}
+
+	remoteReleaseTar := fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/release/%s/kubernetes.tar.gz", version)
+	localReleaseTar := filepath.Join(downloadDir, fmt.Sprintf("kubernetes-%s.tar.gz", version))
+	if _, err := os.Stat(localReleaseTar); os.IsNotExist(err) {
+		out, err := os.Create(localReleaseTar)
+		if err != nil {
+			return "", err
+		}
+		resp, err := http.Get(remoteReleaseTar)
+		if err != nil {
+			out.Close()
+			return "", err
+		}
+		defer resp.Body.Close()
+		io.Copy(out, resp.Body)
+		if err != nil {
+			out.Close()
+			return "", err
+		}
+		out.Close()
+	}
+	if !runRawBash("untarRelease", fmt.Sprintf("tar -C %s -zxf %s --strip-components=1", localReleaseDir, localReleaseTar)) {
+		log.Fatal("Failed to untar release. Aborting.")
+	}
+	// Now that we have the binaries saved locally, use the path to the untarred
+	// directory as the "root" path for future operations.
+	return localReleaseDir, nil
 }
 
 // Fisher-Yates shuffle using the given RNG r
@@ -299,18 +376,27 @@ func printSubreport(title string, tests []string, results ResultsByTest) {
 
 // All nonsense below is temporary until we have go versions of these things.
 
-func runBashWithOutputs(stepName, bashFragment string) (bool, string, string) {
+// Runs the provided bash without wrapping it in any kubernetes-specific gunk.
+func runRawBashWithOutputs(stepName, bash string) (bool, string, string) {
 	cmd := exec.Command("bash", "-s")
 	if *trace_bash {
 		cmd.Args = append(cmd.Args, "-x")
 	}
-	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
+	cmd.Stdin = strings.NewReader(bash)
 	return finishRunning(stepName, cmd)
 }
 
-func runBash(stepName, bashFragment string) bool {
-	result, _, _ := runBashWithOutputs(stepName, bashFragment)
+func runRawBash(stepName, bashFragment string) bool {
+	result, _, _ := runRawBashWithOutputs(stepName, bashFragment)
 	return result
+}
+
+func runBashWithOutputs(stepName, bashFragment string) (bool, string, string) {
+	return runRawBashWithOutputs(stepName, bashWrap(bashFragment))
+}
+
+func runBash(stepName, bashFragment string) bool {
+	return runRawBash(stepName, bashWrap(bashFragment))
 }
 
 // call the returned anonymous function to stop.
@@ -418,11 +504,11 @@ export KUBE_CONFIG_FILE="config-test.sh"
 
 # TODO(jbeda): This will break on usage if there is a space in
 # ${KUBE_ROOT}.  Covert to an array?  Or an exported function?
-export KUBECFG="` + *root + `/cluster/kubecfg.sh` + kubecfgArgs() + `"
-export KUBECTL="` + *root + `/cluster/kubectl.sh` + kubectlArgs() + `"
+export KUBECFG="` + versionRoot + `/cluster/kubecfg.sh` + kubecfgArgs() + `"
+export KUBECTL="` + versionRoot + `/cluster/kubectl.sh` + kubectlArgs() + `"
 
 source "` + *root + `/cluster/kube-env.sh"
-source "` + *root + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "` + versionRoot + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
