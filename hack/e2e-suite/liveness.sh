@@ -30,7 +30,7 @@ function teardown() {
   ${KUBECFG} delete pods/liveness-http
 }
 
-function waitForRunning() {
+function waitForNotPending() {
   pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=liveness list pods)
   # Pod turn up on a clean cluster can take a while for the docker image pull.
   all_running=0
@@ -40,7 +40,7 @@ function waitForRunning() {
     all_running=1
     for id in $pod_id_list; do
       current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
-      if [[ "$current_status" != "Running" ]]; then
+      if [[ "$current_status" == "Pending" ]]; then
         all_running=0
         break
       fi
@@ -58,7 +58,7 @@ function waitForRunning() {
 trap "teardown" EXIT
 
 ${KUBECFG} -c ${KUBE_ROOT}/examples/liveness/http-liveness.yaml create pods
-waitForRunning
+waitForNotPending
 
 before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-http)
 
@@ -67,7 +67,7 @@ for i in $(seq 1 24); do
   sleep 10 
   after=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-http)
   echo "Restarts: ${after} > ${before}"
-  if [[ "${after}" > "${before} ]]; then
+  if [[ "${after}" > "${before}" ]]; then
     break
   fi
 done
