@@ -49,6 +49,7 @@ type AuthOverrideFlags struct {
 	Token             string
 	Username          string
 	Password          string
+	GssProxy          string
 }
 
 // ContextOverrideFlags holds the flag names to be used for binding command line flags for Cluster objects
@@ -84,6 +85,7 @@ const (
 	FlagBearerToken  = "token"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
+	FlagGssProxy     = "gssproxy"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -95,6 +97,7 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		Token:             prefix + FlagBearerToken,
 		Username:          prefix + FlagUsername,
 		Password:          prefix + FlagPassword,
+		GssProxy:          prefix + FlagGssProxy,
 	}
 }
 
@@ -135,6 +138,7 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flags.StringVar(&authInfo.Token, flagNames.Token, "", "Bearer token for authentication to the API server.")
 	flags.StringVar(&authInfo.Username, flagNames.Username, "", "Username for basic authentication to the API server.")
 	flags.StringVar(&authInfo.Password, flagNames.Password, "", "Password for basic authentication to the API server.")
+	flags.StringVar(&authInfo.GssProxy, flagNames.GssProxy, "", "Path to gssproxy socket to use for Negotiate authentication.")
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables

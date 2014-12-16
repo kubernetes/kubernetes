@@ -67,6 +67,10 @@ type Config struct {
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 
+	// Server requires Negotiate authentication.  This client will attempt to use
+	// the local proxy via a Unix socket at "GssProxy" to do the heavy lifting.
+	GssProxy string
+
 	// Server should be accessed without verifying the TLS
 	// certificate. For testing only.
 	Insecure bool
@@ -256,16 +260,28 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 // the underlying connection (like WebSocket or HTTP2 clients). Pure HTTP clients should use
 // the higher level TransportFor or RESTClientFor methods.
 func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTripper, error) {
+	methods := 0
 	// Set authentication wrappers
 	hasBasicAuth := config.Username != "" || config.Password != ""
-	if hasBasicAuth && config.BearerToken != "" {
-		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
+	if hasBasicAuth {
+		methods++
+	}
+	if config.BearerToken != "" {
+		methods++
+	}
+	if config.GssProxy != "" {
+		methods++
+	}
+	if methods > 1 {
+		return nil, fmt.Errorf("username/password, bearer token, or gssproxy may be set, but not more than one")
 	}
 	switch {
 	case config.BearerToken != "":
 		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
 	case hasBasicAuth:
 		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
+	case config.GssProxy != "":
+		rt = NewNegotiateAuthRoundTripper(config.GssProxy, rt)
 	}
 	if len(config.UserAgent) > 0 {
 		rt = NewUserAgentRoundTripper(config.UserAgent, rt)

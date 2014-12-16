@@ -180,6 +180,9 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 		mergedConfig.Username = configAuthInfo.Username
 		mergedConfig.Password = configAuthInfo.Password
 	}
+	if len(configAuthInfo.GssProxy) > 0 {
+		mergedConfig.GssProxy = configAuthInfo.GssProxy
+	}
 
 	// if there isn't sufficient information to authenticate the user to the server, merge in ~/.kubernetes_auth.
 	if !canIdentifyUser(*mergedConfig) {
@@ -220,6 +223,7 @@ func makeUserIdentificationConfig(info clientauth.Info) *client.Config {
 	config.CertFile = info.CertFile
 	config.KeyFile = info.KeyFile
 	config.BearerToken = info.BearerToken
+	config.GssProxy = info.GssProxy
 	return config
 }
 
@@ -236,8 +240,8 @@ func makeServerIdentificationConfig(info clientauth.Info) client.Config {
 func canIdentifyUser(config client.Config) bool {
 	return len(config.Username) > 0 ||
 		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||
-		len(config.BearerToken) > 0
-
+		len(config.BearerToken) > 0 ||
+		len(config.GssProxy) > 0
 }
 
 // Namespace implements KubeConfig
