@@ -128,13 +128,21 @@ SCHEDULER_LOG=/tmp/kube-scheduler.log
   --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!
 
-echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
-echo "Logs: "
-echo "  ${APISERVER_LOG}"
-echo "  ${CTLRMGR_LOG}"
-echo "  ${KUBELET_LOG}"
-echo "  ${PROXY_LOG}"
-echo "  ${SCHEDULER_LOG}"
+cat <<EOF
+Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
+
+Logs:
+  ${APISERVER_LOG}
+  ${CTLRMGR_LOG}
+  ${KUBELET_LOG}
+  ${PROXY_LOG}
+  ${SCHEDULER_LOG}
+
+To start using your cluster, open up another terminal/tab and run:
+
+  export KUBERNETES_PROVIDER=local
+  cluster/kubectl.sh
+EOF
 
 cleanup()
 {
