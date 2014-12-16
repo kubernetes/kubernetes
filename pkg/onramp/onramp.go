@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
 )
 
@@ -134,13 +135,26 @@ func (onrmp *Onramp) monitorPods() {
 				glog.Infof("Pod %s has been added\n", onrmp.podNameList[m].PodName)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				onrmp.podNameList[m].NewPod = 0
-				// Insert callout for add here
+				ex := exec.New()
+				cmd := ex.Command("onramp_iptables_setup.sh", "ADD", pod.Name, "10.16.185.126", pod.CurrentState.PodIP)
+				_, err := cmd.CombinedOutput()
+				if (err != nil) {
+					glog.Infof("Error Executing Creation of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
+					continue
+				}
+
 			}
 
 			if (pod.CurrentState.PodIP != onrmp.podNameList[m].PodIP) {
 				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodName, onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
-				// Insert callout for update here
+				ex := exec.New()
+				cmd := ex.Command("onramp_iptables_setup.sh", "MODIFY", pod.Name, "10.16.185.126", pod.CurrentState.PodIP)
+				_, err := cmd.CombinedOutput()
+				if (err != nil) {
+					glog.Infof("Error Executing Modification of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
+					continue
+				}
 			}
 		}
 		onrmp.podNameLock.Unlock()
