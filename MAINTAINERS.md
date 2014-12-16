@@ -18,3 +18,4 @@ least one maintainer on relevant issues and PRs.
 * Local: [Derek Carr](https://github.com/derekwaynecarr)
 * Vagrant: [Derek Carr](https://github.com/derekwaynecarr)
 * CloudStack: [Sebastien Goasguen](https://github.com/runseb)
+* Ubuntu: [Vipin Jain](https://github.com/jainvipin)
