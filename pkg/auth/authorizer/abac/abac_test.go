@@ -131,6 +131,126 @@ func NotTestAuthorize(t *testing.T) {
 	}
 }
 
+func TestSubjectMatches(t *testing.T) {
+	testCases := map[string]struct {
+		User        user.DefaultInfo
+		PolicyUser  string
+		PolicyGroup string
+		ExpectMatch bool
+	}{
+		"empty policy matches unauthed user": {
+			User:        user.DefaultInfo{},
+			PolicyUser:  "",
+			PolicyGroup: "",
+			ExpectMatch: true,
+		},
+		"empty policy matches authed user": {
+			User:        user.DefaultInfo{Name: "Foo"},
+			PolicyUser:  "",
+			PolicyGroup: "",
+			ExpectMatch: true,
+		},
+		"empty policy matches authed user with groups": {
+			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"a", "b"}},
+			PolicyUser:  "",
+			PolicyGroup: "",
+			ExpectMatch: true,
+		},
+
+		"user policy does not match unauthed user": {
+			User:        user.DefaultInfo{},
+			PolicyUser:  "Foo",
+			PolicyGroup: "",
+			ExpectMatch: false,
+		},
+		"user policy does not match different user": {
+			User:        user.DefaultInfo{Name: "Bar"},
+			PolicyUser:  "Foo",
+			PolicyGroup: "",
+			ExpectMatch: false,
+		},
+		"user policy is case-sensitive": {
+			User:        user.DefaultInfo{Name: "foo"},
+			PolicyUser:  "Foo",
+			PolicyGroup: "",
+			ExpectMatch: false,
+		},
+		"user policy does not match substring": {
+			User:        user.DefaultInfo{Name: "FooBar"},
+			PolicyUser:  "Foo",
+			PolicyGroup: "",
+			ExpectMatch: false,
+		},
+		"user policy matches username": {
+			User:        user.DefaultInfo{Name: "Foo"},
+			PolicyUser:  "Foo",
+			PolicyGroup: "",
+			ExpectMatch: true,
+		},
+
+		"group policy does not match unauthed user": {
+			User:        user.DefaultInfo{},
+			PolicyUser:  "",
+			PolicyGroup: "Foo",
+			ExpectMatch: false,
+		},
+		"group policy does not match user in different group": {
+			User:        user.DefaultInfo{Name: "FooBar", Groups: []string{"B"}},
+			PolicyUser:  "",
+			PolicyGroup: "A",
+			ExpectMatch: false,
+		},
+		"group policy is case-sensitive": {
+			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
+			PolicyUser:  "",
+			PolicyGroup: "b",
+			ExpectMatch: false,
+		},
+		"group policy does not match substring": {
+			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "BBB", "C"}},
+			PolicyUser:  "",
+			PolicyGroup: "B",
+			ExpectMatch: false,
+		},
+		"group policy matches user in group": {
+			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
+			PolicyUser:  "",
+			PolicyGroup: "B",
+			ExpectMatch: true,
+		},
+
+		"user and group policy requires user match": {
+			User:        user.DefaultInfo{Name: "Bar", Groups: []string{"A", "B", "C"}},
+			PolicyUser:  "Foo",
+			PolicyGroup: "B",
+			ExpectMatch: false,
+		},
+		"user and group policy requires group match": {
+			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
+			PolicyUser:  "Foo",
+			PolicyGroup: "D",
+			ExpectMatch: false,
+		},
+		"user and group policy matches": {
+			User:        user.DefaultInfo{Name: "Foo", Groups: []string{"A", "B", "C"}},
+			PolicyUser:  "Foo",
+			PolicyGroup: "B",
+			ExpectMatch: true,
+		},
+	}
+
+	for k, tc := range testCases {
+		attr := authorizer.AttributesRecord{
+			User: &tc.User,
+		}
+		actualMatch := policy{User: tc.PolicyUser, Group: tc.PolicyGroup}.subjectMatches(attr)
+		if tc.ExpectMatch != actualMatch {
+			t.Errorf("%v: Expected actorMatches=%v but actually got=%v",
+				k, tc.ExpectMatch, actualMatch)
+		}
+	}
+}
+
 func newWithContents(t *testing.T, contents string) (authorizer.Authorizer, error) {
 	f, err := ioutil.TempFile("", "abac_test")
 	if err != nil {

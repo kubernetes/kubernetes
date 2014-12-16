@@ -37,8 +37,8 @@ import (
 // body.Namespace, if we want to add that feature, without affecting the
 // meta.Namespace.
 type policy struct {
-	User string `json:"user,omitempty"`
-	// TODO: add support for groups as well as users.
+	User  string `json:"user,omitempty"`
+	Group string `json:"group,omitempty"`
 	// TODO: add support for robot accounts as well as human user accounts.
 	// TODO: decide how to namespace user names when multiple authentication
 	// providers are in use. Either add "Realm", or assume "user@example.com"
@@ -98,7 +98,7 @@ func NewFromFile(path string) (policyList, error) {
 }
 
 func (p policy) matches(a authorizer.Attributes) bool {
-	if p.User == "" || p.User == a.GetUserName() {
+	if p.subjectMatches(a) {
 		if p.Readonly == false || (p.Readonly == a.IsReadOnly()) {
 			if p.Kind == "" || (p.Kind == a.GetKind()) {
 				if p.Namespace == "" || (p.Namespace == a.GetNamespace()) {
@@ -108,6 +108,27 @@ func (p policy) matches(a authorizer.Attributes) bool {
 		}
 	}
 	return false
+}
+
+func (p policy) subjectMatches(a authorizer.Attributes) bool {
+	if p.User != "" {
+		// Require user match
+		if p.User != a.GetUserName() {
+			return false
+		}
+	}
+
+	if p.Group != "" {
+		// Require group match
+		for _, group := range a.GetGroups() {
+			if p.Group == group {
+				return true
+			}
+		}
+		return false
+	}
+
+	return true
 }
 
 // Authorizer implements authorizer.Authorize
