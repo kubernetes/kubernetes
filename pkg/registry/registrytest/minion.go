@@ -20,15 +20,20 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+// MinionRegistry implements minion.Registry interface.
 type MinionRegistry struct {
 	Err     error
 	Minion  string
 	Minions api.NodeList
+
 	sync.Mutex
 }
 
+// MakeMinionList constructs api.MinionList from list of minion names and a NodeResource.
 func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.NodeList {
 	list := api.NodeList{
 		Items: make([]api.Node, len(minions)),
@@ -94,4 +99,8 @@ func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	}
 	r.Minions.Items = newList
 	return r.Err
+}
+
+func (r *MinionRegistry) WatchMinions(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return nil, r.Err
 }

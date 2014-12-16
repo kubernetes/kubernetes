@@ -20,6 +20,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -85,4 +87,8 @@ func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.Node
 		}
 	}
 	return result, nil
+}
+
+func (r *HealthyRegistry) WatchMinions(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return r.delegate.WatchMinions(ctx, label, field, resourceVersion)
 }

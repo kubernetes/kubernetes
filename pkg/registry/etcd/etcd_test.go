@@ -1681,6 +1681,112 @@ func TestEtcdDeleteMinion(t *testing.T) {
 	}
 }
 
+func TestEtcdWatchMinion(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient)
+	watching, err := registry.WatchMinions(ctx,
+		labels.Everything(),
+		labels.Everything(),
+		"1",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.WaitForWatchCompletion()
+
+	select {
+	case _, ok := <-watching.ResultChan():
+		if !ok {
+			t.Errorf("watching channel should be open")
+		}
+	default:
+	}
+	fakeClient.WatchInjectError <- nil
+	if _, ok := <-watching.ResultChan(); ok {
+		t.Errorf("watching channel should be closed")
+	}
+	watching.Stop()
+}
+
+func TestEtcdWatchMinionsMatch(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient)
+	watching, err := registry.WatchMinions(ctx,
+		labels.SelectorFromSet(labels.Set{"name": "foo"}),
+		labels.Everything(),
+		"1",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.WaitForWatchCompletion()
+
+	node := &api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+			Labels: map[string]string{
+				"name": "foo",
+			},
+		},
+	}
+	nodeBytes, _ := latest.Codec.Encode(node)
+	fakeClient.WatchResponse <- &etcd.Response{
+		Action: "create",
+		Node: &etcd.Node{
+			Value: string(nodeBytes),
+		},
+	}
+	select {
+	case _, ok := <-watching.ResultChan():
+		if !ok {
+			t.Errorf("watching channel should be open")
+		}
+	case <-time.After(time.Millisecond * 100):
+		t.Error("unexpected timeout from result channel")
+	}
+	watching.Stop()
+}
+
+func TestEtcdWatchMinionsNotMatch(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient)
+	watching, err := registry.WatchMinions(ctx,
+		labels.SelectorFromSet(labels.Set{"name": "foo"}),
+		labels.Everything(),
+		"1",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.WaitForWatchCompletion()
+
+	node := &api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "bar",
+			Labels: map[string]string{
+				"name": "bar",
+			},
+		},
+	}
+	nodeBytes, _ := latest.Codec.Encode(node)
+	fakeClient.WatchResponse <- &etcd.Response{
+		Action: "create",
+		Node: &etcd.Node{
+			Value: string(nodeBytes),
+		},
+	}
+
+	select {
+	case <-watching.ResultChan():
+		t.Error("unexpected result from result channel")
+	case <-time.After(time.Millisecond * 100):
+		// expected case
+	}
+}
+
 // TODO We need a test for the compare and swap behavior.  This basically requires two things:
 //   1) Add a per-operation synchronization channel to the fake etcd client, such that any operation waits on that
 //      channel, this will enable us to orchestrate the flow of etcd requests in the test.

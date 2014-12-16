@@ -42,12 +42,15 @@ const (
 	ServicePath string = "/registry/services/specs"
 	// ServiceEndpointPath is the path to service endpoints resources in etcd
 	ServiceEndpointPath string = "/registry/services/endpoints"
+	// NodePath is the path to node resources in etcd
+	NodePath string = "/registry/minions"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// Registry implements PodRegistry, ControllerRegistry, ServiceRegistry and MinionRegistry, backed by etcd.
+// Registry implements BindingRegistry, ControllerRegistry, EndpointRegistry,
+// MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.
 type Registry struct {
 	tools.EtcdHelper
 	boundPodFactory pod.BoundPodFactory
@@ -570,31 +573,35 @@ func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector,
 	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
 }
 
-func makeMinionKey(minionID string) string {
-	return "/registry/minions/" + minionID
+func makeNodeKey(nodeID string) string {
+	return NodePath + "/" + nodeID
+}
+
+func makeNodeListKey() string {
+	return NodePath
 }
 
 func (r *Registry) ListMinions(ctx api.Context) (*api.NodeList, error) {
 	minions := &api.NodeList{}
-	err := r.ExtractToList("/registry/minions", minions)
+	err := r.ExtractToList(makeNodeListKey(), minions)
 	return minions, err
 }
 
 func (r *Registry) CreateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.CreateObj(makeMinionKey(minion.Name), minion, 0)
+	err := r.CreateObj(makeNodeKey(minion.Name), minion, 0)
 	return etcderr.InterpretCreateError(err, "minion", minion.Name)
 }
 
 func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.SetObj(makeMinionKey(minion.Name), minion)
+	err := r.SetObj(makeNodeKey(minion.Name), minion)
 	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
 }
 
 func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
 	var minion api.Node
-	key := makeMinionKey(minionID)
+	key := makeNodeKey(minionID)
 	err := r.ExtractObj(key, &minion, false)
 	if err != nil {
 		return nil, etcderr.InterpretGetError(err, "minion", minion.Name)
@@ -603,10 +610,27 @@ func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Node, error
 }
 
 func (r *Registry) DeleteMinion(ctx api.Context, minionID string) error {
-	key := makeMinionKey(minionID)
+	key := makeNodeKey(minionID)
 	err := r.Delete(key, true)
 	if err != nil {
 		return etcderr.InterpretDeleteError(err, "minion", minionID)
 	}
 	return nil
+}
+
+func (r *Registry) WatchMinions(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "node")
+	if err != nil {
+		return nil, err
+	}
+	key := makeNodeListKey()
+	return r.WatchList(key, version, func(obj runtime.Object) bool {
+		minionObj, ok := obj.(*api.Node)
+		if !ok {
+			// Must be an error: return true to propagate to upper level.
+			return true
+		}
+		// TODO: Add support for filtering based on field, once NodeStatus is defined.
+		return label.Matches(labels.Set(minionObj.Labels))
+	})
 }
