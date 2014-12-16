@@ -40,22 +40,24 @@ done
 
 # Let the minion know who its master is
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+cat <<EOF >/etc/salt/minion.d/master.conf
+master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+EOF
 
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   network_mode: openvswitch
-  node_ip: $MINION_IP
-  etcd_servers: $MASTER_IP
-  api_servers: $MASTER_IP
+  node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  etcd_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: eth1
-  apiservers: $MASTER_IP
+  apiservers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   roles:
     - kubernetes-pool
     - kubernetes-pool-vagrant
-  cbr-cidr: $MINION_IP_RANGE
-  minion_ip: $MINION_IP
+  cbr-cidr: '$(echo "$MINION_IP_RANGE" | sed -e "s/'/''/g")'
+  minion_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time
