@@ -572,6 +572,17 @@ type ServiceList struct {
 	Items []Service `json:"items"`
 }
 
+// Session Affinity Type string
+type AffinityType string
+
+const (
+	// AffinityTypeClientIP is the Client IP based.
+	AffinityTypeClientIP AffinityType = "ClientIP"
+
+	// AffinityTypeNone - no session affinity.
+	AffinityTypeNone AffinityType = "None"
+)
+
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct{}
 
@@ -606,6 +617,9 @@ type ServiceSpec struct {
 	// ContainerPort is the name of the port on the container to direct traffic to.
 	// Optional, if unspecified use the first port on the container.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty"`
+
+	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
+	SessionAffinity *AffinityType `json:"sessionAffinity,omitempty"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

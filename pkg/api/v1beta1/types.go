@@ -448,6 +448,17 @@ type PodTemplate struct {
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
 }
 
+// Session Affinity Type string
+type AffinityType string
+
+const (
+	// AffinityTypeClientIP is the Client IP based.
+	AffinityTypeClientIP AffinityType = "ClientIP"
+
+	// AffinityTypeNone - no session affinity.
+	AffinityTypeNone AffinityType = "None"
+)
+
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
@@ -487,6 +498,9 @@ type Service struct {
 
 	// ProxyPort is assigned by the master.  If specified by the user it will be ignored.
 	ProxyPort int `json:"proxyPort,omitempty" description:"if non-zero, a pre-allocated host port used for this service by the proxy on each node; assigned by the master and ignored on input"`
+
+	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
+	SessionAffinity *AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; Disabled if unspecified"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

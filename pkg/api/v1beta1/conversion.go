@@ -436,6 +436,10 @@ func init() {
 			out.ContainerPort = in.Spec.ContainerPort
 			out.PortalIP = in.Spec.PortalIP
 			out.ProxyPort = in.Spec.ProxyPort
+			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
+				return err
+			}
+
 			return nil
 		},
 		func(in *Service, out *newer.Service, s conversion.Scope) error {
@@ -459,6 +463,10 @@ func init() {
 			out.Spec.ContainerPort = in.ContainerPort
 			out.Spec.PortalIP = in.PortalIP
 			out.Spec.ProxyPort = in.ProxyPort
+			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
+				return err
+			}
+
 			return nil
 		},
 
