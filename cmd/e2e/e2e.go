@@ -56,7 +56,9 @@ func waitForPodRunning(c *client.Client, id string) {
 	}
 }
 
-// assetPath returns a path to the requested file; safe on all OSes.
+// assetPath returns a path to the requested file; safe on all
+// OSes. NOTE: If you use an asset in this test, you MUST add it to
+// the KUBE_TEST_PORTABLE array in hack/lib/golang.sh.
 func assetPath(pathElements ...string) string {
 	return filepath.Join(*repoRoot, filepath.Join(pathElements...))
 }

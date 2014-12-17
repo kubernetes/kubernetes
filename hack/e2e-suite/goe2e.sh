@@ -60,6 +60,7 @@ esac
 locations=(
   "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/e2e"
   "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/e2e"
+  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/e2e"
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
