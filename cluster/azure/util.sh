@@ -145,7 +145,7 @@ function upload-server-tars() {
     echo "==> SERVER_BINARY_TAR_URL: $SERVER_BINARY_TAR_URL"
     echo "==> SALT_TAR_URL: $SALT_TAR_URL"
 
-    echo "--> Checking storage exsists..."
+    echo "--> Checking storage exists..."
     if [[ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
     grep data)" ]]; then
         echo "--> Creating storage..."
@@ -156,7 +156,7 @@ function upload-server-tars() {
     stg_key=$(azure_call storage account keys list $AZ_STG --json | \
         json_val '["primaryKey"]')
 
-    echo "--> Checking storage container exsists..."
+    echo "--> Checking storage container exists..."
     if [[ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
       $CONTAINER 2>/dev/null | grep data)" ]]; then
         echo "--> Creating storage container..."
