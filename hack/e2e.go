@@ -316,14 +316,25 @@ func Test() (results ResultsByTest) {
 	for i, name := range toRun {
 		absName := filepath.Join(*root, "hack", "e2e-suite", name)
 		log.Printf("Starting test [%v/%v]: %v", i+1, len(toRun), name)
+		start := time.Now()
 		testResult := results[name]
 		res, stdout, stderr := runBashWithOutputs(name, absName)
+		duration_ms := time.Now().Sub(start).Seconds() * 1000
 		if res {
 			fmt.Printf("ok %v - %v\n", i+1, name)
+			if *tap {
+				fmt.Printf("  ---\n  duration_ms: %.3f\n  ...\n", duration_ms)
+			}
 			testResult.Pass++
 		} else {
 			fmt.Printf("not ok %v - %v\n", i+1, name)
+			if *tap {
+				fmt.Printf("  ---\n  duration_ms: %.3f\n", duration_ms)
+			}
 			printBashOutputs("  ", "    ", stdout, stderr)
+			if *tap {
+				fmt.Printf("  ...\n")
+			}
 			testResult.Fail++
 		}
 		results[name] = testResult
