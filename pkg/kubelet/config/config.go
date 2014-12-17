@@ -53,6 +53,10 @@ type PodConfig struct {
 
 	// the channel of denormalized changes passed to listeners
 	updates chan kubelet.PodUpdate
+
+	// contains the list of all configured sources
+	sourcesLock sync.Mutex
+	sources     util.StringSet
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -64,6 +68,7 @@ func NewPodConfig(mode PodConfigNotificationMode) *PodConfig {
 		pods:    storage,
 		mux:     config.NewMux(storage),
 		updates: updates,
+		sources: util.StringSet{},
 	}
 	return podConfig
 }
@@ -71,7 +76,20 @@ func NewPodConfig(mode PodConfigNotificationMode) *PodConfig {
 // Channel creates or returns a config source channel.  The channel
 // only accepts PodUpdates
 func (c *PodConfig) Channel(source string) chan<- interface{} {
+	c.sourcesLock.Lock()
+	defer c.sourcesLock.Unlock()
+	c.sources.Insert(source)
 	return c.mux.Channel(source)
+}
+
+// SeenAllSources returns true if this config has received a SET
+// message from all configured sources, false otherwise.
+func (c *PodConfig) SeenAllSources() bool {
+	if c.pods == nil {
+		return false
+	}
+	glog.V(6).Infof("Looking for %v, have seen %v", c.sources.List(), c.pods.sourcesSeen)
+	return c.pods.seenSources(c.sources.List()...)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
@@ -98,6 +116,10 @@ type podStorage struct {
 	// on the updates channel
 	updateLock sync.Mutex
 	updates    chan<- kubelet.PodUpdate
+
+	// contains the set of all sources that have sent at least one SET
+	sourcesSeenLock sync.Mutex
+	sourcesSeen     util.StringSet
 }
 
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
@@ -105,9 +127,10 @@ type podStorage struct {
 // TODO: allow initialization of the current state of the store with snapshotted version.
 func newPodStorage(updates chan<- kubelet.PodUpdate, mode PodConfigNotificationMode) *podStorage {
 	return &podStorage{
-		pods:    make(map[string]map[string]*api.BoundPod),
-		mode:    mode,
-		updates: updates,
+		pods:        make(map[string]map[string]*api.BoundPod),
+		mode:        mode,
+		updates:     updates,
+		sourcesSeen: util.StringSet{},
 	}
 }
 
@@ -138,12 +161,12 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *updates
 		}
 		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET, source}
 		}
 
 	case PodConfigNotificationSnapshot:
 		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET, source}
 		}
 
 	default:
@@ -212,6 +235,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 	case kubelet.SET:
 		glog.V(4).Infof("Setting pods for source %s : %v", source, update)
+		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
 		pods = make(map[string]*api.BoundPod)
@@ -254,6 +278,18 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	return adds, updates, deletes
 }
 
+func (s *podStorage) markSourceSet(source string) {
+	s.sourcesSeenLock.Lock()
+	defer s.sourcesSeenLock.Unlock()
+	s.sourcesSeen.Insert(source)
+}
+
+func (s *podStorage) seenSources(sources ...string) bool {
+	s.sourcesSeenLock.Lock()
+	defer s.sourcesSeenLock.Unlock()
+	return s.sourcesSeen.HasAll(sources...)
+}
+
 func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.BoundPod) {
 	names := util.StringSet{}
 	for i := range pods {
@@ -280,7 +316,7 @@ func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.Boun
 func (s *podStorage) Sync() {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
-	s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET}
+	s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET, kubelet.AllSource}
 }
 
 // Object implements config.Accessor

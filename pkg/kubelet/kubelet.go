@@ -53,6 +53,8 @@ type SyncHandler interface {
 	SyncPods([]api.BoundPod) error
 }
 
+type SourcesReadyFn func() bool
+
 type volumeMap map[string]volume.Interface
 
 // New creates a new Kubelet for use in main
@@ -66,7 +68,8 @@ func NewMainKubelet(
 	pullQPS float32,
 	pullBurst int,
 	minimumGCAge time.Duration,
-	maxContainerCount int) *Kubelet {
+	maxContainerCount int,
+	sourcesReady SourcesReadyFn) *Kubelet {
 	return &Kubelet{
 		hostname:              hn,
 		dockerClient:          dc,
@@ -82,6 +85,7 @@ func NewMainKubelet(
 		pullBurst:             pullBurst,
 		minimumGCAge:          minimumGCAge,
 		maxContainerCount:     maxContainerCount,
+		sourcesReady:          sourcesReady,
 	}
 }
 
@@ -112,6 +116,7 @@ type Kubelet struct {
 	podWorkers            *podWorkers
 	resyncInterval        time.Duration
 	pods                  []api.BoundPod
+	sourcesReady          SourcesReadyFn
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -907,7 +912,12 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 			}
 		})
 	}
-
+	if !kl.sourcesReady() {
+		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
+		// for sources that haven't reported yet.
+		glog.V(4).Infof("Skipping deletes, sources aren't ready yet.")
+		return nil
+	}
 	// Kill any containers we don't need.
 	for _, container := range dockerContainers {
 		// Don't kill containers that are in the desired pods.

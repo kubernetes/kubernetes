@@ -119,7 +119,7 @@ func TestReadFromFile(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      simpleSubdomainSafeHash(file.Name()),
 				UID:       simpleSubdomainSafeHash(file.Name()),
@@ -170,7 +170,7 @@ func TestExtractFromValidDataFile(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, expectedPod)
+	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, expectedPod)
 	if !reflect.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
@@ -191,7 +191,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 
 	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET)
+	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
 	if !reflect.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
@@ -239,7 +239,7 @@ func TestExtractFromDir(t *testing.T) {
 	}
 
 	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, pods...)
+	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, pods...)
 	sort.Sort(sortedPods(update.Pods))
 	sort.Sort(sortedPods(expected.Pods))
 	if !reflect.DeepEqual(expected, update) {

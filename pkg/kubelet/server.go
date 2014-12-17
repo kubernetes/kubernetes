@@ -59,6 +59,7 @@ func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{},
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
+	updates <- PodUpdate{[]api.BoundPod{}, SET, ServerSource}
 	glog.Fatal(s.ListenAndServe())
 }
 
@@ -143,7 +144,7 @@ func (s *Server) handleContainer(w http.ResponseWriter, req *http.Request) {
 	if pod.UID == "" {
 		pod.UID = "1"
 	}
-	s.updates <- PodUpdate{[]api.BoundPod{pod}, SET}
+	s.updates <- PodUpdate{[]api.BoundPod{pod}, SET, ServerSource}
 
 }
 
@@ -166,8 +167,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 		pods[i].Name = fmt.Sprintf("%d", i+1)
 		pods[i].Spec = specs[i]
 	}
-	s.updates <- PodUpdate{pods, SET}
-
+	s.updates <- PodUpdate{pods, SET, ServerSource}
 }
 
 // handleContainerLogs handles containerLogs request against the Kubelet

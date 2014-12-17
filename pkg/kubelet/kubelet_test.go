@@ -55,6 +55,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools
 	kubelet.etcdClient = fakeEtcdClient
 	kubelet.rootDirectory = "/tmp/kubelet"
 	kubelet.podWorkers = newPodWorkers()
+	kubelet.sourcesReady = func() bool { return true }
 	return kubelet, fakeEtcdClient, fakeDocker
 }
 
@@ -511,6 +512,49 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 	fakeDocker.Unlock()
+}
+
+func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
+	ready := false
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.sourcesReady = func() bool { return ready }
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_foo_bar.new.test"},
+			ID:    "1234",
+		},
+		{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_"},
+			ID:    "9876",
+		},
+	}
+	if err := kubelet.SyncPods([]api.BoundPod{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Validate nothing happened.
+	verifyCalls(t, fakeDocker, []string{"list"})
+	fakeDocker.ClearCalls()
+
+	ready = true
+	if err := kubelet.SyncPods([]api.BoundPod{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+
+	// A map iteration is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+		"9876": true,
+	}
+	if len(fakeDocker.Stopped) != 2 ||
+		!expectedToStop[fakeDocker.Stopped[0]] ||
+		!expectedToStop[fakeDocker.Stopped[1]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
 }
 
 func TestSyncPodsDeletes(t *testing.T) {

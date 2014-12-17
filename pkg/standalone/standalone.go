@@ -176,7 +176,7 @@ func RunKubelet(kcfg *KubeletConfig) {
 	}
 
 	cfg := makePodSourceConfig(kcfg)
-	k := createAndInitKubelet(kcfg)
+	k := createAndInitKubelet(kcfg, cfg)
 	// process pods and exit.
 	if kcfg.Runonce {
 		if _, err := k.RunOnce(cfg.Updates()); err != nil {
@@ -194,7 +194,7 @@ func startKubelet(k *kubelet.Kubelet, cfg *config.PodConfig, kc *KubeletConfig) 
 	// start the kubelet server
 	if kc.EnableServer {
 		go util.Forever(func() {
-			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), net.IP(kc.Address), kc.Port, kc.EnableDebuggingHandlers)
+			kubelet.ListenAndServeKubeletServer(k, cfg.Channel(kubelet.ServerSource), net.IP(kc.Address), kc.Port, kc.EnableDebuggingHandlers)
 		}, 0)
 	}
 }
@@ -205,17 +205,19 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 
 	// define file config source
 	if kc.ConfigFile != "" {
-		config.NewSourceFile(kc.ConfigFile, kc.FileCheckFrequency, cfg.Channel("file"))
+		glog.Infof("Adding manifest file: %v", kc.ConfigFile)
+		config.NewSourceFile(kc.ConfigFile, kc.FileCheckFrequency, cfg.Channel(kubelet.FileSource))
 	}
 
 	// define url config source
 	if kc.ManifestURL != "" {
-		config.NewSourceURL(kc.ManifestURL, kc.HttpCheckFrequency, cfg.Channel("http"))
+		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
+		config.NewSourceURL(kc.ManifestURL, kc.HttpCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
 
 	if kc.EtcdClient != nil {
 		glog.Infof("Watching for etcd configs at %v", kc.EtcdClient.GetCluster())
-		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel("etcd"))
+		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel(kubelet.EtcdSource))
 	}
 	return cfg
 }
@@ -247,7 +249,7 @@ type KubeletConfig struct {
 	Runonce                 bool
 }
 
-func createAndInitKubelet(kc *KubeletConfig) *kubelet.Kubelet {
+func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) *kubelet.Kubelet {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -261,7 +263,8 @@ func createAndInitKubelet(kc *KubeletConfig) *kubelet.Kubelet {
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
 		kc.MinimumGCAge,
-		kc.MaxContainerCount)
+		kc.MaxContainerCount,
+		pc.SeenAllSources)
 
 	k.BirthCry()
 

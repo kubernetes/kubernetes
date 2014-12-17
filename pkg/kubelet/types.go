@@ -36,6 +36,18 @@ const (
 	REMOVE
 	// Pods with the given ids have been updated in this source
 	UPDATE
+
+	// These constants identify the sources of pods
+	// Updates from a file
+	FileSource = "file"
+	// Updates from etcd
+	EtcdSource = "etcd"
+	// Updates from querying a web page
+	HTTPSource = "http"
+	// Updates received to the kubelet server
+	ServerSource = "server"
+	// Updates from all sources
+	AllSource = "*"
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
@@ -48,8 +60,9 @@ const (
 // functionally similar, this helps our unit tests properly check that the correct PodUpdates
 // are generated.
 type PodUpdate struct {
-	Pods []api.BoundPod
-	Op   PodOperation
+	Pods   []api.BoundPod
+	Op     PodOperation
+	Source string
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod across all config sources.

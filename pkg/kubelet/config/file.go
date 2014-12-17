@@ -73,14 +73,14 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
+		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.FileSource}
 
 	case statInfo.Mode().IsRegular():
 		pod, err := extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET}
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
