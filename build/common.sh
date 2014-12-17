@@ -503,6 +503,7 @@ function kube::release::package_tarballs() {
   kube::release::package_client_tarballs
   kube::release::package_server_tarballs
   kube::release::package_salt_tarball
+  kube::release::package_test_tarball
   kube::release::package_full_tarball
 }
 
@@ -579,6 +580,31 @@ function kube::release::package_salt_tarball() {
   cp -R "${KUBE_ROOT}/cluster/saltbase" "${release_stage}/"
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+}
+
+# This is the stuff you need to run tests from the binary distribution.
+function kube::release::package_test_tarball() {
+  echo "+++ Building tarball: test"
+
+  local release_stage="${RELEASE_STAGE}/test/kubernetes"
+  rm -rf "${release_stage}"
+  mkdir -p "${release_stage}"
+
+  local platform
+  for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
+    local test_bins=("${KUBE_TEST_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
+    fi
+    mkdir -p "${release_stage}/platforms/${platform}"
+    cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/platforms/${platform}"
+  done
+
+  cp -R --parents ${KUBE_TEST_PORTABLE[@]} ${release_stage}
+
+  local package_name="${RELEASE_DIR}/kubernetes-test.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 

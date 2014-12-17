@@ -48,6 +48,15 @@ readonly KUBE_TEST_TARGETS=(
   cmd/integration
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
+readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
+readonly KUBE_TEST_PORTABLE=(
+  api/examples/pod.json
+  cmd/e2e/pod.json
+  contrib/for-tests/network-tester/rc.json
+  contrib/for-tests/network-tester/service.json
+  hack/e2e.go
+  hack/e2e-suite
+)
 
 # If we update this we need to also update the set of golang compilers we build
 # in 'build/build-image/Dockerfile'
