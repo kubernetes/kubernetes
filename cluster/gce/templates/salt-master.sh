@@ -19,7 +19,9 @@ sed -i -e "\|^deb.*http://ftp.debian.org/debian| s/^/#/" /etc/apt/sources.list.d
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+cat <<EOF >/etc/salt/minion.d/master.conf
+master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+EOF
 
 cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
 log_level: debug

@@ -62,17 +62,19 @@ done
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+cat <<EOF >/etc/salt/minion.d/master.conf
+master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+EOF
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  node_ip: $MASTER_IP
-  master_ip: $MASTER_IP
-  publicAddressOverride: $MASTER_IP
+  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  master_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   network_mode: openvswitch
   networkInterfaceName: eth1
-  etcd_servers: $MASTER_IP
-  api_servers: $MASTER_IP
+  etcd_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   cloud: vagrant
   cloud_provider: vagrant
   roles:
@@ -81,11 +83,11 @@ EOF
 
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
-  portal_net: $PORTAL_NET
-  cert_ip: $MASTER_IP
-  enable_node_monitoring: $ENABLE_NODE_MONITORING
-  enable_node_logging: $ENABLE_NODE_LOGGING
-  logging_destination: $LOGGING_DESTINATION
+  portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
+  cert_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
+  enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
+  logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master
@@ -155,7 +157,6 @@ rest_cherrypy:
   webhook_disable_auth: True
 EOF
 
-
   # Install Salt Master
   #
   # -M installs the master
@@ -163,7 +164,7 @@ EOF
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -N
 
   # Install salt-api
-  #  
+  #
   # This is used to provide the network transport for salt-api
   yum install -y python-cherrypy
   # This is used to inform the cloud provider used in the vagrant cluster
