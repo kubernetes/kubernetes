@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
@@ -47,7 +48,7 @@ func IsContextNotFound(err error) bool {
 }
 
 // Validate checks for errors in the Config.  It does not return early so that it can find as many errors as possible.
-func Validate(config Config) error {
+func Validate(config clientcmdapi.Config) error {
 	validationErrors := make([]error, 0)
 
 	if len(config.CurrentContext) != 0 {
@@ -73,7 +74,7 @@ func Validate(config Config) error {
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
-func ConfirmUsable(config Config, passedContextName string) error {
+func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 	validationErrors := make([]error, 0)
 
 	var contextName string
@@ -102,7 +103,7 @@ func ConfirmUsable(config Config, passedContextName string) error {
 }
 
 // validateClusterInfo looks for conflicts and errors in the cluster info
-func validateClusterInfo(clusterName string, clusterInfo Cluster) []error {
+func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) []error {
 	validationErrors := make([]error, 0)
 
 	if len(clusterInfo.Server) == 0 {
@@ -120,7 +121,7 @@ func validateClusterInfo(clusterName string, clusterInfo Cluster) []error {
 }
 
 // validateAuthInfo looks for conflicts and errors in the auth info
-func validateAuthInfo(authInfoName string, authInfo AuthInfo) []error {
+func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []error {
 	validationErrors := make([]error, 0)
 
 	usingAuthPath := false
@@ -163,7 +164,7 @@ func validateAuthInfo(authInfoName string, authInfo AuthInfo) []error {
 }
 
 // validateContext looks for errors in the context.  It is not transitive, so errors in the reference authInfo or cluster configs are not included in this return
-func validateContext(contextName string, context Context, config Config) []error {
+func validateContext(contextName string, context clientcmdapi.Context, config clientcmdapi.Config) []error {
 	validationErrors := make([]error, 0)
 
 	if len(context.AuthInfo) == 0 {

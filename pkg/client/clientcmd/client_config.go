@@ -23,43 +23,49 @@ import (
 	"github.com/imdario/mergo"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 var (
 	// TODO: eventually apiserver should start on 443 and be secure by default
-	defaultCluster = Cluster{Server: "http://localhost:8080"}
-	envVarCluster  = Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
+	defaultCluster = clientcmdapi.Cluster{Server: "http://localhost:8080"}
+	envVarCluster  = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
 )
 
 // ClientConfig is used to make it easy to get an api server client
 type ClientConfig interface {
+	RawConfig() (clientcmdapi.Config, error)
 	// ClientConfig returns a complete client config
 	ClientConfig() (*client.Config, error)
 }
 
-// DirectClientConfig is a ClientConfig interface that is backed by a Config, options overrides, and an optional fallbackReader for auth information
+// DirectClientConfig is a ClientConfig interface that is backed by a clientcmdapi.Config, options overrides, and an optional fallbackReader for auth information
 type DirectClientConfig struct {
-	config         Config
+	config         clientcmdapi.Config
 	contextName    string
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
 }
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
-func NewDefaultClientConfig(config Config, overrides *ConfigOverrides) ClientConfig {
+func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) ClientConfig {
 	return DirectClientConfig{config, config.CurrentContext, overrides, nil}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
-func NewNonInteractiveClientConfig(config Config, contextName string, overrides *ConfigOverrides) ClientConfig {
+func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides) ClientConfig {
 	return DirectClientConfig{config, contextName, overrides, nil}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
-func NewInteractiveClientConfig(config Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
+func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
 	return DirectClientConfig{config, contextName, overrides, fallbackReader}
+}
+
+func (config DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
+	return config.config, nil
 }
 
 // ClientConfig implements ClientConfig
@@ -102,7 +108,7 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 // 1.  configClusterInfo (the final result of command line flags and merged .kubeconfig files)
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
 // 3.  load the ~/.kubernetes_auth file as a default
-func getServerIdentificationPartialConfig(configAuthInfo AuthInfo, configClusterInfo Cluster) (*client.Config, error) {
+func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, configClusterInfo clientcmdapi.Cluster) (*client.Config, error) {
 	mergedConfig := &client.Config{}
 
 	defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.kubernetes_auth")
@@ -140,7 +146,7 @@ func getServerIdentificationPartialConfig(configAuthInfo AuthInfo, configCluster
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
 // 3.  if there is not enough information to idenfity the user, load try the ~/.kubernetes_auth file
 // 4.  if there is not enough information to identify the user, prompt if possible
-func getUserIdentificationPartialConfig(configAuthInfo AuthInfo, fallbackReader io.Reader) (*client.Config, error) {
+func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader) (*client.Config, error) {
 	mergedConfig := &client.Config{}
 
 	if len(configAuthInfo.AuthPath) > 0 {
@@ -255,15 +261,15 @@ func (config DirectClientConfig) getClusterName() string {
 	return config.getContext().Cluster
 }
 
-func (config DirectClientConfig) getContext() Context {
+func (config DirectClientConfig) getContext() clientcmdapi.Context {
 	return config.config.Contexts[config.getContextName()]
 }
 
-func (config DirectClientConfig) getAuthInfo() AuthInfo {
+func (config DirectClientConfig) getAuthInfo() clientcmdapi.AuthInfo {
 	authInfos := config.config.AuthInfos
 	authInfoName := config.getAuthInfoName()
 
-	var mergedAuthInfo AuthInfo
+	var mergedAuthInfo clientcmdapi.AuthInfo
 	if configAuthInfo, exists := authInfos[authInfoName]; exists {
 		mergo.Merge(&mergedAuthInfo, configAuthInfo)
 	}
@@ -272,11 +278,11 @@ func (config DirectClientConfig) getAuthInfo() AuthInfo {
 	return mergedAuthInfo
 }
 
-func (config DirectClientConfig) getCluster() Cluster {
+func (config DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfos := config.config.Clusters
 	clusterInfoName := config.getClusterName()
 
-	var mergedClusterInfo Cluster
+	var mergedClusterInfo clientcmdapi.Cluster
 	mergo.Merge(&mergedClusterInfo, defaultCluster)
 	mergo.Merge(&mergedClusterInfo, envVarCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {

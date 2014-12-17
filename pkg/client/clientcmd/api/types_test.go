@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientcmd
+package api
 
 import (
 	"fmt"
 
-	"gopkg.in/v2/yaml"
+	"github.com/ghodss/yaml"
 )
 
 func ExampleEmptyConfig() {
@@ -32,11 +32,11 @@ func ExampleEmptyConfig() {
 
 	fmt.Printf("%v", string(output))
 	// Output:
-	// preferences: {}
 	// clusters: {}
-	// users: {}
 	// contexts: {}
 	// current-context: ""
+	// preferences: {}
+	// users: {}
 }
 
 func ExampleOfOptionsConfig() {
@@ -86,17 +86,30 @@ func ExampleOfOptionsConfig() {
 
 	fmt.Printf("%v", string(output))
 	// Output:
-	// preferences:
-	//   colors: true
 	// clusters:
 	//   alfa:
-	//     server: https://alfa.org:8080
 	//     api-version: v1beta2
-	//     insecure-skip-tls-verify: true
 	//     certificate-authority: path/to/my/cert-ca-filename
+	//     insecure-skip-tls-verify: true
+	//     server: https://alfa.org:8080
 	//   bravo:
-	//     server: https://bravo.org:8080
 	//     api-version: v1beta1
+	//     server: https://bravo.org:8080
+	// contexts:
+	//   alfa-as-black-mage:
+	//     cluster: alfa
+	//     namespace: zulu
+	//     user: black-mage-via-file
+	//   alfa-as-white-mage:
+	//     cluster: alfa
+	//     user: white-mage-via-cert
+	//   bravo-as-black-mage:
+	//     cluster: bravo
+	//     namespace: yankee
+	//     user: black-mage-via-file
+	// current-context: alfa-as-white-mage
+	// preferences:
+	//   colors: true
 	// users:
 	//   black-mage-via-file:
 	//     auth-path: path/to/my/.kubernetes_auth
@@ -105,17 +118,4 @@ func ExampleOfOptionsConfig() {
 	//   white-mage-via-cert:
 	//     client-certificate: path/to/my/client-cert-filename
 	//     client-key: path/to/my/client-key-filename
-	// contexts:
-	//   alfa-as-black-mage:
-	//     cluster: alfa
-	//     user: black-mage-via-file
-	//     namespace: zulu
-	//   alfa-as-white-mage:
-	//     cluster: alfa
-	//     user: white-mage-via-cert
-	//   bravo-as-black-mage:
-	//     cluster: bravo
-	//     user: black-mage-via-file
-	//     namespace: yankee
-	// current-context: alfa-as-white-mage
 }

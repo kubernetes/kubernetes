@@ -85,7 +85,7 @@ func testBindClientConfig(cmd *cobra.Command) ClientConfig {
 	cmd.PersistentFlags().StringVar(&loadingRules.CommandLinePath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &ConfigOverrides{}
-	overrides.BindFlags(cmd.PersistentFlags(), RecommendedConfigOverrideFlags(""))
+	BindOverrideFlags(overrides, cmd.PersistentFlags(), RecommendedConfigOverrideFlags(""))
 	clientConfig := NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig

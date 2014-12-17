@@ -22,30 +22,31 @@ import (
 	"strings"
 	"testing"
 
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
-	config := NewConfig()
-	config.Clusters["missing ca"] = Cluster{
+	config := clientcmdapi.NewConfig()
+	config.Clusters["missing ca"] = clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: "missing",
 	}
-	config.AuthInfos["error"] = AuthInfo{
+	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
 		AuthPath: "anything",
 		Token:    "here",
 	}
-	config.Contexts["dirty"] = Context{
+	config.Contexts["dirty"] = clientcmdapi.Context{
 		Cluster:  "missing ca",
 		AuthInfo: "error",
 	}
-	config.Clusters["clean"] = Cluster{
+	config.Clusters["clean"] = clientcmdapi.Cluster{
 		Server: "anything",
 	}
-	config.AuthInfos["clean"] = AuthInfo{
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
 		Token: "here",
 	}
-	config.Contexts["clean"] = Context{
+	config.Contexts["clean"] = clientcmdapi.Context{
 		Cluster:  "clean",
 		AuthInfo: "clean",
 	}
@@ -62,16 +63,16 @@ func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 	badValidation.testConfig(t)
 }
 func TestConfirmUsableBadInfoConfig(t *testing.T) {
-	config := NewConfig()
-	config.Clusters["missing ca"] = Cluster{
+	config := clientcmdapi.NewConfig()
+	config.Clusters["missing ca"] = clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: "missing",
 	}
-	config.AuthInfos["error"] = AuthInfo{
+	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
 		AuthPath: "anything",
 		Token:    "here",
 	}
-	config.Contexts["first"] = Context{
+	config.Contexts["first"] = clientcmdapi.Context{
 		Cluster:  "missing ca",
 		AuthInfo: "error",
 	}
@@ -83,7 +84,7 @@ func TestConfirmUsableBadInfoConfig(t *testing.T) {
 	test.testConfirmUsable("first", t)
 }
 func TestConfirmUsableEmptyConfig(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"no context chosen"},
@@ -92,7 +93,7 @@ func TestConfirmUsableEmptyConfig(t *testing.T) {
 	test.testConfirmUsable("", t)
 }
 func TestConfirmUsableMissingConfig(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"context was not found for"},
@@ -101,7 +102,7 @@ func TestConfirmUsableMissingConfig(t *testing.T) {
 	test.testConfirmUsable("not-here", t)
 }
 func TestValidateEmptyConfig(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	test := configValidationTest{
 		config: config,
 	}
@@ -109,7 +110,7 @@ func TestValidateEmptyConfig(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidateMissingCurrentContextConfig(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	config.CurrentContext = "anything"
 	test := configValidationTest{
 		config:                 config,
@@ -119,7 +120,7 @@ func TestValidateMissingCurrentContextConfig(t *testing.T) {
 	test.testConfig(t)
 }
 func TestIsContextNotFound(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	config.CurrentContext = "anything"
 
 	err := Validate(*config)
@@ -128,9 +129,9 @@ func TestIsContextNotFound(t *testing.T) {
 	}
 }
 func TestValidateMissingReferencesConfig(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	config.CurrentContext = "anything"
-	config.Contexts["anything"] = Context{Cluster: "missing", AuthInfo: "missing"}
+	config.Contexts["anything"] = clientcmdapi.Context{Cluster: "missing", AuthInfo: "missing"}
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"user, missing, was not found for Context anything", "cluster, missing, was not found for Context anything"},
@@ -140,9 +141,9 @@ func TestValidateMissingReferencesConfig(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidateEmptyContext(t *testing.T) {
-	config := NewConfig()
+	config := clientcmdapi.NewConfig()
 	config.CurrentContext = "anything"
-	config.Contexts["anything"] = Context{}
+	config.Contexts["anything"] = clientcmdapi.Context{}
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"user was not specified for Context anything", "cluster was not specified for Context anything"},
@@ -153,8 +154,8 @@ func TestValidateEmptyContext(t *testing.T) {
 }
 
 func TestValidateEmptyClusterInfo(t *testing.T) {
-	config := NewConfig()
-	config.Clusters["empty"] = Cluster{}
+	config := clientcmdapi.NewConfig()
+	config.Clusters["empty"] = clientcmdapi.Cluster{}
 	test := configValidationTest{
 		config:                 config,
 		expectedErrorSubstring: []string{"no server found for"},
@@ -164,8 +165,8 @@ func TestValidateEmptyClusterInfo(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidateMissingCAFileClusterInfo(t *testing.T) {
-	config := NewConfig()
-	config.Clusters["missing ca"] = Cluster{
+	config := clientcmdapi.NewConfig()
+	config.Clusters["missing ca"] = clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: "missing",
 	}
@@ -178,8 +179,8 @@ func TestValidateMissingCAFileClusterInfo(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidateCleanClusterInfo(t *testing.T) {
-	config := NewConfig()
-	config.Clusters["clean"] = Cluster{
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = clientcmdapi.Cluster{
 		Server: "anything",
 	}
 	test := configValidationTest{
@@ -193,8 +194,8 @@ func TestValidateCleanWithCAClusterInfo(t *testing.T) {
 	tempFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(tempFile.Name())
 
-	config := NewConfig()
-	config.Clusters["clean"] = Cluster{
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = clientcmdapi.Cluster{
 		Server:               "anything",
 		CertificateAuthority: tempFile.Name(),
 	}
@@ -207,8 +208,8 @@ func TestValidateCleanWithCAClusterInfo(t *testing.T) {
 }
 
 func TestValidateEmptyAuthInfo(t *testing.T) {
-	config := NewConfig()
-	config.AuthInfos["error"] = AuthInfo{}
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["error"] = clientcmdapi.AuthInfo{}
 	test := configValidationTest{
 		config: config,
 	}
@@ -217,8 +218,8 @@ func TestValidateEmptyAuthInfo(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidatePathNotFoundAuthInfo(t *testing.T) {
-	config := NewConfig()
-	config.AuthInfos["error"] = AuthInfo{
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
 		AuthPath: "missing",
 	}
 	test := configValidationTest{
@@ -230,8 +231,8 @@ func TestValidatePathNotFoundAuthInfo(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
-	config := NewConfig()
-	config.AuthInfos["error"] = AuthInfo{
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
 		ClientCertificate: "missing",
 		ClientKey:         "missing",
 	}
@@ -247,8 +248,8 @@ func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 	tempFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(tempFile.Name())
 
-	config := NewConfig()
-	config.AuthInfos["clean"] = AuthInfo{
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
 		ClientCertificate: tempFile.Name(),
 		ClientKey:         tempFile.Name(),
 	}
@@ -263,8 +264,8 @@ func TestValidateCleanPathAuthInfo(t *testing.T) {
 	tempFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(tempFile.Name())
 
-	config := NewConfig()
-	config.AuthInfos["clean"] = AuthInfo{
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
 		AuthPath: tempFile.Name(),
 	}
 	test := configValidationTest{
@@ -275,8 +276,8 @@ func TestValidateCleanPathAuthInfo(t *testing.T) {
 	test.testConfig(t)
 }
 func TestValidateCleanTokenAuthInfo(t *testing.T) {
-	config := NewConfig()
-	config.AuthInfos["clean"] = AuthInfo{
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
 		Token: "any-value",
 	}
 	test := configValidationTest{
@@ -288,7 +289,7 @@ func TestValidateCleanTokenAuthInfo(t *testing.T) {
 }
 
 type configValidationTest struct {
-	config                 *Config
+	config                 *clientcmdapi.Config
 	expectedErrorSubstring []string
 }
 
