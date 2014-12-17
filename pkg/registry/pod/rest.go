@@ -294,8 +294,12 @@ func getPodStatus(pod *api.Pod, nodes client.NodeInterface) (api.PodPhase, error
 	if pod.Status.Info == nil {
 		return api.PodPending, nil
 	}
+	// TODO(dchen1107): move the entire logic to kubelet?
 	running := 0
+	waiting := 0
 	stopped := 0
+	failed := 0
+	succeeded := 0
 	unknown := 0
 	for _, container := range pod.Spec.Containers {
 		if containerStatus, ok := pod.Status.Info[container.Name]; ok {
@@ -303,6 +307,13 @@ func getPodStatus(pod *api.Pod, nodes client.NodeInterface) (api.PodPhase, error
 				running++
 			} else if containerStatus.State.Termination != nil {
 				stopped++
+				if containerStatus.State.Termination.ExitCode == 0 {
+					succeeded++
+				} else {
+					failed++
+				}
+			} else if containerStatus.State.Waiting != nil {
+				waiting++
 			} else {
 				unknown++
 			}
@@ -311,12 +322,32 @@ func getPodStatus(pod *api.Pod, nodes client.NodeInterface) (api.PodPhase, error
 		}
 	}
 	switch {
+	case waiting > 0:
+		// One or more containers has not been started
+		return api.PodPending, nil
 	case running > 0 && unknown == 0:
+		// All containers have been started, and at least
+		// one container is running
 		return api.PodRunning, nil
 	case running == 0 && stopped > 0 && unknown == 0:
-		return api.PodFailed, nil
-	case running == 0 && stopped == 0 && unknown > 0:
-		return api.PodPending, nil
+		// All containers are terminated
+		if pod.Spec.RestartPolicy.Always != nil {
+			// All containers are in the process of restarting
+			return api.PodRunning, nil
+		}
+		if stopped == succeeded {
+			// RestartPolicy is not Always, and all
+			// containers are terminated in success
+			return api.PodSucceeded, nil
+		}
+		if pod.Spec.RestartPolicy.Never != nil {
+			// RestartPolicy is Never, and all containers are
+			// terminated with at least one in failure
+			return api.PodFailed, nil
+		}
+		// RestartPolicy is OnFailure, and at least one in failure
+		// and in the process of restarting
+		return api.PodRunning, nil
 	default:
 		return api.PodPending, nil
 	}
