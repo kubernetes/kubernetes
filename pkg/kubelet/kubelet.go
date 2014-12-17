@@ -89,20 +89,6 @@ func NewMainKubelet(
 	}
 }
 
-// NewIntegrationTestKubelet creates a new Kubelet for use in integration tests.
-// TODO: add more integration tests, and expand parameter list as needed.
-func NewIntegrationTestKubelet(hn string, rd string, dc dockertools.DockerInterface) *Kubelet {
-	return &Kubelet{
-		hostname:              hn,
-		dockerClient:          dc,
-		rootDirectory:         rd,
-		dockerPuller:          &dockertools.FakeDockerPuller{},
-		networkContainerImage: NetworkContainerImage,
-		resyncInterval:        3 * time.Second,
-		podWorkers:            newPodWorkers(),
-	}
-}
-
 type httpGetter interface {
 	Get(url string) (*http.Response, error)
 }
