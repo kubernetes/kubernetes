@@ -14,20 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# exit on any error
-set -e
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
-
-MINION_IP=$4
-MINION_ID=$5
 DOCKER_BRIDGE=kbr0
 OVS_SWITCH=obr0
 GRE_TUNNEL_BASE=gre
-BRIDGE_BASE=10.244
-BRIDGE_ADDRESS=${BRIDGE_BASE}.${MINION_ID}.1
-BRIDGE_NETWORK=${BRIDGE_ADDRESS}/24
-BRIDGE_NETMASK=255.255.255.0
 NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
 POST_NETWORK_SCRIPT_DIR=/kubernetes-vagrant
 POST_NETWORK_SCRIPT=${POST_NETWORK_SCRIPT_DIR}/network_closure.sh
@@ -42,8 +31,8 @@ DEVICE=${DOCKER_BRIDGE}
 ONBOOT=yes
 TYPE=Bridge
 BOOTPROTO=static
-IPADDR=${BRIDGE_ADDRESS}
-NETMASK=${BRIDGE_NETMASK}
+IPADDR=${MINION_CONTAINER_ADDR}
+NETMASK=${MINION_CONTAINER_NETMASK}
 STP=yes
 EOF
 
@@ -59,10 +48,8 @@ BRIDGE=${DOCKER_BRIDGE}
 EOF
 
 # now loop through all other minions and create persistent gre tunnels
-MINION_IPS=$3
-MINION_IP_ARRAY=(`echo ${MINION_IPS} | tr "," "\n"`)
 GRE_NUM=0
-for remote_ip in "${MINION_IP_ARRAY[@]}"
+for remote_ip in "${MINION_IPS[@]}"
 do
     if [ "${remote_ip}" == "${MINION_IP}" ]; then
          continue
@@ -82,8 +69,8 @@ EOF
 done
 
 # add ip route rules such that all pod traffic flows through docker bridge and consequently to the gre tunnels
-cat <<EOF > /${NETWORK_CONF_PATH}route-${DOCKER_BRIDGE}
-${BRIDGE_BASE}.0.0/16 dev ${DOCKER_BRIDGE} scope link src ${BRIDGE_ADDRESS}
+cat <<EOF > ${NETWORK_CONF_PATH}route-${DOCKER_BRIDGE}
+${CONTAINER_SUBNET} dev ${DOCKER_BRIDGE} scope link src ${MINION_CONTAINER_ADDR}
 EOF
 
 # generate the post-configure script to be called by salt as cmd.wait
@@ -92,7 +79,7 @@ cat <<EOF > ${POST_NETWORK_SCRIPT}
 
 set -e
 
-# Only do this operation once, otherwise, we get docker.servicee files output on disk, and the command line arguments get applied multiple times
+# Only do this operation once, otherwise, we get docker.service files output on disk, and the command line arguments get applied multiple times
 grep -q kbr0 /etc/sysconfig/docker || {
   # Stop docker before making these updates
   systemctl stop docker
@@ -106,7 +93,7 @@ grep -q kbr0 /etc/sysconfig/docker || {
 
   # modify the docker service file such that it uses the kube docker bridge and not its own
   #echo "OPTIONS=-b=kbr0 --iptables=false --selinux-enabled" > /etc/sysconfig/docker
-  echo "OPTIONS='-b=kbr0 --iptables=false --selinux-enabled'" >/etc/sysconfig/docker
+  echo "OPTIONS='-b=kbr0 --iptables=false --selinux-enabled ${DOCKER_OPTS}'" >/etc/sysconfig/docker
   systemctl daemon-reload
   systemctl restart docker.service
 

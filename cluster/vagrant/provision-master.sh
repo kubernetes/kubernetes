@@ -17,9 +17,6 @@
 # exit on any error
 set -e
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
-
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
   echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
@@ -50,10 +47,9 @@ fi
 
 
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
-minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   minion=${MINION_NAMES[$i]}
-  ip=${minion_ip_array[$i]}
+  ip=${MINION_IPS[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
@@ -109,27 +105,39 @@ cat <<EOF >/etc/salt/master.d/salt-output.conf
 # Minimize the amount of output to terminal
 state_verbose: False
 state_output: mixed
+log_level: debug
+log_level_logfile: debug
 EOF
+
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
+
 
 # Generate and distribute a shared secret (bearer token) to
 # apiserver and kubelet so that kubelet can authenticate to
 # apiserver to send events.
-kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
-
-mkdir -p /srv/salt-overlay/salt/kube-apiserver
 known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+if [[ ! -f "${known_tokens_file}" ]]; then
+  kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
-mkdir -p /srv/salt-overlay/salt/kubelet
-kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-(umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+  mkdir -p /srv/salt-overlay/salt/kube-apiserver
+  known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+  (umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+
+  mkdir -p /srv/salt-overlay/salt/kubelet
+  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
+  (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+fi
 
 # Configure nginx authorization
-mkdir -p "$KUBE_TEMP"
 mkdir -p /srv/salt-overlay/salt/nginx
-python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpasswd" "$MASTER_USER" "$MASTER_PASSWD"
-MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
-echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
+if [[ ! -f /srv/salt-overlay/salt/nginx/htpasswd ]]; then
+  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
+    -b -c "/srv/salt-overlay/salt/nginx/htpasswd" \
+    "$MASTER_USER" "$MASTER_PASSWD"
+fi
 
 echo "Running release install script"
 rm -rf /kube-install
@@ -141,7 +149,7 @@ pushd /kube-install
 popd
 
 # we will run provision to update code each time we test, so we do not want to do salt installs each time
-if ! which salt-master >/dev/null 2>&1; then
+if ! which salt-master &>/dev/null; then
 
   # Configure the salt-api
   cat <<EOF >/etc/salt/master.d/salt-api.conf
@@ -173,7 +181,6 @@ EOF
   # enabling the service (which is not an error) from being printed to stderr.
   SYSTEMD_LOG_LEVEL=notice systemctl enable salt-api
   systemctl start salt-api
-
 fi
 
 if ! which salt-minion >/dev/null 2>&1; then
@@ -186,5 +193,5 @@ else
   # set up to run highstate as new minions join for the first time.
   echo "Executing configuration"
   salt '*' mine.update
-  salt --force-color '*' state.highstate
+  salt --show-timeout --force-color '*' state.highstate
 fi
