@@ -175,29 +175,29 @@ type VolumeSource struct {
 }
 
 type PersistentDisk struct {
-	TypeMeta
-	ObjectMeta
-	Spec    DiskSpec
-	Status  DiskStatus
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+	Spec       DiskSpec   `json:"spec,omitempty"`
+	Status     DiskStatus `json:"status,omitempty"`
 }
 
 type DiskSpec struct {
 
 	// unique name of the PD resource.
 	// used to identify the disk in GCE or AWS
-	PDName				string `json: "pdName"`
+	PDName string `json: "pdName"`
 
 	// policy that specifies whether to delete a disk (or not) when a pod is deleted
-	RetentionPolicy		RetentionPolicy `json: "retentionPolicy"`
+	RetentionPolicy RetentionPolicy `json: "retentionPolicy"`
 
 	// size of the disk, in gb
-	Size        		int
+	Size int `json:"size"`
 
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	FSType				string `json:"fsType,omitempty"`
+	FSType string `json:"fsType,omitempty"`
 
 	// Optional: Partition on the disk to mount.
 	// If omitted, kubelet will attempt to mount the device name.
@@ -209,50 +209,48 @@ type DiskSpec struct {
 
 	// minimum performance of the disk, in IOPS.
 	// corresponds to performance attributes in GCE/AWS
-	MinimumIOPS			int
+	MinimumIOPS int `json:"minimumIOPS,omitempty"`
 
 	// minimum performance of the disk, in MBps.
 	// corresponds to performance attributes in GCE/AWS
-	MinimumThroughput 	int
-
+	MinimumThroughput int `json:"minimumThroughput,omitempty"`
 }
 
 type DiskStatus struct {
-
-	Phase			DiskPhase
+	Phase DiskPhase `json:"phase,omitempty"`
 
 	// a disk can be mounted on many hosts, depending on type.
-	Mounts 			[]Mount
+	Mounts []Mount `json:"mounts"`
 
 	// used to place pods on hosts for local storage
 	// used to determine how long a disk has been orphaned
-	LastMount		Mount
+	LastMount Mount `json:"lastMount,omitempty"`
 }
 
 type Mount struct {
-	Host            string
-	HostIP          string
-	MountedDate     util.Time
-	Phase			DiskPhase
+	Host        string    `json:"host,omitempty"`
+	HostIP      string    `json:"hostIP,omitempty"`
+	MountedDate util.Time `json:"mountedDate,omitempty"`
+	Phase       DiskPhase `json:"phase,omitempty"`
 }
 
 type RetentionPolicy string
 
 const (
-	DeleteOnPodDelete	= "DeleteOnPodDeletion"
-	RetainOnPodDelete	= "RetainOnPodDelete"
+	DeleteOnPodDelete RetentionPolicy = "DeleteOnPodDeletion"
+	RetainOnPodDelete RetentionPolicy = "RetainOnPodDelete"
 )
 
 type DiskPhase string
 
 const (
-	MountPending    	DiskPhase = "Pending"
-	Attached            DiskPhase = "Attached"
-	Formatting			DiskPhase = "Formatting"
-	Formatted			DiskPhase = "Formatted"
-	Mounted             DiskPhase = "Mounted"
-	MountFailed         DiskPhase = "Failed"
-	MountDelete     	DiskPhase = "Deleted"
+	MountPending DiskPhase = "Pending"
+	Attached     DiskPhase = "Attached"
+	Formatting   DiskPhase = "Formatting"
+	Formatted    DiskPhase = "Formatted"
+	Mounted      DiskPhase = "Mounted"
+	MountFailed  DiskPhase = "Failed"
+	MountDelete  DiskPhase = "Deleted"
 )
 
 // HostDir represents bare host directory volume.
