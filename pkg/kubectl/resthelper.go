@@ -50,6 +50,10 @@ func (m *RESTHelper) Get(namespace, name string, selector labels.Selector) (runt
 	return m.RESTClient.Get().Path(m.Resource).Namespace(namespace).Path(name).SelectorParam("labels", selector).Do().Get()
 }
 
+func (m *RESTHelper) List(namespace string, selector labels.Selector) (runtime.Object, error) {
+	return m.RESTClient.Get().Path(m.Resource).Namespace(namespace).Path("").SelectorParam("labels", selector).Do().Get()
+}
+
 func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Path("watch").

@@ -411,11 +411,26 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) ([]b
 	switch {
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
-			return nil, false, &UnexpectedStatusError{
+			var err error = &UnexpectedStatusError{
 				Request:  req,
 				Response: resp,
 				Body:     string(body),
 			}
+			// TODO: handle other error classes we know about
+			switch resp.StatusCode {
+			case http.StatusConflict:
+				if req.Method == "POST" {
+					// TODO: add Resource() and ResourceName() as Request methods so that we can set these
+					err = errors.NewAlreadyExists("", "")
+				} else {
+					err = errors.NewConflict("", "", err)
+				}
+			case http.StatusNotFound:
+				err = errors.NewNotFound("", "")
+			case http.StatusBadRequest:
+				err = errors.NewBadRequest(err.Error())
+			}
+			return nil, false, err
 		}
 		return nil, false, errors.FromObject(&status)
 	}
