@@ -5,9 +5,7 @@ PODNAME=$2
 EXTIP=$3
 PODIP=$4
 
-LOGFILE=/tmp/$PODNAME.log
-
-rm -f $LOGFILE
+LOGFILE=`mktemp --tmpdir=/tmp $PODNAME.XXXXXX`
 
 create_mapping()
 {
@@ -109,7 +107,7 @@ ADD)
 	;;
 MODIFY)
 	delete_mapping $PODNAME
-	create_mapping $POSNAME $EXTIP $PODIP
+	create_mapping $PODNAME $EXTIP $PODIP
 	;;
 DELETE)
 	delete_mapping $PODNAME
