@@ -34,6 +34,7 @@ import (
 // For more details on the remote API, check http://goo.gl/G3plxW.
 type DockerServer struct {
 	containers     []*docker.Container
+	execs          []*docker.Exec
 	cMut           sync.RWMutex
 	images         []docker.Image
 	iMut           sync.RWMutex
@@ -90,18 +91,22 @@ func (s *DockerServer) buildMuxer() {
 	s.mux.Path("/containers/{id:.*}/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.inspectContainer))
 	s.mux.Path("/containers/{id:.*}/top").Methods("GET").HandlerFunc(s.handlerWrapper(s.topContainer))
 	s.mux.Path("/containers/{id:.*}/start").Methods("POST").HandlerFunc(s.handlerWrapper(s.startContainer))
+	s.mux.Path("/containers/{id:.*}/kill").Methods("POST").HandlerFunc(s.handlerWrapper(s.stopContainer))
 	s.mux.Path("/containers/{id:.*}/stop").Methods("POST").HandlerFunc(s.handlerWrapper(s.stopContainer))
 	s.mux.Path("/containers/{id:.*}/pause").Methods("POST").HandlerFunc(s.handlerWrapper(s.pauseContainer))
 	s.mux.Path("/containers/{id:.*}/unpause").Methods("POST").HandlerFunc(s.handlerWrapper(s.unpauseContainer))
 	s.mux.Path("/containers/{id:.*}/wait").Methods("POST").HandlerFunc(s.handlerWrapper(s.waitContainer))
 	s.mux.Path("/containers/{id:.*}/attach").Methods("POST").HandlerFunc(s.handlerWrapper(s.attachContainer))
 	s.mux.Path("/containers/{id:.*}").Methods("DELETE").HandlerFunc(s.handlerWrapper(s.removeContainer))
+	s.mux.Path("/containers/{id:.*}/exec").Methods("POST").HandlerFunc(s.handlerWrapper(s.createExecContainer))
+	s.mux.Path("/exec/{id:.*}/start").Methods("POST").HandlerFunc(s.handlerWrapper(s.startExecContainer))
 	s.mux.Path("/images/create").Methods("POST").HandlerFunc(s.handlerWrapper(s.pullImage))
 	s.mux.Path("/build").Methods("POST").HandlerFunc(s.handlerWrapper(s.buildImage))
 	s.mux.Path("/images/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.listImages))
 	s.mux.Path("/images/{id:.*}").Methods("DELETE").HandlerFunc(s.handlerWrapper(s.removeImage))
 	s.mux.Path("/images/{name:.*}/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.inspectImage))
 	s.mux.Path("/images/{name:.*}/push").Methods("POST").HandlerFunc(s.handlerWrapper(s.pushImage))
+	s.mux.Path("/images/{name:.*}/tag").Methods("POST").HandlerFunc(s.handlerWrapper(s.tagImage))
 	s.mux.Path("/events").Methods("GET").HandlerFunc(s.listEvents)
 	s.mux.Path("/_ping").Methods("GET").HandlerFunc(s.handlerWrapper(s.pingDocker))
 	s.mux.Path("/images/load").Methods("POST").HandlerFunc(s.handlerWrapper(s.loadImage))
@@ -173,8 +178,8 @@ func (s *DockerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Returns default http.Handler mux, it allows customHandlers to call the
-// default behavior if wanted.
+// DefaultHandler returns default http.Handler mux, it allows customHandlers to
+// call the default behavior if wanted.
 func (s *DockerServer) DefaultHandler() http.Handler {
 	return s.mux
 }
@@ -210,6 +215,7 @@ func (s *DockerServer) listContainers(w http.ResponseWriter, r *http.Request) {
 				Created: container.Created.Unix(),
 				Status:  container.State.String(),
 				Ports:   container.NetworkSettings.PortMappingAPI(),
+				Names:   []string{fmt.Sprintf("/%s", container.Name)},
 			}
 		}
 	}
@@ -269,8 +275,7 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	image, err := s.findImage(config.Image)
-	if err != nil {
+	if _, err := s.findImage(config.Image); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -278,7 +283,7 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 	ports := map[docker.Port][]docker.PortBinding{}
 	for port := range config.ExposedPorts {
 		ports[port] = []docker.PortBinding{{
-			HostIp:   "0.0.0.0",
+			HostIP:   "0.0.0.0",
 			HostPort: strconv.Itoa(mathrand.Int() % 65536),
 		}}
 	}
@@ -294,6 +299,7 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	container := docker.Container{
+		Name:    r.URL.Query().Get("name"),
 		ID:      s.generateID(),
 		Created: time.Now(),
 		Path:    path,
@@ -305,7 +311,7 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 			ExitCode:  0,
 			StartedAt: time.Now(),
 		},
-		Image: image,
+		Image: config.Image,
 		NetworkSettings: &docker.NetworkSettings{
 			IPAddress:   fmt.Sprintf("172.16.42.%d", mathrand.Int()%250+2),
 			IPPrefixLen: 24,
@@ -557,8 +563,10 @@ func (s *DockerServer) buildImage(w http.ResponseWriter, r *http.Request) {
 	}
 	//we did not use that Dockerfile to build image cause we are a fake Docker daemon
 	image := docker.Image{
-		ID: s.generateID(),
+		ID:      s.generateID(),
+		Created: time.Now(),
 	}
+
 	query := r.URL.Query()
 	repository := image.ID
 	if t := query.Get("t"); t != "" {
@@ -597,12 +605,34 @@ func (s *DockerServer) pushImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Pushed")
 }
 
+func (s *DockerServer) tagImage(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	s.iMut.RLock()
+	if _, ok := s.imgIDs[name]; !ok {
+		s.iMut.RUnlock()
+		http.Error(w, "No such image", http.StatusNotFound)
+		return
+	}
+	s.iMut.RUnlock()
+	s.iMut.Lock()
+	defer s.iMut.Unlock()
+	newRepo := r.URL.Query().Get("repo")
+	s.imgIDs[newRepo] = s.imgIDs[name]
+	w.WriteHeader(http.StatusCreated)
+}
+
 func (s *DockerServer) removeImage(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	s.iMut.RLock()
 	var tag string
 	if img, ok := s.imgIDs[id]; ok {
 		id, tag = img, id
+	}
+	var tags []string
+	for tag, taggedID := range s.imgIDs {
+		if taggedID == id {
+			tags = append(tags, tag)
+		}
 	}
 	s.iMut.RUnlock()
 	_, index, err := s.findImageByID(id)
@@ -613,8 +643,10 @@ func (s *DockerServer) removeImage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 	s.iMut.Lock()
 	defer s.iMut.Unlock()
-	s.images[index] = s.images[len(s.images)-1]
-	s.images = s.images[:len(s.images)-1]
+	if len(tags) < 2 {
+		s.images[index] = s.images[len(s.images)-1]
+		s.images = s.images[:len(s.images)-1]
+	}
 	if tag != "" {
 		delete(s.imgIDs, tag)
 	}
@@ -689,4 +721,24 @@ func (s *DockerServer) getImage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/tar")
 
+}
+
+func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	exec := docker.Exec{ID: "id-exec-created-by-test"}
+	s.execs = append(s.execs, &exec)
+	json.NewEncoder(w).Encode(map[string]string{"Id": exec.ID})
+
+}
+
+func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	for _, exec := range s.execs {
+		if exec.ID == id {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNotFound)
 }

@@ -88,7 +88,7 @@ func TestListImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := newTestClient(&FakeRoundTripper{message: body, status: http.StatusOK})
-	images, err := client.ListImages(false)
+	images, err := client.ListImages(ListImagesOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -100,25 +100,42 @@ func TestListImages(t *testing.T) {
 func TestListImagesParameters(t *testing.T) {
 	fakeRT := &FakeRoundTripper{message: "null", status: http.StatusOK}
 	client := newTestClient(fakeRT)
-	_, err := client.ListImages(false)
+	_, err := client.ListImages(ListImagesOptions{All: false})
 	if err != nil {
 		t.Fatal(err)
 	}
 	req := fakeRT.requests[0]
 	if req.Method != "GET" {
-		t.Errorf("ListImages(false: Wrong HTTP method. Want GET. Got %s.", req.Method)
+		t.Errorf("ListImages({All: false}: Wrong HTTP method. Want GET. Got %s.", req.Method)
 	}
-	if all := req.URL.Query().Get("all"); all != "0" {
-		t.Errorf("ListImages(false): Wrong parameter. Want all=0. Got all=%s", all)
+	if all := req.URL.Query().Get("all"); all != "0" && all != "" {
+		t.Errorf("ListImages({All: false}): Wrong parameter. Want all=0 or not present at all. Got all=%s", all)
 	}
 	fakeRT.Reset()
-	_, err = client.ListImages(true)
+	_, err = client.ListImages(ListImagesOptions{All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	req = fakeRT.requests[0]
 	if all := req.URL.Query().Get("all"); all != "1" {
-		t.Errorf("ListImages(true): Wrong parameter. Want all=1. Got all=%s", all)
+		t.Errorf("ListImages({All: true}): Wrong parameter. Want all=1. Got all=%s", all)
+	}
+	fakeRT.Reset()
+	_, err = client.ListImages(ListImagesOptions{Filters: map[string][]string{
+		"dangling": {"true"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req = fakeRT.requests[0]
+	body := req.URL.Query().Get("filters")
+	var filters map[string][]string
+	err = json.Unmarshal([]byte(body), &filters)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filters["dangling"]) != 1 || filters["dangling"][0] != "true" {
+		t.Errorf("ListImages(dangling=[true]): Wrong filter map. Want dangling=[true], got dangling=%v", filters["dangling"])
 	}
 }
 

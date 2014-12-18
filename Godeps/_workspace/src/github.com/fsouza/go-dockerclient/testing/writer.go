@@ -13,9 +13,9 @@ import (
 type stdType [8]byte
 
 var (
-	stdin  stdType = stdType{0: 0}
-	stdout stdType = stdType{0: 1}
-	stderr stdType = stdType{0: 2}
+	stdin  = stdType{0: 0}
+	stdout = stdType{0: 1}
+	stderr = stdType{0: 2}
 )
 
 type stdWriter struct {

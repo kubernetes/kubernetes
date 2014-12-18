@@ -29,7 +29,7 @@ func main() {
                 fmt.Println("Created: ", img.Created)
                 fmt.Println("Size: ", img.Size)
                 fmt.Println("VirtualSize: ", img.VirtualSize)
-                fmt.Println("ParentId: ", img.ParentId)
+                fmt.Println("ParentId: ", img.ParentID)
         }
 }
 ```
