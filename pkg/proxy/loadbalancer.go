@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"net"
 )
 
@@ -25,4 +26,6 @@ type LoadBalancer interface {
 	// NextEndpoint returns the endpoint to handle a request for the given
 	// service and source address.
 	NextEndpoint(service string, srcAddr net.Addr) (string, error)
+	NewService(service string, sessionAffinityType api.AffinityType, stickyMaxAgeMinutes int) error
+	CleanupStaleStickySessions(service string)
 }
