@@ -40,6 +40,11 @@
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.6.2-10-g51fe59a",
+			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v0.2.0-rc1-120-g23142f6",
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
@@ -47,6 +52,46 @@
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "83f84dc933714d51504ceed59f43ead21d096fe7"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/archive",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/fileutils",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/ioutils",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/pools",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/promise",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/system",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/units",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
