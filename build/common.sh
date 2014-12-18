@@ -602,7 +602,7 @@ function kube::release::package_test_tarball() {
       "${release_stage}/platforms/${platform}"
   done
 
-  cp -R --parents ${KUBE_TEST_PORTABLE[@]} ${release_stage}
+  tar c ${KUBE_TEST_PORTABLE[@]} | tar x -C ${release_stage}
 
   local package_name="${RELEASE_DIR}/kubernetes-test.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
