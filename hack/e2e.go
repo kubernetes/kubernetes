@@ -319,17 +319,20 @@ func Test() (results ResultsByTest) {
 		start := time.Now()
 		testResult := results[name]
 		res, stdout, stderr := runBashWithOutputs(name, absName)
-		duration_ms := time.Now().Sub(start).Seconds() * 1000
+		// The duration_ms output is an undocumented Jenkins TAP
+		// plugin feature for test duration. One might think _ms means
+		// milliseconds, but Jenkins interprets this field in seconds.
+		duration_secs := time.Now().Sub(start).Seconds()
 		if res {
 			fmt.Printf("ok %v - %v\n", i+1, name)
 			if *tap {
-				fmt.Printf("  ---\n  duration_ms: %.3f\n  ...\n", duration_ms)
+				fmt.Printf("  ---\n  duration_ms: %.3f\n  ...\n", duration_secs)
 			}
 			testResult.Pass++
 		} else {
 			fmt.Printf("not ok %v - %v\n", i+1, name)
 			if *tap {
-				fmt.Printf("  ---\n  duration_ms: %.3f\n", duration_ms)
+				fmt.Printf("  ---\n  duration_ms: %.3f\n", duration_secs)
 			}
 			printBashOutputs("  ", "    ", stdout, stderr)
 			if *tap {
