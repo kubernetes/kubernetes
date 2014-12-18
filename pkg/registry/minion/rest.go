@@ -86,6 +86,9 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 // Get satisfies the RESTStorage interface.
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	minion, err := rs.registry.GetMinion(ctx, id)
+	if err != nil {
+		return minion, err
+	}
 	if minion == nil {
 		return nil, ErrDoesNotExist
 	}
