@@ -150,16 +150,27 @@ type NodeSelector struct {
 	info NodeInfo
 }
 
-func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+// TODO: this is really a hack, we should support arbitrary reflection on fields.
+func NodeToSelectableFields(node *api.Node) labels.Set {
+	return labels.Set{
+		"$.Name": node.Name,
+	}
+}
+
+func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, nodeName string) (bool, error) {
 	if len(pod.Spec.NodeSelector) == 0 {
 		return true, nil
 	}
 	selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
-	minion, err := n.info.GetNodeInfo(node)
+	node, err := n.info.GetNodeInfo(nodeName)
 	if err != nil {
 		return false, err
 	}
-	return selector.Matches(labels.Set(minion.Labels)), nil
+	labelSet := NodeToSelectableFields(node)
+	for key, value := range node.Labels {
+		labelSet[key] = value
+	}
+	return selector.Matches(labels.Set(labelSet)), nil
 }
 
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
