@@ -72,13 +72,20 @@ func (s *Scheme) Log(l DebugLogger) {
 	s.converter.Debug = l
 }
 
-// nameFunc returns the name of the type that we wish to use for encoding. Defaults to
-// the go name of the type if the type is not registered.
+// nameFunc returns the name of the type that we wish to use to determine when two types attempt
+// a conversion. Defaults to the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
 	// find the preferred names for this type
 	names, ok := s.typeToKind[t]
 	if !ok {
 		return t.Name()
+	}
+	if internal, ok := s.versionMap[""]; ok {
+		for _, name := range names {
+			if t, ok := internal[name]; ok {
+				return s.typeToKind[t][0]
+			}
+		}
 	}
 	return names[0]
 }
