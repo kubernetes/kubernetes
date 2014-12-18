@@ -74,6 +74,12 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		obj = objOut
 	}
 
+	// ensure the output object name comes from the destination type
+	_, objKind, err = s.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, err
+	}
+
 	// Version and Kind should be set on the wire.
 	err = s.SetVersionAndKind(destVersion, objKind, obj)
 	if err != nil {
