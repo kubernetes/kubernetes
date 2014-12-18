@@ -182,7 +182,7 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	}
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- d.client.StartExec(execObj.Id, startOpts)
+		errChan <- d.client.StartExec(execObj.ID, startOpts)
 	}()
 	wrBuf.Flush()
 	return buf.Bytes(), <-errChan
