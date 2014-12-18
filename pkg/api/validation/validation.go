@@ -26,6 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
+	"github.com/golang/glog"
 )
 
 // ServiceLister is an abstract interface for testing.
@@ -568,9 +570,18 @@ func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
 // ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
 func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
+
+	if !reflect.DeepEqual(minion.Status, api.NodeStatus{}) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("status", minion.Status, "status must be empty"))
+	}
+
+	// Allow users to update labels and capacity
 	oldMinion.Labels = minion.Labels
+	oldMinion.Spec.Capacity = minion.Spec.Capacity
+
 	if !reflect.DeepEqual(oldMinion, minion) {
-		allErrs = append(allErrs, fmt.Errorf("update contains more than labels changes"))
+		glog.V(4).Infof("Update failed validation %#v vs %#v", oldMinion, minion)
+		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or capacity changes"))
 	}
 	return allErrs
 }
