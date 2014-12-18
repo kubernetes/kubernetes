@@ -391,6 +391,7 @@ function kube-up {
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/format-and-mount-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
@@ -405,6 +406,13 @@ function kube-up {
     fi
   fi
 
+  # We have to make sure the disk is created before creating the master VM, so
+  # run this in the foreground.
+  gcloud compute disks create "${MASTER_NAME}-pd" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --size "10GB"
+
   gcloud compute instances create "${MASTER_NAME}" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
@@ -414,7 +422,8 @@ function kube-up {
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
     --scopes "storage-ro" "compute-rw" \
-    --metadata-from-file "startup-script=${KUBE_TEMP}/master-start.sh" &
+    --metadata-from-file "startup-script=${KUBE_TEMP}/master-start.sh" \
+    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no &
 
   # Create the firewall rules, 10 at a time.
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
