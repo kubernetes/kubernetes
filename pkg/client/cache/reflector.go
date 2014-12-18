@@ -172,7 +172,7 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) err
 
 	watchDuration := time.Now().Sub(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
+		glog.V(4).Infof("Unexpected watch close - watch lasted less than a second and no items received")
 		return errors.New("very short watch")
 	}
 	glog.V(4).Infof("Watch close - %v total %v items received", r.expectedType, eventCount)
