@@ -23,9 +23,11 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"text/template"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -191,7 +193,7 @@ var replicationControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR", "REP
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
 var minionColumns = []string{"NAME", "LABELS"}
 var statusColumns = []string{"STATUS"}
-var eventColumns = []string{"NAME", "KIND", "CONDITION", "REASON", "MESSAGE"}
+var eventColumns = []string{"TIME", "NAME", "KIND", "CONDITION", "REASON", "MESSAGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -317,7 +319,8 @@ func printStatus(status *api.Status, w io.Writer) error {
 
 func printEvent(event *api.Event, w io.Writer) error {
 	_, err := fmt.Fprintf(
-		w, "%s\t%s\t%s\t%s\t%s\n",
+		w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		event.Timestamp.Time.Format(time.RFC1123Z),
 		event.InvolvedObject.Name,
 		event.InvolvedObject.Kind,
 		event.Condition,
@@ -327,7 +330,9 @@ func printEvent(event *api.Event, w io.Writer) error {
 	return err
 }
 
+// Sorts and prints the EventList in a human-friendly format.
 func printEventList(list *api.EventList, w io.Writer) error {
+	sort.Sort(SortableEvents(list.Items))
 	for i := range list.Items {
 		if err := printEvent(&list.Items[i], w); err != nil {
 			return err
@@ -350,12 +355,10 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		resultValue := handler.printFunc.Call(args)[0]
 		if resultValue.IsNil() {
 			return nil
-		} else {
-			return resultValue.Interface().(error)
 		}
-	} else {
-		return fmt.Errorf("error: unknown type %#v", obj)
+		return resultValue.Interface().(error)
 	}
+	return fmt.Errorf("error: unknown type %#v", obj)
 }
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.

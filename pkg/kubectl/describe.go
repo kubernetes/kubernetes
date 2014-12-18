@@ -21,6 +21,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -193,22 +194,21 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 	})
 }
 
-type sortableEvents []api.Event
-
-func (s sortableEvents) Len() int           { return len(s) }
-func (s sortableEvents) Less(i, j int) bool { return s[i].Timestamp.Before(s[j].Timestamp.Time) }
-func (s sortableEvents) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
 func describeEvents(el *api.EventList, w io.Writer) {
 	if len(el.Items) == 0 {
 		fmt.Fprint(w, "No events.")
 		return
 	}
-	sort.Sort(sortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\nFrom\tSubobjectPath\tCondition\tReason\tMessage\n")
+	sort.Sort(SortableEvents(el.Items))
+	fmt.Fprint(w, "Events:\nTime\tFrom\tSubobjectPath\tCondition\tReason\tMessage\n")
 	for _, e := range el.Items {
-		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
-			e.Source, e.InvolvedObject.FieldPath, e.Condition, e.Reason, e.Message)
+		fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%v\t%v\n",
+			e.Timestamp.Time.Format(time.RFC1123Z),
+			e.Source,
+			e.InvolvedObject.FieldPath,
+			e.Condition,
+			e.Reason,
+			e.Message)
 	}
 }
 

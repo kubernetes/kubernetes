@@ -19,8 +19,11 @@ package kubectl
 import (
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type describeClient struct {
@@ -28,6 +31,10 @@ type describeClient struct {
 	Namespace string
 	Err       error
 	*client.Fake
+}
+
+func init() {
+	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
 
 func TestDescribePod(t *testing.T) {
@@ -54,4 +61,40 @@ func TestDescribeService(t *testing.T) {
 	if !strings.Contains(out, "Labels:") || !strings.Contains(out, "bar") {
 		t.Errorf("unexpected out: %s", out)
 	}
+}
+
+func TestPodDescribeResultsSorted(t *testing.T) {
+	// Arrange
+	fake := &client.Fake{
+		EventsList: api.EventList{
+			Items: []api.Event{
+				{
+					Source:    "kubelet",
+					Message:   "Item 1",
+					Timestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				},
+				{
+					Source:    "scheduler",
+					Message:   "Item 2",
+					Timestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				},
+				{
+					Source:    "kubelet",
+					Message:   "Item 3",
+					Timestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+	}
+	c := &describeClient{T: t, Namespace: "foo", Fake: fake}
+	d := PodDescriber{c}
+
+	// Act
+	out, err := d.Describe("foo", "bar")
+
+	// Assert
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "\t" /* columnDelimiter */, t)
 }
