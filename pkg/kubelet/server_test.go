@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -90,7 +89,7 @@ func newServerTest() *serverTestFramework {
 	}
 	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{}
-	server := NewServer(fw.fakeKubelet, fw.updateChan, true)
+	server := NewServer(fw.fakeKubelet, true)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -109,160 +108,6 @@ func readResp(resp *http.Response) (string, error) {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	return string(body), err
-}
-
-func TestContainer(t *testing.T) {
-	fw := newServerTest()
-	expected := []api.ContainerManifest{
-		{
-			ID:   "test_manifest",
-			UUID: "value",
-			Containers: []api.Container{
-				{
-					Name: "container",
-				},
-			},
-			Volumes: []api.Volume{
-				{
-					Name: "test",
-				},
-			},
-			RestartPolicy: api.RestartPolicy{
-				Never: &api.RestartPolicyNever{},
-			},
-		},
-	}
-	body := bytes.NewBuffer([]byte(encodeJSON(expected[0]))) // Only send a single ContainerManifest
-	resp, err := http.Post(fw.testHTTPServer.URL+"/container", "application/json", body)
-	if err != nil {
-		t.Errorf("Post returned: %v", err)
-	}
-	resp.Body.Close()
-	close(fw.updateChan)
-	received := fw.updateReader.GetList()
-	if len(received) != 1 {
-		t.Errorf("Expected 1 manifest, but got %v", len(received))
-	}
-	expectedPods := []api.BoundPod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				Name: "test_manifest",
-				UID:  "value",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name: "container",
-					},
-				},
-				Volumes: []api.Volume{
-					{
-						Name: "test",
-					},
-				},
-				RestartPolicy: api.RestartPolicy{
-					Never: &api.RestartPolicyNever{},
-				},
-			},
-		},
-	}
-	if !reflect.DeepEqual(expectedPods, received[0]) {
-		t.Errorf("Expected %#v, but got %#v", expectedPods, received[0])
-	}
-}
-
-func TestContainers(t *testing.T) {
-	fw := newServerTest()
-	expected := []api.ContainerManifest{
-		{
-			ID: "test_manifest_1",
-			Containers: []api.Container{
-				{
-					Name: "container",
-				},
-			},
-			Volumes: []api.Volume{
-				{
-					Name: "test",
-				},
-			},
-			RestartPolicy: api.RestartPolicy{
-				Never: &api.RestartPolicyNever{},
-			},
-		},
-		{
-			ID: "test_manifest_2",
-			Containers: []api.Container{
-				{
-					Name: "container2",
-				},
-			},
-			Volumes: []api.Volume{
-				{
-					Name: "test2",
-				},
-			},
-			RestartPolicy: api.RestartPolicy{
-				Never: &api.RestartPolicyNever{},
-			},
-		},
-	}
-	body := bytes.NewBuffer([]byte(encodeJSON(expected)))
-	resp, err := http.Post(fw.testHTTPServer.URL+"/containers", "application/json", body)
-	if err != nil {
-		t.Errorf("Post returned: %v", err)
-	}
-	resp.Body.Close()
-	close(fw.updateChan)
-	received := fw.updateReader.GetList()
-	if len(received) != 1 {
-		t.Errorf("Expected 1 update, but got %v", len(received))
-	}
-	expectedPods := []api.BoundPod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				Name: "1",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name: "container",
-					},
-				},
-				Volumes: []api.Volume{
-					{
-						Name: "test",
-					},
-				},
-				RestartPolicy: api.RestartPolicy{
-					Never: &api.RestartPolicyNever{},
-				},
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				Name: "2",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name: "container2",
-					},
-				},
-				Volumes: []api.Volume{
-					{
-						Name: "test2",
-					},
-				},
-				RestartPolicy: api.RestartPolicy{
-					Never: &api.RestartPolicyNever{},
-				},
-			},
-		},
-	}
-	if !reflect.DeepEqual(expectedPods, received[0]) {
-		t.Errorf("Expected %#v, but got %#v", expectedPods, received[0])
-	}
 }
 
 func TestPodInfo(t *testing.T) {
