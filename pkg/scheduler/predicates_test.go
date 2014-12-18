@@ -307,6 +307,33 @@ func TestPodFitsSelector(t *testing.T) {
 			pod: api.Pod{
 				Spec: api.PodSpec{
 					NodeSelector: map[string]string{
+						"$.Name": "testhost",
+					},
+				},
+			},
+			labels: map[string]string{},
+			fits:   true,
+			test:   "hostname",
+		},
+		{
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"$.Name": "testhost",
+						"foo":    "bar",
+					},
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "hostname and labels",
+		},
+		{
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
 						"foo": "bar",
 					},
 				},
@@ -335,7 +362,12 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
+		node := api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "testhost",
+				Labels: test.labels,
+			},
+		}
 
 		fit := NodeSelector{FakeNodeInfo(node)}
 		fits, err := fit.PodSelectorMatches(test.pod, []api.Pod{}, "machine")
