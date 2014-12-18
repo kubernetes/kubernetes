@@ -189,6 +189,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 	ws.Produces(restful.MIME_JSON)
 	// TODO: require json on input
 	//ws.Consumes(restful.MIME_JSON)
+	ws.ApiVersion(version)
 
 	// TODO: add scheme to APIGroupVersion rather than using api.Scheme
 
