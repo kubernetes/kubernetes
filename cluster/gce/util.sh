@@ -726,7 +726,7 @@ function restart-kube-proxy {
 function setup-monitoring {
   if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     echo "Setting up cluster monitoring using Heapster."
-
+    detect-project
     if ! gcloud compute firewall-rules describe monitoring-heapster &>/dev/null; then
       if ! gcloud compute firewall-rules create monitoring-heapster \
           --project "${PROJECT}" \
