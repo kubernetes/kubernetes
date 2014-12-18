@@ -315,6 +315,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer httplog.NewLogged(req, &w).StacktraceWhen(
 		httplog.StatusIsNot(
 			http.StatusOK,
+			http.StatusMovedPermanently,
+			http.StatusTemporaryRedirect,
 			http.StatusNotFound,
 		),
 	).Log()
