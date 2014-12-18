@@ -104,8 +104,8 @@
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Comment": "0.2.1-267-g15d2c6e",
-			"Rev": "15d2c6e3eb670c545d0af0604d7f9aff3871af04"
+			"Comment": "0.2.1-334-g9c377ff",
+			"Rev": "9c377ffd9aed48a012adf1c3fd517fe98394120b"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",

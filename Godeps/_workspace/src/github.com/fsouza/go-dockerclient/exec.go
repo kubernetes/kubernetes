@@ -50,8 +50,10 @@ type StartExecOptions struct {
 	Success chan struct{} `json:"-"`
 }
 
+// Exec is the type representing a `docker exec` instance and containing the
+// instance ID
 type Exec struct {
-	Id string `json:"Id,omitempty" yaml:"Id,omitempty"`
+	ID string `json:"Id,omitempty" yaml:"Id,omitempty"`
 }
 
 // CreateExec sets up an exec instance in a running container `id`, returning the exec
@@ -76,9 +78,9 @@ func (c *Client) CreateExec(opts CreateExecOptions) (*Exec, error) {
 	return &exec, nil
 }
 
-// Starts a previously set up exec instance id. If opts.Detach is true, it returns
-// after starting the exec command. Otherwise, it sets up an interactive session
-// with the exec command.
+// StartExec starts a previously set up exec instance id. If opts.Detach is
+// true, it returns after starting the exec command. Otherwise, it sets up an
+// interactive session with the exec command.
 //
 // See http://goo.gl/JW8Lxl for more details
 func (c *Client) StartExec(id string, opts StartExecOptions) error {
@@ -102,8 +104,9 @@ func (c *Client) StartExec(id string, opts StartExecOptions) error {
 	return c.hijack("POST", path, opts.Success, opts.RawTerminal, opts.InputStream, opts.ErrorStream, opts.OutputStream, opts)
 }
 
-// Resizes the tty session used by the exec command id. This API is valid only
-// if Tty was specified as part of creating and starting the exec command.
+// ResizeExecTTY resizes the tty session used by the exec command id. This API
+// is valid only if Tty was specified as part of creating and starting the exec
+// command.
 //
 // See http://goo.gl/YDSx1f for more details
 func (c *Client) ResizeExecTTY(id string, height, width int) error {

@@ -344,7 +344,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		portBindings[dockerPort] = []docker.PortBinding{
 			{
 				HostPort: strconv.Itoa(exteriorPort),
-				HostIp:   port.HostIP,
+				HostIP:   port.HostIP,
 			},
 		}
 	}
@@ -487,7 +487,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			Hostname:     pod.Name,
 			Image:        container.Image,
 			Memory:       int64(container.Memory),
-			CpuShares:    int64(milliCPUToShares(container.CPU)),
+			CPUShares:    int64(milliCPUToShares(container.CPU)),
 			WorkingDir:   container.WorkingDir,
 		},
 	}
