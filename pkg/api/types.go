@@ -760,6 +760,9 @@ type Binding struct {
 // import both.
 type Status struct {
 	TypeMeta `json:",inline"`
+	// TODO: Using "ListMeta" because it makes fewer assumptions than
+	// ObjectMeta; ideally, we should make a meta type that contains
+	// just SelfLink, Namespace, and UID.
 	ListMeta `json:"metadata,omitempty"`
 
 	// One of: "Success", "Failure", "Working" (for operations not yet completed)
