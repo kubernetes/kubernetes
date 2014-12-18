@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
 )
@@ -37,6 +38,8 @@ type podNameIP struct {
 type Onramp struct {
 	etcdClient tools.EtcdClient
 	kubeClient *client.Client
+	extInterface string
+	extAddrs util.StringList
 	podNameList []podNameIP
 	podNameLock *sync.Mutex
 	podMonitor	int
@@ -54,10 +57,12 @@ type OnrampRouterClaim struct {
 // Helper structs to allow use of foreign types
 type Container api.Container
 
-func NewOnramp(ec tools.EtcdClient, ac *client.Client) *Onramp {
+func NewOnramp(ec tools.EtcdClient, ac *client.Client, intf string, addrs util.StringList) *Onramp {
 	return &Onramp{
 		etcdClient: ec,
 		kubeClient: ac,
+		extInterface: intf,
+		extAddrs: addrs,
 		podNameLock: &sync.Mutex{},
 		podMonitor: 0,
 	}

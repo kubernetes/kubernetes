@@ -32,11 +32,15 @@ var (
 	etcdServerList util.StringList
 	kubeApiServer  util.StringList
 	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
+	intf      string
+	externalAddrs  util.StringList
 )
 
 func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional). Mutually exclusive with -etcd_config")
-	flag.Var(&kubeApiServer, "master", "List of Kube api servers to watch (http://ip:port), comma separated (optional).")
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (requried). Mutually exclusive with -etcd_config")
+	flag.Var(&kubeApiServer, "master", "List of Kube api servers to watch (http://ip:port), comma separated (erquired).")
+	flag.StringVar(&intf, "interface", "", "Interface on which external traffic arrives. (required)")
+	flag.Var(&externalAddrs, "external_addrs", "List of ipv4 address which to use as external, comma separated (required).")
 }
 
 func main() {
@@ -56,6 +60,16 @@ func main() {
 		etcdClient = etcd.NewClient(etcdServerList)
 	}
 
+	if intf == "" {
+		glog.Infof("Must specify an interface to act as external\n")
+		return
+	}
+
+	if len(externalAddrs) == 0 {
+		glog.Infof("Must specify at least one external address\n") 
+		return
+	}
+
 	if len(kubeApiServer) > 0 {
 		kubeClient = client.NewOrDie(&client.Config{Host: kubeApiServer[0], Version: "v1beta1"})
 	}
@@ -70,7 +84,7 @@ func main() {
 		glog.Infof("Watching for etcd configs at %v", etcdClient.GetCluster())
 	}
 
-	Onrmp := onramp.NewOnramp(etcdClient, kubeClient)
+	Onrmp := onramp.NewOnramp(etcdClient, kubeClient, intf, externalAddrs)
 	// Start watching for work to do
 	go util.Forever(func() { Onrmp.Run() }, 0)
 
