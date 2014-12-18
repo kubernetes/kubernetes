@@ -604,6 +604,43 @@ type ReplicationControllerList struct {
 	Items []ReplicationController `json:"items"`
 }
 
+type PodPerNodeControllerSpec struct {
+	// A selector specifying the set of nodes.  An instance of the pod template is run on each matching node
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// TemplateRef is a reference to an object that describes the pod that will be created if
+	// insufficient replicas are detected. This reference is ignored if a Template is set.
+	// Must be set before converting to a v1beta3 API object
+	TemplateRef *ObjectReference `json:"templateRef,omitempty"`
+
+	// Template is the object that describes the pod that will be created if
+	// insufficient replicas are detected. Internally, this takes precedence over a
+	// TemplateRef.
+	// Must be set before converting to a v1beta1 or v1beta2 API object.
+	Template *PodTemplateSpec `json:"template,omitempty"`
+
+	// Shutdown specifies if this per-pod controller should be shutdown.
+	// shutdown per-pod controllers delete all corresponding pods on all nodes in the node selector
+	Shutdown bool `json:"template,omitempty"`
+}
+
+type PodPerNodeController struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this pod per node controller
+	Spec PodPerNodeControllerSpec `json:"spec,omitempty"`
+
+	// Status would go here when there is anything to return for status
+}
+
+type PodPerNodeControllerList struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	Items []PodPerNodeController `json:"items"`
+}
+
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct{}
 
