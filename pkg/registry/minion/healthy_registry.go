@@ -40,6 +40,9 @@ func NewHealthyRegistry(delegate Registry, client client.KubeletHealthChecker) R
 
 func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
 	minion, err := r.delegate.GetMinion(ctx, minionID)
+	if err != nil {
+		return minion, err
+	}
 	if minion == nil {
 		return nil, ErrDoesNotExist
 	}

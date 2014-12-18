@@ -604,7 +604,7 @@ func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Node, error
 	key := makeNodeKey(minionID)
 	err := r.ExtractObj(key, &minion, false)
 	if err != nil {
-		return nil, etcderr.InterpretGetError(err, "minion", minion.Name)
+		return nil, etcderr.InterpretGetError(err, "minion", minionID)
 	}
 	return &minion, nil
 }
