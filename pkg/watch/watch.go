@@ -56,6 +56,26 @@ type Event struct {
 	Object runtime.Object
 }
 
+type emptyWatch chan Event
+
+// NewEmptyWatch returns a watch interface that returns no results and is closed.
+// May be used in certain error conditions where no information is available but
+// an error is not warranted.
+func NewEmptyWatch() Interface {
+	ch := make(chan Event)
+	close(ch)
+	return emptyWatch(ch)
+}
+
+// Stop implements Interface
+func (w emptyWatch) Stop() {
+}
+
+// ResultChan implements Interface
+func (w emptyWatch) ResultChan() <-chan Event {
+	return chan Event(w)
+}
+
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
 	result  chan Event

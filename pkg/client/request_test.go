@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -164,6 +165,7 @@ func TestRequestWatch(t *testing.T) {
 	testCases := []struct {
 		Request *Request
 		Err     bool
+		Empty   bool
 	}{
 		{
 			Request: &Request{err: errors.New("bail")},
@@ -191,15 +193,59 @@ func TestRequestWatch(t *testing.T) {
 			},
 			Err: true,
 		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, io.EOF
+				}),
+				baseURL: &url.URL{},
+			},
+			Empty: true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, &url.Error{Err: io.EOF}
+				}),
+				baseURL: &url.URL{},
+			},
+			Empty: true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, errors.New("http: can't write HTTP request on broken connection")
+				}),
+				baseURL: &url.URL{},
+			},
+			Empty: true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, errors.New("foo: connection reset by peer")
+				}),
+				baseURL: &url.URL{},
+			},
+			Empty: true,
+		},
 	}
 	for i, testCase := range testCases {
 		watch, err := testCase.Request.Watch()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
+			continue
 		}
 		if hasErr && watch != nil {
 			t.Errorf("%d: watch should be nil when error is returned", i)
+			continue
+		}
+		if testCase.Empty {
+			_, ok := <-watch.ResultChan()
+			if ok {
+				t.Errorf("%d: expected the watch to be empty: %#v", watch)
+			}
 		}
 	}
 }
