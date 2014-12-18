@@ -235,7 +235,7 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 		if ok {
 			if netContainerInfo.PodIP != "" {
 				pod.Status.PodIP = netContainerInfo.PodIP
-			} else {
+			} else if netContainerInfo.State.Running != nil {
 				glog.Warningf("No network settings: %#v", netContainerInfo)
 			}
 		} else {
