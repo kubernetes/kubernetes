@@ -155,6 +155,7 @@ func init() {
 			if err := s.Convert(&in.Spec, &out.DesiredState.Manifest, 0); err != nil {
 				return err
 			}
+			out.DesiredState.Host = in.Spec.Host
 			if err := s.Convert(&in.Status, &out.CurrentState, 0); err != nil {
 				return err
 			}
@@ -176,6 +177,7 @@ func init() {
 			if err := s.Convert(&in.DesiredState.Manifest, &out.Spec, 0); err != nil {
 				return err
 			}
+			out.Spec.Host = in.DesiredState.Host
 			if err := s.Convert(&in.CurrentState, &out.Status, 0); err != nil {
 				return err
 			}
@@ -251,6 +253,7 @@ func init() {
 			if err := s.Convert(&in.Spec, &out.DesiredState.Manifest, 0); err != nil {
 				return err
 			}
+			out.DesiredState.Host = in.Spec.Host
 			if err := s.Convert(&in.ObjectMeta.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
@@ -260,6 +263,7 @@ func init() {
 			if err := s.Convert(&in.DesiredState.Manifest, &out.Spec, 0); err != nil {
 				return err
 			}
+			out.Spec.Host = in.DesiredState.Host
 			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
 				return err
 			}
@@ -323,12 +327,14 @@ func init() {
 			if err := s.Convert(&in, &out.Manifest, 0); err != nil {
 				return err
 			}
+			out.Host = in.Host
 			return nil
 		},
 		func(in *PodState, out *newer.PodSpec, s conversion.Scope) error {
 			if err := s.Convert(&in.Manifest, &out, 0); err != nil {
 				return err
 			}
+			out.Host = in.Host
 			return nil
 		},
 		func(in *newer.Service, out *Service, s conversion.Scope) error {

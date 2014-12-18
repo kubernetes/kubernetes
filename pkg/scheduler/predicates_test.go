@@ -124,6 +124,52 @@ func TestPodFitsResources(t *testing.T) {
 	}
 }
 
+func TestPodFitsHost(t *testing.T) {
+	tests := []struct {
+		pod  api.Pod
+		node string
+		fits bool
+		test string
+	}{
+		{
+			pod:  api.Pod{},
+			node: "foo",
+			fits: true,
+			test: "no host specified",
+		},
+		{
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Host: "foo",
+				},
+			},
+			node: "foo",
+			fits: true,
+			test: "host matches",
+		},
+		{
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Host: "bar",
+				},
+			},
+			node: "foo",
+			fits: false,
+			test: "host doesn't match",
+		},
+	}
+
+	for _, test := range tests {
+		result, err := PodFitsHost(test.pod, []api.Pod{}, test.node)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if result != test.fits {
+			t.Errorf("unexpected difference for %s: got: %v expected %v", test.test, test.fits, result)
+		}
+	}
+}
+
 func TestPodFitsPorts(t *testing.T) {
 	tests := []struct {
 		pod          api.Pod

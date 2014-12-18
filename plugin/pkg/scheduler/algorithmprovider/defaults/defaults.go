@@ -37,6 +37,8 @@ func defaultPredicates() util.StringSet {
 		factory.RegisterFitPredicate("NoDiskConflict", algorithm.NoDiskConflict),
 		// Fit is determined by node selector query
 		factory.RegisterFitPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(factory.MinionLister)),
+		// Fit is determined by the presence of the Host parameter and a string match
+		factory.RegisterFitPredicate("HostName", algorithm.PodFitsHost),
 	)
 }
 
