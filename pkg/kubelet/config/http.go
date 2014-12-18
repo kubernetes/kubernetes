@@ -97,7 +97,7 @@ func (s *sourceURL) extractFromURL() error {
 		if len(pod.Namespace) == 0 {
 			pod.Namespace = api.NamespaceDefault
 		}
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET}
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
@@ -138,7 +138,7 @@ func (s *sourceURL) extractFromURL() error {
 				pod.Namespace = api.NamespaceDefault
 			}
 		}
-		s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET}
+		s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 

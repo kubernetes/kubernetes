@@ -40,10 +40,14 @@ type FakeDockerClient struct {
 	VersionInfo   docker.Env
 }
 
-func (f *FakeDockerClient) clearCalls() {
+func (f *FakeDockerClient) ClearCalls() {
 	f.Lock()
 	defer f.Unlock()
 	f.called = []string{}
+	f.Stopped = []string{}
+	f.pulled = []string{}
+	f.Created = []string{}
+	f.Removed = []string{}
 }
 
 func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {

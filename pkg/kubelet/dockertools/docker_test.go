@@ -76,7 +76,7 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
 
-	fakeDocker.clearCalls()
+	fakeDocker.ClearCalls()
 	dockerContainer, found, _ = dockerContainers.FindPodContainer("foobar", "", "foo")
 	verifyCalls(t, fakeDocker, []string{})
 	if dockerContainer != nil || found {

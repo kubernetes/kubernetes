@@ -124,6 +124,7 @@ func TestExtractFromHTTP(t *testing.T) {
 			desc:      "Single manifest",
 			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
 			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.HTTPSource,
 				api.BoundPod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "foo",
@@ -141,6 +142,7 @@ func TestExtractFromHTTP(t *testing.T) {
 				{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
 			},
 			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.HTTPSource,
 				api.BoundPod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "1",
@@ -169,7 +171,7 @@ func TestExtractFromHTTP(t *testing.T) {
 		{
 			desc:      "Empty Array",
 			manifests: []api.ContainerManifest{},
-			expected:  CreatePodUpdate(kubelet.SET),
+			expected:  CreatePodUpdate(kubelet.SET, kubelet.HTTPSource),
 		},
 	}
 	for _, testCase := range testCases {

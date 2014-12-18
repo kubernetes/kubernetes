@@ -79,7 +79,7 @@ func (s *sourceEtcd) run() {
 			}
 
 			glog.V(4).Infof("Received state from etcd watch: %+v", pods)
-			s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
+			s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.EtcdSource}
 		}
 	}
 }
