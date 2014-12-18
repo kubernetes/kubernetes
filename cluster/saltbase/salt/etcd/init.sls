@@ -78,6 +78,9 @@ etcd:
     - user: etcd
     - group: etcd
     - dir_mode: 700
+    - require:
+      - user: etcd
+      - group: etcd
 
 {% if grains['os_family'] == 'RedHat' %}
 
@@ -118,4 +121,8 @@ etcd-service:
       {% endif %}
       - file: etcd-tar
       - file: etcd-symlink
+    - require:
+      - file: /var/etcd
+      - user: etcd
+      - group: etcd
 
