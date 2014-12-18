@@ -683,7 +683,7 @@ func TestSyncCreate(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "other",
-		expectedSet: "/prefix/version/foo/bar?namespace=other",
+		expectedSet: "/prefix/version/ns/other/foo/bar",
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
@@ -696,7 +696,7 @@ func TestSyncCreate(t *testing.T) {
 		Other: "bar",
 	}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/ns/other/foo?sync=true", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

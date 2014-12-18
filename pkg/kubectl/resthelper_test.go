@@ -37,6 +37,15 @@ func objBody(obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), obj))))
 }
 
+// splitPath returns the segments for a URL path.
+func splitPath(path string) []string {
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return []string{}
+	}
+	return strings.Split(path, "/")
+}
+
 func TestRESTHelperDelete(t *testing.T) {
 	tests := []struct {
 		Err     bool
@@ -65,12 +74,13 @@ func TestRESTHelperDelete(t *testing.T) {
 					t.Errorf("unexpected method: %#v", req)
 					return false
 				}
-				if !strings.HasSuffix(req.URL.Path, "/foo") {
-					t.Errorf("url doesn't contain name: %#v", req)
+				parts := splitPath(req.URL.Path)
+				if parts[1] != "bar" {
+					t.Errorf("url doesn't contain namespace: %#v", req)
 					return false
 				}
-				if req.URL.Query().Get("namespace") != "bar" {
-					t.Errorf("url doesn't contain namespace: %#v", req)
+				if parts[2] != "foo" {
+					t.Errorf("url doesn't contain name: %#v", req)
 					return false
 				}
 				return true
@@ -105,7 +115,8 @@ func TestRESTHelperCreate(t *testing.T) {
 			t.Errorf("unexpected method: %#v", req)
 			return false
 		}
-		if req.URL.Query().Get("namespace") != "bar" {
+		parts := splitPath(req.URL.Path)
+		if parts[1] != "bar" {
 			t.Errorf("url doesn't contain namespace: %#v", req)
 			return false
 		}
@@ -230,12 +241,13 @@ func TestRESTHelperGet(t *testing.T) {
 					t.Errorf("unexpected method: %#v", req)
 					return false
 				}
-				if !strings.HasSuffix(req.URL.Path, "/foo") {
-					t.Errorf("url doesn't contain name: %#v", req)
+				parts := splitPath(req.URL.Path)
+				if parts[1] != "bar" {
+					t.Errorf("url doesn't contain namespace: %#v", req)
 					return false
 				}
-				if req.URL.Query().Get("namespace") != "bar" {
-					t.Errorf("url doesn't contain namespace: %#v", req)
+				if parts[2] != "foo" {
+					t.Errorf("url doesn't contain name: %#v", req)
 					return false
 				}
 				return true
@@ -273,12 +285,13 @@ func TestRESTHelperUpdate(t *testing.T) {
 			t.Errorf("unexpected method: %#v", req)
 			return false
 		}
-		if !strings.HasSuffix(req.URL.Path, "/foo") {
-			t.Errorf("url doesn't contain name: %#v", req)
+		parts := splitPath(req.URL.Path)
+		if parts[1] != "bar" {
+			t.Errorf("url doesn't contain namespace: %#v", req)
 			return false
 		}
-		if req.URL.Query().Get("namespace") != "bar" {
-			t.Errorf("url doesn't contain namespace: %#v", req)
+		if parts[2] != "foo" {
+			t.Errorf("url doesn't contain name: %#v", req)
 			return false
 		}
 		return true

@@ -142,7 +142,7 @@ func TestProxy(t *testing.T) {
 		{"POST", "/some/other/dir", "question", "answer", "default"},
 		{"PUT", "/some/dir/id", "different question", "answer", "default"},
 		{"DELETE", "/some/dir/id", "", "ok", "default"},
-		{"GET", "/some/dir/id?namespace=other", "", "answer", "other"},
+		{"GET", "/some/dir/id", "", "answer", "other"},
 	}
 
 	for _, item := range table {
@@ -152,6 +152,9 @@ func TestProxy(t *testing.T) {
 				t.Errorf("%v - unexpected error %v", item.method, err)
 			}
 			if e, a := item.reqBody, string(gotBody); e != a {
+				t.Errorf("%v - expected %v, got %v", item.method, e, a)
+			}
+			if e, a := item.path, req.URL.Path; e != a {
 				t.Errorf("%v - expected %v, got %v", item.method, e, a)
 			}
 			fmt.Fprint(w, item.respBody)
@@ -169,27 +172,34 @@ func TestProxy(t *testing.T) {
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
-		req, err := http.NewRequest(
-			item.method,
-			server.URL+"/prefix/version/proxy/foo/id"+item.path,
-			strings.NewReader(item.reqBody),
-		)
-		if err != nil {
-			t.Errorf("%v - unexpected error %v", item.method, err)
-			continue
+		// test each supported URL pattern for finding the redirection resource in the proxy in a particular namespace
+		proxyTestPatterns := []string{
+			"/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace,
+			"/prefix/version/proxy/ns/" + item.reqNamespace + "/foo/id" + item.path,
 		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Errorf("%v - unexpected error %v", item.method, err)
-			continue
-		}
-		gotResp, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Errorf("%v - unexpected error %v", item.method, err)
-		}
-		resp.Body.Close()
-		if e, a := item.respBody, string(gotResp); e != a {
-			t.Errorf("%v - expected %v, got %v", item.method, e, a)
+		for _, proxyTestPattern := range proxyTestPatterns {
+			req, err := http.NewRequest(
+				item.method,
+				server.URL+proxyTestPattern,
+				strings.NewReader(item.reqBody),
+			)
+			if err != nil {
+				t.Errorf("%v - unexpected error %v", item.method, err)
+				continue
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Errorf("%v - unexpected error %v", item.method, err)
+				continue
+			}
+			gotResp, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%v - unexpected error %v", item.method, err)
+			}
+			resp.Body.Close()
+			if e, a := item.respBody, string(gotResp); e != a {
+				t.Errorf("%v - expected %v, got %v", item.method, e, a)
+			}
 		}
 	}
 }

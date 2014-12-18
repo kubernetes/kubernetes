@@ -23,6 +23,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	authhandlers "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
@@ -38,24 +39,6 @@ var specialVerbs = map[string]bool{
 	"proxy":    true,
 	"redirect": true,
 	"watch":    true,
-}
-
-// KindFromRequest returns Kind if Kind can be extracted from the request.  Otherwise, the empty string.
-func KindFromRequest(req http.Request) string {
-	// TODO: find a way to keep this code's assumptions about paths up to date with changes in the code.  Maybe instead
-	// of directly adding handler's code to the master's Mux, have a function which forces the structure when adding
-	// them.
-	parts := splitPath(req.URL.Path)
-	if len(parts) > 2 && parts[0] == "api" {
-		if _, ok := specialVerbs[parts[2]]; ok {
-			if len(parts) > 3 {
-				return parts[3]
-			}
-		} else {
-			return parts[2]
-		}
-	}
-	return ""
 }
 
 // IsReadOnlyReq() is true for any (or at least many) request which has no observable
@@ -185,14 +168,16 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 
 	attribs.ReadOnly = IsReadOnlyReq(*req)
 
+	namespace, kind, _, _ := KindAndNamespace(req)
+
 	// If a path follows the conventions of the REST object store, then
 	// we can extract the object Kind.  Otherwise, not.
-	attribs.Kind = KindFromRequest(*req)
+	attribs.Kind = kind
 
 	// If the request specifies a namespace, then the namespace is filled in.
 	// Assumes there is no empty string namespace.  Unspecified results
 	// in empty (does not understand defaulting rules.)
-	attribs.Namespace = req.URL.Query().Get("namespace")
+	attribs.Namespace = namespace
 
 	return &attribs
 }
@@ -207,4 +192,80 @@ func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGet
 		}
 		forbidden(w, req)
 	})
+}
+
+// KindAndNamespace returns the kind, namespace, and path parts for the request relative to /{kind}/{name}
+// Valid Inputs:
+// Storage paths
+// /ns/{namespace}/{kind}
+// /ns/{namespace}/{kind}/{resourceName}
+// /{kind}
+// /{kind}/{resourceName}
+// /{kind}/{resourceName}?namespace={namespace}
+// /{kind}?namespace={namespace}
+//
+// Special verbs:
+// /proxy/{kind}/{resourceName}
+// /proxy/ns/{namespace}/{kind}/{resourceName}
+// /redirect/ns/{namespace}/{kind}/{resourceName}
+// /redirect/{kind}/{resourceName}
+// /watch/{kind}
+// /watch/ns/{namespace}/{kind}
+//
+// Fully qualified paths for above:
+// /api/{version}/*
+// /api/{version}/*
+func KindAndNamespace(req *http.Request) (namespace, kind string, parts []string, err error) {
+	parts = splitPath(req.URL.Path)
+	if len(parts) < 1 {
+		err = fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
+		return
+	}
+
+	// handle input of form /api/{version}/* by adjusting special paths
+	if parts[0] == "api" {
+		if len(parts) > 2 {
+			parts = parts[2:]
+		} else {
+			err = fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+			return
+		}
+	}
+
+	// handle input of form /{specialVerb}/*
+	if _, ok := specialVerbs[parts[0]]; ok {
+		if len(parts) > 1 {
+			parts = parts[1:]
+		} else {
+			err = fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+			return
+		}
+	}
+
+	// URL forms: /ns/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
+	if parts[0] == "ns" {
+		if len(parts) < 3 {
+			err = fmt.Errorf("ResourceTypeAndNamespace expects a path of form /ns/{namespace}/*")
+			return
+		}
+		namespace = parts[1]
+		kind = parts[2]
+		parts = parts[2:]
+		return
+	}
+
+	// URL forms: /{kind}/*
+	// URL forms: POST /{kind} is a legacy API convention to create in "default" namespace
+	// URL forms: /{kind}/{resourceName} use the "default" namespace if omitted from query param
+	// URL forms: /{kind} assume cross-namespace operation if omitted from query param
+	kind = parts[0]
+	namespace = req.URL.Query().Get("namespace")
+	if len(namespace) == 0 {
+		if len(parts) > 1 || req.Method == "POST" {
+			namespace = api.NamespaceDefault
+		} else {
+			namespace = api.NamespaceAll
+		}
+	}
+	return
 }

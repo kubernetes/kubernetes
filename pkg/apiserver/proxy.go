@@ -78,35 +78,32 @@ type ProxyHandler struct {
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// use the default namespace to address the service
-	ctx := api.NewDefaultContext()
-	// if not in default namespace, provide the query parameter
-	// TODO this will need to go in the path in the future and not as a query parameter
-	namespace := req.URL.Query().Get("namespace")
-	if len(namespace) > 0 {
-		ctx = api.WithNamespace(ctx, namespace)
+	namespace, kind, parts, err := KindAndNamespace(req)
+	if err != nil {
+		notFound(w, req)
+		return
 	}
-	parts := strings.SplitN(req.URL.Path, "/", 3)
+	ctx := api.WithNamespace(api.NewContext(), namespace)
 	if len(parts) < 2 {
 		notFound(w, req)
 		return
 	}
-	resourceName := parts[0]
 	id := parts[1]
 	rest := ""
-	if len(parts) == 3 {
-		rest = parts[2]
+	if len(parts) > 2 {
+		proxyParts := parts[2:]
+		rest = strings.Join(proxyParts, "/")
 	}
-	storage, ok := r.storage[resourceName]
+	storage, ok := r.storage[kind]
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' has no storage object", resourceName)
+		httplog.LogOf(req, w).Addf("'%v' has no storage object", kind)
 		notFound(w, req)
 		return
 	}
 
 	redirector, ok := storage.(Redirector)
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resourceName)
+		httplog.LogOf(req, w).Addf("'%v' is not a redirector", kind)
 		notFound(w, req)
 		return
 	}
@@ -150,7 +147,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxy.Transport = &proxyTransport{
 		proxyScheme:      req.URL.Scheme,
 		proxyHost:        req.URL.Host,
-		proxyPathPrepend: path.Join(r.prefix, resourceName, id),
+		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, kind, id),
 	}
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)

@@ -47,7 +47,7 @@ func NewRESTHelper(client RESTClient, mapping *meta.RESTMapping) *RESTHelper {
 }
 
 func (m *RESTHelper) Get(namespace, name string, selector labels.Selector) (runtime.Object, error) {
-	return m.RESTClient.Get().Path(m.Resource).Namespace(namespace).Path(name).SelectorParam("labels", selector).Do().Get()
+	return m.RESTClient.Get().Namespace(namespace).Path(m.Resource).Path(name).SelectorParam("labels", selector).Do().Get()
 }
 
 func (m *RESTHelper) List(namespace string, selector labels.Selector) (runtime.Object, error) {
@@ -57,8 +57,8 @@ func (m *RESTHelper) List(namespace string, selector labels.Selector) (runtime.O
 func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Path("watch").
-		Path(m.Resource).
 		Namespace(namespace).
+		Path(m.Resource).
 		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", labelSelector).
 		SelectorParam("fields", fieldSelector).
@@ -66,7 +66,7 @@ func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fie
 }
 
 func (m *RESTHelper) Delete(namespace, name string) error {
-	return m.RESTClient.Delete().Path(m.Resource).Namespace(namespace).Path(name).Do().Error()
+	return m.RESTClient.Delete().Namespace(namespace).Path(m.Resource).Path(name).Do().Error()
 }
 
 func (m *RESTHelper) Create(namespace string, modify bool, data []byte) error {
@@ -99,7 +99,7 @@ func (m *RESTHelper) Create(namespace string, modify bool, data []byte) error {
 }
 
 func createResource(c RESTClient, resourcePath, namespace string, data []byte) error {
-	return c.Post().Path(resourcePath).Namespace(namespace).Body(data).Do().Error()
+	return c.Post().Namespace(namespace).Path(resourcePath).Body(data).Do().Error()
 }
 
 func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte) error {
@@ -142,5 +142,5 @@ func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte)
 }
 
 func updateResource(c RESTClient, resourcePath, namespace, name string, data []byte) error {
-	return c.Put().Path(resourcePath).Namespace(namespace).Path(name).Body(data).Do().Error()
+	return c.Put().Namespace(namespace).Path(resourcePath).Path(name).Body(data).Do().Error()
 }
