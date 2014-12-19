@@ -44,6 +44,10 @@ function validate() {
 
     local id
     num_running=0
+    if [[ ${#pod_id_list[@]} -ne $num_replicas ]]; then
+      echo "Too few or too many replicas."
+      continue
+    fi
     for id in "${pod_id_list[@]+${pod_id_list[@]}}"; do
       local template_string current_status current_image host_ip
 
@@ -78,7 +82,7 @@ function validate() {
       fi
 
       template_string="{{(index .currentState.info \"${CONTROLLER_NAME}\").image}}"
-      current_image=$($KUBECFG -template="${template_string}" get "pods/$id")
+      current_image=$($KUBECFG -template="${template_string}" get "pods/$id") || true
       if [[ "$current_image" != "${DOCKER_HUB_USER}/update-demo:${container_image_version}" ]]; then
         echo "  ${id} is created but running wrong image"
         continue
