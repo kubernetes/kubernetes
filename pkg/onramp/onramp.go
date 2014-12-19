@@ -31,6 +31,7 @@ import (
 type podNameIP struct {
 	PodName string
 	PodIP	string
+	ExtIP	string
 	NewPod	int
 }
 
@@ -40,6 +41,7 @@ type Onramp struct {
 	kubeClient *client.Client
 	extInterface string
 	extAddrs util.StringList
+	usedExtAddrs util.StringList
 	podNameList []podNameIP
 	podNameLock *sync.Mutex
 	podMonitor	int
@@ -112,6 +114,19 @@ func (onrmp *Onramp) scanPods() {
 	}
 }
 
+func (onrmp *Onramp) allocateExtAddr() (extAddr *string) {
+	if (len(onrmp.extAddrs) == 0) {
+		glog.Infof("No external Addresses to use, skipping\n")
+		return nil
+	}
+	glog.Infof("Getting New External Address\n")
+	var newIP *string = &onrmp.extAddrs[0]
+	onrmp.extAddrs = onrmp.extAddrs[1:len(onrmp.extAddrs)]
+	onrmp.usedExtAddrs = append(onrmp.usedExtAddrs, *newIP)
+	glog.Infof("Using IP address %s\n", *newIP)
+	return newIP 
+}
+
 func (onrmp *Onramp) monitorPods() {
 
 	ns := api.NamespaceAll
@@ -120,9 +135,10 @@ func (onrmp *Onramp) monitorPods() {
 	for {
 		glog.Infof("Sleeping\n")
 		time.Sleep(10 * time.Second)
-		glog.Infof("Checknig podMonitor\n")
+		glog.Infof("Checking podMonitor\n")
 		// Note: This is racy, fix it
 		if (onrmp.podMonitor == 0) {
+			glog.Infof("podmonitor already running\n");
 			return
 		}	
 		glog.Infof("Continuing monitor\n")
@@ -137,11 +153,17 @@ func (onrmp *Onramp) monitorPods() {
 
 			glog.Infof("Checking pod %s\n", onrmp.podNameList[m].PodName)
 			if (onrmp.podNameList[m].NewPod == 1) {
+				var extIP *string = onrmp.allocateExtAddr()
+				if (extIP == nil) {
+					continue;
+				}
+				onrmp.podNameList[m].ExtIP = *extIP
+
 				glog.Infof("Pod %s has been added\n", onrmp.podNameList[m].PodName)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				onrmp.podNameList[m].NewPod = 0
 				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "ADD", pod.Name, "10.16.185.126", pod.CurrentState.PodIP)
+				cmd := ex.Command("onramp_iptables_setup.sh", "ADD", onrmp.extInterface, pod.Name, *extIP, pod.CurrentState.PodIP)
 				_, err := cmd.CombinedOutput()
 				if (err != nil) {
 					glog.Infof("Error Executing Creation of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
@@ -154,7 +176,7 @@ func (onrmp *Onramp) monitorPods() {
 				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodName, onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "MODIFY", pod.Name, "10.16.185.126", pod.CurrentState.PodIP)
+				cmd := ex.Command("onramp_iptables_setup.sh", "MODIFY", onrmp.extInterface, pod.Name, onrmp.podNameList[m].ExtIP, pod.CurrentState.PodIP)
 				_, err := cmd.CombinedOutput()
 				if (err != nil) {
 					glog.Infof("Error Executing Modification of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)

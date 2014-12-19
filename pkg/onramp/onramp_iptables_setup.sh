@@ -1,9 +1,10 @@
 #!/bin/sh
 
 ACTION=$1
-PODNAME=$2
-EXTIP=$3
-PODIP=$4
+INTERFACE=$2
+PODNAME=$3
+EXTIP=$4
+PODIP=$5
 
 LOGFILE=`mktemp --tmpdir=/tmp $PODNAME.XXXXXX`
 
@@ -22,7 +23,7 @@ create_mapping()
 
 	# Start by creating the  DNAT rule on the private chain
 	echo "ADDING PRIVATE CHAIN $DNATCHAIN" >> $LOGFILE
-	iptables -t nat -A $DNATCHAIN -i em1 --destination $EXTIP/32 -j DNAT --to $PODIP >> $LOGFILE
+	iptables -t nat -A $DNATCHAIN -i $INTERFACE  -j DNAT --to $PODIP >> $LOGFILE
 
 	# Then setup the MASQ rule to do the SNAT
 	echo "ADDING PRIVATE CHAIN $SNATCHAIN" >> $LOGFILE
@@ -31,7 +32,7 @@ create_mapping()
 
 	# Then bind them in by jumping to them from the master chains
 	echo "ATTACHING NEW PRIVATE CHAINS" >> $LOGFILE
-	iptables -t nat -A PREROUTING -j $DNATCHAIN >> $LOGFILE
+	iptables -t nat -A PREROUTING --destination $EXTIP/32 -j $DNATCHAIN >> $LOGFILE
 	iptables -t nat -A POSTROUTING -j $SNATCHAIN >> $LOGFILE
 }
 
