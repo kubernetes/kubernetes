@@ -4,6 +4,7 @@
 
 1. You need an AWS account. Visit [http://aws.amazon.com](http://aws.amazon.com) to get started
 2. Install and configure [AWS Command Line Interface](http://aws.amazon.com/cli)
+3. You need an AWS [instance profile and role](http://docs.aws.amazon.com/IAM/latest/UserGuide/instance-profiles.html) with EC2 full access.
 
 ### Cluster turnup
 
