@@ -325,6 +325,8 @@ func (m *Master) init(c *Config) {
 	var userContexts = handlers.NewUserRequestContext()
 	var authenticator = c.Authenticator
 
+	nodeRESTStorage := minion.NewREST(m.minionRegistry)
+
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewREST(&pod.RESTConfig{
@@ -332,13 +334,19 @@ func (m *Master) init(c *Config) {
 			PodCache:      podCache,
 			PodInfoGetter: c.KubeletClient,
 			Registry:      m.podRegistry,
-			Nodes:         m.client.Nodes(),
+			// Note: this allows the pod rest object to directly call
+			// the node rest object without going through the network &
+			// apiserver. This arrangement should be temporary, nodes
+			// shouldn't really need this at all. Once we add more auth in,
+			// we need to consider carefully if this sort of shortcut is a
+			// good idea.
+			Nodes: RESTStorageToNodes(nodeRESTStorage).Nodes(),
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
-		"minions":                minion.NewREST(m.minionRegistry),
-		"nodes":                  minion.NewREST(m.minionRegistry),
+		"minions":                nodeRESTStorage,
+		"nodes":                  nodeRESTStorage,
 		"events":                 event.NewREST(m.eventRegistry),
 
 		// TODO: should appear only in scheduler API group.
