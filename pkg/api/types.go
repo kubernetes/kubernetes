@@ -452,6 +452,11 @@ type PodSpec struct {
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Host is a request to schedule this pod onto a specific host.  If it is non-empty,
+	// the the scheduler simply schedules this pod onto that host, assuming that it fits
+	// resource requirements.
+	Host string `json:"host,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

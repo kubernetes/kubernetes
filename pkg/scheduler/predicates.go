@@ -162,6 +162,13 @@ func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, n
 	return selector.Matches(labels.Set(minion.Labels)), nil
 }
 
+func PodFitsHost(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	if len(pod.Spec.Host) == 0 {
+		return true, nil
+	}
+	return pod.Spec.Host == node, nil
+}
+
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	existingPorts := getUsedPorts(existingPods...)
 	wantPorts := getUsedPorts(pod)

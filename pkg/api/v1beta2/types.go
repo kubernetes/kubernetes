@@ -831,6 +831,11 @@ type PodSpec struct {
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
+
+	// Host is a request to schedule this pod onto a specific host.  If it is non-empty,
+	// the the scheduler simply schedules this pod onto that host, assuming that it fits
+	// resource requirements.
+	Host string `json:"host,omitempty" description:"host requested for this pod"`
 }
 
 // BoundPod is a collection of containers that should be run on a host. A BoundPod
