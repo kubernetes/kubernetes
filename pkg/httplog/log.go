@@ -168,8 +168,8 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 func (rl *respLogger) Flush() {
 	if flusher, ok := rl.w.(http.Flusher); ok {
 		flusher.Flush()
-	} else {
-		glog.V(2).Infof("Unable to convert %v into http.Flusher", rl.w)
+	} else if glog.V(2) {
+		glog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
 	}
 }
 
