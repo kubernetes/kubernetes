@@ -39,7 +39,9 @@ type serviceInfo struct {
 	socket     proxySocket
 	timeout    time.Duration
 	// TODO: make this an net.IP address
-	publicIP []string
+	publicIP            []string
+	sessionAffinityType api.AffinityType
+	stickyMaxAgeMinutes int
 }
 
 // How long we wait for a connection to a backend in seconds
@@ -341,6 +343,7 @@ func (proxier *Proxier) SyncLoop() {
 				glog.Errorf("Failed to ensure iptables: %v", err)
 			}
 			proxier.ensurePortals()
+			proxier.cleanupStaleStickySessions()
 		}
 	}
 }
@@ -354,6 +357,15 @@ func (proxier *Proxier) ensurePortals() {
 		err := proxier.openPortal(name, info)
 		if err != nil {
 			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
+		}
+	}
+}
+
+// clean up any stale sticky session records in the hash map.
+func (proxier *Proxier) cleanupStaleStickySessions() {
+	for name, info := range proxier.serviceMap {
+		if info.sessionAffinityType != api.AffinityTypeNone {
+			proxier.loadBalancer.CleanupStaleStickySessions(name)
 		}
 	}
 }
@@ -403,10 +415,12 @@ func (proxier *Proxier) addServiceOnPort(service string, protocol api.Protocol, 
 		return nil, err
 	}
 	si := &serviceInfo{
-		proxyPort: portNum,
-		protocol:  protocol,
-		socket:    sock,
-		timeout:   timeout,
+		proxyPort:           portNum,
+		protocol:            protocol,
+		socket:              sock,
+		timeout:             timeout,
+		sessionAffinityType: api.AffinityTypeNone,
+		stickyMaxAgeMinutes: 180,
 	}
 	proxier.setServiceInfo(service, si)
 
@@ -456,10 +470,19 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info.portalIP = serviceIP
 		info.portalPort = service.Spec.Port
 		info.publicIP = service.Spec.PublicIPs
+
+		if service.Spec.SessionAffinity != nil {
+			info.sessionAffinityType = *service.Spec.SessionAffinity
+			// TODO: paramaterize this in the types api file as an attribute of sticky session.   For now it's hardcoded to 3 hours.
+			info.stickyMaxAgeMinutes = 180
+		}
+		glog.V(4).Infof("info: %+v", info)
+
 		err = proxier.openPortal(service.Name, info)
 		if err != nil {
 			glog.Errorf("Failed to open portal for %q: %v", service.Name, err)
 		}
+		proxier.loadBalancer.NewService(service.Name, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 	}
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()

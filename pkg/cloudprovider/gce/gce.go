@@ -155,14 +155,27 @@ func makeHostLink(projectID, zone, host string) string {
 		projectID, zone, host)
 }
 
-func (gce *GCECloud) makeTargetPool(name, region string, hosts []string) (string, error) {
+// Session Affinity Type string
+type GCEAffinityType string
+
+const (
+	// AffinityTypeNone - no session affinity.
+	GCEAffinityTypeNone GCEAffinityType = "None"
+	// AffinityTypeClientIP is the Client IP based.
+	GCEAffinityTypeClientIP GCEAffinityType = "CLIENT_IP"
+	// AffinityTypeClientIP is the Client IP based.
+	GCEAffinityTypeClientIPProto GCEAffinityType = "CLIENT_IP_PROTO"
+)
+
+func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) (string, error) {
 	var instances []string
 	for _, host := range hosts {
 		instances = append(instances, makeHostLink(gce.projectID, gce.zone, host))
 	}
 	pool := &compute.TargetPool{
-		Name:      name,
-		Instances: instances,
+		Name:            name,
+		Instances:       instances,
+		SessionAffinity: string(affinityType),
 	}
 	_, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
 	if err != nil {
@@ -191,9 +204,22 @@ func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return false, err
 }
 
+//translate from what K8s supports to what the cloud provider supports for session affinity.
+func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
+	switch affinityType {
+	case api.AffinityTypeClientIP:
+		return GCEAffinityTypeClientIP
+	case api.AffinityTypeNone:
+		return GCEAffinityTypeNone
+	default:
+		glog.Errorf("unexpected affinity type: %v", affinityType)
+		return GCEAffinityTypeNone
+	}
+}
+
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string) (net.IP, error) {
-	pool, err := gce.makeTargetPool(name, region, hosts)
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (net.IP, error) {
+	pool, err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		return nil, err
 	}

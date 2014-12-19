@@ -134,16 +134,20 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 			if err != nil {
 				return nil, err
 			}
+			var affinityType api.AffinityType = api.AffinityTypeNone
+			if service.Spec.SessionAffinity != nil {
+				affinityType = *service.Spec.SessionAffinity
+			}
 			if len(service.Spec.PublicIPs) > 0 {
 				for _, publicIP := range service.Spec.PublicIPs {
-					_, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts))
+					_, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 					if err != nil {
 						// TODO: have to roll-back any successful calls.
 						return nil, err
 					}
 				}
 			} else {
-				ip, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts))
+				ip, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 				if err != nil {
 					return nil, err
 				}
