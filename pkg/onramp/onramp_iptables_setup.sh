@@ -33,7 +33,7 @@ create_mapping()
 	# Then bind them in by jumping to them from the master chains
 	echo "ATTACHING NEW PRIVATE CHAINS" >> $LOGFILE
 	iptables -t nat -A PREROUTING --destination $EXTIP/32 -j $DNATCHAIN >> $LOGFILE
-	iptables -t nat -A POSTROUTING -j $SNATCHAIN >> $LOGFILE
+	iptables -t nat -A POSTROUTING --destination $PODIP/32 -j $SNATCHAIN >> $LOGFILE
 }
 
 find_rulenum()
