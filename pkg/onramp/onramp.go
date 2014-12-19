@@ -136,15 +136,13 @@ func (onrmp *Onramp) monitorPods() {
 	for {
 		glog.Infof("Sleeping\n")
 		time.Sleep(10 * time.Second)
-		glog.Infof("Checking podMonitor\n")
-		// Note: This is racy, fix it
-		if (onrmp.podMonitor == 0) {
-			glog.Infof("podmonitor already running\n");
-			return
-		}	
 		glog.Infof("Continuing monitor\n")
 		onrmp.podNameLock.Lock()
-
+		if (len(onrmp.podNameList) == 0) {
+			onrmp.podMonitor = 0
+			onrmp.podNameLock.Unlock()
+			return
+		}
 		for m := range onrmp.podNameList {
 			pod, err := pdi.Get(onrmp.podNameList[m].PodName)
 			if (err != nil) {
