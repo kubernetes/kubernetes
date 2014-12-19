@@ -17,17 +17,17 @@
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
-ZONE=us-central1-b
+ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
-NUM_MINIONS=2
+NUM_MINIONS=${NUM_MINIONS:-2}
 # TODO(dchen1107): Filed an internal issue to create an alias
 # for containervm image, so that gcloud will expand this
 # to the latest supported image.
 IMAGE=container-vm-v20141208
 IMAGE_PROJECT=google-containers
-NETWORK=e2e
-INSTANCE_PREFIX="e2e-test-${USER}"
+NETWORK=${KUBE_GCE_NETWORK:-e2e}
+INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
