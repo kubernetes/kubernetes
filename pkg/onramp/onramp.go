@@ -17,6 +17,7 @@ limitations under the License.
 package onramp
 
 import (
+	"os"
 	"sync"
 	"time"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -147,8 +148,16 @@ func (onrmp *Onramp) monitorPods() {
 		for m := range onrmp.podNameList {
 			pod, err := pdi.Get(onrmp.podNameList[m].PodName)
 			if (err != nil) {
-				glog.Infof("Could not get Pod for %s\n", onrmp.podNameList[m].PodName)
-				continue;
+				glog.Infof("Could not get Pod for %s, deleting\n", onrmp.podNameList[m].PodName)
+				ex := exec.New()
+				cmd := ex.Command("onramp_iptables_setup.sh", "DELETE", onrmp.extInterface, onrmp.podNameList[m].PodName, "NONE", "NONE")
+				_, err := cmd.CombinedOutput()
+				if (err != nil) {
+					glog.Infof("Error Executing Delete for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
+				}
+		
+				onrmp.podNameList = append(onrmp.podNameList[0:m], onrmp.podNameList[m+1:]...)
+				break; //Need to break here to restart the for loop with a new range computation		
 			}
 
 			glog.Infof("Checking pod %s\n", onrmp.podNameList[m].PodName)
@@ -190,6 +199,26 @@ func (onrmp *Onramp) monitorPods() {
 
 // Run starts the kubelet reacting to config updates
 func (onrmp *Onramp) Run() {
+
+	// Before we do anything else, the internal and external interfaces need to be set to
+	// forward
+	file, err := os.Open("/proc/sys/net/ipv4/conf/" + onrmp.extInterface + "/forwarding")
+	if (err != nil) {
+		glog.Infof("Could not find interface %s: \n", onrmp.extInterface, err)
+		return
+	}
+	file.WriteString("1")
+	file.Close()
+
+	file, err = os.Open("/proc/sys/net/ipv4/conf/flannel.1/forwarding")
+
+	if (err != nil) {
+		glog.Infof("Could not find interface flannel.1: \n", err)
+		return
+	}
+
+	file.WriteString("1")
+	file.Close()
 
 	response, err := onrmp.etcdClient.Watch("/registry/pods/default/", 0, true, nil, nil)
 	if err != nil {
