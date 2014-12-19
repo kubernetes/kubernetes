@@ -226,6 +226,8 @@ func init() {
 				*out = PodTerminated
 			case newer.PodFailed:
 				*out = PodTerminated
+			case newer.PodUnknown:
+				*out = PodUnknown
 			default:
 				return errors.New("The string provided is not a valid PodPhase constant value")
 			}
@@ -244,6 +246,8 @@ func init() {
 			case PodTerminated:
 				// Older API versions did not contain enough info to map to PodSucceeded
 				*out = newer.PodFailed
+			case PodUnknown:
+				*out = newer.PodUnknown
 			default:
 				return errors.New("The string provided is not a valid PodPhase constant value")
 			}
