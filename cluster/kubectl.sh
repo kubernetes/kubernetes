@@ -63,6 +63,7 @@ locations=(
   "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
   "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
   "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
+  "${HOME}/google-cloud-sdk/bin/kubectl"
 )
 kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
@@ -81,19 +82,34 @@ if [[ ! -x "$kubectl" ]]; then
   exit 1
 fi
 
-# When we are using vagrant it has hard coded auth.  We repeat that here so that
-# we don't clobber auth that might be used for a publicly facing cluster.
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  auth_config=(
-    "--auth-path=$HOME/.kubernetes_vagrant_auth"
-  )
-else
-  auth_config=()
+# While GKE requires the kubectl binary, it's actually called through gcloud.
+if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
+  detect-project &> /dev/null
+  kubectl="${GCLOUD}"
 fi
 
-detect-master > /dev/null
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  # When we are using vagrant it has hard coded auth.  We repeat that here so that
+  # we don't clobber auth that might be used for a publicly facing cluster.
+  config=(
+    "--auth-path=$HOME/.kubernetes_vagrant_auth"
+  )
+elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  # GKE runs kubectl through gcloud.
+  config=(
+    "preview"
+    "container"
+    "kubectl"
+    "--project=${PROJECT}"
+    "--zone=${ZONE}"
+    "--cluster=${CLUSTER_NAME}"
+  )
+fi
+
+detect-master &> /dev/null
 if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-"$kubectl" "${auth_config[@]:+${auth_config[@]}}" "$@"
+echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@}" >&2
+"${kubectl}" "${config[@]:+${config[@]}}" "${@}"

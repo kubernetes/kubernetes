@@ -84,7 +84,7 @@ function detect-project () {
     echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
-  echo "Project: $PROJECT (autodetected from gcloud config)"
+  echo "Project: $PROJECT" >&2
 }
 
 
@@ -139,11 +139,9 @@ function upload-server-tars() {
 #   MINION_NAMES
 #   ZONE
 # Vars set:
-#   KUBE_MINION_IP_ADDRESS (array)
+#   KUBE_MINION_IP_ADDRESSES (array)
 function detect-minions () {
-  if [[ -z "${PROJECT-}" ]]; then
-    detect-project
-  fi
+  detect-project
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -166,15 +164,12 @@ function detect-minions () {
 #
 # Assumed vars:
 #   MASTER_NAME
-#   PROJECT (if unset, will detect-project)
 #   ZONE
 # Vars set:
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
 function detect-master () {
-  if [[ -z "${PROJECT-}" ]]; then
-    detect-project
-  fi
+  detect-project
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     KUBE_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -251,6 +246,7 @@ function wait-for-jobs {
 # $2: IP ranges.
 # $3: Target tags for this firewall rule.
 function create-firewall-rule {
+  detect-project
   local attempt=0
   while true; do
     if ! gcloud compute firewall-rules create "$1" \
@@ -258,7 +254,7 @@ function create-firewall-rule {
       --network "${NETWORK}" \
       --source-ranges "$2" \
       --target-tags "$3" \
-      --allow tcp udp icmp esp ah sctp; then 
+      --allow tcp udp icmp esp ah sctp; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}"
           exit 2
@@ -275,6 +271,7 @@ function create-firewall-rule {
 # $1: The name of the route.
 # $2: IP range.
 function create-route {
+  detect-project
   local attempt=0
   while true; do
     if ! gcloud compute routes create "$1" \
@@ -300,6 +297,7 @@ function create-route {
 # $2: The scopes flag.
 # $3: The minion start script.
 function create-instance {
+  detect-project
   local attempt=0
   while true; do
     if ! gcloud compute instances create "$1" \
@@ -334,7 +332,6 @@ function create-instance {
 #   KUBE_ROOT
 #   <Various vars set in config file>
 function kube-up {
-  # Detect the project into $PROJECT if it isn't set
   detect-project
 
   # Make sure we have the tar files staged on Google Storage
@@ -570,18 +567,16 @@ EOF
 
 }
 
-# Delete a kubernetes cluster.
+# Delete a kubernetes cluster. This is called from test-teardown.
 #
 # Assumed vars:
 #   MASTER_NAME
 #   INSTANCE_PREFIX
 #   ZONE
-#   PROJECT
 # This function tears down cluster resources 10 at a time to avoid issuing too many
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
 # down the firewall rules and routes.
 function kube-down {
-  # Detect the project into $PROJECT
   detect-project
 
   echo "Bringing down cluster"
@@ -685,15 +680,12 @@ function test-build-release {
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e-test.sh.
+# called from hack/e2e.go only when running -up (it is run after kube-up).
 #
 # Assumed vars:
-#   PROJECT
 #   Variables from config.sh
 function test-setup {
-
   # Detect the project into $PROJECT if it isn't set
-  # gce specific
   detect-project
 
   # Open up port 80 & 8080 so common containers on minions can be reached
@@ -705,12 +697,10 @@ function test-setup {
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
 }
 
-# Execute after running tests to perform any required clean-up.  This is called
-# from hack/e2e-test.sh
-#
-# Assumed Vars:
-#   PROJECT
+# Execute after running tests to perform any required clean-up. This is called
+# from hack/e2e.go
 function test-teardown {
+  detect-project
   echo "Shutting down test cluster in background."
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
@@ -735,6 +725,7 @@ function restart-kube-proxy {
 function setup-monitoring {
   if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     echo "Setting up cluster monitoring using Heapster."
+
     detect-project
     if ! gcloud compute firewall-rules describe monitoring-heapster &>/dev/null; then
       if ! gcloud compute firewall-rules create monitoring-heapster \
