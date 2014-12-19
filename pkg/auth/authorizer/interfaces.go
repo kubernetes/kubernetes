@@ -26,7 +26,11 @@ type Attributes interface {
 	// The user string which the request was authenticated as, or empty if
 	// no authentication occured and the request was allowed to proceed.
 	GetUserName() string
-	// TODO: add groups, e.g. GetGroups() []string
+
+	// The list of group names the authenticated user is a member of. Can be
+	// empty if the authenticated user is not in any groups, or if no
+	// authentication occurred.
+	GetGroups() []string
 
 	// When IsReadOnly() == true, the request has no side effects, other than
 	// caching, logging, and other incidentals.
@@ -56,6 +60,10 @@ type AttributesRecord struct {
 
 func (a AttributesRecord) GetUserName() string {
 	return a.User.GetName()
+}
+
+func (a AttributesRecord) GetGroups() []string {
+	return a.User.GetGroups()
 }
 
 func (a AttributesRecord) IsReadOnly() bool {
