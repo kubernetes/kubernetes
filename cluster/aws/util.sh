@@ -30,7 +30,7 @@ function json_val {
 # TODO (ayurchuk) Refactor the get_* functions to use filters
 # TODO (bburns) Parameterize this for multiple cluster per project
 function get_instance_ids {
-  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance["Tags"] if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
+  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance.get("Tags", []) if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
 }
 
 function get_vpc_id {
@@ -58,7 +58,7 @@ function expect_instance_states {
 }
 
 function get_instance_public_ip {
-  python -c "import json,sys; lst = [str(instance['NetworkInterfaces'][0]['Association']['PublicIp']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] for tag in instance['Tags'] if tag['Value'] == '$1' and instance['State']['Name'] == 'running']; print ' '.join(lst)"
+  python -c "import json,sys; lst = [str(instance['NetworkInterfaces'][0]['Association']['PublicIp']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] for tag in instance.get('Tags', []) if tag['Value'] == '$1' and instance['State']['Name'] == 'running']; print ' '.join(lst)"
 }
 
 function detect-master () {
@@ -229,20 +229,60 @@ function kube-up {
     ssh-keygen -f $AWS_SSH_KEY -N ''
   fi
 
-  $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1 || true
-  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
-  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > /dev/null
-  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > /dev/null
-  $AWS_CMD create-tags --resources $VPC_ID --tags Key=Name,Value=kubernetes-vpc > /dev/null
-  SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 172.20.0.0/24 --vpc-id $VPC_ID | json_val '["Subnet"]["SubnetId"]')
-  IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
-  $AWS_CMD attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID > /dev/null
+  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE} || {
+        echo "You need to set up an IAM profile and role for kubernetes"
+        exit 1
+  }
+
+  $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > $LOG 2>&1 || true
+
+  VPC_ID=$($AWS_CMD describe-vpcs | get_vpc_id)
+
+  if [ -z "$VPC_ID" ]; then
+	  echo "Creating vpc."
+	  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
+	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
+	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
+	  $AWS_CMD create-tags --resources $VPC_ID --tags Key=Name,Value=kubernetes-vpc > $LOG
+
+  fi
+
+  echo "Using VPC $VPC_ID"
+
+  SUBNET_ID=$($AWS_CMD describe-subnets | get_subnet_id $VPC_ID)
+  if [ -z "$SUBNET_ID" ]; then
+	  echo "Creating subnet."
+	  SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 172.20.0.0/24 --vpc-id $VPC_ID | json_val '["Subnet"]["SubnetId"]')
+  fi
+
+  echo "Using subnet $SUBNET_ID"
+
+  IGW_ID=$($AWS_CMD describe-internet-gateways | get_igw_id $VPC_ID)
+  if [ -z "$IGW_ID" ]; then
+	  echo "Creating Internet Gateway."
+	  IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
+	  $AWS_CMD attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID > $LOG
+  fi
+
+  echo "Using Internet Gateway $IGW_ID"
+
+  echo "Associating route table."
   ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
-  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > /dev/null
-  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > /dev/null
-  $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > /dev/null
-  SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes-sec-group --description kubernetes-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
-  $AWS_CMD authorize-security-group-ingress --group-id $SEC_GROUP_ID --protocol -1 --port all --cidr 0.0.0.0/0 > /dev/null
+  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
+  echo "Configuring route table."
+  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > $LOG || true
+  echo "Adding route to route table."
+  $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > $LOG || true
+
+  echo "Using Route Table $ROUTE_TABLE_ID"
+
+  SEC_GROUP_ID=$($AWS_CMD describe-security-groups | get_sec_group_id)
+
+  if [ -z "$SEC_GROUP_ID" ]; then
+	  echo "Creating security group."
+	  SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes-sec-group --description kubernetes-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
+	  $AWS_CMD authorize-security-group-ingress --group-id $SEC_GROUP_ID --protocol -1 --port all --cidr 0.0.0.0/0 > $LOG
+  fi
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
@@ -264,9 +304,10 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
-
+  echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
     --image-id $IMAGE \
+    --iam-instance-profile Name=$IAM_PROFILE \
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
     --private-ip-address 172.20.0.9 \
@@ -275,11 +316,12 @@ function kube-up {
     --associate-public-ip-address \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   sleep 3
-  $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=$MASTER_NAME > /dev/null
+  $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=$MASTER_NAME > $LOG
   sleep 3
-  $AWS_CMD create-tags --resources $master_id --tags Key=Role,Value=$MASTER_TAG > /dev/null
+  $AWS_CMD create-tags --resources $master_id --tags Key=Role,Value=$MASTER_TAG > $LOG
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    echo "Starting Minion (${MINION_NAMES[$i]})"
     (
       # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
       echo "#! /bin/bash"
@@ -289,6 +331,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
     minion_id=$($AWS_CMD run-instances \
       --image-id $IMAGE \
+      --iam-instance-profile Name=$IAM_PROFILE \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
       --private-ip-address 172.20.0.1${i} \
@@ -299,7 +342,7 @@ function kube-up {
     sleep 3
     n=0
     until [ $n -ge 5 ]; do
-      $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=${MINION_NAMES[$i]} > /dev/null && break
+      $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=${MINION_NAMES[$i]} > $LOG && break
       n=$[$n+1]
       sleep 15
     done
@@ -307,13 +350,13 @@ function kube-up {
     sleep 3
     n=0
     until [ $n -ge 5 ]; do
-      $AWS_CMD create-tags --resources $minion_id --tags Key=Role,Value=$MINION_TAG > /dev/null && break
+      $AWS_CMD create-tags --resources $minion_id --tags Key=Role,Value=$MINION_TAG > $LOG && break
       n=$[$n+1]
       sleep 15
     done
 
     sleep 3
-    $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > /dev/null
+    $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
 
     # We are not able to add a route to the instance until that instance is in "running" state.
     # This is quite an ugly solution to this problem. In Bash 4 we could use assoc. arrays to do this for
@@ -323,7 +366,7 @@ function kube-up {
       if [[ "$instance_state" == "" ]]; then
         echo "Minion ${MINION_NAMES[$i]} running"
         sleep 10
-        $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > /dev/null
+        $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
         break
       else
         echo "Waiting for minion ${MINION_NAMES[$i]} to spawn"
@@ -342,8 +385,8 @@ function kube-up {
     exit 2
   fi
 
-  detect-master > /dev/null
-  detect-minions > /dev/null
+  detect-master > $LOG
+  detect-minions > $LOG
 
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
@@ -354,7 +397,7 @@ function kube-up {
     sleep 10
   done
   echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > /dev/null
+  ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
 
   echo "Waiting for cluster initialization."
   echo
@@ -364,7 +407,7 @@ function kube-up {
   echo
 
   until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
-    --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
+    --fail --output $LOG --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
     printf "."
     sleep 2
   done
@@ -380,7 +423,7 @@ function kube-up {
   # Basic sanity checking
   for i in ${KUBE_MINION_IP_ADDRESSES[@]}; do
     # Make sure docker is installed
-    ssh -oStrictHostKeyChecking=no ubuntu@$i -i ~/.ssh/kube_aws_rsa which docker > /dev/null 2>&1
+    ssh -oStrictHostKeyChecking=no ubuntu@$i -i ~/.ssh/kube_aws_rsa which docker > $LOG 2>&1
     if [ "$?" != "0" ]; then
       echo "Docker failed to install on $i. Your cluster is unlikely to work correctly."
       echo "Please run ./cluster/aws/kube-down.sh and re-create the cluster. (sorry!)"
@@ -402,9 +445,9 @@ function kube-up {
   # config file.  Distribute the same way the htpasswd is done.
   (
     umask 077
-    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>$LOG
 
     cat << EOF > ~/.kubernetes_auth
 {
@@ -423,7 +466,7 @@ EOF
 
 function kube-down {
   instance_ids=$($AWS_CMD describe-instances | get_instance_ids)
-  $AWS_CMD terminate-instances --instance-ids $instance_ids > /dev/null
+  $AWS_CMD terminate-instances --instance-ids $instance_ids > $LOG
   echo "Waiting for instances deleted"
   while true; do
     instance_states=$($AWS_CMD describe-instances --instance-ids $instance_ids | expect_instance_states terminated)
@@ -444,10 +487,10 @@ function kube-down {
   route_table_id=$($AWS_CMD describe-route-tables | get_route_table_id $vpc_id)
   sec_group_id=$($AWS_CMD describe-security-groups | get_sec_group_id)
 
-  $AWS_CMD delete-subnet --subnet-id $subnet_id > /dev/null
-  $AWS_CMD detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id > /dev/null
-  $AWS_CMD delete-internet-gateway --internet-gateway-id $igw_id > /dev/null
-  $AWS_CMD delete-security-group --group-id $sec_group_id > /dev/null
-  $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > /dev/null
-  $AWS_CMD delete-vpc --vpc-id $vpc_id > /dev/null
+  $AWS_CMD delete-subnet --subnet-id $subnet_id > $LOG
+  $AWS_CMD detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id > $LOG
+  $AWS_CMD delete-internet-gateway --internet-gateway-id $igw_id > $LOG
+  $AWS_CMD delete-security-group --group-id $sec_group_id > $LOG
+  $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > $LOG
+  $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
 }

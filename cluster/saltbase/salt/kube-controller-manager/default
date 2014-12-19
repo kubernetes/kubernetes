@@ -22,8 +22,8 @@
   {% set machines = "-machines=" + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) -%}
 {% endif -%}
 {% if grains.cloud == 'aws' -%}
-  # TODO: turn on AWS as a cloud provider.  Need to figure out AWS role-based auth.
-  {% set cloud_provider = "" -%}
+  {% set cloud_provider = "-cloud_provider=aws" -%}
+  {% set cloud_config = "-cloud_config=/etc/aws.conf" -%}
   {% set minion_regexp = "" -%}
   {% set machines = "-machines " + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) -%}
 {% endif -%}
@@ -46,4 +46,4 @@
 {% endif -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{ cloud_config }} {{pillar['log_level']}}"
