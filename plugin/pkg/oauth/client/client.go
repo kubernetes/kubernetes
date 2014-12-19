@@ -1,0 +1,55 @@
+/*
+Copyright 2014 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package client
+
+import kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+
+const (
+	OAuthAccessTokensPath         = "oauthAccessTokens"
+	OAuthAuthorizeTokensPath      = "oauthAuthorizeTokens"
+	OAuthClientsPath              = "oauthClients"
+	OAuthClientAuthorizationsPath = "oauthClientAuthorizations"
+)
+
+func (c *Client) OAuthAccessTokens() OAuthAccessTokenInterface {
+	return newAccessTokens(c)
+}
+func (c *Client) OAuthAuthorizeTokens() OAuthAuthorizeTokenInterface {
+	return newAuthorizeTokens(c)
+}
+func (c *Client) OAuthClients() OAuthClientInterface {
+	return newClients(c)
+}
+func (c *Client) OAuthClientAuthorizations() OAuthClientAuthorizationInterface {
+	return newClientAuthorizations(c)
+}
+
+// Client is the implementation of an OAuth object client.
+type Client struct {
+	*kclient.RESTClient
+}
+
+func New(r *kclient.RESTClient) Interface {
+	return &Client{r}
+}
+
+type Interface interface {
+	OAuthAccessTokensInterface
+	OAuthAuthorizeTokensInterface
+	OAuthClientsInterface
+	OAuthClientAuthorizationsInterface
+}
