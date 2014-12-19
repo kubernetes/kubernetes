@@ -74,17 +74,18 @@ To destroy the cluster:
 vagrant destroy
 ```
 
-Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubecfg.sh` script.
+Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubectl.sh` script.
 
 You may need to build the binaries first, you can do this with ```make```
 
 ```
-./cluster/kubecfg.sh list /minions
-Minion identifier    Labels
-----------           ----------
-10.245.2.4           <none>
-10.245.2.3           <none>
-10.245.2.2           <none>
+$ ./cluster/kubectl.sh get minions
+
+NAME                LABELS
+10.245.1.4          <none>
+10.245.1.5          <none>
+10.245.1.3          <none>
+
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -128,7 +129,11 @@ When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script w
 ```
 cat ~/.kubernetes_vagrant_auth
 { "User": "vagrant",
-  "Password": "vagrant"}
+  "Password": "vagrant"
+  "CAFile": "/home/k8s_user/.kubernetes.vagrant.ca.crt",
+  "CertFile": "/home/k8s_user/.kubecfg.vagrant.crt",
+  "KeyFile": "/home/k8s_user/.kubecfg.vagrant.key"
+}
 ```
 
 You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
