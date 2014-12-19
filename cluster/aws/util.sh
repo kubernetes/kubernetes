@@ -228,6 +228,11 @@ function kube-up {
     ssh-keygen -f $AWS_SSH_KEY -N ''
   fi
 
+  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE} || {
+        echo "You need to set up an IAM profile and role for kubernetes"
+        exit 1
+  }
+
   $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > $LOG 2>&1 || true
 
   VPC_ID=$($AWS_CMD describe-vpcs | get_vpc_id)
@@ -285,8 +290,8 @@ function kube-up {
     echo "cd /var/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
-    echo "readonly SERVER_BINARY_TAR_URL='https://s3.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
-    echo "readonly SALT_TAR_URL='https://s3.amazonaws.com/${SALT_TAR_URL}'"
+    echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
+    echo "readonly SALT_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SALT_TAR_URL}'"
     echo "readonly AWS_ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"

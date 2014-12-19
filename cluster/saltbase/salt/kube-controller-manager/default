@@ -46,8 +46,4 @@
 {% endif -%}
 {% endif -%}
 
-<<<<<<< HEAD
-DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{pillar['log_level']}}"
-=======
-DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{ cloud_config }}"
->>>>>>> 83f3982eee4d36962919d4f55a41ec1c2111d01a
+DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{ cloud_config }} {{pillar['log_level']}}"
