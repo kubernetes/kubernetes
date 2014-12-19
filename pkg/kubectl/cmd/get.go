@@ -59,10 +59,10 @@ Examples:
 
 			outputFormat := GetFlagString(cmd, "output")
 			templateFile := GetFlagString(cmd, "template")
-			defaultPrinter, err := f.Printer(cmd, mapping, GetFlagBool(cmd, "no-headers"))
+			defaultPrinter, err := f.Printer(cmd, mapping, GetFlagBool(cmd, "no_headers"))
 			checkErr(err)
 
-			outputVersion := GetFlagString(cmd, "output-version")
+			outputVersion := GetFlagString(cmd, "output_version")
 			if len(outputVersion) == 0 {
 				outputVersion = mapping.APIVersion
 			}
@@ -74,7 +74,7 @@ Examples:
 			obj, err := restHelper.Get(namespace, name, labelSelector)
 			checkErr(err)
 
-			isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch-only")
+			isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch_only")
 
 			// print the current object
 			if !isWatchOnly {
@@ -96,11 +96,11 @@ Examples:
 		},
 	}
 	cmd.Flags().StringP("output", "o", "", "Output format: json|yaml|template|templatefile")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version)")
-	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers")
+	cmd.Flags().String("output_version", "", "Output the formatted object with the given version (default api-version)")
+	cmd.Flags().Bool("no_headers", false, "When using the default output, don't print headers")
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when --output=template or --output=templatefile")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
-	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requseted object(s), without listing/getting first.")
+	cmd.Flags().Bool("watch_only", false, "Watch for changes to the requseted object(s), without listing/getting first.")
 	return cmd
 }
