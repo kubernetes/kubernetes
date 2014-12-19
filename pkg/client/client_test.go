@@ -130,6 +130,7 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 	requestBody := body(c.Request.Body, c.Request.RawBody)
 	actualQuery := c.handler.RequestReceived.URL.Query()
 	t.Logf("got query: %v", actualQuery)
+	t.Logf("path: %v", c.Request.Path)
 	// We check the query manually, so blank it out so that FakeHandler.ValidateRequest
 	// won't check it.
 	c.handler.RequestReceived.URL.RawQuery = ""
@@ -161,18 +162,38 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 	}
 }
 
-// convenience function to build paths
+// buildResourcePath is a convenience function for knowing if a namespace should in a path param or not
 func buildResourcePath(namespace, resource string) string {
 	if len(namespace) > 0 {
-		return path.Join("ns", namespace, resource)
+		if NamespaceInPathFor(testapi.Version()) {
+			return path.Join("ns", namespace, resource)
+		}
 	}
 	return resource
+}
+
+// buildQueryValues is a convenience function for knowing if a namespace should go in a query param or not
+func buildQueryValues(namespace string, query url.Values) url.Values {
+	v := url.Values{}
+	if query != nil {
+		for key, values := range query {
+			for _, value := range values {
+				v.Add(key, value)
+			}
+		}
+	}
+	if len(namespace) > 0 {
+		if !NamespaceInPathFor(testapi.Version()) {
+			v.Set("namespace", namespace)
+		}
+	}
+	return v
 }
 
 func TestListEmptyPods(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods")},
+		Request:  testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: &api.PodList{}},
 	}
 	podList, err := c.Setup().Pods(ns).List(labels.Everything())
@@ -182,7 +203,7 @@ func TestListEmptyPods(t *testing.T) {
 func TestListPods(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods")},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.PodList{
 				Items: []api.Pod{
@@ -214,7 +235,7 @@ func validateLabels(a, b string) bool {
 func TestListPodsLabels(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods"), Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods"), Query: buildQueryValues(ns, url.Values{"labels": []string{"foo=bar,name=baz"}})},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.PodList{
@@ -244,7 +265,7 @@ func TestListPodsLabels(t *testing.T) {
 func TestGetPod(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods/foo")},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/pods/foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.Pod{
@@ -278,7 +299,7 @@ func TestGetPodWithNoName(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/pods/foo")},
+		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/pods/foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().Pods(ns).Delete("foo")
@@ -299,7 +320,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: buildResourcePath(ns, "/pods"), Body: requestPod},
+		Request: testRequest{Method: "POST", Path: buildResourcePath(ns, "/pods"), Query: buildQueryValues(ns, nil), Body: requestPod},
 		Response: Response{
 			StatusCode: 200,
 			Body:       requestPod,
@@ -325,7 +346,7 @@ func TestUpdatePod(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/pods/foo")},
+		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/pods/foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: requestPod},
 	}
 	receivedPod, err := c.Setup().Pods(ns).Update(requestPod)
@@ -363,7 +384,7 @@ func TestListControllers(t *testing.T) {
 func TestGetController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/replicationControllers/foo")},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/replicationControllers/foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -402,7 +423,7 @@ func TestUpdateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "PUT", Path: buildResourcePath(ns, "/replicationControllers/foo")},
+		Request: testRequest{Method: "PUT", Path: buildResourcePath(ns, "/replicationControllers/foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -427,7 +448,7 @@ func TestUpdateController(t *testing.T) {
 func TestDeleteController(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/replicationControllers/foo")},
+		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/replicationControllers/foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().ReplicationControllers(ns).Delete("foo")
@@ -440,7 +461,7 @@ func TestCreateController(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
-		Request: testRequest{Method: "POST", Path: buildResourcePath(ns, "/replicationControllers"), Body: requestController},
+		Request: testRequest{Method: "POST", Path: buildResourcePath(ns, "/replicationControllers"), Body: requestController, Query: buildQueryValues(ns, nil)},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
@@ -474,7 +495,7 @@ func body(obj runtime.Object, raw *string) *string {
 func TestListServices(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/services")},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/services"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.ServiceList{
 				Items: []api.Service{
@@ -504,7 +525,7 @@ func TestListServices(t *testing.T) {
 func TestListServicesLabels(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/services"), Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/services"), Query: buildQueryValues(ns, url.Values{"labels": []string{"foo=bar,name=baz"}})},
 		Response: Response{StatusCode: 200,
 			Body: &api.ServiceList{
 				Items: []api.Service{
@@ -536,7 +557,7 @@ func TestListServicesLabels(t *testing.T) {
 func TestGetService(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: buildResourcePath(ns, "/services/1")},
+		Request:  testRequest{Method: "GET", Path: buildResourcePath(ns, "/services/1"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup().Services(ns).Get("1")
@@ -557,7 +578,7 @@ func TestGetServiceWithNoName(t *testing.T) {
 func TestCreateService(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "POST", Path: buildResourcePath(ns, "/services"), Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
+		Request:  testRequest{Method: "POST", Path: buildResourcePath(ns, "/services"), Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}, Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup().Services(ns).Create(&api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
@@ -568,7 +589,7 @@ func TestUpdateService(t *testing.T) {
 	ns := api.NamespaceDefault
 	svc := &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1", ResourceVersion: "1"}}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/services/service-1"), Body: svc},
+		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/services/service-1"), Body: svc, Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: svc},
 	}
 	response, err := c.Setup().Services(ns).Update(svc)
@@ -578,7 +599,7 @@ func TestUpdateService(t *testing.T) {
 func TestDeleteService(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/services/1")},
+		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/services/1"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().Services(ns).Delete("1")
@@ -588,7 +609,7 @@ func TestDeleteService(t *testing.T) {
 func TestListEndpooints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/endpoints")},
+		Request: testRequest{Method: "GET", Path: buildResourcePath(ns, "/endpoints"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
@@ -607,7 +628,7 @@ func TestListEndpooints(t *testing.T) {
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: buildResourcePath(ns, "/endpoints/endpoint-1")},
+		Request:  testRequest{Method: "GET", Path: buildResourcePath(ns, "/endpoints/endpoint-1"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup().Endpoints(ns).Get("endpoint-1")

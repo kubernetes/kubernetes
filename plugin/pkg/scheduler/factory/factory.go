@@ -204,7 +204,7 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
-		glog.Errorf("Error scheduling %v: %v; retrying", pod.Name, err)
+		glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
 		backoff.gc()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
