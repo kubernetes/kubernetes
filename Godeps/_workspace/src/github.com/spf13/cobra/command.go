@@ -11,9 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Commands similar to git, go tools and other modern CLI tools
-// inspired by go, go-Commander, gh and subcommand
-
+//Package cobra is a commander providing a simple interface to create powerful modern CLI interfaces.
+//In addition to providing an interface, Cobra simultaneously provides a controller to organize your application code.
 package cobra
 
 import (
@@ -57,8 +56,9 @@ type Command struct {
 	commandsMaxCommandPathLen int
 
 	flagErrorBuf *bytes.Buffer
+	cmdErrorBuf  *bytes.Buffer
 
-	args          []string
+	args          []string                 // actual args parsed from flags
 	output        *io.Writer               // nil means stderr; use Out() method instead
 	usageFunc     func(*Command) error     // Usage can be defined by application
 	usageTemplate string                   // Can be defined by Application
@@ -172,6 +172,7 @@ func (c *Command) UsagePadding() int {
 
 var minCommandPathPadding int = 11
 
+//
 func (c *Command) CommandPathPadding() int {
 	if c.parent == nil || minCommandPathPadding > c.parent.commandsMaxCommandPathLen {
 		return minCommandPathPadding
@@ -203,9 +204,9 @@ Available Commands: {{range .Commands}}{{if .Runnable}}
 {{.Flags.FlagUsages}}{{end}}{{if .HasParent}}{{if and (gt .Commands 0) (gt .Parent.Commands 1) }}
 Additional help topics: {{if gt .Commands 0 }}{{range .Commands}}{{if not .Runnable}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if gt .Parent.Commands 1 }}{{range .Parent.Commands}}{{if .Runnable}}{{if not (eq .Name $cmd.Name) }}{{end}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{end}}
-{{end}}
+{{end}}{{ if .HasSubCommands }}
 Use "{{.Root.Name}} help [command]" for more information about that command.
-`
+{{end}}`
 	}
 }
 
@@ -355,10 +356,22 @@ func (c *Command) execute(a []string) (err error) {
 	err = c.ParseFlags(a)
 
 	if err != nil {
+		// We're writing subcommand usage to root command's error buffer to have it displayed to the user
+		r := c.Root()
+		if r.cmdErrorBuf == nil {
+			r.cmdErrorBuf = new(bytes.Buffer)
+		}
+		// for writing the usage to the buffer we need to switch the output temporarily
+		// since Out() returns root output, you also need to revert that on root
+		out := r.Out()
+		r.SetOutput(r.cmdErrorBuf)
+		c.Usage()
+		r.SetOutput(out)
 		return err
 	} else {
-		// If help is called, regardless of other flags, we print that
-		if c.helpFlagVal {
+		// If help is called, regardless of other flags, we print that.
+		// Print help also if c.Run is nil.
+		if c.helpFlagVal || !c.Runnable() {
 			c.Help()
 			return nil
 		}
@@ -430,7 +443,12 @@ func (c *Command) Execute() (err error) {
 			// Flags parsing had an error.
 			// If an error happens here, we have to report it to the user
 			c.Println(c.errorMsgFromParse())
-			c.Usage()
+			// If an error happens search also for subcommand info about that
+			if c.cmdErrorBuf != nil && c.cmdErrorBuf.Len() > 0 {
+				c.Println(c.cmdErrorBuf.String())
+			} else {
+				c.Usage()
+			}
 			return e
 		} else {
 			// If help is called, regardless of other flags, we print that
@@ -465,6 +483,10 @@ func (c *Command) Execute() (err error) {
 
 func (c *Command) initHelp() {
 	if c.helpCommand == nil {
+		if !c.HasSubCommands() {
+			return
+		}
+
 		c.helpCommand = &Command{
 			Use:   "help [command]",
 			Short: "Help about any command",
@@ -479,13 +501,17 @@ func (c *Command) initHelp() {
 // Used for testing
 func (c *Command) ResetCommands() {
 	c.commands = nil
+	c.helpCommand = nil
+	c.cmdErrorBuf = new(bytes.Buffer)
+	c.cmdErrorBuf.Reset()
 }
 
+//Commands returns a slice of child commands.
 func (c *Command) Commands() []*Command {
 	return c.commands
 }
 
-// Add one or many commands as children of this
+// AddCommand adds one or more commands to this parent command.
 func (c *Command) AddCommand(cmds ...*Command) {
 	for i, x := range cmds {
 		if cmds[i] == c {
@@ -549,7 +575,7 @@ func (c *Command) UsageString() string {
 	return bb.String()
 }
 
-// The full path to this command
+// CommandPath returns the full path to this command.
 func (c *Command) CommandPath() string {
 	str := c.Name()
 	x := c

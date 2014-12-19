@@ -120,7 +120,9 @@ In this example we are attaching it to the root, but commands can be attached at
 
 ### Assign flags to a command
 
-Since the flags are defined and used in different locations, we need to define a variable outside with the correct scope to assign the flag to work with.
+Since the flags are defined and used in different locations, we need to
+define a variable outside with the correct scope to assign the flag to
+work with.
 
     var Verbose bool
     var Source string
