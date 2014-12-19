@@ -188,8 +188,8 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 	return nil
 }
 
-var podColumns = []string{"NAME", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
-var replicationControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR", "REPLICAS"}
+var podColumns = []string{"POD", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
+var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
 var minionColumns = []string{"NAME", "LABELS"}
 var statusColumns = []string{"STATUS"}
@@ -235,22 +235,24 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	if err := api.Scheme.Convert(&pod.Spec, spec); err != nil {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
-	il := listOfImages(spec)
-	// Be paranoid about the case where there is no image.
-	var firstImage string
-	if len(il) > 0 {
-		firstImage, il = il[0], il[1:]
+	containers := spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-		pod.Name, firstImage,
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		pod.Name,
+		firstContainer.Name,
+		firstContainer.Image,
 		podHostString(pod.Status.Host, pod.Status.HostIP),
-		formatLabels(pod.Labels), pod.Status.Phase)
+		formatLabels(pod.Labels),
+		pod.Status.Phase)
 	if err != nil {
 		return err
 	}
-	// Lay out all the other images on separate lines.
-	for _, image := range il {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", image, "", "", "")
+	// Lay out all the other containers on separate lines.
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", "", "")
 		if err != nil {
 			return err
 		}
@@ -268,10 +270,28 @@ func printPodList(podList *api.PodList, w io.Writer) error {
 }
 
 func printReplicationController(controller *api.ReplicationController, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		controller.Name, makeImageList(&controller.Spec.Template.Spec),
-		formatLabels(controller.Spec.Selector), controller.Spec.Replicas)
-	return err
+	containers := controller.Spec.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
+		controller.Name,
+		firstContainer.Name,
+		firstContainer.Image,
+		formatLabels(controller.Spec.Selector),
+		controller.Spec.Replicas)
+	if err != nil {
+		return err
+	}
+	// Lay out all the other containers on separate lines.
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer) error {
