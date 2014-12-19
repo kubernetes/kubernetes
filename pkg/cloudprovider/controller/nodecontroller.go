@@ -27,32 +27,32 @@ import (
 	"github.com/golang/glog"
 )
 
-type MinionController struct {
+type NodeController struct {
 	cloud           cloudprovider.Interface
 	matchRE         string
 	staticResources *api.NodeResources
-	minions         []string
+	nodes           []string
 	kubeClient      client.Interface
 }
 
-// NewMinionController returns a new minion controller to sync instances from cloudprovider.
-func NewMinionController(
+// NewNodeController returns a new node controller to sync instances from cloudprovider.
+func NewNodeController(
 	cloud cloudprovider.Interface,
 	matchRE string,
-	minions []string,
+	nodes []string,
 	staticResources *api.NodeResources,
-	kubeClient client.Interface) *MinionController {
-	return &MinionController{
+	kubeClient client.Interface) *NodeController {
+	return &NodeController{
 		cloud:           cloud,
 		matchRE:         matchRE,
-		minions:         minions,
+		nodes:           nodes,
 		staticResources: staticResources,
 		kubeClient:      kubeClient,
 	}
 }
 
-// Run starts syncing instances from cloudprovider periodically, or create initial minion list.
-func (s *MinionController) Run(period time.Duration) {
+// Run starts syncing instances from cloudprovider periodically, or create initial node list.
+func (s *NodeController) Run(period time.Duration) {
 	if s.cloud != nil && len(s.matchRE) > 0 {
 		go util.Forever(func() {
 			if err := s.SyncCloud(); err != nil {
@@ -66,24 +66,24 @@ func (s *MinionController) Run(period time.Duration) {
 
 // SyncStatic registers list of machines from command line flag. It returns after successful
 // registration of all machines.
-func (s *MinionController) SyncStatic(period time.Duration) error {
+func (s *NodeController) SyncStatic(period time.Duration) error {
 	registered := util.NewStringSet()
 	for {
-		for _, minionID := range s.minions {
-			if registered.Has(minionID) {
+		for _, nodeID := range s.nodes {
+			if registered.Has(nodeID) {
 				continue
 			}
 			_, err := s.kubeClient.Nodes().Create(&api.Node{
-				ObjectMeta: api.ObjectMeta{Name: minionID},
+				ObjectMeta: api.ObjectMeta{Name: nodeID},
 				Spec: api.NodeSpec{
 					Capacity: s.staticResources.Capacity,
 				},
 			})
 			if err == nil {
-				registered.Insert(minionID)
+				registered.Insert(nodeID)
 			}
 		}
-		if registered.Len() == len(s.minions) {
+		if registered.Len() == len(s.nodes) {
 			return nil
 		}
 		time.Sleep(period)
@@ -91,44 +91,44 @@ func (s *MinionController) SyncStatic(period time.Duration) error {
 }
 
 // SyncCloud syncs list of instances from cloudprovider to master etcd registry.
-func (s *MinionController) SyncCloud() error {
-	matches, err := s.cloudMinions()
+func (s *NodeController) SyncCloud() error {
+	matches, err := s.cloudNodes()
 	if err != nil {
 		return err
 	}
-	minions, err := s.kubeClient.Nodes().List()
+	nodes, err := s.kubeClient.Nodes().List()
 	if err != nil {
 		return err
 	}
-	minionMap := make(map[string]*api.Node)
-	for _, minion := range minions.Items {
-		minionMap[minion.Name] = &minion
+	nodeMap := make(map[string]*api.Node)
+	for _, node := range nodes.Items {
+		nodeMap[node.Name] = &node
 	}
 
-	// Create or delete minions from registry.
-	for _, minion := range matches.Items {
-		if _, ok := minionMap[minion.Name]; !ok {
-			glog.Infof("Create minion in registry: %s", minion.Name)
-			_, err = s.kubeClient.Nodes().Create(&minion)
+	// Create or delete nodes from registry.
+	for _, node := range matches.Items {
+		if _, ok := nodeMap[node.Name]; !ok {
+			glog.Infof("Create node in registry: %s", node.Name)
+			_, err = s.kubeClient.Nodes().Create(&node)
 			if err != nil {
-				glog.Errorf("Create minion error: %s", minion.Name)
+				glog.Errorf("Create node error: %s", node.Name)
 			}
 		}
-		delete(minionMap, minion.Name)
+		delete(nodeMap, node.Name)
 	}
 
-	for minionID := range minionMap {
-		glog.Infof("Delete minion from registry: %s", minionID)
-		err = s.kubeClient.Nodes().Delete(minionID)
+	for nodeID := range nodeMap {
+		glog.Infof("Delete node from registry: %s", nodeID)
+		err = s.kubeClient.Nodes().Delete(nodeID)
 		if err != nil {
-			glog.Errorf("Delete minion error: %s", minionID)
+			glog.Errorf("Delete node error: %s", nodeID)
 		}
 	}
 	return nil
 }
 
-// cloudMinions constructs and returns api.NodeList from cloudprovider.
-func (s *MinionController) cloudMinions() (*api.NodeList, error) {
+// cloudNodes constructs and returns api.NodeList from cloudprovider.
+func (s *NodeController) cloudNodes() (*api.NodeList, error) {
 	instances, ok := s.cloud.Instances()
 	if !ok {
 		return nil, fmt.Errorf("cloud doesn't support instances")

@@ -26,8 +26,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
+	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
@@ -130,8 +131,8 @@ func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
 		},
 	}
-	minionController := minionControllerPkg.NewMinionController(nil, "", machineList, nodeResources, cl)
-	minionController.Run(10 * time.Second)
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl)
+	nodeController.Run(10 * time.Second)
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
