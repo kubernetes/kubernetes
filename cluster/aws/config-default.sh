@@ -42,3 +42,5 @@ ENABLE_NODE_MONITORING=true
 # Optional: Install node logging
 ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+IAM_PROFILE="kubernetes"
+LOG="/dev/null"
