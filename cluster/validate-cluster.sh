@@ -35,7 +35,7 @@ detect-minions > /dev/null
 MINIONS_FILE=/tmp/minions
 attempt=0
 while true; do
-  "${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.items}}{{.id}}\n{{end}}' list minions > "${MINIONS_FILE}"
+  "${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' > "${MINIONS_FILE}"
   found=$(grep -c . "${MINIONS_FILE}")
   if [[ ${found} == "${NUM_MINIONS}" ]]; then
     break
