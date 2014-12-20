@@ -317,10 +317,12 @@ const (
 	PodWaiting PodStatus = "Waiting"
 	// PodRunning means that the pod is up and running.
 	PodRunning PodStatus = "Running"
-	// PodTerminated means that the pod has stopped.
+	// PodTerminated means that the pod has stopped with error(s)
 	PodTerminated PodStatus = "Terminated"
 	// PodUnknown means that we failed to obtain info about the pod.
 	PodUnknown PodStatus = "Unknown"
+	// PodSucceeded means that the pod has stopped without error(s)
+	PodSucceeded PodStatus = "Succeeded"
 )
 
 type ContainerStateWaiting struct {
