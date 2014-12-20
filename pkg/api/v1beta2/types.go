@@ -286,6 +286,8 @@ const (
 	PodTerminated PodStatus = "Terminated"
 	// PodUnknown means that we failed to obtain info about the pod.
 	PodUnknown PodStatus = "Unknown"
+	// PodSucceeded means that the pod has stopped without error(s)
+	PodSucceeded PodStatus = "Succeeded"
 )
 
 type ContainerStateWaiting struct {

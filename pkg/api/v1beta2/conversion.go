@@ -113,7 +113,7 @@ func init() {
 			case newer.PodRunning:
 				*out = PodRunning
 			case newer.PodSucceeded:
-				*out = PodTerminated
+				*out = PodSucceeded
 			case newer.PodFailed:
 				*out = PodTerminated
 			case newer.PodUnknown:
@@ -136,6 +136,8 @@ func init() {
 			case PodTerminated:
 				// Older API versions did not contain enough info to map to PodSucceeded
 				*out = newer.PodFailed
+			case PodSucceeded:
+				*out = newer.PodSucceeded
 			case PodUnknown:
 				*out = newer.PodUnknown
 			default:
