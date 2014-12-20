@@ -37,6 +37,13 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+func makeNamespaceURL(namespace, suffix string) string {
+	if client.NamespaceInPathFor(testapi.Version()) {
+		return makeURL("/ns/" + namespace + suffix)
+	}
+	return makeURL(suffix + "?namespace=" + namespace)
+}
+
 func makeURL(suffix string) string {
 	return path.Join("/api", testapi.Version(), suffix)
 }
@@ -221,7 +228,7 @@ func TestCreateReplica(t *testing.T) {
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
-	fakeHandler.ValidateRequest(t, makeURL("/ns/default/pods"), "POST", nil)
+	fakeHandler.ValidateRequest(t, makeNamespaceURL("default", "/pods"), "POST", nil)
 	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)

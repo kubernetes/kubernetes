@@ -117,7 +117,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, versionInterfaces.Codec)
+	client := NewRESTClient(baseURL, versionInterfaces.Codec, NamespaceInPathFor(version))
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -251,4 +251,10 @@ func defaultVersionFor(config *Config) string {
 		version = latest.Version
 	}
 	return version
+}
+
+// namespaceInPathFor is used to control what api version should use namespace in url paths
+func NamespaceInPathFor(version string) bool {
+	// we use query param for v1beta1/v1beta2, v1beta3+ will use path param
+	return (version != "v1beta1" && version != "v1beta2")
 }
