@@ -171,7 +171,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 			rs.fillPodInfo(pod)
 			status, err := getPodStatus(pod, rs.nodes)
 			if err != nil {
-				return pod, err
+				status = api.PodUnknown
 			}
 			pod.Status.Phase = status
 			if pod.Status.Host != "" {
@@ -285,8 +285,8 @@ func getPodStatus(pod *api.Pod, nodes client.NodeInterface) (api.PodPhase, error
 			if errors.IsNotFound(err) {
 				return api.PodFailed, nil
 			}
-			glog.Errorf("Error listing minions: %v", err)
-			return "", err
+			glog.Errorf("Error getting pod info: %v", err)
+			return api.PodUnknown, nil
 		}
 	} else {
 		glog.Errorf("Unexpected missing minion interface, status may be in-accurate")

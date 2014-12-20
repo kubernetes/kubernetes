@@ -65,7 +65,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		j.FieldPath = c.RandString()
 	},
 	func(j *internal.PodPhase, c fuzz.Continue) {
-		statuses := []internal.PodPhase{internal.PodPending, internal.PodRunning, internal.PodFailed}
+		statuses := []internal.PodPhase{internal.PodPending, internal.PodRunning, internal.PodFailed, internal.PodUnknown}
 		*j = statuses[c.Rand.Intn(len(statuses))]
 	},
 	func(j *internal.ReplicationControllerSpec, c fuzz.Continue) {
