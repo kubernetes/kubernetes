@@ -1,3 +1,4 @@
+{% set cloud_config = "" -%}
 {% set daemon_args = "$DAEMON_ARGS" -%}
 {% if grains['os_family'] == 'RedHat' -%}
 	{% set daemon_args = "" -%}
