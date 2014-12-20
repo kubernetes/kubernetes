@@ -421,10 +421,9 @@ func (m *Master) InstallSwaggerAPI() {
 	swaggerConfig := swagger.Config{
 		WebServices: m.handlerContainer.RegisteredWebServices(),
 		// TODO: Parameterize the path?
-		ApiPath: "/swaggerapi/",
-		// TODO: Distribute UI javascript and enable the UI
-		//SwaggerPath: "/swaggerui/",
-		//SwaggerFilePath: "/srv/apiserver/swagger/dist"
+		ApiPath:         "/swaggerapi/",
+		SwaggerPath:     "/swaggerui/",
+		SwaggerFilePath: "/static/swagger-ui/",
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 }
