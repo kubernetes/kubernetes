@@ -69,16 +69,11 @@ function test-build-release() {
 # Verify needed binaries exist.
 function verify-prereqs() {
   echo "... in verify-prereqs()" >&2
-  local cmd
-  # TODO(mbforbes): This assumes you have a "normal" gcloud installed even if
-  # you are setting one differently using ${GCLOUD}.
-  for cmd in gcloud kubectl; do
-    which "${cmd}" >/dev/null || {
-      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
-      echo "SDK can be downloaded from https://cloud.google.com/sdk/."
-      exit 1
-    }
-  done
+
+  ${GCLOUD} preview --help >/dev/null 2>&1 || {
+    echo "Either the GCLOUD environment variable is wrong, or the 'preview' component"
+    echo "is not installed. (Fix with 'gcloud components update preview')"
+  }
 }
 
 # Instantiate a kubernetes cluster
