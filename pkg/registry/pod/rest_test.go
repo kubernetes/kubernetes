@@ -28,11 +28,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+type fakeCache struct {
+	requestedNamespace string
+	requestedName      string
+
+	statusToReturn *api.PodStatus
+	errorToReturn  error
+}
+
+func (f *fakeCache) GetPodStatus(namespace, name string) (*api.PodStatus, error) {
+	f.requestedNamespace = namespace
+	f.requestedName = name
+	return f.statusToReturn, f.errorToReturn
+}
 
 func expectApiStatusError(t *testing.T, ch <-chan apiserver.RESTResult, msg string) {
 	out := <-ch
@@ -61,6 +74,7 @@ func TestCreatePodRegistryError(t *testing.T) {
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	pod := &api.Pod{}
 	ctx := api.NewDefaultContext()
@@ -76,6 +90,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	pod := &api.Pod{}
 	ctx := api.NewDefaultContext()
@@ -98,6 +113,7 @@ func TestCreatePodSetsUID(t *testing.T) {
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	pod := &api.Pod{}
 	ctx := api.NewDefaultContext()
@@ -117,6 +133,7 @@ func TestListPodsError(t *testing.T) {
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	ctx := api.NewContext()
 	pods, err := storage.List(ctx, labels.Everything(), labels.Everything())
@@ -128,10 +145,40 @@ func TestListPodsError(t *testing.T) {
 	}
 }
 
+func TestListPodsCacheError(t *testing.T) {
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pods = &api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+		},
+	}
+	storage := REST{
+		registry: podRegistry,
+		podCache: &fakeCache{errorToReturn: client.ErrPodInfoNotAvailable},
+	}
+	ctx := api.NewContext()
+	pods, err := storage.List(ctx, labels.Everything(), labels.Everything())
+	if err != nil {
+		t.Fatalf("Expected no error, got %#v", err)
+	}
+	pl := pods.(*api.PodList)
+	if len(pl.Items) != 1 {
+		t.Fatalf("Unexpected 0-len pod list: %+v", pl)
+	}
+	if e, a := api.PodUnknown, pl.Items[0].Status.Phase; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
 func TestListEmptyPodList(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(&api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}})
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	ctx := api.NewContext()
 	pods, err := storage.List(ctx, labels.Everything(), labels.Everything())
@@ -145,14 +192,6 @@ func TestListEmptyPodList(t *testing.T) {
 	if pods.(*api.PodList).ResourceVersion != "1" {
 		t.Errorf("Unexpected resource version: %#v", pods)
 	}
-}
-
-type fakeClock struct {
-	t time.Time
-}
-
-func (f *fakeClock) Now() time.Time {
-	return f.t
 }
 
 func TestListPodList(t *testing.T) {
@@ -173,8 +212,7 @@ func TestListPodList(t *testing.T) {
 	}
 	storage := REST{
 		registry: podRegistry,
-		ipCache:  ipCache{},
-		clock:    &fakeClock{},
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{Phase: api.PodRunning}},
 	}
 	ctx := api.NewContext()
 	podsObj, err := storage.List(ctx, labels.Everything(), labels.Everything())
@@ -186,7 +224,7 @@ func TestListPodList(t *testing.T) {
 	if len(pods.Items) != 2 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
-	if pods.Items[0].Name != "foo" {
+	if pods.Items[0].Name != "foo" || pods.Items[0].Status.Phase != api.PodRunning {
 		t.Errorf("Unexpected pod: %#v", pods.Items[0])
 	}
 	if pods.Items[1].Name != "bar" {
@@ -218,8 +256,7 @@ func TestListPodListSelection(t *testing.T) {
 	}
 	storage := REST{
 		registry: podRegistry,
-		ipCache:  ipCache{},
-		clock:    &fakeClock{},
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	ctx := api.NewContext()
 
@@ -283,6 +320,7 @@ func TestPodDecode(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	expected := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -306,11 +344,36 @@ func TestPodDecode(t *testing.T) {
 
 func TestGetPod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pod = &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Status:     api.PodStatus{Host: "machine"},
+	}
+	storage := REST{
+		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{Phase: api.PodRunning}},
+	}
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
+	pod := obj.(*api.Pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expect := *podRegistry.Pod
+	expect.Status.Phase = api.PodRunning
+	// TODO: when host is moved to spec, remove this line.
+	expect.Status.Host = "machine"
+	if e, a := &expect, pod; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected pod. Expected %#v, Got %#v", e, a)
+	}
+}
+
+func TestGetPodCacheError(t *testing.T) {
+	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	storage := REST{
 		registry: podRegistry,
-		ipCache:  ipCache{},
-		clock:    &fakeClock{},
+		podCache: &fakeCache{errorToReturn: client.ErrPodInfoNotAvailable},
 	}
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
@@ -319,489 +382,10 @@ func TestGetPod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if e, a := podRegistry.Pod, pod; !reflect.DeepEqual(e, a) {
+	expect := *podRegistry.Pod
+	expect.Status.Phase = api.PodUnknown
+	if e, a := &expect, pod; !reflect.DeepEqual(e, a) {
 		t.Errorf("Unexpected pod. Expected %#v, Got %#v", e, a)
-	}
-}
-
-func TestGetPodCloud(t *testing.T) {
-	fakeCloud := &fake_cloud.FakeCloud{}
-	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}, Status: api.PodStatus{Host: "machine"}}
-
-	clock := &fakeClock{t: time.Now()}
-
-	storage := REST{
-		registry:      podRegistry,
-		cloudProvider: fakeCloud,
-		ipCache:       ipCache{},
-		clock:         clock,
-	}
-	ctx := api.NewContext()
-	obj, err := storage.Get(ctx, "foo")
-	pod := obj.(*api.Pod)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if e, a := podRegistry.Pod, pod; !reflect.DeepEqual(e, a) {
-		t.Errorf("Unexpected pod. Expected %#v, Got %#v", e, a)
-	}
-
-	// This call should hit the cache, so we expect no additional calls to the cloud
-	obj, err = storage.Get(ctx, "foo")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "ip-address" {
-		t.Errorf("Unexpected calls: %#v", fakeCloud.Calls)
-	}
-
-	// Advance the clock, this call should miss the cache, so expect one more call.
-	clock.t = clock.t.Add(60 * time.Second)
-	obj, err = storage.Get(ctx, "foo")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[1] != "ip-address" {
-		t.Errorf("Unexpected calls: %#v", fakeCloud.Calls)
-	}
-}
-
-func TestPodStatusWithBadNode(t *testing.T) {
-	fakeClient := client.Fake{
-		MinionsList: api.NodeList{
-			Items: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "machine"},
-				},
-			},
-		},
-	}
-	desiredState := api.PodSpec{
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	stoppedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{},
-		},
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Host: "machine-2",
-				},
-			},
-			api.PodFailed,
-			"no info, but bad machine",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
-					},
-					Host: "machine-two",
-				},
-			},
-			api.PodFailed,
-			"all running but minion is missing",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": stoppedState,
-						"containerB": stoppedState,
-					},
-					Host: "machine-two",
-				},
-			},
-			api.PodFailed,
-			"all stopped but minion missing",
-		},
-	}
-	for _, test := range tests {
-		if status, err := getPodStatus(test.pod, fakeClient.Nodes()); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-			if err != nil {
-				t.Errorf("In test %s, unexpected error: %v", test.test, err)
-			}
-		}
-	}
-}
-
-func TestPodStatusWithRestartAlways(t *testing.T) {
-	fakeClient := client.Fake{
-		MinionsList: api.NodeList{
-			Items: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "machine"},
-				},
-			},
-		},
-	}
-	desiredState := api.PodSpec{
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-	}
-	currentState := api.PodStatus{
-		Host: "machine",
-	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	stoppedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{},
-		},
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"all running",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": stoppedState,
-						"containerB": stoppedState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"all stopped with restart always",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": stoppedState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"mixed state #1 with restart always",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodPending,
-			"mixed state #2 with restart always",
-		},
-	}
-	for _, test := range tests {
-		if status, err := getPodStatus(test.pod, fakeClient.Nodes()); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-			if err != nil {
-				t.Errorf("In test %s, unexpected error: %v", test.test, err)
-			}
-		}
-	}
-}
-
-func TestPodStatusWithRestartNever(t *testing.T) {
-	fakeClient := client.Fake{
-		MinionsList: api.NodeList{
-			Items: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "machine"},
-				},
-			},
-		},
-	}
-	desiredState := api.PodSpec{
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicy{Never: &api.RestartPolicyNever{}},
-	}
-	currentState := api.PodStatus{
-		Host: "machine",
-	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	succeededState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-	failedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"all running with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": succeededState,
-						"containerB": succeededState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodSucceeded,
-			"all succeeded with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": failedState,
-						"containerB": failedState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodFailed,
-			"all failed with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": succeededState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"mixed state #1 with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodPending,
-			"mixed state #2 with restart never",
-		},
-	}
-	for _, test := range tests {
-		if status, err := getPodStatus(test.pod, fakeClient.Nodes()); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-			if err != nil {
-				t.Errorf("In test %s, unexpected error: %v", test.test, err)
-			}
-		}
-	}
-}
-
-func TestPodStatusWithRestartOnFailure(t *testing.T) {
-	fakeClient := client.Fake{
-		MinionsList: api.NodeList{
-			Items: []api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "machine"},
-				},
-			},
-		},
-	}
-	desiredState := api.PodSpec{
-		Containers: []api.Container{
-			{Name: "containerA"},
-			{Name: "containerB"},
-		},
-		RestartPolicy: api.RestartPolicy{OnFailure: &api.RestartPolicyOnFailure{}},
-	}
-	currentState := api.PodStatus{
-		Host: "machine",
-	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	succeededState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-	failedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
-
-	tests := []struct {
-		pod    *api.Pod
-		status api.PodPhase
-		test   string
-	}{
-		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"all running with restart onfailure",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": succeededState,
-						"containerB": succeededState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodSucceeded,
-			"all succeeded with restart onfailure",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": failedState,
-						"containerB": failedState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"all failed with restart never",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": succeededState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodRunning,
-			"mixed state #1 with restart onfailure",
-		},
-		{
-			&api.Pod{
-				Spec: desiredState,
-				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-					},
-					Host: "machine",
-				},
-			},
-			api.PodPending,
-			"mixed state #2 with restart onfailure",
-		},
-	}
-	for _, test := range tests {
-		if status, err := getPodStatus(test.pod, fakeClient.Nodes()); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-			if err != nil {
-				t.Errorf("In test %s, unexpected error: %v", test.test, err)
-			}
-		}
 	}
 }
 
@@ -810,6 +394,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := REST{
 		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	ctx := api.NewDefaultContext()
 	pod := &api.Pod{
@@ -837,8 +422,8 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	storage := REST{
-		registry:      podRegistry,
-		podPollPeriod: time.Millisecond * 100,
+		registry: podRegistry,
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
 	pod := &api.Pod{}
 	pod.Name = "foo"
@@ -865,57 +450,6 @@ type FakePodInfoGetter struct {
 
 func (f *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodContainerInfo, error) {
 	return api.PodContainerInfo{ContainerInfo: f.info}, f.err
-}
-
-func TestFillPodInfo(t *testing.T) {
-	expectedIP := "1.2.3.4"
-	expectedTime, _ := time.Parse("2013-Feb-03", "2013-Feb-03")
-	fakeGetter := FakePodInfoGetter{
-		info: map[string]api.ContainerStatus{
-			"net": {
-				State: api.ContainerState{
-					Running: &api.ContainerStateRunning{
-						StartedAt: util.NewTime(expectedTime),
-					},
-				},
-				RestartCount: 1,
-				PodIP:        expectedIP,
-			},
-		},
-	}
-	storage := REST{
-		podCache: &fakeGetter,
-	}
-	pod := api.Pod{Status: api.PodStatus{Host: "foo"}}
-	storage.fillPodInfo(&pod)
-	if !reflect.DeepEqual(fakeGetter.info, pod.Status.Info) {
-		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.Status.Info)
-	}
-	if pod.Status.PodIP != expectedIP {
-		t.Errorf("Expected %s, Got %s", expectedIP, pod.Status.PodIP)
-	}
-}
-
-func TestFillPodInfoNoData(t *testing.T) {
-	expectedIP := ""
-	fakeGetter := FakePodInfoGetter{
-		info: map[string]api.ContainerStatus{
-			"net": {
-				State: api.ContainerState{},
-			},
-		},
-	}
-	storage := REST{
-		podCache: &fakeGetter,
-	}
-	pod := api.Pod{Status: api.PodStatus{Host: "foo"}}
-	storage.fillPodInfo(&pod)
-	if !reflect.DeepEqual(fakeGetter.info, pod.Status.Info) {
-		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.Status.Info)
-	}
-	if pod.Status.PodIP != expectedIP {
-		t.Errorf("Expected %s, Got %s", expectedIP, pod.Status.PodIP)
-	}
 }
 
 func TestCreatePodWithConflictingNamespace(t *testing.T) {

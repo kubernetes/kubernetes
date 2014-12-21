@@ -63,6 +63,7 @@ var (
 type fakeKubeletClient struct{}
 
 func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error) {
+	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podID)
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
 	var c client.PodInfoGetter
