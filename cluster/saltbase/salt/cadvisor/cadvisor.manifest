@@ -14,8 +14,8 @@ containers:
       - name: varlibdocker
         mountPath: /var/lib/docker
         readOnly: true
-      - name: cgroups
-        mountPath: /sys/fs/cgroup
+      - name: sysfs
+        mountPath: /sys
         readOnly: true
 volumes:
   - name: varrun
