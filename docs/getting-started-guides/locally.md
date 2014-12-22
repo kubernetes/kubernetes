@@ -24,7 +24,7 @@ In a separate tab of your terminal, run:
 
 ```
 cd kubernetes
-sudo hack/local-up-cluster.sh
+hack/local-up-cluster.sh
 ```
 
 This will build and start a lightweight local cluster, consisting of a master
