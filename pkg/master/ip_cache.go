@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 )
@@ -31,7 +32,7 @@ type ipCacheEntry struct {
 }
 
 type ipCache struct {
-	clock         Clock
+	clock         util.Clock
 	cloudProvider cloudprovider.Interface
 	cache         map[string]ipCacheEntry
 	lock          sync.Mutex
@@ -40,26 +41,12 @@ type ipCache struct {
 // NewIPCache makes a new ip caching layer, which will get IP addresses from cp,
 // and use clock for deciding when to re-get an IP address.
 // Thread-safe.
-func NewIPCache(cp cloudprovider.Interface, clock Clock) *ipCache {
+func NewIPCache(cp cloudprovider.Interface, clock util.Clock) *ipCache {
 	return &ipCache{
 		clock:         clock,
 		cloudProvider: cp,
 		cache:         map[string]ipCacheEntry{},
 	}
-}
-
-// Clock allows for injecting fake or real clocks into
-// the cache.
-type Clock interface {
-	Now() time.Time
-}
-
-// RealClock really calls time.Now()
-type RealClock struct{}
-
-// Now returns the current time.
-func (r RealClock) Now() time.Time {
-	return time.Now()
 }
 
 // GetInstanceIP returns the IP address of host, from the cache

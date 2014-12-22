@@ -21,19 +21,12 @@ import (
 	"time"
 
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
-
-type fakeClock struct {
-	t time.Time
-}
-
-func (f *fakeClock) Now() time.Time {
-	return f.t
-}
 
 func TestCacheExpire(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
-	clock := &fakeClock{t: time.Now()}
+	clock := &util.FakeClock{time.Now()}
 
 	c := NewIPCache(fakeCloud, clock)
 
@@ -41,7 +34,7 @@ func TestCacheExpire(t *testing.T) {
 	// This call should hit the cache, so we expect no additional calls to the cloud
 	_ = c.GetInstanceIP("foo")
 	// Advance the clock, this call should miss the cache, so expect one more call.
-	clock.t = clock.t.Add(60 * time.Second)
+	clock.Time = clock.Time.Add(60 * time.Second)
 	_ = c.GetInstanceIP("foo")
 
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[1] != "ip-address" || fakeCloud.Calls[0] != "ip-address" {
