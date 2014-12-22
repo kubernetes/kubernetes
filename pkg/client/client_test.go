@@ -162,7 +162,7 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 	}
 }
 
-// buildResourcePath is a convenience function for knowing if a namespace should in a path param or not
+// buildResourcePath is a convenience function for knowing if a namespace should be in a path param or not
 func buildResourcePath(namespace, resource string) string {
 	if len(namespace) > 0 {
 		if NamespaceInPathFor(testapi.Version()) {
@@ -172,7 +172,7 @@ func buildResourcePath(namespace, resource string) string {
 	return resource
 }
 
-// buildQueryValues is a convenience function for knowing if a namespace should go in a query param or not
+// buildQueryValues is a convenience function for knowing if a namespace should be in a query param or not
 func buildQueryValues(namespace string, query url.Values) url.Values {
 	v := url.Values{}
 	if query != nil {
