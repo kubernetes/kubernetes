@@ -41,6 +41,7 @@ type Onramp struct {
 	etcdClient tools.EtcdClient
 	kubeClient *client.Client
 	extInterface string
+	intInterface string
 	extAddrs util.StringList
 	usedExtAddrs util.StringList
 	podNameList []podNameIP
@@ -60,11 +61,12 @@ type OnrampRouterClaim struct {
 // Helper structs to allow use of foreign types
 type Container api.Container
 
-func NewOnramp(ec tools.EtcdClient, ac *client.Client, intf string, addrs util.StringList) *Onramp {
+func NewOnramp(ec tools.EtcdClient, ac *client.Client, eintf string, iintf string, addrs util.StringList) *Onramp {
 	return &Onramp{
 		etcdClient: ec,
 		kubeClient: ac,
-		extInterface: intf,
+		extInterface: eintf,
+		intInterface: iintf,
 		extAddrs: addrs,
 		podNameLock: &sync.Mutex{},
 		podMonitor: 0,
@@ -148,7 +150,7 @@ func (onrmp *Onramp) monitorPods() {
 			if (err != nil) {
 				glog.Infof("Could not get Pod for %s, deleting\n", onrmp.podNameList[m].PodName)
 				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "DELETE", onrmp.extInterface, onrmp.podNameList[m].PodName, "NONE", "NONE")
+				cmd := ex.Command("onramp_iptables_setup.sh", "DELETE", onrmp.extInterface, onrmp.intInterface, onrmp.podNameList[m].PodName, "NONE", "NONE")
 				_, err := cmd.CombinedOutput()
 				if (err != nil) {
 					glog.Infof("Error Executing Delete for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
@@ -170,7 +172,7 @@ func (onrmp *Onramp) monitorPods() {
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				onrmp.podNameList[m].NewPod = 0
 				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "ADD", onrmp.extInterface, pod.Name, *extIP, pod.CurrentState.PodIP)
+				cmd := ex.Command("onramp_iptables_setup.sh", "ADD", onrmp.extInterface, onrmp.intInterface, pod.Name, *extIP, pod.CurrentState.PodIP)
 				_, err := cmd.CombinedOutput()
 				if (err != nil) {
 					glog.Infof("Error Executing Creation of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
@@ -183,7 +185,7 @@ func (onrmp *Onramp) monitorPods() {
 				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodName, onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "MODIFY", onrmp.extInterface, pod.Name, onrmp.podNameList[m].ExtIP, pod.CurrentState.PodIP)
+				cmd := ex.Command("onramp_iptables_setup.sh", "MODIFY", onrmp.extInterface, onrmp.intInterface, pod.Name, onrmp.podNameList[m].ExtIP, pod.CurrentState.PodIP)
 				_, err := cmd.CombinedOutput()
 				if (err != nil) {
 					glog.Infof("Error Executing Modification of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
@@ -208,10 +210,10 @@ func (onrmp *Onramp) Run() {
 	file.WriteString("1")
 	file.Close()
 
-	file, err = os.OpenFile("/proc/sys/net/ipv4/conf/flannel.1/forwarding", os.O_RDWR, 0666)
+	file, err = os.OpenFile("/proc/sys/net/ipv4/conf/" + onrmp.intInterface + "/forwarding", os.O_RDWR, 0666)
 
 	if (err != nil) {
-		glog.Infof("Could not find interface flannel.1: \n", err)
+		glog.Infof("Could not find interface %s: \n", onrmp.intInterface, err)
 		return
 	}
 
