@@ -160,4 +160,4 @@ cleanup()
 
 trap cleanup EXIT
 
-while true; do read x; done
+while true; do sleep 1; done
