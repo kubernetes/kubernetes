@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -31,12 +32,14 @@ type FakeDockerClient struct {
 	Container     *docker.Container
 	ContainerMap  map[string]*docker.Container
 	Image         *docker.Image
+	Images        []docker.APIImages
 	Err           error
 	called        []string
 	Stopped       []string
 	pulled        []string
 	Created       []string
 	Removed       []string
+	RemovedImages util.StringSet
 	VersionInfo   docker.Env
 }
 
@@ -172,8 +175,18 @@ func (f *FakeDockerClient) Version() (*docker.Env, error) {
 func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec, error) {
 	return &docker.Exec{"12345678"}, nil
 }
+
 func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
 	return nil
+}
+
+func (f *FakeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
+	return f.Images, f.Err
+}
+
+func (f *FakeDockerClient) RemoveImage(image string) error {
+	f.RemovedImages.Insert(image)
+	return f.Err
 }
 
 // FakeDockerPuller is a stub implementation of DockerPuller.
