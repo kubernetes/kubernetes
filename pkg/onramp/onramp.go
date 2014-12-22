@@ -200,7 +200,7 @@ func (onrmp *Onramp) Run() {
 
 	// Before we do anything else, the internal and external interfaces need to be set to
 	// forward
-	file, err := os.Open("/proc/sys/net/ipv4/conf/" + onrmp.extInterface + "/forwarding")
+	file, err := os.OpenFile("/proc/sys/net/ipv4/conf/" + onrmp.extInterface + "/forwarding", os.O_RDWR, 0666)
 	if (err != nil) {
 		glog.Infof("Could not find interface %s: \n", onrmp.extInterface, err)
 		return
@@ -208,7 +208,7 @@ func (onrmp *Onramp) Run() {
 	file.WriteString("1")
 	file.Close()
 
-	file, err = os.Open("/proc/sys/net/ipv4/conf/flannel.1/forwarding")
+	file, err = os.OpenFile("/proc/sys/net/ipv4/conf/flannel.1/forwarding", os.O_RDWR, 0666)
 
 	if (err != nil) {
 		glog.Infof("Could not find interface flannel.1: \n", err)
