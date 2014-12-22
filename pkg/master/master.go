@@ -319,28 +319,24 @@ func makeMinionRegistry(c *Config) minion.Registry {
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	podCache := NewPodCache(c.KubeletClient, m.podRegistry)
-	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
-
 	var userContexts = handlers.NewUserRequestContext()
 	var authenticator = c.Authenticator
 
 	nodeRESTStorage := minion.NewREST(m.minionRegistry)
+	ipCache := NewIPCache(c.Cloud, util.RealClock{}, 30*time.Second)
+	podCache := NewPodCache(
+		ipCache,
+		c.KubeletClient,
+		RESTStorageToNodes(nodeRESTStorage).Nodes(),
+		m.podRegistry,
+	)
+	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewREST(&pod.RESTConfig{
-			CloudProvider: c.Cloud,
-			PodCache:      podCache,
-			PodInfoGetter: c.KubeletClient,
-			Registry:      m.podRegistry,
-			// Note: this allows the pod rest object to directly call
-			// the node rest object without going through the network &
-			// apiserver. This arrangement should be temporary, nodes
-			// shouldn't really need this at all. Once we add more auth in,
-			// we need to consider carefully if this sort of shortcut is a
-			// good idea.
-			Nodes: RESTStorageToNodes(nodeRESTStorage).Nodes(),
+			PodCache: podCache,
+			Registry: m.podRegistry,
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
