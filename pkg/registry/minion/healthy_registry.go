@@ -47,14 +47,14 @@ func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Node
 		return nil, ErrDoesNotExist
 	}
 	if err != nil {
-		return nil, err
+		return minion, err
 	}
 	status, err := r.client.HealthCheck(minionID)
 	if err != nil {
-		return nil, err
+		return minion, err
 	}
 	if status == health.Unhealthy {
-		return nil, ErrNotHealty
+		return minion, ErrNotHealty
 	}
 	return minion, nil
 }

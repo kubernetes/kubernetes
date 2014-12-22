@@ -98,7 +98,7 @@ func TestFiltering(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if minion != nil {
-		t.Errorf("Unexpected presence of 'm1'")
+	if minion == nil {
+		t.Errorf("unexpected absence of 'm1'")
 	}
 }
