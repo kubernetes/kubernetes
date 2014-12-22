@@ -270,8 +270,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		zoneSpread := ZoneSpread{serviceLister: FakeServiceLister(test.services), zoneLabel: "zone"}
-		list, err := zoneSpread.ZoneSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeLabeledMinionList(test.nodes)))
+		zoneSpread := ServiceAntiAffinity{serviceLister: FakeServiceLister(test.services), label: "zone"}
+		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeLabeledMinionList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

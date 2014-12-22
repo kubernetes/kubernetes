@@ -80,25 +80,25 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister
 	return result, nil
 }
 
-type ZoneSpread struct {
+type ServiceAntiAffinity struct {
 	serviceLister ServiceLister
-	zoneLabel     string
+	label         string
 }
 
-func NewZoneSpreadPriority(serviceLister ServiceLister, zoneLabel string) PriorityFunction {
-	zoneSpread := &ZoneSpread{
+func NewServiceAntiAffinityPriority(serviceLister ServiceLister, label string) PriorityFunction {
+	antiAffinity := &ServiceAntiAffinity{
 		serviceLister: serviceLister,
-		zoneLabel:     zoneLabel,
+		label:         label,
 	}
-	return zoneSpread.ZoneSpreadPriority
+	return antiAffinity.CalculateAntiAffinityPriority
 }
 
-func (z *ZoneSpread) ZoneSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var service api.Service
 	var pods []api.Pod
 	var err error
 
-	service, err = z.serviceLister.GetPodService(pod)
+	service, err = s.serviceLister.GetPodService(pod)
 	if err == nil {
 		selector := labels.SelectorFromSet(service.Spec.Selector)
 		pods, err = podLister.ListPods(selector)
@@ -116,8 +116,8 @@ func (z *ZoneSpread) ZoneSpreadPriority(pod api.Pod, podLister PodLister, minion
 	openMinions := []string{}
 	zonedMinions := map[string]string{}
 	for _, minion := range minions.Items {
-		if labels.Set(minion.Labels).Has(z.zoneLabel) {
-			zone := labels.Set(minion.Labels).Get(z.zoneLabel)
+		if labels.Set(minion.Labels).Has(s.label) {
+			zone := labels.Set(minion.Labels).Get(s.label)
 			zonedMinions[minion.Name] = zone
 		} else {
 			openMinions = append(openMinions, minion.Name)

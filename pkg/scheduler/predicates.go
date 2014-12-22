@@ -167,6 +167,43 @@ func PodFitsHost(pod api.Pod, existingPods []api.Pod, node string) (bool, error)
 	return pod.Spec.Host == node, nil
 }
 
+type NodeLabelChecker struct {
+	info     NodeInfo
+	labels   []string
+	presence bool
+}
+
+func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) FitPredicate {
+	labelChecker := &NodeLabelChecker{
+		info:     info,
+		labels:   labels,
+		presence: presence,
+	}
+	return labelChecker.CheckNodeLabelPresence
+}
+
+// CheckNodeLabelPresence checks whether a particular label exists on a minion or not, regardless of its value
+// Consider the cases where the minions are places in regions/zones/racks and these are identified by labels
+// In some cases, it is required that only minions that are part of ANY of the defined regions/zones/racks be selected
+//
+// Alternately, eliminating minions that have a certain label, regardless of value, is also useful
+// A minion may have a label with "retiring" as key and the date as the value
+// and it may be desirable to avoid scheduling new pods on this minion
+func (n *NodeLabelChecker) CheckNodeLabelPresence(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	var exists bool
+	minion, err := n.info.GetNodeInfo(node)
+	if err != nil {
+		return false, err
+	}
+	for _, label := range n.labels {
+		exists = labels.Set(minion.Labels).Has(label)
+		if (exists && !n.presence) || (!exists && n.presence) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	existingPorts := getUsedPorts(existingPods...)
 	wantPorts := getUsedPorts(pod)

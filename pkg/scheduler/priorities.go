@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
 )
 
@@ -87,4 +88,48 @@ func LeastRequestedPriority(pod api.Pod, podLister PodLister, minionLister Minio
 		list = append(list, calculateOccupancy(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
+}
+
+type NodeLabelPrioritizer struct {
+	label    string
+	presence bool
+}
+
+func NewNodeLabelPriority(label string, presence bool) PriorityFunction {
+	labelPrioritizer := &NodeLabelPrioritizer{
+		label:    label,
+		presence: presence,
+	}
+	return labelPrioritizer.CalculateNodeLabelPriority
+}
+
+// CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value
+// Consider the cases where the minions are places in regions/zones/racks and these are identified by labels
+// In some cases, it is required that only minions that are part of ANY of the defined regions/zones/racks be selected
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	var score int
+	minions, err := minionLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	// find the zones that the minions belong to
+	labeledMinions := map[string]bool{}
+	for _, minion := range minions.Items {
+		exists := labels.Set(minion.Labels).Has(n.label)
+		labeledMinions[minion.Name] = (exists && n.presence) || (!exists && !n.presence)
+	}
+
+	result := []HostPriority{}
+	//score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest
+	for minionName, success := range labeledMinions {
+		if success {
+			score = 10
+		} else {
+			score = 0
+		}
+		result = append(result, HostPriority{host: minionName, score: score})
+	}
+	return result, nil
 }

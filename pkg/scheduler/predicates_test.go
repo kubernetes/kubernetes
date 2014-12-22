@@ -386,3 +386,63 @@ func TestPodFitsSelector(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeLabelPresence(t *testing.T) {
+	label := map[string]string{"foo": "bar", "bar": "foo"}
+	tests := []struct {
+		pod          api.Pod
+		existingPods []api.Pod
+		labels       []string
+		presence     bool
+		fits         bool
+		test         string
+	}{
+		{
+			labels:   []string{"baz"},
+			presence: true,
+			fits:     false,
+			test:     "label does not match, presence true",
+		},
+		{
+			labels:   []string{"baz"},
+			presence: false,
+			fits:     true,
+			test:     "label does not match, presence false",
+		},
+		{
+			labels:   []string{"foo", "baz"},
+			presence: true,
+			fits:     false,
+			test:     "one label matches, presence true",
+		},
+		{
+			labels:   []string{"foo", "baz"},
+			presence: false,
+			fits:     false,
+			test:     "one label matches, presence false",
+		},
+		{
+			labels:   []string{"foo", "bar"},
+			presence: true,
+			fits:     true,
+			test:     "all labels match, presence true",
+		},
+		{
+			labels:   []string{"foo", "bar"},
+			presence: false,
+			fits:     false,
+			test:     "all labels match, presence false",
+		},
+	}
+	for _, test := range tests {
+		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
+		labelChecker := NodeLabelChecker{FakeNodeInfo(node), test.labels, test.presence}
+		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, test.existingPods, "machine")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
