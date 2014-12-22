@@ -68,10 +68,12 @@ function cleanup {
 }
 
 function influx-data-exists {
+  local max_retries=10
+  local retry_delay=30 #seconds
   local influx_ip=$("${KUBECTL}" get -o json pods influx-grafana | grep hostIP | awk '{print $2}' | sed 's/["|,]//g')
   local influx_url="http://$influx_ip:8086/db/k8s/series?u=root&p=root"
-  if ! curl -G $influx_url --data-urlencode "q=select * from stats limit 1" \
-    || ! curl -G $influx_url --data-urlencode "q=select * from machine limit 1"; then
+  if ! curl --retry $max_retries --retry-delay $retry_delay -G $influx_url --data-urlencode "q=select * from stats limit 1" \
+    || ! curl --retry $max_retries --retry-delay $retry_delay -G $influx_url --data-urlencode "q=select * from machine limit 1"; then
     echo "failed to retrieve stats from Infludb. monitoring test failed"
     exit 1
   fi
