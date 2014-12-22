@@ -88,7 +88,7 @@ esac
 GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 
 APISERVER_LOG=/tmp/kube-apiserver.log
-"${GO_OUT}/kube-apiserver" \
+sudo "${GO_OUT}/kube-apiserver" \
   -v=${LOG_LEVEL} \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
@@ -101,14 +101,14 @@ APISERVER_PID=$!
 kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: "
 
 CTLRMGR_LOG=/tmp/kube-controller-manager.log
-"${GO_OUT}/kube-controller-manager" \
+sudo "${GO_OUT}/kube-controller-manager" \
   -v=${LOG_LEVEL} \
   --machines="127.0.0.1" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
-"${GO_OUT}/kubelet" \
+sudo "${GO_OUT}/kubelet" \
   -v=${LOG_LEVEL} \
   --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
@@ -117,13 +117,13 @@ KUBELET_LOG=/tmp/kubelet.log
 KUBELET_PID=$!
 
 PROXY_LOG=/tmp/kube-proxy.log
-"${GO_OUT}/kube-proxy" \
+sudo "${GO_OUT}/kube-proxy" \
   -v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 
 SCHEDULER_LOG=/tmp/kube-scheduler.log
-"${GO_OUT}/kube-scheduler" \
+sudo "${GO_OUT}/kube-scheduler" \
   -v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!
@@ -147,11 +147,11 @@ EOF
 cleanup()
 {
     echo "Cleaning up..."
-    kill "${APISERVER_PID}"
-    kill "${CTLRMGR_PID}"
-    kill "${KUBELET_PID}"
-    kill "${PROXY_PID}"
-    kill "${SCHEDULER_PID}"
+    sudo kill "${APISERVER_PID}"
+    sudo kill "${CTLRMGR_PID}"
+    sudo kill "${KUBELET_PID}"
+    sudo kill "${PROXY_PID}"
+    sudo kill "${SCHEDULER_PID}"
 
     kill "${ETCD_PID}"
     rm -rf "${ETCD_DIR}"
