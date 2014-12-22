@@ -194,7 +194,7 @@ go run e2e.go -ctl='delete pod foobar'
 ```
 
 ## Testing out flaky tests
-[Instructions here](docs/devel/flaky-tests.md)
+[Instructions here](flaky-tests.md)
 
 ## Add/Update dependencies
 
