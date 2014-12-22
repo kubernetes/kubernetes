@@ -1,11 +1,13 @@
 [Unit]
 Description=Kubernetes Scheduler Plugin
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+Wants=network.target
 
 [Service]
-EnvironmentFile=-/etc/kubernetes/config
-EnvironmentFile=-/etc/kubernetes/apiserver
-EnvironmentFile=-/etc/kubernetes/scheduler
+EnvironmentFile=-/etc/sysconfig/kubeconfig
+EnvironmentFile=-/etc/sysconfig/kubeapiserver
+EnvironmentFile=-/etc/sysconfig/kubescheduler
 User=kube
 ExecStart=/usr/bin/kube-scheduler \
 	    ${KUBE_LOGTOSTDERR} \

@@ -5,8 +5,8 @@ After=docker.socket cadvisor.service
 Requires=docker.socket
 
 [Service]
-EnvironmentFile=-/etc/kubernetes/config
-EnvironmentFile=-/etc/kubernetes/kubelet
+EnvironmentFile=-/etc/sysconfig/kubeconfig
+EnvironmentFile=-/etc/sysconfig/kubelet
 ExecStart=/usr/bin/kubelet \
 	    ${KUBE_LOGTOSTDERR} \
 	    ${KUBE_LOG_LEVEL} \
@@ -17,6 +17,32 @@ ExecStart=/usr/bin/kubelet \
 	    ${KUBE_ALLOW_PRIV} \
 	    ${KUBELET_ARGS}
 Restart=on-failure
+LimitNOFILE=16384
+#######################################
+# Note: prevent network flooding on failures and splits
+#######################################
+RestartSec=20
+
+#######################################
+# Note: Below are cgroup options
+#  root group promotion if *required*
+#######################################
+Slice=kublet
+CPUAccounting=true
+CPUShares=1024
+MemoryAccounting=true
+BlockIOAccounting=true
+#######################################
+# Note: Admin cgroup policy
+#######################################
+#MemoryLimit=
+#MemorySoftLimit=
+#BlockIOWeight=
+#BlockIODeviceWeight=
+#BlockIOReadBandwidth=
+#BlockIOWriteBandwidth=
+#DeviceAllow=
+#DevicePolicy=auto|closed|strict
 
 [Install]
 WantedBy=multi-user.target
