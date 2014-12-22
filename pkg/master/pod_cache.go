@@ -80,28 +80,35 @@ func (p *PodCache) GetPodStatus(namespace, name string) (*api.PodStatus, error) 
 	return &value, nil
 }
 
-// lock must *not* be held
-func (p *PodCache) nodeExists(name string) bool {
+func (p *PodCache) nodeExistsInCache(name string) (exists, cacheHit bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	exists, cacheHit := p.currentNodes[objKey{"", name}]
+	exists, cacheHit = p.currentNodes[objKey{"", name}]
+	return exists, cacheHit
+}
+
+// lock must *not* be held
+func (p *PodCache) nodeExists(name string) bool {
+	exists, cacheHit := p.nodeExistsInCache(name)
 	if cacheHit {
 		return exists
 	}
-	// Don't block everyone while looking up this minion.
-	// Because this may require an RPC to our storage (e.g. etcd).
-	func() {
-		p.lock.Unlock()
-		defer p.lock.Lock()
-		_, err := p.nodes.Get(name)
-		exists = true
-		if err != nil {
-			exists = false
-			if !errors.IsNotFound(err) {
-				glog.Errorf("Unexpected error type verifying minion existence: %+v", err)
-			}
+	// TODO: suppose there's N concurrent requests for node "foo"; in that case
+	// it might be useful to block all of them and only look up "foo" once.
+	// (This code will make up to N lookups.) One way of doing that would be to
+	// have a pool of M mutexes and require that before looking up "foo" you must
+	// lock mutex hash("foo") % M.
+	_, err := p.nodes.Get(name)
+	exists = true
+	if err != nil {
+		exists = false
+		if !errors.IsNotFound(err) {
+			glog.Errorf("Unexpected error type verifying minion existence: %+v", err)
 		}
-	}()
+	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	p.currentNodes[objKey{"", name}] = exists
 	return exists
 }
@@ -109,23 +116,32 @@ func (p *PodCache) nodeExists(name string) bool {
 // TODO: once Host gets moved to spec, this can take a podSpec + metadata instead of an
 // entire pod?
 func (p *PodCache) updatePodStatus(pod *api.Pod) error {
+	newStatus, err := p.computePodStatus(pod)
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	// Map accesses must be locked.
+	p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
+
+	return err
+}
+
+// computePodStatus always returns a new status, even if it also returns a non-nil error.
+// TODO: once Host gets moved to spec, this can take a podSpec + metadata instead of an
+// entire pod?
+func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	newStatus := pod.Status
+
 	if pod.Status.Host == "" {
-		p.lock.Lock()
-		defer p.lock.Unlock()
 		// Not assigned.
 		newStatus.Phase = api.PodPending
-		p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
-		return nil
+		return newStatus, nil
 	}
 
 	if !p.nodeExists(pod.Status.Host) {
-		p.lock.Lock()
-		defer p.lock.Unlock()
 		// Assigned to non-existing node.
 		newStatus.Phase = api.PodFailed
-		p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
-		return nil
+		return newStatus, nil
 	}
 
 	info, err := p.containerInfo.GetPodInfo(pod.Status.Host, pod.Namespace, pod.Name)
@@ -142,27 +158,33 @@ func (p *PodCache) updatePodStatus(pod *api.Pod) error {
 			}
 		}
 	}
+	return newStatus, err
+}
+
+func (p *PodCache) resetNodeExistenceCache() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
-	return err
+	p.currentNodes = map[objKey]bool{}
 }
 
 // UpdateAllContainers updates information about all containers.
+// Callers should let one call to UpdateAllContainers finish before
+// calling again, or risk having new info getting clobbered by delayed
+// old info.
 func (p *PodCache) UpdateAllContainers() {
-	func() {
-		// Reset which nodes we think exist
-		p.lock.Lock()
-		defer p.lock.Unlock()
-		p.currentNodes = map[objKey]bool{}
-	}()
+	p.resetNodeExistenceCache()
 
 	ctx := api.NewContext()
 	pods, err := p.pods.ListPods(ctx, labels.Everything())
 	if err != nil {
-		glog.Errorf("Error synchronizing container list: %v", err)
+		glog.Errorf("Error getting pod list: %v", err)
 		return
 	}
+
+	// TODO: this algorithm is 1 goroutine & RPC per pod. With a little work,
+	// it should be possible to make it 1 per *node*, which will be important
+	// at very large scales. (To be clear, the goroutines shouldn't matter--
+	// it's the RPCs that need to be minimized.)
 	var wg sync.WaitGroup
 	for i := range pods.Items {
 		pod := &pods.Items[i]
@@ -171,7 +193,7 @@ func (p *PodCache) UpdateAllContainers() {
 			defer wg.Done()
 			err := p.updatePodStatus(pod)
 			if err != nil && err != client.ErrPodInfoNotAvailable {
-				glog.Errorf("Error synchronizing container: %v", err)
+				glog.Errorf("Error getting info for pod %v/%v: %v", pod.Namespace, pod.Name, err)
 			}
 		}()
 	}

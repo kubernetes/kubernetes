@@ -18,6 +18,7 @@ package master
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,19 +28,48 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type FakePodInfoGetter struct {
+type podInfoCall struct {
 	host      string
-	id        string
 	namespace string
-	data      api.PodContainerInfo
-	err       error
+	name      string
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, namespace, id string) (api.PodContainerInfo, error) {
-	f.host = host
-	f.id = id
-	f.namespace = namespace
-	return f.data, f.err
+type podInfoResponse struct {
+	useCount int
+	data     api.PodContainerInfo
+	err      error
+}
+
+type podInfoCalls map[podInfoCall]*podInfoResponse
+
+type FakePodInfoGetter struct {
+	calls podInfoCalls
+	lock  sync.Mutex
+
+	// default data/error to return, or you can add
+	// responses to specific calls-- that will take precedence.
+	data api.PodContainerInfo
+	err  error
+}
+
+func (f *FakePodInfoGetter) GetPodInfo(host, namespace, name string) (api.PodContainerInfo, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.calls == nil {
+		f.calls = podInfoCalls{}
+	}
+
+	key := podInfoCall{host, namespace, name}
+	call, ok := f.calls[key]
+	if !ok {
+		f.calls[key] = &podInfoResponse{
+			0, f.data, f.err,
+		}
+		call = f.calls[key]
+	}
+	call.useCount++
+	return call.data, call.err
 }
 
 func TestPodCacheGetDifferentNamespace(t *testing.T) {
@@ -171,6 +201,7 @@ func makeNode(name string) *api.Node {
 
 func TestPodUpdateAllContainers(t *testing.T) {
 	pod := makePod(api.NamespaceDefault, "foo", "machine", "bar")
+	pod2 := makePod(api.NamespaceDefault, "baz", "machine", "qux")
 	config := podCacheTestConfig{
 		ipFunc: func(host string) string {
 			if host == "machine" {
@@ -180,15 +211,22 @@ func TestPodUpdateAllContainers(t *testing.T) {
 		},
 		kubeletContainerInfo: api.PodInfo{"bar": api.ContainerStatus{}},
 		nodes:                []api.Node{*makeNode("machine")},
-		pods:                 []api.Pod{*pod},
+		pods:                 []api.Pod{*pod, *pod2},
 	}
 	cache := config.Construct()
 
 	cache.UpdateAllContainers()
 
-	fake := config.fakePodInfo
-	if fake.host != "machine" || fake.id != "foo" || fake.namespace != api.NamespaceDefault {
-		t.Errorf("Unexpected access: %+v", fake)
+	call1 := config.fakePodInfo.calls[podInfoCall{"machine", api.NamespaceDefault, "foo"}]
+	call2 := config.fakePodInfo.calls[podInfoCall{"machine", api.NamespaceDefault, "baz"}]
+	if call1 == nil || call1.useCount != 1 {
+		t.Errorf("Expected 1 call for 'foo': %+v", config.fakePodInfo.calls)
+	}
+	if call2 == nil || call2.useCount != 1 {
+		t.Errorf("Expected 1 call for 'baz': %+v", config.fakePodInfo.calls)
+	}
+	if len(config.fakePodInfo.calls) != 2 {
+		t.Errorf("Expected 2 calls: %+v", config.fakePodInfo.calls)
 	}
 
 	status, err := cache.GetPodStatus(api.NamespaceDefault, "foo")
@@ -200,6 +238,14 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	}
 	if e, a := "1.2.3.5", status.HostIP; e != a {
 		t.Errorf("Unexpected mismatch. Expected: %+v, Got: %+v", e, a)
+	}
+
+	if e, a := 1, len(config.fakeNodes.Actions); e != a {
+		t.Errorf("Expected: %v, Got: %v; %+v", e, a, config.fakeNodes.Actions)
+	} else {
+		if e, a := "get-minion", config.fakeNodes.Actions[0].Action; e != a {
+			t.Errorf("Expected: %v, Got: %v; %+v", e, a, config.fakeNodes.Actions)
+		}
 	}
 }
 
