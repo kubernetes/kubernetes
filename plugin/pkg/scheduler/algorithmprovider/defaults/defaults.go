@@ -48,9 +48,6 @@ func defaultPriorities() util.StringSet {
 		factory.RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
 		factory.RegisterPriorityFunction("ServiceSpreadingPriority", algorithm.NewServiceSpreadPriority(factory.ServiceLister), 1),
-		// spreads pods belonging to the same service across minions in different zones
-		// TODO: remove the hardcoding of the "zone" label and move it to a constant
-		factory.RegisterPriorityFunction("ZoneSpreadingPriority", algorithm.NewServiceAntiAffinityPriority(factory.ServiceLister, "zone"), 1),
 		// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
 		factory.RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 0),
 	)

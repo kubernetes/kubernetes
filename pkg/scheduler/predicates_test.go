@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -31,7 +32,22 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return &node, nil
 }
 
+<<<<<<< HEAD
 func makeResources(milliCPU int64, memory int64) api.NodeResources {
+=======
+type FakeNodeListInfo []api.Node
+
+func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
+	for _, node := range nodes {
+		if node.Name == nodeName {
+			return &node, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+}
+
+func makeResources(milliCPU int, memory int) api.NodeResources {
+>>>>>>> e0101c2... Adding service affinity predicate
 	return api.NodeResources{
 		Capacity: api.ResourceList{
 			api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
@@ -438,6 +454,118 @@ func TestNodeLabelPresence(t *testing.T) {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: label}}
 		labelChecker := NodeLabelChecker{FakeNodeInfo(node), test.labels, test.presence}
 		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, test.existingPods, "machine")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
+
+func TestServiceAffinity(t *testing.T) {
+	selector := map[string]string{"foo": "bar"}
+	labels1 := map[string]string{
+		"region": "r1",
+		"zone":   "z11",
+	}
+	labels2 := map[string]string{
+		"region": "r1",
+		"zone":   "z12",
+	}
+	labels3 := map[string]string{
+		"region": "r2",
+		"zone":   "z21",
+	}
+	labels4 := map[string]string{
+		"region": "r2",
+		"zone":   "z22",
+	}
+	node1 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labels1}}
+	node2 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labels2}}
+	node3 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labels3}}
+	node4 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine4", Labels: labels4}}
+	node5 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine5", Labels: labels4}}
+	tests := []struct {
+		pod      api.Pod
+		pods     []api.Pod
+		services []api.Service
+		node     string
+		labels   []string
+		fits     bool
+		test     string
+	}{
+		{
+			node:   "machine1",
+			fits:   true,
+			labels: []string{"region"},
+			test:   "nothing scheduled",
+		},
+		{
+			pod:    api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"region": "r1"}}},
+			node:   "machine1",
+			fits:   true,
+			labels: []string{"region"},
+			test:   "pod with region label match",
+		},
+		{
+			pod:    api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"region": "r2"}}},
+			node:   "machine1",
+			fits:   false,
+			labels: []string{"region"},
+			test:   "pod with region label mismatch",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			fits:     true,
+			labels:   []string{"region"},
+			test:     "service pod on same minion",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			fits:     true,
+			labels:   []string{"region"},
+			test:     "service pod on different minion, region match",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			fits:     false,
+			labels:   []string{"region"},
+			test:     "service pod on different minion, region mismatch",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			fits:     false,
+			labels:   []string{"region", "zone"},
+			test:     "service pod on different minion, multiple labels, not all match",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			node:     "machine4",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			fits:     true,
+			labels:   []string{"region", "zone"},
+			test:     "service pod on different minion, multiple labels, all match",
+		},
+	}
+
+	for _, test := range tests {
+		nodes := []api.Node{node1, node2, node3, node4, node5}
+		serviceAffinity := ServiceAffinity{FakePodLister(test.pods), FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
+		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, []api.Pod{}, test.node)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

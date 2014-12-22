@@ -183,7 +183,7 @@ func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) FitPre
 }
 
 // CheckNodeLabelPresence checks whether a particular label exists on a minion or not, regardless of its value
-// Consider the cases where the minions are places in regions/zones/racks and these are identified by labels
+// Consider the cases where the minions are placed in regions/zones/racks and these are identified by labels
 // In some cases, it is required that only minions that are part of ANY of the defined regions/zones/racks be selected
 //
 // Alternately, eliminating minions that have a certain label, regardless of value, is also useful
@@ -202,6 +202,82 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod api.Pod, existingPods []ap
 		}
 	}
 	return true, nil
+}
+
+type ServiceAffinity struct {
+	podLister     PodLister
+	serviceLister ServiceLister
+	nodeInfo      NodeInfo
+	labels        []string
+}
+
+func NewServiceAffinityPredicate(podLister PodLister, serviceLister ServiceLister, nodeInfo NodeInfo, labels []string) FitPredicate {
+	affinity := &ServiceAffinity{
+		podLister:     podLister,
+		serviceLister: serviceLister,
+		nodeInfo:      nodeInfo,
+		labels:        labels,
+	}
+	return affinity.CheckServiceAffinity
+}
+
+func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	var affinitySelector labels.Selector
+
+	// check if the pod being scheduled has the affinity labels specified
+	affinityLabels := map[string]string{}
+	labelsExist := true
+	for _, l := range s.labels {
+		if labels.Set(pod.Labels).Has(l) {
+			affinityLabels[l] = labels.Set(pod.Labels).Get(l)
+		} else {
+			// the current pod does not specify all the labels, look in the existing service pods
+			labelsExist = false
+		}
+	}
+
+	// skip looking at other pods in the service if the current pod defines all the required affinity labels
+	if !labelsExist {
+		service, err := s.serviceLister.GetPodService(pod)
+		if err == nil {
+			selector := labels.SelectorFromSet(service.Spec.Selector)
+			servicePods, err := s.podLister.ListPods(selector)
+			if err != nil {
+				return false, err
+			}
+			if len(servicePods) > 0 {
+				// consider any service pod and fetch the minion its hosted on
+				otherMinion, err := s.nodeInfo.GetNodeInfo(servicePods[0].Status.Host)
+				if err != nil {
+					return false, err
+				}
+				for _, l := range s.labels {
+					// If the pod being scheduled has the label value specified, do not override it
+					if _, exists := affinityLabels[l]; exists {
+						continue
+					}
+					if labels.Set(otherMinion.Labels).Has(l) {
+						affinityLabels[l] = labels.Set(otherMinion.Labels).Get(l)
+					}
+				}
+			}
+		}
+	}
+
+	// if there are no existing pods in the service, consider all minions
+	if len(affinityLabels) == 0 {
+		affinitySelector = labels.Everything()
+	} else {
+		affinitySelector = labels.Set(affinityLabels).AsSelector()
+	}
+
+	minion, err := s.nodeInfo.GetNodeInfo(node)
+	if err != nil {
+		return false, err
+	}
+
+	// check if the minion matches the selector
+	return affinitySelector.Matches(labels.Set(minion.Labels)), nil
 }
 
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
