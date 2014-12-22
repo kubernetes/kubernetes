@@ -96,8 +96,8 @@ type Request struct {
 	sync     bool
 	timeout  time.Duration
 
-	// flag to control how to use namespace in urls
-	namespaceAsPath bool
+	// If true, put ns/<namespace> in path; if false, add "?namespace=<namespace>" as a query parameter
+	namespaceInPath bool
 
 	// output
 	err  error
@@ -105,13 +105,13 @@ type Request struct {
 }
 
 // NewRequest creates a new request with the core attributes.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, codec runtime.Codec, namespaceAsPath bool) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, codec runtime.Codec, namespaceInPath bool) *Request {
 	return &Request{
 		client:          client,
 		verb:            verb,
 		baseURL:         baseURL,
 		codec:           codec,
-		namespaceAsPath: namespaceAsPath,
+		namespaceInPath: namespaceInPath,
 		path:            baseURL.Path,
 	}
 }
@@ -141,7 +141,7 @@ func (r *Request) Namespace(namespace string) *Request {
 	}
 
 	if len(namespace) > 0 {
-		if r.namespaceAsPath {
+		if r.namespaceInPath {
 			return r.Path("ns").Path(namespace)
 		} else {
 			return r.setParam("namespace", namespace)
