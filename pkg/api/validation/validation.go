@@ -578,6 +578,8 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	// Allow users to update labels and capacity
 	oldMinion.Labels = minion.Labels
 	oldMinion.Spec.Capacity = minion.Spec.Capacity
+	// Clear status
+	oldMinion.Status = minion.Status
 
 	if !reflect.DeepEqual(oldMinion, minion) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldMinion, minion)
