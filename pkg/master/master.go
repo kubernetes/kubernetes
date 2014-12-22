@@ -323,7 +323,7 @@ func (m *Master) init(c *Config) {
 	var authenticator = c.Authenticator
 
 	nodeRESTStorage := minion.NewREST(m.minionRegistry)
-	ipCache := NewIPCache(c.Cloud, util.RealClock{})
+	ipCache := NewIPCache(c.Cloud, util.RealClock{}, 30*time.Second)
 	podCache := NewPodCache(
 		ipCache,
 		c.KubeletClient,

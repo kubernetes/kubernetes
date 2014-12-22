@@ -28,16 +28,32 @@ func TestCacheExpire(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	clock := &util.FakeClock{time.Now()}
 
-	c := NewIPCache(fakeCloud, clock)
+	c := NewIPCache(fakeCloud, clock, 60*time.Second)
 
 	_ = c.GetInstanceIP("foo")
 	// This call should hit the cache, so we expect no additional calls to the cloud
 	_ = c.GetInstanceIP("foo")
 	// Advance the clock, this call should miss the cache, so expect one more call.
-	clock.Time = clock.Time.Add(60 * time.Second)
+	clock.Time = clock.Time.Add(61 * time.Second)
 	_ = c.GetInstanceIP("foo")
 
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[1] != "ip-address" || fakeCloud.Calls[0] != "ip-address" {
+		t.Errorf("Unexpected calls: %+v", fakeCloud.Calls)
+	}
+}
+
+func TestCacheNotExpire(t *testing.T) {
+	fakeCloud := &fake_cloud.FakeCloud{}
+	clock := &util.FakeClock{time.Now()}
+
+	c := NewIPCache(fakeCloud, clock, 60*time.Second)
+
+	_ = c.GetInstanceIP("foo")
+	// This call should hit the cache, so we expect no additional calls to the cloud
+	clock.Time = clock.Time.Add(60 * time.Second)
+	_ = c.GetInstanceIP("foo")
+
+	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "ip-address" {
 		t.Errorf("Unexpected calls: %+v", fakeCloud.Calls)
 	}
 }

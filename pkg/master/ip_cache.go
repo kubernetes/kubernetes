@@ -36,16 +36,21 @@ type ipCache struct {
 	cloudProvider cloudprovider.Interface
 	cache         map[string]ipCacheEntry
 	lock          sync.Mutex
+	ttl           time.Duration
 }
 
 // NewIPCache makes a new ip caching layer, which will get IP addresses from cp,
 // and use clock for deciding when to re-get an IP address.
 // Thread-safe.
-func NewIPCache(cp cloudprovider.Interface, clock util.Clock) *ipCache {
+//
+// TODO: when we switch to go1.4, this class would be a good candidate for something
+// that could be produced from a template and a type via `go generate`.
+func NewIPCache(cp cloudprovider.Interface, clock util.Clock, ttl time.Duration) *ipCache {
 	return &ipCache{
 		clock:         clock,
 		cloudProvider: cp,
 		cache:         map[string]ipCacheEntry{},
+		ttl:           ttl,
 	}
 }
 
@@ -57,7 +62,7 @@ func (c *ipCache) GetInstanceIP(host string) string {
 	data, ok := c.cache[host]
 	now := c.clock.Now()
 
-	if !ok || now.Sub(data.lastUpdate) > (30*time.Second) {
+	if !ok || now.Sub(data.lastUpdate) > c.ttl {
 		ip := getInstanceIPFromCloud(c.cloudProvider, host)
 		data = ipCacheEntry{
 			ip:         ip,
