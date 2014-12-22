@@ -45,7 +45,7 @@ Kubernetes documentation is organized into several categories.
     - for people who want to create a kubernetes cluster
     - in [docs/getting-started-guides](docs/getting-started-guides)
   - **User Documentation**
-    - [User FAQ](wiki/User-FAQ)
+    - [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
     - in [docs](docs/overview.md)
     - for people who want to run programs on kubernetes
     - describes current features of the system (with brief mentions of planned features)
