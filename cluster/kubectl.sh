@@ -22,6 +22,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+# Get the absolute path of the directory component of a file, i.e. the
+# absolute path of the dirname of $1.
+get_absolute_dirname() {
+  echo "$(cd "$(dirname "$1")" && pwd)"
+}
+
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
   Darwin)
@@ -58,33 +64,44 @@ case "$(uname -m)" in
     ;;
 esac
 
-# Gather up the list of likely places and use ls to find the latest one.
-locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
-  "${HOME}/google-cloud-sdk/bin/kubectl"
-)
-kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+# If KUBECTL_PATH isn't set, gather up the list of likely places and use ls
+# to find the latest one.
+if [[ -z "${KUBECTL_PATH:-}" ]]; then
+  locations=(
+    "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
+    "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
+    "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
+  )
+  kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-if [[ ! -x "$kubectl" ]]; then
+  if [[ ! -x "$kubectl" ]]; then
+    {
+      echo "It looks as if you don't have a compiled kubectl binary"
+      echo
+      echo "If you are running from a clone of the git repo, please run"
+      echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
+      echo "Docker installed."
+      echo
+      echo "If you are running from a binary release tarball, something is wrong. "
+      echo "Look at http://kubernetes.io/ for information on how to contact the "
+      echo "development team for help."
+    } >&2
+    exit 1
+  fi
+elif [[ ! -x "${KUBECTL_PATH}" ]]; then
   {
-    echo "It looks as if you don't have a compiled kubectl binary."
-    echo
-    echo "If you are running from a clone of the git repo, please run"
-    echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
-    echo "Docker installed."
-    echo
-    echo "If you are running from a binary release tarball, something is wrong. "
-    echo "Look at http://kubernetes.io/ for information on how to contact the "
-    echo "development team for help."
+    echo "KUBECTL_PATH enviroment variable set to '${KUBECTL_PATH}', but "
+    echo "this doesn't seem to be a valid executable."
   } >&2
   exit 1
 fi
+kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# While GKE requires the kubectl binary, it's actually called through gcloud.
+# While GKE requires the kubectl binary, it's actually called through
+# gcloud. But we need to adjust the PATH so gcloud gets the right one.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
+  export PATH=$(get_absolute_dirname $kubectl):$PATH
   kubectl="${GCLOUD}"
 fi
 
