@@ -17,8 +17,6 @@ limitations under the License.
 package event
 
 import (
-	"path"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
@@ -52,11 +50,10 @@ func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
 			NewListFunc:  func() runtime.Object { return &api.EventList{} },
 			EndpointName: "events",
 			KeyRootFunc: func(ctx api.Context) string {
-				return "/registry/events"
+				return etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/events")
 			},
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
-				// TODO - we need to store this in a namespace relative path
-				return path.Join("/registry/events", id), nil
+				return etcdgeneric.NamespaceKeyFunc(ctx, "/registry/events", id)
 			},
 			Helper: h,
 		},
