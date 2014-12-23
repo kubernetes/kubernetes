@@ -64,11 +64,18 @@ for test in http exec; do
   waitForNotPending
 
   before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+  while [[ "${before}" == "<no value>" ]]; do
+    before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+  done
+  
   echo "Waiting for restarts."
   for i in $(seq 1 24); do
     sleep 10 
     after=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
     echo "Restarts: ${after} > ${before}"
+    if [[ "${after}" == "<no value>" ]]; then
+      continue
+    fi
     if [[ "${after}" > "${before}" ]]; then
       break
     fi
