@@ -130,6 +130,16 @@ func (onrmp *Onramp) allocateExtAddr() (extAddr *string) {
 	return newIP 
 }
 
+func (onrmp *Onramp) mapAction(action string, eintf string, iintf string, name string, extip string, podip string) (error) {
+
+	ex := exec.New()
+	cmd := ex.Command("onramp_iptables_setup.sh", action, eintf, iintf, name, extip, podip)
+	_, err := cmd.CombinedOutput()
+
+	return err
+}
+
+
 func (onrmp *Onramp) monitorPods() {
 
 	ns := api.NamespaceAll
@@ -149,11 +159,10 @@ func (onrmp *Onramp) monitorPods() {
 			pod, err := pdi.Get(onrmp.podNameList[m].PodName)
 			if (err != nil) {
 				glog.Infof("Could not get Pod for %s, deleting\n", onrmp.podNameList[m].PodName)
-				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "DELETE", onrmp.extInterface, onrmp.intInterface, onrmp.podNameList[m].PodName, "NONE", "NONE")
-				_, err := cmd.CombinedOutput()
+				err := onrmp.mapAction("DELETE", onrmp.extInterface, onrmp.intInterface, onrmp.podNameList[m].PodName, "NONE", "NONE")
 				if (err != nil) {
 					glog.Infof("Error Executing Delete for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
+					continue
 				}
 		
 				onrmp.podNameList = append(onrmp.podNameList[0:m], onrmp.podNameList[m+1:]...)
@@ -171,9 +180,7 @@ func (onrmp *Onramp) monitorPods() {
 				glog.Infof("Pod %s has been added\n", onrmp.podNameList[m].PodName)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
 				onrmp.podNameList[m].NewPod = 0
-				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "ADD", onrmp.extInterface, onrmp.intInterface, pod.Name, *extIP, pod.CurrentState.PodIP)
-				_, err := cmd.CombinedOutput()
+				err := onrmp.mapAction("ADD", onrmp.extInterface, onrmp.intInterface, pod.Name, *extIP, pod.CurrentState.PodIP)
 				if (err != nil) {
 					glog.Infof("Error Executing Creation of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
 					continue
@@ -184,9 +191,7 @@ func (onrmp *Onramp) monitorPods() {
 			if (pod.CurrentState.PodIP != onrmp.podNameList[m].PodIP) {
 				glog.Infof("Pod %s has changed ip %s => %s, updating\n", onrmp.podNameList[m].PodName, onrmp.podNameList[m].PodIP, pod.CurrentState.PodIP)
 				onrmp.podNameList[m].PodIP = pod.CurrentState.PodIP
-				ex := exec.New()
-				cmd := ex.Command("onramp_iptables_setup.sh", "MODIFY", onrmp.extInterface, onrmp.intInterface, pod.Name, onrmp.podNameList[m].ExtIP, pod.CurrentState.PodIP)
-				_, err := cmd.CombinedOutput()
+				err := onrmp.mapAction("MODIFY", onrmp.extInterface, onrmp.intInterface, pod.Name, onrmp.podNameList[m].ExtIP, pod.CurrentState.PodIP)
 				if (err != nil) {
 					glog.Infof("Error Executing Modification of New IP Tables rules for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
 					continue
