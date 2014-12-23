@@ -6,11 +6,18 @@ package docker
 
 import "fmt"
 
+// ChangeType is a type for constants indicating the type of change
+// in a container
 type ChangeType int
 
 const (
+	// ChangeModify is the ChangeType for container modifications
 	ChangeModify ChangeType = iota
+
+	// ChangeAdd is the ChangeType for additions to a container
 	ChangeAdd
+
+	// ChangeDelete is the ChangeType for deletions from a container
 	ChangeDelete
 )
 

@@ -25,12 +25,6 @@ import (
 var Codec = runtime.CodecFor(api.Scheme, "v1beta2")
 
 func init() {
-	// Future names are supported, and declared first so they take precedence
-	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
-	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
-	api.Scheme.AddKnownTypeWithName("v1beta2", "Operation", &ServerOp{})
-	api.Scheme.AddKnownTypeWithName("v1beta2", "OperationList", &ServerOpList{})
-
 	api.Scheme.AddKnownTypes("v1beta2",
 		&Pod{},
 		&PodContainerInfo{},
@@ -58,6 +52,8 @@ func init() {
 	// Future names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
 	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Operation", &ServerOp{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "OperationList", &ServerOpList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
