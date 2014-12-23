@@ -290,6 +290,130 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 	}
 }
 
+func TestTemplatePanic(t *testing.T) {
+	tmpl := `{{and ((index .currentState.info "update-demo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
+	printer, err := NewTemplatePrinter([]byte(tmpl), testapi.Version(), api.Scheme)
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(&api.Pod{}, buffer)
+	if err == nil {
+		t.Fatalf("expected that template to crash")
+	}
+	if buffer.String() == "" {
+		t.Errorf("no debugging info was printed")
+	}
+}
+
+func TestTemplateStrings(t *testing.T) {
+	// This unit tests the "exists" function as well as the template from update.sh
+	table := map[string]struct {
+		pod    api.Pod
+		expect string
+	}{
+		"nilInfo":   {api.Pod{}, "false"},
+		"emptyInfo": {api.Pod{Status: api.PodStatus{Info: api.PodInfo{}}}, "false"},
+		"containerExists": {
+			api.Pod{
+				Status: api.PodStatus{
+					Info: api.PodInfo{"update-demo": api.ContainerStatus{}},
+				},
+			},
+			"false",
+		},
+		"netExists": {
+			api.Pod{
+				Status: api.PodStatus{
+					Info: api.PodInfo{"net": api.ContainerStatus{}},
+				},
+			},
+			"false",
+		},
+		"bothExist": {
+			api.Pod{
+				Status: api.PodStatus{
+					Info: api.PodInfo{
+						"update-demo": api.ContainerStatus{},
+						"net":         api.ContainerStatus{},
+					},
+				},
+			},
+			"false",
+		},
+		"oneValid": {
+			api.Pod{
+				Status: api.PodStatus{
+					Info: api.PodInfo{
+						"update-demo": api.ContainerStatus{},
+						"net": api.ContainerStatus{
+							State: api.ContainerState{
+								Running: &api.ContainerStateRunning{
+									StartedAt: util.Time{},
+								},
+							},
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"bothValid": {
+			api.Pod{
+				Status: api.PodStatus{
+					Info: api.PodInfo{
+						"update-demo": api.ContainerStatus{
+							State: api.ContainerState{
+								Running: &api.ContainerStateRunning{
+									StartedAt: util.Time{},
+								},
+							},
+						},
+						"net": api.ContainerStatus{
+							State: api.ContainerState{
+								Running: &api.ContainerStateRunning{
+									StartedAt: util.Time{},
+								},
+							},
+						},
+					},
+				},
+			},
+			"true",
+		},
+	}
+
+	// The point of this test is to verify that the below template works. If you change this
+	// template, you need to update hack/e2e-suite/update.sh.
+	tmpl :=
+		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "net" "state" "running")}}`
+	useThisToDebug := `
+a: {{exists . "currentState"}}
+b: {{exists . "currentState" "info"}}
+c: {{exists . "currentState" "info" "update-demo"}}
+d: {{exists . "currentState" "info" "update-demo" "state"}}
+e: {{exists . "currentState" "info" "update-demo" "state" "running"}}
+f: {{exists . "currentState" "info" "update-demo" "state" "running" "startedAt"}}`
+	_ = useThisToDebug // don't complain about unused var
+
+	printer, err := NewTemplatePrinter([]byte(tmpl), "v1beta1", api.Scheme)
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+
+	for name, item := range table {
+		buffer := &bytes.Buffer{}
+		err = printer.PrintObj(&item.pod, buffer)
+		if err != nil {
+			t.Errorf("%v: unexpected err: %v", name, err)
+			continue
+		}
+		if e, a := item.expect, buffer.String(); e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+	}
+}
+
 func TestPrinters(t *testing.T) {
 	om := func(name string) api.ObjectMeta { return api.ObjectMeta{Name: name} }
 	templatePrinter, err := NewTemplatePrinter([]byte("{{.name}}"), testapi.Version(), api.Scheme)

@@ -327,25 +327,38 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
 type TemplatePrinter struct {
-	template *template.Template
+	rawTemplate string
+	template    *template.Template
 }
 
 func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
-	t, err := template.New("output").Parse(string(tmpl))
+	t, err := template.New("output").
+		Funcs(template.FuncMap{"exists": exists}).
+		Parse(string(tmpl))
 	if err != nil {
 		return nil, err
 	}
-	return &TemplatePrinter{t}, nil
+	return &TemplatePrinter{string(tmpl), t}, nil
 }
 
 // Print parses the data as JSON, and re-formats it with the Go Template.
 func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
-	obj := map[string]interface{}{}
-	err := json.Unmarshal(data, &obj)
+	out := map[string]interface{}{}
+	err := json.Unmarshal(data, &out)
 	if err != nil {
 		return err
 	}
-	return t.template.Execute(w, obj)
+	if err := t.safeExecute(w, out); err != nil {
+		// It is way easier to debug this stuff when it shows up in
+		// stdout instead of just stdin. So in addition to returning
+		// a nice error, also print useful stuff with the writer.
+		fmt.Fprintf(w, "Error executing template: %v\n", err)
+		fmt.Fprintf(w, "template was:\n%v\n", t.rawTemplate)
+		fmt.Fprintf(w, "raw data was:\n%v\n", string(data))
+		fmt.Fprintf(w, "object given to template engine was:\n%+v\n", out)
+		return fmt.Errorf("error executing template '%v': '%v'\n----data----\n%#v\n", t.rawTemplate, err, out)
+	}
+	return nil
 }
 
 // PrintObj formats the obj with the Go Template.
@@ -355,4 +368,94 @@ func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 	return t.Print(data, w)
+}
+
+// safeExecute tries to execute the template, but catches panics and returns an error
+// should the template engine panic.
+func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
+	var panicErr error
+	// Sorry for the double anonymous function. There's probably a clever way
+	// to do this that has the defer'd func setting the value to be returned, but
+	// that would be even less obvious.
+	retErr := func() error {
+		defer func() {
+			if x := recover(); x != nil {
+				panicErr = fmt.Errorf("caught panic: %+v", x)
+			}
+		}()
+		return p.template.Execute(w, obj)
+	}()
+	if panicErr != nil {
+		return panicErr
+	}
+	return retErr
+}
+
+// exists returns true if it would be possible to call the index function
+// with these arguments.
+//
+// TODO: how to document this for users?
+//
+// index returns the result of indexing its first argument by the following
+// arguments.  Thus "index x 1 2 3" is, in Go syntax, x[1][2][3]. Each
+// indexed item must be a map, slice, or array.
+func exists(item interface{}, indices ...interface{}) bool {
+	v := reflect.ValueOf(item)
+	for _, i := range indices {
+		index := reflect.ValueOf(i)
+		var isNil bool
+		if v, isNil = indirect(v); isNil {
+			return false
+		}
+		switch v.Kind() {
+		case reflect.Array, reflect.Slice, reflect.String:
+			var x int64
+			switch index.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				x = index.Int()
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+				x = int64(index.Uint())
+			default:
+				return false
+			}
+			if x < 0 || x >= int64(v.Len()) {
+				return false
+			}
+			v = v.Index(int(x))
+		case reflect.Map:
+			if !index.IsValid() {
+				index = reflect.Zero(v.Type().Key())
+			}
+			if !index.Type().AssignableTo(v.Type().Key()) {
+				return false
+			}
+			if x := v.MapIndex(index); x.IsValid() {
+				v = x
+			} else {
+				v = reflect.Zero(v.Type().Elem())
+			}
+		default:
+			return false
+		}
+	}
+	if _, isNil := indirect(v); isNil {
+		return false
+	}
+	return true
+}
+
+// stolen from text/template
+// indirect returns the item at the end of indirection, and a bool to indicate if it's nil.
+// We indirect through pointers and empty interfaces (only) because
+// non-empty interfaces have methods we might need.
+func indirect(v reflect.Value) (rv reflect.Value, isNil bool) {
+	for ; v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface; v = v.Elem() {
+		if v.IsNil() {
+			return v, true
+		}
+		if v.Kind() == reflect.Interface && v.NumMethod() > 0 {
+			break
+		}
+	}
+	return v, false
 }
