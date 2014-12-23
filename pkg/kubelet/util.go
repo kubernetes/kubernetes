@@ -24,7 +24,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -75,18 +74,6 @@ func ConnectToDockerOrDie(dockerEndpoint string) *docker.Client {
 		glog.Fatal("Couldn't connect to docker.")
 	}
 	return client
-}
-
-// TODO: move this into the kubelet itself
-func GarbageCollectLoop(k *Kubelet) {
-	func() {
-		util.Forever(func() {
-			err := k.GarbageCollectContainers()
-			if err != nil {
-				glog.Errorf("Garbage collect failed: %v", err)
-			}
-		}, time.Minute*1)
-	}()
 }
 
 // TODO: move this into the kubelet itself

@@ -47,7 +47,9 @@ func init() {
 
 func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools.FakeDockerClient) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeDocker := &dockertools.FakeDockerClient{}
+	fakeDocker := &dockertools.FakeDockerClient{
+		RemovedImages: util.StringSet{},
+	}
 
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
@@ -1697,4 +1699,27 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
+}
+
+func TestGarbageCollectImages(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+
+	fakeDocker.Images = []docker.APIImages{
+		{
+			ID: "foo",
+		},
+		{
+			ID: "bar",
+		},
+	}
+
+	if err := kubelet.GarbageCollectImages(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(fakeDocker.RemovedImages) != 2 ||
+		!fakeDocker.RemovedImages.Has("foo") ||
+		!fakeDocker.RemovedImages.Has("bar") {
+		t.Errorf("unexpected images removed: %v", fakeDocker.RemovedImages)
+	}
 }

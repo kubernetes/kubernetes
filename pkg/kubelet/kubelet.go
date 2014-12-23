@@ -109,6 +109,11 @@ type Kubelet struct {
 	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
 	refLock       sync.RWMutex
 
+	// Tracks active pulls.  Needed to protect image garbage collection
+	// See: https://github.com/docker/docker/issues/8926 for details
+	// TODO: Remove this when (if?) that issue is fixed.
+	pullLock sync.RWMutex
+
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
 	// Optional, defaults to simple implementaiton
@@ -200,6 +205,36 @@ func (kl *Kubelet) purgeOldest(ids []string) error {
 		}
 	}
 
+	return nil
+}
+
+func (kl *Kubelet) GarbageCollectLoop() {
+	util.Forever(func() {
+		if err := kl.GarbageCollectContainers(); err != nil {
+			glog.Errorf("Garbage collect failed: %v", err)
+		}
+		if err := kl.GarbageCollectImages(); err != nil {
+			glog.Errorf("Garbage collect images failed: %v", err)
+		}
+	}, time.Minute*1)
+}
+
+func (kl *Kubelet) getUnusedImages() ([]string, error) {
+	kl.pullLock.Lock()
+	defer kl.pullLock.Unlock()
+	return dockertools.GetUnusedImages(kl.dockerClient)
+}
+
+func (kl *Kubelet) GarbageCollectImages() error {
+	images, err := kl.getUnusedImages()
+	if err != nil {
+		return err
+	}
+	for ix := range images {
+		if err := kl.dockerClient.RemoveImage(images[ix]); err != nil {
+			glog.Errorf("Failed to remove image: %s (%v)", images[ix], err)
+		}
+	}
 	return nil
 }
 
@@ -607,10 +642,7 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 		return "", err
 	}
 	if !ok {
-		if err := kl.dockerPuller.Pull(container.Image); err != nil {
-			if ref != nil {
-				record.Eventf(ref, "failed", "failed", "Failed to pull image %s", container.Image)
-			}
+		if err := kl.pullImage(container.Image, ref); err != nil {
 			return "", err
 		}
 	}
@@ -618,6 +650,18 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 		record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %s", container.Image)
 	}
 	return kl.runContainer(pod, container, nil, "")
+}
+
+func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
+	kl.pullLock.RLock()
+	defer kl.pullLock.RUnlock()
+	if err := kl.dockerPuller.Pull(img); err != nil {
+		if ref != nil {
+			record.Eventf(ref, "failed", "failed", "Failed to pull image %s", img)
+		}
+		return err
+	}
+	return nil
 }
 
 // Kill all containers in a pod.  Returns the number of containers deleted and an error if one occurs.

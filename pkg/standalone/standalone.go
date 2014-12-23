@@ -269,7 +269,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) *kubelet.Kube
 
 	k.BirthCry()
 
-	go kubelet.GarbageCollectLoop(k)
+	go k.GarbageCollectLoop()
 	go kubelet.MonitorCAdvisor(k, kc.CAdvisorPort)
 	kubelet.InitHealthChecking(k)
 
