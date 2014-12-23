@@ -1,4 +1,4 @@
 FROM golang:1.4-onbuild
 VOLUME ["/git"]
-CMD ["-dest", "/git"]
+ENV GIT_SYNC_DEST /git
 ENTRYPOINT ["/go/bin/git-sync"]

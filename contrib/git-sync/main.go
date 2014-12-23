@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-var interval = flag.String("interval", env("INTERVAL", "60s"), "git pull interval")
-var repo = flag.String("repo", env("REPO", ""), "git repo url")
-var branch = flag.String("branch", env("BRANCH", "master"), "git branch")
-var hook = flag.String("hook", env("HOOK", "/"), "web hook path")
-var dest = flag.String("dest", env("DEST", ""), "destination path")
+var interval = flag.String("interval", env("GIT_SYNC_INTERVAL", "60s"), "git pull interval")
+var repo = flag.String("repo", env("GIT_SYNC_REPO", ""), "git repo url")
+var branch = flag.String("branch", env("GIT_SYNC_BRANCH", "master"), "git branch")
+var handler = flag.String("handler", env("GIT_SYNC_HANDLER", "/"), "web hook handler")
+var dest = flag.String("dest", env("GIT_SYNC_DEST", ""), "destination path")
 
 func env(key, def string) string {
 	if env := os.Getenv(key); env != "" {
@@ -24,7 +24,7 @@ func env(key, def string) string {
 	return def
 }
 
-const usage = "usage: REPO= DEST= [INTERVAL= BRANCH= HOOK=] git-sync -repo GIT_REPO_URL -dest PATH [-interval -branch -hook]"
+const usage = "usage: GIT_SYNC_REPO= GIT_SYNC_DEST= [GIT_SYNC_INTERVAL= GIT_SYNC_BRANCH= GIT_SYNC_HANDLER=] git-sync -repo GIT_REPO_URL -dest PATH [-interval -branch -handler]"
 
 func main() {
 	flag.Parse()
@@ -44,7 +44,7 @@ func main() {
 			gitSync()
 		}
 	}()
-	http.HandleFunc(*hook, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(*handler, func(w http.ResponseWriter, r *http.Request) {
 		gitSync()
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))

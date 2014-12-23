@@ -10,7 +10,7 @@ It can be used to source a container volume with the content of a git repo.
 # build the container
 docker build -t git-sync .
 # run the git-sync container
-docker run -d -e INTERVAL=1s -e REPO=https://github.com/GoogleCloudPlatform/kubernetes -e BRANCH=gh-pages -v /git-data:/usr/share/nginx/html git-sync
+docker run -d -e GIT_SYNC_INTERVAL=1s -e GIT_SYNC_REPO=https://github.com/GoogleCloudPlatform/kubernetes -e GIT_SYNC_BRANCH=gh-pages -v /git-data:/git git-sync
 # run a nginx container to serve sync'ed content
-docker run -d -p 8080:80 -v /git-data:/var/www nginx 
+docker run -d -p 8080:80 -v /git-data:/usr/share/nginx/html nginx 
 ```
