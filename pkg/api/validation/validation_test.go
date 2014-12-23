@@ -1236,6 +1236,20 @@ func TestValidateMinionUpdate(t *testing.T) {
 				HostIP: "1.2.3.4",
 			},
 		}, false},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"bar": "foo"},
+			},
+			Status: api.NodeStatus{
+				HostIP: "1.2.3.4",
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"bar": "fooobaz"},
+			},
+		}, true},
 	}
 	for _, test := range tests {
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
