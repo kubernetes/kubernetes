@@ -25,13 +25,13 @@ desiredState:
                     "-peer-bind-addr=127.0.0.1",
             ]
           - name: kube2sky
-            image: kubernetes/kube2sky:latest
+            image: kubernetes/kube2sky:1.0
             command: [
                     # entrypoint = "/kube2sky",
                     "-domain={DNS_DOMAIN}",
             ]
           - name: skydns
-            image: skynetservices/skydns:latest
+            image: kubernetes/skydns:2014-12-23-001
             command: [
                     # entrypoint = "/skydns",
                     "-machines=http://localhost:4001",
