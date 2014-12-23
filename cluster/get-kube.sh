@@ -39,7 +39,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-release=v0.7.0
+release=v0.7.2
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
