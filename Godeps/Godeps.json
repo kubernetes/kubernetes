@@ -152,8 +152,8 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
-			"Comment": "v0.1.0-31-ge13cda2",
-			"Rev": "e13cda260ce48d63ce816f4fa72b6c6cd096596d"
+			"Comment": "v1.0.0",
+			"Rev": "da56de6a59e53fdd61be1b5d9b87df34c47ac420"
 		},
 		{
 			"ImportPath": "github.com/skratchdot/open-golang/open",
