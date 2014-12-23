@@ -2,6 +2,7 @@ package main // import "github.com/GoogleCloudPlatform/kubernetes/git-sync"
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -39,34 +40,106 @@ func main() {
 	if _, err := exec.LookPath("git"); err != nil {
 		log.Fatalf("required git executable not found: %v", err)
 	}
+	repo, err := NewRepo()
+	if err != nil {
+		log.Fatalf("error creating repo: %v", err)
+	}
+	syncc := make(chan struct{})
+	tick := time.Tick(pullInterval)
 	go func() {
-		for _ = range time.Tick(pullInterval) {
-			gitSync()
+		for {
+			repo.Sync()
+			select {
+			case <-tick:
+			case <-syncc:
+			}
 		}
 	}()
 	http.HandleFunc(*handler, func(w http.ResponseWriter, r *http.Request) {
-		gitSync()
+		syncc <- struct{}{}
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func gitSync() {
-	if _, err := os.Stat(path.Join(*dest, ".git")); os.IsNotExist(err) {
-		cmd := exec.Command("git", "clone", "-b", *branch, *repo, *dest)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Printf("command %q : %v", strings.Join(cmd.Args, " "), err)
-			return
-		}
-		log.Println(string(output))
-		return
+type Repo struct {
+	basePath   string
+	mirrorPath string
+	lastRev    string
+}
+
+func NewRepo() (*Repo, error) {
+	mirrorRepoPath := path.Join(*dest, ".git")
+	_, err := os.Stat(mirrorRepoPath)
+	if err == nil {
+		log.Printf("found existing mirror repo %q", mirrorRepoPath)
+		return &Repo{
+			basePath:   *dest,
+			mirrorPath: mirrorRepoPath,
+		}, nil
 	}
-	cmd := exec.Command("git", "pull", "origin", *branch)
-	cmd.Dir = *dest
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("error checking repo %q: %v", mirrorRepoPath, err)
+	}
+	cmd := exec.Command("git", "clone", "--mirror", "-b", *branch, *repo, mirrorRepoPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("command %q : %v", strings.Join(cmd.Args, " "), err)
+		return nil, fmt.Errorf("error cloning repo %q: %v:", strings.Join(cmd.Args, " "), err)
+	}
+	log.Printf("clone %q: %s", *repo, string(output))
+	return &Repo{
+		basePath:   *dest,
+		mirrorPath: mirrorRepoPath,
+	}, nil
+}
+
+func (r *Repo) Sync() {
+	cmd := exec.Command("git", "fetch", "origin", *branch)
+	cmd.Dir = r.mirrorPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("error running command %q: %v", strings.Join(cmd.Args, " "), err)
 		return
 	}
-	log.Println(string(output))
+	log.Printf("fetch: %s", string(output))
+	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = r.mirrorPath
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("error running command %q: %v", strings.Join(cmd.Args, " "), err)
+		return
+	}
+	rev := strings.TrimSpace(string(output))
+	if rev == r.lastRev {
+		log.Printf("no new rev since last check %q", rev)
+		return
+	}
+	r.lastRev = rev
+	log.Printf("HEAD is: %q", rev)
+	repoPath := path.Join(r.basePath, rev)
+	_, err = os.Stat(repoPath)
+	if err == nil {
+		log.Printf("found existing repo: %q", repoPath)
+		return
+	}
+	if !os.IsNotExist(err) {
+		log.Printf("error stating repo %q: %v", repoPath, err)
+		return
+	}
+	cmd = exec.Command("git", "clone", r.mirrorPath, repoPath)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("error running command %q : %v", strings.Join(cmd.Args, " "), err)
+		return
+	}
+	log.Printf("clone %q: %v", repoPath, string(output))
+	tempPath := path.Join(r.basePath, "HEAD."+rev)
+	if err := os.Symlink(rev, tempPath); err != nil {
+		log.Printf("error creating temporary symlink %q: %v", tempPath, err)
+		return
+	}
+	linkPath := path.Join(r.basePath, "HEAD")
+	if err := os.Rename(tempPath, linkPath); err != nil {
+		log.Printf("error moving symlink %q: %v", linkPath, err)
+		return
+	}
 }
