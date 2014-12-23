@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7
+### Features
+  - Make updating node labels easier
+  - Support updating node capacity
+  - kubectl streaming log support
+  - Improve /validate validation
+  - Fix GCE-PD to work across machine reboots
+  - Don't delete other attached disks on cluster turn-down
+  - Return errors if a user attempts to create a UDP external balancer
+  - TLS version bump from SSLv3 to TLSv1.0
+  - x509 request authenticator
+  - Container VM on GCE updated to 20141208
+  - Improvements to kubectl yaml handling
+### Bug fixes
+  - Fix kubelet panics when docker has no name for containers
+  - Only count non-dead pods in replica controller status reporting
+  - Fix version requirements for docker exec
+
+## 0.6
+### Features
+  - Docker 1.3.3 (0.6.2)
+  - Authentication for Kubelet/Apiserver communication
+  - Kubectl clean ups
+  - Enable Docker Cache on GCE
+  - Better support for Private Repositories
+### Bug fixes
+  - Fixed Public IP support on non-GCE hosts
+  - Fixed 32-bit build
+
 ## 0.5 (11/17/2014)
 ### Features
   - New client utility available: kubectl. This will eventually replace kubecfg. (#1325)
