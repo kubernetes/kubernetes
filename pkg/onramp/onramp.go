@@ -130,6 +130,17 @@ func (onrmp *Onramp) allocateExtAddr() (extAddr *string) {
 	return newIP 
 }
 
+func (onrmp *Onramp) freeExtAddr(extAddr string) {
+	//remove the extAddr from the usedExtAddrs list and add it to the extAddrs list
+	for m := range onrmp.usedExtAddrs {
+		if (onrmp.usedExtAddrs[m] == extAddr) {
+			onrmp.usedExtAddrs = append(onrmp.usedExtAddrs[0:m], onrmp.usedExtAddrs[m+1:]...)
+			onrmp.extAddrs = append(onrmp.extAddrs, extAddr)
+			return
+		}
+	}
+}
+
 func (onrmp *Onramp) mapAction(action string, eintf string, iintf string, name string, extip string, podip string) (error) {
 
 	ex := exec.New()
@@ -164,7 +175,7 @@ func (onrmp *Onramp) monitorPods() {
 					glog.Infof("Error Executing Delete for pod %s: %s\n", onrmp.podNameList[m].PodName, err)
 					continue
 				}
-		
+				onrmp.freeExtAddr(onrmp.podNameList[m].ExtIP)
 				onrmp.podNameList = append(onrmp.podNameList[0:m], onrmp.podNameList[m+1:]...)
 				break; //Need to break here to restart the for loop with a new range computation		
 			}
