@@ -177,3 +177,20 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
+
+func TestTemplatePanic(t *testing.T) {
+	tmpl := `{{and ((index .currentState.info "update-demo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
+	// kind is always blank in memory and set on the wire
+	printer, err := NewTemplatePrinter([]byte(tmpl))
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(&api.Pod{}, buffer)
+	if err == nil {
+		t.Fatalf("expected that template to crash")
+	}
+	if buffer.String() == "" {
+		t.Errorf("no debugging info was printed")
+	}
+}

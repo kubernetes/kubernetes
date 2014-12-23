@@ -327,7 +327,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
 type TemplatePrinter struct {
-	template *template.Template
+	rawTemplate string
+	template    *template.Template
 }
 
 func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
@@ -335,17 +336,27 @@ func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &TemplatePrinter{t}, nil
+	return &TemplatePrinter{string(tmpl), t}, nil
 }
 
 // Print parses the data as JSON, and re-formats it with the Go Template.
 func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
-	obj := map[string]interface{}{}
-	err := json.Unmarshal(data, &obj)
+	out := map[string]interface{}{}
+	err := json.Unmarshal(data, &out)
 	if err != nil {
 		return err
 	}
-	return t.template.Execute(w, obj)
+	if err := t.template.Execute(w, out); err != nil {
+		// It is way easier to debug this stuff when it shows up in
+		// stdout instead of just stdin. So in addition to returning
+		// a nice error, also print useful stuff with the writer.
+		fmt.Fprintf(w, "Error executing template: %v\n", err)
+		fmt.Fprintf(w, "template was:\n%v\n", t.rawTemplate)
+		fmt.Fprintf(w, "raw data was:\n%v\n", string(data))
+		fmt.Fprintf(w, "object given to template engine was:\n%+v\n", out)
+		return fmt.Errorf("error executing template '%v': '%v'\n----data----\n%#v\n", t.rawTemplate, err, out)
+	}
+	return nil
 }
 
 // PrintObj formats the obj with the Go Template.

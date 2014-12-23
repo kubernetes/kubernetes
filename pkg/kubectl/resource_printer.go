@@ -417,7 +417,14 @@ func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 	if err = p.template.Execute(w, out); err != nil {
-		return fmt.Errorf("error executing template '%v': '%v'\n----data----\n%#v\n", p.rawTemplate, err, out)
+		// It is way easier to debug this stuff when it shows up in
+		// stdout instead of just stdin. So in addition to returning
+		// a nice error, also print useful stuff with the writer.
+		fmt.Fprintf(w, "Error executing template: %v\n", err)
+		fmt.Fprintf(w, "template was:\n\t%v\n", p.rawTemplate)
+		fmt.Fprintf(w, "raw data was:\n\t%v\n", string(data))
+		fmt.Fprintf(w, "object given to template engine was:\n\t%+v\n", out)
+		return fmt.Errorf("error executing template '%v': '%v'\n----data----\n%+v\n", p.rawTemplate, err, out)
 	}
 	return nil
 }
