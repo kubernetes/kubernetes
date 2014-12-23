@@ -427,10 +427,18 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 // each region.
 
 func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (string, error) {
-	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, port, hosts)
-	if affinity != api.AffinityTypeNone {
+	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, port, hosts, affinity)
+
+	var persistence *vips.SessionPersistence
+	switch affinity {
+	case api.AffinityTypeNone:
+		persistence = nil
+	case api.AffinityTypeClientIP:
+		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
+	default:
 		return "", fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
+
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
@@ -485,6 +493,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		Protocol:     "TCP",
 		ProtocolPort: port,
 		PoolID:       pool.ID,
+		Persistence:  persistence,
 	}).Extract()
 	if err != nil {
 		if mon != nil {
