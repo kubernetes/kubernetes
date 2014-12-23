@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
+	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -42,11 +43,11 @@ func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Regi
 
 func TestEventCreate(t *testing.T) {
 	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Reason:     "forTesting",
 	}
 	eventB := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Reason:     "forTesting",
 	}
 
@@ -67,8 +68,12 @@ func TestEventCreate(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/events/foo"
+	ctx := api.NewDefaultContext()
 	key := "foo"
+	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/registry/events", key)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	table := map[string]struct {
 		existing tools.EtcdResponseWithError
@@ -93,7 +98,7 @@ func TestEventCreate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestEventEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Create(api.NewContext(), key, item.toCreate)
+		err := registry.Create(ctx, key, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
