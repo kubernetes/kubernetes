@@ -225,6 +225,9 @@ func (onrmp *Onramp) Run() {
 	file.WriteString("1")
 	file.Close()
 
+	// Put our iptables nat table in a known, empty state
+	onrmp.mapAction("RESET", "X", "X", "X", "X", "X")
+
 	response, err := onrmp.etcdClient.Watch("/registry/pods/default/", 0, true, nil, nil)
 	if err != nil {
 		glog.Infof("Error on etcd watch: %s\n", err)

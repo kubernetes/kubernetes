@@ -97,6 +97,18 @@ delete_mapping()
 	iptables -t nat -X $SNATCHAIN >> $LOGFILE
 }
 
+reset_nat_table()
+{
+	echo "FLUSHING NAT TABLE" >> $LOGFILE
+	iptables --t nat --flush >> $LOGFILE 2>&1
+
+	for i in `iptables --list -t nat | grep Chain | grep "\-[D|S]NAT" | awk '{print $2}'`
+	do
+		echo "DELETEING $i" >> $LOGFILE
+		iptables -t nat -X $i >> $LOGFILE 2>&1
+	done
+}
+
 
 #START
 
@@ -113,6 +125,9 @@ MODIFY)
 	;;
 DELETE)
 	delete_mapping $PODNAME
+	;;
+RESET)
+	reset_nat_table
 	;;
 esac
 
