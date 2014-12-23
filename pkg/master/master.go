@@ -59,6 +59,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/oauth"
 
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
@@ -67,15 +68,16 @@ import (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Client            *client.Client
-	Cloud             cloudprovider.Interface
-	EtcdHelper        tools.EtcdHelper
-	EventTTL          time.Duration
-	MinionRegexp      string
-	KubeletClient     client.KubeletClient
-	PortalNet         *net.IPNet
-	EnableLogsSupport bool
-	EnableUISupport   bool
+	Client             *client.Client
+	Cloud              cloudprovider.Interface
+	EtcdHelper         tools.EtcdHelper
+	EventTTL           time.Duration
+	MinionRegexp       string
+	KubeletClient      client.KubeletClient
+	PortalNet          *net.IPNet
+	EnableLogsSupport  bool
+	EnableUISupport    bool
+	EnableOAuthSupport bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
 	// allow v1beta3 to be conditionally enabled
@@ -138,6 +140,7 @@ type Master struct {
 	rootWebService        *restful.WebService
 	enableLogsSupport     bool
 	enableUISupport       bool
+	enableOAuthSupport    bool
 	enableSwaggerSupport  bool
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
@@ -292,6 +295,7 @@ func New(c *Config) *Master {
 		rootWebService:        new(restful.WebService),
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
+		enableOAuthSupport:    c.EnableOAuthSupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
@@ -405,6 +409,12 @@ func (m *Master) init(c *Config) {
 		"resourceQuotas":      resourcequota.NewREST(m.resourceQuotaRegistry),
 		"resourceQuotaUsages": resourcequotausage.NewREST(m.resourceQuotaRegistry),
 		"namespaces":          namespace.NewREST(m.namespaceRegistry),
+	}
+
+	if c.EnableOAuthSupport {
+		oauth.InstallStorage(m.storage, c.EtcdHelper)
+		oauth.InstallSupport(m.client.RESTClient, []string{"my_secret"}, m.mux)
+		c.Authenticator = oauth.InstallAuthenticator(m.client.RESTClient, c.Authenticator)
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
