@@ -110,7 +110,7 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	var provider AlgorithmProviderConfig
 	provider, ok := algorithmProviderMap[name]
 	if !ok {
-		return nil, fmt.Errorf("plugin '%v' has not been registered", provider)
+		return nil, fmt.Errorf("plugin %q has not been registered", name)
 	}
 
 	return &provider, nil
@@ -124,7 +124,7 @@ func getFitPredicateFunctions(keys util.StringSet) ([]algorithm.FitPredicate, er
 	for _, key := range keys.List() {
 		function, ok := fitPredicateMap[key]
 		if !ok {
-			return nil, fmt.Errorf("Invalid predicate key %s specified - no corresponding function found", key)
+			return nil, fmt.Errorf("Invalid predicate key %q specified - no corresponding function found", key)
 		}
 		predicates = append(predicates, function)
 	}
