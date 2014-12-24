@@ -88,13 +88,13 @@ func formatURL(host string, port int, path string) string {
 
 // DoHTTPCheck checks if a GET request to the url succeeds.
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
-// If the HTTP response code is unsuccessful, it returns Unhealthy.
-// It returns Unknown and err if the HTTP communication itself fails.
+// If the HTTP response code is unsuccessful or HTTP communication fails, it returns Unhealthy.
 // This is exported because some other packages may want to do direct HTTP checks.
 func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if err != nil {
-		return Unknown, err
+		glog.V(1).Infof("HTTP probe error: %v", err)
+		return Unhealthy, nil
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
