@@ -6,8 +6,8 @@ The ```kubectl``` command provides command line access to the kubernetes API.
 #### version
 Print the version of the client and server.
 
-```sh
 Usage: 
+```
   kubectl version [flags]
 
  Available Flags:
@@ -30,8 +30,9 @@ Use "kubectl help [command]" for more information about that command.
 
 #### proxy
 Create a local proxy to the API server
-```sh
+
 Usage: 
+```
   kubectl proxy [flags]
 
  Available Flags:
@@ -54,7 +55,6 @@ Usage:
 
 #### get
 Display one or more resources
-```sh
 Possible resources include pods (po), replication controllers (rc), services
 (se), minions (mi), or events (ev).
 
@@ -62,6 +62,7 @@ If you specify a Go template, you can use any fields defined for the API version
 you are connecting to the server with.
 
 Examples:
+```sh
   $ kubectl get pods
   <list all pods in ps output format>
 
@@ -70,8 +71,9 @@ Examples:
 
   $ kubectl get -o json pod 1234-56-7890-234234-456456
   <list single pod in json output format>
-
+```
 Usage: 
+```
   kubectl get [(-o|--output=)json|yaml|...] <resource> [<id>] [flags]
 
  Available Flags:
@@ -100,11 +102,11 @@ Usage:
 #### describe
 Show details of a specific resource.
 
-```sh
 This command joins many API calls together to form a detailed description of a
 given resource.
 
 Usage: 
+```
   kubectl describe <resource> <id> [flags]
 
  Available Flags:
@@ -136,8 +138,8 @@ Examples:
   $ cat pod.json | kubectl create -f -
   <create a pod based on the json passed into stdin>
 ```
-```sh
 Usage: 
+```
   kubectl create -f filename [flags]
 
  Available Flags:
@@ -173,8 +175,8 @@ Examples:
   $ cat config.json | kubectl apply -f -
   <creates all resources listed in config.json>
 ```
-```sh
 Usage: 
+```
   kubectl createall [-d directory] [-f filename] [flags]
 
  Available Flags:
@@ -209,8 +211,8 @@ Examples:
   <update a pod based on the json passed into stdin>
 ```
 
-```sh
 Usage: 
+```
   kubectl update -f filename [flags]
 
  Available Flags:
@@ -257,8 +259,8 @@ Examples:
   <delete a pod with ID 1234-56-7890-234234-456456>
 ```
 
-```sh
 Usage: 
+```
   kubectl delete ([-f filename] | (<resource> [(<id> | -l <label>)] [flags]
 
  Available Flags:
@@ -289,8 +291,8 @@ Examples:
   $ kubectl log -f 123456-7890 ruby-container
   <starts streaming of ruby-container logs from pod 123456-7890>
 ```
-```sh
 Usage: 
+```
   kubectl log [-f] <pod> [<container>] [flags]
 
  Available Flags:
@@ -311,7 +313,7 @@ Usage:
 ```
 
 ### Usage
-```sh
+```
 Usage: 
   kubectl [flags]
   kubectl [command]
