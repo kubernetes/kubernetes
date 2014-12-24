@@ -148,7 +148,7 @@ type Instances struct {
 
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
-	glog.V(2).Info("openstack.Instances() called")
+	glog.V(4).Info("openstack.Instances() called")
 
 	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -185,14 +185,14 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		return nil, false
 	}
 
-	glog.V(2).Infof("Found %v compute flavors", len(flavor_to_resource))
+	glog.V(3).Infof("Found %v compute flavors", len(flavor_to_resource))
 	glog.V(1).Info("Claiming to support Instances")
 
 	return &Instances{compute, flavor_to_resource}, true
 }
 
 func (i *Instances) List(name_filter string) ([]string, error) {
-	glog.V(2).Infof("openstack List(%v) called", name_filter)
+	glog.V(4).Infof("openstack List(%v) called", name_filter)
 
 	opts := servers.ListOpts{
 		Name:   name_filter,
@@ -215,7 +215,8 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 		return nil, err
 	}
 
-	glog.V(2).Infof("Found %v entries: %v", len(ret), ret)
+	glog.V(3).Infof("Found %v instances matching %v: %v",
+		len(ret), name_filter, ret)
 
 	return ret, nil
 }
@@ -300,14 +301,14 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 }
 
 func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	glog.V(2).Infof("NodeAddresses(%v) called", name)
+	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
 	ip, err := getAddressByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(2).Infof("NodeAddresses(%v) => %v", name, ip)
+	glog.V(4).Infof("NodeAddresses(%v) => %v", name, ip)
 
 	// net.ParseIP().String() is to maintain compatibility with the old code
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
@@ -323,7 +324,7 @@ func (i *Instances) ExternalID(name string) (string, error) {
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
-	glog.V(2).Infof("GetNodeResources(%v) called", name)
+	glog.V(4).Infof("GetNodeResources(%v) called", name)
 
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
@@ -343,7 +344,7 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 		return nil, ErrNotFound
 	}
 
-	glog.V(2).Infof("GetNodeResources(%v) => %v", name, rsrc)
+	glog.V(4).Infof("GetNodeResources(%v) => %v", name, rsrc)
 
 	return rsrc, nil
 }
@@ -427,7 +428,7 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 // each region.
 
 func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (string, error) {
-	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, port, hosts, affinity)
+	glog.V(4).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, port, hosts, affinity)
 
 	var persistence *vips.SessionPersistence
 	switch affinity {
@@ -507,7 +508,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
-	glog.V(2).Infof("UpdateTCPLoadBalancer(%v, %v, %v)", name, region, hosts)
+	glog.V(4).Infof("UpdateTCPLoadBalancer(%v, %v, %v)", name, region, hosts)
 
 	vip, err := getVipByName(lb.network, name)
 	if err != nil {
@@ -568,7 +569,7 @@ func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []strin
 }
 
 func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
-	glog.V(2).Infof("DeleteTCPLoadBalancer(%v, %v)", name, region)
+	glog.V(4).Infof("DeleteTCPLoadBalancer(%v, %v)", name, region)
 
 	vip, err := getVipByName(lb.network, name)
 	if err != nil {
