@@ -58,8 +58,11 @@ var (
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
 		"read-only address. It is assumed that firewall rules are set up such that "+
 		"this port is not reachable from outside of the cluster.")
-	securePort              = flag.Int("secure_port", 0, "The port from which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS ")
-	tlsCertFile             = flag.String("tls_cert_file", "", "File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert).")
+	securePort  = flag.Int("secure_port", 8443, "The port from which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS ")
+	tlsCertFile = flag.String("tls_cert_file", "", ""+
+		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
+		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
+		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
 	tlsPrivateKeyFile       = flag.String("tls_private_key_file", "", "File containing x509 private key matching --tls_cert_file.")
 	apiPrefix               = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
 	storageVersion          = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
@@ -236,6 +239,15 @@ func main() {
 		go func() {
 			defer util.HandleCrash()
 			for {
+				if *tlsCertFile == "" && *tlsPrivateKeyFile == "" {
+					*tlsCertFile = "/var/run/kubernetes/apiserver.crt"
+					*tlsPrivateKeyFile = "/var/run/kubernetes/apiserver.key"
+					if err := util.GenerateSelfSignedCert(config.PublicAddress, *tlsCertFile, *tlsPrivateKeyFile); err != nil {
+						glog.Errorf("Unable to generate self signed cert: %v", err)
+					} else {
+						glog.Infof("Using self-signed cert (%s, %s)", *tlsCertFile, *tlsPrivateKeyFile)
+					}
+				}
 				if err := secureServer.ListenAndServeTLS(*tlsCertFile, *tlsPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				}
