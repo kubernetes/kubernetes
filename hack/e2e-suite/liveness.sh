@@ -25,10 +25,20 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
+liveness_tests="http exec"
+if [[ ${KUBERNETES_PROVIDER} == "gke" ]]; then
+  server_version=$(kube_server_version)
+  if [[ ${server_version} -le 702 ]]; then
+    echo "GKE server version <= 0.7.2, limiting test to http (version = ${server_version})"
+    liveness_tests="http"
+  fi
+fi
+
 function teardown() {
   echo "Cleaning up test artifacts"
-  ${KUBECFG} delete pods/liveness-http
-  ${KUBECFG} delete pods/liveness-exec
+  for test in ${liveness_tests}; do
+    ${KUBECFG} delete pods/liveness-${test}
+  done
 }
 
 function waitForNotPending() {
@@ -58,7 +68,7 @@ function waitForNotPending() {
 
 trap "teardown" EXIT
 
-for test in http exec; do
+for test in ${liveness_tests}; do
   echo "Liveness test: ${test}"
   ${KUBECFG} -c ${KUBE_ROOT}/examples/liveness/${test}-liveness.yaml create pods
   waitForNotPending
