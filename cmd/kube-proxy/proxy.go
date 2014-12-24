@@ -42,6 +42,7 @@ var (
 	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
 	clientConfig   = &client.Config{}
 	healthz_port   = flag.Int("healthz_port", 10249, "The port to bind the health check server. Use 0 to disable.")
+	oomScoreAdj    = flag.Int("oom_score_adj", -899, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 )
 
 func init() {
@@ -54,6 +55,10 @@ func main() {
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
+
+	if err := util.ApplyOomScoreAdj(*oomScoreAdj); err != nil {
+		glog.Info(err)
+	}
 
 	verflag.PrintAndExitIfRequested()
 
