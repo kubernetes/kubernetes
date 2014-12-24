@@ -25,6 +25,47 @@ import (
 	"github.com/google/gofuzz"
 )
 
+func TestConverter_DefaultConvert(t *testing.T) {
+	type A struct {
+		Foo string
+		Baz int
+	}
+	type B struct {
+		Bar string
+		Baz int
+	}
+	c := NewConverter()
+	c.Debug = t
+	c.NameFunc = func(t reflect.Type) string { return "MyType" }
+
+	// Ensure conversion funcs can call DefaultConvert to get default behavior,
+	// then fixup remaining fields manually
+	err := c.Register(func(in *A, out *B, s Scope) error {
+		if err := s.DefaultConvert(in, out, IgnoreMissingFields); err != nil {
+			return err
+		}
+		out.Bar = in.Foo
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	x := A{"hello, intrepid test reader!", 3}
+	y := B{}
+
+	err = c.Convert(&x, &y, 0, nil)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if e, a := x.Foo, y.Bar; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := x.Baz, y.Baz; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
 func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type A struct {
 		Foo string
@@ -86,7 +127,6 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-
 	err = c.Convert(&A{}, &C{}, 0, nil)
 	if err == nil {
 		t.Errorf("unexpected non-error")
