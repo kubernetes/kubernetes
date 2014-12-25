@@ -26,7 +26,7 @@ volumes:
     source:
       hostDir:
         path: /var/lib/docker
-  - name: cgroups
+  - name: sysfs
     source:
       hostDir:
-        path: /sys/fs/cgroup
+        path: /sys
