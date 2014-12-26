@@ -61,6 +61,7 @@ var (
 	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	authPath                = flag.String("auth_path", "", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	cAdvisorPort            = flag.Uint("cadvisor_port", 4194, "The port of the localhost cAdvisor endpoint")
+	oomScoreAdj             = flag.Int("oom_score_adj", -900, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	apiServerList           util.StringList
 )
 
@@ -91,6 +92,10 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	setupRunOnce()
+
+	if err := util.ApplyOomScoreAdj(*oomScoreAdj); err != nil {
+		glog.Info(err)
+	}
 
 	kcfg := standalone.KubeletConfig{
 		Address:                 address,

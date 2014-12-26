@@ -51,21 +51,16 @@ function validate() {
     for id in "${pod_id_list[@]+${pod_id_list[@]}}"; do
       local template_string current_status current_image host_ip
 
-      # NB: This template string is a little subtle.
-      #
-      # Notes:
-      #
-      # The 'and' operator will return blank if any of the inputs are non-
-      # nil/false.  If they are all set, then it'll return the last one.
-      #
-      # The container is name has a dash in it and so we can't use the simple
-      # syntax.  Instead we need to quote that and use the 'index' operator.
-      #
-      # The value here is a structure with just a Time member.  This is
-      # currently always set to a zero time.
+      # NB: kubectl & kubecfg add the "exists" function to the standard template functions.
+      # This lets us check to see if the "running" entry exists for each of the containers
+      # we care about. Exists will never return an error and it's safe to check a chain of
+      # things, any one of which may not exist. In the below template, all of info, 
+      # containername, and running might be nil, so the normal index function isn't very
+      # helpful.
+      # This template is unit-tested in kubec{tl|fg}, so if you change it, update the unit test.
       #
       # You can read about the syntax here: http://golang.org/pkg/text/template/
-      template_string="{{and ((index .currentState.info \"${CONTROLLER_NAME}\").state.running.startedAt) .currentState.info.net.state.running.startedAt}}"
+      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"net\" \"state\" \"running\")}}"
       current_status=$($KUBECFG -template="${template_string}" get "pods/$id") || {
         if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
           echo "  $id no longer exists"
@@ -76,10 +71,12 @@ function validate() {
           exit -1
         fi
       }
-      if [[ "$current_status" == "<no value>" ]]; then
-        echo "  $id is created but not running ${current_status}"
+      if [[ "$current_status" == "false" ]]; then
+        echo "  $id is created but not running."
         continue
       fi
+
+      echo "  $id is created and both net and update-demo containers are running: $current_status"
 
       template_string="{{(index .currentState.info \"${CONTROLLER_NAME}\").image}}"
       current_image=$($KUBECFG -template="${template_string}" get "pods/$id") || true

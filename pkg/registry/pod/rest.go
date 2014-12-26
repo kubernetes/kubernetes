@@ -18,6 +18,7 @@ package pod
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -174,4 +175,47 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		}
 		return rs.registry.GetPod(ctx, pod.Name)
 	}), nil
+}
+
+// ResourceLocation returns a URL to which one can send traffic for the specified pod.
+func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
+	// Allow ID as "podname" or "podname:port".  If port is not specified,
+	// try to use the first defined port on the pod.
+	parts := strings.Split(id, ":")
+	if len(parts) > 2 {
+		return "", errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
+	}
+	name := parts[0]
+	port := ""
+	if len(parts) == 2 {
+		// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
+		port = parts[1]
+	}
+
+	obj, err := rs.Get(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	pod := obj.(*api.Pod)
+	if pod == nil {
+		return "", nil
+	}
+
+	// Try to figure out a port.
+	if port == "" {
+		for i := range pod.Spec.Containers {
+			if len(pod.Spec.Containers[i].Ports) > 0 {
+				port = fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[0].ContainerPort)
+				break
+			}
+		}
+	}
+
+	// We leave off the scheme ('http://') because we have no idea what sort of server
+	// is listening at this endpoint.
+	loc := pod.Status.PodIP
+	if port != "" {
+		loc += fmt.Sprintf(":%s", port)
+	}
+	return loc, nil
 }

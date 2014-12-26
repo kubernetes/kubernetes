@@ -443,15 +443,6 @@ func TestCreatePod(t *testing.T) {
 	}
 }
 
-type FakePodInfoGetter struct {
-	info api.PodInfo
-	err  error
-}
-
-func (f *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodContainerInfo, error) {
-	return api.PodContainerInfo{ContainerInfo: f.info}, f.err
-}
-
 func TestCreatePodWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	pod := &api.Pod{
@@ -485,5 +476,110 @@ func TestUpdatePodWithConflictingNamespace(t *testing.T) {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Index(err.Error(), "Pod.Namespace does not match the provided context") == -1 {
 		t.Errorf("Expected 'Pod.Namespace does not match the provided context' error, got '%v'", err.Error())
+	}
+}
+
+func TestResourceLocation(t *testing.T) {
+	expectedIP := "1.2.3.4"
+	testCases := []struct {
+		pod      api.Pod
+		query    string
+		location string
+	}{
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+			},
+			query:    "foo",
+			location: expectedIP,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+			},
+			query:    "foo:12345",
+			location: expectedIP + ":12345",
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr"},
+					},
+				},
+			},
+			query:    "foo",
+			location: expectedIP,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr", Ports: []api.Port{{ContainerPort: 9376}}},
+					},
+				},
+			},
+			query:    "foo",
+			location: expectedIP + ":9376",
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr", Ports: []api.Port{{ContainerPort: 9376}}},
+					},
+				},
+			},
+			query:    "foo:12345",
+			location: expectedIP + ":12345",
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr1"},
+						{Name: "ctr2", Ports: []api.Port{{ContainerPort: 9376}}},
+					},
+				},
+			},
+			query:    "foo",
+			location: expectedIP + ":9376",
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr1", Ports: []api.Port{{ContainerPort: 9376}}},
+						{Name: "ctr2", Ports: []api.Port{{ContainerPort: 1234}}},
+					},
+				},
+			},
+			query:    "foo",
+			location: expectedIP + ":9376",
+		},
+	}
+
+	for _, tc := range testCases {
+		podRegistry := registrytest.NewPodRegistry(nil)
+		podRegistry.Pod = &tc.pod
+		storage := &REST{
+			registry: podRegistry,
+			podCache: &fakeCache{statusToReturn: &api.PodStatus{PodIP: expectedIP}},
+		}
+
+		redirector := apiserver.Redirector(storage)
+		location, err := redirector.ResourceLocation(api.NewDefaultContext(), tc.query)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		if location != tc.location {
+			t.Errorf("Expected %v, but got %v", tc.location, location)
+		}
 	}
 }
