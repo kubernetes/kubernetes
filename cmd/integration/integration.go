@@ -279,7 +279,7 @@ func runAPIVersionsTest(c *client.Client) {
 
 func runSelfLinkTest(c *client.Client) {
 	var svc api.Service
-	err := c.Post().Path("services").Body(
+	err := c.Post().Resource("services").Body(
 		&api.Service{
 			ObjectMeta: api.ObjectMeta{
 				Name: "selflinktest",
@@ -305,7 +305,7 @@ func runSelfLinkTest(c *client.Client) {
 	}
 
 	var svcList api.ServiceList
-	err = c.Get().Path("services").Do().Into(&svcList)
+	err = c.Get().Resource("services").Do().Into(&svcList)
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
@@ -338,7 +338,7 @@ func runSelfLinkTest(c *client.Client) {
 
 func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
-	err := c.Post().Path("services").Body(
+	err := c.Post().Resource("services").Body(
 		&api.Service{
 			TypeMeta: api.TypeMeta{
 				APIVersion: latest.Version,
@@ -377,8 +377,8 @@ func runAtomicPutTest(c *client.Client) {
 				glog.Infof("Starting to update (%s, %s)", l, v)
 				var tmpSvc api.Service
 				err := c.Get().
-					Path("services").
-					Path(svc.Name).
+					Resource("services").
+					Name(svc.Name).
 					Do().
 					Into(&tmpSvc)
 				if err != nil {
@@ -391,7 +391,7 @@ func runAtomicPutTest(c *client.Client) {
 					tmpSvc.Spec.Selector[l] = v
 				}
 				glog.Infof("Posting update (%s, %s)", l, v)
-				err = c.Put().Path("services").Path(svc.Name).Body(&tmpSvc).Do().Error()
+				err = c.Put().Resource("services").Name(svc.Name).Body(&tmpSvc).Do().Error()
 				if err != nil {
 					if errors.IsConflict(err) {
 						glog.Infof("Conflict: (%s, %s)", l, v)
@@ -408,7 +408,7 @@ func runAtomicPutTest(c *client.Client) {
 		}(label, value)
 	}
 	wg.Wait()
-	if err := c.Get().Path("services").Path(svc.Name).Do().Into(&svc); err != nil {
+	if err := c.Get().Resource("services").Name(svc.Name).Do().Into(&svc); err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
 	if !reflect.DeepEqual(testLabels, labels.Set(svc.Spec.Selector)) {
@@ -422,7 +422,7 @@ func runMasterServiceTest(client *client.Client) {
 	var svcList api.ServiceList
 	err := client.Get().
 		Namespace("default").
-		Path("services").
+		Resource("services").
 		Do().
 		Into(&svcList)
 	if err != nil {
@@ -443,8 +443,8 @@ func runMasterServiceTest(client *client.Client) {
 		var ep api.Endpoints
 		err := client.Get().
 			Namespace("default").
-			Path("endpoints").
-			Path("kubernetes").
+			Resource("endpoints").
+			Name("kubernetes").
 			Do().
 			Into(&ep)
 		if err != nil {
@@ -460,8 +460,8 @@ func runMasterServiceTest(client *client.Client) {
 		var ep api.Endpoints
 		err := client.Get().
 			Namespace("default").
-			Path("endpoints").
-			Path("kubernetes-ro").
+			Resource("endpoints").
+			Name("kubernetes-ro").
 			Do().
 			Into(&ep)
 		if err != nil {

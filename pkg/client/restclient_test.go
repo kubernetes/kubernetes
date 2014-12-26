@@ -137,7 +137,7 @@ func TestDoRequestAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().Path("test").Do().Raw()
+	body, err := c.Get().Prefix("test").Do().Raw()
 	if err == nil {
 		t.Fatalf("Unexpected non-error")
 	}
@@ -171,7 +171,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().Path("test").Do().Raw()
+	body, err := c.Get().Prefix("test").Do().Raw()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestDoRequestCreated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().Path("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

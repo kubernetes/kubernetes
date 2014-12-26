@@ -37,7 +37,7 @@ func ValidateObject(data []byte, c *client.Client) error {
 
 	schemaData, err := c.RESTClient.Get().
 		AbsPath("/swaggerapi/api").
-		Path(apiVersion.(string)).
+		Prefix(apiVersion.(string)).
 		Do().
 		Raw()
 	if err != nil {

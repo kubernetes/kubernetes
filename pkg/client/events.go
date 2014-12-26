@@ -66,7 +66,7 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Post().
 		Namespace(event.Namespace).
-		Path("events").
+		Resource("events").
 		Body(event).
 		Do().
 		Into(result)
@@ -78,7 +78,7 @@ func (e *events) List(label, field labels.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
 		Namespace(e.namespace).
-		Path("events").
+		Resource("events").
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Do().
@@ -95,8 +95,8 @@ func (e *events) Get(name string) (*api.Event, error) {
 	result := &api.Event{}
 	err := e.client.Get().
 		Namespace(e.namespace).
-		Path("events").
-		Path(name).
+		Resource("events").
+		Name(name).
 		Do().
 		Into(result)
 	return result, err
@@ -105,9 +105,9 @@ func (e *events) Get(name string) (*api.Event, error) {
 // Watch starts watching for events matching the given selectors.
 func (e *events) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.client.Get().
-		Path("watch").
+		Prefix("watch").
 		Namespace(e.namespace).
-		Path("events").
+		Resource("events").
 		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).

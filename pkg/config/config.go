@@ -80,7 +80,7 @@ func CreateObject(client RESTClientPoster, mapping *meta.RESTMapping, obj runtim
 	}
 
 	// TODO: This should be using RESTHelper
-	err = client.Post().Path(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
+	err = client.Post().Resource(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
 	if err != nil {
 		return errs.NewFieldInvalid(name, obj, err.Error())
 	}

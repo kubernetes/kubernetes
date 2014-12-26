@@ -54,7 +54,7 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 // List takes a selector, and returns the list of replication controllers that match that selector.
 func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
@@ -65,14 +65,14 @@ func (c *replicationControllers) Get(name string) (result *api.ReplicationContro
 	}
 
 	result = &api.ReplicationController{}
-	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new replication controller.
 func (c *replicationControllers) Create(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Post().Namespace(c.ns).Path("replicationControllers").Body(controller).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
@@ -83,21 +83,21 @@ func (c *replicationControllers) Update(controller *api.ReplicationController) (
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
 		return
 	}
-	err = c.r.Put().Namespace(c.ns).Path("replicationControllers").Path(controller.Name).Body(controller).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).Body(controller).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing replication controller.
 func (c *replicationControllers) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
 func (c *replicationControllers) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
-		Path("watch").
+		Prefix("watch").
 		Namespace(c.ns).
-		Path("replicationControllers").
+		Resource("replicationControllers").
 		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).

@@ -139,7 +139,7 @@ type listWatch struct {
 func (lw *listWatch) List() (runtime.Object, error) {
 	return lw.client.
 		Get().
-		Path(lw.resource).
+		Resource(lw.resource).
 		SelectorParam("fields", lw.fieldSelector).
 		Do().
 		Get()
@@ -148,8 +148,8 @@ func (lw *listWatch) List() (runtime.Object, error) {
 func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
 	return lw.client.
 		Get().
-		Path("watch").
-		Path(lw.resource).
+		Prefix("watch").
+		Resource(lw.resource).
 		SelectorParam("fields", lw.fieldSelector).
 		Param("resourceVersion", resourceVersion).
 		Watch()
@@ -195,7 +195,7 @@ func (factory *ConfigFactory) createMinionLW() *listWatch {
 // pollMinions lists all minions and returns an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	list := &api.NodeList{}
-	err := factory.Client.Get().Path("minions").Do().Into(list)
+	err := factory.Client.Get().Resource("minions").Do().Into(list)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			backoff.wait(podID)
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
-			err := factory.Client.Get().Namespace(podNamespace).Path("pods").Path(podID).Do().Into(pod)
+			err := factory.Client.Get().Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
 			if err != nil {
 				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
 				return
@@ -288,7 +288,7 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Post().Namespace(api.Namespace(ctx)).Path("bindings").Body(binding).Do().Error()
+	return b.Post().Namespace(api.Namespace(ctx)).Resource("bindings").Body(binding).Do().Error()
 }
 
 type clock interface {

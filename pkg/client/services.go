@@ -54,7 +54,7 @@ func newServices(c *Client, namespace string) *services {
 // List takes a selector, and returns the list of services that match that selector
 func (c *services) List(selector labels.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
-	err = c.r.Get().Namespace(c.ns).Path("services").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("services").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
@@ -65,14 +65,14 @@ func (c *services) Get(name string) (result *api.Service, err error) {
 	}
 
 	result = &api.Service{}
-	err = c.r.Get().Namespace(c.ns).Path("services").Path(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Post().Namespace(c.ns).Path("services").Body(svc).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
@@ -83,21 +83,21 @@ func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
-	err = c.r.Put().Namespace(c.ns).Path("services").Path(svc.Name).Body(svc).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Path("services").Path(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
 func (c *services) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
-		Path("watch").
+		Prefix("watch").
 		Namespace(c.ns).
-		Path("services").
+		Resource("services").
 		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
