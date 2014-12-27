@@ -105,6 +105,7 @@ func FirstNonEmptyString(args ...string) string {
 }
 
 // Return a list of file names of a certain type within a given directory.
+// TODO: replace with resource.Builder
 func GetFilesFromDir(directory string, fileType string) []string {
 	files := []string{}
 
@@ -121,6 +122,7 @@ func GetFilesFromDir(directory string, fileType string) []string {
 
 // ReadConfigData reads the bytes from the specified filesytem or network
 // location or from stdin if location == "-".
+// TODO: replace with resource.Builder
 func ReadConfigData(location string) ([]byte, error) {
 	if len(location) == 0 {
 		return nil, fmt.Errorf("location given but empty")
@@ -144,6 +146,7 @@ func ReadConfigData(location string) ([]byte, error) {
 	return ReadConfigDataFromLocation(location)
 }
 
+// TODO: replace with resource.Builder
 func ReadConfigDataFromLocation(location string) ([]byte, error) {
 	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
 	if strings.Index(location, "http://") == 0 || strings.Index(location, "https://") == 0 {
