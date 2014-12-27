@@ -64,7 +64,7 @@ If you already have ssh access to every machine using ssh public keys you may sk
 
 **Create a password file.**
 
-The password file should contain the root password for every machine in the cluster.  It will be used in order to lay down your ssh public key.
+The password file should contain the root password for every machine in the cluster.  It will be used in order to lay down your ssh public key. Make sure your machines sshd-config allows password logins from root.
 
 ```
 echo "password" > ~/rootpassword
