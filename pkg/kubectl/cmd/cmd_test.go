@@ -100,7 +100,7 @@ func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
 	return &Factory{
 		Mapper: mapper,
 		Typer:  scheme,
-		Client: func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error) {
+		RESTClient: func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error) {
 			return t.Client, t.Err
 		},
 		Describer: func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error) {

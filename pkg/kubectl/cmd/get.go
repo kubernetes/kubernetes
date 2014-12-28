@@ -56,7 +56,7 @@ Examples:
 			labelSelector, err := labels.ParseSelector(selector)
 			checkErr(err)
 
-			client, err := f.Client(cmd, mapping)
+			client, err := f.RESTClient(cmd, mapping)
 			checkErr(err)
 
 			outputFormat := GetFlagString(cmd, "output")

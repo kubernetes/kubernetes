@@ -79,7 +79,7 @@ Examples:
   <creates all resources listed in config.json>`,
 		Run: func(cmd *cobra.Command, args []string) {
 			clientFunc := func(mapper *meta.RESTMapping) (config.RESTClientPoster, error) {
-				client, err := f.Client(cmd, mapper)
+				client, err := f.RESTClient(cmd, mapper)
 				checkErr(err)
 				return client, nil
 			}

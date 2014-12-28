@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -111,12 +112,23 @@ func makeImageList(spec *api.PodSpec) string {
 	return strings.Join(listOfImages(spec), ",")
 }
 
-// ExpandResourceShortcut will return the expanded version of resource
+// ShortcutExpander is a RESTMapper that can be used for Kubernetes
+// resources.
+type ShortcutExpander struct {
+	meta.RESTMapper
+}
+
+// VersionAndKindForResource implements meta.RESTMapper. It expands the resource first, then invokes the wrapped
+// mapper.
+func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+	resource = expandResourceShortcut(resource)
+	return e.RESTMapper.VersionAndKindForResource(resource)
+}
+
+// expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. Otherwise, will return resource unmodified.
-// TODO: Combine with RESTMapper stuff to provide a general solution
-// to this problem.
-func ExpandResourceShortcut(resource string) string {
+func expandResourceShortcut(resource string) string {
 	shortForms := map[string]string{
 		"po": "pods",
 		"rc": "replicationcontrollers",

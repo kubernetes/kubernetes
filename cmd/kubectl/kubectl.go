@@ -19,11 +19,15 @@ package main
 import (
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+
+	"github.com/golang/glog"
 )
 
 func main() {
-	clientBuilder := clientcmd.NewInteractiveClientConfig(clientcmd.Config{}, "", &clientcmd.ConfigOverrides{}, os.Stdin)
-	cmd.NewFactory(clientBuilder).Run(os.Stdout)
+	cmd := cmd.NewFactory().NewKubectlCommand(os.Stdout)
+	if err := cmd.Execute(); err != nil {
+		glog.Errorf("error: %v", err)
+		os.Exit(1)
+	}
 }

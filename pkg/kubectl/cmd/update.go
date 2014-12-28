@@ -46,7 +46,7 @@ Examples:
 			schema, err := f.Validator(cmd)
 			checkErr(err)
 			mapping, namespace, name, data := ResourceFromFile(cmd, filename, f.Typer, f.Mapper, schema)
-			client, err := f.Client(cmd, mapping)
+			client, err := f.RESTClient(cmd, mapping)
 			checkErr(err)
 
 			err = CompareNamespaceFromFile(cmd, namespace)

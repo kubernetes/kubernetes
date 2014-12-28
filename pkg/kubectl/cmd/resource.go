@@ -63,7 +63,7 @@ func ResourcesFromArgsOrFile(
 	}
 	types := SplitResourceArgument(args[0])
 	for _, arg := range types {
-		resourceName := kubectl.ExpandResourceShortcut(arg)
+		resourceName := arg
 		if len(resourceName) == 0 {
 			usageError(cmd, "Unknown resource %s", resourceName)
 		}
@@ -91,7 +91,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 	}
 
 	if len(args) == 2 {
-		resource := kubectl.ExpandResourceShortcut(args[0])
+		resource := args[0]
 		namespace = GetKubeNamespace(cmd)
 		name = args[1]
 		if len(name) == 0 || len(resource) == 0 {
@@ -129,7 +129,7 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper)
 		usageError(cmd, "Must provide resource and name command line params")
 	}
 
-	resource := kubectl.ExpandResourceShortcut(args[0])
+	resource := args[0]
 	namespace = GetKubeNamespace(cmd)
 	name = args[1]
 	if len(name) == 0 || len(resource) == 0 {
@@ -152,7 +152,7 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}
 
-	resource := kubectl.ExpandResourceShortcut(args[0])
+	resource := args[0]
 	if len(resource) == 0 {
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}
