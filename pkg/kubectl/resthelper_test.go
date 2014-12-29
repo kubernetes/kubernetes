@@ -125,7 +125,7 @@ func TestRESTHelperCreate(t *testing.T) {
 
 	tests := []struct {
 		Resp     *http.Response
-		RespFunc client.HttpClientFunc
+		RespFunc client.HTTPClientFunc
 		HttpErr  error
 		Modify   bool
 		Object   runtime.Object
@@ -299,7 +299,7 @@ func TestRESTHelperUpdate(t *testing.T) {
 
 	tests := []struct {
 		Resp      *http.Response
-		RespFunc  client.HttpClientFunc
+		RespFunc  client.HTTPClientFunc
 		HttpErr   error
 		Overwrite bool
 		Object    runtime.Object

@@ -80,9 +80,9 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
 }
 
-type HttpClientFunc func(*http.Request) (*http.Response, error)
+type HTTPClientFunc func(*http.Request) (*http.Response, error)
 
-func (f HttpClientFunc) Do(req *http.Request) (*http.Response, error) {
+func (f HTTPClientFunc) Do(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
