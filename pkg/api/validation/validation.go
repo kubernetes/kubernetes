@@ -474,10 +474,10 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 			}
 		}
 	}
-	if service.Spec.SessionAffinity != nil {
-		if !supportedSessionAffinityType.Has(string(*service.Spec.SessionAffinity)) {
-			allErrs = append(allErrs, errs.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity))
-		}
+	if service.Spec.SessionAffinity == "" {
+		service.Spec.SessionAffinity = api.AffinityTypeNone
+	} else if !supportedSessionAffinityType.Has(string(service.Spec.SessionAffinity)) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity))
 	}
 
 	return allErrs
