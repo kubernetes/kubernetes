@@ -1013,6 +1013,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 			err := kl.syncPod(pod, dockerContainers)
 			if err != nil {
 				glog.Errorf("Error syncing pod, skipping: %v", err)
+				record.Eventf(pod, "", "failedSync", "Error syncing pod, skipping: %v", err)
 			}
 		})
 	}
