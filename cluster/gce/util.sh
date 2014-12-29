@@ -731,6 +731,7 @@ function setup-monitoring {
       if ! gcloud compute firewall-rules create monitoring-heapster \
           --project "${PROJECT}" \
           --target-tags="${MINION_TAG}" \
+          --network="${NETWORK}" \
           --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
         echo "Failed to set up firewall for monitoring" && false
       fi
