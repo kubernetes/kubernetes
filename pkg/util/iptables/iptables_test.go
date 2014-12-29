@@ -124,6 +124,40 @@ func TestFlushChain(t *testing.T) {
 	}
 }
 
+func TestDeleteChain(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+			// Failure.
+			func() ([]byte, error) { return nil, &exec.FakeExitError{1} },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, ProtocolIpv4)
+	// Success.
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 1 {
+		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	}
+	// Failure.
+	err = runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err == nil {
+		t.Errorf("expected failure")
+	}
+}
+
 func TestEnsureRuleAlreadyExists(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{

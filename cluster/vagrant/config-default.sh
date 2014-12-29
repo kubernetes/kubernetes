@@ -56,3 +56,9 @@ LOGGING_DESTINATION=elasticsearch
 # Extra options to set on the Docker command line.  This is useful for setting
 # --insecure-registry for local registries.
 DOCKER_OPTS=""
+
+# Optional: Install cluster DNS.
+ENABLE_CLUSTER_DNS=true
+DNS_SERVER_IP="10.0.0.10"
+DNS_DOMAIN="kubernetes.local"
+DNS_REPLICAS=1

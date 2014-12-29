@@ -84,6 +84,9 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
   enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
   logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
+  enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+  dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
+  dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master

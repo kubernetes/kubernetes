@@ -32,8 +32,10 @@ import (
 type Interface interface {
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
-	// FlushChain clears the specified chain.
+	// FlushChain clears the specified chain.  If the chain did not exist, return error.
 	FlushChain(table Table, chain Chain) error
+	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
+	DeleteChain(table Table, chain Chain) error
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
 	EnsureRule(table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
@@ -104,6 +106,21 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 	out, err := runner.run(opFlushChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error flushing chain %q: %v: %s", chain, err, out)
+	}
+	return nil
+}
+
+// DeleteChain is part of Interface.
+func (runner *runner) DeleteChain(table Table, chain Chain) error {
+	fullArgs := makeFullArgs(table, chain)
+
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// TODO: we could call iptable -S first, ignore the output and check for non-zero return (more like DeleteRule)
+	out, err := runner.run(opDeleteChain, fullArgs)
+	if err != nil {
+		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
 	}
 	return nil
 }
@@ -257,6 +274,7 @@ type operation string
 const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
+	opDeleteChain operation = "-X"
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"

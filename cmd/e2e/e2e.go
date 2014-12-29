@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -53,7 +54,7 @@ func waitForPodRunning(c *client.Client, id string) {
 		if pod.Status.Phase == api.PodRunning {
 			break
 		}
-		glog.Infof("Waiting for pod status to be running (%s)", pod.Status.Phase)
+		glog.Infof("Waiting for pod status to be %q (found %q)", api.PodRunning, pod.Status.Phase)
 	}
 }
 
@@ -388,6 +389,116 @@ func outputTAPSummary(infoList []TestInfo) {
 	}
 }
 
+// TestClusterDNS checks that cluster DNS works.
+func TestClusterDNS(c *client.Client) bool {
+	podClient := c.Pods(api.NamespaceDefault)
+
+	//TODO: Wait for skyDNS
+
+	// All the names we need to be able to resolve.
+	namesToResolve := []string{
+		"kubernetes-ro",
+		"kubernetes-ro.default",
+		"kubernetes-ro.default.kubernetes.local",
+		"google.com",
+	}
+
+	probeCmd := "for i in `seq 1 600`; do "
+	for _, name := range namesToResolve {
+		probeCmd += fmt.Sprintf("wget -O /dev/null %s && echo OK > /results/%s;", name, name)
+	}
+	probeCmd += "sleep 1; done"
+
+	// Run a pod which probes DNS and exposes the results by HTTP.
+	pod := &api.Pod{
+		TypeMeta: api.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1beta1",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "dns-test",
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "results",
+					Source: &api.VolumeSource{
+						EmptyDir: &api.EmptyDir{},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "webserver",
+					Image: "kubernetes/test-webserver",
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "results",
+							MountPath: "/results",
+						},
+					},
+				},
+				{
+					Name:    "pinger",
+					Image:   "busybox",
+					Command: []string{"sh", "-c", probeCmd},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "results",
+							MountPath: "/results",
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err := podClient.Create(pod)
+	if err != nil {
+		glog.Errorf("Failed to create dns-test pod: %v", err)
+		return false
+	}
+	defer podClient.Delete(pod.Name)
+
+	waitForPodRunning(c, pod.Name)
+	pod, err = podClient.Get(pod.Name)
+	if err != nil {
+		glog.Errorf("Failed to get pod: %v", err)
+		return false
+	}
+
+	// Try to find results for each expected name.
+	var failed []string
+	for try := 1; try < 100; try++ {
+		failed = []string{}
+		for _, name := range namesToResolve {
+			_, err := c.Get().
+				Path("proxy").
+				Namespace("default").
+				Path("pods").
+				Path(pod.Name).
+				Path("results").
+				Path(name).
+				Do().Raw()
+			if err != nil {
+				failed = append(failed, name)
+			}
+		}
+		if len(failed) == 0 {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+	if len(failed) != 0 {
+		glog.Errorf("DNS failed for: %v", failed)
+		return false
+	}
+
+	// TODO: probe from the host, too.
+
+	glog.Info("DNS probes succeeded")
+	return true
+}
+
 func main() {
 	flag.Parse()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
@@ -410,6 +521,7 @@ func main() {
 		{TestImportantURLs, "TestImportantURLs", 3},
 		{TestPodUpdate, "TestPodUpdate", 4},
 		{TestNetwork, "TestNetwork", 5},
+		{TestClusterDNS, "TestClusterDNS", 6},
 	}
 
 	info := []TestInfo{}

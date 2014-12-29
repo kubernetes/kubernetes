@@ -1723,3 +1723,47 @@ func TestGarbageCollectImages(t *testing.T) {
 		t.Errorf("unexpected images removed: %v", fakeDocker.RemovedImages)
 	}
 }
+
+func TestParseResolvConf(t *testing.T) {
+	testCases := []struct {
+		data        string
+		nameservers []string
+		searches    []string
+	}{
+		{"", []string{}, []string{}},
+		{" ", []string{}, []string{}},
+		{"\n", []string{}, []string{}},
+		{"\t\n\t", []string{}, []string{}},
+		{"#comment\n", []string{}, []string{}},
+		{" #comment\n", []string{}, []string{}},
+		{"#comment\n#comment", []string{}, []string{}},
+		{"#comment\nnameserver", []string{}, []string{}},
+		{"#comment\nnameserver\nsearch", []string{}, []string{}},
+		{"nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
+		{" nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
+		{"\tnameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
+		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}},
+		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}},
+		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}},
+		{"search foo", []string{}, []string{"foo"}},
+		{"search foo bar", []string{}, []string{"foo", "bar"}},
+		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}},
+		{"search foo\nsearch bar", []string{}, []string{"bar"}},
+		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}},
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}},
+		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}},
+	}
+	for i, tc := range testCases {
+		ns, srch, err := parseResolvConf(strings.NewReader(tc.data))
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+			continue
+		}
+		if !reflect.DeepEqual(ns, tc.nameservers) {
+			t.Errorf("[%d] expected nameservers %#v, got %#v", i, tc.nameservers, ns)
+		}
+		if !reflect.DeepEqual(srch, tc.searches) {
+			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
+		}
+	}
+}

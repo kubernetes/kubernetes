@@ -378,7 +378,8 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 echo "Test 5: Remove the iptables rules, make sure they come back."
 echo "Manually removing iptables rules"
-ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PROXY"
+ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-HOST"
+ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-CONTAINER"
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
