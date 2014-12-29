@@ -33,10 +33,15 @@ import (
 type Builder interface {
 	// BindFlags must bind and keep track of all the flags required to build a client config object
 	BindFlags(flags *pflag.FlagSet)
-	// Config uses the values of the bound flags and builds a complete client config
-	Config() (*client.Config, error)
 	// Client calls BuildConfig under the covers and uses that config to return a client
 	Client() (*client.Client, error)
+
+	// Config uses the values of the bound flags and builds a complete client config
+	Config() (*client.Config, error)
+	// Override invokes Config(), then passes that to the provided function, and returns a new
+	// builder that will use that config as its default. If Config() returns an error for the default
+	// values the function will not be invoked, and the error will be available when Client() is called.
+	Override(func(*client.Config)) Builder
 }
 
 // cmdAuthInfo is used to track whether flags have been set
@@ -58,6 +63,8 @@ type builder struct {
 	apiserver       string
 	apiVersion      string
 	matchApiVersion bool
+
+	config *client.Config
 }
 
 // NewBuilder returns a valid Builder that uses the passed authLoader.  If authLoader is nil, the NewDefaultAuthLoader is used.
@@ -124,6 +131,26 @@ func (builder *builder) Client() (*client.Client, error) {
 
 // Config implements Builder
 func (builder *builder) Config() (*client.Config, error) {
+	if builder.config != nil {
+		return builder.config, nil
+	}
+	return builder.newConfig()
+}
+
+// Override implements Builder
+func (builder *builder) Override(fn func(*client.Config)) Builder {
+	config, err := builder.newConfig()
+	if err != nil {
+		return builder
+	}
+	fn(config)
+	b := *builder
+	b.config = config
+	return &b
+}
+
+// newConfig creates a new config object for this builder
+func (builder *builder) newConfig() (*client.Config, error) {
 	clientConfig := client.Config{}
 	if len(builder.apiserver) > 0 {
 		clientConfig.Host = builder.apiserver
@@ -140,12 +167,11 @@ func (builder *builder) Config() (*client.Config, error) {
 		authInfoFileFound := true
 		authInfo, err := builder.authLoader.LoadAuth(builder.authPath)
 		if authInfo == nil && err != nil { // only consider failing if we don't have any auth info
-			if os.IsNotExist(err) { // if it's just a case of a missing file, simply flag the auth as not found and use the command line arguments
-				authInfoFileFound = false
-				authInfo = &clientauth.Info{}
-			} else {
+			if !os.IsNotExist(err) { // if it's just a case of a missing file, simply flag the auth as not found and use the command line arguments
 				return nil, err
 			}
+			authInfoFileFound = false
+			authInfo = &clientauth.Info{}
 		}
 
 		// If provided, the command line options override options from the auth file

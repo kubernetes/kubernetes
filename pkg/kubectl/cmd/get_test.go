@@ -37,6 +37,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
+	cmd.Flags().String("api-version", "default", "")
 	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"type", "foo"})
 

@@ -201,13 +201,13 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 			usageError(cmd, "Must specify filename or command line params")
 		}
 
-		version, kind, err := mapper.VersionAndKindForResource(resource)
+		defaultVersion, kind, err := mapper.VersionAndKindForResource(resource)
 		if err != nil {
 			// The error returned by mapper is "no resource defined", which is a usage error
 			usageError(cmd, err.Error())
 		}
-
-		mapping, err = mapper.RESTMapping(version, kind)
+		version := GetFlagString(cmd, "api-version")
+		mapping, err = mapper.RESTMapping(kind, version, defaultVersion)
 		checkErr(err)
 		return
 	}
@@ -216,7 +216,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 		usageError(cmd, "Must specify filename or command line params")
 	}
 
-	mapping, namespace, name, _ = ResourceFromFile(filename, typer, mapper, schema)
+	mapping, namespace, name, _ = ResourceFromFile(cmd, filename, typer, mapper, schema)
 	if len(name) == 0 {
 		checkErr(fmt.Errorf("the resource in the provided file has no name (or ID) defined"))
 	}
@@ -242,7 +242,7 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper)
 	version, kind, err := mapper.VersionAndKindForResource(resource)
 	checkErr(err)
 
-	mapping, err = mapper.RESTMapping(version, kind)
+	mapping, err = mapper.RESTMapping(kind, version)
 	checkErr(err)
 	return
 }
@@ -268,10 +268,11 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 		}
 	}
 
-	version, kind, err := mapper.VersionAndKindForResource(resource)
+	defaultVersion, kind, err := mapper.VersionAndKindForResource(resource)
 	checkErr(err)
 
-	mapping, err = mapper.RESTMapping(version, kind)
+	version := GetFlagString(cmd, "api-version")
+	mapping, err = mapper.RESTMapping(kind, version, defaultVersion)
 	checkErr(err)
 
 	return
@@ -280,23 +281,24 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 // ResourceFromFile retrieves the name and namespace from a valid file. If the file does not
 // resolve to a known type an error is returned. The returned mapping can be used to determine
 // the correct REST endpoint to modify this resource with.
-func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
+func ResourceFromFile(cmd *cobra.Command, filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
 	configData, err := ReadConfigData(filename)
 	checkErr(err)
 	data = configData
 
-	version, kind, err := typer.DataVersionAndKind(data)
+	objVersion, kind, err := typer.DataVersionAndKind(data)
 	checkErr(err)
 
 	// TODO: allow unversioned objects?
-	if len(version) == 0 {
+	if len(objVersion) == 0 {
 		checkErr(fmt.Errorf("the resource in the provided file has no apiVersion defined"))
 	}
 
 	err = schema.ValidateBytes(data)
 	checkErr(err)
 
-	mapping, err = mapper.RESTMapping(version, kind)
+	// decode using the version stored with the object (allows codec to vary across versions)
+	mapping, err = mapper.RESTMapping(kind, objVersion)
 	checkErr(err)
 
 	obj, err := mapping.Codec.Decode(data)
@@ -307,6 +309,13 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 	checkErr(err)
 	name, err = meta.Name(obj)
 	checkErr(err)
+
+	// if the preferred API version differs, get a different mapper
+	version := GetFlagString(cmd, "api-version")
+	if version != objVersion {
+		mapping, err = mapper.RESTMapping(kind, version)
+		checkErr(err)
+	}
 
 	return
 }

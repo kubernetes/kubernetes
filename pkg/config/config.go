@@ -45,7 +45,7 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 			continue
 		}
 
-		mapping, err := mapper.RESTMapping(version, kind)
+		mapping, err := mapper.RESTMapping(kind, version)
 		if err != nil {
 			allErrors = append(allErrors, fmt.Errorf("Config.item[%d] mapping: %v", i, err))
 			continue

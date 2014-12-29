@@ -64,7 +64,9 @@ func NewFactory(clientBuilder clientcmd.Builder) *Factory {
 			}
 		},
 		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
-			return clientBuilder.Client()
+			return clientBuilder.Override(func(c *client.Config) {
+				c.Version = mapping.APIVersion
+			}).Client()
 		},
 		Describer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
 			client, err := clientBuilder.Client()

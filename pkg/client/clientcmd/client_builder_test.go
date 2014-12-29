@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 )
 
@@ -248,6 +249,40 @@ func TestLoadClientAuthInfoOrPrompt(t *testing.T) {
 		if !reflect.DeepEqual(authInfo, tt.authInfo) {
 			t.Errorf("Expected %#v, got %#v", tt.authInfo, authInfo)
 		}
+	}
+}
+
+func TestOverride(t *testing.T) {
+	b := NewBuilder(nil)
+	cfg, err := b.Config()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Version != "" {
+		t.Errorf("unexpected default config version")
+	}
+
+	newCfg, err := b.Override(func(cfg *client.Config) {
+		if cfg.Version != "" {
+			t.Errorf("unexpected default config version")
+		}
+		cfg.Version = "test"
+	}).Config()
+
+	if newCfg.Version != "test" {
+		t.Errorf("unexpected override config version")
+	}
+
+	if cfg.Version != "" {
+		t.Errorf("original object should not change")
+	}
+
+	cfg, err = b.Config()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Version != "" {
+		t.Errorf("override should not be persistent")
 	}
 }
 

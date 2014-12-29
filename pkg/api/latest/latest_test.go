@@ -228,7 +228,7 @@ func TestRESTMapper(t *testing.T) {
 	}
 
 	for _, version := range Versions {
-		mapping, err := RESTMapper.RESTMapping(version, "ReplicationController")
+		mapping, err := RESTMapper.RESTMapping("ReplicationController", version)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
