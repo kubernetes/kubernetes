@@ -36,7 +36,7 @@ func TestHealthChecker(t *testing.T) {
 		health Status
 	}{
 		{http.StatusOK, Healthy},
-		{statusServerEarlyShutdown, Unknown},
+		{statusServerEarlyShutdown, Unhealthy},
 		{http.StatusBadRequest, Unhealthy},
 		{http.StatusBadGateway, Unhealthy},
 		{http.StatusInternalServerError, Unhealthy},
@@ -69,7 +69,7 @@ func TestHealthChecker(t *testing.T) {
 		}
 		hc := NewHealthChecker()
 		health, err := hc.HealthCheck("test", "", api.PodStatus{}, container)
-		if err != nil && tt.health != Unknown {
+		if err != nil && tt.health != Unhealthy {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if health != tt.health {
