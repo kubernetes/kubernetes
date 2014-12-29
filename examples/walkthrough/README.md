@@ -11,6 +11,7 @@ Trivially, a single container might be a pod.  For example, you can express a si
 
 ```yaml
 apiVersion: v1beta1
+kind: Pod
 id: www
 desiredState:
   manifest:
@@ -31,6 +32,7 @@ Now that's great for a static web server, but what about persistent storage?  We
 
 ```yaml
 apiVersion: v1beta1
+kind: Pod
 id: storage
 desiredState:
   manifest:
@@ -88,6 +90,7 @@ However, often you want to have two different containers that work together.  An
 
 ```yaml
 apiVersion: v1beta1
+kind: Pod
 id: www
 desiredState:
   manifest:
