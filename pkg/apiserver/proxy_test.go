@@ -18,7 +18,9 @@ package apiserver
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -132,17 +134,19 @@ func TestProxyTransport_fixLinks(t *testing.T) {
 
 func TestProxy(t *testing.T) {
 	table := []struct {
-		method       string
-		path         string
-		reqBody      string
-		respBody     string
-		reqNamespace string
+		method          string
+		path            string
+		reqBody         string
+		respBody        string
+		respContentType string
+		reqNamespace    string
 	}{
-		{"GET", "/some/dir", "", "answer", "default"},
-		{"POST", "/some/other/dir", "question", "answer", "default"},
-		{"PUT", "/some/dir/id", "different question", "answer", "default"},
-		{"DELETE", "/some/dir/id", "", "ok", "default"},
-		{"GET", "/some/dir/id", "", "answer", "other"},
+		{"GET", "/some/dir", "", "answer", "text/css", "default"},
+		{"GET", "/some/dir", "", "<html><head></head><body>answer</body></html>", "text/html", "default"},
+		{"POST", "/some/other/dir", "question", "answer", "text/css", "default"},
+		{"PUT", "/some/dir/id", "different question", "answer", "text/css", "default"},
+		{"DELETE", "/some/dir/id", "", "ok", "text/css", "default"},
+		{"GET", "/some/dir/id", "", "answer", "text/css", "other"},
 	}
 
 	for _, item := range table {
@@ -157,7 +161,17 @@ func TestProxy(t *testing.T) {
 			if e, a := item.path, req.URL.Path; e != a {
 				t.Errorf("%v - expected %v, got %v", item.method, e, a)
 			}
-			fmt.Fprint(w, item.respBody)
+			w.Header().Set("Content-Type", item.respContentType)
+			var out io.Writer = w
+			if strings.Contains(req.Header.Get("Accept-Encoding"), "gzip") {
+				// The proxier can ask for gzip'd data; we need to provide it with that
+				// in order to test our processing of that data.
+				w.Header().Set("Content-Encoding", "gzip")
+				gzw := gzip.NewWriter(w)
+				out = gzw
+				defer gzw.Close()
+			}
+			fmt.Fprint(out, item.respBody)
 		}))
 		defer proxyServer.Close()
 
