@@ -332,7 +332,7 @@ func TestNetwork(c *client.Client) bool {
 	const maxAttempts = 60
 	for i := 0; i < maxAttempts; i++ {
 		time.Sleep(time.Second)
-		body, err := c.Get().Path("proxy").Path("services").Path(svc.Name).Path("status").Do().Raw()
+		body, err := c.Get().Prefix("proxy").Resource("services").Name(svc.Name).Suffix("status").Do().Raw()
 		if err != nil {
 			glog.Infof("Attempt %v/%v: service/pod still starting. (error: '%v')", i, maxAttempts, err)
 			continue
@@ -344,7 +344,7 @@ func TestNetwork(c *client.Client) bool {
 		case "running":
 			glog.Infof("Attempt %v/%v: test still running", i, maxAttempts)
 		case "fail":
-			if body, err := c.Get().Path("proxy").Path("services").Path(svc.Name).Path("read").Do().Raw(); err != nil {
+			if body, err := c.Get().Prefix("proxy").Resource("services").Name(svc.Name).Suffix("read").Do().Raw(); err != nil {
 				glog.Infof("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err)
 			} else {
 				glog.Infof("Failed on attempt %v. Cleaning up. Details:\n%v", i, string(body))
@@ -353,7 +353,7 @@ func TestNetwork(c *client.Client) bool {
 		}
 	}
 
-	if body, err := c.Get().Path("proxy").Path("services").Path(svc.Name).Path("read").Do().Raw(); err != nil {
+	if body, err := c.Get().Prefix("proxy").Resource("services").Name(svc.Name).Suffix("read").Do().Raw(); err != nil {
 		glog.Infof("Timed out. Cleaning up. Error reading details: %v", err)
 	} else {
 		glog.Infof("Timed out. Cleaning up. Details:\n%v", string(body))
@@ -472,12 +472,11 @@ func TestClusterDNS(c *client.Client) bool {
 		failed = []string{}
 		for _, name := range namesToResolve {
 			_, err := c.Get().
-				Path("proxy").
+				Prefix("proxy").
+				Resource("pods").
 				Namespace("default").
-				Path("pods").
-				Path(pod.Name).
-				Path("results").
-				Path(name).
+				Name(pod.Name).
+				Suffix("results", name).
 				Do().Raw()
 			if err != nil {
 				failed = append(failed, name)

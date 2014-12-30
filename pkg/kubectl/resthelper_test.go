@@ -287,7 +287,7 @@ func TestRESTHelperUpdate(t *testing.T) {
 		}
 		parts := splitPath(req.URL.Path)
 		if parts[1] != "bar" {
-			t.Errorf("url doesn't contain namespace: %#v", req)
+			t.Errorf("url doesn't contain namespace: %#v", req.URL)
 			return false
 		}
 		if parts[2] != "foo" {

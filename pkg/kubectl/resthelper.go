@@ -47,18 +47,18 @@ func NewRESTHelper(client RESTClient, mapping *meta.RESTMapping) *RESTHelper {
 }
 
 func (m *RESTHelper) Get(namespace, name string, selector labels.Selector) (runtime.Object, error) {
-	return m.RESTClient.Get().Namespace(namespace).Path(m.Resource).Path(name).SelectorParam("labels", selector).Do().Get()
+	return m.RESTClient.Get().Resource(m.Resource).Namespace(namespace).Name(name).SelectorParam("labels", selector).Do().Get()
 }
 
 func (m *RESTHelper) List(namespace string, selector labels.Selector) (runtime.Object, error) {
-	return m.RESTClient.Get().Path(m.Resource).Namespace(namespace).Path("").SelectorParam("labels", selector).Do().Get()
+	return m.RESTClient.Get().Resource(m.Resource).Namespace(namespace).SelectorParam("labels", selector).Do().Get()
 }
 
 func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
-		Path("watch").
+		Prefix("watch").
 		Namespace(namespace).
-		Path(m.Resource).
+		Resource(m.Resource).
 		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", labelSelector).
 		SelectorParam("fields", fieldSelector).
@@ -66,7 +66,7 @@ func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fie
 }
 
 func (m *RESTHelper) Delete(namespace, name string) error {
-	return m.RESTClient.Delete().Namespace(namespace).Path(m.Resource).Path(name).Do().Error()
+	return m.RESTClient.Delete().Namespace(namespace).Resource(m.Resource).Name(name).Do().Error()
 }
 
 func (m *RESTHelper) Create(namespace string, modify bool, data []byte) error {
@@ -98,8 +98,8 @@ func (m *RESTHelper) Create(namespace string, modify bool, data []byte) error {
 	return createResource(m.RESTClient, m.Resource, namespace, data)
 }
 
-func createResource(c RESTClient, resourcePath, namespace string, data []byte) error {
-	return c.Post().Namespace(namespace).Path(resourcePath).Body(data).Do().Error()
+func createResource(c RESTClient, resource, namespace string, data []byte) error {
+	return c.Post().Namespace(namespace).Resource(resource).Body(data).Do().Error()
 }
 
 func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte) error {
@@ -119,7 +119,7 @@ func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte)
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
-		serverObj, err := c.Get().Path(m.Resource).Path(name).Do().Get()
+		serverObj, err := c.Get().Resource(m.Resource).Name(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
 			return updateResource(c, m.Resource, namespace, name, data)
@@ -141,6 +141,6 @@ func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte)
 	return updateResource(c, m.Resource, namespace, name, data)
 }
 
-func updateResource(c RESTClient, resourcePath, namespace, name string, data []byte) error {
-	return c.Put().Namespace(namespace).Path(resourcePath).Path(name).Body(data).Do().Error()
+func updateResource(c RESTClient, resource, namespace, name string, data []byte) error {
+	return c.Put().Namespace(namespace).Resource(resource).Name(name).Body(data).Do().Error()
 }

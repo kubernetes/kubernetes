@@ -378,7 +378,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>", method, prettyWireStorage())
 		}
 	case "update":
-		obj, err := c.Verb("GET").Namespace(api.Namespace(ctx)).Path(path).Do().Get()
+		obj, err := c.Verb("GET").Namespace(api.Namespace(ctx)).Suffix(path).Do().Get()
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
@@ -404,7 +404,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		return false
 	}
 
-	r := c.Verb(verb).Namespace(api.Namespace(ctx)).Path(path)
+	r := c.Verb(verb).Namespace(api.Namespace(ctx)).Suffix(path)
 	if len(*selector) > 0 {
 		r.ParseSelectorParam("labels", *selector)
 	}

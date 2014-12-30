@@ -183,8 +183,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return err
 	}
 	schemaData, err := c.c.RESTClient.Get().
-		AbsPath("/swaggerapi/api").
-		Path(version).
+		AbsPath("/swaggerapi/api", version).
 		Do().
 		Raw()
 	if err != nil {

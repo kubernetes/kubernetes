@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
@@ -54,9 +55,12 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 		SelectorParam("labels", labels.Set{"a": "b"}.AsSelector()).
 		UintParam("uint", 1).
 		AbsPath("/abs").
-		Path("test").
+		Prefix("test").
+		Suffix("testing").
 		ParseSelectorParam("foo", "a=b").
 		Namespace("new").
+		Resource("foos").
+		Name("bars").
 		NoPoll().
 		Body("foo").
 		Poller(skipPolling).
@@ -67,6 +71,74 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	}
 	if !reflect.DeepEqual(&original, changed) {
 		t.Errorf("expected %#v, got %#v", &original, changed)
+	}
+}
+
+func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
+	r := &Request{baseURL: &url.URL{}, path: "/path/"}
+	if s := r.finalURL(); s != "/path/" {
+		t.Errorf("trailing slash should be preserved: %s", s)
+	}
+}
+
+func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
+	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	if s := r.finalURL(); s != "/foo/" {
+		t.Errorf("trailing slash should be preserved: %s", s)
+	}
+}
+
+func TestRequestAbsPathJoins(t *testing.T) {
+	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
+	if s := r.finalURL(); s != "foo/bar/baz" {
+		t.Errorf("trailing slash should be preserved: %s", s)
+	}
+}
+
+func TestRequestSetsNamespace(t *testing.T) {
+	r := (&Request{
+		baseURL: &url.URL{
+			Path: "/",
+		},
+	}).Namespace("foo")
+	if r.namespace == "" {
+		t.Errorf("namespace should be set: %#v", r)
+	}
+	if s := r.finalURL(); s != "?namespace=foo" {
+		t.Errorf("namespace should be in params: %s", s)
+	}
+
+	r = (&Request{
+		baseURL: &url.URL{
+			Path: "/",
+		},
+		namespaceInPath: true,
+	}).Namespace("foo")
+	if s := r.finalURL(); s != "ns/foo" {
+		t.Errorf("namespace should be in path: %s", s)
+	}
+}
+
+func TestRequestOrdersNamespaceInPath(t *testing.T) {
+	r := (&Request{
+		baseURL:         &url.URL{},
+		path:            "/test/",
+		namespaceInPath: true,
+	}).Name("bar").Resource("baz").Namespace("foo")
+	if s := r.finalURL(); s != "/test/ns/foo/baz/bar" {
+		t.Errorf("namespace should be in order in path: %s", s)
+	}
+}
+
+func TestRequestSetTwiceError(t *testing.T) {
+	if (&Request{}).Name("bar").Name("baz").err == nil {
+		t.Errorf("setting name twice should result in error")
+	}
+	if (&Request{}).Namespace("bar").Namespace("baz").err == nil {
+		t.Errorf("setting namespace twice should result in error")
+	}
+	if (&Request{}).Resource("bar").Resource("baz").err == nil {
+		t.Errorf("setting resource twice should result in error")
 	}
 }
 
@@ -133,6 +205,9 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 201}, Data: []byte{}, Created: true},
 		{Response: &http.Response{StatusCode: 199}, Error: true},
 		{Response: &http.Response{StatusCode: 500}, Error: true},
+		{Response: &http.Response{StatusCode: 422}, Error: true},
+		{Response: &http.Response{StatusCode: 409}, Error: true},
+		{Response: &http.Response{StatusCode: 404}, Error: true},
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
@@ -151,6 +226,80 @@ func TestTransformResponse(t *testing.T) {
 		}
 		if test.Created != created {
 			t.Errorf("%d: expected created %t, got %t", i, test.Created, created)
+		}
+	}
+}
+
+func TestTransformUnstructuredError(t *testing.T) {
+	testCases := []struct {
+		Req *http.Request
+		Res *http.Response
+
+		Resource string
+		Name     string
+
+		ErrFn func(error) bool
+	}{
+		{
+			Resource: "foo",
+			Name:     "bar",
+			Req: &http.Request{
+				Method: "POST",
+			},
+			Res: &http.Response{
+				StatusCode: http.StatusConflict,
+				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+			},
+			ErrFn: apierrors.IsAlreadyExists,
+		},
+		{
+			Resource: "foo",
+			Name:     "bar",
+			Req: &http.Request{
+				Method: "PUT",
+			},
+			Res: &http.Response{
+				StatusCode: http.StatusConflict,
+				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+			},
+			ErrFn: apierrors.IsConflict,
+		},
+		{
+			Resource: "foo",
+			Name:     "bar",
+			Req:      &http.Request{},
+			Res: &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+			},
+			ErrFn: apierrors.IsNotFound,
+		},
+		{
+			Req: &http.Request{},
+			Res: &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+			},
+			ErrFn: apierrors.IsBadRequest,
+		},
+	}
+
+	for _, testCase := range testCases {
+		r := &Request{
+			codec:        latest.Codec,
+			resourceName: testCase.Name,
+			resource:     testCase.Resource,
+		}
+		_, _, err := r.transformResponse(testCase.Res, testCase.Req)
+		if !testCase.ErrFn(err) {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if len(testCase.Name) != 0 && !strings.Contains(err.Error(), testCase.Name) {
+			t.Errorf("unexpected error string: %s", err)
+		}
+		if len(testCase.Resource) != 0 && !strings.Contains(err.Error(), testCase.Resource) {
+			t.Errorf("unexpected error string: %s", err)
 		}
 	}
 }
@@ -333,8 +482,8 @@ func TestDoRequestNewWay(t *testing.T) {
 	defer testServer.Close()
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
-		Path("foo/bar").
-		Path("baz").
+		Prefix("foo", "bar").
+		Suffix("baz").
 		ParseSelectorParam("labels", "name=foo").
 		Timeout(time.Second).
 		Body([]byte(reqBody)).
@@ -367,8 +516,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
-		Path("foo/bar").
-		Path("baz").
+		Resource("bar").
+		Name("baz").
+		Prefix("foo").
 		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
 		Sync(true).
 		Timeout(time.Second).
@@ -403,8 +553,9 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
-		Path("foo/bar").
-		Path("baz").
+		Suffix("baz").
+		Name("bar").
+		Resource("foo").
 		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(reqObj).
@@ -453,8 +604,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
 	wasCreated := true
 	obj, err := c.Verb("POST").
-		Path("foo/bar").
-		Path("baz").
+		Prefix("foo/bar", "baz").
 		ParseSelectorParam("labels", "name=foo").
 		Timeout(time.Second).
 		Body(file.Name()).
@@ -496,8 +646,7 @@ func TestWasCreated(t *testing.T) {
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
 	wasCreated := false
 	obj, err := c.Verb("PUT").
-		Path("foo/bar").
-		Path("baz").
+		Prefix("foo/bar", "baz").
 		ParseSelectorParam("labels", "name=foo").
 		Timeout(time.Second).
 		Body(reqBodyExpected).
@@ -541,7 +690,7 @@ func TestVerbs(t *testing.T) {
 func TestAbsPath(t *testing.T) {
 	expectedPath := "/bar/foo"
 	c := NewOrDie(&Config{})
-	r := c.Post().Path("/foo").AbsPath(expectedPath)
+	r := c.Post().Prefix("/foo").AbsPath(expectedPath)
 	if r.path != expectedPath {
 		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
 	}
@@ -792,7 +941,7 @@ func TestWatch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	watching, err := s.Get().Path("path/to/watch/thing").Watch()
+	watching, err := s.Get().Prefix("path/to/watch/thing").Watch()
 	if err != nil {
 		t.Fatalf("Unexpected error")
 	}
@@ -841,7 +990,7 @@ func TestStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	readCloser, err := s.Get().Path("path/to/stream/thing").Stream()
+	readCloser, err := s.Get().Prefix("path/to/stream/thing").Stream()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

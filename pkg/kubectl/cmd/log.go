@@ -70,12 +70,10 @@ Examples:
 			}
 
 			readCloser, err := client.RESTClient.Get().
-				Path("proxy/minions").
-				Path(pod.Status.Host).
-				Path("containerLogs").
-				Path(namespace).
-				Path(podID).
-				Path(container).
+				Prefix("proxy").
+				Resource("minions").
+				Name(pod.Status.Host).
+				Suffix("containerLogs", namespace, podID, container).
 				Param("follow", strconv.FormatBool(follow)).
 				Stream()
 			checkErr(err)
