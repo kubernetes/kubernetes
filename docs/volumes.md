@@ -66,7 +66,7 @@ ZONE=us-central1-a
 gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE $DISK_NAME
 gcloud compute instances attach-disk --zone=$ZONE --disk=$DISK_NAME --device-name temp-data kubernetes-master
 gcloud compute ssh --zone=$ZONE kubernetes-master \
-  --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
+  --command "sudo mkdir /mnt/tmp && sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
 gcloud compute instances detach-disk --zone=$ZONE --disk $DISK_NAME kubernetes-master
 ```
 
