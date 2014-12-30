@@ -956,6 +956,7 @@ func TestFieldPath(t *testing.T) {
 	pod := &api.BoundPod{Spec: api.PodSpec{Containers: []api.Container{
 		{Name: "foo"},
 		{Name: "bar"},
+		{Name: ""},
 		{Name: "baz"},
 	}}}
 	table := map[string]struct {
@@ -964,9 +965,10 @@ func TestFieldPath(t *testing.T) {
 		path      string
 		success   bool
 	}{
-		"basic":            {pod, &api.Container{Name: "foo"}, "spec.containers[0]", true},
-		"basic2":           {pod, &api.Container{Name: "baz"}, "spec.containers[2]", true},
-		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers[0]", true},
+		"basic":            {pod, &api.Container{Name: "foo"}, "spec.containers{foo}", true},
+		"basic2":           {pod, &api.Container{Name: "baz"}, "spec.containers{baz}", true},
+		"emptyName":        {pod, &api.Container{Name: ""}, "spec.containers[2]", true},
+		"basicSamePointer": {pod, &pod.Spec.Containers[0], "spec.containers{foo}", true},
 		"missing":          {pod, &api.Container{Name: "qux"}, "", false},
 	}
 

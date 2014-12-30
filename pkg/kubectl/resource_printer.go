@@ -193,7 +193,7 @@ var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
 var minionColumns = []string{"NAME", "LABELS"}
 var statusColumns = []string{"STATUS"}
-var eventColumns = []string{"TIME", "NAME", "KIND", "CONDITION", "REASON", "MESSAGE"}
+var eventColumns = []string{"TIME", "NAME", "KIND", "SUBOBJECT", "CONDITION", "REASON", "MESSAGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -339,10 +339,11 @@ func printStatus(status *api.Status, w io.Writer) error {
 
 func printEvent(event *api.Event, w io.Writer) error {
 	_, err := fmt.Fprintf(
-		w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		event.Timestamp.Time.Format(time.RFC1123Z),
 		event.InvolvedObject.Name,
 		event.InvolvedObject.Kind,
+		event.InvolvedObject.FieldPath,
 		event.Condition,
 		event.Reason,
 		event.Message,
