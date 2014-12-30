@@ -463,7 +463,11 @@ func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
 	for i := range pod.Spec.Containers {
 		here := &pod.Spec.Containers[i]
 		if here.Name == container.Name {
-			return fmt.Sprintf("spec.containers[%d]", i), nil
+			if here.Name == "" {
+				return fmt.Sprintf("spec.containers[%d]", i), nil
+			} else {
+				return fmt.Sprintf("spec.containers{%s}", here.Name), nil
+			}
 		}
 	}
 	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)

@@ -750,10 +750,11 @@ type ObjectReference struct {
 	ResourceVersion string `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
-	// should contain a valid field access statement. For example,
-	// if the object reference is to a container within a pod, this would take on a value like:
-	// "desiredState.manifest.containers[2]". Such statements are valid language constructs in
-	// both go and JavaScript. This is syntax is chosen only to have some well-defined way of
+	// should contain information to identify the sub-object. For example, if the object
+	// reference is to a container within a pod, this would take on a value like:
+	// "spec.containers{name}" (where "name" refers to the name of the container that triggered
+	// the event) or if no container name is specified "spec.containers[2]" (container with
+	// index 2 in this pod). This syntax is chosen only to have some well-defined way of
 	// referencing a part of an object.
 	// TODO: this design is not final and this field is subject to change in the future.
 	FieldPath string `json:"fieldPath,omitempty" description:"if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"`
