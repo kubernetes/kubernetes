@@ -12,7 +12,6 @@ containers:
       - name: varlog
         mountPath: /varlog
 volumes:
-volumes:
   - name: containers
     source:
       hostDir:
