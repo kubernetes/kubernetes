@@ -645,7 +645,7 @@ type ServiceSpec struct {
 	ContainerPort util.IntOrString `json:"containerPort,omitempty"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
-	SessionAffinity *AffinityType `json:"sessionAffinity,omitempty"`
+	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

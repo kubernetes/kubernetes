@@ -485,12 +485,9 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info.portalIP = serviceIP
 		info.portalPort = service.Spec.Port
 		info.publicIP = service.Spec.PublicIPs
-
-		if service.Spec.SessionAffinity != nil {
-			info.sessionAffinityType = *service.Spec.SessionAffinity
-			// TODO: paramaterize this in the types api file as an attribute of sticky session.   For now it's hardcoded to 3 hours.
-			info.stickyMaxAgeMinutes = 180
-		}
+		info.sessionAffinityType = service.Spec.SessionAffinity
+		// TODO: paramaterize this in the types api file as an attribute of sticky session.   For now it's hardcoded to 3 hours.
+		info.stickyMaxAgeMinutes = 180
 		glog.V(4).Infof("info: %+v", info)
 
 		err = proxier.openPortal(service.Name, info)
