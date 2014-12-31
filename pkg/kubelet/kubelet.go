@@ -220,12 +220,13 @@ func (kl *Kubelet) GarbageCollectLoop() {
 }
 
 func (kl *Kubelet) getUnusedImages() ([]string, error) {
-	kl.pullLock.Lock()
-	defer kl.pullLock.Unlock()
 	return dockertools.GetUnusedImages(kl.dockerClient)
 }
 
 func (kl *Kubelet) GarbageCollectImages() error {
+	kl.pullLock.Lock()
+	defer kl.pullLock.Unlock()
+
 	images, err := kl.getUnusedImages()
 	if err != nil {
 		return err
@@ -633,6 +634,10 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
+
+	kl.pullLock.RLock()
+	defer kl.pullLock.RUnlock()
+
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
 	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
 	if err != nil {
@@ -641,6 +646,7 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 		}
 		return "", err
 	}
+
 	if !ok {
 		if err := kl.pullImage(container.Image, ref); err != nil {
 			return "", err
@@ -653,8 +659,6 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 }
 
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
-	kl.pullLock.RLock()
-	defer kl.pullLock.RUnlock()
 	if err := kl.dockerPuller.Pull(img); err != nil {
 		if ref != nil {
 			record.Eventf(ref, "failed", "failed", "Failed to pull image %s", img)
@@ -814,6 +818,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 		}
+		kl.pullLock.RLock()
+		defer kl.pullLock.RUnlock()
 		if !api.IsPullNever(container.ImagePullPolicy) {
 			present, err := kl.dockerPuller.IsImagePresent(container.Image)
 			latest := dockertools.RequireLatestImage(container.Image)
