@@ -262,6 +262,8 @@ func (b *Builder) ContinueOnError() *Builder {
 	return b
 }
 
+// SingleResourceType will cause the builder to error if the user specifies more than a single type
+// of resource.
 func (b *Builder) SingleResourceType() *Builder {
 	b.singleResourceType = true
 	return b

@@ -78,8 +78,8 @@ Examples:
   $ cat config.json | kubectl apply -f -
   <creates all resources listed in config.json>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientFunc := func(mapper *meta.RESTMapping) (config.RESTClientPoster, error) {
-				client, err := f.RESTClient(cmd, mapper)
+			clientFunc := func(mapping *meta.RESTMapping) (config.RESTClientPoster, error) {
+				client, err := f.RESTClient(cmd, mapping)
 				checkErr(err)
 				return client, nil
 			}
@@ -98,12 +98,13 @@ Examples:
 				files = append(GetFilesFromDir(directory, ".json"), GetFilesFromDir(directory, ".yaml")...)
 			}
 
+			mapper, typer := f.Object(cmd)
 			for _, filename := range files {
 				data, err := ReadConfigData(filename)
 				checkErr(err)
 
-				items, errs := DataToObjects(f.Mapper, f.Typer, data)
-				applyErrs := config.CreateObjects(f.Typer, f.Mapper, clientFunc, items)
+				items, errs := DataToObjects(mapper, typer, data)
+				applyErrs := config.CreateObjects(typer, mapper, clientFunc, items)
 
 				errs = append(errs, applyErrs...)
 				if len(errs) > 0 {

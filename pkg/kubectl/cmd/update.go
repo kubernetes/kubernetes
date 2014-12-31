@@ -45,7 +45,8 @@ Examples:
 			}
 			schema, err := f.Validator(cmd)
 			checkErr(err)
-			mapping, namespace, name, data := ResourceFromFile(cmd, filename, f.Typer, f.Mapper, schema)
+			mapper, typer := f.Object(cmd)
+			mapping, namespace, name, data := ResourceFromFile(cmd, filename, typer, mapper, schema)
 			client, err := f.RESTClient(cmd, mapping)
 			checkErr(err)
 

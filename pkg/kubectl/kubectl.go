@@ -112,6 +112,19 @@ func makeImageList(spec *api.PodSpec) string {
 	return strings.Join(listOfImages(spec), ",")
 }
 
+// OutputVersionMapper is a RESTMapper that will prefer mappings that
+// correspond to a preferred output version (if feasible)
+type OutputVersionMapper struct {
+	meta.RESTMapper
+	OutputVersion string
+}
+
+// RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
+func (m OutputVersionMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
+	preferred := append([]string{m.OutputVersion}, versions...)
+	return m.RESTMapper.RESTMapping(kind, preferred...)
+}
+
 // ShortcutExpander is a RESTMapper that can be used for Kubernetes
 // resources.
 type ShortcutExpander struct {
