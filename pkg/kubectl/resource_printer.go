@@ -35,66 +35,94 @@ import (
 	"github.com/golang/glog"
 )
 
-// GetPrinter takes a format type, an optional format argument, a version and a convertor
-// to be used if the underlying printer requires the object to be in a specific schema (
-// any of the generic formatters), and the default printer to use for this object.
-func GetPrinter(format, formatArgument, version string, convertor runtime.ObjectConvertor, defaultPrinter ResourcePrinter) (ResourcePrinter, error) {
+// GetPrinter takes a format type, an optional format argument. It will return true
+// if the format is generic (untyped), otherwise it will return false. The printer
+// is agnostic to schema versions, so you must send arguments to PrintObj in the
+// version you wish them to be shown using a VersionedPrinter (typically when
+// generic is true).
+func GetPrinter(format, formatArgument string) (ResourcePrinter, bool, error) {
 	var printer ResourcePrinter
 	switch format {
 	case "json":
-		printer = &JSONPrinter{version, convertor}
+		printer = &JSONPrinter{}
 	case "yaml":
-		printer = &YAMLPrinter{version, convertor}
+		printer = &YAMLPrinter{}
 	case "template":
 		if len(formatArgument) == 0 {
-			return nil, fmt.Errorf("template format specified but no template given")
+			return nil, false, fmt.Errorf("template format specified but no template given")
 		}
 		var err error
-		printer, err = NewTemplatePrinter([]byte(formatArgument), version, convertor)
+		printer, err = NewTemplatePrinter([]byte(formatArgument))
 		if err != nil {
-			return nil, fmt.Errorf("error parsing template %s, %v\n", formatArgument, err)
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", formatArgument, err)
 		}
 	case "templatefile":
 		if len(formatArgument) == 0 {
-			return nil, fmt.Errorf("templatefile format specified but no template file given")
+			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
 		}
 		data, err := ioutil.ReadFile(formatArgument)
 		if err != nil {
-			return nil, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
+			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
 		}
-		printer, err = NewTemplatePrinter(data, version, convertor)
+		printer, err = NewTemplatePrinter(data)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
 	case "":
-		printer = defaultPrinter
+		return nil, false, nil
 	default:
-		return nil, fmt.Errorf("output format %q not recognized", format)
+		return nil, false, fmt.Errorf("output format %q not recognized", format)
 	}
-	return printer, nil
+	return printer, true, nil
 }
 
 // ResourcePrinter is an interface that knows how to print runtime objects.
 type ResourcePrinter interface {
-	// Print receives an arbitrary object, formats it and prints it to a writer.
+	// Print receives a runtime object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
 }
 
-// JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
-// The input object is assumed to be in the internal version of an API and is converted
-// to the given version first.
-type JSONPrinter struct {
-	version   string
+// ResourcePrinterFunc is a function that can print objects
+type ResourcePrinterFunc func(runtime.Object, io.Writer) error
+
+// PrintObj implements ResourcePrinter
+func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
+	return fn(obj, w)
+}
+
+// VersionedPrinter takes runtime objects and ensures they are converted to a given API version
+// prior to being passed to a nested printer.
+type VersionedPrinter struct {
+	printer   ResourcePrinter
 	convertor runtime.ObjectConvertor
+	version   string
+}
+
+// NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
+func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConvertor, version string) ResourcePrinter {
+	return &VersionedPrinter{
+		printer:   printer,
+		convertor: convertor,
+		version:   version,
+	}
+}
+
+// PrintObj implements ResourcePrinter
+func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	converted, err := p.convertor.ConvertToVersion(obj, p.version)
+	if err != nil {
+		return err
+	}
+	return p.printer.PrintObj(converted, w)
+}
+
+// JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.
+type JSONPrinter struct {
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	outObj, err := p.convertor.ConvertToVersion(obj, p.version)
-	if err != nil {
-		return err
-	}
-	data, err := json.Marshal(outObj)
+	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
@@ -115,11 +143,7 @@ type YAMLPrinter struct {
 
 // PrintObj prints the data as YAML.
 func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	outObj, err := p.convertor.ConvertToVersion(obj, p.version)
-	if err != nil {
-		return err
-	}
-	output, err := yaml.Marshal(outObj)
+	output, err := yaml.Marshal(obj)
 	if err != nil {
 		return err
 	}
@@ -387,11 +411,9 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 type TemplatePrinter struct {
 	rawTemplate string
 	template    *template.Template
-	version     string
-	convertor   runtime.ObjectConvertor
 }
 
-func NewTemplatePrinter(tmpl []byte, asVersion string, convertor runtime.ObjectConvertor) (*TemplatePrinter, error) {
+func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 	t, err := template.New("output").
 		Funcs(template.FuncMap{"exists": exists}).
 		Parse(string(tmpl))
@@ -401,18 +423,12 @@ func NewTemplatePrinter(tmpl []byte, asVersion string, convertor runtime.ObjectC
 	return &TemplatePrinter{
 		rawTemplate: string(tmpl),
 		template:    t,
-		version:     asVersion,
-		convertor:   convertor,
 	}, nil
 }
 
 // PrintObj formats the obj with the Go Template.
 func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	outObj, err := p.convertor.ConvertToVersion(obj, p.version)
-	if err != nil {
-		return err
-	}
-	data, err := json.Marshal(outObj)
+	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}

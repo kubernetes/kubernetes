@@ -17,16 +17,15 @@ limitations under the License.
 package kubectl
 
 import (
-	"io"
 	"os"
 	"os/signal"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// WatchLoop loops, writing objects in the events from w to printer.
+// WatchLoop loops, passing events in w to fn.
 // If user sends interrupt signal, shut down cleanly. Otherwise, never return.
-func WatchLoop(w watch.Interface, printer ResourcePrinter, out io.Writer) {
+func WatchLoop(w watch.Interface, fn func(watch.Event) error) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
@@ -36,8 +35,7 @@ func WatchLoop(w watch.Interface, printer ResourcePrinter, out io.Writer) {
 			if !ok {
 				return
 			}
-			// TODO: need to print out added/modified/deleted!
-			if err := printer.PrintObj(event.Object, out); err != nil {
+			if err := fn(event); err != nil {
 				w.Stop()
 			}
 		case <-signals:

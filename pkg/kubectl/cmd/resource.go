@@ -41,15 +41,23 @@ func ResourcesFromArgsOrFile(
 	mapper meta.RESTMapper,
 	clientBuilder func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error),
 	schema validation.Schema,
+	requireNames bool,
 ) resource.Visitor {
 
 	// handling filename & resource id
 	if len(selector) == 0 {
-		mapping, namespace, name := ResourceFromArgsOrFile(cmd, args, filename, typer, mapper, schema)
-		client, err := clientBuilder(cmd, mapping)
-		checkErr(err)
-
-		return resource.NewInfo(client, mapping, namespace, name)
+		if requireNames || len(filename) > 0 {
+			mapping, namespace, name := ResourceFromArgsOrFile(cmd, args, filename, typer, mapper, schema)
+			client, err := clientBuilder(cmd, mapping)
+			checkErr(err)
+			return resource.NewInfo(client, mapping, namespace, name)
+		}
+		if len(args) == 2 {
+			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, mapper)
+			client, err := clientBuilder(cmd, mapping)
+			checkErr(err)
+			return resource.NewInfo(client, mapping, namespace, name)
+		}
 	}
 
 	labelSelector, err := labels.ParseSelector(selector)
@@ -58,8 +66,11 @@ func ResourcesFromArgsOrFile(
 	namespace := GetKubeNamespace(cmd)
 	visitors := resource.VisitorList{}
 
-	if len(args) != 1 {
+	if len(args) < 1 {
 		usageError(cmd, "Must specify the type of resource")
+	}
+	if len(args) > 1 {
+		usageError(cmd, "Too many arguments")
 	}
 	types := SplitResourceArgument(args[0])
 	for _, arg := range types {

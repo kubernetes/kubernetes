@@ -22,6 +22,8 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
@@ -66,12 +68,12 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 }
 
 type testPrinter struct {
-	Obj runtime.Object
-	Err error
+	Objects []runtime.Object
+	Err     error
 }
 
 func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Obj = obj
+	t.Objects = append(t.Objects, obj)
 	fmt.Fprintf(out, "%#v", obj)
 	return t.Err
 }
@@ -110,6 +112,23 @@ func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
 			return t.Printer, t.Err
 		},
 	}, t, codec
+}
+
+func NewAPIFactory() (*Factory, *testFactory, runtime.Codec) {
+	t := &testFactory{}
+	return &Factory{
+		Mapper: latest.RESTMapper,
+		Typer:  api.Scheme,
+		RESTClient: func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error) {
+			return t.Client, t.Err
+		},
+		Describer: func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error) {
+			return t.Describer, t.Err
+		},
+		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+			return t.Printer, t.Err
+		},
+	}, t, latest.Codec
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
