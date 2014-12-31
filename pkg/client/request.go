@@ -226,6 +226,9 @@ func (r *Request) SelectorParam(paramName string, s labels.Selector) *Request {
 	if r.err != nil {
 		return r
 	}
+	if s.Empty() {
+		return r
+	}
 	return r.setParam(paramName, s.String())
 }
 
