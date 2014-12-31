@@ -55,7 +55,7 @@ func TestCreateLists(t *testing.T) {
 	}{
 		// Minion
 		{
-			location: "/api/" + testapi.Version() + "/minions?fields=",
+			location: "/api/" + testapi.Version() + "/minions",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod
@@ -95,15 +95,15 @@ func TestCreateWatches(t *testing.T) {
 		// Minion watch
 		{
 			rv:       "",
-			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=",
+			location: "/api/" + testapi.Version() + "/watch/minions?resourceVersion=",
 			factory:  factory.createMinionLW,
 		}, {
 			rv:       "0",
-			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=0",
+			location: "/api/" + testapi.Version() + "/watch/minions?resourceVersion=0",
 			factory:  factory.createMinionLW,
 		}, {
 			rv:       "42",
-			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=42",
+			location: "/api/" + testapi.Version() + "/watch/minions?resourceVersion=42",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod watches
