@@ -46,6 +46,11 @@ var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
 var ErrAttrNotFound = errors.New("Expected attribute not found")
 
+const (
+	MiB = 1024 * 1024
+	GB  = 1000 * 1000 * 1000
+)
+
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
 	time.Duration
@@ -181,11 +186,11 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		for _, flavor := range flavorList {
 			rsrc := api.NodeResources{
 				Capacity: api.ResourceList{
-					api.ResourceCPU:            *resource.NewMilliQuantity(int64(flavor.VCPUs*1000), resource.DecimalSI),
-					api.ResourceMemory:         resource.MustParse(fmt.Sprintf("%dMi", flavor.RAM)),
-					"openstack.org/disk":       resource.MustParse(fmt.Sprintf("%dG", flavor.Disk)),
-					"openstack.org/rxTxFactor": *resource.NewQuantity(int64(flavor.RxTxFactor*1000), resource.DecimalSI),
-					"openstack.org/swap":       resource.MustParse(fmt.Sprintf("%dMi", flavor.Swap)),
+					api.ResourceCPU:            *resource.NewQuantity(int64(flavor.VCPUs), resource.DecimalSI),
+					api.ResourceMemory:         *resource.NewQuantity(int64(flavor.RAM)*MiB, resource.BinarySI),
+					"openstack.org/disk":       *resource.NewQuantity(int64(flavor.Disk)*GB, resource.DecimalSI),
+					"openstack.org/rxTxFactor": *resource.NewMilliQuantity(int64(flavor.RxTxFactor)*1000, resource.DecimalSI),
+					"openstack.org/swap":       *resource.NewQuantity(int64(flavor.Swap)*MiB, resource.BinarySI),
 				},
 			}
 			flavor_to_resource[flavor.ID] = &rsrc
