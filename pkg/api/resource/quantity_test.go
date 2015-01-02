@@ -25,6 +25,10 @@ import (
 	"speter.net/go/exp/math/dec/inf"
 )
 
+var (
+	testQuantityFlag = QuantityFlag("quantityFlag", "1M", "dummy flag for testing the quantity flag mechanism")
+)
+
 func dec(i int64, exponent int) *inf.Dec {
 	// See the below test-- scale is the negative of an exponent.
 	return inf.NewDec(i, inf.Scale(-exponent))
@@ -423,5 +427,13 @@ func TestCopy(t *testing.T) {
 	c.Set(6)
 	if q.Value() == 6 {
 		t.Errorf("Copy didn't")
+	}
+}
+
+func TestQFlagSet(t *testing.T) {
+	qf := qFlag{&Quantity{}}
+	qf.Set("1Ki")
+	if e, a := "1Ki", qf.String(); e != a {
+		t.Errorf("Unexpected result %v != %v", e, a)
 	}
 }

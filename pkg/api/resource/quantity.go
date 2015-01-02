@@ -18,6 +18,8 @@ package resource
 
 import (
 	"errors"
+	"flag"
+	"fmt"
 	"math/big"
 	"regexp"
 	"strings"
@@ -371,4 +373,34 @@ func (q *Quantity) Copy() *Quantity {
 		Amount: tmp.Set(q.Amount),
 		Format: q.Format,
 	}
+}
+
+// qFlag is a helper type for the Flag function
+type qFlag struct {
+	dest *Quantity
+}
+
+func (qf qFlag) Set(val string) error {
+	q, err := ParseQuantity(val)
+	if err != nil {
+		return err
+	}
+	// This copy is OK because q will not be referenced again.
+	*qf.dest = *q
+	return nil
+}
+
+func (qf qFlag) String() string {
+	return qf.dest.String()
+}
+
+// QuantityFlag is a helper that makes a quantity flag (using standard flag package).
+// Will panic if defaultValue is not a valid quantity.
+func QuantityFlag(flagName, defaultValue, description string) *Quantity {
+	q, err := ParseQuantity(defaultValue)
+	if err != nil {
+		panic(fmt.Errorf("can't use %v as a quantity: %v", defaultValue, err))
+	}
+	flag.Var(qFlag{q}, flagName, description)
+	return q
 }
