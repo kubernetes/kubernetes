@@ -69,12 +69,12 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
 	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{Version: latest.Version}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("api-version", "default", "")
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"type", "foo"})
 
 	expected := &internalType{Name: "foo"}
@@ -98,11 +98,11 @@ func TestGetSchemaObject(t *testing.T) {
 		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
 	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{Version: "v1beta3"}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
-	cmd.Flags().String("api-version", "v1beta3", "")
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"replicationcontrollers", "foo"})
 
 	if !strings.Contains(buf.String(), "\"foo\"") {
@@ -119,11 +119,11 @@ func TestGetObjects(t *testing.T) {
 		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])},
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := []runtime.Object{&pods.Items[0]}
@@ -145,11 +145,11 @@ func TestGetListObjects(t *testing.T) {
 		Codec: codec,
 		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := []runtime.Object{pods}
@@ -181,11 +181,11 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := []runtime.Object{pods, svc}
@@ -217,12 +217,12 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{Version: "v1beta1"}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
-	cmd.Flags().String("api-version", "v1beta1", "")
 
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -269,11 +269,11 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -345,11 +345,11 @@ func TestWatchSelector(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("selector", "a=b")
@@ -384,11 +384,11 @@ func TestWatchResource(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -422,11 +422,11 @@ func TestWatchOnlyResource(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdGet(buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().String("namespace", "test", "")
 
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})

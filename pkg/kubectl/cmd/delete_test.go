@@ -43,10 +43,10 @@ func TestDeleteObject(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
 	cmd.Run(cmd, []string{})
 
@@ -71,10 +71,10 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
 	cmd.Run(cmd, []string{})
 
@@ -98,12 +98,12 @@ func TestDeleteNoObjects(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 	stderr := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
 	cmd.SetOutput(stderr)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Run(cmd, []string{"pods"})
 
 	if buf.String() != "" {
@@ -133,10 +133,10 @@ func TestDeleteMultipleObject(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
@@ -165,10 +165,10 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
@@ -199,10 +199,10 @@ func TestDeleteDirectory(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 
@@ -240,10 +240,10 @@ func TestDeleteMultipleSelector(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
