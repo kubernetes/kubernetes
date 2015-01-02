@@ -13,13 +13,13 @@ rest of a local-only kubernetes cluster.
 boot2docker up
 $(boot2docker shellinit)
 export DOCKER_HOST_IP=$(boot2docker ip 2>/dev/null)
-export KUBERNETES_MASTER=$DOCKER_HOST_IP:8080
+export KUBERNETES_MASTER=http://$DOCKER_HOST_IP:8080
 ```
 
 #### With local docker daemon
 ```
 export DOCKER_HOST_IP=127.0.0.1
-export KUBERNETES_MASTER=$DOCKER_HOST_IP:8080
+export KUBERNETES_MASTER=http://$DOCKER_HOST_IP:8080
 ```
 
 ### Build the kubernetes docker images
