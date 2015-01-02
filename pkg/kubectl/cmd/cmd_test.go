@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -92,13 +93,15 @@ func (t *testDescriber) Describe(namespace, name string) (output string, err err
 }
 
 type testFactory struct {
-	Mapper    meta.RESTMapper
-	Typer     runtime.ObjectTyper
-	Client    kubectl.RESTClient
-	Describer kubectl.Describer
-	Printer   kubectl.ResourcePrinter
-	Validator validation.Schema
-	Err       error
+	Mapper       meta.RESTMapper
+	Typer        runtime.ObjectTyper
+	Client       kubectl.RESTClient
+	Describer    kubectl.Describer
+	Printer      kubectl.ResourcePrinter
+	Validator    validation.Schema
+	Namespace    string
+	ClientConfig *client.Config
+	Err          error
 }
 
 func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
@@ -124,6 +127,12 @@ func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
 		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
+		DefaultNamespace: func(cmd *cobra.Command) (string, error) {
+			return t.Namespace, t.Err
+		},
+		ClientConfig: func(cmd *cobra.Command) (*client.Config, error) {
+			return t.ClientConfig, t.Err
+		},
 	}, t, codec
 }
 
@@ -146,6 +155,12 @@ func NewAPIFactory() (*Factory, *testFactory, runtime.Codec) {
 		},
 		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
 			return t.Validator, t.Err
+		},
+		DefaultNamespace: func(cmd *cobra.Command) (string, error) {
+			return t.Namespace, t.Err
+		},
+		ClientConfig: func(cmd *cobra.Command) (*client.Config, error) {
+			return t.ClientConfig, t.Err
 		},
 	}, t, latest.Codec
 }
