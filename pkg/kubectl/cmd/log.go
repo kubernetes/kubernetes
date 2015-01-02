@@ -43,7 +43,8 @@ Examples:
 				usageError(cmd, "log <pod> [<container>]")
 			}
 
-			namespace := GetKubeNamespace(cmd)
+			namespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
 			client, err := f.Client(cmd)
 			checkErr(err)
 
