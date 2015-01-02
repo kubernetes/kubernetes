@@ -195,7 +195,7 @@ func (s *NodeController) SyncCloud() error {
 			glog.Infof("Create node in registry: %s", node.Name)
 			_, err = s.kubeClient.Nodes().Create(&node)
 			if err != nil {
-				glog.Errorf("Create node error: %s", node.Name)
+				glog.Errorf("Create node %s error: %v", node.Name, err)
 			}
 		}
 		delete(nodeMap, node.Name)
@@ -206,7 +206,7 @@ func (s *NodeController) SyncCloud() error {
 		glog.Infof("Delete node from registry: %s", nodeID)
 		err = s.kubeClient.Nodes().Delete(nodeID)
 		if err != nil {
-			glog.Errorf("Delete node error: %s", nodeID)
+			glog.Errorf("Delete node %s error: %v", nodeID, err)
 		}
 		s.deletePods(nodeID)
 	}
