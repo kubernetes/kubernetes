@@ -53,8 +53,8 @@ const (
 //   (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
 //
 // No matter which of the three exponent forms is used, no quantity may represent
-// a number less than .001m or greater than 2^63-1 in magnitude. Numbers that exceed
-// a bound will be capped at that bound. (E.g.: 0.0001m will be treated as 0.001m.)
+// a number less than 1m or greater than 2^63-1 in magnitude. Numbers that exceed
+// a bound will be capped at that bound. (E.g.: 0.1m will be treated as 1m.)
 // This may be extended in the future if we require larger or smaller quantities.
 //
 // Numbers with binary suffixes may not have any fractional part.
@@ -104,10 +104,22 @@ var (
 	// splitRE is used to get the various parts of a number.
 	splitRE = regexp.MustCompile(splitREString)
 
+	// Errors that could happen while parsing a string.
 	ErrFormatWrong      = errors.New("quantities must match the regular expression '" + splitREString + "'")
 	ErrNumeric          = errors.New("unable to parse numeric part of quantity")
 	ErrSuffix           = errors.New("unable to parse quantity's suffix")
 	ErrFractionalBinary = errors.New("numbers with binary-style SI suffixes can't have fractional parts")
+
+	// Commonly needed big.Ints-- treat as read only!
+	ten      = big.NewInt(10)
+	zero     = big.NewInt(0)
+	thousand = big.NewInt(1000)
+	ten24    = big.NewInt(1024)
+	decZero  = inf.NewDec(0, 0)
+
+	// Smallest and largest (in magnitude) numbers allowed.
+	minAllowed = inf.NewDec(1, 3)         // == 1/1000
+	maxAllowed = inf.NewDec((1<<63)-1, 0) // == max int64
 )
 
 // ParseQuantity turns str into a Quantity, or returns an error.
@@ -140,26 +152,35 @@ func ParseQuantity(str string) (*Quantity, error) {
 			return nil, ErrFractionalBinary
 		}
 		// exponent will always be a multiple of 10.
-		dec1024 := inf.NewDec(1024, 0)
 		for exponent > 0 {
-			amount.Mul(amount, dec1024)
+			amount.UnscaledBig().Mul(amount.UnscaledBig(), ten24)
 			exponent -= 10
 		}
 	}
 
+	// Cap at min/max bounds.
+	sign := amount.Sign()
+	if sign == -1 {
+		amount.Neg(amount)
+	}
+	// This rounds non-zero values up to the minimum representable
+	// value, under the theory that if you want some resources, you
+	// should get some resources, even if you asked for way too small
+	// of an amount.
+	// Arguably, this should be inf.RoundHalfUp (normal rounding), but
+	// that would have the side effect of rounding values < .5m to zero.
+	amount.Round(amount, 3, inf.RoundUp)
+
+	// The max is just a simple cap.
+	if amount.Cmp(maxAllowed) > 0 {
+		amount.Set(maxAllowed)
+	}
+	if sign == -1 {
+		amount.Neg(amount)
+	}
+
 	return &Quantity{amount, format}, nil
 }
-
-var (
-	// Commonly needed big.Ints-- treat as read only!
-	ten      = big.NewInt(10)
-	zero     = big.NewInt(0)
-	thousand = big.NewInt(1000)
-	ten24    = big.NewInt(1024)
-
-	minAllowed = inf.NewDec(1, 6)
-	maxAllowed = inf.NewDec(999, -18)
-)
 
 // removeFactors divides in a loop; the return values have the property that
 // d == result * factor ^ times

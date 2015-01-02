@@ -97,21 +97,20 @@ func TestQuantityParse(t *testing.T) {
 
 		// Things that look like floating point
 		{"0.001", Quantity{dec(1, -3), DecimalSI}},
-		{"0.0005", Quantity{dec(5, -4), DecimalSI}},
+		{"0.0005k", Quantity{dec(5, -1), DecimalSI}},
 		{"0.005", Quantity{dec(5, -3), DecimalSI}},
 		{"0.05", Quantity{dec(5, -2), DecimalSI}},
 		{"0.5", Quantity{dec(5, -1), DecimalSI}},
-		{"0.00050", Quantity{dec(5, -4), DecimalSI}},
+		{"0.00050k", Quantity{dec(5, -1), DecimalSI}},
 		{"0.00500", Quantity{dec(5, -3), DecimalSI}},
 		{"0.05000", Quantity{dec(5, -2), DecimalSI}},
 		{"0.50000", Quantity{dec(5, -1), DecimalSI}},
-		{"0.5e-3", Quantity{dec(5, -4), DecimalExponent}},
-		{"0.5e-2", Quantity{dec(5, -3), DecimalExponent}},
+		{"0.5e0", Quantity{dec(5, -1), DecimalExponent}},
 		{"0.5e-1", Quantity{dec(5, -2), DecimalExponent}},
+		{"0.5e-2", Quantity{dec(5, -3), DecimalExponent}},
 		{"0.5e0", Quantity{dec(5, -1), DecimalExponent}},
 		{"10.035M", Quantity{dec(10035, 3), DecimalSI}},
 
-		{"1.1E-3", Quantity{dec(11, -4), DecimalExponent}},
 		{"1.2e3", Quantity{dec(12, 2), DecimalExponent}},
 		{"1.3E6", Quantity{dec(13, 5), DecimalExponent}},
 		{"1.40e9", Quantity{dec(14, 8), DecimalExponent}},
@@ -119,7 +118,6 @@ func TestQuantityParse(t *testing.T) {
 		{"1.6e15", Quantity{dec(16, 14), DecimalExponent}},
 		{"1.7E18", Quantity{dec(17, 17), DecimalExponent}},
 
-		{"3.001m", Quantity{dec(3001, -6), DecimalSI}},
 		{"9.01", Quantity{dec(901, -2), DecimalSI}},
 		{"8.1k", Quantity{dec(81, 2), DecimalSI}},
 		{"7.123456M", Quantity{dec(7123456, 0), DecimalSI}},
@@ -130,17 +128,57 @@ func TestQuantityParse(t *testing.T) {
 		{"2.5P", Quantity{dec(25, 14), DecimalSI}},
 		{"1.01E", Quantity{dec(101, 16), DecimalSI}},
 
-		// Things that saturate
-		//{"0.1m",
-		//{"9Ei",
-		//{"9223372036854775807Ki",
-		//{"12E",
+		// Things that saturate/round
+		{"3.001m", Quantity{dec(4, -3), DecimalSI}},
+		{"1.1E-3", Quantity{dec(2, -3), DecimalExponent}},
+		{"0.0001", Quantity{dec(1, -3), DecimalSI}},
+		{"0.0005", Quantity{dec(1, -3), DecimalSI}},
+		{"0.00050", Quantity{dec(1, -3), DecimalSI}},
+		{"0.5e-3", Quantity{dec(1, -3), DecimalExponent}},
+		{"0.9m", Quantity{dec(1, -3), DecimalSI}},
+		{"0.12345", Quantity{dec(124, -3), DecimalSI}},
+		{"0.12354", Quantity{dec(124, -3), DecimalSI}},
+		{"9Ei", Quantity{maxAllowed, BinarySI}},
+		{"9223372036854775807Ki", Quantity{maxAllowed, BinarySI}},
+		{"12E", Quantity{maxAllowed, DecimalSI}},
 	}
 
 	for _, item := range table {
 		got, err := ParseQuantity(item.input)
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", item.input, err)
+			continue
+		}
+		if e, a := item.expect.Amount, got.Amount; e.Cmp(a) != 0 {
+			t.Errorf("%v: expected %v, got %v", item.input, e, a)
+		}
+		if e, a := item.expect.Format, got.Format; e != a {
+			t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+		}
+	}
+
+	// Try the negative version of everything
+	desired := &inf.Dec{}
+	for _, item := range table {
+		got, err := ParseQuantity("-" + item.input)
+		if err != nil {
+			t.Errorf("-%v: unexpected error: %v", item.input, err)
+			continue
+		}
+		desired.Neg(item.expect.Amount)
+		if e, a := desired, got.Amount; e.Cmp(a) != 0 {
+			t.Errorf("%v: expected %v, got %v", item.input, e, a)
+		}
+		if e, a := item.expect.Format, got.Format; e != a {
+			t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+		}
+	}
+
+	// Try everything with an explicit +
+	for _, item := range table {
+		got, err := ParseQuantity("+" + item.input)
+		if err != nil {
+			t.Errorf("-%v: unexpected error: %v", item.input, err)
 			continue
 		}
 		if e, a := item.expect.Amount, got.Amount; e.Cmp(a) != 0 {
@@ -208,13 +246,22 @@ func TestQuantityString(t *testing.T) {
 		{Quantity{dec(3, 3), DecimalExponent}, "3e3"},
 		{Quantity{dec(3, 3), DecimalSI}, "3k"},
 		{Quantity{dec(0, 0), DecimalExponent}, "0"},
-
-		{Quantity{dec(-1080, -3), DecimalSI}, "-1.080"},
-		{Quantity{dec(-80*1024, 0), BinarySI}, "-80Ki"},
 	}
 	for _, item := range table {
 		got := item.in.String()
 		if e, a := item.expect, got; e != a {
+			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
+		}
+	}
+	desired := &inf.Dec{} // Avoid modifying the values in the table.
+	for _, item := range table {
+		if item.in.Amount.Cmp(decZero) == 0 {
+			// Don't expect it to print "-0" ever
+			continue
+		}
+		q := item.in
+		q.Amount = desired.Neg(q.Amount)
+		if e, a := "-"+item.expect, q.String(); e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
 		}
 	}
