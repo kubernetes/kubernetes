@@ -120,7 +120,7 @@ func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int, fmt Forma
 		return b, e, BinarySI, true
 	}
 
-	if len(suffix) > 1 && suffix[0] == 'E' || suffix[0] == 'e' {
+	if len(suffix) > 1 && (suffix[0] == 'E' || suffix[0] == 'e') {
 		parsed, err := strconv.ParseInt(string(suffix[1:]), 10, 64)
 		if err != nil {
 			return 0, 0, DecimalExponent, false

@@ -18,8 +18,10 @@ package resource
 
 import (
 	//"reflect"
+	"encoding/json"
 	"testing"
 
+	fuzz "github.com/google/gofuzz"
 	"speter.net/go/exp/math/dec/inf"
 )
 
@@ -112,7 +114,7 @@ func TestQuantityParse(t *testing.T) {
 		{"10.035M", Quantity{dec(10035, 3), DecimalSI}},
 
 		{"1.2e3", Quantity{dec(12, 2), DecimalExponent}},
-		{"1.3E6", Quantity{dec(13, 5), DecimalExponent}},
+		{"1.3E+6", Quantity{dec(13, 5), DecimalExponent}},
 		{"1.40e9", Quantity{dec(14, 8), DecimalExponent}},
 		{"1.53E12", Quantity{dec(153, 10), DecimalExponent}},
 		{"1.6e15", Quantity{dec(16, 14), DecimalExponent}},
@@ -141,6 +143,21 @@ func TestQuantityParse(t *testing.T) {
 		{"9Ei", Quantity{maxAllowed, BinarySI}},
 		{"9223372036854775807Ki", Quantity{maxAllowed, BinarySI}},
 		{"12E", Quantity{maxAllowed, DecimalSI}},
+
+		// We'll accept fractional binary stuff, too.
+		{"100.035Ki", Quantity{dec(10243584, -2), BinarySI}},
+		{"0.5Mi", Quantity{dec(.5*1024*1024, 0), BinarySI}},
+		{"0.05Gi", Quantity{dec(536870912, -1), BinarySI}},
+		{"0.025Ti", Quantity{dec(274877906944, -1), BinarySI}},
+		// These get rounded though
+		{"0.0001i", Quantity{dec(1, -3), DecimalSI}},
+		{"0.005i", Quantity{dec(5, -3), DecimalSI}},
+		{"0.05i", Quantity{dec(50, -3), DecimalSI}},
+		// Also, if below you expect (512, -3), you're wrong in two ways:
+		// In the sequence [1024*1024*1024, 1024*1024, 1024, ?], the last term is "1" not 1/1024.
+		// Even if it were, 500 * 1/1024 = .48828125, NOT .512
+		// I cannot recommend using this feature, it is confusing.
+		{"0.5i", Quantity{dec(500, -3), DecimalSI}},
 	}
 
 	for _, item := range table {
@@ -194,14 +211,6 @@ func TestQuantityParse(t *testing.T) {
 		"1+1.0M",
 		"0.1mi",
 		"0.1am",
-		"0.0001i",
-		"100.035Ki",
-		"0.5Mi",
-		"0.05Gi",
-		"0.5Ti",
-		"0.005i",
-		"0.05i",
-		"0.5i",
 		"aoeu",
 	}
 	for _, item := range invalid {
@@ -223,17 +232,20 @@ func TestQuantityString(t *testing.T) {
 		{Quantity{dec(1001*1024*1024*1024, 0), BinarySI}, "1001Gi"},
 		{Quantity{dec(1024*1024*1024*1024, 0), BinarySI}, "1Ti"},
 		{Quantity{dec(5, 0), BinarySI}, "5i"},
+		{Quantity{dec(500, -3), BinarySI}, "500m"},
 		{Quantity{dec(1, 9), DecimalSI}, "1G"},
 		{Quantity{dec(1000, 6), DecimalSI}, "1G"},
 		{Quantity{dec(1000000, 3), DecimalSI}, "1G"},
 		{Quantity{dec(1000000000, 0), DecimalSI}, "1G"},
 		{Quantity{dec(1, -3), DecimalSI}, "1m"},
 		{Quantity{dec(80, -3), DecimalSI}, "80m"},
-		{Quantity{dec(1080, -3), DecimalSI}, "1.080"},
-		{Quantity{dec(108, -2), DecimalSI}, "1.080"},
-		{Quantity{dec(10800, -4), DecimalSI}, "1.080"},
+		{Quantity{dec(1080, -3), DecimalSI}, "1080m"},
+		{Quantity{dec(108, -2), DecimalSI}, "1080m"},
+		{Quantity{dec(10800, -4), DecimalSI}, "1080m"},
 		{Quantity{dec(300, 6), DecimalSI}, "300M"},
 		{Quantity{dec(1, 12), DecimalSI}, "1T"},
+		{Quantity{dec(1234567, 6), DecimalSI}, "1234567M"},
+		{Quantity{dec(1234567, -3), BinarySI}, "1235i"},
 		{Quantity{dec(3, 3), DecimalSI}, "3k"},
 		{Quantity{dec(0, 0), DecimalSI}, "0"},
 		{Quantity{dec(0, 0), BinarySI}, "0i"},
@@ -264,5 +276,152 @@ func TestQuantityString(t *testing.T) {
 		if e, a := "-"+item.expect, q.String(); e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
 		}
+	}
+}
+
+var fuzzer = fuzz.New().Funcs(
+	func(q *Quantity, c fuzz.Continue) {
+		q.Amount = &inf.Dec{}
+		if c.RandBool() {
+			q.Format = BinarySI
+			if c.RandBool() {
+				q.Amount.SetScale(0)
+				q.Amount.SetUnscaled(c.Int63())
+				return
+			}
+			// Be sure to test cases like 1Mi
+			q.Amount.SetScale(0)
+			q.Amount.SetUnscaled(c.Int63n(1024) << uint(10*c.Intn(5)))
+			return
+		}
+		if c.RandBool() {
+			q.Format = DecimalSI
+		} else {
+			q.Format = DecimalExponent
+		}
+		if c.RandBool() {
+			q.Amount.SetScale(inf.Scale(c.Intn(4)))
+			q.Amount.SetUnscaled(c.Int63())
+			return
+		}
+		// Be sure to test cases like 1M
+		q.Amount.SetScale(inf.Scale(3 - c.Intn(15)))
+		q.Amount.SetUnscaled(c.Int63n(1000))
+	},
+)
+
+func TestJSON(t *testing.T) {
+	for i := 0; i < 500; i++ {
+		q := &Quantity{}
+		fuzzer.Fuzz(q)
+		b, err := json.Marshal(q)
+		if err != nil {
+			t.Errorf("error encoding %v", q)
+		}
+		q2 := &Quantity{}
+		err = json.Unmarshal(b, q2)
+		if err != nil {
+			t.Errorf("%v: error decoding %v", q, string(b))
+		}
+		if q2.Amount.Cmp(q.Amount) != 0 {
+			t.Errorf("Expected equal: %v, %v (json was '%v')", q, q2, string(b))
+		}
+	}
+}
+
+func TestMilliNewSet(t *testing.T) {
+	table := []struct {
+		value  int64
+		format Format
+		expect string
+		exact  bool
+	}{
+		{1, DecimalSI, "1m", true},
+		{1000, DecimalSI, "1", true},
+		{1234000, DecimalSI, "1234", true},
+		{1024, BinarySI, "2i", false}, // Rounded up
+		{1000000, "invalidFormatDefaultsToExponent", "1e3", true},
+		{1024 * 1024, BinarySI, "1049i", false},
+	}
+
+	for _, item := range table {
+		q := NewMilliQuantity(item.value, item.format)
+		if e, a := item.expect, q.String(); e != a {
+			t.Errorf("Expected %v, got %v; %#v", e, a, q)
+		}
+		if !item.exact {
+			continue
+		}
+		q2, err := ParseQuantity(q.String())
+		if err != nil {
+			t.Errorf("Round trip failed on %v", q)
+		}
+		if e, a := item.value, q2.MilliValue(); e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
+	for _, item := range table {
+		q := NewQuantity(0, item.format)
+		q.SetMilli(item.value)
+		if e, a := item.expect, q.String(); e != a {
+			t.Errorf("Set: Expected %v, got %v; %#v", e, a, q)
+		}
+	}
+}
+
+func TestNewSet(t *testing.T) {
+	table := []struct {
+		value  int64
+		format Format
+		expect string
+	}{
+		{1, DecimalSI, "1"},
+		{1000, DecimalSI, "1k"},
+		{1234000, DecimalSI, "1234k"},
+		{1024, BinarySI, "1Ki"},
+		{1000000, "invalidFormatDefaultsToExponent", "1e6"},
+		{1024 * 1024, BinarySI, "1Mi"},
+	}
+
+	for _, item := range table {
+		q := NewQuantity(item.value, item.format)
+		if e, a := item.expect, q.String(); e != a {
+			t.Errorf("Expected %v, got %v; %#v", e, a, q)
+		}
+		q2, err := ParseQuantity(q.String())
+		if err != nil {
+			t.Errorf("Round trip failed on %v", q)
+		}
+		if e, a := item.value, q2.Value(); e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
+	for _, item := range table {
+		q := NewQuantity(0, item.format)
+		q.Set(item.value)
+		if e, a := item.expect, q.String(); e != a {
+			t.Errorf("Set: Expected %v, got %v; %#v", e, a, q)
+		}
+	}
+}
+
+func TestUninitializedNoCrash(t *testing.T) {
+	var q Quantity
+
+	q.Value()
+	q.MilliValue()
+	q.Copy()
+	q.String()
+	q.MarshalJSON()
+}
+
+func TestCopy(t *testing.T) {
+	q := NewQuantity(5, DecimalSI)
+	c := q.Copy()
+	c.Set(6)
+	if q.Value() == 6 {
+		t.Errorf("Copy didn't")
 	}
 }

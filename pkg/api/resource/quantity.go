@@ -25,15 +25,6 @@ import (
 	"speter.net/go/exp/math/dec/inf"
 )
 
-// Format lists the three possible formattings of a quantity.
-type Format string
-
-const (
-	DecimalExponent = Format("DecExponent")
-	BinarySI        = Format("BinSI")
-	DecimalSI       = Format("DecSI")
-)
-
 // Quantity is a fixed-point representation of a number.
 // It provides convenient marshaling/unmarshaling in JSON and YAML,
 // in addition to String() and Int64() accessors.
@@ -41,48 +32,43 @@ const (
 // The serialization format is:
 //
 // <serialized>      ::= <sign><numeric> | <numeric>
-// <numeric>         ::= <digits><exponent> | <digits>.<digits><exponent>
+// <numeric>         ::= <digits><suffix> | <digits>.<digits><suffix>
+//   (Note that <suffix> may be ""!)
 // <sign>            ::= "+" | "-"
 // <digits>          ::= <digit> | <digit><digits>
+// <signedDigits>    ::= <digits> | <sign><digits>
 // <digit>           ::= 0 | 1 | ... | 9
-// <exponent>        ::= <binarySuffix> | <decimalExponent> | <decimalSuffix>
+// <suffix>          ::= <binarySuffix> | <decimalExponent> | <decimalSuffix>
 // <binarySuffix>    ::= i | Ki | Mi | Gi | Ti | Pi | Ei
 // <decimalSuffix>   ::= m | "" | k | M | G | T | P | E
-// <decimalExponent> ::= "e" <digits> | "E" <digits>
-//   (Where digits is always a multiple of 3)
+// <decimalExponent> ::= "e" <signedDigits> | "E" <signedDigits>
 //   (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
 //
 // No matter which of the three exponent forms is used, no quantity may represent
-// a number less than 1m or greater than 2^63-1 in magnitude. Numbers that exceed
-// a bound will be capped at that bound. (E.g.: 0.1m will be treated as 1m.)
+// a number greater than 2^63-1 in magnitude, nor may it have more than 3 digits
+// of precision. Numbers larger or more precise will be capped or rounded.
+// (E.g.: 0.1m will rounded up to 1m.)
 // This may be extended in the future if we require larger or smaller quantities.
 //
-// Numbers with binary suffixes may not have any fractional part.
+// When a Quantity is parsed from a string, it will remember the type of suffix
+// it had, and will use the same type again when it is serialized.
+// One exception: numbers with a Binary SI suffix less than one will be changed
+// to Decimal SI suffix. E.g., .5i becomes 500m. [NOT 512m!]
 //
-// Quantities will be serialized in the same format that they were parsed from.
 // Before serializing, Quantity will be put in "canonical form".
-// This means that Exponent will be adjusted up or down (with a
-// corresponding increase or decrease in Mantissa) until one of the
-// following is true:
-//   a. Binary SI mode: Mantissa mod 1024 is nonzero.
-//        Examples: 1Gi 300Mi 6Ki 1001Gi
-//        Non-canonical: 1024Gi (Should be 1Ti)
-//   b. Decimal SI mode: exponent is greater than 3 and one of Mantissa's three least
-//      significant digits is nonzero.
-//        Examples: 1G 300M 3K 1001G
-//        Non-canonical: 1000G (Should be 1T)
-//   c. Decimal SI mode: exponent is less than or equal to zero, and Mantissa has no more
-//      than three nonzero decimals. If any decimals are nonzero, three
-//      decimals will be emitted.
-//        Examples: 5 123.450 1.001 0.045
-//        Non-canonical: 1m (should be 0.001)
-//   d. Decimal exponent mode: as for decimal SI mode, but using the corresponding
-//      "e6" or "E6" form.
-//
+// This means that Exponent/suffix will be adjusted up or down (with a
+// corresponding increase or decrease in Mantissa) such that:
+//   a. No precision is lost
+//   b. No fractional digits will be emitted
+//   c. The exponent (or suffix) is as large as possible.
 // The sign will be omitted unless the number is negative.
 //
-// Note that the quantity will NEVER be represented by a floating point number. That is
-// the whole point of this exercise.
+// Examples:
+//   1.5 will be serialized as "1500m"
+//   1.5Gi will be serialized as "1576Mi"
+//
+// Note that the quantity will NEVER be internally represented by a
+// floating point number. That is the whole point of this exercise.
 //
 // Non-canonical values will still parse as long as they are well formed,
 // but will be re-emitted in their canonical form. (So always use canonical
@@ -92,11 +78,28 @@ const (
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 type Quantity struct {
+	// Amount is public, so you can manipulate it if the accessor
+	// functions are not sufficient.
 	Amount *inf.Dec
+
+	// Change Format at will. See the comment for Canonicalize for
+	// more details.
 	Format
 }
 
+// Format lists the three possible formattings of a quantity.
+type Format string
+
 const (
+	DecimalExponent = Format("DecExponent")
+	// SI = International System of units.
+	BinarySI  = Format("BinSI")
+	DecimalSI = Format("DecSI")
+)
+
+const (
+	// splitREString is used to separate a number from its suffix; as such,
+	// this is overly permissive, but that's OK-- it will be checked later.
 	splitREString = "^([+-]?[0123456789.]+)([eEimkKMGTP]*[-+]?[0123456789]*)$"
 )
 
@@ -105,21 +108,31 @@ var (
 	splitRE = regexp.MustCompile(splitREString)
 
 	// Errors that could happen while parsing a string.
-	ErrFormatWrong      = errors.New("quantities must match the regular expression '" + splitREString + "'")
-	ErrNumeric          = errors.New("unable to parse numeric part of quantity")
-	ErrSuffix           = errors.New("unable to parse quantity's suffix")
-	ErrFractionalBinary = errors.New("numbers with binary-style SI suffixes can't have fractional parts")
+	ErrFormatWrong = errors.New("quantities must match the regular expression '" + splitREString + "'")
+	ErrNumeric     = errors.New("unable to parse numeric part of quantity")
+	ErrSuffix      = errors.New("unable to parse quantity's suffix")
 
-	// Commonly needed big.Ints-- treat as read only!
+	// Commonly needed big.Int values-- treat as read only!
 	ten      = big.NewInt(10)
 	zero     = big.NewInt(0)
+	one      = big.NewInt(1)
 	thousand = big.NewInt(1000)
 	ten24    = big.NewInt(1024)
-	decZero  = inf.NewDec(0, 0)
+
+	// Commonly needed inf.Dec values-- treat as read only!
+	decZero     = inf.NewDec(0, 0)
+	decOne      = inf.NewDec(1, 0)
+	decMinusOne = inf.NewDec(-1, 0)
+	decThousand = inf.NewDec(1000, 0)
 
 	// Smallest and largest (in magnitude) numbers allowed.
 	minAllowed = inf.NewDec(1, 3)         // == 1/1000
 	maxAllowed = inf.NewDec((1<<63)-1, 0) // == max int64
+
+	// The maximum value we can represent milli-units for.
+	// Compare with the return value of Quantity.Value() to
+	// see if it's safe to use Quantity.MilliValue().
+	MaxMilliValue = ((1 << 63) - 1) / 1000
 )
 
 // ParseQuantity turns str into a Quantity, or returns an error.
@@ -143,19 +156,9 @@ func ParseQuantity(str string) (*Quantity, error) {
 	if base == 10 {
 		amount.SetScale(amount.Scale() + inf.Scale(-exponent))
 	} else if base == 2 {
-		// Detect fractional parts by rounding. There's probably
-		// a better way to do this.
-		if rounded := new(inf.Dec).Round(amount, 0, inf.RoundFloor); rounded.Cmp(amount) != 0 {
-			return nil, ErrFractionalBinary
-		}
-		if exponent < 0 {
-			return nil, ErrFractionalBinary
-		}
-		// exponent will always be a multiple of 10.
-		for exponent > 0 {
-			amount.UnscaledBig().Mul(amount.UnscaledBig(), ten24)
-			exponent -= 10
-		}
+		// numericSuffix = 2 ** exponent
+		numericSuffix := big.NewInt(1).Lsh(one, uint(exponent))
+		amount.UnscaledBig().Mul(amount.UnscaledBig(), numericSuffix)
 	}
 
 	// Cap at min/max bounds.
@@ -174,6 +177,10 @@ func ParseQuantity(str string) (*Quantity, error) {
 	// The max is just a simple cap.
 	if amount.Cmp(maxAllowed) > 0 {
 		amount.Set(maxAllowed)
+	}
+	if format == BinarySI && amount.Cmp(decOne) < 0 && amount.Cmp(decZero) > 0 {
+		// This avoids rounding and hopefully confusion, too.
+		format = DecimalSI
 	}
 	if sign == -1 {
 		amount.Neg(amount)
@@ -201,13 +208,45 @@ func removeFactors(d, factor *big.Int) (result *big.Int, times int) {
 }
 
 // Canonicalize returns the canonical form of q and its suffix (see comment on Quantity).
+//
+// Note about BinarySI:
+// * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
+//   -1 and +1, it will be emitted as if q.Format were DecimalSI.
+// * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
+//   rounded up. (1.1i becomes 2i.)
 func (q *Quantity) Canonicalize() (string, suffix) {
-	mantissa := q.Amount.UnscaledBig()
-	exponent := int(-q.Amount.Scale())
-	amount := big.NewInt(0).Set(mantissa)
+	if q.Amount == nil {
+		return "0", ""
+	}
 
-	switch q.Format {
+	format := q.Format
+	switch format {
 	case DecimalExponent, DecimalSI:
+	case BinarySI:
+		switch q.Amount.Cmp(decZero) {
+		case 0: // exactly equal 0, that's fine
+		case 1: // greater than 0
+			if q.Amount.Cmp(decOne) < 0 {
+				// This avoids rounding and hopefully confusion, too.
+				format = DecimalSI
+			}
+		case -1:
+			if q.Amount.Cmp(decMinusOne) > 0 {
+				// This avoids rounding and hopefully confusion, too.
+				format = DecimalSI
+			}
+		}
+	default:
+		format = DecimalExponent
+	}
+
+	// TODO: If BinarySI formatting is requested but would cause rounding, upgrade to
+	// one of the other formats.
+	switch format {
+	case DecimalExponent, DecimalSI:
+		mantissa := q.Amount.UnscaledBig()
+		exponent := int(-q.Amount.Scale())
+		amount := big.NewInt(0).Set(mantissa)
 		// move all factors of 10 into the exponent for easy reasoning
 		amount, times := removeFactors(amount, ten)
 		exponent += times
@@ -218,34 +257,24 @@ func (q *Quantity) Canonicalize() (string, suffix) {
 			exponent--
 		}
 
-		absAmount := big.NewInt(0).Abs(amount)
-
-		// Canonical form has three decimal digits.
-		if absAmount.Cmp(thousand) >= 0 {
-			// Unless that would cause an exponent of 3-- 111.111e3 is silly.
-			if exponent != 0 {
-				suffix, _ := quantitySuffixer.construct(10, exponent+3, q.Format)
-				number := inf.NewDecBig(amount, 3).String()
-				return number, suffix
-			}
-		}
-		suffix, _ := quantitySuffixer.construct(10, exponent, q.Format)
+		suffix, _ := quantitySuffixer.construct(10, exponent, format)
 		number := amount.String()
 		return number, suffix
 	case BinarySI:
+		tmp := &inf.Dec{}
+		//tmp.Set(q.Amount)
+		tmp.Round(q.Amount, 0, inf.RoundUp)
+		amount := tmp.UnscaledBig()
+		exponent := int(-q.Amount.Scale())
 		// Apply the (base-10) shift. This will lose any fractional
 		// part, which is intentional.
-		for exponent < 0 {
-			amount.Mul(amount, ten)
-			exponent++
-		}
 		for exponent > 0 {
 			amount.Mul(amount, ten)
 			exponent--
 		}
 
-		amount, exponent := removeFactors(amount, ten24)
-		suffix, _ := quantitySuffixer.construct(2, exponent*10, q.Format)
+		amount, exponent = removeFactors(amount, ten24)
+		suffix, _ := quantitySuffixer.construct(2, exponent*10, format)
 		number := amount.String()
 		return number, suffix
 	}
@@ -273,4 +302,73 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	// This copy is safe because parsed will not be referred to again.
 	*q = *parsed
 	return nil
+}
+
+// NewQuantity returns a new Quantity representing the given
+// value in the given format.
+func NewQuantity(value int64, format Format) *Quantity {
+	return &Quantity{
+		Amount: inf.NewDec(value, 0),
+		Format: format,
+	}
+}
+
+// NewMilliQuantity returns a new Quantity representing the given
+// value * 1/1000 in the given format. Note that BinarySI formatting
+// will cause rounding for fractional values.
+func NewMilliQuantity(value int64, format Format) *Quantity {
+	return &Quantity{
+		Amount: inf.NewDec(value, 3),
+		Format: format,
+	}
+}
+
+// Value returns the value of q; any fractional part will be lost.
+func (q *Quantity) Value() int64 {
+	if q.Amount == nil {
+		return 0
+	}
+	tmp := &inf.Dec{}
+	return tmp.Round(q.Amount, 0, inf.RoundUp).UnscaledBig().Int64()
+}
+
+// MilliValue returns the value of q * 1000; this could overflow an int64;
+// if that's a concern, call Value() first to verify the number is small enough.
+func (q *Quantity) MilliValue() int64 {
+	if q.Amount == nil {
+		return 0
+	}
+	tmp := &inf.Dec{}
+	return tmp.Round(tmp.Mul(q.Amount, decThousand), 0, inf.RoundUp).UnscaledBig().Int64()
+}
+
+// Set sets q's value to be value.
+func (q *Quantity) Set(value int64) {
+	if q.Amount == nil {
+		q.Amount = &inf.Dec{}
+	}
+	q.Amount.SetUnscaled(value)
+	q.Amount.SetScale(0)
+}
+
+// SetMilli sets q's value to be value * 1/1000.
+func (q *Quantity) SetMilli(value int64) {
+	if q.Amount == nil {
+		q.Amount = &inf.Dec{}
+	}
+	q.Amount.SetUnscaled(value)
+	q.Amount.SetScale(3)
+}
+
+// Copy is a convenience function that makes a deep copy for you. Non-deep
+// copies of quantities share pointers and you will regret that.
+func (q *Quantity) Copy() *Quantity {
+	if q.Amount == nil {
+		return NewQuantity(0, q.Format)
+	}
+	tmp := &inf.Dec{}
+	return &Quantity{
+		Amount: tmp.Set(q.Amount),
+		Format: q.Format,
+	}
 }
