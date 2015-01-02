@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
@@ -36,9 +37,12 @@ var (
 
 // ClientConfig is used to make it easy to get an api server client
 type ClientConfig interface {
+	// RawConfig returns the merged result of all overrides
 	RawConfig() (clientcmdapi.Config, error)
 	// ClientConfig returns a complete client config
 	ClientConfig() (*client.Config, error)
+	// Namespace returns the namespace resulting from the merged result of all overrides
+	Namespace() (string, error)
 }
 
 // DirectClientConfig is a ClientConfig interface that is backed by a clientcmdapi.Config, options overrides, and an optional fallbackReader for auth information
@@ -226,6 +230,35 @@ func canIdentifyUser(config client.Config) bool {
 
 }
 
+// Namespace implements KubeConfig
+func (config DirectClientConfig) Namespace() (string, error) {
+	if err := config.ConfirmUsable(); err != nil {
+		return "", err
+	}
+
+	configContext := config.getContext()
+
+	if len(configContext.Namespace) != 0 {
+		return configContext.Namespace, nil
+	}
+
+	if len(configContext.NamespacePath) != 0 {
+		nsInfo, err := kubectl.LoadNamespaceInfo(configContext.NamespacePath)
+		if err != nil {
+			return "", err
+		}
+
+		return nsInfo.Namespace, nil
+	}
+
+	// if nothing was specified, try the default file
+	nsInfo, err := kubectl.LoadNamespaceInfo(os.Getenv("HOME") + "/.kubernetes_ns")
+	if err != nil {
+		return "", err
+	}
+	return nsInfo.Namespace, nil
+}
+
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
 func (config DirectClientConfig) ConfirmUsable() error {
@@ -248,21 +281,30 @@ func (config DirectClientConfig) getContextName() string {
 }
 
 func (config DirectClientConfig) getAuthInfoName() string {
-	if len(config.overrides.AuthInfoName) != 0 {
-		return config.overrides.AuthInfoName
+	if len(config.overrides.Context.AuthInfo) != 0 {
+		return config.overrides.Context.AuthInfo
 	}
 	return config.getContext().AuthInfo
 }
 
 func (config DirectClientConfig) getClusterName() string {
-	if len(config.overrides.ClusterName) != 0 {
-		return config.overrides.ClusterName
+	if len(config.overrides.Context.Cluster) != 0 {
+		return config.overrides.Context.Cluster
 	}
 	return config.getContext().Cluster
 }
 
 func (config DirectClientConfig) getContext() clientcmdapi.Context {
-	return config.config.Contexts[config.getContextName()]
+	contexts := config.config.Contexts
+	contextName := config.getContextName()
+
+	var mergedContext clientcmdapi.Context
+	if configContext, exists := contexts[contextName]; exists {
+		mergo.Merge(&mergedContext, configContext)
+	}
+	mergo.Merge(&mergedContext, config.overrides.Context)
+
+	return mergedContext
 }
 
 func (config DirectClientConfig) getAuthInfo() clientcmdapi.AuthInfo {

@@ -49,7 +49,9 @@ Examples:
 				usageError(cmd, "<name> is required for run")
 			}
 
-			namespace := GetKubeNamespace(cmd)
+			namespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+
 			client, err := f.Client(cmd)
 			checkErr(err)
 

@@ -41,10 +41,10 @@ func TestCreateObject(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
 	cmd.Run(cmd, []string{})
 
@@ -73,10 +73,10 @@ func TestCreateMultipleObject(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
@@ -107,10 +107,10 @@ func TestCreateDirectory(t *testing.T) {
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().String("namespace", "test", "")
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 

@@ -47,10 +47,13 @@ Examples:
 			schema, err := f.Validator(cmd)
 			checkErr(err)
 
+			cmdNamespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+
 			mapper, typer := f.Object(cmd)
 			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
 				ContinueOnError().
-				NamespaceParam(GetKubeNamespace(cmd)).RequireNamespace().
+				NamespaceParam(cmdNamespace).RequireNamespace().
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
