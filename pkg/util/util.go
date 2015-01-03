@@ -113,6 +113,14 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	return json.Unmarshal(value, &intstr.IntVal)
 }
 
+// String returns the string value, or Itoa's the int value.
+func (intstr *IntOrString) String() string {
+	if intstr.Kind == IntstrString {
+		return intstr.StrVal
+	}
+	return strconv.Itoa(intstr.IntVal)
+}
+
 // MarshalJSON implements the json.Marshaller interface.
 func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	switch intstr.Kind {

@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta3
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -326,13 +327,13 @@ type Container struct {
 	WorkingDir string   `json:"workingDir,omitempty"`
 	Ports      []Port   `json:"ports,omitempty"`
 	Env        []EnvVar `json:"env,omitempty"`
-	// Optional: Defaults to unlimited.
-	Memory int `json:"memory,omitempty"`
-	// Optional: Defaults to unlimited.
-	CPU           int            `json:"cpu,omitempty"`
-	VolumeMounts  []VolumeMount  `json:"volumeMounts,omitempty"`
-	LivenessProbe *LivenessProbe `json:"livenessProbe,omitempty"`
-	Lifecycle     *Lifecycle     `json:"lifecycle,omitempty"`
+	// Optional: Defaults to unlimited. Units: bytes.
+	Memory resource.Quantity `json:"memory,omitempty"`
+	// Optional: Defaults to unlimited. Units: Cores. (500m == 1/2 core)
+	CPU           resource.Quantity `json:"cpu,omitempty"`
+	VolumeMounts  []VolumeMount     `json:"volumeMounts,omitempty"`
+	LivenessProbe *LivenessProbe    `json:"livenessProbe,omitempty"`
+	Lifecycle     *Lifecycle        `json:"lifecycle,omitempty"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.
@@ -776,9 +777,18 @@ type NodeCondition struct {
 	Message            string              `json:"message,omitempty"`
 }
 
+// ResourceName is the name identifying various resources in a ResourceList.
 type ResourceName string
 
-type ResourceList map[ResourceName]util.IntOrString
+const (
+	// CPU, in cores. (500m = .5 cores)
+	ResourceCPU ResourceName = "cpu"
+	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceMemory ResourceName = "memory"
+)
+
+// ResourceList is a set of (resource name, quantity) pairs.
+type ResourceList map[ResourceName]resource.Quantity
 
 // Node is a worker node in Kubernetes.
 // The name of the node according to etcd is in ID.

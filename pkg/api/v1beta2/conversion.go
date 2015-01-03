@@ -18,10 +18,13 @@ package v1beta2
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func init() {
@@ -38,7 +41,7 @@ func init() {
 	// newer.Scheme.AddStructFieldConversion(string(""), "Status", string(""), "Condition")
 	// newer.Scheme.AddStructFieldConversion(string(""), "Condition", string(""), "Status")
 
-	newer.Scheme.AddConversionFuncs(
+	err := newer.Scheme.AddConversionFuncs(
 		// TypeMeta must be split into two objects
 		func(in *newer.TypeMeta, out *TypeMeta, s conversion.Scope) error {
 			out.Kind = in.Kind
@@ -498,5 +501,61 @@ func init() {
 			out.Timestamp = in.Timestamp
 			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
 		},
+
+		// This is triggered for the Memory field of Container.
+		func(in *int64, out *resource.Quantity, s conversion.Scope) error {
+			out.Set(*in)
+			out.Format = resource.BinarySI
+			return nil
+		},
+		func(in *resource.Quantity, out *int64, s conversion.Scope) error {
+			*out = in.Value()
+			return nil
+		},
+
+		// This is triggered by the CPU field of Container.
+		// Note that if we add other int/Quantity conversions my
+		// simple hack (int64=Value(), int=MilliValue()) here won't work.
+		func(in *int, out *resource.Quantity, s conversion.Scope) error {
+			out.SetMilli(int64(*in))
+			out.Format = resource.DecimalSI
+			return nil
+		},
+		func(in *resource.Quantity, out *int, s conversion.Scope) error {
+			*out = int(in.MilliValue())
+			return nil
+		},
+
+		// Convert resource lists.
+		func(in *ResourceList, out *newer.ResourceList, s conversion.Scope) error {
+			*out = newer.ResourceList{}
+			for k, v := range *in {
+				fv, err := strconv.ParseFloat(v.String(), 64)
+				if err != nil {
+					return fmt.Errorf("value '%v' of '%v': %v", v, k, err)
+				}
+				if k == ResourceCPU {
+					(*out)[newer.ResourceCPU] = *resource.NewMilliQuantity(int64(fv*1000), resource.DecimalSI)
+				} else {
+					(*out)[newer.ResourceName(k)] = *resource.NewQuantity(int64(fv), resource.BinarySI)
+				}
+			}
+			return nil
+		},
+		func(in *newer.ResourceList, out *ResourceList, s conversion.Scope) error {
+			*out = ResourceList{}
+			for k, v := range *in {
+				if k == newer.ResourceCPU {
+					(*out)[ResourceCPU] = util.NewIntOrStringFromString(fmt.Sprintf("%v", float64(v.MilliValue())/1000))
+				} else {
+					(*out)[ResourceName(k)] = util.NewIntOrStringFromInt(int(v.Value()))
+				}
+			}
+			return nil
+		},
 	)
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }
