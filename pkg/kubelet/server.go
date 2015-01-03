@@ -325,7 +325,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // serveStats implements stats logic.
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// /stats/<podfullname>/<containerName> or /stats/<podfullname>/<uuid>/<containerName>
+	// /stats/<podfullname>/<containerName> or /stats/<namespace>/<podfullname>/<uuid>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
 	var stats *info.ContainerInfo
 	var err error
@@ -347,23 +347,21 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		// Backward compatibility without uuid information
 		podFullName := GetPodFullName(&api.BoundPod{
 			ObjectMeta: api.ObjectMeta{
-				Name: components[1],
-				// TODO: I am broken
+				Name:        components[1],
 				Namespace:   api.NamespaceDefault,
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 			},
 		})
 		stats, err = s.host.GetContainerInfo(podFullName, "", components[2], &query)
-	case 4:
+	case 5:
 		podFullName := GetPodFullName(&api.BoundPod{
 			ObjectMeta: api.ObjectMeta{
-				Name: components[1],
-				// TODO: I am broken
-				Namespace:   "",
+				Name:        components[2],
+				Namespace:   components[1],
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 			},
 		})
-		stats, err = s.host.GetContainerInfo(podFullName, components[2], components[2], &query)
+		stats, err = s.host.GetContainerInfo(podFullName, components[3], components[4], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return
