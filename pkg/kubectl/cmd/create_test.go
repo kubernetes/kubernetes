@@ -99,7 +99,7 @@ func TestCreateDirectory(t *testing.T) {
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
 			case p == "/ns/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/ns/test/replicationControllers" && m == "POST":
+			case p == "/ns/test/replicationcontrollers" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

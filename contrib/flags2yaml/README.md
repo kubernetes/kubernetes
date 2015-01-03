@@ -4,5 +4,5 @@
 
 ### Usage
 ```
-$ flags2yaml image=dockerfile/nginx | simplegen - | cluster/kubectl.sh createall -f -
+$ flags2yaml image=dockerfile/nginx | simplegen - | cluster/kubectl.sh create -f -
 ```

@@ -92,6 +92,8 @@ func (t *testDescriber) Describe(namespace, name string) (output string, err err
 }
 
 type testFactory struct {
+	Mapper    meta.RESTMapper
+	Typer     runtime.ObjectTyper
 	Client    kubectl.RESTClient
 	Describer kubectl.Describer
 	Printer   kubectl.ResourcePrinter
@@ -103,10 +105,12 @@ func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
 	scheme, mapper, codec := newExternalScheme()
 	t := &testFactory{
 		Validator: validation.NullSchema{},
+		Mapper:    mapper,
+		Typer:     scheme,
 	}
 	return &Factory{
 		Object: func(*cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
-			return mapper, scheme
+			return t.Mapper, t.Typer
 		},
 		RESTClient: func(*cobra.Command, *meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
