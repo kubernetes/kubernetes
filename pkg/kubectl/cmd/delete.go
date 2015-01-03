@@ -23,10 +23,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
+	flags := &struct {
+		Filenames util.StringList
+	}{}
 	cmd := &cobra.Command{
 		Use:   "delete ([-f filename] | (<resource> [(<id> | -l <label>)]",
 		Short: "Delete a resource by filename, stdin or resource and id",
@@ -54,13 +59,18 @@ Examples:
   $ kubectl delete pod 1234-56-7890-234234-456456
   <delete a pod with ID 1234-56-7890-234234-456456>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			filename := GetFlagString(cmd, "filename")
-			schema, err := f.Validator(cmd)
-			checkErr(err)
-			selector := GetFlagString(cmd, "selector")
-			found := 0
 			mapper, typer := f.Object(cmd)
-			ResourcesFromArgsOrFile(cmd, args, filename, selector, typer, mapper, f.RESTClient, schema, true).Visit(func(r *resource.Info) error {
+			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+				ContinueOnError().
+				NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
+				FilenameParam(flags.Filenames...).
+				SelectorParam(GetFlagString(cmd, "selector")).
+				ResourceTypeOrNameArgs(args...).
+				Flatten().
+				Do()
+
+			found := 0
+			r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
 				found++
 				if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
 					return err
@@ -73,7 +83,7 @@ Examples:
 			}
 		},
 	}
-	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to delete the resource")
+	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to a file containing the resource to delete")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }

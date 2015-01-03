@@ -153,3 +153,7 @@ func NewAPIFactory() (*Factory, *testFactory, runtime.Codec) {
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
+
+func stringBody(body string) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+}
