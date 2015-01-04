@@ -157,6 +157,7 @@ func SimpleRunKubelet(etcdClient tools.EtcdClient, dockerClient dockertools.Dock
 		Address:                 util.IP(net.ParseIP(address)),
 		EnableServer:            true,
 		EnableDebuggingHandlers: true,
+		SyncFrequency:           3 * time.Second,
 	}
 	RunKubelet(&kcfg)
 }
