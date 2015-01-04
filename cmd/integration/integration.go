@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -548,6 +549,7 @@ func runServiceTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func main() {
+	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	util.ReallyCrash = true
 	util.InitLogs()
