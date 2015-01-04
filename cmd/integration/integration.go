@@ -173,7 +173,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	schedulerConfigFactory := factory.NewConfigFactory(cl)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
-		glog.Fatal("Couldn't create scheduler config: %v", err)
+		glog.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	scheduler.New(schedulerConfig).Run()
 
