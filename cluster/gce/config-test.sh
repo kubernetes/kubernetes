@@ -20,6 +20,8 @@ GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
+MINION_DISK_TYPE=pd-standard
+MINION_DISK_SIZE=10GB
 NUM_MINIONS=${NUM_MINIONS:-2}
 # TODO(dchen1107): Filed an internal issue to create an alias
 # for containervm image, so that gcloud will expand this

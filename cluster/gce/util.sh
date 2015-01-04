@@ -304,6 +304,8 @@ function create-instance {
       --project "${PROJECT}" \
       --zone "${ZONE}" \
       --machine-type "${MINION_SIZE}" \
+      --boot-disk-type "${MINION_DISK_TYPE}" \
+      --boot-disk-size "${MINION_DISK_SIZE}" \
       --image-project="${IMAGE_PROJECT}" \
       --image "${IMAGE}" \
       --tags "${MINION_TAG}" \
