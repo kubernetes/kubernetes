@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -40,14 +39,6 @@ import (
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
-
-// apiObjectComparer can do semantic deep equality checks for api objects.
-var apiObjectComparer = conversion.EqualitiesOrDie(
-	func(a, b resource.Quantity) bool {
-		// Ignore formatting, only care that numeric value stayed the same.
-		return a.Amount.Cmp(b.Amount) == 0
-	},
-)
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
@@ -181,7 +172,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), source)
 		return
 	}
-	if !apiObjectComparer.DeepEqual(source, obj2) {
+	if !api.Semantic.DeepEqual(source, obj2) {
 		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v", name, util.ObjectGoPrintDiff(source, obj2), codec, string(data), source)
 		return
 	}
@@ -192,7 +183,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}
-	if !apiObjectComparer.DeepEqual(source, obj3) {
+	if !api.Semantic.DeepEqual(source, obj3) {
 		t.Errorf("3: %v: diff: %v\nCodec: %v", name, util.ObjectDiff(source, obj3), codec)
 		return
 	}
@@ -266,7 +257,7 @@ func TestEncode_Ptr(t *testing.T) {
 	if _, ok := obj2.(*api.Pod); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	if !apiObjectComparer.DeepEqual(obj2, pod) {
+	if !api.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &pod, obj2)
 	}
 }
