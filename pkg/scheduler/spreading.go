@@ -41,9 +41,11 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister
 	var pods []api.Pod
 	var err error
 
-	service, err := s.serviceLister.GetPodService(pod)
+	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
-		selector := labels.SelectorFromSet(service.Spec.Selector)
+		// just use the first service and get the other pods within the service
+		// TODO: a separate predicate can be created that tries to handle all services for the pod
+		selector := labels.SelectorFromSet(services[0].Spec.Selector)
 		pods, err = podLister.ListPods(selector)
 		if err != nil {
 			return nil, err
@@ -94,13 +96,13 @@ func NewServiceAntiAffinityPriority(serviceLister ServiceLister, label string) P
 }
 
 func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	var service api.Service
 	var pods []api.Pod
-	var err error
 
-	service, err = s.serviceLister.GetPodService(pod)
+	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
-		selector := labels.SelectorFromSet(service.Spec.Selector)
+		// just use the first service and get the other pods within the service
+		// TODO: a separate predicate can be created that tries to handle all services for the pod
+		selector := labels.SelectorFromSet(services[0].Spec.Selector)
 		pods, err = podLister.ListPods(selector)
 		if err != nil {
 			return nil, err
@@ -112,43 +114,41 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podList
 		return nil, err
 	}
 
-	// find the zones that the minions belong to
-	openMinions := []string{}
-	zonedMinions := map[string]string{}
+	// separate out the minions that have the label from the ones that don't
+	otherMinions := []string{}
+	labeledMinions := map[string]string{}
 	for _, minion := range minions.Items {
 		if labels.Set(minion.Labels).Has(s.label) {
-			zone := labels.Set(minion.Labels).Get(s.label)
-			zonedMinions[minion.Name] = zone
+			label := labels.Set(minion.Labels).Get(s.label)
+			labeledMinions[minion.Name] = label
 		} else {
-			openMinions = append(openMinions, minion.Name)
+			otherMinions = append(otherMinions, minion.Name)
 		}
 	}
 
 	podCounts := map[string]int{}
-	numServicePods := len(pods)
-	if numServicePods > 0 {
-		for _, pod := range pods {
-			zone, exists := zonedMinions[pod.Status.Host]
-			if !exists {
-				continue
-			}
-			podCounts[zone]++
+	for _, pod := range pods {
+		zone, exists := labeledMinions[pod.Status.Host]
+		if !exists {
+			continue
 		}
+		podCounts[zone]++
 	}
 
+	numServicePods := len(pods)
 	result := []HostPriority{}
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
-	for minion := range zonedMinions {
+	for minion := range labeledMinions {
 		// initializing to the default/max minion score of 10
 		fScore := float32(10)
 		if numServicePods > 0 {
-			fScore = 10 * (float32(numServicePods-podCounts[zonedMinions[minion]]) / float32(numServicePods))
+			fScore = 10 * (float32(numServicePods-podCounts[labeledMinions[minion]]) / float32(numServicePods))
 		}
 		result = append(result, HostPriority{host: minion, score: int(fScore)})
 	}
 	// add the open minions with a score of 0
-	for _, minion := range openMinions {
+	for _, minion := range otherMinions {
 		result = append(result, HostPriority{host: minion, score: 0})
 	}
 

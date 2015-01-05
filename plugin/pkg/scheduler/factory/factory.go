@@ -238,8 +238,9 @@ func (s *storeToServiceLister) ListServices() (services api.ServiceList, err err
 	return services, nil
 }
 
-func (s *storeToServiceLister) GetPodService(pod api.Pod) (service api.Service, err error) {
+func (s *storeToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
+	var service api.Service
 
 	for _, m := range s.List() {
 		service = *m.(*api.Service)
@@ -249,10 +250,14 @@ func (s *storeToServiceLister) GetPodService(pod api.Pod) (service api.Service, 
 		}
 		selector = labels.Set(service.Spec.Selector).AsSelector()
 		if selector.Matches(labels.Set(pod.Labels)) {
-			return service, nil
+			services = append(services, service)
 		}
 	}
-	return service, fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	if len(services) == 0 {
+		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+
+	return
 }
 
 // Len returns the number of items in the node list.

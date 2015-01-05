@@ -182,7 +182,12 @@ func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) FitPre
 	return labelChecker.CheckNodeLabelPresence
 }
 
-// CheckNodeLabelPresence checks whether a particular label exists on a minion or not, regardless of its value
+// CheckNodeLabelPresence checks whether all of the specified labels exists on a minion or not, regardless of their value
+// If "presence" is false, then returns false if any of the requested labels matches any of the minion's labels,
+// otherwise returns true.
+// If "presence" is true, then returns false if any of the requested labels does not match any of the minion's labels,
+// otherwise returns true.
+//
 // Consider the cases where the minions are placed in regions/zones/racks and these are identified by labels
 // In some cases, it is required that only minions that are part of ANY of the defined regions/zones/racks be selected
 //
@@ -195,8 +200,9 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod api.Pod, existingPods []ap
 	if err != nil {
 		return false, err
 	}
+	minionLabels := labels.Set(minion.Labels)
 	for _, label := range n.labels {
-		exists = labels.Set(minion.Labels).Has(label)
+		exists = minionLabels.Has(label)
 		if (exists && !n.presence) || (!exists && n.presence) {
 			return false, nil
 		}
@@ -221,15 +227,20 @@ func NewServiceAffinityPredicate(podLister PodLister, serviceLister ServiceListe
 	return affinity.CheckServiceAffinity
 }
 
+// CheckServiceAffinity ensures that only the minions that match the specified labels are considered for scheduling.
+// The set of labels to be considered are provided to the struct (ServiceAffinity).
+// The pod is checked for the labels and any missing labels are then checked in the minion
+// that hosts the service pods (peers) for the given pod.
 func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	var affinitySelector labels.Selector
 
-	// check if the pod being scheduled has the affinity labels specified
+	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
 	affinityLabels := map[string]string{}
+	nodeSelector := labels.Set(pod.Spec.NodeSelector)
 	labelsExist := true
 	for _, l := range s.labels {
-		if labels.Set(pod.Labels).Has(l) {
-			affinityLabels[l] = labels.Set(pod.Labels).Get(l)
+		if nodeSelector.Has(l) {
+			affinityLabels[l] = nodeSelector.Get(l)
 		} else {
 			// the current pod does not specify all the labels, look in the existing service pods
 			labelsExist = false
@@ -238,9 +249,11 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.P
 
 	// skip looking at other pods in the service if the current pod defines all the required affinity labels
 	if !labelsExist {
-		service, err := s.serviceLister.GetPodService(pod)
+		services, err := s.serviceLister.GetPodServices(pod)
 		if err == nil {
-			selector := labels.SelectorFromSet(service.Spec.Selector)
+			// just use the first service and get the other pods within the service
+			// TODO: a separate predicate can be created that tries to handle all services for the pod
+			selector := labels.SelectorFromSet(services[0].Spec.Selector)
 			servicePods, err := s.podLister.ListPods(selector)
 			if err != nil {
 				return false, err

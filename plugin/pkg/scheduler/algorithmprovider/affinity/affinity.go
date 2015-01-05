@@ -23,24 +23,34 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 )
 
-const Provider string = "AffinityProvider"
+const AffinityProvider string = "AffinityProvider"
 
 func init() {
-	factory.RegisterAlgorithmProvider(Provider, defaultPredicates(), defaultPriorities())
+	factory.RegisterAlgorithmProvider(AffinityProvider, affinityPredicates(), affinityPriorities())
 }
 
-func defaultPredicates() util.StringSet {
+func affinityPredicates() util.StringSet {
 	return util.NewStringSet(
-		// Fit is defined based on whether the minion has the specified label values as the pod being scheduled
-		// Alternately, if the pod does not specify any/all labels, the other pods in the service are looked at
+		"HostName",
+		"MatchNodeSelector",
+		"PodFitsPorts",
+		"PodFitsResources",
+		"NoDiskConflict",
+		// Ensures that all pods within the same service are hosted on minions within the same region as defined by the "region" label
 		factory.RegisterFitPredicate("ServiceAffinity", algorithm.NewServiceAffinityPredicate(factory.PodLister, factory.ServiceLister, factory.MinionLister, []string{"region"})),
+		// Fit is defined based on the presence/absence of the "region" label on a minion, regardless of value.
+		factory.RegisterFitPredicate("NodeLabelPredicate", algorithm.NewNodeLabelPredicate(factory.MinionLister, []string{"region"}, true)),
 	)
 }
 
-func defaultPriorities() util.StringSet {
+func affinityPriorities() util.StringSet {
 	return util.NewStringSet(
+		"LeastRequestedPriority",
+		"ServiceSpreadingPriority",
 		// spreads pods belonging to the same service across minions in different zones
 		// region and zone can be nested infrastructure topology levels and defined by labels on minions
-		factory.RegisterPriorityFunction("ZoneSpreadingPriority", algorithm.NewServiceAntiAffinityPriority(factory.ServiceLister, "zone"), 1),
+		factory.RegisterPriorityFunction("ZoneSpreadingPriority", algorithm.NewServiceAntiAffinityPriority(factory.ServiceLister, "zone"), 2),
+		// Prioritize nodes based on the presence/absence of a label on a minion, regardless of value.
+		factory.RegisterPriorityFunction("NodeLabelPriority", algorithm.NewNodeLabelPriority("zone", true), 1),
 	)
 }

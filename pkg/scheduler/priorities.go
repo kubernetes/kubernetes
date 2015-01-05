@@ -103,9 +103,9 @@ func NewNodeLabelPriority(label string, presence bool) PriorityFunction {
 	return labelPrioritizer.CalculateNodeLabelPriority
 }
 
-// CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value
-// Consider the cases where the minions are places in regions/zones/racks and these are identified by labels
-// In some cases, it is required that only minions that are part of ANY of the defined regions/zones/racks be selected
+// CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value.
+// If presence is true, prioritizes minions that have the specified label, regardless of value.
+// If presence is false, prioritizes minions that do not have the specified label.
 func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var score int
 	minions, err := minionLister.List()
@@ -113,7 +113,6 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod api.Pod, podLister
 		return nil, err
 	}
 
-	// find the zones that the minions belong to
 	labeledMinions := map[string]bool{}
 	for _, minion := range minions.Items {
 		exists := labels.Set(minion.Labels).Has(n.label)

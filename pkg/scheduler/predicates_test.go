@@ -502,14 +502,14 @@ func TestServiceAffinity(t *testing.T) {
 			test:   "nothing scheduled",
 		},
 		{
-			pod:    api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"region": "r1"}}},
+			pod:    api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r1"}}},
 			node:   "machine1",
 			fits:   true,
 			labels: []string{"region"},
 			test:   "pod with region label match",
 		},
 		{
-			pod:    api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"region": "r2"}}},
+			pod:    api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r2"}}},
 			node:   "machine1",
 			fits:   false,
 			labels: []string{"region"},

@@ -59,8 +59,8 @@ func (f FakePodLister) List(s labels.Selector) (selected []api.Pod, err error) {
 type ServiceLister interface {
 	// Lists all the services
 	ListServices() (api.ServiceList, error)
-	// Gets the service for the given pod
-	GetPodService(api.Pod) (api.Service, error)
+	// Gets the services for the given pod
+	GetPodServices(api.Pod) ([]api.Service, error)
 }
 
 // FakeServiceLister implements ServiceLister on []api.Service for test purposes.
@@ -71,10 +71,8 @@ func (f FakeServiceLister) ListServices() (api.ServiceList, error) {
 	return api.ServiceList{Items: f}, nil
 }
 
-// GetPodService gets the service that has the selector that can match the labels on the given pod
-// We are assuming a single service per pod.
-// In case of multiple services per pod, the first service found is returned
-func (f FakeServiceLister) GetPodService(pod api.Pod) (service api.Service, err error) {
+// GetPodServices gets the services that have the selector that match the labels on the given pod
+func (f FakeServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
 
 	for _, service := range f {
@@ -84,8 +82,12 @@ func (f FakeServiceLister) GetPodService(pod api.Pod) (service api.Service, err 
 		}
 		selector = labels.Set(service.Spec.Selector).AsSelector()
 		if selector.Matches(labels.Set(pod.Labels)) {
-			return service, nil
+			services = append(services, service)
 		}
 	}
-	return service, fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	if len(services) == 0 {
+		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+
+	return
 }
