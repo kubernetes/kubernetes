@@ -61,7 +61,7 @@ cassandra           cassandra           kubernetes/cassandra   kubernetes-minion
 
 
 ### Adding a Cassandra Service
-In Kubernetes a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
+In Kubernetes a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
 ```yaml
@@ -74,7 +74,7 @@ selector:
   name: cassandra
 ```
 
-The important thing to note here is the ```selector``` a label selector is a query that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
+The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=cassandra```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
 Create this service as follows:
 ```sh
