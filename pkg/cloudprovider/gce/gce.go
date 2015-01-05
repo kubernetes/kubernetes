@@ -28,13 +28,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+
 	"code.google.com/p/goauth2/compute/serviceaccount"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	container "code.google.com/p/google-api-go-client/container/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -338,11 +338,12 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	return instances, nil
 }
 
-func makeResources(cpu float32, memory float32) *api.NodeResources {
+// cpu is in cores, memory is in GiB
+func makeResources(cpu float64, memory float64) *api.NodeResources {
 	return &api.NodeResources{
 		Capacity: api.ResourceList{
-			resources.CPU:    util.NewIntOrStringFromInt(int(cpu * 1000)),
-			resources.Memory: util.NewIntOrStringFromInt(int(memory * 1024 * 1024 * 1024)),
+			api.ResourceCPU:    *resource.NewMilliQuantity(int64(cpu*1000), resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(int64(memory*1024*1024*1024), resource.BinarySI),
 		},
 	}
 }
@@ -359,6 +360,7 @@ func (gce *GCECloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO: actually read machine size instead of this awful hack.
 	switch canonicalizeMachineType(res.MachineType) {
 	case "f1-micro":
 		return makeResources(1, 0.6), nil

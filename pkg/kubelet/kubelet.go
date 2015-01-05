@@ -398,7 +398,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
-func milliCPUToShares(milliCPU int) int {
+func milliCPUToShares(milliCPU int64) int64 {
 	if milliCPU == 0 {
 		// zero milliCPU means unset. Use kernel default.
 		return 0
@@ -537,8 +537,8 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			ExposedPorts: exposedPorts,
 			Hostname:     pod.Name,
 			Image:        container.Image,
-			Memory:       int64(container.Memory),
-			CPUShares:    int64(milliCPUToShares(container.CPU)),
+			Memory:       container.Memory.Value(),
+			CPUShares:    milliCPUToShares(container.CPU.MilliValue()),
 			WorkingDir:   container.WorkingDir,
 		},
 	}

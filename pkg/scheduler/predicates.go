@@ -22,7 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/golang/glog"
 )
 
@@ -89,15 +88,15 @@ type ResourceFit struct {
 }
 
 type resourceRequest struct {
-	milliCPU int
-	memory   int
+	milliCPU int64
+	memory   int64
 }
 
 func getResourceRequest(pod *api.Pod) resourceRequest {
 	result := resourceRequest{}
 	for ix := range pod.Spec.Containers {
-		result.memory += pod.Spec.Containers[ix].Memory
-		result.milliCPU += pod.Spec.Containers[ix].CPU
+		result.memory += pod.Spec.Containers[ix].Memory.Value()
+		result.milliCPU += pod.Spec.Containers[ix].CPU.MilliValue()
 	}
 	return result
 }
@@ -113,17 +112,16 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	if err != nil {
 		return false, err
 	}
-	milliCPURequested := 0
-	memoryRequested := 0
+	milliCPURequested := int64(0)
+	memoryRequested := int64(0)
 	for ix := range existingPods {
 		existingRequest := getResourceRequest(&existingPods[ix])
 		milliCPURequested += existingRequest.milliCPU
 		memoryRequested += existingRequest.memory
 	}
 
-	// TODO: convert to general purpose resource matching, when pods ask for resources
-	totalMilliCPU := int(resources.GetFloatResource(info.Spec.Capacity, resources.CPU, 0) * 1000)
-	totalMemory := resources.GetIntegerResource(info.Spec.Capacity, resources.Memory, 0)
+	totalMilliCPU := info.Spec.Capacity.Get(api.ResourceCPU).MilliValue()
+	totalMemory := info.Spec.Capacity.Get(api.ResourceMemory).Value()
 
 	fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 	fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
