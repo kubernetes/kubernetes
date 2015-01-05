@@ -116,3 +116,41 @@ Which exact stateful applications are TBD. Candidates include:
 6. Export monitoring metrics (instrumentation)
 7. Bounded disk space on master and kubelets
   1. GC of unused images
+
+# Reliability
+## Current pain points:
+* Writing end-to-end tests should be made easier e.g. not rely so much (or at all) on scripting and as much as possible be written in Go using appropriate frameworks to make it easy to get started with an end-to-end test.
+* A developer should be able to take an integration test and turn it into an end to end test (and vice versa) without needing to significantly rewrite the test.
+* Some e2e tests currently have false positives (they pass when they should not). 
+* It is unclear whether our e2e tests are representative of real workloads. 
+* We need to make sure other providers stay healthy as we submit code. Breakages for most providers are found too late.
+* Previously discussed: a public dashboard that receives updates from platform maintainers and shows green/red e2e results for each provider per-PR or per-hour or something.
+* It is very challenging to bring up large clusters. For example, for GCE, operations that create routes, firewall rules and instances can fail and need to be robustly retried.
+* We have no current means to measure the reliability of long running clusters and our current test infrastructure isn’t well suited to this use case.
+* We have little or no instrumentation of the various components - memory and CPU usage, time per operation, QPS, etc.
+Reliability Goals:
+* Automated flow that uses exactly the same source for end-to-end etc. tests from GitHub which can be regularly run (hourly, at commit time etc.) to ensure none of the providers are broken. Comment from Zach: “I think this is "none of the providers we directly support are broken" (GCE, maybe some local, maybe others). The traditional OSS model is that vendors (OpenShift for instance) handle their own downstream testing, unless they're willing to work fully upstream.”
+* Dashboard or some other form of storing and querying historical build information.
+
+## Work Items
+
+* Issue [#3130](https://github.com/GoogleCloudPlatform/kubernetes/issues/3130) Rewrite the remaining e2e bash tests in Go. Whilst doing so, reduce/remove the cases where the tests were incorrectly passing.
+* Issue [#3131](https://github.com/GoogleCloudPlatform/kubernetes/issues/3131) Refactor the Go e2e tests to use a test framework (ideally just http://golang.org/pkg/testing/ with some extra bits to make sure the cluster is in the right state at the start of the tests). Try to consolidate on a test framework that works the same for integration and e2e tests.
+* Issue [#3132](https://github.com/GoogleCloudPlatform/kubernetes/issues/3132) Refactor the e2e tests to allow multiple concurrent runs (assuming it is supported by the cloud provider).
+Allow the client to be authenticated to multiple clusters (https://github.com/GoogleCloudPlatform/kubernetes/issues/1755)
+* [PR #3046 - done!] Create a GKE cloud provider.
+* Issue [#2234](https://github.com/GoogleCloudPlatform/kubernetes/issues/2234) Create an integration test dashboard
+* For each supported cloud provider, ensure that we run the e2e tests regularly and fix any breaks
+* [done] Setup Jenkins to run on VM/cluster of VMs in GCE. 
+* Should have separate projects/flows for testing against different vendors.
+* Shared configuration with other GCE projects for vendor specific tests (GKE will need this).
+* Issue [#3134](https://github.com/GoogleCloudPlatform/kubernetes/issues/3134) Jenkis should produce build artifacts and push to gcs ~hourly. Ideally we can use this to build and push a ‘continuous’ or ‘latest-dev’ bucket to the official gcs kubernetes-release bucket.
+* Issue [#2953]((https://github.com/GoogleCloudPlatform/kubernetes/issues/2953) [zml] Capability bits: I proposed this last week, I still need to write up an issue on it. The idea is that along with the API version (and server version?), the server communicates a bucket of tags that says "I support these capabilities". Then tests like pd.sh can stop being conditionalized on provider and can instead be conditionalized on server capability. Want to get this filed/done before v1beta3, and has testing impact. (Zach edit: The I’s here are me.)
+* Stress testing as a Jenkins job using a large-ish number of VMs.
+* Issue [#3135](https://github.com/GoogleCloudPlatform/kubernetes/issues/3135) [zml] Upgrade testing: Related to the previous, but you could write an entire doc on upgrade testing alone. I think we're going to need a story here, and it's actually a long one. We need to get a pretty good handle on upgrade/release policy, versions we're going to keep around (OSS-wise, GKE-wise, etc), versions we're going to allow upgrade between, etc. (I volunteer to help pin people down here - I think the release process is getting driven elsewhere but this is a crossbar item between that group and us that's pretty important). (Zach edit: The I’s here are me.)
+* Issue [#3136](https://github.com/GoogleCloudPlatform/kubernetes/issues/3136) Create a compatibility test matrix. Verify that an old client works with a new server, different api versions, etc.
+* Issue [#3137](https://github.com/GoogleCloudPlatform/kubernetes/issues/3137) Create a soak test. 
+* [satnam] Sometimes builds fail after an update and require a build/make-clean.sh. We should ensure that tests, builds etc. get cleaned up properly.
+* Issue [#3138](https://github.com/GoogleCloudPlatform/kubernetes/issues/3138) [davidopp] A way to record a real workload and replay it deterministically
+* Issue [#3139](https://github.com/GoogleCloudPlatform/kubernetes/issues/3139) [davidopp] A way to generate a synthetic workload and play it
+* Issue [#2852](https://github.com/GoogleCloudPlatform/kubernetes/issues/2852) and Issue [#3067](https://github.com/GoogleCloudPlatform/kubernetes/issues/3067) [vishnuk] Protect system services against kernel OOM kills and resource starvation. 
