@@ -22,7 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-const ConfigSourceAnnotationKey = "kubernetes/config.source"
+const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int

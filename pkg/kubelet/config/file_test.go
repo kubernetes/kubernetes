@@ -21,20 +21,19 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-
-	"github.com/ghodss/yaml"
 )
 
 func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 	manifest := api.ContainerManifest{
 		ID:   id,
-		UUID: "uid",
+		UUID: id,
 		Containers: []api.Container{
 			{
 				Name:  "c" + id,
@@ -53,9 +52,8 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 	}
 	expectedPod := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      id,
-			UID:       "uid",
-			Namespace: "default",
+			Name: id,
+			UID:  id,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -116,7 +114,13 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 }
 
 func TestReadFromFile(t *testing.T) {
-	file := writeTestFile(t, os.TempDir(), "test_pod_config", "version: v1beta1\nid: test\ncontainers:\n- image: test/image")
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta1",
+			"uuid": "12345",
+			"id": "test",
+			"containers": [{ "image": "test/image" }]
+		}`)
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{})
@@ -127,16 +131,53 @@ func TestReadFromFile(t *testing.T) {
 		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "test",
-				UID:       simpleSubdomainSafeHash(file.Name()),
-				Namespace: "default",
-				SelfLink:  "/api/v1beta2/pods/test?namespace=default",
+				UID:       "12345",
+				Namespace: "",
+				SelfLink:  "",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{{Image: "test/image", TerminationMessagePath: "/dev/termination-log"}},
 			},
 		})
+
+		// There's no way to provide namespace in ContainerManifest, so
+		// it will be defaulted.
+		if !strings.HasPrefix(update.Pods[0].ObjectMeta.Namespace, "file-") {
+			t.Errorf("Unexpected namespace: %s", update.Pods[0].ObjectMeta.Namespace)
+		}
+		update.Pods[0].ObjectMeta.Namespace = ""
+
+		// SelfLink depends on namespace.
+		if !strings.HasPrefix(update.Pods[0].ObjectMeta.SelfLink, "/api/") {
+			t.Errorf("Unexpected selflink: %s", update.Pods[0].ObjectMeta.SelfLink)
+		}
+		update.Pods[0].ObjectMeta.SelfLink = ""
+
 		if !api.Semantic.DeepEqual(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadFromFileWithDefaults(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta1",
+			"id": "test",
+			"containers": [{ "image": "test/image" }]
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		if update.Pods[0].ObjectMeta.UID == "" {
+			t.Errorf("Unexpected UID: %s", update.Pods[0].ObjectMeta.UID)
 		}
 
 	case <-time.After(2 * time.Millisecond):
@@ -155,30 +196,6 @@ func TestExtractFromBadDataFile(t *testing.T) {
 		t.Fatalf("Expected error")
 	}
 	expectEmptyChannel(t, ch)
-}
-
-func TestExtractFromValidDataFile(t *testing.T) {
-	manifest, expectedPod := ExampleManifestAndPod("id")
-
-	text, err := json.Marshal(manifest)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
-	defer os.Remove(file.Name())
-
-	expectedPod.ObjectMeta.SelfLink = "/api/v1beta2/pods/" + expectedPod.Name + "?namespace=default"
-	ch := make(chan interface{}, 1)
-	c := sourceFile{file.Name(), ch}
-	err = c.extractFromPath()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, expectedPod)
-	if !api.Semantic.DeepEqual(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
 }
 
 func TestExtractFromEmptyDir(t *testing.T) {
@@ -233,7 +250,6 @@ func TestExtractFromDir(t *testing.T) {
 		}
 		ioutil.WriteFile(name, data, 0755)
 		files[i] = file
-		pods[i].ObjectMeta.SelfLink = "/api/v1beta2/pods/" + pods[i].Name + "?namespace=default"
 	}
 
 	ch := make(chan interface{}, 1)
@@ -244,7 +260,14 @@ func TestExtractFromDir(t *testing.T) {
 	}
 
 	update := (<-ch).(kubelet.PodUpdate)
+	for i := range update.Pods {
+		update.Pods[i].Namespace = "foobar"
+		update.Pods[i].SelfLink = ""
+	}
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, pods...)
+	for i := range expected.Pods {
+		expected.Pods[i].Namespace = "foobar"
+	}
 	sort.Sort(sortedPods(update.Pods))
 	sort.Sort(sortedPods(expected.Pods))
 	if !api.Semantic.DeepEqual(expected, update) {
@@ -255,61 +278,4 @@ func TestExtractFromDir(t *testing.T) {
 			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
 		}
 	}
-}
-
-func TestSubdomainSafeName(t *testing.T) {
-	type Case struct {
-		Input    string
-		Expected string
-	}
-	testCases := []Case{
-		{"/some/path/invalidUPPERCASE", "invaliduppercasa6hlenc0vpqbbdtt26ghneqsq3pvud"},
-		{"/some/path/_-!%$#&@^&*(){}", "nvhc03p016m60huaiv3avts372rl2p"},
-	}
-	for _, testCase := range testCases {
-		value := simpleSubdomainSafeHash(testCase.Input)
-		if value != testCase.Expected {
-			t.Errorf("Expected %s, Got %s", testCase.Expected, value)
-		}
-		value2 := simpleSubdomainSafeHash(testCase.Input)
-		if value != value2 {
-			t.Errorf("Value for %s was not stable across runs: %s %s", testCase.Input, value, value2)
-		}
-	}
-}
-
-// These are used for testing extract json (below)
-type TestData struct {
-	Value  string
-	Number int
-}
-
-type TestObject struct {
-	Name string
-	Data TestData
-}
-
-func verifyStringEquals(t *testing.T, actual, expected string) {
-	if actual != expected {
-		t.Errorf("Verification failed.  Expected: %s, Found %s", expected, actual)
-	}
-}
-
-func verifyIntEquals(t *testing.T, actual, expected int) {
-	if actual != expected {
-		t.Errorf("Verification failed.  Expected: %d, Found %d", expected, actual)
-	}
-}
-
-func TestExtractJSON(t *testing.T) {
-	obj := TestObject{}
-	data := `{ "name": "foo", "data": { "value": "bar", "number": 10 } }`
-
-	if err := yaml.Unmarshal([]byte(data), &obj); err != nil {
-		t.Fatalf("Could not unmarshal JSON: %v", err)
-	}
-
-	verifyStringEquals(t, obj.Name, "foo")
-	verifyStringEquals(t, obj.Data.Value, "bar")
-	verifyIntEquals(t, obj.Data.Number, 10)
 }

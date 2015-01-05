@@ -44,14 +44,14 @@ func TestEventToPods(t *testing.T) {
 			input: watch.Event{
 				Object: &api.BoundPods{
 					Items: []api.BoundPod{
-						{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-						{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+						{ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: "foo"}},
+						{ObjectMeta: api.ObjectMeta{UID: "222", Name: "bar", Namespace: "bar"}},
 					},
 				},
 			},
 			pods: []api.BoundPod{
-				{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "default"}, Spec: api.PodSpec{}},
-				{ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "default"}, Spec: api.PodSpec{}},
+				{ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: "foo"}, Spec: api.PodSpec{}},
+				{ObjectMeta: api.ObjectMeta{UID: "222", Name: "bar", Namespace: "bar"}, Spec: api.PodSpec{}},
 			},
 			fail: false,
 		},
@@ -59,14 +59,12 @@ func TestEventToPods(t *testing.T) {
 			input: watch.Event{
 				Object: &api.BoundPods{
 					Items: []api.BoundPod{
-						{ObjectMeta: api.ObjectMeta{Name: "1"}},
-						{ObjectMeta: api.ObjectMeta{Name: "2", Namespace: "foo"}},
+						{ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo"}},
 					},
 				},
 			},
 			pods: []api.BoundPod{
-				{ObjectMeta: api.ObjectMeta{Name: "1", Namespace: "default"}, Spec: api.PodSpec{}},
-				{ObjectMeta: api.ObjectMeta{Name: "2", Namespace: "foo"}, Spec: api.PodSpec{}},
+				{ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: "default"}, Spec: api.PodSpec{}},
 			},
 			fail: false,
 		},

@@ -19,7 +19,10 @@ package config
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"hash/adler32"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -93,9 +96,7 @@ func (s *sourceURL) extractFromURL() error {
 		if err := api.Scheme.Convert(&manifest, &pod); err != nil {
 			return err
 		}
-		if len(pod.Namespace) == 0 {
-			pod.Namespace = api.NamespaceDefault
-		}
+		applyDefaults(&pod, s.url)
 		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
@@ -130,12 +131,7 @@ func (s *sourceURL) extractFromURL() error {
 		}
 		for i := range boundPods.Items {
 			pod := &boundPods.Items[i]
-			if len(pod.Name) == 0 {
-				pod.Name = fmt.Sprintf("%d", i+1)
-			}
-			if len(pod.Namespace) == 0 {
-				pod.Namespace = api.NamespaceDefault
-			}
+			applyDefaults(pod, s.url)
 		}
 		s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET, kubelet.HTTPSource}
 		return nil
@@ -144,4 +140,20 @@ func (s *sourceURL) extractFromURL() error {
 	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
 		"single manifest (%v: %+v) or as multiple manifests (%v: %+v).\n",
 		s.url, string(data), singleErr, manifest, multiErr, manifests)
+}
+
+func applyDefaults(pod *api.BoundPod, url string) {
+	if len(pod.UID) == 0 {
+		hasher := md5.New()
+		fmt.Fprintf(hasher, "url:%s", url)
+		util.DeepHashObject(hasher, pod)
+		pod.UID = hex.EncodeToString(hasher.Sum(nil)[0:])
+		glog.V(5).Infof("Generated UID %q for pod %q from URL %s", pod.UID, pod.Name, url)
+	}
+	if len(pod.Namespace) == 0 {
+		hasher := adler32.New()
+		fmt.Fprint(hasher, url)
+		pod.Namespace = fmt.Sprintf("url-%08x", hasher.Sum32())
+		glog.V(5).Infof("Generated namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
+	}
 }

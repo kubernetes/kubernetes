@@ -18,15 +18,14 @@ limitations under the License.
 package config
 
 import (
-	"crypto/sha1"
-	"encoding/base32"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"hash/adler32"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -155,11 +154,27 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
 	}
 
+	hostname, err := os.Hostname() //TODO: kubelet name would be better
+	if err != nil {
+		return pod, err
+	}
+
 	if len(pod.UID) == 0 {
-		pod.UID = simpleSubdomainSafeHash(filename)
+		hasher := md5.New()
+		fmt.Fprintf(hasher, "host:%s", hostname)
+		fmt.Fprintf(hasher, "file:%s", filename)
+		util.DeepHashObject(hasher, pod)
+		pod.UID = hex.EncodeToString(hasher.Sum(nil)[0:])
+		glog.V(5).Infof("Generated UID %q for pod %q from file %s", pod.UID, pod.Name, filename)
 	}
 	if len(pod.Namespace) == 0 {
-		pod.Namespace = api.NamespaceDefault
+		hasher := adler32.New()
+		fmt.Fprint(hasher, filename)
+		// TODO: file-<sum>.hostname would be better, if DNS subdomains
+		// are allowed for namespace (some places only allow DNS
+		// labels).
+		pod.Namespace = fmt.Sprintf("file-%08x-%s", hasher.Sum32(), hostname)
+		glog.V(5).Infof("Generated namespace %q for pod %q from file %s", pod.Namespace, pod.Name, filename)
 	}
 	// TODO(dchen1107): BoundPod is not type of runtime.Object. Once we allow kubelet talks
 	// about Pod directly, we can use SelfLinker defined in package: latest
@@ -173,18 +188,4 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		glog.V(1).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.Name, pod.UID)
 	}
 	return pod, nil
-}
-
-var simpleSubdomainSafeEncoding = base32.NewEncoding("0123456789abcdefghijklmnopqrstuv")
-var unsafeDNSLabelReplacement = regexp.MustCompile("[^a-z0-9]+")
-
-// simpleSubdomainSafeHash generates a pod name for the given path that is
-// suitable as a subdomain label.
-func simpleSubdomainSafeHash(path string) string {
-	name := strings.ToLower(filepath.Base(path))
-	name = unsafeDNSLabelReplacement.ReplaceAllString(name, "")
-	hasher := sha1.New()
-	hasher.Write([]byte(path))
-	sha := simpleSubdomainSafeEncoding.EncodeToString(hasher.Sum(nil))
-	return fmt.Sprintf("%.15s%.30s", name, sha)
 }

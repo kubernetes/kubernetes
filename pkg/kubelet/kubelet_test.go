@@ -291,19 +291,20 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	container := api.Container{Name: "bar"}
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
-			// format is k8s_<container-id>_<pod-fullname>
-			Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo.new.test"},
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
+			Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo.new.test_12345678_0"},
 			ID:    "1234",
 		},
 		{
 			// network container
-			Names: []string{"/k8s_net_foo.new.test_"},
+			Names: []string{"/k8s_net_foo.new.test_12345678_0"},
 			ID:    "9876",
 		},
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -476,13 +477,14 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// network container
-			Names: []string{"/k8s_net_foo.new.test_"},
+			Names: []string{"/k8s_net_foo.new.test_12345678_0"},
 			ID:    "9876",
 		},
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -517,13 +519,14 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// network container
-			Names: []string{"/k8s_net_foo.new.test_"},
+			Names: []string{"/k8s_net_foo.new.test_12345678_0"},
 			ID:    "9876",
 		},
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -569,14 +572,15 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 	kubelet, _, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
-			// format is k8s_<container-id>_<pod-fullname>
-			Names: []string{"/k8s_bar_foo.new.test"},
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_bar_foo.new.test_12345678_0"},
 			ID:    "1234",
 		},
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -694,17 +698,17 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.test_1"},
+			Names: []string{"/k8s_foo_bar.new.test_12345678_1111"},
 			ID:    "1234",
 		},
 		"9876": &docker.APIContainers{
 			// network container
-			Names: []string{"/k8s_net_bar.new.test_"},
+			Names: []string{"/k8s_net_bar.new.test_12345678_2222"},
 			ID:    "9876",
 		},
 		"4567": &docker.APIContainers{
 			// Duplicate for the same container.
-			Names: []string{"/k8s_foo_bar.new.test_2"},
+			Names: []string{"/k8s_foo_bar.new.test_12345678_3333"},
 			ID:    "4567",
 		},
 		"2304": &docker.APIContainers{
@@ -715,6 +719,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	}
 	err := kubelet.syncPod(&api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
+			UID:         "12345678",
 			Name:        "bar",
 			Namespace:   "new",
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -732,7 +737,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"list", "stop"})
 
 	// Expect one of the duplicates to be killed.
-	if len(fakeDocker.Stopped) != 1 || (len(fakeDocker.Stopped) != 0 && fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
+	if len(fakeDocker.Stopped) != 1 || (fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 }

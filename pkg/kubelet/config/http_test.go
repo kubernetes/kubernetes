@@ -19,6 +19,7 @@ package config
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
@@ -121,13 +123,14 @@ func TestExtractFromHTTP(t *testing.T) {
 	}{
 		{
 			desc:      "Single manifest",
-			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
+			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo", UUID: "111"},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
 				api.BoundPod{
 					ObjectMeta: api.ObjectMeta{
+						UID:       "111",
 						Name:      "foo",
-						Namespace: "default",
+						Namespace: "foobar",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -138,15 +141,16 @@ func TestExtractFromHTTP(t *testing.T) {
 		{
 			desc: "Multiple manifests",
 			manifests: []api.ContainerManifest{
-				{Version: "v1beta1", ID: "", Containers: []api.Container{{Name: "1", Image: "foo"}}},
-				{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				{Version: "v1beta1", ID: "foo", UUID: "111", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				{Version: "v1beta1", ID: "bar", UUID: "222", Containers: []api.Container{{Name: "1", Image: "foo"}}},
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
 				api.BoundPod{
 					ObjectMeta: api.ObjectMeta{
-						Name:      "1",
-						Namespace: "default",
+						UID:       "111",
+						Name:      "foo",
+						Namespace: "foobar",
 					},
 					Spec: api.PodSpec{
 						Containers: []api.Container{{
@@ -157,8 +161,9 @@ func TestExtractFromHTTP(t *testing.T) {
 				},
 				api.BoundPod{
 					ObjectMeta: api.ObjectMeta{
+						UID:       "222",
 						Name:      "bar",
-						Namespace: "default",
+						Namespace: "foobar",
 					},
 					Spec: api.PodSpec{
 						Containers: []api.Container{{
@@ -192,12 +197,21 @@ func TestExtractFromHTTP(t *testing.T) {
 			continue
 		}
 		update := (<-ch).(kubelet.PodUpdate)
+
+		for i := range update.Pods {
+			// There's no way to provide namespace in ContainerManifest, so
+			// it will be defaulted.
+			if !strings.HasPrefix(update.Pods[i].ObjectMeta.Namespace, "url-") {
+				t.Errorf("Unexpected namespace: %s", update.Pods[0].ObjectMeta.Namespace)
+			}
+			update.Pods[i].ObjectMeta.Namespace = "foobar"
+		}
 		if !api.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for i := range update.Pods {
 			if errs := validation.ValidateBoundPod(&update.Pods[i]); len(errs) != 0 {
-				t.Errorf("%s: Expected no validation errors on %#v, Got %#v", testCase.desc, update.Pods[i], errs)
+				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, update.Pods[i], errors.NewAggregate(errs))
 			}
 		}
 	}
