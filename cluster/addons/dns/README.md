@@ -29,11 +29,11 @@ DNS_REPLICAS=2
 
 sed -e "s/{DNS_DOMAIN}/$DNS_DOMAIN/g" \
     -e "s/{DNS_REPLICAS}/$DNS_REPLICAS/g" \
-    ./contrib/dns/skydns-rc.yaml.in \
+    ./cluster/addons/dns/skydns-rc.yaml.in \
     | ./cluster/kubectl.sh create -f -
 
 sed -e "s/{DNS_SERVER_IP}/$DNS_SERVER_IP/g" \
-    ./contrib/dns/skydns-svc.yaml.in \
+    ./cluster/addons/dns/skydns-svc.yaml.in \
     | ./cluster/kubectl.sh create -f -
 ```
 
@@ -48,6 +48,6 @@ that to etcd for SkyDNS to find.
 
 ## Known issues
 DNS resolution does not work from nodes directly, but it DOES work for
-containers.  As best I can figure out, this is some oddity around DNAT and
+containers.  As best I (thockin) can figure out, this is some oddity around DNAT and
 localhost in the kernel.  I think I have a workaround, but it's not quite baked
 as of the this writing (11/6/2014).
