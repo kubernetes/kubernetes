@@ -296,7 +296,7 @@ function create-route {
 # $1: The name of the instance.
 # $2: The scopes flag.
 # $3: The minion start script.
-function create-instance {
+function create-minion {
   detect-project
   local attempt=0
   while true; do
@@ -304,6 +304,8 @@ function create-instance {
       --project "${PROJECT}" \
       --zone "${ZONE}" \
       --machine-type "${MINION_SIZE}" \
+      --boot-disk-type "${MINION_DISK_TYPE}" \
+      --boot-disk-size "${MINION_DISK_SIZE}" \
       --image-project="${IMAGE_PROJECT}" \
       --image "${IMAGE}" \
       --tags "${MINION_TAG}" \
@@ -466,7 +468,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
     local scopes_flag="${scope_flags[@]}"
-    create-instance "${MINION_NAMES[$i]}" "${scopes_flag}" "startup-script=${KUBE_TEMP}/minion-start-${i}.sh" &
+    create-minion "${MINION_NAMES[$i]}" "${scopes_flag}" "startup-script=${KUBE_TEMP}/minion-start-${i}.sh" &
 
     if [ $i -ne 0 ] && [ $((i%5)) -eq 0 ]; then
       echo Waiting for creation of a batch of instances at $i...
