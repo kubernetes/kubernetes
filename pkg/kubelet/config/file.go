@@ -159,6 +159,11 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	if len(pod.Namespace) == 0 {
 		pod.Namespace = api.NamespaceDefault
 	}
+	// TODO(dchen1107): BoundPod is not type of runtime.Object. Once we allow kubelet talks
+	// about Pod directly, we can use SelfLinker defined in package: latest
+	// Currently just simply follow the same format in resthandler.go
+	pod.ObjectMeta.SelfLink = fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s",
+		pod.Name, pod.Namespace)
 
 	if glog.V(4) {
 		glog.Infof("Got pod from file %q: %#v", filename, pod)

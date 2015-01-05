@@ -130,8 +130,9 @@ func SetupEventSending(authPath string, apiServerList util.StringList) {
 			glog.Errorf("Unable to make apiserver client: %v", err)
 		} else {
 			// Send events to APIserver if there is a client.
+			hostname := util.GetHostname("")
 			glog.Infof("Sending events to APIserver.")
-			record.StartRecording(apiClient.Events(""), "kubelet")
+			record.StartRecording(apiClient.Events(""), "kubelet:"+hostname)
 		}
 	}
 }

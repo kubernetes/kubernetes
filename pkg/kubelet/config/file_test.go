@@ -124,6 +124,7 @@ func TestReadFromFile(t *testing.T) {
 				Name:      "test",
 				UID:       simpleSubdomainSafeHash(file.Name()),
 				Namespace: "default",
+				SelfLink:  "/api/v1beta2/pods/test?namespace=default",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{{Image: "test/image", TerminationMessagePath: "/dev/termination-log"}},
@@ -161,6 +162,7 @@ func TestExtractFromValidDataFile(t *testing.T) {
 	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
 	defer os.Remove(file.Name())
 
+	expectedPod.ObjectMeta.SelfLink = "/api/v1beta2/pods/" + expectedPod.Name + "?namespace=default"
 	ch := make(chan interface{}, 1)
 	c := sourceFile{file.Name(), ch}
 	err = c.extractFromPath()
@@ -226,6 +228,7 @@ func TestExtractFromDir(t *testing.T) {
 		}
 		ioutil.WriteFile(name, data, 0755)
 		files[i] = file
+		pods[i].ObjectMeta.SelfLink = "/api/v1beta2/pods/" + pods[i].Name + "?namespace=default"
 	}
 
 	ch := make(chan interface{}, 1)
