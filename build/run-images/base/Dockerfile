@@ -14,7 +14,7 @@
 
 # This file creates a minimal container for running Kubernetes binaries
 
-FROM google/debian:wheezy
+FROM progrium/busybox
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 WORKDIR /kubernetes
