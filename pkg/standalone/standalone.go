@@ -18,12 +18,12 @@ package standalone
 
 import (
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
@@ -32,7 +32,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -99,22 +98,10 @@ func RunScheduler(cl *client.Client) {
 
 // RunControllerManager starts a controller
 func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int64) {
-	if int64(int(nodeMilliCPU)) != nodeMilliCPU {
-		glog.Warningf("node_milli_cpu is too big for platform. Clamping: %d -> %d",
-			nodeMilliCPU, math.MaxInt32)
-		nodeMilliCPU = math.MaxInt32
-	}
-
-	if int64(int(nodeMemory)) != nodeMemory {
-		glog.Warningf("node_memory is too big for platform. Clamping: %d -> %d",
-			nodeMemory, math.MaxInt32)
-		nodeMemory = math.MaxInt32
-	}
-
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
-			resources.CPU:    util.NewIntOrStringFromInt(int(nodeMilliCPU)),
-			resources.Memory: util.NewIntOrStringFromInt(int(nodeMemory)),
+			api.ResourceCPU:    *resource.NewMilliQuantity(nodeMilliCPU, resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
 		},
 	}
 	minionController := minionControllerPkg.NewMinionController(nil, "", machineList, nodeResources, cl)

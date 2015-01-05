@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -136,7 +135,7 @@ func TestControllerDecode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(controller, controllerOut) {
+	if !api.Semantic.DeepEqual(controller, controllerOut) {
 		t.Errorf("Expected %#v, found %#v", controller, controllerOut)
 	}
 }
@@ -208,7 +207,7 @@ func TestControllerParsing(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(controller, expectedController) {
+	if !api.Semantic.DeepEqual(controller, expectedController) {
 		t.Errorf("Parsing failed: %s %#v %#v", string(data), controller, expectedController)
 	}
 }
@@ -375,7 +374,7 @@ func TestFillCurrentState(t *testing.T) {
 	if controller.Status.Replicas != 2 {
 		t.Errorf("expected 2, got: %d", controller.Status.Replicas)
 	}
-	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.Spec.Selector).AsSelector()) {
+	if !api.Semantic.DeepEqual(fakeLister.s, labels.Set(controller.Spec.Selector).AsSelector()) {
 		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.Spec.Selector).AsSelector(), fakeLister.s)
 	}
 }

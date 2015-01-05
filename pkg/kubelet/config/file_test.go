@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -130,7 +129,7 @@ func TestReadFromFile(t *testing.T) {
 				Containers: []api.Container{{Image: "test/image", TerminationMessagePath: "/dev/termination-log"}},
 			},
 		})
-		if !reflect.DeepEqual(expected, update) {
+		if !api.Semantic.DeepEqual(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
@@ -171,7 +170,7 @@ func TestExtractFromValidDataFile(t *testing.T) {
 	}
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, expectedPod)
-	if !reflect.DeepEqual(expected, update) {
+	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 }
@@ -192,7 +191,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
-	if !reflect.DeepEqual(expected, update) {
+	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 }
@@ -242,7 +241,7 @@ func TestExtractFromDir(t *testing.T) {
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, pods...)
 	sort.Sort(sortedPods(update.Pods))
 	sort.Sort(sortedPods(expected.Pods))
-	if !reflect.DeepEqual(expected, update) {
+	if !api.Semantic.DeepEqual(expected, update) {
 		t.Fatalf("Expected %#v, Got %#v", expected, update)
 	}
 	for i := range update.Pods {

@@ -148,7 +148,7 @@ var (
 	// The maximum value we can represent milli-units for.
 	// Compare with the return value of Quantity.Value() to
 	// see if it's safe to use Quantity.MilliValue().
-	MaxMilliValue = ((1 << 63) - 1) / 1000
+	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
 )
 
 // ParseQuantity turns str into a Quantity, or returns an error.

@@ -22,20 +22,19 @@ package main
 
 import (
 	"flag"
-	"math"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
@@ -51,8 +50,9 @@ var (
 	minionRegexp    = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
 	machineList     util.StringList
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
+	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	nodeMilliCPU = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory   = flag.Int64("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
+	nodeMemory   = resource.QuantityFlag("node_memory", "3Gi", "The amount of memory (in bytes) provisioned on each node")
 )
 
 func init() {
@@ -90,18 +90,6 @@ func main() {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	if int64(int(*nodeMilliCPU)) != *nodeMilliCPU {
-		glog.Warningf("node_milli_cpu is too big for platform. Clamping: %d -> %d",
-			*nodeMilliCPU, math.MaxInt32)
-		*nodeMilliCPU = math.MaxInt32
-	}
-
-	if int64(int(*nodeMemory)) != *nodeMemory {
-		glog.Warningf("node_memory is too big for platform. Clamping: %d -> %d",
-			*nodeMemory, math.MaxInt32)
-		*nodeMemory = math.MaxInt32
-	}
-
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 
 	endpoints := service.NewEndpointController(kubeClient)
@@ -113,8 +101,8 @@ func main() {
 	cloud := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
-			resources.CPU:    util.NewIntOrStringFromInt(int(*nodeMilliCPU)),
-			resources.Memory: util.NewIntOrStringFromInt(int(*nodeMemory)),
+			api.ResourceCPU:    *resource.NewMilliQuantity(*nodeMilliCPU, resource.DecimalSI),
+			api.ResourceMemory: *nodeMemory,
 		},
 	}
 	minionController := minionControllerPkg.NewMinionController(cloud, *minionRegexp, machineList, nodeResources, kubeClient)

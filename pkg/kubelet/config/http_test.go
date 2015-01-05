@@ -19,7 +19,6 @@ package config
 import (
 	"encoding/json"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"time"
 
@@ -193,7 +192,7 @@ func TestExtractFromHTTP(t *testing.T) {
 			continue
 		}
 		update := (<-ch).(kubelet.PodUpdate)
-		if !reflect.DeepEqual(testCase.expected, update) {
+		if !api.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for i := range update.Pods {
