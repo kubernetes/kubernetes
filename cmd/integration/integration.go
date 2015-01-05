@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -172,7 +173,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	schedulerConfigFactory := factory.NewConfigFactory(cl)
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
-		glog.Fatal("Couldn't create scheduler config: %v", err)
+		glog.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	scheduler.New(schedulerConfig).Run()
 
@@ -548,6 +549,7 @@ func runServiceTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func main() {
+	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	util.ReallyCrash = true
 	util.InitLogs()
