@@ -84,32 +84,32 @@ func TestGetContainerID(t *testing.T) {
 	}
 }
 
-func verifyPackUnpack(t *testing.T, podNamespace, manifestUUID, podName, containerName string) {
+func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName string) {
 	container := &api.Container{Name: containerName}
 	hasher := adler32.New()
 	data := fmt.Sprintf("%#v", *container)
 	hasher.Write([]byte(data))
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	name := BuildDockerName(manifestUUID, podFullName, container)
-	returnedPodFullName, returnedUUID, returnedContainerName, hash := ParseDockerName(name)
-	if podFullName != returnedPodFullName || manifestUUID != returnedUUID || containerName != returnedContainerName || computedHash != hash {
-		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, manifestUUID, containerName, computedHash, returnedPodFullName, returnedUUID, returnedContainerName, hash)
+	name := BuildDockerName(podUID, podFullName, container)
+	returnedPodFullName, returnedUID, returnedContainerName, hash := ParseDockerName(name)
+	if podFullName != returnedPodFullName || podUID != returnedUID || containerName != returnedContainerName || computedHash != hash {
+		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, podUID, containerName, computedHash, returnedPodFullName, returnedUID, returnedContainerName, hash)
 	}
 }
 
 func TestContainerManifestNaming(t *testing.T) {
-	manifestUUID := "d1b925c9-444a-11e4-a576-42010af0a203"
-	verifyPackUnpack(t, "file", manifestUUID, "manifest1234", "container5678")
-	verifyPackUnpack(t, "file", manifestUUID, "mani-fest-1234", "container5678")
-	// UUID is same as pod name
-	verifyPackUnpack(t, "file", manifestUUID, manifestUUID, "container123")
+	podUID := "d1b925c9-444a-11e4-a576-42010af0a203"
+	verifyPackUnpack(t, "file", podUID, "manifest1234", "container5678")
+	verifyPackUnpack(t, "file", podUID, "mani-fest-1234", "container5678")
+	// UID is same as pod name
+	verifyPackUnpack(t, "file", podUID, podUID, "container123")
 	// empty namespace
-	verifyPackUnpack(t, "", manifestUUID, manifestUUID, "container123")
-	// No UUID
-	verifyPackUnpack(t, "other", "", manifestUUID, "container456")
+	verifyPackUnpack(t, "", podUID, podUID, "container123")
+	// No UID
+	verifyPackUnpack(t, "other", "", podUID, "container456")
 	// No Container name
-	verifyPackUnpack(t, "other", "", manifestUUID, "")
+	verifyPackUnpack(t, "other", "", podUID, "")
 
 	container := &api.Container{Name: "container"}
 	podName := "foo"
