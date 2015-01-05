@@ -1,0 +1,71 @@
+{
+  "id": "influx-grafana",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "influx-grafana",
+      "containers": [
+        {
+          "name": "influxdb",
+          "image": "kubernetes/heapster_influxdb",
+          "ports": [
+            {
+              "containerPort": 8083,
+              "hostPort": 8083
+            },
+            {
+              "containerPort": 8086,
+              "hostPort": 8086
+            },
+            {
+              "containerPort": 8090,
+              "hostPort": 8090
+            },
+            {
+              "containerPort": 8099,
+              "hostPort": 8099
+            }
+          ]
+        },
+        {
+          "name": "grafana",
+          "image": "kubernetes/heapster_grafana",
+          "ports": [
+            {
+              "containerPort": 80,
+              "hostPort": 80
+            }
+          ],
+          "env": [
+            {
+              "name": "HTTP_USER",
+              "value": "{KUBE_USER}"
+            },
+            {
+              "name": "HTTP_PASS",
+              "value": "{KUBE_PASSWORD}"
+            }
+          ]
+        },
+        {
+          "name": "elasticsearch",
+          "image": "dockerfile/elasticsearch",
+          "ports": [
+            {
+              "containerPort": 9200,
+              "hostPort": 9200
+            },
+            {
+              "containerPort": 9300
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "labels": {
+    "name": "influxdb"
+  }
+}

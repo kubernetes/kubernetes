@@ -6,13 +6,15 @@
     "manifest": {
       "version": "v1beta1",
       "id": "heapster",
-      "containers": [{
-        "name": "heapster",
-        "image": "kubernetes/heapster",
-	}]
+      "containers": [
+        {
+          "name": "heapster",
+          "image": "kubernetes/heapster"
+        }
+      ]
     }
   },
   "labels": {
-    "name": "heapster",
+    "name": "heapster"
   }
 }

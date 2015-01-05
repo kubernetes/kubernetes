@@ -746,15 +746,14 @@ function setup-monitoring {
     get-password
     ensure-temp-dir
 
-    cp "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" "${KUBE_TEMP}/influx-grafana-pod.0.json"
-    sed "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" \
-        "${KUBE_TEMP}/influx-grafana-pod.0.json" > "${KUBE_TEMP}/influx-grafana-pod.1.json"
-    sed "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" \
-        "${KUBE_TEMP}/influx-grafana-pod.1.json" > "${KUBE_TEMP}/influx-grafana-pod.2.json"
+    sed -e "s/{KUBE_USER}/$KUBE_USER/g" \
+        -e "s/{KUBE_PASSWORD}/$KUBE_PASSWORD/g" \
+        "${KUBE_ROOT}/cluster/addons/cluster-monitoring/influx-grafana-pod.json" \
+      > "${KUBE_TEMP}/influx-grafana-pod.json"
     local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-    if "${kubectl}" create -f "${KUBE_TEMP}/influx-grafana-pod.2.json" &> /dev/null \
-        && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
-        && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" &> /dev/null; then
+    if "${kubectl}" create -f "${KUBE_TEMP}/influx-grafana-pod.json" &> /dev/null \
+        && "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/cluster-monitoring/influx-grafana-service.json" &> /dev/null \
+        && "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/cluster-monitoring/heapster-pod.json" &> /dev/null; then
       local dashboard_url="http://$(${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g')"
       echo
       echo "Grafana dashboard will be available at $dashboard_url. Wait for the monitoring dashboard to be online."
