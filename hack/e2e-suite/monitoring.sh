@@ -26,7 +26,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-MONITORING="${KUBE_ROOT}/examples/monitoring"
+MONITORING="${KUBE_ROOT}/cluster/addons/cluster-monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 MONITORING_FIREWALL_RULE="monitoring-test"
 
@@ -54,7 +54,7 @@ function cleanup {
   "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-pod.json" || true
   "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-service.json" || true
   "${KUBECTL}" delete -f "${MONITORING}/heapster-pod.json" || true
-  
+
   # This only has work to do on gce and gke
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     detect-project

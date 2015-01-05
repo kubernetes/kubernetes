@@ -6,5 +6,7 @@
   "containerPort": 8086,
   "provider": "kubernetes-default",
   "component": "influxdb",
-  "selector": { "name": "influxdb" }
+  "selector": {
+    "name": "influxdb"
+  }
 }
