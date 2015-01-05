@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -334,7 +335,7 @@ func Test() (results ResultsByTest) {
 			if *tap {
 				fmt.Printf("  ---\n  duration_ms: %.3f\n", duration_secs)
 			}
-			printBashOutputs("  ", "    ", stdout, stderr)
+			printBashOutputs("  ", "    ", stdout, stderr, *tap)
 			if *tap {
 				fmt.Printf("  ...\n")
 			}
@@ -432,7 +433,7 @@ func runBashUntil(stepName, bashFragment string) func() {
 			headerprefix = "# " + headerprefix
 			lineprefix = "# " + lineprefix
 		}
-		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()))
+		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()), false)
 	}
 }
 
@@ -471,17 +472,42 @@ func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
 	return true, "", ""
 }
 
-func printBashOutputs(headerprefix, lineprefix, stdout, stderr string) {
+func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bool) {
 	// The |'s (plus appropriate prefixing) are to make this look
-	// "YAMLish" to the Jenkins TAP plugin
+	// "YAMLish" to the Jenkins TAP plugin:
+	//   https://wiki.jenkins-ci.org/display/JENKINS/TAP+Plugin
 	if stdout != "" {
 		fmt.Printf("%vstdout: |\n", headerprefix)
+		if escape {
+			stdout = escapeOutput(stdout)
+		}
 		printPrefixedLines(lineprefix, stdout)
 	}
 	if stderr != "" {
 		fmt.Printf("%vstderr: |\n", headerprefix)
+		if escape {
+			stderr = escapeOutput(stderr)
+		}
 		printPrefixedLines(lineprefix, stderr)
 	}
+}
+
+// Escape stdout/stderr so the Jenkins YAMLish parser doesn't barf on
+// it. This escaping is crude (it masks all colons as something humans
+// will hopefully see as a colon, for instance), but it should get the
+// job done without pulling in a whole YAML package.
+func escapeOutput(s string) (out string) {
+	for _, r := range s {
+		switch {
+		case !strconv.IsPrint(r):
+			out += " "
+		case r == ':':
+			out += "\u02D0" // "ː", MODIFIER LETTER TRIANGULAR COLON
+		default:
+			out += string(r)
+		}
+	}
+	return
 }
 
 func printPrefixedLines(prefix, s string) {
