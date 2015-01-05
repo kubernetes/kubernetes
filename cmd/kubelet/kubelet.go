@@ -124,7 +124,7 @@ func main() {
 		CAdvisorPort:            *cAdvisorPort,
 		EnableServer:            *enableServer,
 		EnableDebuggingHandlers: *enableDebuggingHandlers,
-		DockerClient:            kubelet.ConnectToDockerOrDie(*dockerEndpoint),
+		DockerClient:            util.ConnectToDockerOrDie(*dockerEndpoint),
 		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
 	}
 

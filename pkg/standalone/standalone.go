@@ -21,7 +21,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -54,21 +53,6 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNotFound)
-}
-
-// Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
-func GetDockerEndpoint(dockerEndpoint string) string {
-	var endpoint string
-	if len(dockerEndpoint) > 0 {
-		endpoint = dockerEndpoint
-	} else if len(os.Getenv("DOCKER_HOST")) > 0 {
-		endpoint = os.Getenv("DOCKER_HOST")
-	} else {
-		endpoint = "unix:///var/run/docker.sock"
-	}
-	glog.Infof("Connecting to docker on %s", endpoint)
-
-	return endpoint
 }
 
 // RunApiServer starts an API server in a go routine.
@@ -172,7 +156,7 @@ func RunKubelet(kcfg *KubeletConfig) {
 	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
 
-	kcfg.Hostname = kubelet.GetHostname(kcfg.HostnameOverride)
+	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
 	if len(kcfg.RootDirectory) > 0 {
 		kubelet.SetupRootDirectoryOrDie(kcfg.RootDirectory)
 	}
