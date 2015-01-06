@@ -85,6 +85,8 @@ function verify-prereqs() {
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
 function kube-up() {
+  local service_prefix
+
   echo "... in kube-up()" >&2
   detect-project >&2
   "${GCLOUD}" preview container clusters create "${CLUSTER_NAME}" \
@@ -92,6 +94,19 @@ function kube-up() {
     --project="${PROJECT}" \
     --cluster-api-version="${CLUSTER_API_VERSION:-}" \
     --num-nodes="${NUM_MINIONS}"
+
+  # Compute DNS_SERVER_IP: This is looking for something like
+  # "servicesIpv4Cidr: 10.27.240.0/20" and returning "10.27.240"
+  # (which is presumptious of at least a /24 network mask, but easier
+  # to use in bash than the /20). We then tack on the DNS_SERVER_OCTET
+  # to mutate the global DNS_SERVER_IP.
+  if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
+    service_prefix=$("${GCLOUD}" preview container clusters describe \
+      --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" |
+      egrep "^servicesIpv4Cidr:" | cut -f2 -d\ | cut -f1-3 -d.)
+
+    DNS_SERVER_IP="${service_prefix}.${DNS_SERVER_OCTET}"
+  fi
 }
 
 # Called during cluster/kube-up.sh

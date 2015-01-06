@@ -28,6 +28,15 @@ NETWORK="${NETWORK:-default}"
 GCLOUD="${GCLOUD:-gcloud}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
 
+# Optional: Install cluster DNS.
+# TODO: enable this when DNS_SERVER_IP can be easily bound.
+ENABLE_CLUSTER_DNS=true
+# DNS_SERVER_IP bound during kube-up using servicesIpv4Cidr
+# and DNS_SERVER_OCTET.
+DNS_SERVER_OCTET="10"
+DNS_DOMAIN="kubernetes.local"
+DNS_REPLICAS=1
+
 # This is a hack, but I keep setting this when I run commands manually, and
 # then things grossly fail during normal runs because cluster/kubecfg.sh and
 # cluster/kubectl.sh both use this if it's set.
