@@ -540,7 +540,7 @@ const containerNamePrefix = "k8s"
 
 func HashContainer(container *api.Container) uint64 {
 	hash := adler32.New()
-	fmt.Fprintf(hash, "%#v", *container)
+	util.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
 }
 

@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
@@ -87,8 +88,7 @@ func TestGetContainerID(t *testing.T) {
 func verifyPackUnpack(t *testing.T, podNamespace, manifestUUID, podName, containerName string) {
 	container := &api.Container{Name: containerName}
 	hasher := adler32.New()
-	data := fmt.Sprintf("%#v", *container)
-	hasher.Write([]byte(data))
+	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
 	name := BuildDockerName(manifestUUID, podFullName, container)
