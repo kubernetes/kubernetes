@@ -41,13 +41,13 @@ type EventRecorder interface {
 // StartRecording starts sending events to recorder. Call once while initializing
 // your binary. Subsequent calls will be ignored. The return value can be ignored
 // or used to stop recording, if desired.
-func StartRecording(recorder EventRecorder, sourceName string) watch.Interface {
+func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
 	return GetEvents(func(event *api.Event) {
 		// Make a copy before modification, because there could be multiple listeners.
 		// Events are safe to copy like this.
 		eventCopy := *event
 		event = &eventCopy
-		event.Source = sourceName
+		event.Source = source
 		try := 0
 		for {
 			try++

@@ -145,7 +145,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		},
 		Condition: "Tested",
 		Reason:    "ForTesting",
-		Source:    "test",
+		Source:    api.EventSource{Component: "test"},
 	}
 	label, field, err := rest.getAttrs(eventA)
 	if err != nil {

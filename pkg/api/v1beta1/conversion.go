@@ -548,7 +548,9 @@ func init() {
 			return nil
 		},
 
-		// Event Status -> Condition
+		// Event Status <-> Condition
+		// Event Source <-> Source.Component
+		// Event Host <-> Source.Host
 		// TODO: remove this when it becomes possible to specify a field name conversion on a specific type
 		func(in *newer.Event, out *Event, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
@@ -560,7 +562,8 @@ func init() {
 			out.Status = in.Condition
 			out.Reason = in.Reason
 			out.Message = in.Message
-			out.Source = in.Source
+			out.Source = in.Source.Component
+			out.Host = in.Source.Host
 			out.Timestamp = in.Timestamp
 			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
 		},
@@ -574,7 +577,8 @@ func init() {
 			out.Condition = in.Status
 			out.Reason = in.Reason
 			out.Message = in.Message
-			out.Source = in.Source
+			out.Source.Component = in.Source
+			out.Source.Host = in.Host
 			out.Timestamp = in.Timestamp
 			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
 		},

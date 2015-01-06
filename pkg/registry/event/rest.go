@@ -109,7 +109,7 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, e
 		"condition":                      event.Condition,
 		"status":                         event.Condition, // TODO: remove me when we version fields
 		"reason":                         event.Reason,
-		"source":                         event.Source,
+		"source":                         event.Source.Component,
 	}, nil
 }
 
