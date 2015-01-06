@@ -20,6 +20,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"encoding/json"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -55,7 +56,6 @@ type Onramp struct {
 type OnrampRouterClaim struct {
 	ExternalIP   string   `json:"externalIP" yaml:"externalIP"`
 	InternalIP   string   `json:"internalIP" yaml:"internalIP"`
-	ContainerIPS []string `json:"containerIPS" yaml:"containerIPS"`
 }
 
 // Helper structs to allow use of foreign types
@@ -73,8 +73,32 @@ func NewOnramp(ec tools.EtcdClient, ac *client.Client, eintf string, iintf strin
 	}
 }
 
-func (onrmp *Onramp) claimExternalName(container Container) {
+func (onrmp *Onramp) claimExternalName(podRef podNameIP) (bool) {
 	// Need to put code here to mark this router as being the owner of this external path
+	newClaim := &OnrampRouterClaim{ ExternalIP: podRef.ExtIP, InternalIP: podRef.PodIP}
+	var key string = "/onramp/" + podRef.PodName
+	claimjson, cerr := json.Marshal(newClaim)
+
+	if (cerr != nil) {
+		glog.Infof("Could not marshall new Claim: %s\n", cerr);
+		return false
+	}
+	_, err := onrmp.etcdClient.Create(key, string(claimjson), 500)
+	if (err != nil) {
+		glog.Infof("Error claiming pod: %s\n", err)
+		return false
+	}
+	return true
+}
+
+func (onrmp *Onramp) freeExternalName(podRef podNameIP) (bool) {
+	var key string = "/onramp/" + podRef.PodName
+	_, err := onrmp.etcdClient.Delete(key, false)
+	if (err != nil) {
+		glog.Infof("Error removing external claim: %s\n", err)
+		return false
+	}
+	return true
 }
 
 func (onrmp *Onramp) scanContainer(podName string, container Container) {
@@ -91,10 +115,14 @@ func (onrmp *Onramp) scanContainer(podName string, container Container) {
 		}
 
 		newPod := podNameIP{ PodName: podName, PodIP: pod.CurrentState.PodIP, NewPod: 1}
+
+		if (onrmp.claimExternalName(newPod) == false) {
+
+		}
+
 		onrmp.podNameLock.Lock()
 		onrmp.podNameList = append(onrmp.podNameList, newPod)
 		onrmp.podNameLock.Unlock()
-		onrmp.claimExternalName(container)
 	}
 }
 
@@ -176,6 +204,7 @@ func (onrmp *Onramp) monitorPods() {
 					continue
 				}
 				onrmp.freeExtAddr(onrmp.podNameList[m].ExtIP)
+				onrmp.freeExternalName(onrmp.podNameList[m])
 				onrmp.podNameList = append(onrmp.podNameList[0:m], onrmp.podNameList[m+1:]...)
 				break; //Need to break here to restart the for loop with a new range computation		
 			}
