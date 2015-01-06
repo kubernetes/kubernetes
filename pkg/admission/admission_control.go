@@ -19,6 +19,7 @@ package admission
 import (
 	"errors"
 
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -30,7 +31,7 @@ type stubAdmissionController struct {
 
 func (ac *stubAdmissionController) AdmissionControl(operation, kind, namespace string, object runtime.Object) (err error) {
 	if !ac.admit {
-		err = errors.New("No changes allowed")
+		err = apierrors.NewConflict(kind, "name", errors.New("No changes allowed"))
 	}
 	return err
 }

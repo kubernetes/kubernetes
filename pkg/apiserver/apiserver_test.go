@@ -477,6 +477,26 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestDeleteInvokesAdmissionControl(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admission.NewAlwaysDenyController())
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusConflict {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
 func TestDeleteMissing(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	ID := "id"
@@ -534,6 +554,39 @@ func TestUpdate(t *testing.T) {
 	}
 	if !selfLinker.called {
 		t.Errorf("Never set self link")
+	}
+}
+
+func TestUpdateInvokesAdmissionControl(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/prefix/version/simple/" + ID,
+	}
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admission.NewAlwaysDenyController())
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	item := &Simple{
+		Other: "bar",
+	}
+	body, err := codec.Encode(item)
+	if err != nil {
+		// The following cases will fail, so die now
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	client := http.Client{}
+	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusConflict {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
@@ -613,6 +666,41 @@ func TestCreate(t *testing.T) {
 		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
 	}
 	wait.Done()
+}
+
+func TestCreateInvokesAdmissionControl(t *testing.T) {
+	wait := sync.WaitGroup{}
+	wait.Add(1)
+	simpleStorage := &SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (returnObj runtime.Object, err error) {
+			wait.Wait()
+			return &Simple{}, nil
+		},
+	}
+	handler := Handle(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, codec, "/prefix", testVersion, selfLinker, admission.NewAlwaysDenyController())
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{
+		Other: "foo",
+	}
+	data, _ := codec.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusConflict {
+		t.Errorf("Unexpected response %#v", response)
+	}
 }
 
 func TestCreateNotFound(t *testing.T) {

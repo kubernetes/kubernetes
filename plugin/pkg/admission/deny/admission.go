@@ -18,8 +18,10 @@ package deny
 
 import (
 	"errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"io"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 )
 
 func init() {
@@ -31,7 +33,7 @@ func init() {
 type alwaysDeny struct{}
 
 func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return errors.New("You shall not pass!")
+	return apierrors.NewConflict(a.GetKind(), "", errors.New("No changes allowed"))
 }
 
 func NewAlwaysDeny() admission.Interface {
