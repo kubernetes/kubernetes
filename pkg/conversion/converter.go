@@ -78,6 +78,10 @@ type Scope interface {
 	// parameters, you'll run out of stack space before anything useful happens.
 	Convert(src, dest interface{}, flags FieldMatchingFlags) error
 
+	// DefaultConvert performs the default conversion, without calling a conversion func
+	// on the current stack frame. This makes it safe to call from a conversion func.
+	DefaultConvert(src, dest interface{}, flags FieldMatchingFlags) error
+
 	// SrcTags and DestTags contain the struct tags that src and dest had, respectively.
 	// If the enclosing object was not a struct, then these will contain no tags, of course.
 	SrcTag() reflect.StructTag
@@ -165,6 +169,12 @@ func (s *scope) setKeys(src, dest interface{}) {
 // Convert continues a conversion.
 func (s *scope) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
 	return s.converter.Convert(src, dest, flags, s.meta)
+}
+
+// DefaultConvert continues a conversion, performing a default conversion (no conversion func)
+// for the current stack frame.
+func (s *scope) DefaultConvert(src, dest interface{}, flags FieldMatchingFlags) error {
+	return s.converter.DefaultConvert(src, dest, flags, s.meta)
 }
 
 // SrcTag returns the tag of the struct containing the current source item, if any.
@@ -296,6 +306,24 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 // it is not used by Convert() other than storing it in the scope.
 // Not safe for objects with cyclic references!
 func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
+	return c.doConversion(src, dest, flags, meta, c.convert)
+}
+
+// DefaultConvert will translate src to dest if it knows how. Both must be pointers.
+// No conversion func is used. If the default copying mechanism
+// doesn't work on this type pair, an error will be returned.
+// Read the comments on the various FieldMatchingFlags constants to understand
+// what the 'flags' parameter does.
+// 'meta' is given to allow you to pass information to conversion functions,
+// it is not used by DefaultConvert() other than storing it in the scope.
+// Not safe for objects with cyclic references!
+func (c *Converter) DefaultConvert(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
+	return c.doConversion(src, dest, flags, meta, c.defaultConvert)
+}
+
+type conversionFunc func(sv, dv reflect.Value, scope *scope) error
+
+func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags, meta *Meta, f conversionFunc) error {
 	dv, err := EnforcePtr(dest)
 	if err != nil {
 		return err
@@ -315,7 +343,7 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 	// Leave something on the stack, so that calls to struct tag getters never fail.
 	s.srcStack.push(scopeStackElem{})
 	s.destStack.push(scopeStackElem{})
-	return c.convert(sv, dv, s)
+	return f(sv, dv, s)
 }
 
 // callCustom calls 'custom' with sv & dv. custom must be a conversion function.
@@ -357,6 +385,14 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		}
 		return c.callCustom(sv, dv, fv, scope)
 	}
+
+	return c.defaultConvert(sv, dv, scope)
+}
+
+// defaultConvert recursively copies sv into dv. no conversion function is called
+// for the current stack frame (but conversion functions may be called for nested objects)
+func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
+	dt, st := dv.Type(), sv.Type()
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
 		return scope.error("type names don't match (%v, %v)", c.NameFunc(st), c.NameFunc(dt))
