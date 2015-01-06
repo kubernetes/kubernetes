@@ -19,7 +19,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"path"
 	"strconv"
 	"time"
@@ -93,10 +92,7 @@ func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
 		return pods, errors.New("unable to parse response as BoundPods")
 	}
 
-	for i, pod := range boundPods.Items {
-		if len(pod.Name) == 0 {
-			pod.Name = fmt.Sprintf("%d", i+1)
-		}
+	for _, pod := range boundPods.Items {
 		// TODO: generate random UID if not present
 		if pod.UID == "" && !pod.CreationTimestamp.IsZero() {
 			pod.UID = strconv.FormatInt(pod.CreationTimestamp.Unix(), 10)

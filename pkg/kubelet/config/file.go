@@ -153,7 +153,6 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
 	}
 
-	pod.Name = simpleSubdomainSafeHash(filename)
 	if len(pod.UID) == 0 {
 		pod.UID = simpleSubdomainSafeHash(filename)
 	}
