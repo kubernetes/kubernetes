@@ -161,6 +161,9 @@ go run e2e.go --build
 # Create a fresh cluster.  Deletes a cluster first, if it exists
 go run e2e.go --up
 
+# Create a fresh cluster at a specific release version.
+go run e2e.go --up --version=0.7.0
+
 # Test if a cluster is up.
 go run e2e.go --isup
 
