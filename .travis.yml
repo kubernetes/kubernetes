@@ -13,7 +13,6 @@ install:
   - ./hack/verify-description.sh
   - ./hack/travis/install-std-race.sh
   - ./hack/build-go.sh
-  - go get ./contrib/podex
 
 script:
   - KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh
