@@ -34,10 +34,11 @@ import (
 )
 
 const (
-	EtcdErrorCodeNotFound      = 100
-	EtcdErrorCodeTestFailed    = 101
-	EtcdErrorCodeNodeExist     = 105
-	EtcdErrorCodeValueRequired = 200
+	EtcdErrorCodeNotFound          = 100
+	EtcdErrorCodeTestFailed        = 101
+	EtcdErrorCodeNodeExist         = 105
+	EtcdErrorCodeValueRequired     = 200
+	EtcdErrorCodeEventIndexCleared = 401
 )
 
 var (
@@ -59,6 +60,7 @@ type EtcdClient interface {
 	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
 	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
+	RawWatch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.RawResponse, stop chan bool) (*etcd.RawResponse, error)
 }
 
 // EtcdGetSet interface exposes only the etcd operations needed by EtcdHelper.
@@ -70,6 +72,7 @@ type EtcdGetSet interface {
 	Delete(key string, recursive bool) (*etcd.Response, error)
 	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
+	RawWatch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.RawResponse, stop chan bool) (*etcd.RawResponse, error)
 }
 
 type EtcdResourceVersioner interface {
@@ -109,6 +112,11 @@ type EtcdHelper struct {
 	Codec  runtime.Codec
 	// optional, no atomic operations can be performed without this interface
 	ResourceVersioner EtcdResourceVersioner
+}
+
+// IsEtcdEventHistoryOutdated returns true iff a resource version is outdated.
+func IsEtcdEventIndexCleared(err error) bool {
+	return isEtcdErrorNum(err, EtcdErrorCodeEventIndexCleared)
 }
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.
