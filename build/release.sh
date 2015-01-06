@@ -37,6 +37,5 @@ if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
 fi
 
 kube::build::copy_output
-kube::build::run_image
 kube::release::package_tarballs
 kube::release::gcs::release
