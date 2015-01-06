@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
@@ -75,6 +76,7 @@ type Config struct {
 	CorsAllowedOriginList util.StringList
 	Authenticator         authenticator.Request
 	Authorizer            authorizer.Authorizer
+	AdmissionControl      admission.AdmissionControl
 
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
@@ -118,6 +120,7 @@ type Master struct {
 	corsAllowedOriginList util.StringList
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
+	admissionControl      admission.AdmissionControl
 	masterCount           int
 
 	readOnlyServer  string
@@ -248,6 +251,7 @@ func New(c *Config) *Master {
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
+		admissionControl:      c.AdmissionControl,
 
 		masterCount:     c.MasterCount,
 		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
@@ -462,19 +466,19 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker) {
+func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.AdmissionControl) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta1.Codec, "/api/v1beta1", latest.SelfLinker
+	return storage, v1beta1.Codec, "/api/v1beta1", latest.SelfLinker, m.admissionControl
 }
 
 // API_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker) {
+func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.AdmissionControl) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker
+	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker, m.admissionControl
 }

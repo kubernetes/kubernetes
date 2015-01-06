@@ -50,7 +50,7 @@ func TestWatchWebsocket(t *testing.T) {
 	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker)
+	}, codec, "/api", "version", selfLinker, admissionHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -104,7 +104,7 @@ func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker)
+	}, codec, "/api", "version", selfLinker, admissionHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -167,7 +167,7 @@ func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker)
+	}, codec, "/api", "version", selfLinker, admissionHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -239,7 +239,7 @@ func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker)
+	}, codec, "/api", "version", selfLinker, admissionHandler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	defer server.CloseClientConnections()

@@ -21,6 +21,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -31,12 +32,13 @@ import (
 
 // RESTHandler implements HTTP verbs on a set of RESTful resources identified by name.
 type RESTHandler struct {
-	storage         map[string]RESTStorage
-	codec           runtime.Codec
-	canonicalPrefix string
-	selfLinker      runtime.SelfLinker
-	ops             *Operations
-	asyncOpWait     time.Duration
+	storage          map[string]RESTStorage
+	codec            runtime.Codec
+	canonicalPrefix  string
+	selfLinker       runtime.SelfLinker
+	ops              *Operations
+	asyncOpWait      time.Duration
+	admissionControl admission.AdmissionControl
 }
 
 // ServeHTTP handles requests to all RESTStorage objects.
@@ -205,6 +207,14 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
+
+		// invoke admission control
+		err = h.admissionControl.AdmissionControl("CREATE", parts[0], namespace, obj)
+		if err != nil {
+			errorJSON(err, h.codec, w)
+			return
+		}
+
 		out, err := storage.Create(ctx, obj)
 		if err != nil {
 			errorJSON(err, h.codec, w)
@@ -218,6 +228,14 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			notFound(w, req)
 			return
 		}
+
+		// invoke admission control
+		err := h.admissionControl.AdmissionControl("DELETE", parts[0], namespace, nil)
+		if err != nil {
+			errorJSON(err, h.codec, w)
+			return
+		}
+
 		out, err := storage.Delete(ctx, parts[1])
 		if err != nil {
 			errorJSON(err, h.codec, w)
@@ -242,6 +260,14 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
+
+		// invoke admission control
+		err = h.admissionControl.AdmissionControl("UPDATE", parts[0], namespace, obj)
+		if err != nil {
+			errorJSON(err, h.codec, w)
+			return
+		}
+
 		out, err := storage.Update(ctx, obj)
 		if err != nil {
 			errorJSON(err, h.codec, w)
