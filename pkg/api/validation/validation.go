@@ -370,8 +370,12 @@ func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(pod.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
+	} else if !util.IsDNSSubdomain(pod.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, ""))
 	}
-	if !util.IsDNSSubdomain(pod.Namespace) {
+	if len(pod.Namespace) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", pod.Namespace))
+	} else if !util.IsDNSSubdomain(pod.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace, ""))
 	}
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
@@ -549,25 +553,20 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 }
 
 // ValidateBoundPod tests if required fields on a bound pod are set.
-func ValidateBoundPod(pod *api.BoundPod) (errors []error) {
-	if !util.IsDNSSubdomain(pod.Name) {
-		errors = append(errors, errs.NewFieldInvalid("name", pod.Name, ""))
+func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(pod.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
+	} else if !util.IsDNSSubdomain(pod.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, ""))
 	}
-	if !util.IsDNSSubdomain(pod.Namespace) {
-		errors = append(errors, errs.NewFieldInvalid("namespace", pod.Namespace, ""))
+	if len(pod.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", pod.Namespace))
+	} else if !util.IsDNSSubdomain(pod.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace, ""))
 	}
-	containerManifest := &api.ContainerManifest{
-		Version:       "v1beta2",
-		ID:            pod.Name,
-		UUID:          pod.UID,
-		Containers:    pod.Spec.Containers,
-		Volumes:       pod.Spec.Volumes,
-		RestartPolicy: pod.Spec.RestartPolicy,
-	}
-	if errs := ValidateManifest(containerManifest); len(errs) != 0 {
-		errors = append(errors, errs...)
-	}
-	return errors
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
+	return allErrs
 }
 
 // ValidateMinion tests if required fields in the minion are set.
