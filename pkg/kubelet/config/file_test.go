@@ -121,7 +121,7 @@ func TestReadFromFile(t *testing.T) {
 		update := got.(kubelet.PodUpdate)
 		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      simpleSubdomainSafeHash(file.Name()),
+				Name:      "test",
 				UID:       simpleSubdomainSafeHash(file.Name()),
 				Namespace: "default",
 			},
@@ -160,8 +160,6 @@ func TestExtractFromValidDataFile(t *testing.T) {
 	}
 	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
 	defer os.Remove(file.Name())
-
-	expectedPod.Name = simpleSubdomainSafeHash(file.Name())
 
 	ch := make(chan interface{}, 1)
 	c := sourceFile{file.Name(), ch}
@@ -228,7 +226,6 @@ func TestExtractFromDir(t *testing.T) {
 		}
 		ioutil.WriteFile(name, data, 0755)
 		files[i] = file
-		pods[i].Name = simpleSubdomainSafeHash(name)
 	}
 
 	ch := make(chan interface{}, 1)
