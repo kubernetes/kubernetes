@@ -132,6 +132,7 @@ func TestExtractFromHTTP(t *testing.T) {
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						DNSPolicy:     api.DNSClusterFirst,
 					},
 				}),
 		},

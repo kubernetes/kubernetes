@@ -32,6 +32,7 @@ func init() {
 			out.Spec.Containers = in.Containers
 			out.Spec.Volumes = in.Volumes
 			out.Spec.RestartPolicy = in.RestartPolicy
+			out.Spec.DNSPolicy = in.DNSPolicy
 			out.Name = in.ID
 			out.UID = in.UUID
 			// TODO(dchen1107): Move this conversion to pkg/api/v1beta[123]/conversion.go
@@ -48,6 +49,7 @@ func init() {
 			out.Containers = in.Spec.Containers
 			out.Volumes = in.Spec.Volumes
 			out.RestartPolicy = in.Spec.RestartPolicy
+			out.DNSPolicy = in.Spec.DNSPolicy
 			out.Version = "v1beta2"
 			out.ID = in.Name
 			out.UUID = in.UID
@@ -104,6 +106,7 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			out.DNSPolicy = in.DNSPolicy
 			out.Version = "v1beta2"
 			return nil
 		},
@@ -117,6 +120,7 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			out.DNSPolicy = in.DNSPolicy
 			return nil
 		},
 	)

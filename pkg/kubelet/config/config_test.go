@@ -59,6 +59,7 @@ func CreateValidPod(name, namespace, source string) api.BoundPod {
 		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}
 }
