@@ -499,10 +499,12 @@ func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bo
 func escapeOutput(s string) (out string) {
 	for _, r := range s {
 		switch {
+		case r == '\n':
+			out += string(r)
 		case !strconv.IsPrint(r):
 			out += " "
 		case r == ':':
-			out += "\u02D0" // "ː", MODIFIER LETTER TRIANGULAR COLON
+			out += "\ua789" // "꞉", modifier letter colon
 		default:
 			out += string(r)
 		}
