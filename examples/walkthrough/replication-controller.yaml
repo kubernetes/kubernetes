@@ -13,7 +13,7 @@ desiredState:
     desiredState:
       manifest:
         version: v1beta1
-        id: ngix
+        id: nginx
         containers:
           - name: nginx
             image: dockerfile/nginx
