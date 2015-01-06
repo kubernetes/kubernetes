@@ -55,7 +55,6 @@ Env Variable | Default | Description
 `KUBE_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
 `KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
 `KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
-`KUBE_BUILD_RUN_IMAGES` | `n` | *Experimental* Build Docker images for running most server components.
 `KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
 
 ## Basic Flow
@@ -68,25 +67,10 @@ Everything in `build/build-image/` is meant to be run inside of the container.  
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
-## Runtime Docker Images
-
-This support is experimental and hasn't been used yet to deploy a cluster.
-
-The files necessarily for the release Docker images are in `build/run-images/*`.  All of this is staged into `_output/images` similar to build-image.  The `base` image is used as a base for each of the specialized containers and is generally never pushed to a shared repository.
-
-If the release script is set to upload to GCS, it'll do the following:
-* Start up a local `google/docker-registry` registry that is backed by GCS.
-* Rename/push the runtime images to that registry.
-
 ## TODOs
 
 These are in no particular order
 
 * [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
-* [ ] Get a cluster up and running with the Docker images.  Perhaps start with a local cluster and move up to a GCE cluster.
-* [ ] Implement (#186)[https://github.com/GoogleCloudPlatform/kubernetes/issues/186].  This will make it easier to develop Kubernetes.
 * [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Create an install script that'll let us do a `curl https://[URL] | bash` to get that tarball down and ensure that other dependencies (cloud SDK?) are installed and configured correctly.
-* [ ] Support/test Windows as a client.
 * [ ] Finish support for the Dockerized runtime. Issue (#19)[https://github.com/GoogleCloudPlatform/kubernetes/issues/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
-* [ ] Support uploading to the Docker index instead of the GCS bucket.  This'll allow easier installs for those not running on GCE

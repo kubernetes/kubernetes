@@ -34,7 +34,6 @@ source hack/lib/init.sh
 # Incoming options
 #
 readonly KUBE_SKIP_CONFIRMATIONS="${KUBE_SKIP_CONFIRMATIONS:-n}"
-readonly KUBE_BUILD_RUN_IMAGES="${KUBE_BUILD_RUN_IMAGES:-n}"
 readonly KUBE_GCS_UPLOAD_RELEASE="${KUBE_GCS_UPLOAD_RELEASE:-n}"
 readonly KUBE_GCS_NO_CACHING="${KUBE_GCS_NO_CACHING:-y}"
 readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
@@ -85,18 +84,6 @@ readonly DOCKER_DATA_MOUNT_ARGS=(
   --volume "${REMOTE_OUTPUT_GOPATH}"
   --volume "${REMOTE_GODEP_GOPATH}"
 )
-
-
-readonly KUBE_RUN_IMAGE_BASE="kubernetes"
-readonly KUBE_RUN_IMAGES=(
-  kube-apiserver
-  kube-controller-manager
-  kube-proxy
-  kube-scheduler
-  kubelet
-  bootstrap
-)
-
 
 # This is where the final release artifacts are created locally
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
@@ -317,30 +304,6 @@ function kube::build::build_image_cross() {
   kube::build::docker_build "${KUBE_BUILD_IMAGE_CROSS}" "${build_context_dir}"
 }
 
-# Builds the runtime image.  Assumes that the appropriate binaries are already
-# built and in $LOCAL_OUTPUT_BINPATH.
-function kube::build::run_image() {
-  [[ ${KUBE_BUILD_RUN_IMAGES} =~ ^[yY]$ ]] || return 0
-
-  local -r build_context_base="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_RUN_IMAGE_BASE}"
-
-  # First build the base image.  This one brings in all of the binaries.
-  mkdir -p "${build_context_base}"
-  tar czf "${build_context_base}/kube-bins.tar.gz" \
-    -C "${LOCAL_OUTPUT_BINPATH}/linux/amd64" \
-    "${KUBE_RUN_IMAGES[@]}"
-  cp -R build/run-images/base/* "${build_context_base}/"
-  kube::build::docker_build "${KUBE_RUN_IMAGE_BASE}" "${build_context_base}"
-
-  local b
-  for b in "${KUBE_RUN_IMAGES[@]}" ; do
-    local sub_context_dir="${build_context_base}-$b"
-    mkdir -p "${sub_context_dir}"
-    cp -R build/run-images/$b/* "${sub_context_dir}/"
-    kube::build::docker_build "${KUBE_RUN_IMAGE_BASE}-$b" "${sub_context_dir}"
-  done
-}
-
 # Build a docker image from a Dockerfile.
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
@@ -375,13 +338,6 @@ function kube::build::clean_image() {
 
 function kube::build::clean_images() {
   kube::build::clean_image "${KUBE_BUILD_IMAGE}"
-
-  kube::build::clean_image "${KUBE_RUN_IMAGE_BASE}"
-
-  local b
-  for b in "${KUBE_RUN_IMAGES[@]}" ; do
-    kube::build::clean_image "${KUBE_RUN_IMAGE_BASE}-${b}"
-  done
 
   echo "+++ Cleaning all other untagged docker images"
   "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
@@ -732,59 +688,6 @@ function kube::release::gcs::ensure_release_bucket() {
     echo "Creating Google Cloud Storage bucket: $KUBE_GCS_RELEASE_BUCKET"
     gsutil mb -p "${GCLOUD_PROJECT}" "gs://${KUBE_GCS_RELEASE_BUCKET}"
   fi
-}
-
-function kube::release::gcs::ensure_docker_registry() {
-  local -r reg_container_name="gcs-registry"
-
-  local -r running=$("${DOCKER[@]}" inspect ${reg_container_name} 2>/dev/null \
-    | build/json-extractor.py 0.State.Running 2>/dev/null)
-
-  [[ "$running" != "true" ]] || return 0
-
-  # Grovel around and find the OAuth token in the gcloud config
-  local -r boto=~/.config/gcloud/legacy_credentials/${GCLOUD_ACCOUNT}/.boto
-  local refresh_token
-  refresh_token=$(grep 'gs_oauth2_refresh_token =' "$boto" | awk '{ print $3 }')
-
-  if [[ -z "$refresh_token" ]]; then
-    echo "Couldn't find OAuth 2 refresh token in ${boto}" >&2
-    return 1
-  fi
-
-  # If we have an old one sitting around, remove it
-  "${DOCKER[@]}" rm ${reg_container_name} >/dev/null 2>&1 || true
-
-  echo "+++ Starting GCS backed Docker registry"
-  local -ra docker_cmd=(
-    "${DOCKER[@]}" run -d "--name=${reg_container_name}"
-    -e "GCS_BUCKET=${KUBE_GCS_RELEASE_BUCKET}"
-    -e "STORAGE_PATH=${KUBE_GCS_DOCKER_REG_PREFIX}"
-    -e "GCP_OAUTH2_REFRESH_TOKEN=${refresh_token}"
-    -p 127.0.0.1:5000:5000
-    google/docker-registry
-  )
-
-  "${docker[@]}"
-
-  # Give it time to spin up before we start throwing stuff at it
-  sleep 5
-}
-
-function kube::release::gcs::push_images() {
-  [[ ${KUBE_BUILD_RUN_IMAGES} =~ ^[yY]$ ]] || return 0
-
-  kube::release::gcs::ensure_docker_registry
-
-  # Tag each of our run binaries with the right registry and push
-  local b image_name
-  for b in "${KUBE_RUN_IMAGES[@]}" ; do
-    image_name="${KUBE_RUN_IMAGE_BASE}-${b}"
-    echo "+++ Tagging and pushing ${image_name} to GCS bucket ${KUBE_GCS_RELEASE_BUCKET}"
-    "${DOCKER[@]}" tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${image_name}"
-    "${DOCKER[@]}" push "localhost:5000/${image_name}"
-    "${DOCKER[@]}" rmi "localhost:5000/${image_name}"
-  done
 }
 
 function kube::release::gcs::copy_release_artifacts() {
