@@ -95,6 +95,10 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 # Verify that the right utilities and such are installed for building Kube.  Set
 # up some dynamic constants.
 #
+# Args:
+#   $1 The type of operation to verify for.  Only 'clean' is supported in which
+#   case we don't verify docker.
+#
 # Vars set:
 #   KUBE_ROOT_HASH
 #   KUBE_BUILD_IMAGE_TAG
@@ -104,44 +108,47 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 #   DOCKER_MOUNT_ARGS
 function kube::build::verify_prereqs() {
   echo "+++ Verifying Prerequisites...."
-  if [[ -z "$(which docker)" ]]; then
-    echo "Can't find 'docker' in PATH, please fix and retry." >&2
-    echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
-    exit 1
-  fi
 
-  if kube::build::is_osx; then
-    if [[ -z "$DOCKER_NATIVE" ]];then
-      if [[ -z "$(which boot2docker)" ]]; then
-        echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
-        echo "See: https://docs.docker.com/installation/mac/" >&2
-        exit 1
-      fi
-      if [[ $(boot2docker status) != "running" ]]; then
-        echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
-        exit 1
-      else
-        # Reach over and set the clock. After sleep/resume the clock will skew.
-        echo "+++ Setting boot2docker clock"
-        boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+  if [[ "${1-}" != "clean" ]]; then
+    if [[ -z "$(which docker)" ]]; then
+      echo "Can't find 'docker' in PATH, please fix and retry." >&2
+      echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
+      exit 1
+    fi
+
+    if kube::build::is_osx; then
+      if [[ -z "$DOCKER_NATIVE" ]];then
+        if [[ -z "$(which boot2docker)" ]]; then
+          echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
+          echo "See: https://docs.docker.com/installation/mac/" >&2
+          exit 1
+        fi
+        if [[ $(boot2docker status) != "running" ]]; then
+          echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
+          exit 1
+        else
+          # Reach over and set the clock. After sleep/resume the clock will skew.
+          echo "+++ Setting boot2docker clock"
+          boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
+        fi
       fi
     fi
-  fi
 
-  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
-    {
-      echo "Can't connect to 'docker' daemon.  please fix and retry."
-      echo
-      echo "Possible causes:"
-      echo "  - On Mac OS X, boot2docker VM isn't installed or started"
-      echo "  - On Mac OS X, docker env variable isn't set approriately. Run:"
-      echo "      \$(boot2docker shellinit)"
-      echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
-      echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
-      echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
-      echo "  - On Linux, Docker daemon hasn't been started or has crashed"
-    } >&2
-    exit 1
+    if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
+      {
+        echo "Can't connect to 'docker' daemon.  please fix and retry."
+        echo
+        echo "Possible causes:"
+        echo "  - On Mac OS X, boot2docker VM isn't installed or started"
+        echo "  - On Mac OS X, docker env variable isn't set approriately. Run:"
+        echo "      \$(boot2docker shellinit)"
+        echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
+        echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
+        echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
+        echo "  - On Linux, Docker daemon hasn't been started or has crashed"
+      } >&2
+      exit 1
+    fi
   fi
 
   KUBE_ROOT_HASH=$(kube::build::short_hash "$KUBE_ROOT")
@@ -161,15 +168,17 @@ function kube::build::is_osx() {
 
 function kube::build::clean_output() {
   # Clean out the output directory if it exists.
-  if kube::build::build_image_built ; then
-    echo "+++ Cleaning out _output/dockerized/bin/ via docker build image"
-    kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_BINPATH}'/*"
-  else
-    echo "!!! Build image not built.  Cannot clean via docker build image."
-  fi
+  if kube::build::has_docker ; then
+    if kube::build::build_image_built ; then
+      echo "+++ Cleaning out _output/dockerized/bin/ via docker build image"
+      kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_BINPATH}'/*"
+    else
+      echo "!!! Build image not built.  Cannot clean via docker build image."
+    fi
 
-  echo "+++ Removing data container"
-  "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    echo "+++ Removing data container"
+    "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  fi
 
   echo "+++ Cleaning out local _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
@@ -195,6 +204,10 @@ function kube::build::prepare_output() {
     fi
   fi
 
+}
+
+function kube::build::has_docker() {
+  which docker &> /dev/null
 }
 
 # Detect if a specific image exists
@@ -337,6 +350,8 @@ function kube::build::clean_image() {
 }
 
 function kube::build::clean_images() {
+  kube::build::has_docker || return 0
+
   kube::build::clean_image "${KUBE_BUILD_IMAGE}"
 
   echo "+++ Cleaning all other untagged docker images"
