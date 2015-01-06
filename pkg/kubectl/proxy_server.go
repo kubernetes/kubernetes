@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
+	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
@@ -39,10 +39,12 @@ func NewProxyServer(filebase string, cfg *client.Config, port int) (*ProxyServer
 	if prefix == "" {
 		prefix = "/api"
 	}
-	target, err := url.Parse(singleJoiningSlash(cfg.Host, prefix))
+	target, err := url.Parse(cfg.Host)
 	if err != nil {
 		return nil, err
 	}
+	target.Path = path.Join(target.Path, prefix)
+
 	proxy := newProxyServer(target)
 	if proxy.Transport, err = client.TransportFor(cfg); err != nil {
 		return nil, err
@@ -62,23 +64,11 @@ func newProxyServer(target *url.URL) *ProxyServer {
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
-		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+		req.URL.Path = path.Join(target.Path, req.URL.Path)
 	}
 	return &ProxyServer{ReverseProxy: httputil.ReverseProxy{Director: director}}
 }
 
 func newFileHandler(prefix, base string) http.Handler {
 	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
-}
-
-func singleJoiningSlash(a, b string) string {
-	aslash := strings.HasSuffix(a, "/")
-	bslash := strings.HasPrefix(b, "/")
-	switch {
-	case aslash && bslash:
-		return a + b[1:]
-	case !aslash && !bslash:
-		return a + "/" + b
-	}
-	return a + b
 }

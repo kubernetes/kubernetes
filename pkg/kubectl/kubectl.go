@@ -59,7 +59,8 @@ type NamespaceInfo struct {
 	Namespace string
 }
 
-// LoadNamespaceInfo parses a NamespaceInfo object from a file path. It creates a file at the specified path if it doesn't exist with the default namespace.
+// LoadNamespaceInfo parses a NamespaceInfo object from a file path.
+// It creates a file at the specified path if it doesn't exist with the default namespace.
 func LoadNamespaceInfo(path string) (*NamespaceInfo, error) {
 	var ns NamespaceInfo
 	if _, err := os.Stat(path); os.IsNotExist(err) {
