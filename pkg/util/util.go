@@ -52,12 +52,12 @@ func HandleCrash() {
 	}
 }
 
-// Forever loops forever running f every d.  Catches any panics, and keeps going.
+// Forever loops forever running f every period.  Catches any panics, and keeps going.
 func Forever(f func(), period time.Duration) {
 	Until(f, period, nil)
 }
 
-// Until loops until stop channel is closed, running f every d.
+// Until loops until stop channel is closed, running f every period.
 // Catches any panics, and keeps going. f may not be invoked if
 // stop channel is already closed.
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
