@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -162,10 +163,10 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-
-		ReadWritePort: portNumber,
-		ReadOnlyPort:  portNumber,
-		PublicAddress: host,
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
+		ReadWritePort:     portNumber,
+		ReadOnlyPort:      portNumber,
+		PublicAddress:     host,
 	})
 	handler.delegate = m.Handler
 

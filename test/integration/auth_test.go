@@ -32,6 +32,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -306,6 +307,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -356,6 +358,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -421,6 +424,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -480,6 +484,7 @@ func TestBobIsForbidden(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -539,6 +544,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -617,6 +623,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -700,6 +707,7 @@ func TestKindAuthorization(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport
@@ -777,6 +785,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admission.NewAlwaysAdmitController(),
 	})
 
 	transport := http.DefaultTransport

@@ -113,7 +113,7 @@ func TestOperationsList(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionHandler)
+	}, codec, "/prefix", "version", selfLinker, admissionControl)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -170,7 +170,7 @@ func TestOpGet(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionHandler)
+	}, codec, "/prefix", "version", selfLinker, admissionControl)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	defer server.Close()
