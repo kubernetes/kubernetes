@@ -338,7 +338,22 @@ func TestValidateRestartPolicy(t *testing.T) {
 	if noPolicySpecified.Always == nil {
 		t.Errorf("expected Always policy specified")
 	}
+}
 
+func TestValidateDNSPolicy(t *testing.T) {
+	successCases := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault, api.DNSPolicy("")}
+	for _, policy := range successCases {
+		if errs := validateDNSPolicy(&policy); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []api.DNSPolicy{api.DNSPolicy("invalid")}
+	for _, policy := range errorCases {
+		if errs := validateDNSPolicy(&policy); len(errs) == 0 {
+			t.Errorf("expected failure for %v", policy)
+		}
+	}
 }
 
 func TestValidateManifest(t *testing.T) {
@@ -404,59 +419,109 @@ func TestValidateManifest(t *testing.T) {
 	}
 }
 
-func TestValidatePod(t *testing.T) {
-	errs := ValidatePod(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: "foo", Namespace: api.NamespaceDefault,
-			Labels: map[string]string{
-				"foo": "bar",
-			},
+func TestValidatePodSpec(t *testing.T) {
+	successCases := []api.PodSpec{
+		{}, // empty is valid, if not very useful */
+		{ // Populate basic fields, leave defaults for most.
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{
-				Always: &api.RestartPolicyAlways{},
+		{ // Populate all fields.
+			Volumes: []api.Volume{
+				{Name: "vol"},
 			},
+			Containers:    []api.Container{{Name: "ctr", Image: "image"}},
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+			NodeSelector: map[string]string{
+				"key": "value",
+			},
+			Host: "foobar",
 		},
-	})
-	if len(errs) != 0 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
-	errs = ValidatePod(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: api.NamespaceDefault,
-			Labels: map[string]string{
-				"foo": "bar",
-			},
-		},
-		Spec: api.PodSpec{},
-	})
-	if len(errs) != 0 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	for i := range successCases {
+		if errs := ValidatePodSpec(&successCases[i]); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
 	}
 
-	errs = ValidatePodSpec(&api.PodSpec{
-		RestartPolicy: api.RestartPolicy{
-			Always: &api.RestartPolicyAlways{},
-			Never:  &api.RestartPolicyNever{},
+	failureCases := map[string]api.PodSpec{
+		"bad volume": {
+			Volumes: []api.Volume{{}},
 		},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
+		"bad container": {
+			Containers: []api.Container{{}},
+		},
+		"bad DNS policy": {
+			DNSPolicy: api.DNSPolicy("invalid"),
+		},
 	}
-	errs = ValidatePod(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: api.NamespaceDefault,
-			Labels: map[string]string{
-				"1/2/3/4/5": "bar", // invalid
-				"valid":     "bar", // good
+	for k, v := range failureCases {
+		if errs := ValidatePodSpec(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %q", k)
+		}
+	}
+
+	defaultPod := api.PodSpec{} // all empty fields
+	if errs := ValidatePodSpec(&defaultPod); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+	if util.AllPtrFieldsNil(defaultPod.RestartPolicy) {
+		t.Errorf("expected a default RestartPolicy")
+	}
+	if defaultPod.DNSPolicy == "" {
+		t.Errorf("expected a default DNSPolicy")
+	}
+}
+
+func TestValidatePod(t *testing.T) {
+	successCases := []api.Pod{
+		{ // Mostly empty.
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
+		},
+		{ // Basic fields.
+			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Volumes:    []api.Volume{{Name: "vol"}},
+				Containers: []api.Container{{Name: "ctr", Image: "image"}},
 			},
 		},
-		Spec: api.PodSpec{},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
+		{ // Just about everything.
+			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "vol"},
+				},
+				Containers:    []api.Container{{Name: "ctr", Image: "image"}},
+				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				DNSPolicy:     api.DNSClusterFirst,
+				NodeSelector: map[string]string{
+					"key": "value",
+				},
+				Host: "foobar",
+			},
+		},
+	}
+	for _, pod := range successCases {
+		if errs := ValidatePod(&pod); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.Pod{
+		"bad name":      {ObjectMeta: api.ObjectMeta{Name: "", Namespace: "ns"}},
+		"bad namespace": {ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}},
+		"bad spec": {
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{{}},
+			},
+		},
+	}
+	for k, v := range errorCases {
+		if errs := ValidatePod(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
 	}
 }
 
@@ -619,6 +684,57 @@ func TestValidatePodUpdate(t *testing.T) {
 			if len(errs) == 0 {
 				t.Errorf("unexpected valid: %s %v, %v", test.test, test.a, test.b)
 			}
+		}
+	}
+}
+
+func TestValidateBoundPods(t *testing.T) {
+	successCases := []api.BoundPod{
+		{ // Mostly empty.
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
+		},
+		{ // Basic fields.
+			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Volumes:    []api.Volume{{Name: "vol"}},
+				Containers: []api.Container{{Name: "ctr", Image: "image"}},
+			},
+		},
+		{ // Just about everything.
+			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "vol"},
+				},
+				Containers:    []api.Container{{Name: "ctr", Image: "image"}},
+				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				DNSPolicy:     api.DNSClusterFirst,
+				NodeSelector: map[string]string{
+					"key": "value",
+				},
+				Host: "foobar",
+			},
+		},
+	}
+	for _, pod := range successCases {
+		if errs := ValidateBoundPod(&pod); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.Pod{
+		"bad name":      {ObjectMeta: api.ObjectMeta{Name: "", Namespace: "ns"}},
+		"bad namespace": {ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}},
+		"bad spec": {
+			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{{}},
+			},
+		},
+	}
+	for k, v := range errorCases {
+		if errs := ValidatePod(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
 		}
 	}
 }
