@@ -162,6 +162,10 @@ func TestQuantityParse(t *testing.T) {
 		// Even if it were, 500 * 1/1024 = .48828125, NOT .512
 		// I cannot recommend using this feature, it is confusing.
 		{"0.5i", Quantity{dec(500, -3), DecimalSI}},
+
+		// Things written by trolls
+		{".001", Quantity{dec(1, -3), DecimalSI}},
+		{"1.", Quantity{dec(1, 0), DecimalSI}},
 	}
 
 	for _, item := range table {
