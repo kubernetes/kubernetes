@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -107,7 +108,7 @@ type etcdWatcher struct {
 	list   bool // If we're doing a recursive watch, should be true.
 	filter FilterFunc
 
-	etcdIncoming  chan *etcd.Response
+	etcdIncoming  chan *etcd.RawResponse
 	etcdError     chan error
 	etcdStop      chan bool
 	etcdCallEnded chan struct{}
@@ -133,7 +134,7 @@ func newEtcdWatcher(list bool, filter FilterFunc, encoding runtime.Codec, versio
 		transform:    transform,
 		list:         list,
 		filter:       filter,
-		etcdIncoming: make(chan *etcd.Response),
+		etcdIncoming: make(chan *etcd.RawResponse),
 		etcdError:    make(chan error, 1),
 		etcdStop:     make(chan bool),
 		outgoing:     make(chan watch.Event),
@@ -150,21 +151,31 @@ func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string, resourceVersion u
 	defer util.HandleCrash()
 	defer close(w.etcdError)
 	if resourceVersion == 0 {
-		latest, err := etcdGetInitialWatchState(client, key, w.list, w.etcdIncoming)
+		latest, err := w.etcdGetInitialWatchState(client, key, w.list)
 		if err != nil {
 			w.etcdError <- err
 			return
 		}
 		resourceVersion = latest + 1
 	}
-	_, err := client.Watch(key, resourceVersion, w.list, w.etcdIncoming, w.etcdStop)
+	res, err := client.RawWatch(key, resourceVersion, w.list, w.etcdIncoming, w.etcdStop)
 	if err != nil && err != etcd.ErrWatchStoppedByUser {
+		if IsEtcdEventIndexCleared(err) {
+			resourceIndex := res.Header.Get("X-Etcd-Index")
+			index, parseErr := strconv.ParseUint(resourceIndex, 10, 64)
+			if parseErr != nil {
+				err = fmt.Errorf("Poorly formated etcd-index: %s %v", resourceIndex, parseErr)
+			} else {
+				w.etcdWatch(client, key, index+1)
+				return
+			}
+		}
 		w.etcdError <- err
 	}
 }
 
 // etcdGetInitialWatchState turns an etcd Get request into a watch equivalent
-func etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool, incoming chan<- *etcd.Response) (resourceVersion uint64, err error) {
+func (w *etcdWatcher) etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool) (resourceVersion uint64, err error) {
 	resp, err := client.Get(key, false, recursive)
 	if err != nil {
 		if !IsEtcdNotFound(err) {
@@ -177,23 +188,23 @@ func etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool, inc
 		return resourceVersion, nil
 	}
 	resourceVersion = resp.EtcdIndex
-	convertRecursiveResponse(resp.Node, resp, incoming)
+	w.convertRecursiveResponse(resp.Node, resp)
 	return
 }
 
 // convertRecursiveResponse turns a recursive get response from etcd into individual response objects
 // by copying the original response.  This emulates the behavior of a recursive watch.
-func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming chan<- *etcd.Response) {
+func (w *etcdWatcher) convertRecursiveResponse(node *etcd.Node, response *etcd.Response) {
 	if node.Dir {
 		for i := range node.Nodes {
-			convertRecursiveResponse(node.Nodes[i], response, incoming)
+			w.convertRecursiveResponse(node.Nodes[i], response)
 		}
 		return
 	}
 	copied := *response
 	copied.Action = "get"
 	copied.Node = node
-	incoming <- &copied
+	w.sendResult(&copied)
 }
 
 // translate pulls stuff from etcd, converts, and pushes out the outgoing channel. Meant to be
@@ -220,7 +231,18 @@ func (w *etcdWatcher) translate() {
 			return
 		case res, ok := <-w.etcdIncoming:
 			if ok {
-				w.sendResult(res)
+				response, err := res.Unmarshal()
+				if err != nil {
+					w.emit(watch.Event{
+						watch.Error,
+						&api.Status{
+							Status:  api.StatusFailure,
+							Message: err.Error(),
+						},
+					})
+				} else {
+					w.sendResult(response)
+				}
 			}
 			// If !ok, don't return here-- must wait for etcdError channel
 			// to give an error or be closed.
