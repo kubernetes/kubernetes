@@ -34,10 +34,29 @@
 #   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | sh
 #  Rackspace
 #   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | sh
-
+#
+#  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
+#  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 set -o errexit
 set -o nounset
 set -o pipefail
+
+function create-cluster {
+  echo "Creating a kubernetes on ${KUBERNETES_PROVIDER:-gce}..."
+  (
+    cd kubernetes
+    ./cluster/kube-up.sh
+    echo "Kubernetes binaries at ${PWD}/kubernetes/cluster/"
+    echo "You may want to add this directory to your PATH in \$HOME/.profile"
+
+    echo "Installation successful!"
+  )
+}
+
+if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
+  create-cluster
+  exit 0
+fi
 
 release=v0.7.2
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
@@ -48,7 +67,9 @@ if [[ "${uname}" == "Darwin" ]]; then
 elif [[ "${uname}" == "Linux" ]]; then
   platform="linux"
 else
-  echo "Unknown, unsupported platform: (${uname}).  Bailing out."
+  echo "Unknown, unsupported platform: (${uname})."
+  echo "Supported platforms: Linux, Darwin."
+  echo "Bailing out."
   exit 2
 fi
 
@@ -60,17 +81,29 @@ elif [[ "${machine}" == "i686" ]]; then
 elif [[ "${machine}" == "arm*" ]]; then
   arch="arm"
 else
-  echo "Unknown, unsupported architecture (${machine}).  Bailing out."
+  echo "Unknown, unsupported architecture (${machine})."
+  echo "Supported architectures x86_64, i686, arm*"
+  echo "Bailing out."
   exit 3
 fi
 
 file=kubernetes.tar.gz
 
-echo "Downloading kubernetes release ${release}"
+
+echo "Downloading kubernetes release ${release} to ${PWD}/kubernetes.tar.gz"
+if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+  echo "Is this ok? [Y]/n"
+  read confirm
+  if [[ "$confirm" == "n" ]]; then
+    echo "Aborting."
+    exit 0
+  fi
+fi
+
 if [[ $(which wget) ]]; then
   wget -O ${file} ${release_url}
 elif [[ $(which curl) ]]; then
-  curl -o ${file} ${release_url}
+  curl -L -o ${file} ${release_url}
 else
   echo "Couldn't find curl or wget.  Bailing out."
   exit 1
@@ -80,14 +113,5 @@ echo "Unpacking kubernetes release ${release}"
 tar -xzf ${file}
 rm ${file}
 
-echo "Installing kubernetes..."
-(
-  cd kubernetes
-  ./cluster/kube-up.sh
-)
-
-echo "Kubernetes binaries at ${PWD}/kubernetes/platforms/${platform}/${arch}/PATH"
-echo "You may want to add this directory to your PATH in \$HOME/.profile"
-
-echo "Installation successful!"
+create-cluster
 
