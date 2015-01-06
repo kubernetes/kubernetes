@@ -1,3 +1,354 @@
+## kubectl
+The ```kubectl``` command provides command line access to the kubernetes API.
+
+### Commands
+
+#### version
+Print the version of the client and server.
+
+Usage: 
+```
+  kubectl version [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The version of the API to use against the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority="": Path to a certificate file for the certificate authority
+  -c, --client=false: Client version only (no server required)
+      --client-certificate="": Path to a client certificate for TLS.
+      --client-key="": Path to a client key file for TLS.
+  -h, --help=false: help for version
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": Kubernetes apiserver to connect to
+
+
+Use "kubectl help [command]" for more information about that command.
+```
+
+#### proxy
+Create a local proxy to the API server
+
+Usage: 
+```
+  kubectl proxy [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -h, --help=false: help for proxy
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -p, --port=8001: The port on which to run the proxy
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+  -w, --www="": Also serve static files from the given directory under the prefix /static
+```
+
+#### get
+Display one or more resources
+Possible resources include pods (po), replication controllers (rc), services
+(se), minions (mi), or events (ev).
+
+If you specify a Go template, you can use any fields defined for the API version
+you are connecting to the server with.
+
+Examples:
+```sh
+  $ kubectl get pods
+  <list all pods in ps output format>
+
+  $ kubectl get replicationController 1234-56-7890-234234-456456
+  <list single replication controller in ps output format>
+
+  $ kubectl get -o json pod 1234-56-7890-234234-456456
+  <list single pod in json output format>
+```
+Usage: 
+```
+  kubectl get [(-o|--output=)json|yaml|...] <resource> [<id>] [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -h, --help=false: help for get
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --no-headers=false: When using the default output, don't print headers
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -o, --output="": Output format: json|yaml|template|templatefile
+      --output-version="": Output the formatted object with the given version (default api-version)
+  -l, --selector="": Selector (label query) to filter on
+  -s, --server="": The address of the Kubernetes API server
+  -t, --template="": Template string or path to template file to use when --output=template or --output=templatefile
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+  -w, --watch=false: After listing/getting the requested object, watch for changes.
+      --watch-only=false: Watch for changes to the requseted object(s), without listing/getting first.
+```
+
+#### describe
+Show details of a specific resource.
+
+This command joins many API calls together to form a detailed description of a
+given resource.
+
+Usage: 
+```
+  kubectl describe <resource> <id> [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -h, --help=false: help for describe
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+#### create
+Create a resource by filename or stdin.
+
+JSON and YAML formats are accepted.
+
+Examples:
+```sh
+  $ kubectl create -f pod.json
+  <create a pod using the data in pod.json>
+
+  $ cat pod.json | kubectl create -f -
+  <create a pod based on the json passed into stdin>
+```
+Usage: 
+```
+  kubectl create -f filename [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -f, --filename="": Filename or URL to file to use to create the resource
+  -h, --help=false: help for create
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+#### createall
+Create all resources contained in JSON file specified in a directory, filename or stdin
+
+JSON and YAML formats are accepted.
+
+Examples:
+```sh
+  $ kubectl createall -d configs/
+  <creates all resources listed in JSON or YAML files, found recursively under the configs directory>
+
+  $ kubectl createall -f config.json
+  <creates all resources listed in config.json>
+
+  $ cat config.json | kubectl apply -f -
+  <creates all resources listed in config.json>
+```
+Usage: 
+```
+  kubectl createall [-d directory] [-f filename] [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -d, --directory="": Directory of JSON or YAML files to use to update the resource
+  -f, --filename="": Filename or URL to file to use to update the resource
+  -h, --help=false: help for createall
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+#### update
+Update a resource by filename or stdin.
+
+JSON and YAML formats are accepted.
+
+Examples:
+```sh
+  $ kubectl update -f pod.json
+  <update a pod using the data in pod.json>
+
+  $ cat pod.json | kubectl update -f -
+  <update a pod based on the json passed into stdin>
+```
+
+Usage: 
+```
+  kubectl update -f filename [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -f, --filename="": Filename or URL to file to use to update the resource
+  -h, --help=false: help for update
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+#### delete
+Delete a resource by filename, stdin, resource and id or by resources and label selector.
+
+JSON and YAML formats are accepted.
+
+If both a filename and command line arguments are passed, the command line
+arguments are used and the filename is ignored.
+
+Note that the delete command does NOT do resource version checks, so if someone
+submits an update to a resource right when you submit a delete, their update
+will be lost along with the rest of the resource.
+
+Examples:
+```sh
+  $ kubectl delete -f pod.json
+  <delete a pod using the type and id pod.json>
+
+  $ cat pod.json | kubectl delete -f -
+  <delete a pod based on the type and id in the json passed into stdin>
+
+  $ kubectl delete pods,services -l name=myLabel
+  <delete pods and services with label name=myLabel>
+
+  $ kubectl delete pod 1234-56-7890-234234-456456
+  <delete a pod with ID 1234-56-7890-234234-456456>
+```
+
+Usage: 
+```
+  kubectl delete ([-f filename] | (<resource> [(<id> | -l <label>)] [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -f, --filename="": Filename or URL to file to use to delete the resource
+  -h, --help=false: help for delete
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -l, --selector="": Selector (label query) to filter on
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+#### logs
+Print the logs for a container in a pod. If the pod has only one container, the container name is optional
+Examples:
+```sh
+  $ kubectl log 123456-7890 ruby-container
+  <returns snapshot of ruby-container logs from pod 123456-7890>
+
+  $ kubectl log -f 123456-7890 ruby-container
+  <starts streaming of ruby-container logs from pod 123456-7890>
+```
+Usage: 
+```
+  kubectl log [-f] <pod> [<container>] [flags]
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -f, --follow=false: Specify if the logs should be streamed.
+  -h, --help=false: help for log
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+### Usage
+```
+Usage: 
+  kubectl [flags]
+  kubectl [command]
+
+Available Commands: 
+  version                                                   Print version of client and server
+  proxy                                                     Run a proxy to the Kubernetes API server
+  get [(-o|--output=)json|yaml|...] <resource> [<id>]       Display one or many resources
+  describe <resource> <id>                                  Show details of a specific resource
+  create -f filename                                        Create a resource by filename or stdin
+  createall [-d directory] [-f filename]                    Create all resources specified in a directory, filename or stdin
+  update -f filename                                        Update a resource by filename or stdin
+  delete ([-f filename] | (<resource> [(<id> | -l <label>)] Delete a resource by filename, stdin or resource and id
+  namespace [<namespace>]                                   Set and view the current Kubernetes namespace
+  log [-f] <pod> [<container>]                              Print the logs for a container in a pod.
+  help [command]                                            Help about any command
+
+ Available Flags:
+      --api-version="v1beta1": The API version to use when talking to the server
+  -a, --auth-path="/Users/bburns/.kubernetes_auth": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority=: Path to a cert. file for the certificate authority.
+      --client-certificate=: Path to a client key file for TLS.
+      --client-key=: Path to a client key file for TLS.
+  -h, --help=false: help for kubectl
+      --insecure-skip-tls-verify=%!s(bool=false): If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --token=: Bearer token for authentication to the API server.
+      --validate=false: If true, use a schema to validate the input before sending it
+```
+
+
+## kubecfg is deprecated.  Please use kubectl!
 ## kubecfg command line interface
 The `kubecfg` command line tools is used to interact with the Kubernetes HTTP API.
 
