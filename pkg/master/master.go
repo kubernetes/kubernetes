@@ -419,7 +419,7 @@ func (m *Master) InstallSwaggerAPI() {
 		// TODO: Parameterize the path?
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
-		SwaggerFilePath: "/static/swagger-ui/",
+		SwaggerFilePath: "/swagger-ui/",
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 }
