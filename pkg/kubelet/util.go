@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -32,49 +30,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisor "github.com/google/cadvisor/client"
 )
-
-// TODO: move this into a pkg/util
-func GetHostname(hostnameOverride string) string {
-	hostname := []byte(hostnameOverride)
-	if string(hostname) == "" {
-		// Note: We use exec here instead of os.Hostname() because we
-		// want the FQDN, and this is the easiest way to get it.
-		fqdn, err := exec.Command("hostname", "-f").Output()
-		if err != nil {
-			glog.Fatalf("Couldn't determine hostname: %v", err)
-		}
-		hostname = fqdn
-	}
-	return strings.TrimSpace(string(hostname))
-}
-
-// TODO: move this into a pkg/util
-func GetDockerEndpoint(dockerEndpoint string) string {
-	var endpoint string
-	if len(dockerEndpoint) > 0 {
-		endpoint = dockerEndpoint
-	} else if len(os.Getenv("DOCKER_HOST")) > 0 {
-		endpoint = os.Getenv("DOCKER_HOST")
-	} else {
-		endpoint = "unix:///var/run/docker.sock"
-	}
-	glog.Infof("Connecting to docker on %s", endpoint)
-
-	return endpoint
-}
-
-// TODO: move this into pkg/util
-func ConnectToDockerOrDie(dockerEndpoint string) *docker.Client {
-	client, err := docker.NewClient(GetDockerEndpoint(dockerEndpoint))
-	if err != nil {
-		glog.Fatal("Couldn't connect to docker.")
-	}
-	return client
-}
 
 // TODO: move this into the kubelet itself
 func MonitorCAdvisor(k *Kubelet, cp uint) {

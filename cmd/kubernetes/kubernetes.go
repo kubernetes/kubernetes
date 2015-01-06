@@ -27,7 +27,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/standalone"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -52,7 +51,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string
 	standalone.RunScheduler(cl)
 	standalone.RunControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
-	dockerClient := kubelet.ConnectToDockerOrDie(*dockerEndpoint)
+	dockerClient := util.ConnectToDockerOrDie(*dockerEndpoint)
 	standalone.SimpleRunKubelet(etcdClient, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250)
 }
 
