@@ -672,7 +672,7 @@ func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 }
 
 func (kl *Kubelet) killContainerByID(ID, name string) error {
-	glog.V(2).Infof("Killing: %s", ID)
+	glog.V(2).Infof("Killing container with id %s and name %s", ID, name)
 	err := kl.dockerClient.StopContainer(ID, 10)
 	if len(name) == 0 {
 		return err
@@ -783,13 +783,14 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	uuid := pod.UID
 	containersToKeep := make(map[dockertools.DockerID]empty)
 	killedContainers := make(map[dockertools.DockerID]empty)
+	glog.V(4).Infof("Syncing Pod, podFullName: %s, uuid: %s", podFullName, uuid)
 
 	// Make sure we have a network container
 	var netID dockertools.DockerID
 	if netDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
 		netID = dockertools.DockerID(netDockerContainer.ID)
 	} else {
-		glog.V(3).Infof("Network container doesn't exist for pod %q, re-creating the pod", podFullName)
+		glog.V(2).Infof("Network container doesn't exist for pod %q, killing and re-creating the pod", podFullName)
 		count, err := kl.killContainersInPod(pod, dockerContainers)
 		if err != nil {
 			return err
@@ -845,9 +846,9 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				glog.V(1).Infof("pod %s container %s is unhealthy.", podFullName, container.Name, healthy)
+				glog.V(1).Infof("pod %s container %s is unhealthy. Container will be killed and re-created.", podFullName, container.Name, healthy)
 			} else {
-				glog.V(3).Infof("container hash changed %d vs %d.", hash, expectedHash)
+				glog.V(1).Infof("pod %s container %s hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
 			if err := kl.killContainer(dockerContainer); err != nil {
 				glog.V(1).Infof("Failed to kill container %s: %v", dockerContainer.ID, err)
