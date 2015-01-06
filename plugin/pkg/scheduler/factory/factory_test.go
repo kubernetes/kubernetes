@@ -88,7 +88,7 @@ func TestPollMinions(t *testing.T) {
 }
 
 func makeNamespaceURL(namespace, suffix string, isClient bool) string {
-	if client.NamespaceInPathFor(testapi.Version()) {
+	if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
 		return makeURL("/ns/" + namespace + suffix)
 	}
 	// if this is a url the client should call, encode the url

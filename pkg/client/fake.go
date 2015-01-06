@@ -90,23 +90,28 @@ func (f HTTPClientFunc) Do(req *http.Request) (*http.Response, error) {
 type FakeRESTClient struct {
 	Client HTTPClient
 	Codec  runtime.Codec
+	Legacy bool
 	Req    *http.Request
 	Resp   *http.Response
 	Err    error
 }
 
 func (c *FakeRESTClient) Get() *Request {
-	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.Codec, true)
+	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
 }
+
 func (c *FakeRESTClient) Put() *Request {
-	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, c.Codec, true)
+	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
 }
+
 func (c *FakeRESTClient) Post() *Request {
-	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.Codec, true)
+	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
 }
+
 func (c *FakeRESTClient) Delete() *Request {
-	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, c.Codec, true)
+	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
 }
+
 func (c *FakeRESTClient) Do(req *http.Request) (*http.Response, error) {
 	c.Req = req
 	if c.Client != HTTPClient(nil) {

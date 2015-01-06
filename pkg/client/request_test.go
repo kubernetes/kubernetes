@@ -75,21 +75,21 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, path: "/path/"}
+	r := &Request{baseURL: &url.URL{}, path: "/path/", namespaceInQuery: true}
 	if s := r.finalURL(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("/foo/")
 	if s := r.finalURL(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
+	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("foo/bar", "baz")
 	if s := r.finalURL(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -100,6 +100,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 		baseURL: &url.URL{
 			Path: "/",
 		},
+		namespaceInQuery: true,
 	}).Namespace("foo")
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
@@ -112,7 +113,6 @@ func TestRequestSetsNamespace(t *testing.T) {
 		baseURL: &url.URL{
 			Path: "/",
 		},
-		namespaceInPath: true,
 	}).Namespace("foo")
 	if s := r.finalURL(); s != "ns/foo" {
 		t.Errorf("namespace should be in path: %s", s)
@@ -121,9 +121,8 @@ func TestRequestSetsNamespace(t *testing.T) {
 
 func TestRequestOrdersNamespaceInPath(t *testing.T) {
 	r := (&Request{
-		baseURL:         &url.URL{},
-		path:            "/test/",
-		namespaceInPath: true,
+		baseURL: &url.URL{},
+		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
 	if s := r.finalURL(); s != "/test/ns/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
@@ -212,7 +211,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, testapi.Codec(), true)
+		r := NewRequest(nil, "", uri, testapi.Codec(), true, true)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}

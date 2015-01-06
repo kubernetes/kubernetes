@@ -48,7 +48,7 @@ func getFakeClient(t *testing.T, validURLs []string) (ClientPosterFunc, *httptes
 	return func(mapping *meta.RESTMapping) (RESTClientPoster, error) {
 		fakeCodec := runtime.CodecFor(api.Scheme, "v1beta1")
 		fakeUri, _ := url.Parse(server.URL + "/api/v1beta1")
-		return client.NewRESTClient(fakeUri, fakeCodec, false), nil
+		return client.NewRESTClient(fakeUri, "v1beta1", fakeCodec, true), nil
 	}, server
 }
 

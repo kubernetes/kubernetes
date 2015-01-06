@@ -38,7 +38,7 @@ import (
 )
 
 func makeNamespaceURL(namespace, suffix string) string {
-	if client.NamespaceInPathFor(testapi.Version()) {
+	if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
 		return makeURL("/ns/" + namespace + suffix)
 	}
 	return makeURL(suffix + "?namespace=" + namespace)

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
@@ -34,9 +35,19 @@ type Config struct {
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
 	Prefix string
-	// Version is the API version to talk to. If not specified, the client will use
-	// the preferred version.
+	// Version is the API version to talk to. Must be provided when initializing
+	// a RESTClient directly. When initializing a Client, will be set with the default
+	// code version.
 	Version string
+	// LegacyBehavior defines whether the RESTClient should follow conventions that
+	// existed prior to v1beta3 in Kubernetes - namely, namespace (if specified)
+	// not being part of the path, and resource names allowing mixed case. Set to
+	// true when using Kubernetes v1beta1 or v1beta2.
+	LegacyBehavior bool
+	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
+	// to a RESTClient or Client. Required when initializing a RESTClient, optional
+	// when initializing a Client.
+	Codec runtime.Codec
 
 	// Server requires Basic authentication
 	Username string
@@ -80,16 +91,14 @@ type KubeletConfig struct {
 // is not valid.
 func New(c *Config) (*Client, error) {
 	config := *c
-	if config.Prefix == "" {
-		config.Prefix = "/api"
+	if err := SetKubernetesDefaults(&config); err != nil {
+		return nil, err
 	}
 	client, err := RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
-	version := defaultVersionFor(&config)
-	isPreV1Beta3 := (version == "v1beta1" || version == "v1beta2")
-	return &Client{client, isPreV1Beta3}, nil
+	return &Client{client}, nil
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
@@ -101,15 +110,37 @@ func NewOrDie(c *Config) *Client {
 	return client
 }
 
-// RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
-// object.
-func RESTClientFor(config *Config) (*RESTClient, error) {
-	version := defaultVersionFor(config)
-
-	// Set version
+// SetKubernetesDefaults sets default values on the provided client config for accessing the
+// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
+func SetKubernetesDefaults(config *Config) error {
+	if config.Prefix == "" {
+		config.Prefix = "/api"
+	}
+	if len(config.Version) == 0 {
+		config.Version = defaultVersionFor(config)
+	}
+	version := config.Version
 	versionInterfaces, err := latest.InterfacesFor(version)
 	if err != nil {
-		return nil, fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
+		return fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
+	}
+	if config.Codec == nil {
+		config.Codec = versionInterfaces.Codec
+	}
+	config.LegacyBehavior = (version == "v1beta1" || version == "v1beta2")
+	return nil
+}
+
+// RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
+// object. Note that a RESTClient may require fields that are optional when initializing a Client.
+// A RESTClient created by this method is generic - it expects to operate on an API that follows
+// the Kubernetes conventions, but may not be the Kubernetes API.
+func RESTClientFor(config *Config) (*RESTClient, error) {
+	if len(config.Version) == 0 {
+		return nil, fmt.Errorf("version is required when initializing a RESTClient")
+	}
+	if config.Codec == nil {
+		return nil, fmt.Errorf("Codec is required when initializing a RESTClient")
 	}
 
 	baseURL, err := defaultServerUrlFor(config)
@@ -117,7 +148,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, versionInterfaces.Codec, NamespaceInPathFor(version))
+	client := NewRESTClient(baseURL, config.Version, config.Codec, config.LegacyBehavior)
 
 	transport, err := TransportFor(config)
 	if err != nil {
@@ -229,9 +260,9 @@ func IsConfigTransportTLS(config *Config) bool {
 	return baseURL.Scheme == "https"
 }
 
-// defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor
+// defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor. It
+// requires Host and Version to be set prior to being called.
 func defaultServerUrlFor(config *Config) (*url.URL, error) {
-	version := defaultVersionFor(config)
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
 	defaultTLS := config.CertFile != "" || config.Insecure
@@ -239,7 +270,7 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	if host == "" {
 		host = "localhost"
 	}
-	return DefaultServerURL(host, config.Prefix, version, defaultTLS)
+	return DefaultServerURL(host, config.Prefix, config.Version, defaultTLS)
 }
 
 // defaultVersionFor is shared between defaultServerUrlFor and RESTClientFor
@@ -251,10 +282,4 @@ func defaultVersionFor(config *Config) string {
 		version = latest.Version
 	}
 	return version
-}
-
-// namespaceInPathFor is used to control what api version should use namespace in url paths
-func NamespaceInPathFor(version string) bool {
-	// we use query param for v1beta1/v1beta2, v1beta3+ will use path param
-	return (version != "v1beta1" && version != "v1beta2")
 }

@@ -44,7 +44,7 @@ func (c *Client) ReplicationControllers(namespace string) ReplicationControllerI
 }
 
 func (c *Client) Nodes() NodeInterface {
-	return newNodes(c, c.preV1Beta3)
+	return newNodes(c)
 }
 
 func (c *Client) Events(namespace string) EventInterface {
@@ -78,9 +78,6 @@ type APIStatus interface {
 // Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
-
-	// preV1Beta3 is true for v1beta1 and v1beta2
-	preV1Beta3 bool
 }
 
 // ServerVersion retrieves and parses the server's version.
@@ -131,4 +128,9 @@ func IsTimeout(err error) bool {
 		return true
 	}
 	return false
+}
+
+// preV1Beta3 returns true if the provided API version is an API introduced before v1beta3.
+func preV1Beta3(version string) bool {
+	return version == "v1beta1" || version == "v1beta2"
 }
