@@ -37,6 +37,7 @@ type Interface interface {
 	VersionInterface
 	NodesInterface
 	EventNamespacer
+	BoundPodsNamespacer
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -45,6 +46,10 @@ func (c *Client) ReplicationControllers(namespace string) ReplicationControllerI
 
 func (c *Client) Nodes() NodeInterface {
 	return newNodes(c, c.preV1Beta3)
+}
+
+func (c *Client) BoundPods() BoundPodsInterface {
+	return newBoundPods(c)
 }
 
 func (c *Client) Events(namespace string) EventInterface {

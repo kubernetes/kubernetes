@@ -33,6 +33,7 @@ import (
 )
 
 type fakeKubelet struct {
+	fullNameFunc      func(namespace, name string) (string, bool)
 	infoFunc          func(name string) (api.PodInfo, error)
 	containerInfoFunc func(podFullName, uid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
@@ -41,6 +42,10 @@ type fakeKubelet struct {
 	logFunc           func(w http.ResponseWriter, req *http.Request)
 	runFunc           func(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
 	containerLogsFunc func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
+}
+
+func (fk *fakeKubelet) GetPodFullName(namespace, name string) (string, bool) {
+	return fk.fullNameFunc(namespace, name)
 }
 
 func (fk *fakeKubelet) GetPodInfo(name, uuid string) (api.PodInfo, error) {
@@ -88,7 +93,11 @@ func newServerTest() *serverTestFramework {
 		updateChan: make(chan interface{}),
 	}
 	fw.updateReader = startReading(fw.updateChan)
-	fw.fakeKubelet = &fakeKubelet{}
+	fw.fakeKubelet = &fakeKubelet{
+		fullNameFunc: func(namespace, name string) (string, bool) {
+			return fmt.Sprintf("%s.%s.api", name, namespace), true
+		},
+	}
 	server := NewServer(fw.fakeKubelet, true)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
@@ -116,7 +125,7 @@ func TestPodInfo(t *testing.T) {
 		"goodpod": api.ContainerStatus{},
 	}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
-		if name == "goodpod.default.etcd" {
+		if name == "goodpod.default.api" {
 			return expected, nil
 		}
 		return nil, fmt.Errorf("bad pod %s", name)
@@ -142,7 +151,7 @@ func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
 	expectedInfo := &info.ContainerInfo{}
 	podID := "somepod"
-	expectedPodID := "somepod" + ".default.etcd"
+	expectedPodID := "somepod" + ".default.api"
 	expectedContainerName := "goodcontainer"
 	fw.fakeKubelet.containerInfoFunc = func(podID, uid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
@@ -171,7 +180,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 	expectedInfo := &info.ContainerInfo{}
 	podID := "somepod"
 	expectedNamespace := "custom"
-	expectedPodID := "somepod" + "." + expectedNamespace + ".etcd"
+	expectedPodID := "somepod" + "." + expectedNamespace + ".api"
 	expectedContainerName := "goodcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
 	fw.fakeKubelet.containerInfoFunc = func(podID, uid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
@@ -276,7 +285,7 @@ func TestServeRunInContainer(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + "." + podNamespace + ".etcd"
+	expectedPodName := podName + "." + podNamespace + ".api"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
 	fw.fakeKubelet.runFunc = func(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {
@@ -316,7 +325,7 @@ func TestServeRunInContainerWithUUID(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + "." + podNamespace + ".etcd"
+	expectedPodName := podName + "." + podNamespace + ".api"
 	expectedUuid := "7e00838d_-_3523_-_11e4_-_8421_-_42010af0a720"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
@@ -360,7 +369,7 @@ func TestContainerLogs(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
+	expectedPodName := podName + ".other.api"
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := false
@@ -400,7 +409,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
+	expectedPodName := podName + ".other.api"
 	expectedContainerName := "baz"
 	expectedTail := "5"
 	expectedFollow := false
@@ -440,7 +449,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
+	expectedPodName := podName + ".other.api"
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := true

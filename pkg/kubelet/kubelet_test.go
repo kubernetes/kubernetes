@@ -32,7 +32,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
@@ -45,8 +44,7 @@ func init() {
 	util.ReallyCrash = true
 }
 
-func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools.FakeDockerClient) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
+func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient) {
 	fakeDocker := &dockertools.FakeDockerClient{
 		RemovedImages: util.StringSet{},
 	}
@@ -54,11 +52,10 @@ func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
-	kubelet.etcdClient = fakeEtcdClient
 	kubelet.rootDirectory = "/tmp/kubelet"
 	kubelet.podWorkers = newPodWorkers()
 	kubelet.sourcesReady = func() bool { return true }
-	return kubelet, fakeEtcdClient, fakeDocker
+	return kubelet, fakeDocker
 }
 
 func verifyCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
@@ -89,7 +86,7 @@ func verifyBoolean(t *testing.T, expected, value bool) {
 }
 
 func TestKubeletDirs(t *testing.T) {
-	kubelet, _, _ := newTestKubelet(t)
+	kubelet, _ := newTestKubelet(t)
 	root := kubelet.rootDirectory
 	if err := os.MkdirAll(root, 0750); err != nil {
 		t.Fatalf("can't mkdir(%q): %s", root, err)
@@ -136,7 +133,7 @@ func TestKillContainerWithError(t *testing.T) {
 			},
 		},
 	}
-	kubelet, _, _ := newTestKubelet(t)
+	kubelet, _ := newTestKubelet(t)
 	kubelet.dockerClient = fakeDocker
 	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
 	if err == nil {
@@ -146,7 +143,7 @@ func TestKillContainerWithError(t *testing.T) {
 }
 
 func TestKillContainer(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "1234",
@@ -195,7 +192,7 @@ func (cr *channelReader) GetList() [][]api.BoundPod {
 }
 
 func TestSyncPodsDoesNothing(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	container := api.Container{Name: "bar"}
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -231,7 +228,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 }
 
 func TestSyncPodsWithTerminationLog(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	container := api.Container{
 		Name: "bar",
 		TerminationMessagePath: "/dev/somepath",
@@ -292,7 +289,7 @@ func matchString(t *testing.T, pattern, str string) bool {
 }
 
 func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.networkContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	err := kubelet.SyncPods([]api.BoundPod{
@@ -338,7 +335,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 }
 
 func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{}
 	kubelet.networkContainerImage = "custom_image_name"
@@ -380,7 +377,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 }
 
 func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// network container
@@ -419,7 +416,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 }
 
 func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeHttp := fakeHTTP{}
 	kubelet.httpClient = &fakeHttp
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -474,7 +471,7 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 }
 
 func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// format is k8s_<container-id>_<pod-fullname>
@@ -518,7 +515,7 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 
 func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	ready := false
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.sourcesReady = func() bool { return ready }
 
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -560,7 +557,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 }
 
 func TestSyncPodsDeletes(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// the k8s prefix is required for the kubelet to manage the container
@@ -598,7 +595,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 }
 
 func TestSyncPodDeletesDuplicate(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
@@ -656,7 +653,7 @@ func (f *FalseHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
 }
 
 func TestSyncPodBadHash(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.healthChecker = &FalseHealthChecker{}
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
@@ -702,7 +699,7 @@ func TestSyncPodBadHash(t *testing.T) {
 }
 
 func TestSyncPodUnhealthy(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.healthChecker = &FalseHealthChecker{}
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
@@ -777,7 +774,7 @@ func TestMakeEnvVariables(t *testing.T) {
 }
 
 func TestMountExternalVolumes(t *testing.T) {
-	kubelet, _, _ := newTestKubelet(t)
+	kubelet, _ := newTestKubelet(t)
 	pod := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
@@ -1025,7 +1022,7 @@ func TestGetContainerInfo(t *testing.T) {
 	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
 
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -1075,7 +1072,7 @@ func TestGetRootInfo(t *testing.T) {
 }
 
 func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID: "foobar",
@@ -1101,7 +1098,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	expectedErr := fmt.Errorf("some error")
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, expectedErr)
 
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -1129,7 +1126,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor := &mockCadvisorClient{}
 
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.ContainerList = []docker.APIContainers{}
 
@@ -1154,7 +1151,7 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	kubelet.runner = &fakeCommandRunner
 
@@ -1176,7 +1173,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 
 func TestRunInContainer(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.runner = &fakeCommandRunner
 
 	containerID := "abc1234"
@@ -1216,7 +1213,7 @@ func TestRunInContainer(t *testing.T) {
 
 func TestRunHandlerExec(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.runner = &fakeCommandRunner
 
 	containerID := "abc1234"
@@ -1264,7 +1261,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 func TestRunHandlerHttp(t *testing.T) {
 	fakeHttp := fakeHTTP{}
 
-	kubelet, _, _ := newTestKubelet(t)
+	kubelet, _ := newTestKubelet(t)
 	kubelet.httpClient = &fakeHttp
 
 	podName := "podFoo"
@@ -1293,7 +1290,7 @@ func TestRunHandlerHttp(t *testing.T) {
 }
 
 func TestNewHandler(t *testing.T) {
-	kubelet, _, _ := newTestKubelet(t)
+	kubelet, _ := newTestKubelet(t)
 	handler := &api.Handler{
 		HTTPGet: &api.HTTPGetAction{
 			Host: "foo",
@@ -1324,7 +1321,7 @@ func TestNewHandler(t *testing.T) {
 }
 
 func TestSyncPodEventHandlerFails(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
@@ -1485,7 +1482,7 @@ func TestKubeletGarbageCollection(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		kubelet, _, fakeDocker := newTestKubelet(t)
+		kubelet, fakeDocker := newTestKubelet(t)
 		kubelet.maxContainerCount = 5
 		fakeDocker.ContainerList = test.containers
 		fakeDocker.ContainerMap = test.containerDetails
@@ -1652,7 +1649,7 @@ func TestPurgeOldest(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		kubelet, _, fakeDocker := newTestKubelet(t)
+		kubelet, fakeDocker := newTestKubelet(t)
 		kubelet.maxContainerCount = 5
 		fakeDocker.ContainerMap = test.containerDetails
 		kubelet.purgeOldest(test.ids)
@@ -1663,7 +1660,7 @@ func TestPurgeOldest(t *testing.T) {
 }
 
 func TestSyncPodsWithPullPolicy(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
 	kubelet.networkContainerImage = "custom_image_name"
@@ -1704,7 +1701,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 }
 
 func TestGarbageCollectImages(t *testing.T) {
-	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet, fakeDocker := newTestKubelet(t)
 
 	fakeDocker.Images = []docker.APIImages{
 		{

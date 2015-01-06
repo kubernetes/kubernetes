@@ -36,7 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
@@ -63,7 +62,6 @@ type volumeMap map[string]volume.Interface
 func NewMainKubelet(
 	hn string,
 	dc dockertools.DockerInterface,
-	ec tools.EtcdClient,
 	rd string,
 	ni string,
 	ri time.Duration,
@@ -77,7 +75,6 @@ func NewMainKubelet(
 	return &Kubelet{
 		hostname:              hn,
 		dockerClient:          dc,
-		etcdClient:            ec,
 		rootDirectory:         rd,
 		resyncInterval:        ri,
 		networkContainerImage: ni,
@@ -120,8 +117,6 @@ type Kubelet struct {
 	// TODO: Remove this when (if?) that issue is fixed.
 	pullLock sync.RWMutex
 
-	// Optional, no events will be sent without it
-	etcdClient tools.EtcdClient
 	// Optional, defaults to simple implementaiton
 	healthChecker health.HealthChecker
 	// Optional, defaults to simple Docker implementation
@@ -1129,6 +1124,8 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 
 // GetKubeletContainerLogs returns logs from the container
 // The second parameter of GetPodInfo and FindPodContainer methods represents pod UUID, which is allowed to be blank
+// TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
+// or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
 	_, err := kl.GetPodInfo(podFullName, "")
 	if err == dockertools.ErrNoContainersInPod {
@@ -1148,6 +1145,18 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 // GetBoundPods returns all pods bound to the kubelet and their spec
 func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
 	return kl.pods, nil
+}
+
+// GetPodFullName provides the first pod that matches namespace and name, or false
+// if no such pod can be found.
+func (kl *Kubelet) GetPodFullName(namespace, name string) (string, bool) {
+	for i := range kl.pods {
+		pod := &kl.pods[i]
+		if pod.Namespace == namespace && pod.Name == name {
+			return GetPodFullName(pod), true
+		}
+	}
+	return "", false
 }
 
 // GetPodInfo returns information from Docker about the containers in a pod

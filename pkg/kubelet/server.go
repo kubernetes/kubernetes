@@ -33,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
@@ -66,6 +65,7 @@ type HostInterface interface {
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetBoundPods() ([]api.BoundPod, error)
+	GetPodFullName(namespace, name string) (string, bool)
 	GetPodInfo(name, uuid string) (api.PodInfo, error)
 	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
@@ -146,13 +146,11 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	follow, _ := strconv.ParseBool(uriValues.Get("follow"))
 	tail := uriValues.Get("tail")
 
-	podFullName := GetPodFullName(&api.BoundPod{
-		ObjectMeta: api.ObjectMeta{
-			Name:        podID,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
-		},
-	})
+	podFullName, ok := s.host.GetPodFullName(podNamespace, podID)
+	if !ok {
+		http.Error(w, "Pod does not exist", http.StatusNotFound)
+		return
+	}
 
 	fw := FlushWriter{writer: w}
 	if flusher, ok := fw.writer.(http.Flusher); ok {
@@ -217,19 +215,12 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request, version
 		http.Error(w, "Missing 'podNamespace=' query entry.", http.StatusBadRequest)
 		return
 	}
-	// TODO: backwards compatibility with existing API, needs API change
-	podFullName := GetPodFullName(&api.BoundPod{
-		ObjectMeta: api.ObjectMeta{
-			Name:        podID,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
-		},
-	})
-	info, err := s.host.GetPodInfo(podFullName, podUUID)
-	if err == dockertools.ErrNoContainersInPod {
-		http.Error(w, "api.BoundPod does not exist", http.StatusNotFound)
+	podFullName, ok := s.host.GetPodFullName(podNamespace, podID)
+	if !ok {
+		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
 	}
+	info, err := s.host.GetPodInfo(podFullName, podUUID)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -293,13 +284,11 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
 		return
 	}
-	podFullName := GetPodFullName(&api.BoundPod{
-		ObjectMeta: api.ObjectMeta{
-			Name:        podID,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
-		},
-	})
+	podFullName, ok := s.host.GetPodFullName(podNamespace, podID)
+	if !ok {
+		http.Error(w, "Pod does not exist", http.StatusNotFound)
+		return
+	}
 	command := strings.Split(u.Query().Get("cmd"), " ")
 	data, err := s.host.RunInContainer(podFullName, uuid, container, command)
 	if err != nil {
@@ -344,23 +333,20 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		// TODO(monnand) Implement this
 		errors.New("pod level status currently unimplemented")
 	case 3:
-		// Backward compatibility without uuid information
-		podFullName := GetPodFullName(&api.BoundPod{
-			ObjectMeta: api.ObjectMeta{
-				Name:        components[1],
-				Namespace:   api.NamespaceDefault,
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
-			},
-		})
+		// Backward compatibility without uuid information, does not support namespace
+		podFullName, ok := s.host.GetPodFullName(api.NamespaceDefault, components[1])
+		if !ok {
+			http.Error(w, "Pod does not exist", http.StatusNotFound)
+			return
+		}
+		glog.Infof("pod stats %s", podFullName)
 		stats, err = s.host.GetContainerInfo(podFullName, "", components[2], &query)
 	case 5:
-		podFullName := GetPodFullName(&api.BoundPod{
-			ObjectMeta: api.ObjectMeta{
-				Name:        components[2],
-				Namespace:   components[1],
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
-			},
-		})
+		podFullName, ok := s.host.GetPodFullName(components[1], components[2])
+		if !ok {
+			http.Error(w, "Pod does not exist", http.StatusNotFound)
+			return
+		}
 		stats, err = s.host.GetContainerInfo(podFullName, components[3], components[4], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
