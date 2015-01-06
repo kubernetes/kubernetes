@@ -34,11 +34,12 @@ export KUBERNETES_MASTER=http://$DOCKER_HOST_IP:8080
 docker run -v /var/run/docker.sock:/var/run/docker.sock kubernetes-bootstrap
 ```
 
-### Build kubernetes clean
+### Build kubernetes client
 
 ```
-./build/make-client.sh
-# set $host_os and $host_arch to your local host os and architecture.
+./hack/build-go.sh
+# set $host_os and $host_arch to match your local host os and architecture.
+host_os=linux host_arch=amd64
 export PATH=$(readlink -f _output/build/$host_os/$host_arch):$PATH
 ```
 
