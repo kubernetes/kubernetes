@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
@@ -93,6 +94,10 @@ func (s *SourceAPI) runServices(resourceVersion *string) {
 	watcher, err := s.servicesWatcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for services changes: %v", err)
+		if !client.IsTimeout(err) {
+			// Reset so that we do a fresh get request
+			*resourceVersion = ""
+		}
 		time.Sleep(wait.Jitter(s.waitDuration, 0.0))
 		return
 	}
@@ -157,6 +162,11 @@ func (s *SourceAPI) runEndpoints(resourceVersion *string) {
 	watcher, err := s.endpointsWatcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for endpoints changes: %v", err)
+		if !client.IsTimeout(err) {
+			// Reset so that we do a fresh get request
+			*resourceVersion = ""
+		}
+
 		time.Sleep(wait.Jitter(s.waitDuration, 0.0))
 		return
 	}

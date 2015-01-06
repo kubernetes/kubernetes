@@ -122,6 +122,27 @@ func TestServicesError(t *testing.T) {
 
 	// should have listed only
 	<-ch
+	if resourceVersion != "" {
+		t.Errorf("unexpected resource version, got %#v", resourceVersion)
+	}
+	if !reflect.DeepEqual(fakeClient.Actions, []client.FakeAction{{"watch-services", "1"}}) {
+		t.Errorf("unexpected actions, got %#v", fakeClient)
+	}
+}
+
+func TestServicesErrorTimeout(t *testing.T) {
+	fakeClient := &client.Fake{Err: errors.New("use of closed network connection")}
+	services := make(chan ServiceUpdate)
+	source := SourceAPI{servicesWatcher: fakeClient.Services(api.NamespaceAll), endpointsWatcher: fakeClient.Endpoints(api.NamespaceAll), services: services}
+	resourceVersion := "1"
+	ch := make(chan struct{})
+	go func() {
+		source.runServices(&resourceVersion)
+		close(ch)
+	}()
+
+	// should have listed only
+	<-ch
 	if resourceVersion != "1" {
 		t.Errorf("unexpected resource version, got %#v", resourceVersion)
 	}
@@ -236,6 +257,27 @@ func TestEndpointsFromZero(t *testing.T) {
 
 func TestEndpointsError(t *testing.T) {
 	fakeClient := &client.Fake{Err: errors.New("test")}
+	endpoints := make(chan EndpointsUpdate)
+	source := SourceAPI{servicesWatcher: fakeClient.Services(api.NamespaceAll), endpointsWatcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}
+	resourceVersion := "1"
+	ch := make(chan struct{})
+	go func() {
+		source.runEndpoints(&resourceVersion)
+		close(ch)
+	}()
+
+	// should have listed only
+	<-ch
+	if resourceVersion != "" {
+		t.Errorf("unexpected resource version, got %#v", resourceVersion)
+	}
+	if !reflect.DeepEqual(fakeClient.Actions, []client.FakeAction{{"watch-endpoints", "1"}}) {
+		t.Errorf("unexpected actions, got %#v", fakeClient)
+	}
+}
+
+func TestEndpointsErrorTimeout(t *testing.T) {
+	fakeClient := &client.Fake{Err: errors.New("use of closed network connection")}
 	endpoints := make(chan EndpointsUpdate)
 	source := SourceAPI{servicesWatcher: fakeClient.Services(api.NamespaceAll), endpointsWatcher: fakeClient.Endpoints(api.NamespaceAll), endpoints: endpoints}
 	resourceVersion := "1"
