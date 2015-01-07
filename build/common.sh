@@ -40,7 +40,8 @@ readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 # KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
 readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel}/
 readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
-
+readonly KUBE_GCS_LATEST_FILE=${KUBE_GCS_LATEST_FILE:-}
+readonly KUBE_GCS_LATEST_CONTENTS=${KUBE_GCS_LATEST_CONTENTS:-}
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
@@ -768,4 +769,21 @@ function kube::release::gcs::copy_release_artifacts() {
   fi
 
   gsutil ls -lhr "${gcs_destination}"
+}
+
+function kube::release::gcs::publish_latest() {
+  local latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+
+  mkdir -p "${RELEASE_STAGE}/upload"
+  echo ${KUBE_GCS_LATEST_CONTENTS} > "${RELEASE_STAGE}/upload/latest"
+
+  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
+    "${RELEASE_STAGE}/upload/latest" "${latest_file_dst}"
+
+  if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
+    gsutil acl ch -R -g all:R "${latest_file_dst}" >/dev/null 2>&1
+  fi
+
+  echo "+++ gsutil cat ${latest_file_dst}:"
+  gsutil cat ${latest_file_dst}
 }
