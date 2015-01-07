@@ -2,7 +2,7 @@ version: v1beta2
 id: cadvisor-agent
 containers:
   - name: cadvisor
-    image: google/cadvisor:latest
+    image: google/cadvisor:0.7.1
     ports:
       - name: http
         containerPort: 8080
