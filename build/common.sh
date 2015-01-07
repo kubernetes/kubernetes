@@ -658,7 +658,6 @@ function kube::release::gcs::release() {
 
   kube::release::gcs::verify_prereqs
   kube::release::gcs::ensure_release_bucket
-  kube::release::gcs::push_images
   kube::release::gcs::copy_release_artifacts
 }
 
