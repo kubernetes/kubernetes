@@ -251,7 +251,7 @@ func runReplicationControllerTest(c *client.Client) {
 	glog.Infof("Done creating replication controllers")
 
 	// Give the controllers some time to actually create the pods
-	if err := wait.Poll(time.Second, time.Second*30, c.ControllerHasDesiredReplicas(controller)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, client.ControllerHasDesiredReplicas(c, &controller)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
