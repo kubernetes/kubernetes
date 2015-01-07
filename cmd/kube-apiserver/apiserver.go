@@ -168,7 +168,7 @@ func main() {
 	}
 
 	admissionControlPluginNames := strings.Split(*admissionControl, ",")
-	admissionController := admission.NewAdmissionControl(client, admissionControlPluginNames, *admissionControlConfigFile)
+	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, *admissionControlConfigFile)
 
 	config := &master.Config{
 		Client:                client,

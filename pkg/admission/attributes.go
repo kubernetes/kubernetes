@@ -17,30 +17,23 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type attributesRecord struct {
-	client    client.Interface
 	namespace string
 	kind      string
 	operation string
 	object    runtime.Object
 }
 
-func NewAttributesRecord(client client.Interface, object runtime.Object, namespace, kind, operation string) Attributes {
+func NewAttributesRecord(object runtime.Object, namespace, kind, operation string) Attributes {
 	return &attributesRecord{
-		client:    client,
 		namespace: namespace,
 		kind:      kind,
 		operation: operation,
 		object:    object,
 	}
-}
-
-func (record *attributesRecord) GetClient() client.Interface {
-	return record.client
 }
 
 func (record *attributesRecord) GetNamespace() string {

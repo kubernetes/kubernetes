@@ -17,12 +17,16 @@ limitations under the License.
 package admit
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"io"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysAdmit", func(config io.Reader) (admission.Interface, error) { return NewAlwaysAdmit(), nil })
+	admission.RegisterPlugin("AlwaysAdmit", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+		return NewAlwaysAdmit(), nil
+	})
 }
 
 // alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.

@@ -17,14 +17,12 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // Attributes is an interface used by AdmissionController to get information about a request
 // that is used to make an admission decision.
 type Attributes interface {
-	GetClient() client.Interface
 	GetNamespace() string
 	GetKind() string
 	GetOperation() string
@@ -35,9 +33,4 @@ type Attributes interface {
 type Interface interface {
 	// Admit makes an admission decision based on the request attributes
 	Admit(a Attributes) (err error)
-}
-
-// AdmissionControl is responsible for performing Admission control decisions
-type AdmissionControl interface {
-	AdmissionControl(operation, kind, namespace string, object runtime.Object) (err error)
 }

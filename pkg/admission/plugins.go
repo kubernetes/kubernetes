@@ -21,6 +21,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
 )
 
@@ -28,7 +29,7 @@ import (
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
-type Factory func(config io.Reader) (Interface, error)
+type Factory func(client client.Interface, config io.Reader) (Interface, error)
 
 // All registered admission options.
 var pluginsMutex sync.Mutex
@@ -62,19 +63,19 @@ func RegisterPlugin(name string, plugin Factory) {
 // the name is not known.  The error return is only used if the named provider
 // was known but failed to initialize. The config parameter specifies the
 // io.Reader handler of the configuration file for the cloud provider, or nil
-// for no configuation.
-func GetPlugin(name string, config io.Reader) (Interface, error) {
+// for no configuration.
+func GetPlugin(name string, client client.Interface, config io.Reader) (Interface, error) {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
 	f, found := plugins[name]
 	if !found {
 		return nil, nil
 	}
-	return f(config)
+	return f(client, config)
 }
 
 // InitPlugin creates an instance of the named interface
-func InitPlugin(name string, configFilePath string) Interface {
+func InitPlugin(name string, client client.Interface, configFilePath string) Interface {
 	var config *os.File
 
 	if name == "" {
@@ -94,7 +95,7 @@ func InitPlugin(name string, configFilePath string) Interface {
 		defer config.Close()
 	}
 
-	plugin, err := GetPlugin(name, config)
+	plugin, err := GetPlugin(name, client, config)
 	if err != nil {
 		glog.Fatalf("Couldn't init admission plugin %q: %v", name, err)
 	}

@@ -39,6 +39,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/deny"
 )
 
 func convert(obj runtime.Object) (runtime.Object, error) {
@@ -54,7 +56,7 @@ var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
 var selfLinker runtime.SelfLinker = accessor
 var mapper meta.RESTMapper
-var admissionControl admission.AdmissionControl
+var admissionControl admission.Interface
 
 func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
@@ -94,7 +96,7 @@ func init() {
 	)
 	defMapper.Add(api.Scheme, true, versions...)
 	mapper = defMapper
-	admissionControl = admission.NewAlwaysAdmitController()
+	admissionControl = admit.NewAlwaysAdmit()
 }
 
 type Simple struct {
@@ -482,7 +484,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admission.NewAlwaysDenyController())
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny())
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -492,7 +494,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if response.StatusCode != http.StatusConflict {
+	if response.StatusCode != http.StatusForbidden {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
@@ -566,7 +568,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 		t:           t,
 		expectedSet: "/prefix/version/simple/" + ID,
 	}
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admission.NewAlwaysDenyController())
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny())
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -585,7 +587,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if response.StatusCode != http.StatusConflict {
+	if response.StatusCode != http.StatusForbidden {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
@@ -679,7 +681,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix", testVersion, selfLinker, admission.NewAlwaysDenyController())
+	}, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny())
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -698,7 +700,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if response.StatusCode != http.StatusConflict {
+	if response.StatusCode != http.StatusForbidden {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }

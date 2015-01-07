@@ -16,16 +16,18 @@ limitations under the License.
 
 package admission
 
-import ()
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+)
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface
 
 // New returns an admission.Interface that will enforce admission control decisions
-func newInterface(pluginNames []string, configFilePath string) Interface {
+func NewFromPlugins(client client.Interface, pluginNames []string, configFilePath string) Interface {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
-		plugin := InitPlugin(pluginName, configFilePath)
+		plugin := InitPlugin(pluginName, client, configFilePath)
 		if plugin != nil {
 			plugins = append(plugins, plugin)
 		}

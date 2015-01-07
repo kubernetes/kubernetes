@@ -22,10 +22,13 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysDeny", func(config io.Reader) (admission.Interface, error) { return NewAlwaysDeny(), nil })
+	admission.RegisterPlugin("AlwaysDeny", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+		return NewAlwaysDeny(), nil
+	})
 }
 
 // alwaysDeny is an implementation of admission.Interface which always says no to an admission request.
@@ -33,7 +36,7 @@ func init() {
 type alwaysDeny struct{}
 
 func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return apierrors.NewConflict(a.GetKind(), "", errors.New("No changes allowed"))
+	return apierrors.NewForbidden(a.GetKind(), "", errors.New("Admission control is denying all modifications"))
 }
 
 func NewAlwaysDeny() admission.Interface {

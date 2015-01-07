@@ -38,7 +38,7 @@ type RESTHandler struct {
 	selfLinker       runtime.SelfLinker
 	ops              *Operations
 	asyncOpWait      time.Duration
-	admissionControl admission.AdmissionControl
+	admissionControl admission.Interface
 }
 
 // ServeHTTP handles requests to all RESTStorage objects.
@@ -209,7 +209,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 		}
 
 		// invoke admission control
-		err = h.admissionControl.AdmissionControl("CREATE", parts[0], namespace, obj)
+		err = h.admissionControl.Admit(admission.NewAttributesRecord(obj, namespace, parts[0], "CREATE"))
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -230,7 +230,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 		}
 
 		// invoke admission control
-		err := h.admissionControl.AdmissionControl("DELETE", parts[0], namespace, nil)
+		err := h.admissionControl.Admit(admission.NewAttributesRecord(nil, namespace, parts[0], "DELETE"))
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -262,7 +262,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 		}
 
 		// invoke admission control
-		err = h.admissionControl.AdmissionControl("UPDATE", parts[0], namespace, obj)
+		err = h.admissionControl.Admit(admission.NewAttributesRecord(obj, namespace, parts[0], "UPDATE"))
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return

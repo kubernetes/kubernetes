@@ -76,7 +76,7 @@ type Config struct {
 	CorsAllowedOriginList util.StringList
 	Authenticator         authenticator.Request
 	Authorizer            authorizer.Authorizer
-	AdmissionControl      admission.AdmissionControl
+	AdmissionControl      admission.Interface
 
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
@@ -120,7 +120,7 @@ type Master struct {
 	corsAllowedOriginList util.StringList
 	authenticator         authenticator.Request
 	authorizer            authorizer.Authorizer
-	admissionControl      admission.AdmissionControl
+	admissionControl      admission.Interface
 	masterCount           int
 
 	readOnlyServer  string
@@ -466,7 +466,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.AdmissionControl) {
+func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
@@ -475,7 +475,7 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec,
 }
 
 // API_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.AdmissionControl) {
+func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
