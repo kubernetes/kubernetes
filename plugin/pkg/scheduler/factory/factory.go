@@ -28,10 +28,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 
 	"github.com/golang/glog"
@@ -130,38 +128,13 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}, nil
 }
 
-type listWatch struct {
-	client        *client.Client
-	fieldSelector labels.Selector
-	resource      string
-}
-
-func (lw *listWatch) List() (runtime.Object, error) {
-	return lw.client.
-		Get().
-		Resource(lw.resource).
-		SelectorParam("fields", lw.fieldSelector).
-		Do().
-		Get()
-}
-
-func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
-	return lw.client.
-		Get().
-		Prefix("watch").
-		Resource(lw.resource).
-		SelectorParam("fields", lw.fieldSelector).
-		Param("resourceVersion", resourceVersion).
-		Watch()
-}
-
-// createUnassignedPodLW returns a listWatch that finds all pods that need to be
+// createUnassignedPodLW returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
-func (factory *ConfigFactory) createUnassignedPodLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-		resource:      "pods",
+func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
+	return &cache.ListWatch{
+		Client:        factory.Client,
+		FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+		Resource:      "pods",
 	}
 }
 
@@ -173,22 +146,23 @@ func parseSelectorOrDie(s string) labels.Selector {
 	return selector
 }
 
-// createAssignedPodLW returns a listWatch that finds all pods that are
+// createAssignedPodLW returns a cache.ListWatch that finds all pods that are
 // already scheduled.
-func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
-		resource:      "pods",
+// TODO: return a ListerWatcher interface instead?
+func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
+	return &cache.ListWatch{
+		Client:        factory.Client,
+		FieldSelector: parseSelectorOrDie("DesiredState.Host!="),
+		Resource:      "pods",
 	}
 }
 
-// createMinionLW returns a listWatch that gets all changes to minions.
-func (factory *ConfigFactory) createMinionLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie(""),
-		resource:      "minions",
+// createMinionLW returns a cache.ListWatch that gets all changes to minions.
+func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
+	return &cache.ListWatch{
+		Client:        factory.Client,
+		FieldSelector: parseSelectorOrDie(""),
+		Resource:      "minions",
 	}
 }
 
