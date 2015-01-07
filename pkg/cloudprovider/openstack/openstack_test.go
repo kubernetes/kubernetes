@@ -49,7 +49,7 @@ monitor-max-retries = 3
 	}
 
 	if !cfg.LoadBalancer.CreateMonitor {
-		t.Errorf("incorrect lb.createmonitor: %s", cfg.LoadBalancer.CreateMonitor)
+		t.Errorf("incorrect lb.createmonitor: %t", cfg.LoadBalancer.CreateMonitor)
 	}
 	if cfg.LoadBalancer.MonitorDelay.Duration != 1*time.Minute {
 		t.Errorf("incorrect lb.monitordelay: %s", cfg.LoadBalancer.MonitorDelay)
@@ -58,7 +58,7 @@ monitor-max-retries = 3
 		t.Errorf("incorrect lb.monitortimeout: %s", cfg.LoadBalancer.MonitorTimeout)
 	}
 	if cfg.LoadBalancer.MonitorMaxRetries != 3 {
-		t.Errorf("incorrect lb.monitormaxretries: %s", cfg.LoadBalancer.MonitorMaxRetries)
+		t.Errorf("incorrect lb.monitormaxretries: %d", cfg.LoadBalancer.MonitorMaxRetries)
 	}
 }
 

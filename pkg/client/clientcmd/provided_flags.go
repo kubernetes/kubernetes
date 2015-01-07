@@ -96,5 +96,5 @@ func (flag *BoolFlag) Provided() bool {
 }
 
 func (flag *BoolFlag) String() string {
-	return fmt.Sprintf("%s", flag.Value)
+	return fmt.Sprintf("%t", flag.Value)
 }

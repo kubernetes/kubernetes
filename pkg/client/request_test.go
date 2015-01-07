@@ -393,7 +393,7 @@ func TestRequestWatch(t *testing.T) {
 		if testCase.Empty {
 			_, ok := <-watch.ResultChan()
 			if ok {
-				t.Errorf("%d: expected the watch to be empty: %#v", watch)
+				t.Errorf("%d: expected the watch to be empty: %#v", i, watch)
 			}
 		}
 	}

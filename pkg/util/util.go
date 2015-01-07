@@ -141,11 +141,11 @@ func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 // Writes 'value' to /proc/self/oom_score_adj.
 func ApplyOomScoreAdj(value int) error {
 	if value < -1000 || value > 1000 {
-		return fmt.Errorf("invalid value(%d) specified for oom_score_adj. Values must be within the range [-1000, 1000]")
+		return fmt.Errorf("invalid value(%d) specified for oom_score_adj. Values must be within the range [-1000, 1000]", value)
 	}
 
 	if err := ioutil.WriteFile("/proc/self/oom_score_adj", []byte(strconv.Itoa(value)), 0700); err != nil {
-		fmt.Errorf("failed to set oom_score_adj to %s - %q", value, err)
+		fmt.Errorf("failed to set oom_score_adj to %d - %q", value, err)
 	}
 
 	return nil
