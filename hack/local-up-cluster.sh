@@ -113,6 +113,8 @@ sudo "${GO_OUT}/kubelet" \
   --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
+  --api_servers="${API_HOST}:${API_PORT}" \
+  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
   --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
 KUBELET_PID=$!
 
