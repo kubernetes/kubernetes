@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 )
 
 const (
@@ -68,8 +70,11 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 			err = CompareNamespaceFromFile(cmd, namespace)
 			checkErr(err)
 
-			client, err := f.ClientBuilder.Client()
+			config, err := f.ClientConfig.ClientConfig()
 			checkErr(err)
+			client, err := client.New(config)
+			checkErr(err)
+
 			obj, err := mapping.Codec.Decode(data)
 			checkErr(err)
 			newRc := obj.(*api.ReplicationController)
