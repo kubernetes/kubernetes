@@ -21,10 +21,12 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
@@ -99,6 +101,24 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 	return &Client{client}, nil
+}
+
+func MatchesServerVersion(c *Config) error {
+	client, err := New(c)
+	if err != nil {
+		return err
+	}
+
+	clientVersion := version.Get()
+	serverVersion, err := client.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("couldn't read version from server: %v\n", err)
+	}
+	if s := *serverVersion; !reflect.DeepEqual(clientVersion, s) {
+		return fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", s, clientVersion)
+	}
+
+	return nil
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
