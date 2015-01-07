@@ -24,6 +24,6 @@ import (
 )
 
 func main() {
-	clientBuilder := clientcmd.NewBuilder(clientcmd.NewPromptingAuthLoader(os.Stdin))
+	clientBuilder := clientcmd.NewInteractiveClientConfig(clientcmd.Config{}, "", &clientcmd.ConfigOverrides{}, os.Stdin)
 	cmd.NewFactory(clientBuilder).Run(os.Stdout)
 }
