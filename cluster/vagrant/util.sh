@@ -273,3 +273,11 @@ function teardown-monitoring {
 function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests"
 }
+
+function setup-logging {
+  echo "TODO: setup logging"
+}
+
+function teardown-logging {
+  echo "TODO: teardown logging"
+}

@@ -28,6 +28,8 @@ echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
 teardown-monitoring
+teardown-logging
+
 kube-down
 
 echo "Done"

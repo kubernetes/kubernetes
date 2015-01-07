@@ -261,3 +261,11 @@ function kube-down() {
   "${GCLOUD}" preview container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}"
 }
+
+function setup-logging {
+  echo "TODO: setup logging"
+}
+
+function teardown-logging {
+  echo "TODO: teardown logging"
+}

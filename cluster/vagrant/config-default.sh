@@ -50,8 +50,12 @@ MASTER_PASSWD=vagrant
 ENABLE_NODE_MONITORING=true
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING=true
+ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
+
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=false
+ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Extra options to set on the Docker command line.  This is useful for setting
 # --insecure-registry for local registries.

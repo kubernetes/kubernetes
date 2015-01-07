@@ -350,6 +350,14 @@ function teardown-monitoring {
   echo "TODO"
 }
 
+function setup-logging {
+  echo "TODO: setup logging"
+}
+
+function teardown-logging {
+  echo "TODO: teardown logging"
+}
+
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Rackspace doesn't need special preparations for e2e tests"

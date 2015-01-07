@@ -1,0 +1,8 @@
+apiVersion: v1beta1
+kind: Service
+id: elasticsearch-logging
+containerPort: es-port
+port: 9200
+selector:
+  name: elasticsearch-logging
+createExternalLoadBalancer: true

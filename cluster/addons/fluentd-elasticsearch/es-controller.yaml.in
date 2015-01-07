@@ -1,0 +1,32 @@
+apiVersion: v1beta1
+kind: ReplicationController
+id: elasticsearch-logging-controller
+desiredState:
+  replicas: {ELASTICSEARCH_LOGGING_REPLICAS}
+  replicaSelector:
+    name: elasticsearch-logging
+  podTemplate:
+    desiredState:
+      manifest:
+        version: v1beta1
+        id: es-log-ingestion
+        containers:
+          - name: elasticsearch-logging
+            image: dockerfile/elasticsearch
+            ports:
+              - name: es-port
+                containerPort: 9200
+              - name: es-transport-port
+                containerPort: 9300
+            volumeMounts:
+              - name: es-persistent-storage
+                mountPath: /data
+        volumes:
+          - name: es-persistent-storage
+            source:
+              emptyDir: {}
+    labels:
+      name: elasticsearch-logging
+labels:
+  name: elasticsearch-logging
+ 
