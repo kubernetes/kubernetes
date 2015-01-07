@@ -373,8 +373,8 @@ func TestValidateManifest(t *testing.T) {
 					Image:      "image",
 					Command:    []string{"foo", "bar"},
 					WorkingDir: "/tmp",
-					Memory:     *resource.Q("1"),
-					CPU:        *resource.Q("1"),
+					Memory:     resource.MustParse("1"),
+					CPU:        resource.MustParse("1"),
 					Ports: []api.Port{
 						{Name: "p1", ContainerPort: 80, HostPort: 8080},
 						{Name: "p2", ContainerPort: 81},
@@ -624,7 +624,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "foo:V1",
-							CPU:   *resource.Q("100m"),
+							CPU:   resource.MustParse("100m"),
 						},
 					},
 				},
@@ -635,7 +635,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "foo:V2",
-							CPU:   *resource.Q("1000m"),
+							CPU:   resource.MustParse("1000m"),
 						},
 					},
 				},
@@ -1301,8 +1301,8 @@ func TestValidateMinionUpdate(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.Q("10000"),
-					api.ResourceMemory: *resource.Q("100"),
+					api.ResourceCPU:    resource.MustParse("10000"),
+					api.ResourceMemory: resource.MustParse("100"),
 				},
 			},
 		}, api.Node{
@@ -1311,8 +1311,8 @@ func TestValidateMinionUpdate(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.Q("100"),
-					api.ResourceMemory: *resource.Q("10000"),
+					api.ResourceCPU:    resource.MustParse("100"),
+					api.ResourceMemory: resource.MustParse("10000"),
 				},
 			},
 		}, true},
@@ -1323,8 +1323,8 @@ func TestValidateMinionUpdate(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.Q("10000"),
-					api.ResourceMemory: *resource.Q("100"),
+					api.ResourceCPU:    resource.MustParse("10000"),
+					api.ResourceMemory: resource.MustParse("100"),
 				},
 			},
 		}, api.Node{
@@ -1334,8 +1334,8 @@ func TestValidateMinionUpdate(t *testing.T) {
 			},
 			Spec: api.NodeSpec{
 				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.Q("100"),
-					api.ResourceMemory: *resource.Q("10000"),
+					api.ResourceCPU:    resource.MustParse("100"),
+					api.ResourceMemory: resource.MustParse("10000"),
 				},
 			},
 		}, true},

@@ -734,8 +734,8 @@ func TestCreateMinion(t *testing.T) {
 		},
 		Spec: api.NodeSpec{
 			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.Q("1000m"),
-				api.ResourceMemory: *resource.Q("1Mi"),
+				api.ResourceCPU:    resource.MustParse("1000m"),
+				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
 	}

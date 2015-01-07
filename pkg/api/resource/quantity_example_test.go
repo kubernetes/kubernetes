@@ -38,17 +38,17 @@ func ExampleFormat() {
 	// cores = 5300m
 }
 
-func ExampleParseOrDie() {
-	memorySize := resource.ParseOrDie("5Gi")
+func ExampleMustParse() {
+	memorySize := resource.MustParse("5Gi")
 	fmt.Printf("memorySize = %v (%v)\n", memorySize.Value(), memorySize.Format)
 
-	diskSize := resource.ParseOrDie("5G")
+	diskSize := resource.MustParse("5G")
 	fmt.Printf("diskSize = %v (%v)\n", diskSize.Value(), diskSize.Format)
 
-	cores := resource.ParseOrDie("5300m")
+	cores := resource.MustParse("5300m")
 	fmt.Printf("milliCores = %v (%v)\n", cores.MilliValue(), cores.Format)
 
-	cores2 := resource.ParseOrDie("5.4")
+	cores2 := resource.MustParse("5.4")
 	fmt.Printf("milliCores = %v (%v)\n", cores2.MilliValue(), cores2.Format)
 
 	// Output:

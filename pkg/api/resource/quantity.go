@@ -102,14 +102,14 @@ const (
 	DecimalSI       = Format("DecimalSI")       // e.g., 12M  (12 * 10^6)
 )
 
-// ParseOrDie turns the given string into a quantity or panics; for tests
+// MustParse turns the given string into a quantity or panics; for tests
 // or others cases where you know the string is valid.
-func ParseOrDie(str string) *Quantity {
+func MustParse(str string) Quantity {
 	q, err := ParseQuantity(str)
 	if err != nil {
 		panic(fmt.Errorf("cannot parse '%v': %v", str, err))
 	}
-	return q
+	return *q
 }
 
 const (
@@ -403,10 +403,7 @@ func (qf qFlag) String() string {
 // QuantityFlag is a helper that makes a quantity flag (using standard flag package).
 // Will panic if defaultValue is not a valid quantity.
 func QuantityFlag(flagName, defaultValue, description string) *Quantity {
-	q, err := ParseQuantity(defaultValue)
-	if err != nil {
-		panic(fmt.Errorf("can't use %v as a quantity: %v", defaultValue, err))
-	}
-	flag.Var(qFlag{q}, flagName, description)
-	return q
+	q := MustParse(defaultValue)
+	flag.Var(qFlag{&q}, flagName, description)
+	return &q
 }

@@ -170,10 +170,10 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 			rsrc := api.NodeResources{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:            *resource.NewMilliQuantity(int64(flavor.VCPUs*1000), resource.DecimalSI),
-					api.ResourceMemory:         *resource.Q(fmt.Sprintf("%dMi", flavor.RAM)),
-					"openstack.org/disk":       *resource.Q(fmt.Sprintf("%dG", flavor.Disk)),
+					api.ResourceMemory:         resource.MustParse(fmt.Sprintf("%dMi", flavor.RAM)),
+					"openstack.org/disk":       resource.MustParse(fmt.Sprintf("%dG", flavor.Disk)),
 					"openstack.org/rxTxFactor": *resource.NewQuantity(int64(flavor.RxTxFactor*1000), resource.DecimalSI),
-					"openstack.org/swap":       *resource.Q(fmt.Sprintf("%dMiB", flavor.Swap)),
+					"openstack.org/swap":       resource.MustParse(fmt.Sprintf("%dMi", flavor.Swap)),
 				},
 			}
 			flavor_to_resource[flavor.ID] = &rsrc

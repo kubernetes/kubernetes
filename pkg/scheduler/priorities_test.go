@@ -56,14 +56,14 @@ func TestLeastRequested(t *testing.T) {
 	}
 	cpuOnly := api.PodSpec{
 		Containers: []api.Container{
-			{CPU: *resource.Q("1000m")},
-			{CPU: *resource.Q("2000m")},
+			{CPU: resource.MustParse("1000m")},
+			{CPU: resource.MustParse("2000m")},
 		},
 	}
 	cpuAndMemory := api.PodSpec{
 		Containers: []api.Container{
-			{CPU: *resource.Q("1000m"), Memory: *resource.Q("2000")},
-			{CPU: *resource.Q("2000m"), Memory: *resource.Q("3000")},
+			{CPU: resource.MustParse("1000m"), Memory: resource.MustParse("2000")},
+			{CPU: resource.MustParse("2000m"), Memory: resource.MustParse("3000")},
 		},
 	}
 	tests := []struct {
