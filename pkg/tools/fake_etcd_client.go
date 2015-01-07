@@ -131,7 +131,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 		}
 		return &etcd.Response{}, EtcdErrorNotFound
 	}
-	f.t.Logf("returning %v: %v %#v", key, result.R, result.E)
+	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
 	return result.R, result.E
 }
 
@@ -262,6 +262,7 @@ func (f *FakeEtcdClient) WaitForWatchCompletion() {
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
+	f.Mutex.Lock()
 	if f.WatchImmediateError != nil {
 		return nil, f.WatchImmediateError
 	}
@@ -273,6 +274,7 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	defer close(injectedError)
 	f.WatchInjectError = injectedError
 
+	f.Mutex.Unlock()
 	if receiver == nil {
 		return f.Get(prefix, false, recursive)
 	} else {
