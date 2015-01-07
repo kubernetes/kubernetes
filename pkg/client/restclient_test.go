@@ -31,19 +31,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestChecksCodec(t *testing.T) {
+func TestSetsCodec(t *testing.T) {
 	testCases := map[string]struct {
 		Err    bool
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		"v1beta1": {false, "/v1beta1/", v1beta1.Codec},
-		"":        {false, "/v1beta1/", v1beta1.Codec},
-		"v1beta2": {false, "/v1beta2/", v1beta2.Codec},
+		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
+		"":        {false, "/api/v1beta1/", v1beta1.Codec},
+		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
 		"v1beta3": {true, "", nil},
 	}
 	for version, expected := range testCases {
-		client, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: version})
+		client, err := New(&Config{Host: "127.0.0.1", Version: version})
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -54,12 +54,67 @@ func TestChecksCodec(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		if e, a := expected.Prefix, client.baseURL.Path; e != a {
+		if e, a := expected.Prefix, client.RESTClient.baseURL.Path; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
-		if e, a := expected.Codec, client.Codec; e != a {
+		if e, a := expected.Codec, client.RESTClient.Codec; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
+	}
+}
+
+func TestSetDefaults(t *testing.T) {
+	testCases := []struct {
+		Config Config
+		After  Config
+		Err    bool
+	}{
+		{
+			Config{},
+			Config{
+				Prefix:         "/api",
+				Version:        latest.Version,
+				Codec:          latest.Codec,
+				LegacyBehavior: (latest.Version == "v1beta1" || latest.Version == "v1beta2"),
+			},
+			false,
+		},
+		{
+			Config{
+				Version: "not_an_api",
+			},
+			Config{},
+			true,
+		},
+	}
+	for _, testCase := range testCases {
+		val := &testCase.Config
+		err := SetKubernetesDefaults(val)
+		switch {
+		case err == nil && testCase.Err:
+			t.Errorf("expected error but was nil")
+			continue
+		case err != nil && !testCase.Err:
+			t.Errorf("unexpected error %v", err)
+			continue
+		case err != nil:
+			continue
+		}
+		if *val != testCase.After {
+			t.Errorf("unexpected result object: %#v", val)
+		}
+	}
+}
+
+func TestRESTClientRequires(t *testing.T) {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "", Codec: testapi.Codec()}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "v1beta1"}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Version(), Codec: testapi.Codec()}); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
@@ -81,7 +136,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {
-		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1"})
+		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1", Codec: testapi.Codec()})
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
@@ -110,7 +165,14 @@ func TestDoRequestBearer(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	request, _ := http.NewRequest("GET", testServer.URL, nil)
-	c, err := RESTClientFor(&Config{Host: testServer.URL, BearerToken: "test"})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		BearerToken: "test",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,7 +195,14 @@ func TestDoRequestAccepted(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "test", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		Username: "test",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -167,7 +236,15 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		Username: "user",
+		Password: "pass",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,7 +275,12 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -226,7 +308,15 @@ func TestDoRequestCreated(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		Username: "user",
+		Password: "pass",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

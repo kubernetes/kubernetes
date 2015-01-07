@@ -35,10 +35,13 @@ import (
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
 	baseURL *url.URL
+	// A string identifying the version of the API this client is expected to use.
+	apiVersion string
 
-	// namespaceInPath controls if URLs should encode the namespace as path param instead of query param
-	// needed for backward compatibility
-	namespaceInPath bool
+	// LegacyBehavior controls if URLs should encode the namespace as a query param,
+	// and if resource case is preserved for supporting older API conventions of
+	// Kubernetes.  Newer clients should leave this false.
+	LegacyBehavior bool
 
 	// Codec is the encoding and decoding scheme that applies to a particular set of
 	// REST resources.
@@ -59,10 +62,9 @@ type RESTClient struct {
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
-// decoding of responses from the server. If the namespace should be specified as part
-// of the path (after the resource), set namespaceInPath to true, otherwise it will be
-// passed as "namespace" in the query string.
-func NewRESTClient(baseURL *url.URL, c runtime.Codec, namespaceInPath bool) *RESTClient {
+// decoding of responses from the server. If this client should use the older, legacy
+// API conventions from Kubernetes API v1beta1 and v1beta2, set legacyBehavior true.
+func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -71,10 +73,12 @@ func NewRESTClient(baseURL *url.URL, c runtime.Codec, namespaceInPath bool) *RES
 	base.Fragment = ""
 
 	return &RESTClient{
-		baseURL: &base,
-		Codec:   c,
+		baseURL:    &base,
+		apiVersion: apiVersion,
 
-		namespaceInPath: namespaceInPath,
+		Codec: c,
+
+		LegacyBehavior: legacyBehavior,
 
 		// Make asynchronous requests by default
 		Sync: false,
@@ -106,7 +110,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if poller == nil {
 		poller = c.DefaultPoll
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.namespaceInPath).Poller(poller).Sync(c.Sync).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Poller(poller).Sync(c.Sync).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -134,6 +138,7 @@ func (c *RESTClient) Operation(name string) *Request {
 	return c.Get().Resource("operations").Name(name).Sync(false).NoPoll()
 }
 
+// DefaultPoll performs a polling action based on the PollPeriod set on the Client.
 func (c *RESTClient) DefaultPoll(name string) (*Request, bool) {
 	if c.PollPeriod == 0 {
 		return nil, false
@@ -142,4 +147,9 @@ func (c *RESTClient) DefaultPoll(name string) (*Request, bool) {
 	time.Sleep(c.PollPeriod)
 	// Make a poll request
 	return c.Operation(name).Poller(c.DefaultPoll), true
+}
+
+// APIVersion returns the APIVersion this RESTClient is expected to use.
+func (c *RESTClient) APIVersion() string {
+	return c.apiVersion
 }

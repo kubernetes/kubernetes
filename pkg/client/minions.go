@@ -35,18 +35,17 @@ type NodeInterface interface {
 
 // nodes implements NodesInterface
 type nodes struct {
-	r          *Client
-	preV1Beta3 bool
+	r *Client
 }
 
 // newNodes returns a nodes object. Uses "minions" as the
 // URL resource name for v1beta1 and v1beta2.
-func newNodes(c *Client, isPreV1Beta3 bool) *nodes {
-	return &nodes{c, isPreV1Beta3}
+func newNodes(c *Client) *nodes {
+	return &nodes{c}
 }
 
 func (c *nodes) resourceName() string {
-	if c.preV1Beta3 {
+	if preV1Beta3(c.r.APIVersion()) {
 		return "minions"
 	}
 	return "nodes"

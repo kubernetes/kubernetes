@@ -165,7 +165,7 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 // buildResourcePath is a convenience function for knowing if a namespace should be in a path param or not
 func buildResourcePath(namespace, resource string) string {
 	if len(namespace) > 0 {
-		if NamespaceInPathFor(testapi.Version()) {
+		if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
 			return path.Join("ns", namespace, resource)
 		}
 	}
@@ -183,7 +183,7 @@ func buildQueryValues(namespace string, query url.Values) url.Values {
 		}
 	}
 	if len(namespace) > 0 {
-		if !NamespaceInPathFor(testapi.Version()) {
+		if testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2" {
 			v.Set("namespace", namespace)
 		}
 	}
@@ -765,7 +765,7 @@ func TestNewMinionPath(t *testing.T) {
 		Response: Response{StatusCode: 200},
 	}
 	cl := c.Setup()
-	cl.preV1Beta3 = false
+	cl.apiVersion = "v1beta3"
 	err := cl.Nodes().Delete("foo")
 	c.Validate(t, nil, err)
 }

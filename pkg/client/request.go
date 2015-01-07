@@ -89,8 +89,12 @@ type Request struct {
 	// whether to poll.
 	poller PollFunc
 
-	// If true, put ns/<namespace> in path; if false, add "?namespace=<namespace>" as a query parameter
-	namespaceInPath bool
+	// If true, add "?namespace=<namespace>" as a query parameter, if false put ns/<namespace> in path
+	// Query parameter is considered legacy behavior
+	namespaceInQuery bool
+	// If true, lowercase resource prior to inserting into a path, if false, leave it as is. Preserving
+	// case is considered legacy behavior.
+	preserveResourceCase bool
 
 	// generic components accessible via method setters
 	path    string
@@ -110,15 +114,18 @@ type Request struct {
 	body io.Reader
 }
 
-// NewRequest creates a new request with the core attributes.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, codec runtime.Codec, namespaceInPath bool) *Request {
+// NewRequest creates a new request helper object for accessing runtime.Objects on a server.
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL,
+	codec runtime.Codec, namespaceInQuery bool, preserveResourceCase bool) *Request {
 	return &Request{
-		client:          client,
-		verb:            verb,
-		baseURL:         baseURL,
-		codec:           codec,
-		namespaceInPath: namespaceInPath,
-		path:            baseURL.Path,
+		client:  client,
+		verb:    verb,
+		baseURL: baseURL,
+		path:    baseURL.Path,
+
+		codec:                codec,
+		namespaceInQuery:     namespaceInQuery,
+		preserveResourceCase: preserveResourceCase,
 	}
 }
 
@@ -323,11 +330,15 @@ func (r *Request) Poller(poller PollFunc) *Request {
 
 func (r *Request) finalURL() string {
 	p := r.path
-	if r.namespaceInPath {
+	if !r.namespaceInQuery {
 		p = path.Join(p, "ns", r.namespace)
 	}
 	if len(r.resource) != 0 {
-		p = path.Join(p, r.resource)
+		resource := r.resource
+		if !r.preserveResourceCase {
+			resource = strings.ToLower(resource)
+		}
+		p = path.Join(p, resource)
 	}
 	// Join trims trailing slashes, so preserve r.path's trailing slash for backwards compat if nothing was changed
 	if len(r.resourceName) != 0 || len(r.subpath) != 0 {
@@ -342,7 +353,7 @@ func (r *Request) finalURL() string {
 		query.Add(key, value)
 	}
 
-	if !r.namespaceInPath && len(r.namespace) > 0 {
+	if r.namespaceInQuery && len(r.namespace) > 0 {
 		query.Add("namespace", r.namespace)
 	}
 
