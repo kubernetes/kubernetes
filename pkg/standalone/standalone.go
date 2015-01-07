@@ -142,6 +142,8 @@ func SimpleRunKubelet(etcdClient tools.EtcdClient, dockerClient dockertools.Dock
 		EnableServer:            true,
 		EnableDebuggingHandlers: true,
 		SyncFrequency:           3 * time.Second,
+		MinimumGCAge:            10 * time.Second,
+		MaxContainerCount:       5,
 	}
 	RunKubelet(&kcfg)
 }
@@ -162,7 +164,11 @@ func RunKubelet(kcfg *KubeletConfig) {
 	}
 
 	cfg := makePodSourceConfig(kcfg)
-	k := createAndInitKubelet(kcfg, cfg)
+	k, err := createAndInitKubelet(kcfg, cfg)
+	if err != nil {
+		glog.Errorf("Failed to create kubelet: %s", err)
+		return
+	}
 	// process pods and exit.
 	if kcfg.Runonce {
 		if _, err := k.RunOnce(cfg.Updates()); err != nil {
@@ -237,11 +243,11 @@ type KubeletConfig struct {
 	Runonce                 bool
 }
 
-func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) *kubelet.Kubelet {
+func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k := kubelet.NewMainKubelet(
+	k, err := kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.DockerClient,
 		kc.EtcdClient,
@@ -256,11 +262,15 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) *kubelet.Kube
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS))
 
+	if err != nil {
+		return nil, err
+	}
+
 	k.BirthCry()
 
 	go k.GarbageCollectLoop()
 	go kubelet.MonitorCAdvisor(k, kc.CAdvisorPort)
 	kubelet.InitHealthChecking(k)
 
-	return k
+	return k, nil
 }
