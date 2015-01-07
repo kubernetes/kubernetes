@@ -130,8 +130,8 @@
 			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
 		},
 		{
-			"ImportPath": "github.com/kr/text",
-			"Rev": "6807e777504f54ad073ecef66747de158294b639"
+			"ImportPath": "github.com/miekg/dns",
+			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/aws",
@@ -160,6 +160,11 @@
 			"Rev": "ba570a111973b539baf23c918213059543b5bb6e"
 		},
 		{
+			"ImportPath": "github.com/skynetservices/skydns/msg",
+			"Comment": "2.0.1d-2-g245a121",
+			"Rev": "245a1216be2a7f5377ea56e957fdfa0de6ecd067"
+		},
+		{
 			"ImportPath": "github.com/spf13/cobra",
 			"Rev": "e1e66f7b4e667751cf530ddb6e72b79d6eeb0235"
 		},
@@ -178,11 +183,6 @@
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
 			"Rev": "37614ac27794505bf7867ca93aac883cadb6a5f7"
-		},
-		{
-			"ImportPath": "github.com/tonnerre/golang-pretty",
-			"Comment": "debian/0.0_git20130613-1-1-ge7fccc0",
-			"Rev": "e7fccc03e91bad289b96c21aa3312a220689bdd7"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
