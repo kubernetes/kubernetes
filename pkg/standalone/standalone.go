@@ -268,6 +268,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.Hostname,
 		kc.DockerClient,
 		kc.EtcdClient,
+		kc.KubeClient,
 		kc.RootDirectory,
 		kc.NetworkContainerImage,
 		kc.SyncFrequency,
