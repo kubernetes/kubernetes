@@ -897,8 +897,9 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 		}
+
+		// TODO: Refactor this to use pullImage
 		kl.pullLock.RLock()
-		defer kl.pullLock.RUnlock()
 		if !api.IsPullNever(container.ImagePullPolicy) {
 			present, err := kl.dockerPuller.IsImagePresent(container.Image)
 			latest := dockertools.RequireLatestImage(container.Image)
@@ -932,6 +933,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			continue
 		}
 		containersToKeep[containerID] = empty{}
+		kl.pullLock.RUnlock()
 	}
 
 	// Kill any containers in this pod which were not identified above (guards against duplicates).
