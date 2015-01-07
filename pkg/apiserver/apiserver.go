@@ -56,6 +56,7 @@ const (
 // Handle returns a Handler function that exposes the provided storage interfaces
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
+// Note: This method is used only in tests.
 func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, selfLinker runtime.SelfLinker, admissionControl admission.Interface) http.Handler {
 	prefix := root + "/" + version
 	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker, admissionControl)
@@ -122,14 +123,19 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	// and status-code behavior
 	if namespaceScope {
 		path = "ns/{namespace}/" + path
-		ws.Param(ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string"))
 	}
 	glog.V(3).Infof("Installing version=/%s, kind=/%s, path=/%s\n", version, kind, path)
 
-	ws.Route(ws.POST(path).To(h).
-		Doc("create a " + kind).
-		Operation("create" + kind).
-		Reads(versionedObject)) // from the request
+	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
+	namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
+
+	ws.Route(
+		addParamIf(
+			ws.POST(path).To(h).
+				Doc("create a "+kind).
+				Operation("create"+kind).
+				Reads(versionedObject), // from the request
+			namespaceParam, namespaceScope))
 
 	// TODO: This seems like a hack. Add NewList() to storage?
 	listKind := kind + "List"
@@ -142,31 +148,51 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 		} else {
 			versionedList := indirectArbitraryPointer(versionedListPtr)
 			glog.V(3).Infoln("type: ", reflect.TypeOf(versionedList))
-			ws.Route(ws.GET(path).To(h).
-				Doc("list objects of kind "+kind).
-				Operation("list"+kind).
-				Returns(http.StatusOK, "OK", versionedList))
+			ws.Route(
+				addParamIf(
+					ws.GET(path).To(h).
+						Doc("list objects of kind "+kind).
+						Operation("list"+kind).
+						Returns(http.StatusOK, "OK", versionedList),
+					namespaceParam, namespaceScope))
 		}
 	}
 
-	ws.Route(ws.GET(path + "/{name}").To(h).
-		Doc("read the specified " + kind).
-		Operation("read" + kind).
-		Param(ws.PathParameter("name", "name of the "+kind).DataType("string")).
-		Writes(versionedObject)) // on the response
+	ws.Route(
+		addParamIf(
+			ws.GET(path+"/{name}").To(h).
+				Doc("read the specified "+kind).
+				Operation("read"+kind).
+				Param(nameParam).
+				Writes(versionedObject), // on the response
+			namespaceParam, namespaceScope))
 
-	ws.Route(ws.PUT(path + "/{name}").To(h).
-		Doc("update the specified " + kind).
-		Operation("update" + kind).
-		Param(ws.PathParameter("name", "name of the "+kind).DataType("string")).
-		Reads(versionedObject)) // from the request
+	ws.Route(
+		addParamIf(
+			ws.PUT(path+"/{name}").To(h).
+				Doc("update the specified "+kind).
+				Operation("update"+kind).
+				Param(nameParam).
+				Reads(versionedObject), // from the request
+			namespaceParam, namespaceScope))
 
 	// TODO: Support PATCH
 
-	ws.Route(ws.DELETE(path + "/{name}").To(h).
-		Doc("delete the specified " + kind).
-		Operation("delete" + kind).
-		Param(ws.PathParameter("name", "name of the "+kind).DataType("string")))
+	ws.Route(
+		addParamIf(
+			ws.DELETE(path+"/{name}").To(h).
+				Doc("delete the specified "+kind).
+				Operation("delete"+kind).
+				Param(nameParam),
+			namespaceParam, namespaceScope))
+}
+
+// Adds the given param to the given route builder if shouldAdd is true. Does nothing if shouldAdd is false.
+func addParamIf(b *restful.RouteBuilder, parameter *restful.Parameter, shouldAdd bool) *restful.RouteBuilder {
+	if !shouldAdd {
+		return b
+	}
+	return b.Param(parameter)
 }
 
 // InstallREST registers the REST handlers (storage, watch, and operations) into a restful Container.
@@ -266,8 +292,16 @@ func InstallValidator(mux Mux, servers func() map[string]Server) {
 func InstallSupport(container *restful.Container, ws *restful.WebService) {
 	// TODO: convert healthz to restful and remove container arg
 	healthz.InstallHandler(container.ServeMux)
-	ws.Route(ws.GET("/").To(handleIndex))
-	ws.Route(ws.GET("/version").To(handleVersion))
+
+	// Set up a service to return the git code version.
+	ws.Path("/version")
+	ws.Doc("git code version from which this is built")
+	ws.Route(
+		ws.GET("/").To(handleVersion).
+			Doc("get the code version").
+			Operation("getCodeVersion").
+			Produces(restful.MIME_JSON).
+			Consumes(restful.MIME_JSON))
 }
 
 // InstallLogsSupport registers the APIServer log support function into a mux.
@@ -275,6 +309,22 @@ func InstallLogsSupport(mux Mux) {
 	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+}
+
+// Adds a service to return the supported api versions.
+func AddApiWebService(container *restful.Container, apiPrefix string, versions []string) {
+	// TODO: InstallREST should register each version automatically
+
+	versionHandler := APIVersionHandler(versions[:]...)
+	getApiVersionsWebService := new(restful.WebService)
+	getApiVersionsWebService.Path(apiPrefix)
+	getApiVersionsWebService.Doc("get available api versions")
+	getApiVersionsWebService.Route(getApiVersionsWebService.GET("/").To(versionHandler).
+		Doc("get available api versions").
+		Operation("getApiVersions").
+		Produces(restful.MIME_JSON).
+		Consumes(restful.MIME_JSON))
+	container.Add(getApiVersionsWebService)
 }
 
 // handleVersion writes the server's version information.
