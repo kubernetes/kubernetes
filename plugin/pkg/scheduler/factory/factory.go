@@ -19,7 +19,6 @@ limitations under the License.
 package factory
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -38,8 +37,8 @@ import (
 )
 
 var (
-	PodLister    = &storeToPodLister{cache.NewStore()}
-	MinionLister = &storeToNodeLister{cache.NewStore()}
+	PodLister    = &cache.StoreToPodLister{cache.NewStore()}
+	MinionLister = &cache.StoreToNodeLister{cache.NewStore()}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -48,9 +47,9 @@ type ConfigFactory struct {
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
 	// a means to list all scheduled pods
-	PodLister *storeToPodLister
+	PodLister *cache.StoreToPodLister
 	// a means to list all minions
-	MinionLister *storeToNodeLister
+	MinionLister *cache.StoreToNodeLister
 }
 
 // NewConfigFactory initializes the factory.
@@ -225,41 +224,6 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			}
 		}()
 	}
-}
-
-// storeToNodeLister turns a store into a minion lister. The store must contain (only) minions.
-type storeToNodeLister struct {
-	cache.Store
-}
-
-func (s *storeToNodeLister) List() (machines api.NodeList, err error) {
-	for _, m := range s.Store.List() {
-		machines.Items = append(machines.Items, *(m.(*api.Node)))
-	}
-	return machines, nil
-}
-
-// GetNodeInfo returns cached data for the minion 'id'.
-func (s *storeToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	if minion, ok := s.Get(id); ok {
-		return minion.(*api.Node), nil
-	}
-	return nil, fmt.Errorf("minion '%v' is not in cache", id)
-}
-
-// storeToPodLister turns a store into a pod lister. The store must contain (only) pods.
-type storeToPodLister struct {
-	cache.Store
-}
-
-func (s *storeToPodLister) ListPods(selector labels.Selector) (pods []api.Pod, err error) {
-	for _, m := range s.List() {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, *pod)
-		}
-	}
-	return pods, nil
 }
 
 // nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
