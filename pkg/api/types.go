@@ -985,6 +985,13 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 
+type EventSource struct {
+	// Component from which the event is generated.
+	Component string `json:"component,omitempty"`
+	// Host name on which the event is generated.
+	Host string `json:"host,omitempty"`
+}
+
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
@@ -1014,8 +1021,7 @@ type Event struct {
 	Message string `json:"message,omitempty"`
 
 	// Optional. The component reporting this event. Should be a short machine understandable string.
-	// TODO: provide exact specification for format.
-	Source string `json:"source,omitempty"`
+	Source EventSource `json:"source,omitempty"`
 
 	// The time at which the client recorded the event. (Time of server receipt is in TypeMeta.)
 	Timestamp util.Time `json:"timestamp,omitempty"`

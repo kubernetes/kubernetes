@@ -23,6 +23,7 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -130,8 +131,13 @@ func SetupEventSending(authPath string, apiServerList util.StringList) {
 			glog.Errorf("Unable to make apiserver client: %v", err)
 		} else {
 			// Send events to APIserver if there is a client.
+			hostname := util.GetHostname("")
 			glog.Infof("Sending events to APIserver.")
-			record.StartRecording(apiClient.Events(""), "kubelet")
+			record.StartRecording(apiClient.Events(""),
+				api.EventSource{
+					Component: "kubelet",
+					Host:      hostname,
+				})
 		}
 	}
 }
