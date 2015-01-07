@@ -117,9 +117,3 @@ func (info Info) MergeWithConfig(c client.Config) (client.Config, error) {
 	}
 	return config, nil
 }
-
-func (info Info) Complete() bool {
-	return len(info.User) > 0 ||
-		len(info.CertFile) > 0 ||
-		len(info.BearerToken) > 0
-}

@@ -15,17 +15,11 @@ limitations under the License.
 */
 
 /*
-Package clientcmd provides one stop shopping for building a working client from a fixed config,
-from a .kubeconfig file, from command line flags, or from any merged combination.
+Package cmd provides one stop shopping for a command line executable to bind the correct flags,
+build the client config, and create a working client. The code for usage looks like this:
 
-Sample usage from merged .kubeconfig files (local directory, home directory)
-	loadingRules := clientcmd.NewKubeConfigLoadingRules()
-	// if you want to change the loading rules (which files in which order), you can do so here
-
-	configOverrides := &clientcmd.ConfigOverrides{}
-	// if you want to change override values or bind them to flags, there are methods to help you
-
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingKubeConfig(loadingRules, configOverrides)
-	kubeConfig.Client()
+    clientBuilder := clientcmd.NewBuilder(clientcmd.NewDefaultAuthLoader())
+    clientBuilder.BindFlags(cmds.PersistentFlags())
+    apiClient, err := clientBuilder.Client()
 */
 package clientcmd
