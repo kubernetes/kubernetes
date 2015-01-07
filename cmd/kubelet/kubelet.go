@@ -102,8 +102,6 @@ func main() {
 
 	kcfg := standalone.KubeletConfig{
 		Address:                 address,
-		AuthPath:                *authPath,
-		ApiServerList:           apiServerList,
 		AllowPrivileged:         *allowPrivileged,
 		HostnameOverride:        *hostnameOverride,
 		RootDirectory:           *rootDirectory,
@@ -125,6 +123,7 @@ func main() {
 		EnableServer:            *enableServer,
 		EnableDebuggingHandlers: *enableDebuggingHandlers,
 		DockerClient:            util.ConnectToDockerOrDie(*dockerEndpoint),
+		ApiClient:               kubelet.ApiClientMaybe(*authPath, apiServerList),
 		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
 	}
 

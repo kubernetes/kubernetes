@@ -122,22 +122,32 @@ func getApiserverClient(authPath string, apiServerList util.StringList) (*client
 	}
 }
 
-func SetupEventSending(authPath string, apiServerList util.StringList) {
+// Return an apiserver client, or nil if not wanted or an error occurs.
+func ApiClientMaybe(authPath string, apiServerList util.StringList) *client.Client {
 	// Make an API client if possible.
 	if len(apiServerList) < 1 {
 		glog.Info("No api servers specified.")
+		return nil
 	} else {
 		if apiClient, err := getApiserverClient(authPath, apiServerList); err != nil {
 			glog.Errorf("Unable to make apiserver client: %v", err)
+			return nil
 		} else {
-			// Send events to APIserver if there is a client.
-			hostname := util.GetHostname("")
-			glog.Infof("Sending events to APIserver.")
-			record.StartRecording(apiClient.Events(""),
-				api.EventSource{
-					Component: "kubelet",
-					Host:      hostname,
-				})
+			return apiClient
 		}
 	}
+}
+
+func SetupEventSending(apiClient *client.Client) {
+	if apiClient == nil {
+		return
+	}
+	// Send events to APIserver if there is a client.
+	hostname := util.GetHostname("")
+	glog.Infof("Sending events to APIserver.")
+	record.StartRecording(apiClient.Events(""),
+		api.EventSource{
+			Component: "kubelet",
+			Host:      hostname,
+		})
 }

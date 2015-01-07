@@ -129,9 +129,10 @@ func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an etcdClient.
 // Under the hood it calls RunKubelet (below)
-func SimpleRunKubelet(etcdClient tools.EtcdClient, dockerClient dockertools.DockerInterface, hostname, rootDir, manifestURL, address string, port uint) {
+func SimpleRunKubelet(etcdClient tools.EtcdClient, apiClient *client.Client, dockerClient dockertools.DockerInterface, hostname, rootDir, manifestURL, address string, port uint) {
 	kcfg := KubeletConfig{
 		EtcdClient:            etcdClient,
+		ApiClient:             apiClient,
 		DockerClient:          dockerClient,
 		HostnameOverride:      hostname,
 		RootDirectory:         rootDir,
@@ -152,7 +153,7 @@ func SimpleRunKubelet(etcdClient tools.EtcdClient, dockerClient dockertools.Dock
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig) {
-	kubelet.SetupEventSending(kcfg.AuthPath, kcfg.ApiServerList)
+	kubelet.SetupEventSending(kcfg.ApiClient)
 	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
 
@@ -210,11 +211,10 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 
 type KubeletConfig struct {
 	EtcdClient              tools.EtcdClient
+	ApiClient               *client.Client
 	DockerClient            dockertools.DockerInterface
 	CAdvisorPort            uint
 	Address                 util.IP
-	AuthPath                string
-	ApiServerList           util.StringList
 	AllowPrivileged         bool
 	HostnameOverride        string
 	RootDirectory           string
