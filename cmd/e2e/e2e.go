@@ -541,6 +541,7 @@ func TestClusterDNS(c *client.Client) bool {
 		if len(failed) == 0 {
 			break
 		}
+		glog.Infof("lookups failed for: %v", failed)
 		time.Sleep(3 * time.Second)
 	}
 	if len(failed) != 0 {
