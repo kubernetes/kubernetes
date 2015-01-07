@@ -93,7 +93,8 @@ function kube-up() {
     --zone="${ZONE}" \
     --project="${PROJECT}" \
     --cluster-api-version="${CLUSTER_API_VERSION:-}" \
-    --num-nodes="${NUM_MINIONS}"
+    --num-nodes="${NUM_MINIONS}" \
+    --network="${NETWORK}"
 
   # Compute DNS_SERVER_IP: This is looking for something like
   # "servicesIpv4Cidr: 10.27.240.0/20" and returning "10.27.240"

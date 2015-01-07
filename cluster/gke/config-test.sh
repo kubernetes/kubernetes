@@ -16,6 +16,7 @@
 
 # The following are test-specific settings.
 CLUSTER_NAME="${CLUSTER_NAME:-${USER}-gke-e2e}"
+NETWORK=${KUBE_GKE_NETWORK:-e2e}
 
 # For ease of maintenance, extract any pieces that do not vary between default
 # and test in a common config.
