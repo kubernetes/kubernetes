@@ -10,7 +10,7 @@ coreos:
     bind-addr: 0.0.0.0
     peer-addr: $private_ipv4:7001
     cluster-active-size: 1
-    etcd-http-read-timeout: 86400
+    http-read-timeout: 86400.0
     snapshot: true
   units:
     - name: etcd.service
