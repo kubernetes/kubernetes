@@ -191,11 +191,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	minionController.Run(10 * time.Second)
 
 	// Kubelet (localhost)
-	standalone.SimpleRunKubelet(etcdClient, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250)
+	standalone.SimpleRunKubelet(cl, etcdClient, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	standalone.SimpleRunKubelet(etcdClient, &fakeDocker2, machineList[1], testRootDir2, "", "127.0.0.1", 10251)
+	standalone.SimpleRunKubelet(cl, etcdClient, &fakeDocker2, machineList[1], testRootDir2, "", "127.0.0.1", 10251)
 
 	return apiServer.URL
 }

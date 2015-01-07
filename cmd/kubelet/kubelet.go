@@ -100,10 +100,13 @@ func main() {
 		glog.Info(err)
 	}
 
+	client, err := standalone.GetAPIServerClient(*authPath, apiServerList)
+	if err != nil && len(apiServerList) > 0 {
+		glog.Warningf("No API client: %v", err)
+	}
+
 	kcfg := standalone.KubeletConfig{
 		Address:                 address,
-		AuthPath:                *authPath,
-		ApiServerList:           apiServerList,
 		AllowPrivileged:         *allowPrivileged,
 		HostnameOverride:        *hostnameOverride,
 		RootDirectory:           *rootDirectory,
@@ -125,6 +128,7 @@ func main() {
 		EnableServer:            *enableServer,
 		EnableDebuggingHandlers: *enableDebuggingHandlers,
 		DockerClient:            util.ConnectToDockerOrDie(*dockerEndpoint),
+		KubeClient:              client,
 		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
 	}
 

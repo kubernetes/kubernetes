@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"path"
@@ -27,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -97,47 +95,12 @@ func SetupLogging() {
 	record.StartLogging(glog.Infof)
 }
 
-// TODO: move this into pkg/client
-func getApiserverClient(authPath string, apiServerList util.StringList) (*client.Client, error) {
-	authInfo, err := clientauth.LoadFromFile(authPath)
-	if err != nil {
-		return nil, err
-	}
-	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
-	if err != nil {
-		return nil, err
-	}
-	if len(apiServerList) < 1 {
-		return nil, fmt.Errorf("no apiservers specified.")
-	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(apiServerList) > 1 {
-		glog.Infof("Mulitple api servers specified.  Picking first one")
-	}
-	clientConfig.Host = apiServerList[0]
-	if c, err := client.New(&clientConfig); err != nil {
-		return nil, err
-	} else {
-		return c, nil
-	}
-}
-
-func SetupEventSending(authPath string, apiServerList util.StringList) {
-	// Make an API client if possible.
-	if len(apiServerList) < 1 {
-		glog.Info("No api servers specified.")
-	} else {
-		if apiClient, err := getApiserverClient(authPath, apiServerList); err != nil {
-			glog.Errorf("Unable to make apiserver client: %v", err)
-		} else {
-			// Send events to APIserver if there is a client.
-			hostname := util.GetHostname("")
-			glog.Infof("Sending events to APIserver.")
-			record.StartRecording(apiClient.Events(""),
-				api.EventSource{
-					Component: "kubelet",
-					Host:      hostname,
-				})
-		}
-	}
+func SetupEventSending(client *client.Client) {
+	glog.Infof("Sending events to api server.")
+	hostname := util.GetHostname("")
+	record.StartRecording(client.Events(""),
+		api.EventSource{
+			Component: "kubelet",
+			Host:      hostname,
+		})
 }

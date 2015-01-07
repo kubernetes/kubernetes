@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -53,6 +54,31 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNotFound)
+}
+
+// TODO: replace this with clientcmd
+func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client.Client, error) {
+	authInfo, err := clientauth.LoadFromFile(authPath)
+	if err != nil {
+		return nil, err
+	}
+	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
+	if err != nil {
+		return nil, err
+	}
+	if len(apiServerList) < 1 {
+		return nil, fmt.Errorf("no api servers specified.")
+	}
+	// TODO: adapt Kube client to support LB over several servers
+	if len(apiServerList) > 1 {
+		glog.Infof("Mulitple api servers specified.  Picking first one")
+	}
+	clientConfig.Host = apiServerList[0]
+	c, err := client.New(&clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // RunApiServer starts an API server in a go routine.
@@ -129,8 +155,9 @@ func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an etcdClient.
 // Under the hood it calls RunKubelet (below)
-func SimpleRunKubelet(etcdClient tools.EtcdClient, dockerClient dockertools.DockerInterface, hostname, rootDir, manifestURL, address string, port uint) {
+func SimpleRunKubelet(client *client.Client, etcdClient tools.EtcdClient, dockerClient dockertools.DockerInterface, hostname, rootDir, manifestURL, address string, port uint) {
 	kcfg := KubeletConfig{
+		KubeClient:            client,
 		EtcdClient:            etcdClient,
 		DockerClient:          dockerClient,
 		HostnameOverride:      hostname,
@@ -152,7 +179,11 @@ func SimpleRunKubelet(etcdClient tools.EtcdClient, dockerClient dockertools.Dock
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig) {
-	kubelet.SetupEventSending(kcfg.AuthPath, kcfg.ApiServerList)
+	if kcfg.KubeClient != nil {
+		kubelet.SetupEventSending(kcfg.KubeClient)
+	} else {
+		glog.Infof("No api server defined - no events will be sent.")
+	}
 	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
 
@@ -210,11 +241,10 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 
 type KubeletConfig struct {
 	EtcdClient              tools.EtcdClient
+	KubeClient              *client.Client
 	DockerClient            dockertools.DockerInterface
 	CAdvisorPort            uint
 	Address                 util.IP
-	AuthPath                string
-	ApiServerList           util.StringList
 	AllowPrivileged         bool
 	HostnameOverride        string
 	RootDirectory           string

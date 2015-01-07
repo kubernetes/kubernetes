@@ -33,6 +33,7 @@ import (
 )
 
 type fakeKubelet struct {
+	podByNameFunc     func(namespace, name string) (*api.BoundPod, bool)
 	infoFunc          func(name string) (api.PodInfo, error)
 	containerInfoFunc func(podFullName, uid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
@@ -41,6 +42,10 @@ type fakeKubelet struct {
 	logFunc           func(w http.ResponseWriter, req *http.Request)
 	runFunc           func(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
 	containerLogsFunc func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
+}
+
+func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
+	return fk.podByNameFunc(namespace, name)
 }
 
 func (fk *fakeKubelet) GetPodInfo(name, uuid string) (api.PodInfo, error) {
@@ -88,7 +93,19 @@ func newServerTest() *serverTestFramework {
 		updateChan: make(chan interface{}),
 	}
 	fw.updateReader = startReading(fw.updateChan)
-	fw.fakeKubelet = &fakeKubelet{}
+	fw.fakeKubelet = &fakeKubelet{
+		podByNameFunc: func(namespace, name string) (*api.BoundPod, bool) {
+			return &api.BoundPod{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+					Annotations: map[string]string{
+						ConfigSourceAnnotationKey: "etcd",
+					},
+				},
+			}, true
+		},
+	}
 	server := NewServer(fw.fakeKubelet, true)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
