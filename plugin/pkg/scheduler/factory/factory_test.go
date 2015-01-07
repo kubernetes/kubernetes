@@ -29,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -139,57 +138,6 @@ func TestDefaultErrorFunc(t *testing.T) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		break
-	}
-}
-
-func TestStoreToMinionLister(t *testing.T) {
-	store := cache.NewStore()
-	ids := util.NewStringSet("foo", "bar", "baz")
-	for id := range ids {
-		store.Add(id, &api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
-	}
-	sml := storeToNodeLister{store}
-
-	gotNodes, err := sml.List()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	got := make([]string, len(gotNodes.Items))
-	for ix := range gotNodes.Items {
-		got[ix] = gotNodes.Items[ix].Name
-	}
-	if !ids.HasAll(got...) || len(got) != len(ids) {
-		t.Errorf("Expected %v, got %v", ids, got)
-	}
-}
-
-func TestStoreToPodLister(t *testing.T) {
-	store := cache.NewStore()
-	ids := []string{"foo", "bar", "baz"}
-	for _, id := range ids {
-		store.Add(id, &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   id,
-				Labels: map[string]string{"name": id},
-			},
-		})
-	}
-	spl := storeToPodLister{store}
-
-	for _, id := range ids {
-		got, err := spl.ListPods(labels.Set{"name": id}.AsSelector())
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		if e, a := 1, len(got); e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-			continue
-		}
-		if e, a := id, got[0].Name; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-			continue
-		}
 	}
 }
 
