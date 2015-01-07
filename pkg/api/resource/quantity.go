@@ -41,22 +41,20 @@ import (
 // <sign>            ::= "+" | "-"
 // <signedNumber>    ::= <number> | <sign><number>
 // <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
-// <binarySI>        ::= i | Ki | Mi | Gi | Ti | Pi | Ei
+// <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
 //   (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
 // <decimalSI>       ::= m | "" | k | M | G | T | P | E
 //   (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
 // <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
 //
 // No matter which of the three exponent forms is used, no quantity may represent
-// a number greater than 2^63-1 in magnitude, nor may it have more than 3 digits
-// of precision. Numbers larger or more precise will be capped or rounded.
+// a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal
+// places. Numbers larger or more precise will be capped or rounded up.
 // (E.g.: 0.1m will rounded up to 1m.)
 // This may be extended in the future if we require larger or smaller quantities.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
 // it had, and will use the same type again when it is serialized.
-// One exception: numbers with a Binary SI suffix less than bigOne will be changed
-// to Decimal SI suffix. E.g., .5i becomes 500m. [NOT 512m!]
 //
 // Before serializing, Quantity will be put in "canonical form".
 // This means that Exponent/suffix will be adjusted up or down (with a
@@ -137,10 +135,12 @@ var (
 	big1024     = big.NewInt(1024)
 
 	// Commonly needed inf.Dec values-- treat as read only!
-	decZero     = inf.NewDec(0, 0)
-	decOne      = inf.NewDec(1, 0)
-	decMinusOne = inf.NewDec(-1, 0)
-	decThousand = inf.NewDec(1000, 0)
+	decZero      = inf.NewDec(0, 0)
+	decOne       = inf.NewDec(1, 0)
+	decMinusOne  = inf.NewDec(-1, 0)
+	decThousand  = inf.NewDec(1000, 0)
+	dec1024      = inf.NewDec(1024, 0)
+	decMinus1024 = inf.NewDec(-1024, 0)
 
 	// Largest (in magnitude) number allowed.
 	maxAllowed = inf.NewDec((1<<63)-1, 0) // == max int64
@@ -241,16 +241,14 @@ func (q *Quantity) Canonicalize() (string, suffix) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 	case BinarySI:
-		switch q.Amount.Cmp(decZero) {
-		case 0: // exactly equal 0, that's fine
-		case 1: // greater than 0
-			if q.Amount.Cmp(decOne) < 0 {
-				// This avoids rounding and hopefully confusion, too.
-				format = DecimalSI
-			}
-		case -1:
-			if q.Amount.Cmp(decMinusOne) > 0 {
-				// This avoids rounding and hopefully confusion, too.
+		if q.Amount.Cmp(decMinus1024) > 0 && q.Amount.Cmp(dec1024) < 0 {
+			// This avoids rounding and hopefully confusion, too.
+			format = DecimalSI
+		} else {
+			tmp := &inf.Dec{}
+			tmp.Round(q.Amount, 0, inf.RoundUp)
+			if tmp.Cmp(q.Amount) != 0 {
+				// Don't lose precision-- show as DecimalSI
 				format = DecimalSI
 			}
 		}
@@ -281,16 +279,8 @@ func (q *Quantity) Canonicalize() (string, suffix) {
 	case BinarySI:
 		tmp := &inf.Dec{}
 		tmp.Round(q.Amount, 0, inf.RoundUp)
-		amount := tmp.UnscaledBig()
-		exponent := int(-q.Amount.Scale())
-		// Apply the (base-10) shift. This will lose any fractional
-		// part, which is intentional.
-		for exponent > 0 {
-			amount.Mul(amount, bigTen)
-			exponent--
-		}
 
-		amount, exponent = removeFactors(amount, big1024)
+		amount, exponent := removeFactors(tmp.UnscaledBig(), big1024)
 		suffix, _ := quantitySuffixer.construct(2, exponent*10, format)
 		number := amount.String()
 		return number, suffix

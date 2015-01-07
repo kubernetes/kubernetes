@@ -62,8 +62,18 @@ func TestQuantityParse(t *testing.T) {
 		expect Quantity
 	}{
 		{"0", Quantity{dec(0, 0), DecimalSI}},
+		{"0m", Quantity{dec(0, 0), DecimalSI}},
+		{"0Ki", Quantity{dec(0, 0), BinarySI}},
+		{"0k", Quantity{dec(0, 0), DecimalSI}},
+		{"0Mi", Quantity{dec(0, 0), BinarySI}},
+		{"0M", Quantity{dec(0, 0), DecimalSI}},
+		{"0Gi", Quantity{dec(0, 0), BinarySI}},
+		{"0G", Quantity{dec(0, 0), DecimalSI}},
+		{"0Ti", Quantity{dec(0, 0), BinarySI}},
+		{"0T", Quantity{dec(0, 0), DecimalSI}},
+
 		// Binary suffixes
-		{"9i", Quantity{dec(9, 0), BinarySI}},
+		{"1Ki", Quantity{dec(1024, 0), BinarySI}},
 		{"8Ki", Quantity{dec(8*1024, 0), BinarySI}},
 		{"7Mi", Quantity{dec(7*1024*1024, 0), BinarySI}},
 		{"6Gi", Quantity{dec(6*1024*1024*1024, 0), BinarySI}},
@@ -153,19 +163,13 @@ func TestQuantityParse(t *testing.T) {
 		{"0.5Mi", Quantity{dec(.5*1024*1024, 0), BinarySI}},
 		{"0.05Gi", Quantity{dec(536870912, -1), BinarySI}},
 		{"0.025Ti", Quantity{dec(274877906944, -1), BinarySI}},
-		// These get rounded though
-		{"0.0001i", Quantity{dec(1, -3), DecimalSI}},
-		{"0.005i", Quantity{dec(5, -3), DecimalSI}},
-		{"0.05i", Quantity{dec(50, -3), DecimalSI}},
-		// Also, if below you expect (512, -3), you're wrong in two ways:
-		// In the sequence [1024*1024*1024, 1024*1024, 1024, ?], the last term is "1" not 1/1024.
-		// Even if it were, 500 * 1/1024 = .48828125, NOT .512
-		// I cannot recommend using this feature, it is confusing.
-		{"0.5i", Quantity{dec(500, -3), DecimalSI}},
 
 		// Things written by trolls
+		{"0.000001Ki", Quantity{dec(2, -3), DecimalSI}}, // rounds up, changes format
 		{".001", Quantity{dec(1, -3), DecimalSI}},
+		{".0001k", Quantity{dec(100, -3), DecimalSI}},
 		{"1.", Quantity{dec(1, 0), DecimalSI}},
+		{"1.G", Quantity{dec(1, 9), DecimalSI}},
 	}
 
 	for _, item := range table {
@@ -220,6 +224,9 @@ func TestQuantityParse(t *testing.T) {
 		"0.1mi",
 		"0.1am",
 		"aoeu",
+		".5i",
+		"1i",
+		"-3.01i",
 	}
 	for _, item := range invalid {
 		_, err := ParseQuantity(item)
@@ -239,7 +246,7 @@ func TestQuantityString(t *testing.T) {
 		{Quantity{dec(6*1024, 0), BinarySI}, "6Ki"},
 		{Quantity{dec(1001*1024*1024*1024, 0), BinarySI}, "1001Gi"},
 		{Quantity{dec(1024*1024*1024*1024, 0), BinarySI}, "1Ti"},
-		{Quantity{dec(5, 0), BinarySI}, "5i"},
+		{Quantity{dec(5, 0), BinarySI}, "5"},
 		{Quantity{dec(500, -3), BinarySI}, "500m"},
 		{Quantity{dec(1, 9), DecimalSI}, "1G"},
 		{Quantity{dec(1000, 6), DecimalSI}, "1G"},
@@ -253,10 +260,11 @@ func TestQuantityString(t *testing.T) {
 		{Quantity{dec(300, 6), DecimalSI}, "300M"},
 		{Quantity{dec(1, 12), DecimalSI}, "1T"},
 		{Quantity{dec(1234567, 6), DecimalSI}, "1234567M"},
-		{Quantity{dec(1234567, -3), BinarySI}, "1235i"},
+		{Quantity{dec(1234567, -3), BinarySI}, "1234567m"},
 		{Quantity{dec(3, 3), DecimalSI}, "3k"},
+		{Quantity{dec(1025, 0), BinarySI}, "1025"},
 		{Quantity{dec(0, 0), DecimalSI}, "0"},
-		{Quantity{dec(0, 0), BinarySI}, "0i"},
+		{Quantity{dec(0, 0), BinarySI}, "0"},
 		{Quantity{dec(1, 9), DecimalExponent}, "1e9"},
 		{Quantity{dec(1, -3), DecimalExponent}, "1e-3"},
 		{Quantity{dec(80, -3), DecimalExponent}, "80e-3"},
@@ -281,6 +289,44 @@ func TestQuantityString(t *testing.T) {
 		}
 		q := item.in
 		q.Amount = desired.Neg(q.Amount)
+		if e, a := "-"+item.expect, q.String(); e != a {
+			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
+		}
+	}
+}
+
+func TestQuantityParseEmit(t *testing.T) {
+	table := []struct {
+		in     string
+		expect string
+	}{
+		{"1Ki", "1Ki"},
+		{"1Mi", "1Mi"},
+		{"1Gi", "1Gi"},
+		{"1024Mi", "1Gi"},
+		{"1000M", "1G"},
+		{".000001Ki", "2m"},
+	}
+
+	for _, item := range table {
+		q, err := ParseQuantity(item.in)
+		if err != nil {
+			t.Errorf("Couldn't parse %v", item.in)
+			continue
+		}
+		if e, a := item.expect, q.String(); e != a {
+			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
+		}
+	}
+	for _, item := range table {
+		q, err := ParseQuantity("-" + item.in)
+		if err != nil {
+			t.Errorf("Couldn't parse %v", item.in)
+			continue
+		}
+		if q.Amount.Cmp(decZero) == 0 {
+			continue
+		}
 		if e, a := "-"+item.expect, q.String(); e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
 		}
@@ -347,9 +393,9 @@ func TestMilliNewSet(t *testing.T) {
 		{1, DecimalSI, "1m", true},
 		{1000, DecimalSI, "1", true},
 		{1234000, DecimalSI, "1234", true},
-		{1024, BinarySI, "2i", false}, // Rounded up
+		{1024, BinarySI, "1024m", false}, // Format changes
 		{1000000, "invalidFormatDefaultsToExponent", "1e3", true},
-		{1024 * 1024, BinarySI, "1049i", false},
+		{1024 * 1024, BinarySI, "1048576m", false}, // Format changes
 	}
 
 	for _, item := range table {

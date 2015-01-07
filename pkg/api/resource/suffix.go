@@ -73,13 +73,15 @@ type suffixHandler struct {
 func newSuffixer() suffixer {
 	sh := &suffixHandler{}
 
-	sh.binSuffixes.addSuffix("i", bePair{2, 0})
 	sh.binSuffixes.addSuffix("Ki", bePair{2, 10})
 	sh.binSuffixes.addSuffix("Mi", bePair{2, 20})
 	sh.binSuffixes.addSuffix("Gi", bePair{2, 30})
 	sh.binSuffixes.addSuffix("Ti", bePair{2, 40})
 	sh.binSuffixes.addSuffix("Pi", bePair{2, 50})
 	sh.binSuffixes.addSuffix("Ei", bePair{2, 60})
+	// Don't emit an error when trying to produce
+	// a suffix for 2^0.
+	sh.decSuffixes.addSuffix("", bePair{2, 0})
 
 	sh.decSuffixes.addSuffix("m", bePair{10, -3})
 	sh.decSuffixes.addSuffix("", bePair{10, 0})
