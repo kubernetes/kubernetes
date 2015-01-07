@@ -16,6 +16,7 @@
 
 # The following are default-specific settings.
 CLUSTER_NAME="${CLUSTER_NAME:-${USER}-gke}"
+NETWORK=${KUBE_GKE_NETWORK:-default}
 
 # For ease of maintenance, extract any pieces that do not vary between default
 # and test in a common config.
