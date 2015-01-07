@@ -5,7 +5,6 @@ desiredState:
   replicas: 1
   replicaSelector:
     name: hazelcast
-  # This is identical to the pod config above
   podTemplate:
     desiredState:
       manifest:

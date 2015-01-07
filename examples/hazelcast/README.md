@@ -87,7 +87,7 @@ $ kubectl get endpoints hazelcast -o yaml
 apiVersion: v1beta1
 creationTimestamp: 2015-01-05T05:51:50Z
 endpoints:
-- 10.244.1.10:9042
+- xxx.xxx.xxx.xxx:5701
 id: hazelcast
 kind: Endpoints
 namespace: default
@@ -261,7 +261,7 @@ public class HazelcastDiscoveryController implements CommandLineRunner {
   public void run(String... args) {
     log.info("Asking k8s registry at {}..", getKubeApi());
     KubernetesFactory kubernetesFactory = new KubernetesFactory(getKubeApi());
-    final List<PodSchema> hazelcastPods = retrieveHazelcasPods(
+    final List<PodSchema> hazelcastPods = retrieveHazelcastPods(
         kubernetesFactory.createKubernetes());
     log.info("Found {} pods running Hazelcast.", hazelcastPods.size());
     if (!hazelcastPods.isEmpty()) {
@@ -269,7 +269,7 @@ public class HazelcastDiscoveryController implements CommandLineRunner {
     }
   }
 
-  public List<PodSchema> retrieveHazelcasPods(final Kubernetes kubernetes) {
+  public List<PodSchema> retrieveHazelcastPods(final Kubernetes kubernetes) {
     final List<PodSchema> hazelcastPods = new CopyOnWriteArrayList<>();
     kubernetes.getPods().getItems().parallelStream().filter(pod -> pod.
         getLabels().get(hazelcastPodLabelKey).equals(hazelcastPodLabelValue)).
