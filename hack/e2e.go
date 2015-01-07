@@ -286,7 +286,7 @@ func Test() (results ResultsByTest) {
 			continue
 		}
 		if err != nil {
-			log.Fatal("Bad test pattern: %v", tests)
+			log.Fatalf("Bad test pattern: %v", *tests)
 		}
 		toRun = append(toRun, name)
 	}

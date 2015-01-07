@@ -49,7 +49,7 @@ func TestAlgorithmProviders(t *testing.T) {
 			break
 		}
 		if len(p.PriorityFunctionKeys) == 0 {
-			t.Error("%s algorithm provider shouldn't have 0 priority functions", pn)
+			t.Errorf("%s algorithm provider shouldn't have 0 priority functions", pn)
 		}
 		for _, pf := range p.PriorityFunctionKeys.List() {
 			if !factory.IsPriorityFunctionRegistered(pf) {

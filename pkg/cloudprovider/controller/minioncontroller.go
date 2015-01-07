@@ -88,7 +88,6 @@ func (s *MinionController) SyncStatic(period time.Duration) error {
 		}
 		time.Sleep(period)
 	}
-	return nil
 }
 
 // SyncCloud syncs list of instances from cloudprovider to master etcd registry.
