@@ -256,11 +256,32 @@ function restart-kube-proxy {
 }
 
 function setup-monitoring {
-    echo "TODO"
+  if [[ "${MONITORING}" == "true" ]]; then
+    echo "Setting up Cluster Monitoring using Heapster."
+	# Re-use master auth for Grafana
+    get-password
+    sed -i "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
+    sed -i "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
+    local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
+    if "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" &> /dev/null \
+      && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
+      && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" &> /dev/null; then
+      dashboardIP="http://$KUBE_USER:$KUBE_PASSWORD@`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
+      echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online. Use the master user name and password for the dashboard."
+    else
+      echo "Failed to Setup Monitoring"
+      teardown-monitoring
+    fi
+  fi
 }
 
 function teardown-monitoring {
-  echo "TODO"
+  if [[ "${MONITORING}" == "true" ]]; then
+    local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
+    ${kubectl} delete pods heapster &> /dev/null || true
+    ${kubectl} delete pods influx-grafana &> /dev/null || true
+    ${kubectl} delete services influx-master &> /dev/null || true
+  fi
 }
 
 # Perform preparations required to run e2e tests
