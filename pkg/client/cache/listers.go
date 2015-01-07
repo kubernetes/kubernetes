@@ -74,5 +74,17 @@ func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
 	return nil, fmt.Errorf("minion '%v' is not in cache", id)
 }
 
-// TODO: add StoreToServiceLister for use in kube-proxy and kubelet.
-// TODO: add StoreToServiceLister for use in kube-proxy.
+// StoreToServiceLister makes a Store have the List method of the client.ServiceInterface
+// The Store must contain (only) Services.
+type StoreToServiceLister struct {
+	Store
+}
+
+func (s *StoreToServiceLister) List() (svcs api.ServiceList, err error) {
+	for _, m := range s.Store.List() {
+		svcs.Items = append(svcs.Items, *(m.(*api.Service)))
+	}
+	return svcs, nil
+}
+
+// TODO: add StoreToEndpointsLister for use in kube-proxy.
