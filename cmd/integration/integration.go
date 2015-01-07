@@ -101,7 +101,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func startComponents(manifestURL string) (apiServerURL string) {
+func startComponents(manifestURL string) *client.Client {
 	// Setup
 	servers := []string{"http://localhost:4001"}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -190,14 +190,21 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	minionController := minionControllerPkg.NewMinionController(nil, "", machineList, nodeResources, cl)
 	minionController.Run(10 * time.Second)
 
+	// Ok. we're good to go.
+	glog.Infof("API Server started on %s", apiServer.URL)
+	// Wait for the synchronization threads to come up.
+	time.Sleep(time.Second * 10)
+
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
+
 	// Kubelet (localhost)
-	standalone.SimpleRunKubelet(etcdClient, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250)
+	standalone.SimpleRunKubelet(etcdClient, kubeClient, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	standalone.SimpleRunKubelet(etcdClient, &fakeDocker2, machineList[1], testRootDir2, "", "127.0.0.1", 10251)
+	standalone.SimpleRunKubelet(etcdClient, kubeClient, &fakeDocker2, machineList[1], testRootDir2, "", "127.0.0.1", 10251)
 
-	return apiServer.URL
+	return kubeClient
 }
 
 // podsOnMinions returns true when all of the selected pods exist on a minion.
@@ -563,14 +570,7 @@ func main() {
 
 	manifestURL := ServeCachedManifestFile()
 
-	apiServerURL := startComponents(manifestURL)
-
-	// Ok. we're good to go.
-	glog.Infof("API Server started on %s", apiServerURL)
-	// Wait for the synchronization threads to come up.
-	time.Sleep(time.Second * 10)
-
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
+	kubeClient := startComponents(manifestURL)
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
