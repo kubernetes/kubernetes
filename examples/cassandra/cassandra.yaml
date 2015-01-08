@@ -16,6 +16,9 @@ desiredState:
             containerPort: 9042
           - name: thrift
             containerPort: 9160
+        volumeMounts:
+          - name: data
+            mountPath: /cassandra_data
         env:
           - key: MAX_HEAP_SIZE
             value: 512M
@@ -23,6 +26,10 @@ desiredState:
             value: 100M
           - key: KUBERNETES_API_PROTOCOL
             value: http
+    volumes:
+      - name: data
+        source:
+          emptyDir: ""
 labels:
   name: cassandra
 
