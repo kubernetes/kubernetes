@@ -68,6 +68,12 @@ function create-provision-scripts {
     echo "PORTAL_NET='${PORTAL_NET}'"
     echo "MASTER_USER='${MASTER_USER}'"
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
+    echo "ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
+    echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+    echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
+    echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
+    echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
+    echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
