@@ -61,29 +61,35 @@ type volumeMap map[string]volume.Interface
 
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
-	hn string,
-	dc dockertools.DockerInterface,
-	ec tools.EtcdClient,
-	rd string,
-	ni string,
-	ri time.Duration,
+	hostname string,
+	dockerClient dockertools.DockerInterface,
+	etcdClient tools.EtcdClient,
+	rootDirectory string,
+	networkContainerImage string,
+	resyncInterval time.Duration,
 	pullQPS float32,
 	pullBurst int,
 	minimumGCAge time.Duration,
 	maxContainerCount int,
 	sourcesReady SourcesReadyFn,
 	clusterDomain string,
-	clusterDNS net.IP) *Kubelet {
+	clusterDNS net.IP) (*Kubelet, error) {
+	if resyncInterval <= 0 {
+		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
+	}
+	if minimumGCAge <= 0 {
+		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
+	}
 	return &Kubelet{
-		hostname:              hn,
-		dockerClient:          dc,
-		etcdClient:            ec,
-		rootDirectory:         rd,
-		resyncInterval:        ri,
-		networkContainerImage: ni,
+		hostname:              hostname,
+		dockerClient:          dockerClient,
+		etcdClient:            etcdClient,
+		rootDirectory:         rootDirectory,
+		resyncInterval:        resyncInterval,
+		networkContainerImage: networkContainerImage,
 		podWorkers:            newPodWorkers(),
 		dockerIDToRef:         map[dockertools.DockerID]*api.ObjectReference{},
-		runner:                dockertools.NewDockerContainerCommandRunner(dc),
+		runner:                dockertools.NewDockerContainerCommandRunner(dockerClient),
 		httpClient:            &http.Client{},
 		pullQPS:               pullQPS,
 		pullBurst:             pullBurst,
@@ -92,7 +98,7 @@ func NewMainKubelet(
 		sourcesReady:          sourcesReady,
 		clusterDomain:         clusterDomain,
 		clusterDNS:            clusterDNS,
-	}
+	}, nil
 }
 
 type httpGetter interface {
@@ -202,7 +208,7 @@ func (kl *Kubelet) purgeOldest(ids []string) error {
 		if err != nil {
 			return err
 		}
-		if !data.State.Running && (kl.minimumGCAge == 0 || time.Now().Sub(data.State.FinishedAt) > kl.minimumGCAge) {
+		if !data.State.Running && (time.Now().Sub(data.State.FinishedAt) > kl.minimumGCAge) {
 			dockerData = append(dockerData, data)
 		}
 	}
