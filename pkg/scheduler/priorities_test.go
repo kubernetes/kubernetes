@@ -21,17 +21,16 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
-func makeMinion(node string, cpu, memory int) api.Node {
+func makeMinion(node string, milliCPU, memory int64) api.Node {
 	return api.Node{
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Spec: api.NodeSpec{
 			Capacity: api.ResourceList{
-				resources.CPU:    util.NewIntOrStringFromInt(cpu),
-				resources.Memory: util.NewIntOrStringFromInt(memory),
+				api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 		},
 	}
@@ -57,14 +56,14 @@ func TestLeastRequested(t *testing.T) {
 	}
 	cpuOnly := api.PodSpec{
 		Containers: []api.Container{
-			{CPU: 1000},
-			{CPU: 2000},
+			{CPU: resource.MustParse("1000m")},
+			{CPU: resource.MustParse("2000m")},
 		},
 	}
 	cpuAndMemory := api.PodSpec{
 		Containers: []api.Container{
-			{CPU: 1000, Memory: 2000},
-			{CPU: 2000, Memory: 3000},
+			{CPU: resource.MustParse("1000m"), Memory: resource.MustParse("2000")},
+			{CPU: resource.MustParse("2000m"), Memory: resource.MustParse("3000")},
 		},
 	}
 	tests := []struct {

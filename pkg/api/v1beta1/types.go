@@ -254,7 +254,7 @@ type Container struct {
 	Ports      []Port   `json:"ports,omitempty" description:"list of ports to expose from the container"`
 	Env        []EnvVar `json:"env,omitempty" description:"list of environment variables to set in the container"`
 	// Optional: Defaults to unlimited.
-	Memory int `json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
+	Memory int64 `json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
 	// Optional: Defaults to unlimited.
 	CPU           int            `json:"cpu,omitempty" description:"CPU share in thousandths of a core"`
 	VolumeMounts  []VolumeMount  `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesystem"`
@@ -582,6 +582,13 @@ type NodeResources struct {
 }
 
 type ResourceName string
+
+const (
+	// CPU, in cores. (floating point w/ 3 decimal places)
+	ResourceCPU ResourceName = "cpu"
+	// Memory, in bytes.
+	ResourceMemory ResourceName = "memory"
+)
 
 type ResourceList map[ResourceName]util.IntOrString
 

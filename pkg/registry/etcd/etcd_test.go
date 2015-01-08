@@ -448,7 +448,7 @@ func TestEtcdUpdatePodNotScheduled(t *testing.T) {
 	}
 	var podOut api.Pod
 	latest.Codec.DecodeInto([]byte(response.Node.Value), &podOut)
-	if !reflect.DeepEqual(podOut, podIn) {
+	if !api.Semantic.DeepEqual(podOut, podIn) {
 		t.Errorf("expected: %v, got: %v", podOut, podIn)
 	}
 }
@@ -529,7 +529,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 	}
 	var podOut api.Pod
 	latest.Codec.DecodeInto([]byte(response.Node.Value), &podOut)
-	if !reflect.DeepEqual(podOut, podIn) {
+	if !api.Semantic.DeepEqual(podOut, podIn) {
 		t.Errorf("expected: %#v, got: %#v", podOut, podIn)
 	}
 
@@ -542,7 +542,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 		t.Fatalf("unexpected error decoding response: %v", err)
 	}
 
-	if len(list.Items) != 2 || !reflect.DeepEqual(list.Items[0].Spec, podIn.Spec) {
+	if len(list.Items) != 2 || !api.Semantic.DeepEqual(list.Items[0].Spec, podIn.Spec) {
 		t.Errorf("unexpected container list: %d\n items[0] -   %#v\n podin.spec - %#v\n", len(list.Items), list.Items[0].Spec, podIn.Spec)
 	}
 }

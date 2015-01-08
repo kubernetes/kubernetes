@@ -21,8 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
 type FakeNodeInfo api.Node
@@ -32,17 +31,11 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return &node, nil
 }
 
-func makeResources(milliCPU int, memory int) api.NodeResources {
+func makeResources(milliCPU int64, memory int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
-			resources.CPU: util.IntOrString{
-				IntVal: milliCPU,
-				Kind:   util.IntstrInt,
-			},
-			resources.Memory: util.IntOrString{
-				IntVal: memory,
-				Kind:   util.IntstrInt,
-			},
+			api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 		},
 	}
 }
@@ -51,8 +44,8 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 	containers := []api.Container{}
 	for _, req := range usage {
 		containers = append(containers, api.Container{
-			Memory: req.memory,
-			CPU:    req.milliCPU,
+			Memory: *resource.NewQuantity(req.memory, resource.BinarySI),
+			CPU:    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
 		})
 	}
 	return api.Pod{

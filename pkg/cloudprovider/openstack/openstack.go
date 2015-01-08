@@ -36,8 +36,8 @@ import (
 	"github.com/rackspace/gophercloud/pagination"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -169,11 +169,11 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		for _, flavor := range flavorList {
 			rsrc := api.NodeResources{
 				Capacity: api.ResourceList{
-					"cpu":                      util.NewIntOrStringFromInt(flavor.VCPUs),
-					"memory":                   util.NewIntOrStringFromString(fmt.Sprintf("%dMiB", flavor.RAM)),
-					"openstack.org/disk":       util.NewIntOrStringFromString(fmt.Sprintf("%dGB", flavor.Disk)),
-					"openstack.org/rxTxFactor": util.NewIntOrStringFromInt(int(flavor.RxTxFactor * 1000)),
-					"openstack.org/swap":       util.NewIntOrStringFromString(fmt.Sprintf("%dMiB", flavor.Swap)),
+					api.ResourceCPU:            *resource.NewMilliQuantity(int64(flavor.VCPUs*1000), resource.DecimalSI),
+					api.ResourceMemory:         resource.MustParse(fmt.Sprintf("%dMi", flavor.RAM)),
+					"openstack.org/disk":       resource.MustParse(fmt.Sprintf("%dG", flavor.Disk)),
+					"openstack.org/rxTxFactor": *resource.NewQuantity(int64(flavor.RxTxFactor*1000), resource.DecimalSI),
+					"openstack.org/swap":       resource.MustParse(fmt.Sprintf("%dMi", flavor.Swap)),
 				},
 			}
 			flavor_to_resource[flavor.ID] = &rsrc

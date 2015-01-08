@@ -201,7 +201,7 @@ func TestMinionListConversionToNew(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		if e, a := item.newML, got; !reflect.DeepEqual(e, a) {
+		if e, a := item.newML, got; !newer.Semantic.DeepEqual(e, a) {
 			t.Errorf("Expected: %#v, got %#v", e, a)
 		}
 	}
@@ -234,7 +234,7 @@ func TestMinionListConversionToOld(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if e, a := oldML, got; !reflect.DeepEqual(e, a) {
+	if e, a := oldML, got; !newer.Semantic.DeepEqual(e, a) {
 		t.Errorf("Expected: %#v, got %#v", e, a)
 	}
 }

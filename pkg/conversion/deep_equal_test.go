@@ -22,13 +22,26 @@ import (
 
 func TestEqualities(t *testing.T) {
 	e := Equalities{}
+	type Bar struct {
+		X int
+	}
+	type Baz struct {
+		Y Bar
+	}
 	err := e.AddFuncs(
 		func(a, b int) bool {
 			return a+1 == b
 		},
+		func(a, b Bar) bool {
+			return a.X*10 == b.X
+		},
 	)
 	if err != nil {
 		t.Fatalf("Unexpected: %v", err)
+	}
+
+	type Foo struct {
+		X int
 	}
 
 	table := []struct {
@@ -38,6 +51,10 @@ func TestEqualities(t *testing.T) {
 		{1, 2, true},
 		{2, 1, false},
 		{"foo", "foo", true},
+		{Foo{1}, Foo{2}, true},
+		{Bar{1}, Bar{10}, true},
+		{&Bar{1}, &Bar{10}, true},
+		{Baz{Bar{1}}, Baz{Bar{10}}, true},
 		{map[string]int{"foo": 1}, map[string]int{"foo": 2}, true},
 		{map[string]int{}, map[string]int(nil), true},
 		{[]int{}, []int(nil), true},

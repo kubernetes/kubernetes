@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -429,7 +428,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		newContainers = append(newContainers, container)
 	}
 	pod.Spec.Containers = newContainers
-	if !reflect.DeepEqual(pod.Spec, oldPod.Spec) {
+	if !api.Semantic.DeepEqual(pod.Spec, oldPod.Spec) {
 		// TODO: a better error would include all immutable fields explicitly.
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers, "some fields are immutable"))
 	}
@@ -586,7 +585,7 @@ func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
 func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if !reflect.DeepEqual(minion.Status, api.NodeStatus{}) {
+	if !api.Semantic.DeepEqual(minion.Status, api.NodeStatus{}) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("status", minion.Status, "status must be empty"))
 	}
 
@@ -596,7 +595,7 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	// Clear status
 	oldMinion.Status = minion.Status
 
-	if !reflect.DeepEqual(oldMinion, minion) {
+	if !api.Semantic.DeepEqual(oldMinion, minion) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldMinion, minion)
 		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or capacity changes"))
 	}

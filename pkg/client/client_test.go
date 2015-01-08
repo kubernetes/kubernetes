@@ -28,9 +28,9 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -96,7 +96,7 @@ func (c *testClient) Setup() *testClient {
 func (c *testClient) Validate(t *testing.T, received runtime.Object, err error) {
 	c.ValidateCommon(t, err)
 
-	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
+	if c.Response.Body != nil && !api.Semantic.DeepEqual(c.Response.Body, received) {
 		t.Errorf("bad response for request %#v: expected %#v, got %#v", c.Request, c.Response.Body, received)
 	}
 }
@@ -734,8 +734,8 @@ func TestCreateMinion(t *testing.T) {
 		},
 		Spec: api.NodeSpec{
 			Capacity: api.ResourceList{
-				resources.CPU:    util.NewIntOrStringFromInt(1000),
-				resources.Memory: util.NewIntOrStringFromInt(1024 * 1024),
+				api.ResourceCPU:    resource.MustParse("1000m"),
+				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
 	}

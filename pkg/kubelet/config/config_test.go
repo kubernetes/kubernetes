@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"reflect"
 	"sort"
 	"testing"
 
@@ -65,13 +64,7 @@ func CreateValidPod(name, namespace, source string) api.BoundPod {
 }
 
 func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...api.BoundPod) kubelet.PodUpdate {
-	// We deliberately return an empty slice instead of a nil pointer here
-	// because reflect.DeepEqual differentiates between the two and we need to
-	// pick one for consistency.
 	newPods := make([]api.BoundPod, len(pods))
-	if len(pods) == 0 {
-		return kubelet.PodUpdate{newPods, op, source}
-	}
 	for i := range pods {
 		newPods[i] = pods[i]
 	}
@@ -89,7 +82,7 @@ func expectPodUpdate(t *testing.T, ch <-chan kubelet.PodUpdate, expected ...kube
 	for i := range expected {
 		update := <-ch
 		sort.Sort(sortedPods(update.Pods))
-		if !reflect.DeepEqual(expected[i], update) {
+		if !api.Semantic.DeepEqual(expected[i], update) {
 			t.Fatalf("Expected %#v, Got %#v", expected[i], update)
 		}
 	}

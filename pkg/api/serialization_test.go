@@ -27,12 +27,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	docker "github.com/fsouza/go-dockerclient"
 	fuzz "github.com/google/gofuzz"
+	"speter.net/go/exp/math/dec/inf"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
@@ -136,6 +139,16 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 			c.RandString(): c.RandString(),
 		}
 	},
+
+	func(q *resource.Quantity, c fuzz.Continue) {
+		// Real Quantity fuzz testing is done elsewhere;
+		// this limited subset of functionality survives
+		// round-tripping to v1beta1/2.
+		q.Amount = &inf.Dec{}
+		q.Format = resource.DecimalExponent
+		//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
+		q.Amount.SetUnscaled(c.Int63n(1000))
+	},
 )
 
 func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
@@ -159,7 +172,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), source)
 		return
 	}
-	if !reflect.DeepEqual(source, obj2) {
+	if !api.Semantic.DeepEqual(source, obj2) {
 		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v", name, util.ObjectGoPrintDiff(source, obj2), codec, string(data), source)
 		return
 	}
@@ -170,7 +183,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	}
-	if !reflect.DeepEqual(source, obj3) {
+	if !api.Semantic.DeepEqual(source, obj3) {
 		t.Errorf("3: %v: diff: %v\nCodec: %v", name, util.ObjectDiff(source, obj3), codec)
 		return
 	}
@@ -244,7 +257,7 @@ func TestEncode_Ptr(t *testing.T) {
 	if _, ok := obj2.(*api.Pod); !ok {
 		t.Fatalf("Got wrong type")
 	}
-	if !reflect.DeepEqual(obj2, pod) {
+	if !api.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &pod, obj2)
 	}
 }

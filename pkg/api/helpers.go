@@ -18,6 +18,28 @@ package api
 
 import (
 	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+)
+
+// Semantic can do semantic deep equality checks for api objects.
+// Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
+var Semantic = conversion.EqualitiesOrDie(
+	func(a, b resource.Quantity) bool {
+		// Ignore formatting, only care that numeric value stayed the same.
+		// TODO: if we decide it's important, after we drop v1beta1/2, we
+		// could start comparing format.
+		//
+		// Uninitialized quantities are equivilent to 0 quantities.
+		if a.Amount == nil && b.MilliValue() == 0 {
+			return true
+		}
+		if b.Amount == nil && a.MilliValue() == 0 {
+			return true
+		}
+		return a.Amount.Cmp(b.Amount) == 0
+	},
 )
 
 // TODO: Address these per #1502
