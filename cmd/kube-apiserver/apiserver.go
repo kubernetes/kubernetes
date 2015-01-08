@@ -82,6 +82,7 @@ var (
 	allowPrivileged            = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
 	portalNet                  util.IPNet // TODO: make this a list
 	enableLogsSupport          = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
+	runtimeConfig              util.ConfigurationMap
 	kubeletConfig              = client.KubeletConfig{
 		Port:        10250,
 		EnableHttps: false,
@@ -89,10 +90,13 @@ var (
 )
 
 func init() {
+	runtimeConfig = make(util.ConfigurationMap)
+
 	flag.Var(&address, "address", "The IP address on to serve on (set to 0.0.0.0 for all interfaces)")
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&corsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	flag.Var(&portalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	flag.Var(&runtimeConfig, "runtime_config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
 	client.BindKubeletClientConfigFlags(flag.CommandLine, &kubeletConfig)
 }
 
@@ -139,6 +143,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
+
+	_, v1beta3 := runtimeConfig["api/v1beta3"]
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
@@ -189,6 +195,7 @@ func main() {
 		Authenticator:         authenticator,
 		Authorizer:            authorizer,
 		AdmissionControl:      admissionController,
+		EnableV1Beta3:         v1beta3,
 	}
 	m := master.New(config)
 

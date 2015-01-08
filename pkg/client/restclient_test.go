@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -40,7 +41,8 @@ func TestSetsCodec(t *testing.T) {
 		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
 		"":        {false, "/api/v1beta1/", v1beta1.Codec},
 		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
-		"v1beta3": {true, "", nil},
+		"v1beta3": {false, "/api/v1beta3/", v1beta3.Codec},
+		"v1beta4": {true, "", nil},
 	}
 	for version, expected := range testCases {
 		client, err := New(&Config{Host: "127.0.0.1", Version: version})
