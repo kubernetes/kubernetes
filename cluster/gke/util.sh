@@ -140,7 +140,8 @@ function test-setup() {
     "${MINION_TAG}-${USER}-http-alt" \
     --allow tcp:80 tcp:8080 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}"
+    --target-tags "${MINION_TAG}" \
+    --network="${NETWORK}"
 }
 
 # Ensure that we have a password created for validating to the master.
