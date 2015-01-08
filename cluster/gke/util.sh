@@ -94,6 +94,17 @@ function kube-up() {
     gcloud compute networks create "${NETWORK}" --range "${NETWORK_RANGE}"
   fi
 
+  # Allow SSH on all nodes in the network. This doesn't actually check whether
+  # such a rule exists, only whether we've created this exact rule.
+  if ! gcloud compute firewall-rules describe "${FIREWALL_SSH}" &>/dev/null; then
+    echo "Creating new firewall for SSH: ${FIREWALL_SSH}" >&2
+    gcloud compute firewall-rules create "${FIREWALL_SSH}" \
+      --allow="tcp:22" \
+      --network="${NETWORK}" \
+      --project="${PROJECT}" \
+      --source-ranges="0.0.0.0/0"
+  fi
+
   # Bring up the cluster.
   "${GCLOUD}" preview container clusters create "${CLUSTER_NAME}" \
     --zone="${ZONE}" \
