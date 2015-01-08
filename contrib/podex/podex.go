@@ -28,15 +28,18 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	dockerclient "github.com/fsouza/go-dockerclient"
 	"github.com/ghodss/yaml"
 )
 
@@ -46,6 +49,13 @@ var generateJSON = flag.Bool("json", false, "generate json manifest")
 var generateYAML = flag.Bool("yaml", false, "generate yaml manifest")
 var podName = flag.String("id", "", "set pod name")
 
+type image struct {
+	Host      string
+	Namespace string
+	Image     string
+	Tag       string
+}
+
 func main() {
 	flag.Parse()
 
@@ -54,45 +64,38 @@ func main() {
 	}
 	if *podName == "" {
 		if flag.NArg() > 1 {
-			log.Fatal(usage)
+			log.Print(usage)
+			log.Fatal("podex: -id arg is required when passing more than one image")
 		}
-		_, *podName = parseDockerImage(flag.Arg(0))
+		_, _, *podName, _ = splitDockerImageName(flag.Arg(0))
 	}
 
 	if (!*generateJSON && !*generateYAML) || (*generateJSON && *generateYAML) {
 		log.Fatal(usage)
 	}
 
-	dockerHost := os.Getenv("DOCKER_HOST")
-	if dockerHost == "" {
-		log.Fatalf("DOCKER_HOST is not set")
-	}
-	docker, err := dockerclient.NewClient(dockerHost)
-	if err != nil {
-		log.Fatalf("failed to connect to %q: %v", dockerHost, err)
-	}
-
 	podContainers := []v1beta1.Container{}
 
 	for _, imageName := range flag.Args() {
-		parts, baseName := parseDockerImage(imageName)
+		host, namespace, repo, tag := splitDockerImageName(imageName)
+
 		container := v1beta1.Container{
-			Name:  baseName,
+			Name:  repo,
 			Image: imageName,
 		}
 
-		// TODO(proppy): use the regitry API instead of the remote API to get image metadata.
-		img, err := docker.InspectImage(imageName)
+		img, err := getImageMetadata(host, namespace, repo, tag)
+
 		if err != nil {
-			log.Fatalf("failed to inspect image %q: %v", imageName, err)
+			log.Fatalf("failed to get image metadata %q: %v", imageName, err)
 		}
-		for p := range img.Config.ExposedPorts {
+		for p := range img.ContainerConfig.ExposedPorts {
 			port, err := strconv.Atoi(p.Port())
 			if err != nil {
-				log.Fatalf("failed to parse port %q: %v", parts[0], err)
+				log.Fatalf("failed to parse port %q: %v", p.Port(), err)
 			}
 			container.Ports = append(container.Ports, v1beta1.Port{
-				Name:          strings.Join([]string{baseName, p.Proto(), p.Port()}, "-"),
+				Name:          strings.Join([]string{repo, p.Proto(), p.Port()}, "-"),
 				ContainerPort: port,
 				Protocol:      v1beta1.Protocol(strings.ToUpper(p.Proto())),
 			})
@@ -126,14 +129,98 @@ func main() {
 	}
 }
 
-// parseDockerImage split a docker image name of the form [REGISTRYHOST/][USERNAME/]NAME[:TAG]
-// TODO: handle the TAG
-// Returns array of images name parts and base image name
-func parseDockerImage(imageName string) (parts []string, baseName string) {
-	// Parse docker image name
-	// IMAGE: [REGISTRYHOST/][USERNAME/]NAME[:TAG]
-	// NAME: [a-z0-9-_.]
-	parts = strings.Split(imageName, "/")
-	baseName = parts[len(parts)-1]
+// splitDockerImageName split a docker image name of the form [HOST/][NAMESPACE/]REPOSITORY[:TAG]
+func splitDockerImageName(imageName string) (host, namespace, repo, tag string) {
+	hostNamespaceImage := strings.Split(imageName, "/")
+	last := len(hostNamespaceImage) - 1
+	repoTag := strings.Split(hostNamespaceImage[last], ":")
+	repo = repoTag[0]
+	if len(repoTag) > 1 {
+		tag = repoTag[1]
+	}
+	switch len(hostNamespaceImage) {
+	case 2:
+		host = ""
+		namespace = hostNamespaceImage[0]
+	case 3:
+		host = hostNamespaceImage[0]
+		namespace = hostNamespaceImage[1]
+	}
 	return
+}
+
+type Port string
+
+func (p Port) Port() string {
+	parts := strings.Split(string(p), "/")
+	return parts[0]
+}
+
+func (p Port) Proto() string {
+	parts := strings.Split(string(p), "/")
+	if len(parts) == 1 {
+		return "tcp"
+	}
+	return parts[1]
+}
+
+type imageMetadata struct {
+	ID              string `json:"id"`
+	ContainerConfig struct {
+		ExposedPorts map[Port]struct{}
+	} `json:"container_config"`
+}
+
+func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error) {
+	if host == "" {
+		host = "index.docker.io"
+	}
+	if namespace == "" {
+		namespace = "library"
+	}
+	if tag == "" {
+		tag = "latest"
+	}
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/images", host, namespace, repo), nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Add("X-Docker-Token", "true")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting X-Docker-Token from index.docker.io: %v", err)
+	}
+	endpoints := resp.Header.Get("X-Docker-Endpoints")
+	token := resp.Header.Get("X-Docker-Token")
+	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/tags/%s", endpoints, namespace, repo, tag), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Add("Authorization", "Token "+token)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting image id for %s/%s:%s %v", namespace, repo, tag, err)
+	}
+	var imageID string
+	if err = json.NewDecoder(resp.Body).Decode(&imageID); err != nil {
+		return nil, fmt.Errorf("error decoding image id: %v", err)
+	}
+	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/images/%s/json", endpoints, imageID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Add("Authorization", "Token "+token)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting json for image %q: %v", imageID, err)
+	}
+	data, _ := ioutil.ReadAll(resp.Body)
+	buf := bytes.NewBuffer(data)
+	log.Print(string(data))
+	var image imageMetadata
+	if err := json.NewDecoder(buf).Decode(&image); err != nil {
+		return nil, fmt.Errorf("error decoding image %q metadata: %v", imageID, err)
+	}
+	return &image, nil
 }
