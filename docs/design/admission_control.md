@@ -40,7 +40,6 @@ package admission
 
 // Attributes is an interface used by a plug-in to make an admission decision on a individual request.
 type Attributes interface {
-  GetClient() client.Interface
   GetNamespace() string
   GetKind() string
   GetOperation() string
@@ -60,7 +59,7 @@ of admission.Interface.
 
 ```
 func init() {
-  admission.RegisterPlugin("AlwaysDeny", func(config io.Reader) (admission.Interface, error) { return NewAlwaysDeny(), nil })
+  admission.RegisterPlugin("AlwaysDeny", func(client client.Interface, config io.Reader) (admission.Interface, error) { return NewAlwaysDeny(), nil })
 }
 ```
 
@@ -73,7 +72,7 @@ will ensure the following:
 2. Authenticate user
 3. Authorize user
 4. If operation=create|update, then validate(object)
-5. If operation=create|update|delete, then admissionControl.AdmissionControl(requestAttributes)
+5. If operation=create|update|delete, then admission.Admit(requestAttributes)
   a. invoke each admission.Interface object in sequence
 6. Object is persisted
 
