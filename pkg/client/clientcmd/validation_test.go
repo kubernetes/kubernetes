@@ -52,7 +52,7 @@ func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 
 	badValidation := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"unable to read auth-path", "more than one authentication method", "unable to read certificate-authority"},
+		expectedErrorSubstring: []string{"unable to read auth-path", "unable to read certificate-authority"},
 	}
 	okTest := configValidationTest{
 		config: config,
@@ -77,7 +77,7 @@ func TestConfirmUsableBadInfoConfig(t *testing.T) {
 	}
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"unable to read auth-path", "more than one authentication method", "unable to read certificate-authority"},
+		expectedErrorSubstring: []string{"unable to read auth-path", "unable to read certificate-authority"},
 	}
 
 	test.testConfirmUsable("first", t)
@@ -211,20 +211,6 @@ func TestValidateEmptyAuthInfo(t *testing.T) {
 	config.AuthInfos["error"] = AuthInfo{}
 	test := configValidationTest{
 		config: config,
-	}
-
-	test.testAuthInfo("error", t)
-	test.testConfig(t)
-}
-func TestValidateTooMayTechniquesAuthInfo(t *testing.T) {
-	config := NewConfig()
-	config.AuthInfos["error"] = AuthInfo{
-		AuthPath: "anything",
-		Token:    "here",
-	}
-	test := configValidationTest{
-		config:                 config,
-		expectedErrorSubstring: []string{"more than one authentication method found"},
 	}
 
 	test.testAuthInfo("error", t)

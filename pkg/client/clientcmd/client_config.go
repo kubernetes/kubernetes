@@ -71,48 +71,153 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 	configAuthInfo := config.getAuthInfo()
 	configClusterInfo := config.getCluster()
 
-	clientConfig := client.Config{}
+	clientConfig := &client.Config{}
 	clientConfig.Host = configClusterInfo.Server
 	clientConfig.Version = configClusterInfo.APIVersion
 
 	// only try to read the auth information if we are secure
-	if client.IsConfigTransportTLS(clientConfig) {
-		var authInfo *clientauth.Info
+	if client.IsConfigTransportTLS(*clientConfig) {
 		var err error
-		switch {
-		case len(configAuthInfo.AuthPath) > 0:
-			authInfo, err = NewDefaultAuthLoader().LoadAuth(configAuthInfo.AuthPath)
-			if err != nil {
-				return nil, err
-			}
 
-		case len(configAuthInfo.Token) > 0:
-			authInfo = &clientauth.Info{BearerToken: configAuthInfo.Token}
-
-		case len(configAuthInfo.ClientCertificate) > 0:
-			authInfo = &clientauth.Info{
-				CertFile: configAuthInfo.ClientCertificate,
-				KeyFile:  configAuthInfo.ClientKey,
-			}
-
-		default:
-			authInfo = &clientauth.Info{}
-		}
-
-		if !authInfo.Complete() && (config.fallbackReader != nil) {
-			prompter := NewPromptingAuthLoader(config.fallbackReader)
-			authInfo = prompter.Prompt()
-		}
-
-		authInfo.Insecure = &configClusterInfo.InsecureSkipTLSVerify
-
-		clientConfig, err = authInfo.MergeWithConfig(clientConfig)
+		// mergo is a first write wins for map value and a last writing wins for interface values
+		userAuthPartialConfig, err := getUserIdentificationPartialConfig(configAuthInfo, config.fallbackReader)
 		if err != nil {
 			return nil, err
 		}
+		mergo.Merge(clientConfig, userAuthPartialConfig)
+
+		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
+		if err != nil {
+			return nil, err
+		}
+		mergo.Merge(clientConfig, serverAuthPartialConfig)
 	}
 
-	return &clientConfig, nil
+	return clientConfig, nil
+}
+
+// clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
+// both, so we have to split the objects and merge them separately
+// we want this order of precedence for the server identification
+// 1.  configClusterInfo (the final result of command line flags and merged .kubeconfig files)
+// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
+// 3.  load the ~/.kubernetes_auth file as a default
+func getServerIdentificationPartialConfig(configAuthInfo AuthInfo, configClusterInfo Cluster) (*client.Config, error) {
+	mergedConfig := &client.Config{}
+
+	defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.kubernetes_auth")
+	// if the error is anything besides a does not exist, then fail.  Not existing is ok
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	if defaultAuthPathInfo != nil {
+		defaultAuthPathConfig := makeServerIdentificationConfig(*defaultAuthPathInfo)
+		mergo.Merge(mergedConfig, defaultAuthPathConfig)
+	}
+
+	if len(configAuthInfo.AuthPath) > 0 {
+		authPathInfo, err := NewDefaultAuthLoader().LoadAuth(configAuthInfo.AuthPath)
+		if err != nil {
+			return nil, err
+		}
+		authPathConfig := makeServerIdentificationConfig(*authPathInfo)
+		mergo.Merge(mergedConfig, authPathConfig)
+	}
+
+	// configClusterInfo holds the information identify the server provided by .kubeconfig
+	configClientConfig := &client.Config{}
+	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
+	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
+	mergo.Merge(mergedConfig, configClientConfig)
+
+	return mergedConfig, nil
+}
+
+// clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
+// both, so we have to split the objects and merge them separately
+// we want this order of precedence for user identifcation
+// 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
+// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
+// 3.  if there is not enough information to idenfity the user, load try the ~/.kubernetes_auth file
+// 4.  if there is not enough information to identify the user, prompt if possible
+func getUserIdentificationPartialConfig(configAuthInfo AuthInfo, fallbackReader io.Reader) (*client.Config, error) {
+	mergedConfig := &client.Config{}
+
+	if len(configAuthInfo.AuthPath) > 0 {
+		authPathInfo, err := NewDefaultAuthLoader().LoadAuth(configAuthInfo.AuthPath)
+		if err != nil {
+			return nil, err
+		}
+		authPathConfig := makeUserIdentificationConfig(*authPathInfo)
+		mergo.Merge(mergedConfig, authPathConfig)
+	}
+
+	// blindly overwrite existing values based on precedence
+	if len(configAuthInfo.Token) > 0 {
+		mergedConfig.BearerToken = configAuthInfo.Token
+	}
+	if len(configAuthInfo.ClientCertificate) > 0 {
+		mergedConfig.CertFile = configAuthInfo.ClientCertificate
+		mergedConfig.KeyFile = configAuthInfo.ClientKey
+	}
+
+	// if there isn't sufficient information to authenticate the user to the server, merge in ~/.kubernetes_auth.
+	if !canIdentifyUser(*mergedConfig) {
+		defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.kubernetes_auth")
+		// if the error is anything besides a does not exist, then fail.  Not existing is ok
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		if defaultAuthPathInfo != nil {
+			defaultAuthPathConfig := makeUserIdentificationConfig(*defaultAuthPathInfo)
+			previouslyMergedConfig := mergedConfig
+			mergedConfig = &client.Config{}
+			mergo.Merge(mergedConfig, defaultAuthPathConfig)
+			mergo.Merge(mergedConfig, previouslyMergedConfig)
+		}
+	}
+
+	// if there still isn't enough information to authenticate the user, try prompting
+	if !canIdentifyUser(*mergedConfig) && (fallbackReader != nil) {
+		prompter := NewPromptingAuthLoader(fallbackReader)
+		promptedAuthInfo := prompter.Prompt()
+
+		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
+		previouslyMergedConfig := mergedConfig
+		mergedConfig = &client.Config{}
+		mergo.Merge(mergedConfig, promptedConfig)
+		mergo.Merge(mergedConfig, previouslyMergedConfig)
+	}
+
+	return mergedConfig, nil
+}
+
+// makeUserIdentificationFieldsConfig returns a client.Config capable of being merged using mergo for only user identification information
+func makeUserIdentificationConfig(info clientauth.Info) *client.Config {
+	config := &client.Config{}
+	config.Username = info.User
+	config.Password = info.Password
+	config.CertFile = info.CertFile
+	config.KeyFile = info.KeyFile
+	config.BearerToken = info.BearerToken
+	return config
+}
+
+// makeUserIdentificationFieldsConfig returns a client.Config capable of being merged using mergo for only server identification information
+func makeServerIdentificationConfig(info clientauth.Info) client.Config {
+	config := client.Config{}
+	config.CAFile = info.CAFile
+	if info.Insecure != nil {
+		config.Insecure = *info.Insecure
+	}
+	return config
+}
+
+func canIdentifyUser(config client.Config) bool {
+	return len(config.Username) > 0 ||
+		len(config.CertFile) > 0 ||
+		len(config.BearerToken) > 0
+
 }
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,

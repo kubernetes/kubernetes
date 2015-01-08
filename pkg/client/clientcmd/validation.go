@@ -122,11 +122,13 @@ func validateClusterInfo(clusterName string, clusterInfo Cluster) []error {
 func validateAuthInfo(authInfoName string, authInfo AuthInfo) []error {
 	validationErrors := make([]error, 0)
 
+	usingAuthPath := false
 	methods := make([]string, 0, 3)
 	if len(authInfo.Token) != 0 {
 		methods = append(methods, "token")
 	}
 	if len(authInfo.AuthPath) != 0 {
+		usingAuthPath = true
 		methods = append(methods, "authFile")
 
 		file, err := os.Open(authInfo.AuthPath)
@@ -151,7 +153,8 @@ func validateAuthInfo(authInfoName string, authInfo AuthInfo) []error {
 		}
 	}
 
-	if (len(methods)) > 1 {
+	// authPath also provides information for the client to identify the server, so allow multiple auth methods in that case
+	if (len(methods) > 1) && (!usingAuthPath) {
 		validationErrors = append(validationErrors, fmt.Errorf("more than one authentication method found for  %v.  Found %v, only one is allowed", authInfoName, methods))
 	}
 
