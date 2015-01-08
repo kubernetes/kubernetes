@@ -92,6 +92,20 @@ func NewAlreadyExists(kind, name string) error {
 	}}
 }
 
+// NewForbidden returns an error indicating the requested action was forbidden
+func NewForbidden(kind, name string, err error) error {
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusForbidden,
+		Reason: api.StatusReasonForbidden,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+		},
+		Message: fmt.Sprintf("%s %q is forbidden", kind, name),
+	}}
+}
+
 // NewConflict returns an error indicating the item can't be updated as provided.
 func NewConflict(kind, name string, err error) error {
 	return &StatusError{api.Status{

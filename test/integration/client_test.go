@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 )
 
 func init() {
@@ -56,6 +57,7 @@ func TestClient(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	testCases := []string{

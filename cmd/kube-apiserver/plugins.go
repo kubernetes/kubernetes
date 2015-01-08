@@ -25,4 +25,7 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
+
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/deny"
 )

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -63,23 +64,25 @@ var (
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
 		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
-	tlsPrivateKeyFile       = flag.String("tls_private_key_file", "", "File containing x509 private key matching --tls_cert_file.")
-	apiPrefix               = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
-	storageVersion          = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
-	cloudProvider           = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
-	cloudConfigFile         = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	healthCheckMinions      = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
-	eventTTL                = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
-	tokenAuthFile           = flag.String("token_auth_file", "", "If set, the file that will be used to secure the secure port of the API server via token authentication.")
-	authorizationMode       = flag.String("authorization_mode", "AlwaysAllow", "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
-	authorizationPolicyFile = flag.String("authorization_policy_file", "", "File with authorization policy in csv format, used with --authorization_mode=ABAC, on the secure port.")
-	etcdServerList          util.StringList
-	etcdConfigFile          = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
-	corsAllowedOriginList   util.StringList
-	allowPrivileged         = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
-	portalNet               util.IPNet // TODO: make this a list
-	enableLogsSupport       = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
-	kubeletConfig           = client.KubeletConfig{
+	tlsPrivateKeyFile          = flag.String("tls_private_key_file", "", "File containing x509 private key matching --tls_cert_file.")
+	apiPrefix                  = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
+	storageVersion             = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
+	cloudProvider              = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	cloudConfigFile            = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	healthCheckMinions         = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
+	eventTTL                   = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
+	tokenAuthFile              = flag.String("token_auth_file", "", "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+	authorizationMode          = flag.String("authorization_mode", "AlwaysAllow", "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
+	authorizationPolicyFile    = flag.String("authorization_policy_file", "", "File with authorization policy in csv format, used with --authorization_mode=ABAC, on the secure port.")
+	admissionControl           = flag.String("admission_control", "AlwaysAdmit", "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
+	admissionControlConfigFile = flag.String("admission_control_config_file", "", "File with admission control configuration.")
+	etcdServerList             util.StringList
+	etcdConfigFile             = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
+	corsAllowedOriginList      util.StringList
+	allowPrivileged            = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
+	portalNet                  util.IPNet // TODO: make this a list
+	enableLogsSupport          = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
+	kubeletConfig              = client.KubeletConfig{
 		Port:        10250,
 		EnableHttps: false,
 	}
@@ -164,6 +167,9 @@ func main() {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
 
+	admissionControlPluginNames := strings.Split(*admissionControl, ",")
+	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, *admissionControlConfigFile)
+
 	config := &master.Config{
 		Client:                client,
 		Cloud:                 cloud,
@@ -182,6 +188,7 @@ func main() {
 		PublicAddress:         *publicAddressOverride,
 		Authenticator:         authenticator,
 		Authorizer:            authorizer,
+		AdmissionControl:      admissionController,
 	}
 	m := master.New(config)
 

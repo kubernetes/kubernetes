@@ -40,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 )
 
@@ -306,6 +307,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -356,6 +358,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -421,6 +424,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -480,6 +484,7 @@ func TestBobIsForbidden(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -539,6 +544,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -617,6 +623,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -700,6 +707,7 @@ func TestKindAuthorization(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -777,6 +785,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
