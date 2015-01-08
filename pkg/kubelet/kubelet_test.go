@@ -17,7 +17,9 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -1486,9 +1488,15 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 }
 
 type fakeContainerCommandRunner struct {
-	Cmd []string
-	ID  string
-	E   error
+	Cmd    []string
+	ID     string
+	E      error
+	Stdin  io.Reader
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
+	TTY    bool
+	Port   uint16
+	Stream io.ReadWriteCloser
 }
 
 func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]byte, error) {
@@ -1499,6 +1507,23 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 
 func (f *fakeContainerCommandRunner) GetDockerServerVersion() ([]uint, error) {
 	return nil, nil
+}
+
+func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+	f.Cmd = cmd
+	f.ID = id
+	f.Stdin = in
+	f.Stdout = out
+	f.Stderr = err
+	f.TTY = tty
+	return f.E
+}
+
+func (f *fakeContainerCommandRunner) PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+	f.ID = podInfraContainerID
+	f.Port = port
+	f.Stream = stream
+	return nil
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
@@ -2805,5 +2830,252 @@ func TestGetPodReadyCondition(t *testing.T) {
 			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
 		}
 	}
+}
 
+func TestExecInContainerNoSuchPod(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+	err := kubelet.ExecInContainer(
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		"",
+		containerName,
+		[]string{"ls"},
+		nil,
+		nil,
+		nil,
+		false,
+	)
+	if err == nil {
+		t.Fatal("unexpected non-error")
+	}
+	if fakeCommandRunner.ID != "" {
+		t.Fatal("unexpected invocation of runner.ExecInContainer")
+	}
+}
+
+func TestExecInContainerNoSuchContainer(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, fakeDocker := newTestKubelet(t)
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerID := "containerFoo"
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			ID:    "notfound",
+			Names: []string{"/k8s_notfound_" + podName + "." + podNamespace + ".test_12345678_42"},
+		},
+	}
+
+	err := kubelet.ExecInContainer(
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+			UID:         "12345678",
+			Name:        podName,
+			Namespace:   podNamespace,
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		}}),
+		"",
+		containerID,
+		[]string{"ls"},
+		nil,
+		nil,
+		nil,
+		false,
+	)
+	if err == nil {
+		t.Fatal("unexpected non-error")
+	}
+	if fakeCommandRunner.ID != "" {
+		t.Fatal("unexpected invocation of runner.ExecInContainer")
+	}
+}
+
+type fakeReadWriteCloser struct{}
+
+func (f *fakeReadWriteCloser) Write(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeReadWriteCloser) Read(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeReadWriteCloser) Close() error {
+	return nil
+}
+
+func TestExecInContainer(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, fakeDocker := newTestKubelet(t)
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerID := "containerFoo"
+	command := []string{"ls"}
+	stdin := &bytes.Buffer{}
+	stdout := &fakeReadWriteCloser{}
+	stderr := &fakeReadWriteCloser{}
+	tty := true
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			ID:    containerID,
+			Names: []string{"/k8s_" + containerID + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+		},
+	}
+
+	err := kubelet.ExecInContainer(
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+			UID:         "12345678",
+			Name:        podName,
+			Namespace:   podNamespace,
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		}}),
+		"",
+		containerID,
+		[]string{"ls"},
+		stdin,
+		stdout,
+		stderr,
+		tty,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if e, a := containerID, fakeCommandRunner.ID; e != a {
+		t.Fatalf("container id: expected %s, got %s", e, a)
+	}
+	if e, a := command, fakeCommandRunner.Cmd; !reflect.DeepEqual(e, a) {
+		t.Fatalf("command: expected '%v', got '%v'", e, a)
+	}
+	if e, a := stdin, fakeCommandRunner.Stdin; e != a {
+		t.Fatalf("stdin: expected %#v, got %#v", e, a)
+	}
+	if e, a := stdout, fakeCommandRunner.Stdout; e != a {
+		t.Fatalf("stdout: expected %#v, got %#v", e, a)
+	}
+	if e, a := stderr, fakeCommandRunner.Stderr; e != a {
+		t.Fatalf("stderr: expected %#v, got %#v", e, a)
+	}
+	if e, a := tty, fakeCommandRunner.TTY; e != a {
+		t.Fatalf("tty: expected %t, got %t", e, a)
+	}
+}
+
+func TestPortForwardNoSuchPod(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	var port uint16 = 5000
+
+	err := kubelet.PortForward(
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		"",
+		port,
+		nil,
+	)
+	if err == nil {
+		t.Fatal("unexpected non-error")
+	}
+	if fakeCommandRunner.ID != "" {
+		t.Fatal("unexpected invocation of runner.PortForward")
+	}
+}
+
+func TestPortForwardNoSuchContainer(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, fakeDocker := newTestKubelet(t)
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	var port uint16 = 5000
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			ID:    "notfound",
+			Names: []string{"/k8s_notfound_" + podName + "." + podNamespace + ".test_12345678_42"},
+		},
+	}
+
+	err := kubelet.PortForward(
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+			UID:         "12345678",
+			Name:        podName,
+			Namespace:   podNamespace,
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		}}),
+		"",
+		port,
+		nil,
+	)
+	if err == nil {
+		t.Fatal("unexpected non-error")
+	}
+	if fakeCommandRunner.ID != "" {
+		t.Fatal("unexpected invocation of runner.PortForward")
+	}
+}
+
+func TestPortForward(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, fakeDocker := newTestKubelet(t)
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerID := "containerFoo"
+	var port uint16 = 5000
+	stream := &fakeReadWriteCloser{}
+
+	infraContainerID := "infra"
+	kubelet.podInfraContainerImage = "POD"
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			ID:    infraContainerID,
+			Names: []string{"/k8s_" + kubelet.podInfraContainerImage + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+		},
+		{
+			ID:    containerID,
+			Names: []string{"/k8s_" + containerID + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+		},
+	}
+
+	err := kubelet.PortForward(
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+			UID:         "12345678",
+			Name:        podName,
+			Namespace:   podNamespace,
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+		}}),
+		"",
+		port,
+		stream,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if e, a := infraContainerID, fakeCommandRunner.ID; e != a {
+		t.Fatalf("container id: expected %s, got %s", e, a)
+	}
+	if e, a := port, fakeCommandRunner.Port; e != a {
+		t.Fatalf("port: expected %v, got %v", e, a)
+	}
+	if e, a := stream, fakeCommandRunner.Stream; e != a {
+		t.Fatalf("stream: expected %v, got %v", e, a)
+	}
 }

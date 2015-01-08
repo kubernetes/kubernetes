@@ -1,0 +1,52 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl port\-forward \- Forward 1 or more local ports to a pod.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl port\-forward\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Forward 1 or more local ports to a pod.
+Examples:
+  $ kubectl port\-forward \-p mypod 5000 6000
+  <listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000
+   and 6000 in the pod>
+
+.PP
+.RS
+
+.nf
+$ kubectl port\-forward \-p mypod 8888:5000
+<listens on port 8888 locally, forwarding to 5000 in the pod>
+
+$ kubectl port\-forward \-p mypod :5000
+<listens on a random port locally, forwarding to 5000 in the pod>
+
+$ kubectl port\-forward \-p mypod 0:5000
+<listens on a random port locally, forwarding to 5000 in the pod>
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-p\fP, \fB\-\-pod\fP=""
+    Pod name
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

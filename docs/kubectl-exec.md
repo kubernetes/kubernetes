@@ -1,16 +1,30 @@
-## kubectl
+## kubectl exec
 
-kubectl controls the Kubernetes cluster manager
+Execute a command in a container.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Execute a command in a container.
+Examples:
+  $ kubectl exec -p 123456-7890 -c ruby-container date
+  <returns output from running 'date' in ruby-container from pod 123456-7890>
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+  $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il
+  <switches to raw terminal mode, sends stdin to 'bash' in ruby-container from
+   pod 123456-780 and sends stdout/stderr from 'bash' back to the client
 
-kubectl
+kubectl exec -p <pod> -c <container> -- <command> [<args...>]
 
 ### Options
+
+```
+  -c, --container="": Container name
+  -p, --pod="": Pod name
+  -i, --stdin=false: Pass stdin to the container
+  -t, --tty=false: Stdin is a TTY
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -42,22 +56,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-exec](kubectl-exec.md)
-* [kubectl-port-forward](kubectl-port-forward.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

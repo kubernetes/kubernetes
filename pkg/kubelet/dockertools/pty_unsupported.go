@@ -1,5 +1,7 @@
+// +build !linux
+
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package dockertools
 
 import (
 	"os"
-	"runtime"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	"os/exec"
 )
 
-func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	cmd := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+func StartPty(c *exec.Cmd) (pty *os.File, err error) {
+	return nil, nil
 }

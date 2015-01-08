@@ -164,7 +164,8 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewFactory(nil).NewKubectlCommand(ioutil.Discard)
+	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
+	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
 	genMarkdown(kubectl, "", docsDir)
 	for _, c := range kubectl.Commands() {
 		genMarkdown(c, "kubectl", docsDir)

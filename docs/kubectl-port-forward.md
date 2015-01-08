@@ -1,16 +1,34 @@
-## kubectl
+## kubectl port-forward
 
-kubectl controls the Kubernetes cluster manager
+Forward 1 or more local ports to a pod.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Forward 1 or more local ports to a pod.
+Examples:
+  $ kubectl port-forward -p mypod 5000 6000
+  <listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000
+   and 6000 in the pod>
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+	$ kubectl port-forward -p mypod 8888:5000
+	<listens on port 8888 locally, forwarding to 5000 in the pod>
 
-kubectl
+	$ kubectl port-forward -p mypod :5000
+	<listens on a random port locally, forwarding to 5000 in the pod>
+
+	$ kubectl port-forward -p mypod 0:5000
+	<listens on a random port locally, forwarding to 5000 in the pod>
+   
+
+kubectl port-forward -p <pod> [<local port>:]<remote port> [<port>...]
 
 ### Options
+
+```
+  -p, --pod="": Pod name
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -42,22 +60,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-exec](kubectl-exec.md)
-* [kubectl-port-forward](kubectl-port-forward.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 
