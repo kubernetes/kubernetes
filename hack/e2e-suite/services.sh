@@ -249,7 +249,17 @@ function verify_from_container() {
       sudo docker pull busybox >/dev/null;
       sudo docker run busybox sh -c '
           for i in $(seq -s' ' 1 $4); do
-            wget -q -T 1 -O - http://$2:$3;
+            ok=false
+            for j in $(seq -s' ' 1 10); do
+              if wget -q -T 1 -O - http://$2:$3; then
+		ok=true
+                break
+              fi
+              sleep 1
+            done
+            if [[ \${ok} == false ]]; then
+              exit 1
+            fi
           done
       '")) \
       || error "testing $1 portal from container failed"
