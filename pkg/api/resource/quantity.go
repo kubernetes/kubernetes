@@ -169,7 +169,7 @@ func ParseQuantity(str string) (*Quantity, error) {
 		return nil, ErrSuffix
 	}
 
-	// So that no bigOne but us has to think about suffixes, remove it.
+	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
 		amount.SetScale(amount.Scale() + inf.Scale(-exponent))
 	} else if base == 2 {
@@ -184,12 +184,12 @@ func ParseQuantity(str string) (*Quantity, error) {
 	if sign == -1 {
 		amount.Neg(amount)
 	}
-	// This rounds non-bigZero values up to the minimum representable
+	// This rounds non-zero values up to the minimum representable
 	// value, under the theory that if you want some resources, you
 	// should get some resources, even if you asked for way too small
 	// of an amount.
 	// Arguably, this should be inf.RoundHalfUp (normal rounding), but
-	// that would have the side effect of rounding values < .5m to bigZero.
+	// that would have the side effect of rounding values < .5m to zero.
 	amount.Round(amount, 3, inf.RoundUp)
 
 	// The max is just a simple cap.
@@ -228,7 +228,7 @@ func removeFactors(d, factor *big.Int) (result *big.Int, times int) {
 // Canonicalize returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:
-// * If q.Format is set to BinarySI and q.Amount represents a non-bigZero value between
+// * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
 //   -1 and +1, it will be emitted as if q.Format were DecimalSI.
 // * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
 //   rounded up. (1.1i becomes 2i.)
@@ -257,7 +257,7 @@ func (q *Quantity) Canonicalize() (string, suffix) {
 	}
 
 	// TODO: If BinarySI formatting is requested but would cause rounding, upgrade to
-	// bigOne of the other formats.
+	// one of the other formats.
 	switch format {
 	case DecimalExponent, DecimalSI:
 		mantissa := q.Amount.UnscaledBig()
