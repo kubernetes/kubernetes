@@ -739,6 +739,9 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 		}
 		return err
 	}
+	if ref != nil {
+		record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %q", img)
+	}
 	return nil
 }
 
@@ -905,19 +908,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 			if api.IsPullAlways(container.ImagePullPolicy) ||
 				(api.IsPullIfNotPresent(container.ImagePullPolicy) && (!present || latest)) {
-				kl.pullLock.RLock()
-				if err := kl.dockerPuller.Pull(container.Image); err != nil {
-					if ref != nil {
-
-						record.Eventf(ref, "failed", "failed", "Failed to pull image %q", container.Image)
-					}
-					glog.Errorf("Failed to pull image %q: %v; skipping pod %q container %q.", container.Image, err, podFullName, container.Name)
-					kl.pullLock.RUnlock()
+				if err := kl.pullImage(container.Image, ref); err != nil {
 					continue
-				}
-				kl.pullLock.RUnlock()
-				if ref != nil {
-					record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %q", container.Image)
 				}
 			}
 		}
