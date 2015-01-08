@@ -26,6 +26,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -64,6 +65,7 @@ var (
 	oomScoreAdj             = flag.Int("oom_score_adj", -900, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	apiServerList           util.StringList
 	clusterDomain           = flag.String("cluster_domain", "", "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
+	masterServiceNamespace  = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 	clusterDNS              = util.IP(nil)
 )
 
@@ -130,6 +132,7 @@ func main() {
 		DockerClient:            util.ConnectToDockerOrDie(*dockerEndpoint),
 		KubeClient:              client,
 		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
+		MasterServiceNamespace:  *masterServiceNamespace,
 	}
 
 	standalone.RunKubelet(&kcfg)

@@ -45,10 +45,23 @@ func (r *ServiceRegistry) ListServices(ctx api.Context) (*api.ServiceList, error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Return by copy to avoid data races
+	ns, _ := api.NamespaceFrom(ctx)
+
+	// Copy metadata from internal list into result
 	res := new(api.ServiceList)
-	*res = r.List
-	res.Items = append([]api.Service{}, r.List.Items...)
+	res.TypeMeta = r.List.TypeMeta
+	res.ListMeta = r.List.ListMeta
+
+	if ns != api.NamespaceAll {
+		for _, service := range r.List.Items {
+			if ns == service.Namespace {
+				res.Items = append(res.Items, service)
+			}
+		}
+	} else {
+		res.Items = append([]api.Service{}, r.List.Items...)
+	}
+
 	return res, r.Err
 }
 

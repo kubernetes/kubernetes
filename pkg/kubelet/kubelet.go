@@ -34,9 +34,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -76,7 +79,8 @@ func NewMainKubelet(
 	maxContainerCount int,
 	sourceReady SourceReadyFn,
 	clusterDomain string,
-	clusterDNS net.IP) (*Kubelet, error) {
+	clusterDNS net.IP,
+	masterServiceNamespace string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -86,24 +90,31 @@ func NewMainKubelet(
 	if minimumGCAge <= 0 {
 		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
 	}
+
+	serviceStore := cache.NewStore()
+	cache.NewReflector(&cache.ListWatch{kubeClient, labels.Everything(), "services", api.NamespaceAll}, &api.Service{}, serviceStore).Run()
+	serviceLister := &cache.StoreToServiceLister{serviceStore}
+
 	klet := &Kubelet{
-		hostname:              hostname,
-		dockerClient:          dockerClient,
-		etcdClient:            etcdClient,
-		rootDirectory:         rootDirectory,
-		resyncInterval:        resyncInterval,
-		networkContainerImage: networkContainerImage,
-		podWorkers:            newPodWorkers(),
-		dockerIDToRef:         map[dockertools.DockerID]*api.ObjectReference{},
-		runner:                dockertools.NewDockerContainerCommandRunner(dockerClient),
-		httpClient:            &http.Client{},
-		pullQPS:               pullQPS,
-		pullBurst:             pullBurst,
-		minimumGCAge:          minimumGCAge,
-		maxContainerCount:     maxContainerCount,
-		sourceReady:           sourceReady,
-		clusterDomain:         clusterDomain,
-		clusterDNS:            clusterDNS,
+		hostname:               hostname,
+		dockerClient:           dockerClient,
+		etcdClient:             etcdClient,
+		rootDirectory:          rootDirectory,
+		resyncInterval:         resyncInterval,
+		networkContainerImage:  networkContainerImage,
+		podWorkers:             newPodWorkers(),
+		dockerIDToRef:          map[dockertools.DockerID]*api.ObjectReference{},
+		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
+		httpClient:             &http.Client{},
+		pullQPS:                pullQPS,
+		pullBurst:              pullBurst,
+		minimumGCAge:           minimumGCAge,
+		maxContainerCount:      maxContainerCount,
+		sourceReady:            sourceReady,
+		clusterDomain:          clusterDomain,
+		clusterDNS:             clusterDNS,
+		serviceLister:          serviceLister,
+		masterServiceNamespace: masterServiceNamespace,
 	}
 
 	if err := klet.setupDataDirs(); err != nil {
@@ -117,10 +128,15 @@ type httpGetter interface {
 	Get(url string) (*http.Response, error)
 }
 
+type serviceLister interface {
+	List() (api.ServiceList, error)
+}
+
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname              string
 	dockerClient          dockertools.DockerInterface
+	kubeClient            *client.Client
 	rootDirectory         string
 	networkContainerImage string
 	podWorkers            *podWorkers
@@ -168,6 +184,9 @@ type Kubelet struct {
 
 	// If non-nil, use this for container DNS server.
 	clusterDNS net.IP
+
+	masterServiceNamespace string
+	serviceLister          serviceLister
 }
 
 // GetRootDir returns the full path to the directory under which kubelet can
@@ -423,14 +442,6 @@ func (self *podWorkers) Run(podFullName string, action func()) {
 	}()
 }
 
-func makeEnvironmentVariables(container *api.Container) []string {
-	var result []string
-	for _, value := range container.Env {
-		result = append(result, fmt.Sprintf("%s=%s", value.Name, value.Value))
-	}
-	return result
-}
-
 func makeBinds(pod *api.BoundPod, container *api.Container, podVolumes volumeMap) []string {
 	binds := []string{}
 	for _, mount := range container.VolumeMounts {
@@ -607,7 +618,10 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	envVariables := makeEnvironmentVariables(container)
+	envVariables, err := kl.makeEnvironmentVariables(pod.Namespace, container)
+	if err != nil {
+		return "", err
+	}
 	binds := makeBinds(pod, container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
@@ -690,6 +704,91 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 		}
 	}
 	return dockertools.DockerID(dockerContainer.ID), err
+}
+
+var masterServices = util.NewStringSet("kubernetes", "kubernetes-ro")
+
+// getServiceEnvVarMap makes a map[string]string of env vars for services a pod in namespace ns should see
+func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
+	var (
+		serviceMap = make(map[string]api.Service)
+		m          = make(map[string]string)
+	)
+
+	// Get all service resources from the master (via a cache),
+	// and populate them into service enviroment variables.
+	if kl.serviceLister == nil {
+		// Kubelets without masters (e.g. plain GCE ContainerVM) don't set env vars.
+		return m, nil
+	}
+	services, err := kl.serviceLister.List()
+	if err != nil {
+		return m, fmt.Errorf("Failed to list services when setting up env vars.")
+	}
+
+	// project the services in namespace ns onto the master services
+	for _, service := range services.Items {
+		serviceName := service.Name
+
+		switch service.Namespace {
+		// for the case whether the master service namespace is the namespace the pod
+		// is in, pod should receive all the pods in the namespace.
+		//
+		// ordering of the case clauses below enforces this
+		case ns:
+			serviceMap[serviceName] = service
+		case kl.masterServiceNamespace:
+			if masterServices.Has(serviceName) {
+				_, exists := serviceMap[serviceName]
+				if !exists {
+					serviceMap[serviceName] = service
+				}
+			}
+		}
+	}
+	services.Items = []api.Service{}
+	for _, service := range serviceMap {
+		services.Items = append(services.Items, service)
+	}
+
+	for _, e := range envvars.FromServices(&services) {
+		m[e.Name] = e.Value
+	}
+	return m, nil
+}
+
+// Make the service environment variables for a pod in the given namespace.
+func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container) ([]string, error) {
+	var result []string
+	// Note:  These are added to the docker.Config, but are not included in the checksum computed
+	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
+	// api.Container is already running by its hash. (We don't want to restart a container just
+	// because some service changed.)
+	//
+	// Note that there is a race between Kubelet seeing the pod and kubelet seeing the service.
+	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
+	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
+	// and keep trying to resolve the DNS name of the service (recommended).
+	serviceEnv, err := kl.getServiceEnvVarMap(ns)
+	if err != nil {
+		return result, err
+	}
+
+	for _, value := range container.Env {
+		// The code is in transition from using etcd+BoundPods to apiserver+Pods.
+		// So, the master may set service env vars, or kubelet may.  In case both are doing
+		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
+		// env vars.
+		// TODO: remove this net line once all platforms use apiserver+Pods.
+		delete(serviceEnv, value.Name)
+		result = append(result, fmt.Sprintf("%s=%s", value.Name, value.Value))
+	}
+
+	// Append remaining service env vars.
+	for k, v := range serviceEnv {
+		result = append(result, fmt.Sprintf("%s=%s", k, v))
+	}
+	return result, nil
 }
 
 func (kl *Kubelet) applyClusterDNS(hc *docker.HostConfig, pod *api.BoundPod) error {

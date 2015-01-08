@@ -83,7 +83,7 @@ func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client
 }
 
 // RunApiServer starts an API server in a go routine.
-func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, port int) {
+func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
 	helper, err := master.NewEtcdHelper(etcdClient, "")
@@ -104,9 +104,10 @@ func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, p
 		APIPrefix:            "/api",
 		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
 
-		ReadWritePort: port,
-		ReadOnlyPort:  port,
-		PublicAddress: addr,
+		ReadWritePort:          port,
+		ReadOnlyPort:           port,
+		PublicAddress:          addr,
+		MasterServiceNamespace: masterServiceNamespace,
 	})
 	handler.delegate = m.InsecureHandler
 
@@ -144,7 +145,12 @@ func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an etcdClient.
 // Under the hood it calls RunKubelet (below)
-func SimpleRunKubelet(client *client.Client, etcdClient tools.EtcdClient, dockerClient dockertools.DockerInterface, hostname, rootDir, manifestURL, address string, port uint) {
+func SimpleRunKubelet(client *client.Client,
+	etcdClient tools.EtcdClient,
+	dockerClient dockertools.DockerInterface,
+	hostname, rootDir, manifestURL, address string,
+	port uint,
+	masterServiceNamespace string) {
 	kcfg := KubeletConfig{
 		KubeClient:            client,
 		EtcdClient:            etcdClient,
@@ -160,6 +166,7 @@ func SimpleRunKubelet(client *client.Client, etcdClient tools.EtcdClient, docker
 		SyncFrequency:           3 * time.Second,
 		MinimumGCAge:            10 * time.Second,
 		MaxContainerCount:       5,
+		MasterServiceNamespace:  masterServiceNamespace,
 	}
 	RunKubelet(&kcfg)
 }
@@ -255,6 +262,7 @@ type KubeletConfig struct {
 	EnableDebuggingHandlers bool
 	Port                    uint
 	Runonce                 bool
+	MasterServiceNamespace  string
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -275,7 +283,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.MaxContainerCount,
 		pc.IsSourceSeen,
 		kc.ClusterDomain,
-		net.IP(kc.ClusterDNS))
+		net.IP(kc.ClusterDNS),
+		kc.MasterServiceNamespace)
 
 	if err != nil {
 		return nil, err
