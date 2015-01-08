@@ -26,6 +26,7 @@ CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"
 #                 because we use the 'default' network by default.
 NETWORK="${NETWORK:-default}"
 NETWORK_RANGE="${NETWORK_RANGE:-10.240.0.0/16}"
+FIREWALL_SSH="${FIREWALL_SSH:-${NETWORK}-allow-ssh}"
 GCLOUD="${GCLOUD:-gcloud}"
 GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
 ENABLE_CLUSTER_DNS=false
