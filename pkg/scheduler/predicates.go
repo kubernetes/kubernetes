@@ -231,6 +231,11 @@ func NewServiceAffinityPredicate(podLister PodLister, serviceLister ServiceListe
 // The set of labels to be considered are provided to the struct (ServiceAffinity).
 // The pod is checked for the labels and any missing labels are then checked in the minion
 // that hosts the service pods (peers) for the given pod.
+//
+// We add an implicit selector requiring some particular value V for label L to a pod, if:
+// - L is listed in the ServiceAffinity object that is passed into the function
+// - the pod does not have any NodeSelector for L
+// - some other pod from the same service is already scheduled onto a minion that has value V for label L
 func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	var affinitySelector labels.Selector
 
