@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -100,12 +101,11 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 		Run: runHelp,
 	}
 
+	util.AddAllFlagsToPFlagSet(cmds.PersistentFlags())
 	f.ClientConfig = getClientConfig(cmds)
 
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
-	// TODO Add a verbose flag that turns on glog logging. Probably need a way
-	// to do that automatically for every subcommand.
 	cmds.PersistentFlags().Bool(FlagMatchBinaryVersion, false, "Require server version to match client version")
 	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
 	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
