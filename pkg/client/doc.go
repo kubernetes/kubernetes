@@ -30,7 +30,7 @@ Most consumers should use the Config object to create a Client:
     if err != nil {
       // handle error
     }
-    client.ListPods()
+    client.Pods(ns).List()
 
 More advanced consumers may wish to provide their own transport via a http.RoundTripper:
 

@@ -52,7 +52,7 @@ func newPods(c *Client, namespace string) *pods {
 	}
 }
 
-// ListPods takes a selector, and returns the list of pods that match that selector.
+// List takes a selector, and returns the list of pods that match that selector.
 func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
 	err = c.r.Get().Namespace(c.ns).Resource("pods").SelectorParam("labels", selector).Do().Into(result)

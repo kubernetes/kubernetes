@@ -28,7 +28,7 @@ import (
 // may not provide optimal spreading for the members of that Service.
 // TODO: consider if we want to include Service label sets in the scheduling priority.
 func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	pods, err := podLister.ListPods(labels.SelectorFromSet(pod.Labels))
+	pods, err := podLister.List(labels.SelectorFromSet(pod.Labels))
 	if err != nil {
 		return nil, err
 	}

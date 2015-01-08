@@ -58,7 +58,7 @@ Example:
     clientConfig.Host = "example.com:4901"
     clientConfig = info.MergeWithConfig()
     client := client.New(clientConfig)
-    client.ListPods()
+    client.Pods(ns).List()
 */
 package clientauth
 
