@@ -15,6 +15,11 @@
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
 		},
 		{
+			"ImportPath": "code.google.com/p/go.net/spdy",
+			"Comment": "null-240",
+			"Rev": "937a34c9de13c766c814510f76bca091dee06028"
+		},
+		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
 			"Comment": "release-96",
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
@@ -84,6 +89,11 @@
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/term",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/units",
 			"Comment": "v1.4.1-108-g364720b",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
@@ -92,6 +102,10 @@
 			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
 			"Comment": "v1.4.1-108-g364720b",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
+			"ImportPath": "github.com/docker/spdystream",
+			"Rev": "29e1da2890f60336f98d0b3bf28b05070aa2ee4d"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
@@ -144,6 +158,11 @@
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
 			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
+		},
+		{
+			"ImportPath": "github.com/kr/pty",
+			"Comment": "release.r56-25-g05017fc",
+			"Rev": "05017fcccf23c823bfdea560dcc958a136e54fb7"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
