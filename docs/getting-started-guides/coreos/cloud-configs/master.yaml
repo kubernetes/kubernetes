@@ -95,7 +95,7 @@ coreos:
         ExecStart=/opt/bin/kube-apiserver \
         --address=0.0.0.0 \
         --port=8080 \
-        --portal_net 10.1.0.0/16 \
+        --portal_net=10.1.0.0/16 \
         --etcd_servers=http://127.0.0.1:4001 \
         --logtostderr=true
         Restart=always
