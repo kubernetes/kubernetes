@@ -58,7 +58,7 @@ func (f FakePodLister) List(s labels.Selector) (selected []api.Pod, err error) {
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
 type ServiceLister interface {
 	// Lists all the services
-	ListServices() (api.ServiceList, error)
+	List() (api.ServiceList, error)
 	// Gets the services for the given pod
 	GetPodServices(api.Pod) ([]api.Service, error)
 }
@@ -67,7 +67,7 @@ type ServiceLister interface {
 type FakeServiceLister []api.Service
 
 // FakeServiceLister returns api.ServiceList, the list of all services.
-func (f FakeServiceLister) ListServices() (api.ServiceList, error) {
+func (f FakeServiceLister) List() (api.ServiceList, error) {
 	return api.ServiceList{Items: f}, nil
 }
 

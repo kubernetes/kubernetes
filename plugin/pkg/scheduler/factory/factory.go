@@ -187,12 +187,12 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &nodeEnumerator{list}, nil
 }
 
-// createServiceLW returns a listWatch that gets all changes to services.
-func (factory *ConfigFactory) createServiceLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie(""),
-		resource:      "services",
+// createServiceLW returns a cache.ListWatch that gets all changes to services.
+func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
+	return &cache.ListWatch{
+		Client:        factory.Client,
+		FieldSelector: parseSelectorOrDie(""),
+		Resource:      "services",
 	}
 }
 
@@ -224,40 +224,6 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 // nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
 type nodeEnumerator struct {
 	*api.NodeList
-}
-
-// storeToServiceLister turns a store into a service lister. The store must contain (only) services.
-type storeToServiceLister struct {
-	cache.Store
-}
-
-func (s *storeToServiceLister) ListServices() (services api.ServiceList, err error) {
-	for _, m := range s.List() {
-		services.Items = append(services.Items, *(m.(*api.Service)))
-	}
-	return services, nil
-}
-
-func (s *storeToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
-	var selector labels.Selector
-	var service api.Service
-
-	for _, m := range s.List() {
-		service = *m.(*api.Service)
-		// consider only services that are in the same namespace as the pod
-		if service.Namespace != pod.Namespace {
-			continue
-		}
-		selector = labels.Set(service.Spec.Selector).AsSelector()
-		if selector.Matches(labels.Set(pod.Labels)) {
-			services = append(services, service)
-		}
-	}
-	if len(services) == 0 {
-		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
-
-	return
 }
 
 // Len returns the number of items in the node list.

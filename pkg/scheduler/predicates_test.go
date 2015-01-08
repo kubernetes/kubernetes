@@ -32,9 +32,6 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return &node, nil
 }
 
-<<<<<<< HEAD
-func makeResources(milliCPU int64, memory int64) api.NodeResources {
-=======
 type FakeNodeListInfo []api.Node
 
 func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
@@ -46,8 +43,7 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
 }
 
-func makeResources(milliCPU int, memory int) api.NodeResources {
->>>>>>> e0101c2... Adding service affinity predicate
+func makeResources(milliCPU int64, memory int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
 			api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
