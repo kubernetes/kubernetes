@@ -86,19 +86,23 @@ func TestFiltering(t *testing.T) {
 		delegate: mockMinionRegistry,
 		client:   &notMinion{minion: "m1"},
 	}
-	expected := []string{"m2", "m3"}
+	expected := []string{"m1", "m2", "m3"}
 	list, err := healthy.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, registrytest.MakeMinionList(expected, api.NodeResources{})) {
+	expectedMinions := registrytest.MakeMinionList(expected, api.NodeResources{})
+	expectedMinions.Items[0].Status.Conditions = []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionNone}}
+	expectedMinions.Items[1].Status.Conditions = []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}
+	expectedMinions.Items[2].Status.Conditions = []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}
+	if !reflect.DeepEqual(list, expectedMinions) {
 		t.Errorf("Expected %v, Got %v", expected, list)
 	}
 	minion, err := healthy.GetMinion(ctx, "m1")
-	if err == nil {
-		t.Errorf("unexpected non-error")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-	if minion != nil {
-		t.Errorf("Unexpected presence of 'm1'")
+	if minion == nil {
+		t.Errorf("Unexpected empty 'm1'")
 	}
 }

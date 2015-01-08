@@ -22,8 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
 )
 
 type HealthyRegistry struct {
@@ -41,22 +39,9 @@ func NewHealthyRegistry(delegate Registry, client client.KubeletHealthChecker) R
 func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
 	minion, err := r.delegate.GetMinion(ctx, minionID)
 	if err != nil {
-		return minion, err
-	}
-	if minion == nil {
-		return nil, ErrDoesNotExist
-	}
-	if err != nil {
 		return nil, err
 	}
-	status, err := r.client.HealthCheck(minionID)
-	if err != nil {
-		return nil, err
-	}
-	if status == health.Unhealthy {
-		return nil, ErrNotHealty
-	}
-	return minion, nil
+	return r.checkMinion(minion), nil
 }
 
 func (r *HealthyRegistry) DeleteMinion(ctx api.Context, minionID string) error {
@@ -72,26 +57,42 @@ func (r *HealthyRegistry) UpdateMinion(ctx api.Context, minion *api.Node) error 
 }
 
 func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.NodeList, err error) {
-	result := &api.NodeList{}
 	list, err := r.delegate.ListMinions(ctx)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
-	for _, minion := range list.Items {
-		status, err := r.client.HealthCheck(minion.Name)
-		if err != nil {
-			glog.V(1).Infof("%#v failed health check with error: %v", minion, err)
-			continue
-		}
-		if status == health.Healthy {
-			result.Items = append(result.Items, minion)
-		} else {
-			glog.Errorf("%#v failed a health check, ignoring.", minion)
-		}
+	for i := range list.Items {
+		list.Items[i] = *r.checkMinion(&list.Items[i])
 	}
-	return result, nil
+	return list, nil
 }
 
 func (r *HealthyRegistry) WatchMinions(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	return r.delegate.WatchMinions(ctx, label, field, resourceVersion)
+	w, err := r.delegate.WatchMinions(ctx, label, field, resourceVersion)
+	if err != nil {
+		return nil, err
+	}
+	return watch.Filter(w, watch.FilterFunc(func(in watch.Event) (watch.Event, bool) {
+		if node, ok := in.Object.(*api.Node); ok && node != nil {
+			in.Object = r.checkMinion(node)
+		}
+		return in, true
+	})), nil
+}
+
+func (r *HealthyRegistry) checkMinion(node *api.Node) *api.Node {
+	condition := api.ConditionFull
+	switch status, err := r.client.HealthCheck(node.Name); {
+	case err != nil:
+		condition = api.ConditionUnknown
+	case status == health.Unhealthy:
+		condition = api.ConditionNone
+	}
+	// TODO: distinguish other conditions like Reachable/Live, and begin storing this
+	// data on nodes directly via sync loops.
+	node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+		Kind:   api.NodeReady,
+		Status: condition,
+	})
+	return node
 }

@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -80,12 +81,15 @@ func (r *MinionRegistry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
 	r.Lock()
 	defer r.Unlock()
+	if r.Err != nil {
+		return nil, r.Err
+	}
 	for _, node := range r.Minions.Items {
 		if node.Name == minionID {
-			return &node, r.Err
+			return &node, nil
 		}
 	}
-	return nil, r.Err
+	return nil, errors.NewNotFound("node", minionID)
 }
 
 func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
