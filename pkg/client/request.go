@@ -103,6 +103,7 @@ type Request struct {
 
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
+	namespaceSet bool
 	resource     string
 	resourceName string
 	selector     labels.Selector
@@ -190,10 +191,11 @@ func (r *Request) Namespace(namespace string) *Request {
 	if r.err != nil {
 		return r
 	}
-	if len(r.namespace) != 0 {
+	if r.namespaceSet {
 		r.err = fmt.Errorf("namespace already set to %q, cannot change to %q", r.namespace, namespace)
 		return r
 	}
+	r.namespaceSet = true
 	r.namespace = namespace
 	return r
 }
@@ -330,7 +332,7 @@ func (r *Request) Poller(poller PollFunc) *Request {
 
 func (r *Request) finalURL() string {
 	p := r.path
-	if !r.namespaceInQuery {
+	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
 		p = path.Join(p, "ns", r.namespace)
 	}
 	if len(r.resource) != 0 {
@@ -353,7 +355,7 @@ func (r *Request) finalURL() string {
 		query.Add(key, value)
 	}
 
-	if r.namespaceInQuery && len(r.namespace) > 0 {
+	if r.namespaceSet && r.namespaceInQuery && len(r.namespace) > 0 {
 		query.Add("namespace", r.namespace)
 	}
 

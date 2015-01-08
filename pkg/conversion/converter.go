@@ -457,6 +457,10 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 			}
 			dkv := reflect.New(dt.Elem()).Elem()
 			scope.setKeys(sk.Interface(), dk.Interface())
+			// TODO:  sv.MapIndex(sk) may return a value with CanAddr() == false,
+			// because a map[string]struct{} does not allow a pointer reference.
+			// Calling a custom conversion function defined for the map value
+			// will panic. Example is PodInfo map[string]ContainerStatus.
 			if err := c.convert(sv.MapIndex(sk), dkv, scope); err != nil {
 				return err
 			}

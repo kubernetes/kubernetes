@@ -86,6 +86,11 @@ func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	if s := r.finalURL(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
+
+	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	if s := r.finalURL(); s != "/foo/" {
+		t.Errorf("trailing slash should be preserved: %s", s)
+	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {

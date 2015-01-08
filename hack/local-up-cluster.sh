@@ -92,6 +92,7 @@ sudo "${GO_OUT}/kube-apiserver" \
   -v=${LOG_LEVEL} \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
+  --runtime_config=api/v1beta3 \
   --etcd_servers="http://127.0.0.1:4001" \
   --portal_net="10.0.0.0/24" \
   --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &

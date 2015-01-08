@@ -74,6 +74,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
+  --runtime_config=api/v1beta3 \
   --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -87,6 +88,7 @@ kube::log::status "Starting CONTROLLER-MANAGER"
 CTLRMGR_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): " 0.2 25
 
 kube_cmd=(
   "${KUBE_OUTPUT_HOSTBIN}/kubectl"
@@ -94,6 +96,7 @@ kube_cmd=(
 kube_api_versions=(
   v1beta1
   v1beta2
+  v1beta3
 )
 for version in "${kube_api_versions[@]}"; do
   kube_flags=(
@@ -102,7 +105,7 @@ for version in "${kube_api_versions[@]}"; do
     --api-version="${version}"
   )
 
-  kube::log::status "Testing kubectl(pods)"
+  kube::log::status "Testing kubectl(${version}:pods)"
   "${kube_cmd[@]}" get pods "${kube_flags[@]}"
   "${kube_cmd[@]}" create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
   "${kube_cmd[@]}" get pods "${kube_flags[@]}"
@@ -110,34 +113,36 @@ for version in "${kube_api_versions[@]}"; do
   [[ "$("${kube_cmd[@]}" get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]]
   output_pod=$("${kube_cmd[@]}" get pod redis-master -o json --output-version=v1beta1 "${kube_flags[@]}")
   "${kube_cmd[@]}" delete pod redis-master "${kube_flags[@]}"
-  before="$("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}")"
+  before="$("${kube_cmd[@]}" get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
-  after="$("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}")"
+  after="$("${kube_cmd[@]}" get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   [[ "$((${after} - ${before}))" -eq 1 ]]
-  "${kube_cmd[@]}" get pods -o yaml "${kube_flags[@]}" | grep -q "id: redis-master"
+  "${kube_cmd[@]}" get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: redis-master"
   "${kube_cmd[@]}" describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
   "${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
 
-  kube::log::status "Testing kubectl(services)"
+  kube::log::status "Testing kubectl(${version}:services)"
   "${kube_cmd[@]}" get services "${kube_flags[@]}"
   "${kube_cmd[@]}" create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
   "${kube_cmd[@]}" get services "${kube_flags[@]}"
   "${kube_cmd[@]}" delete service frontend "${kube_flags[@]}"
 
-  kube::log::status "Testing kubectl(replicationcontrollers)"
+  kube::log::status "Testing kubectl(${version}:replicationcontrollers)"
   "${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
   "${kube_cmd[@]}" create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   "${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
   "${kube_cmd[@]}" describe replicationcontroller frontendController "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
   "${kube_cmd[@]}" delete rc frontendController "${kube_flags[@]}"
 
-  kube::log::status "Testing kubectl(minions)"
-  "${kube_cmd[@]}" get minions "${kube_flags[@]}"
-  "${kube_cmd[@]}" get minions 127.0.0.1 "${kube_flags[@]}"
-
-  kube::log::status "Testing kubectl(nodes)"
+  kube::log::status "Testing kubectl(${version}:nodes)"
   "${kube_cmd[@]}" get nodes "${kube_flags[@]}"
   "${kube_cmd[@]}" describe nodes 127.0.0.1 "${kube_flags[@]}"
+
+  if [[ "${version}" != "v1beta3" ]]; then
+    kube::log::status "Testing kubectl(${version}:minions)"
+    "${kube_cmd[@]}" get minions "${kube_flags[@]}"
+    "${kube_cmd[@]}" get minions 127.0.0.1 "${kube_flags[@]}"
+  fi
 done
 
 kube::log::status "TEST PASSED"

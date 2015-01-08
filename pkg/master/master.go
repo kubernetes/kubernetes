@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
@@ -72,6 +73,7 @@ type Config struct {
 	EnableLogsSupport     bool
 	EnableUISupport       bool
 	EnableSwaggerSupport  bool
+	EnableV1Beta3         bool
 	APIPrefix             string
 	CorsAllowedOriginList util.StringList
 	Authenticator         authenticator.Request
@@ -122,6 +124,7 @@ type Master struct {
 	authorizer            authorizer.Authorizer
 	admissionControl      admission.Interface
 	masterCount           int
+	v1beta3               bool
 
 	readOnlyServer  string
 	readWriteServer string
@@ -252,6 +255,7 @@ func New(c *Config) *Master {
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
+		v1beta3:               c.EnableV1Beta3,
 
 		masterCount:     c.MasterCount,
 		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
@@ -353,11 +357,16 @@ func (m *Master) init(c *Config) {
 		"bindings": binding.NewREST(m.bindingRegistry),
 	}
 
+	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
+
 	apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1")
 	apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2")
+	if c.EnableV1Beta3 {
+		apiserver.NewAPIGroupVersion(m.API_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3")
+		versionHandler = apiserver.APIVersionHandler("v1beta1", "v1beta2", "v1beta3")
+	}
 
 	// TODO: InstallREST should register each version automatically
-	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
 	m.rootWebService.Route(m.rootWebService.GET(c.APIPrefix).To(versionHandler))
 
 	apiserver.InstallSupport(m.handlerContainer, m.rootWebService)
@@ -481,4 +490,16 @@ func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec,
 		storage[k] = v
 	}
 	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker, m.admissionControl
+}
+
+// API_v1beta3 returns the resources and codec for API version v1beta3.
+func (m *Master) API_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+	storage := make(map[string]apiserver.RESTStorage)
+	for k, v := range m.storage {
+		if k == "minions" {
+			continue
+		}
+		storage[strings.ToLower(k)] = v
+	}
+	return storage, v1beta3.Codec, "/api/v1beta3", latest.SelfLinker, m.admissionControl
 }
