@@ -130,6 +130,11 @@
 			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
 		},
 		{
+			"ImportPath": "github.com/imdario/mergo",
+			"Comment": "0.1.3-8-g6633656",
+			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
+		},
+		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},

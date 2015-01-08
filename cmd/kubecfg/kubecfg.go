@@ -212,7 +212,7 @@ func main() {
 		// TODO: don't specify http or https in Host, and infer that from auth options.
 		clientConfig.Host = "http://localhost:8080"
 	}
-	if client.IsConfigTransportTLS(clientConfig) {
+	if client.IsConfigTransportTLS(*clientConfig) {
 		auth, err := kubecfg.LoadClientAuthInfoOrPrompt(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)

@@ -21,10 +21,12 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
@@ -99,6 +101,24 @@ func New(c *Config) (*Client, error) {
 		return nil, err
 	}
 	return &Client{client}, nil
+}
+
+func MatchesServerVersion(c *Config) error {
+	client, err := New(c)
+	if err != nil {
+		return err
+	}
+
+	clientVersion := version.Get()
+	serverVersion, err := client.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("couldn't read version from server: %v\n", err)
+	}
+	if s := *serverVersion; !reflect.DeepEqual(clientVersion, s) {
+		return fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", s, clientVersion)
+	}
+
+	return nil
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
@@ -252,8 +272,12 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 //
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are
 // still possible.
-func IsConfigTransportTLS(config *Config) bool {
-	baseURL, err := defaultServerUrlFor(config)
+func IsConfigTransportTLS(config Config) bool {
+	// determination of TLS transport does not logically require a version to be specified
+	// modify the copy of the config we got to satisfy preconditions for defaultServerUrlFor
+	config.Version = defaultVersionFor(&config)
+
+	baseURL, err := defaultServerUrlFor(&config)
 	if err != nil {
 		return false
 	}

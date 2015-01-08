@@ -21,6 +21,8 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
@@ -44,7 +46,9 @@ Examples:
 			}
 
 			namespace := GetKubeNamespace(cmd)
-			client, err := f.ClientBuilder.Client()
+			config, err := f.ClientConfig.ClientConfig()
+			checkErr(err)
+			client, err := client.New(config)
 			checkErr(err)
 
 			podID := args[0]
