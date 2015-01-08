@@ -87,6 +87,14 @@ function verify-prereqs() {
 function kube-up() {
   echo "... in kube-up()" >&2
   detect-project >&2
+
+  # Make the specified network if we need to.
+  if ! gcloud compute networks describe "${NETWORK}" &>/dev/null; then
+    echo "Creating new network: ${NETWORK}" >&2
+    gcloud compute networks create "${NETWORK}" --range "${NETWORK_RANGE}"
+  fi
+
+  # Bring up the cluster.
   "${GCLOUD}" preview container clusters create "${CLUSTER_NAME}" \
     --zone="${ZONE}" \
     --project="${PROJECT}" \
