@@ -272,8 +272,12 @@ func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, 
 //
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are
 // still possible.
-func IsConfigTransportTLS(config *Config) bool {
-	baseURL, err := defaultServerUrlFor(config)
+func IsConfigTransportTLS(config Config) bool {
+	// determination of TLS transport does not logically require a version to be specified
+	// modify the copy of the config we got to satisfy preconditions for defaultServerUrlFor
+	config.Version = defaultVersionFor(&config)
+
+	baseURL, err := defaultServerUrlFor(&config)
 	if err != nil {
 		return false
 	}

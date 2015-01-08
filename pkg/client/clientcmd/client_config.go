@@ -76,7 +76,7 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 	clientConfig.Version = configClusterInfo.APIVersion
 
 	// only try to read the auth information if we are secure
-	if client.IsConfigTransportTLS(&clientConfig) {
+	if client.IsConfigTransportTLS(clientConfig) {
 		var authInfo *clientauth.Info
 		var err error
 		switch {

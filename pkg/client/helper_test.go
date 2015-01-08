@@ -89,7 +89,7 @@ func TestIsConfigTransportTLS(t *testing.T) {
 			t.Errorf("setting defaults failed for %#v: %v", testCase.Config, err)
 			continue
 		}
-		useTLS := IsConfigTransportTLS(testCase.Config)
+		useTLS := IsConfigTransportTLS(*testCase.Config)
 		if testCase.TransportTLS != useTLS {
 			t.Errorf("expected %v for %#v", testCase.TransportTLS, testCase.Config)
 		}
