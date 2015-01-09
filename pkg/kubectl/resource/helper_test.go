@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package resource
 
 import (
 	"bytes"
@@ -46,7 +46,7 @@ func splitPath(path string) []string {
 	return strings.Split(path, "/")
 }
 
-func TestRESTHelperDelete(t *testing.T) {
+func TestHelperDelete(t *testing.T) {
 	tests := []struct {
 		Err     bool
 		Req     func(*http.Request) bool
@@ -93,7 +93,7 @@ func TestRESTHelperDelete(t *testing.T) {
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
 		}
-		modifier := &RESTHelper{
+		modifier := &Helper{
 			RESTClient: client,
 		}
 		err := modifier.Delete("bar", "foo")
@@ -109,7 +109,7 @@ func TestRESTHelperDelete(t *testing.T) {
 	}
 }
 
-func TestRESTHelperCreate(t *testing.T) {
+func TestHelperCreate(t *testing.T) {
 	expectPost := func(req *http.Request) bool {
 		if req.Method != "POST" {
 			t.Errorf("unexpected method: %#v", req)
@@ -178,7 +178,7 @@ func TestRESTHelperCreate(t *testing.T) {
 		if test.RespFunc != nil {
 			client.Client = test.RespFunc
 		}
-		modifier := &RESTHelper{
+		modifier := &Helper{
 			RESTClient: client,
 			Codec:      testapi.Codec(),
 			Versioner:  testapi.MetadataAccessor(),
@@ -213,7 +213,7 @@ func TestRESTHelperCreate(t *testing.T) {
 	}
 }
 
-func TestRESTHelperGet(t *testing.T) {
+func TestHelperGet(t *testing.T) {
 	tests := []struct {
 		Err     bool
 		Req     func(*http.Request) bool
@@ -260,10 +260,10 @@ func TestRESTHelperGet(t *testing.T) {
 			Resp:  test.Resp,
 			Err:   test.HttpErr,
 		}
-		modifier := &RESTHelper{
+		modifier := &Helper{
 			RESTClient: client,
 		}
-		obj, err := modifier.Get("bar", "foo", labels.Everything())
+		obj, err := modifier.Get("bar", "foo")
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
@@ -279,7 +279,77 @@ func TestRESTHelperGet(t *testing.T) {
 	}
 }
 
-func TestRESTHelperUpdate(t *testing.T) {
+func TestHelperList(t *testing.T) {
+	tests := []struct {
+		Err     bool
+		Req     func(*http.Request) bool
+		Resp    *http.Response
+		HttpErr error
+	}{
+		{
+			HttpErr: errors.New("failure"),
+			Err:     true,
+		},
+		{
+			Resp: &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       objBody(&api.Status{Status: api.StatusFailure}),
+			},
+			Err: true,
+		},
+		{
+			Resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Body: objBody(&api.PodList{
+					Items: []api.Pod{{
+						ObjectMeta: api.ObjectMeta{Name: "foo"},
+					},
+					},
+				}),
+			},
+			Req: func(req *http.Request) bool {
+				if req.Method != "GET" {
+					t.Errorf("unexpected method: %#v", req)
+					return false
+				}
+				if req.URL.Path != "/ns/bar" {
+					t.Errorf("url doesn't contain name: %#v", req.URL)
+					return false
+				}
+				if req.URL.Query().Get("labels") != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
+					t.Errorf("url doesn't contain query parameters: %#v", req.URL)
+					return false
+				}
+				return true
+			},
+		},
+	}
+	for _, test := range tests {
+		client := &client.FakeRESTClient{
+			Codec: testapi.Codec(),
+			Resp:  test.Resp,
+			Err:   test.HttpErr,
+		}
+		modifier := &Helper{
+			RESTClient: client,
+		}
+		obj, err := modifier.List("bar", labels.SelectorFromSet(labels.Set{"foo": "baz"}))
+		if (err != nil) != test.Err {
+			t.Errorf("unexpected error: %t %v", test.Err, err)
+		}
+		if err != nil {
+			continue
+		}
+		if obj.(*api.PodList).Items[0].Name != "foo" {
+			t.Errorf("unexpected object: %#v", obj)
+		}
+		if test.Req != nil && !test.Req(client.Req) {
+			t.Errorf("unexpected request: %#v", client.Req)
+		}
+	}
+}
+
+func TestHelperUpdate(t *testing.T) {
 	expectPut := func(req *http.Request) bool {
 		if req.Method != "PUT" {
 			t.Errorf("unexpected method: %#v", req)
@@ -358,7 +428,7 @@ func TestRESTHelperUpdate(t *testing.T) {
 		if test.RespFunc != nil {
 			client.Client = test.RespFunc
 		}
-		modifier := &RESTHelper{
+		modifier := &Helper{
 			RESTClient: client,
 			Codec:      testapi.Codec(),
 			Versioner:  testapi.MetadataAccessor(),

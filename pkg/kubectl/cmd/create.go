@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +46,7 @@ Examples:
 			schema, err := f.Validator(cmd)
 			checkErr(err)
 			mapping, namespace, name, data := ResourceFromFile(cmd, filename, f.Typer, f.Mapper, schema)
-			client, err := f.Client(cmd, mapping)
+			client, err := f.RESTClient(cmd, mapping)
 			checkErr(err)
 
 			// use the default namespace if not specified, or check for conflict with the file's namespace
@@ -57,7 +57,7 @@ Examples:
 				checkErr(err)
 			}
 
-			err = kubectl.NewRESTHelper(client, mapping).Create(namespace, true, data)
+			err = resource.NewHelper(client, mapping).Create(namespace, true, data)
 			checkErr(err)
 			fmt.Fprintf(out, "%s\n", name)
 		},

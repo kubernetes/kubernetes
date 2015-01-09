@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 )
 
 func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
@@ -59,9 +59,9 @@ Examples:
 			checkErr(err)
 			selector := GetFlagString(cmd, "selector")
 			found := 0
-			ResourcesFromArgsOrFile(cmd, args, filename, selector, f.Typer, f.Mapper, f.Client, schema).Visit(func(r *ResourceInfo) error {
+			ResourcesFromArgsOrFile(cmd, args, filename, selector, f.Typer, f.Mapper, f.RESTClient, schema).Visit(func(r *resource.Info) error {
 				found++
-				if err := kubectl.NewRESTHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
+				if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
 					return err
 				}
 				fmt.Fprintf(out, "%s\n", r.Name)

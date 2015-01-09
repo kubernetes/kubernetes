@@ -14,20 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
-
-import (
-	"os"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
-
-	"github.com/golang/glog"
-)
-
-func main() {
-	cmd := cmd.NewFactory().NewKubectlCommand(os.Stdout)
-	if err := cmd.Execute(); err != nil {
-		glog.Errorf("error: %v", err)
-		os.Exit(1)
-	}
-}
+// Package resource assists clients in dealing with RESTful objects that match the
+// Kubernetes API conventions. The Helper object provides simple CRUD operations
+// on resources. The Visitor interface makes it easy to deal with multiple resources
+// in bulk for retrieval and operation. The Builder object simplifies converting
+// standard command line arguments and parameters into a Visitor that can iterate
+// over all of the identified resources, whether on the server or on the local
+// filesystem.
+package resource

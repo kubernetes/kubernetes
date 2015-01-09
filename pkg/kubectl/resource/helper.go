@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package resource
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
@@ -23,9 +23,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// RESTHelper provides methods for retrieving or mutating a RESTful
+// Helper provides methods for retrieving or mutating a RESTful
 // resource.
-type RESTHelper struct {
+type Helper struct {
+	// The name of this resource as the server would recognize it
 	Resource string
 	// A RESTClient capable of mutating this resource
 	RESTClient RESTClient
@@ -36,9 +37,9 @@ type RESTHelper struct {
 	Versioner runtime.ResourceVersioner
 }
 
-// NewRESTHelper creates a RESTHelper from a ResourceMapping
-func NewRESTHelper(client RESTClient, mapping *meta.RESTMapping) *RESTHelper {
-	return &RESTHelper{
+// NewHelper creates a Helper from a ResourceMapping
+func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
+	return &Helper{
 		RESTClient: client,
 		Resource:   mapping.Resource,
 		Codec:      mapping.Codec,
@@ -46,15 +47,25 @@ func NewRESTHelper(client RESTClient, mapping *meta.RESTMapping) *RESTHelper {
 	}
 }
 
-func (m *RESTHelper) Get(namespace, name string, selector labels.Selector) (runtime.Object, error) {
-	return m.RESTClient.Get().Resource(m.Resource).Namespace(namespace).Name(name).SelectorParam("labels", selector).Do().Get()
+func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
+	return m.RESTClient.Get().
+		Namespace(namespace).
+		Resource(m.Resource).
+		Name(name).
+		Do().
+		Get()
 }
 
-func (m *RESTHelper) List(namespace string, selector labels.Selector) (runtime.Object, error) {
-	return m.RESTClient.Get().Resource(m.Resource).Namespace(namespace).SelectorParam("labels", selector).Do().Get()
+func (m *Helper) List(namespace string, selector labels.Selector) (runtime.Object, error) {
+	return m.RESTClient.Get().
+		Namespace(namespace).
+		Resource(m.Resource).
+		SelectorParam("labels", selector).
+		Do().
+		Get()
 }
 
-func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
+func (m *Helper) Watch(namespace, resourceVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Prefix("watch").
 		Namespace(namespace).
@@ -65,11 +76,26 @@ func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fie
 		Watch()
 }
 
-func (m *RESTHelper) Delete(namespace, name string) error {
-	return m.RESTClient.Delete().Namespace(namespace).Resource(m.Resource).Name(name).Do().Error()
+func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Interface, error) {
+	return m.RESTClient.Get().
+		Prefix("watch").
+		Namespace(namespace).
+		Resource(m.Resource).
+		Name(name).
+		Param("resourceVersion", resourceVersion).
+		Watch()
 }
 
-func (m *RESTHelper) Create(namespace string, modify bool, data []byte) error {
+func (m *Helper) Delete(namespace, name string) error {
+	return m.RESTClient.Delete().
+		Namespace(namespace).
+		Resource(m.Resource).
+		Name(name).
+		Do().
+		Error()
+}
+
+func (m *Helper) Create(namespace string, modify bool, data []byte) error {
 	if modify {
 		obj, err := m.Codec.Decode(data)
 		if err != nil {
@@ -102,7 +128,7 @@ func createResource(c RESTClient, resource, namespace string, data []byte) error
 	return c.Post().Namespace(namespace).Resource(resource).Body(data).Do().Error()
 }
 
-func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte) error {
+func (m *Helper) Update(namespace, name string, overwrite bool, data []byte) error {
 	c := m.RESTClient
 
 	obj, err := m.Codec.Decode(data)
@@ -119,7 +145,7 @@ func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte)
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
-		serverObj, err := c.Get().Resource(m.Resource).Name(name).Do().Get()
+		serverObj, err := c.Get().Namespace(namespace).Resource(m.Resource).Name(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
 			return updateResource(c, m.Resource, namespace, name, data)

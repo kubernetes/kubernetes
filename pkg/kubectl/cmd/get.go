@@ -21,7 +21,9 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -54,7 +56,7 @@ Examples:
 			labelSelector, err := labels.ParseSelector(selector)
 			checkErr(err)
 
-			client, err := f.Client(cmd, mapping)
+			client, err := f.RESTClient(cmd, mapping)
 			checkErr(err)
 
 			outputFormat := GetFlagString(cmd, "output")
@@ -70,8 +72,13 @@ Examples:
 			printer, err := kubectl.GetPrinter(outputFormat, templateFile, outputVersion, mapping.ObjectConvertor, defaultPrinter)
 			checkErr(err)
 
-			restHelper := kubectl.NewRESTHelper(client, mapping)
-			obj, err := restHelper.Get(namespace, name, labelSelector)
+			restHelper := resource.NewHelper(client, mapping)
+			var obj runtime.Object
+			if len(name) == 0 {
+				obj, err = restHelper.List(namespace, labelSelector)
+			} else {
+				obj, err = restHelper.Get(namespace, name)
+			}
 			checkErr(err)
 
 			isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch-only")

@@ -18,121 +18,18 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
-
-// ResourceInfo contains temporary info to execute REST call
-type ResourceInfo struct {
-	Client    kubectl.RESTClient
-	Mapping   *meta.RESTMapping
-	Namespace string
-	Name      string
-
-	// Optional, this is the most recent value returned by the server if available
-	runtime.Object
-}
-
-// ResourceVisitor lets clients walk the list of resources
-type ResourceVisitor interface {
-	Visit(func(*ResourceInfo) error) error
-}
-
-type ResourceVisitorList []ResourceVisitor
-
-// Visit implements ResourceVisitor
-func (l ResourceVisitorList) Visit(fn func(r *ResourceInfo) error) error {
-	for i := range l {
-		if err := l[i].Visit(fn); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func NewResourceInfo(client kubectl.RESTClient, mapping *meta.RESTMapping, namespace, name string) *ResourceInfo {
-	return &ResourceInfo{
-		Client:    client,
-		Mapping:   mapping,
-		Namespace: namespace,
-		Name:      name,
-	}
-}
-
-// Visit implements ResourceVisitor
-func (r *ResourceInfo) Visit(fn func(r *ResourceInfo) error) error {
-	return fn(r)
-}
-
-// ResourceSelector is a facade for all the resources fetched via label selector
-type ResourceSelector struct {
-	Client    kubectl.RESTClient
-	Mapping   *meta.RESTMapping
-	Namespace string
-	Selector  labels.Selector
-}
-
-// NewResourceSelector creates a resource selector which hides details of getting items by their label selector.
-func NewResourceSelector(client kubectl.RESTClient, mapping *meta.RESTMapping, namespace string, selector labels.Selector) *ResourceSelector {
-	return &ResourceSelector{
-		Client:    client,
-		Mapping:   mapping,
-		Namespace: namespace,
-		Selector:  selector,
-	}
-}
-
-// Visit implements ResourceVisitor
-func (r *ResourceSelector) Visit(fn func(r *ResourceInfo) error) error {
-	list, err := kubectl.NewRESTHelper(r.Client, r.Mapping).List(r.Namespace, r.Selector)
-	if err != nil {
-		if errors.IsBadRequest(err) || errors.IsNotFound(err) {
-			glog.V(2).Infof("Unable to perform a label selector query on %s with labels %s: %v", r.Mapping.Resource, r.Selector, err)
-			return nil
-		}
-		return err
-	}
-	items, err := runtime.ExtractList(list)
-	if err != nil {
-		return err
-	}
-	accessor := meta.NewAccessor()
-	for i := range items {
-		name, err := accessor.Name(items[i])
-		if err != nil {
-			// items without names cannot be visited
-			glog.V(2).Infof("Found %s with labels %s, but can't access the item by name.", r.Mapping.Resource, r.Selector)
-			continue
-		}
-		item := &ResourceInfo{
-			Client:    r.Client,
-			Mapping:   r.Mapping,
-			Namespace: r.Namespace,
-			Name:      name,
-			Object:    items[i],
-		}
-		if err := fn(item); err != nil {
-			if errors.IsNotFound(err) {
-				glog.V(2).Infof("Found %s named %q, but can't be accessed now: %v", r.Mapping.Resource, name, err)
-				return nil
-			}
-			log.Printf("got error for resource %s: %v", r.Mapping.Resource, err)
-			return err
-		}
-	}
-	return nil
-}
 
 // ResourcesFromArgsOrFile computes a list of Resources by extracting info from filename or args. It will
 // handle label selectors provided.
@@ -144,7 +41,7 @@ func ResourcesFromArgsOrFile(
 	mapper meta.RESTMapper,
 	clientBuilder func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error),
 	schema validation.Schema,
-) ResourceVisitor {
+) resource.Visitor {
 
 	// handling filename & resource id
 	if len(selector) == 0 {
@@ -152,34 +49,34 @@ func ResourcesFromArgsOrFile(
 		client, err := clientBuilder(cmd, mapping)
 		checkErr(err)
 
-		return NewResourceInfo(client, mapping, namespace, name)
+		return resource.NewInfo(client, mapping, namespace, name)
 	}
 
 	labelSelector, err := labels.ParseSelector(selector)
 	checkErr(err)
 
 	namespace := GetKubeNamespace(cmd)
-	visitors := ResourceVisitorList{}
+	visitors := resource.VisitorList{}
 
 	if len(args) != 1 {
 		usageError(cmd, "Must specify the type of resource")
 	}
 	types := SplitResourceArgument(args[0])
 	for _, arg := range types {
-		resource := kubectl.ExpandResourceShortcut(arg)
-		if len(resource) == 0 {
-			usageError(cmd, "Unknown resource %s", resource)
+		resourceName := arg
+		if len(resourceName) == 0 {
+			usageError(cmd, "Unknown resource %s", resourceName)
 		}
-		version, kind, err := mapper.VersionAndKindForResource(resource)
+		version, kind, err := mapper.VersionAndKindForResource(resourceName)
 		checkErr(err)
 
-		mapping, err := mapper.RESTMapping(version, kind)
+		mapping, err := mapper.RESTMapping(kind, version)
 		checkErr(err)
 
 		client, err := clientBuilder(cmd, mapping)
 		checkErr(err)
 
-		visitors = append(visitors, NewResourceSelector(client, mapping, namespace, labelSelector))
+		visitors = append(visitors, resource.NewSelector(client, mapping, namespace, labelSelector))
 	}
 	return visitors
 }
@@ -194,7 +91,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 	}
 
 	if len(args) == 2 {
-		resource := kubectl.ExpandResourceShortcut(args[0])
+		resource := args[0]
 		namespace = GetKubeNamespace(cmd)
 		name = args[1]
 		if len(name) == 0 || len(resource) == 0 {
@@ -232,7 +129,7 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper)
 		usageError(cmd, "Must provide resource and name command line params")
 	}
 
-	resource := kubectl.ExpandResourceShortcut(args[0])
+	resource := args[0]
 	namespace = GetKubeNamespace(cmd)
 	name = args[1]
 	if len(name) == 0 || len(resource) == 0 {
@@ -255,7 +152,7 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}
 
-	resource := kubectl.ExpandResourceShortcut(args[0])
+	resource := args[0]
 	if len(resource) == 0 {
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}

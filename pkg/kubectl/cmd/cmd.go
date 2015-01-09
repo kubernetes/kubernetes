@@ -33,6 +33,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -42,55 +43,108 @@ const (
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
 type Factory struct {
-	ClientConfig clientcmd.ClientConfig
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Client       func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error)
-	Describer    func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error)
-	Printer      func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
-	Validator    func(*cobra.Command) (validation.Schema, error)
+	clients *clientCache
+	flags   *pflag.FlagSet
+
+	Mapper meta.RESTMapper
+	Typer  runtime.ObjectTyper
+
+	// Returns a client for accessing Kubernetes resources or an error.
+	Client func(cmd *cobra.Command) (*client.Client, error)
+	// Returns a client.Config for accessing the Kubernetes server.
+	ClientConfig func(cmd *cobra.Command) (*client.Config, error)
+	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
+	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
+	RESTClient func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error)
+	// Returns a Describer for displaying the specified RESTMapping type or an error.
+	Describer func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error)
+	// Returns a Printer for formatting objects of the given type or an error.
+	Printer func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
+	// Returns a schema that can validate objects stored on disk.
+	Validator func(*cobra.Command) (validation.Schema, error)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
-func NewFactory(clientConfig clientcmd.ClientConfig) *Factory {
-	ret := &Factory{
-		ClientConfig: clientConfig,
-		Mapper:       latest.RESTMapper,
-		Typer:        api.Scheme,
-		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
-			return kubectl.NewHumanReadablePrinter(noHeaders), nil
-		},
+func NewFactory() *Factory {
+	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
+
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	clientConfig := DefaultClientConfig(flags)
+	clients := &clientCache{
+		clients: make(map[string]*client.Client),
+		loader:  clientConfig,
 	}
 
-	ret.Validator = func(cmd *cobra.Command) (validation.Schema, error) {
-		if GetFlagBool(cmd, "validate") {
-			client, err := getClient(ret.ClientConfig, GetFlagBool(cmd, FlagMatchBinaryVersion))
+	return &Factory{
+		clients: clients,
+		flags:   flags,
+
+		Mapper: mapper,
+		Typer:  api.Scheme,
+
+		Client: func(cmd *cobra.Command) (*client.Client, error) {
+			return clients.ClientForVersion("")
+		},
+		ClientConfig: func(cmd *cobra.Command) (*client.Config, error) {
+			return clients.ClientConfigForVersion("")
+		},
+		RESTClient: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
+			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			return &clientSwaggerSchema{client, api.Scheme}, nil
-		} else {
+			return client.RESTClient, nil
+		},
+		Describer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
+			client, err := clients.ClientForVersion(mapping.APIVersion)
+			if err != nil {
+				return nil, err
+			}
+			describer, ok := kubectl.DescriberFor(mapping.Kind, client)
+			if !ok {
+				return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
+			}
+			return describer, nil
+		},
+		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		},
+		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
+			if GetFlagBool(cmd, "validate") {
+				client, err := clients.ClientForVersion("")
+				if err != nil {
+					return nil, err
+				}
+				return &clientSwaggerSchema{client, api.Scheme}, nil
+			}
 			return validation.NullSchema{}, nil
-		}
+		},
 	}
-	ret.Client = func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
-		return getClient(ret.ClientConfig, GetFlagBool(cmd, FlagMatchBinaryVersion))
-	}
-	ret.Describer = func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
-		client, err := getClient(ret.ClientConfig, GetFlagBool(cmd, FlagMatchBinaryVersion))
-		if err != nil {
-			return nil, err
-		}
-		describer, ok := kubectl.DescriberFor(mapping.Kind, client)
-		if !ok {
-			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
-		}
-		return describer, nil
-	}
-	return ret
 }
 
-func (f *Factory) Run(out io.Writer) {
+// BindFlags adds any flags that are common to all kubectl sub commands.
+func (f *Factory) BindFlags(flags *pflag.FlagSet) {
+	// any flags defined by external projects (not part of pflags)
+	util.AddAllFlagsToPFlagSet(flags)
+
+	if f.flags != nil {
+		f.flags.VisitAll(func(flag *pflag.Flag) {
+			flags.AddFlag(flag)
+		})
+	}
+
+	// Globally persistent flags across all subcommands.
+	// TODO Change flag names to consts to allow safer lookup from subcommands.
+	// TODO Add a verbose flag that turns on glog logging. Probably need a way
+	// to do that automatically for every subcommand.
+	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+	flags.String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
+	flags.StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
+	flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
+}
+
+// NewKubectlCommand creates the `kubectl` command and its nested children.
+func (f *Factory) NewKubectlCommand(out io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -101,15 +155,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 		Run: runHelp,
 	}
 
-	util.AddAllFlagsToPFlagSet(cmds.PersistentFlags())
-	f.ClientConfig = getClientConfig(cmds)
-
-	// Globally persistent flags across all subcommands.
-	// TODO Change flag names to consts to allow safer lookup from subcommands.
-	cmds.PersistentFlags().Bool(FlagMatchBinaryVersion, false, "Require server version to match client version")
-	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
-	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
-	cmds.PersistentFlags().Bool("validate", false, "If true, use a schema to validate the input before sending it")
+	f.BindFlags(cmds.PersistentFlags())
 
 	cmds.AddCommand(f.NewCmdVersion(out))
 	cmds.AddCommand(f.NewCmdProxy(out))
@@ -125,12 +171,10 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdLog(out))
 	cmds.AddCommand(f.NewCmdRollingUpdate(out))
 
-	if err := cmds.Execute(); err != nil {
-		os.Exit(1)
-	}
+	return cmds
 }
 
-// getClientBuilder creates a clientcmd.ClientConfig that has a hierarchy like this:
+// DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
 //   1.  Use the kubeconfig builder.  The number of merges and overrides here gets a little crazy.  Stay with me.
 //       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy and merge rules:
 //           1.  CommandLineLocation - this parsed from the command line, so it must be late bound
@@ -162,13 +206,13 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 //           2.  If the command line does not specify one, and the auth info has conflicting techniques, fail.
 //           3.  If the command line specifies one and the auth info specifies another, honor the command line technique.
 //   2.  Use default values and potentially prompt for auth information
-func getClientConfig(cmd *cobra.Command) clientcmd.ClientConfig {
+func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewClientConfigLoadingRules()
 	loadingRules.EnvVarPath = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-	cmd.PersistentFlags().StringVar(&loadingRules.CommandLinePath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+	flags.StringVar(&loadingRules.CommandLinePath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &clientcmd.ConfigOverrides{}
-	overrides.BindFlags(cmd.PersistentFlags(), clientcmd.RecommendedConfigOverrideFlags(""))
+	overrides.BindFlags(flags, clientcmd.RecommendedConfigOverrideFlags(""))
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
@@ -246,18 +290,55 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	return schema.ValidateBytes(data)
 }
 
-// TODO Need to only run server version match once per client host creation
-func getClient(clientConfig clientcmd.ClientConfig, matchServerVersion bool) (*client.Client, error) {
-	config, err := clientConfig.ClientConfig()
+// clientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
+// is invoked only once
+type clientCache struct {
+	loader        clientcmd.ClientConfig
+	clients       map[string]*client.Client
+	defaultConfig *client.Config
+	matchVersion  bool
+}
+
+// ClientConfigForVersion returns the correct config for a server
+func (c *clientCache) ClientConfigForVersion(version string) (*client.Config, error) {
+	if c.defaultConfig == nil {
+		config, err := c.loader.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+		c.defaultConfig = config
+
+		if c.matchVersion {
+			if err := client.MatchesServerVersion(config); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// TODO: remove when SetKubernetesDefaults gets added
+	if len(version) == 0 {
+		version = c.defaultConfig.Version
+	}
+
+	// TODO: have a better config copy method
+	config := *c.defaultConfig
+
+	// TODO: call new client.SetKubernetesDefaults method
+	// instead of doing this
+	config.Version = version
+	return &config, nil
+}
+
+// ClientForVersion initializes or reuses a client for the specified version, or returns an
+// error if that is not possible
+func (c *clientCache) ClientForVersion(version string) (*client.Client, error) {
+	config, err := c.ClientConfigForVersion(version)
 	if err != nil {
 		return nil, err
 	}
 
-	if matchServerVersion {
-		err := client.MatchesServerVersion(config)
-		if err != nil {
-			return nil, err
-		}
+	if client, ok := c.clients[config.Version]; ok {
+		return client, nil
 	}
 
 	client, err := client.New(config)
@@ -265,5 +346,6 @@ func getClient(clientConfig clientcmd.ClientConfig, matchServerVersion bool) (*c
 		return nil, err
 	}
 
+	c.clients[config.Version] = client
 	return client, nil
 }
