@@ -1,0 +1,9 @@
+apiVersion: v1beta1
+kind: Service
+id: kibana-logging
+containerPort: kibana-port
+port: 5601
+selector:
+  name: kibana-logging
+createExternalLoadBalancer: true
+ 

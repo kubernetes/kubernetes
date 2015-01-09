@@ -54,6 +54,10 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
 
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=true
+ELASTICSEARCH_LOGGING_REPLICAS=1
+
 # Don't require https for registries in our local RFC1918 network
 EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 

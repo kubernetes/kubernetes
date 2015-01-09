@@ -42,8 +42,12 @@ PORTAL_NET="10.0.0.0/16"
 ENABLE_NODE_MONITORING=true
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING=true
+ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
+
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=false
+ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true

@@ -1,0 +1,22 @@
+apiVersion: v1beta1
+kind:  ReplicationController
+id: kibana-logging-controller
+desiredState:
+  replicas: 1
+  replicaSelector:
+    name: kibana-logging
+  podTemplate:
+    desiredState:
+      manifest:
+        version: v1beta1
+        id: kibana-viewer
+        containers:
+          - name: kibana-logging
+            image: kubernetes/kibana:1.0
+            ports:
+              - name: kibana-port
+                containerPort: 80
+    labels:
+      name: kibana-logging
+labels:
+  name: kibana-logging

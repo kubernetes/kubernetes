@@ -21,3 +21,11 @@ NETWORK=${KUBE_GKE_NETWORK:-default}
 # For ease of maintenance, extract any pieces that do not vary between default
 # and test in a common config.
 source $(dirname "${BASH_SOURCE}")/config-common.sh
+
+# Optional: Install node logging
+ENABLE_NODE_LOGGING=false
+LOGGING_DESTINATION=gcp # options: elasticsearch, gcp
+
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=false
+ELASTICSEARCH_LOGGING_REPLICAS=1

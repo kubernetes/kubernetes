@@ -43,7 +43,7 @@ echo "... calling setup-monitoring" >&2
 setup-monitoring
 
 if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
-  echo ".. setting up cluster DNS"
+  echo "... setting up cluster DNS"
   sed -e "s/{DNS_DOMAIN}/$DNS_DOMAIN/g" \
       -e "s/{DNS_REPLICAS}/$DNS_REPLICAS/g" \
       "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" \
@@ -53,5 +53,8 @@ if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
       "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" \
       | "${KUBE_ROOT}/cluster/kubectl.sh" create -f -
 fi
+
+echo "... calling setup-logging" >&2
+setup-logging
 
 echo "Done" >&2

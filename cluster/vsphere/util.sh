@@ -485,3 +485,11 @@ function setup-monitoring {
 function teardown-monitoring {
   echo "TODO"
 }
+
+function setup-logging {
+  echo "TODO: setup logging"
+}
+
+function teardown-logging {
+  echo "TODO: teardown logging"
+}

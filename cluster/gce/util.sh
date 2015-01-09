@@ -348,14 +348,14 @@ function kube-up {
   local htpasswd
   htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
-  if ! gcloud compute networks describe "${NETWORK}" &>/dev/null; then
+  if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
-    gcloud compute networks create "${NETWORK}" --range "10.240.0.0/16"
+    gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "10.240.0.0/16"
   fi
 
-  if ! gcloud compute firewall-rules describe "${NETWORK}-default-internal" &>/dev/null; then
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal" &>/dev/null; then
     gcloud compute firewall-rules create "${NETWORK}-default-internal" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
@@ -363,7 +363,7 @@ function kube-up {
       --allow "tcp:1-65535" "udp:1-65535" "icmp" &
   fi
 
-  if ! gcloud compute firewall-rules describe "${NETWORK}-default-ssh" &>/dev/null; then
+  if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
     gcloud compute firewall-rules create "${NETWORK}-default-ssh" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
@@ -718,7 +718,7 @@ function test-teardown {
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
-  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --zone="${ZONE}" "${node}" --command "${cmd}"
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
@@ -732,7 +732,7 @@ function setup-monitoring {
     echo "Setting up cluster monitoring using Heapster."
 
     detect-project
-    if ! gcloud compute firewall-rules describe monitoring-heapster &>/dev/null; then
+    if ! gcloud compute firewall-rules --project "{$PROJECT}" describe monitoring-heapster &>/dev/null; then
       if ! gcloud compute firewall-rules create monitoring-heapster \
           --project "${PROJECT}" \
           --target-tags="${MINION_TAG}" \
@@ -774,12 +774,54 @@ function teardown-monitoring {
     "${kubectl}" delete pods heapster &> /dev/null || true
     "${kubectl}" delete pods influx-grafana &> /dev/null || true
     "${kubectl}" delete services influx-master &> /dev/null || true
-    if gcloud compute firewall-rules describe monitoring-heapster &> /dev/null; then
+    if gcloud compute firewall-rules describe --project "${PROJECT}" monitoring-heapster &> /dev/null; then
       gcloud compute firewall-rules delete \
           --project "${PROJECT}" \
           --quiet \
           monitoring-heapster &> /dev/null || true
     fi
+  fi
+}
+
+function setup-logging {
+  # If logging with Fluentd to Elasticsearch is enabled then create pods
+  # and services for Elasticsearch (for ingesting logs) and Kibana (for
+  # viewing logs).
+  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]] && \
+     [[ "${LOGGING_DESTINATION-}" == "elasticsearch" ]] && \
+     [[ "${ENABLE_CLUSTER_LOGGING-}" == "true" ]]; then
+    local -r kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    if sed -e "s/{ELASTICSEARCH_LOGGING_REPLICAS}/${ELASTICSEARCH_LOGGING_REPLICAS}/g" \
+              "${KUBE_ROOT}"/cluster/addons/fluentd-elasticsearch/es-controller.yaml.in | \
+              "${kubectl}" create -f - &> /dev/null && \
+       "${kubectl}" create -f "${KUBE_ROOT}"/cluster/addons/fluentd-elasticsearch/es-service.yaml &> /dev/null && \
+       "${kubectl}" create -f "${KUBE_ROOT}"/cluster/addons/fluentd-elasticsearch/kibana-controller.yaml &> /dev/null && \
+       "${kubectl}" create -f "${KUBE_ROOT}"/cluster/addons/fluentd-elasticsearch/kibana-service.yaml &> /dev/null; then
+      gcloud compute firewall-rules create fluentd-elasticsearch-logging --project "${PROJECT}" \
+             --allow tcp:5601 tcp:9200 tcp:9300 --target-tags "${INSTANCE_PREFIX}"-minion || true
+      local -r region="${ZONE::-2}"
+      local -r es_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" elasticsearch-logging | grep IPAddress | awk '{print $2}')
+      local -r kibana_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" kibana-logging | grep IPAddress | awk '{print $2}')
+      echo
+      echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}http://${es_ip}:9200"
+      echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}http://${kibana_ip}:5601${color_norm}"
+      echo
+    else
+      echo -e "${color_red}Failed to launch Elasticsearch and Kibana pods and services for logging.${color_norm}"
+    fi
+  fi
+}
+
+function teardown-logging {
+  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]] && \
+     [[ "${LOGGING_DESTINATION-}" == "elasticsearch" ]] && \
+     [[ "${ENABLE_CLUSTER_LOGGING-}" == "true" ]]; then
+    local -r kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    "${kubectl}" delete replicationController elasticsearch-logging-controller &> /dev/null || true
+    "${kubectl}" delete service elasticsearch-logging &> /dev/null || true
+    "${kubectl}" delete replicationController kibana-logging-controller &> /dev/null || true
+    "${kubectl}" delete service kibana-logging &> /dev/null || true
+    gcloud compute firewall-rules delete -q fluentd-elasticsearch-logging --project "${PROJECT}" || true
   fi
 }
 

@@ -497,3 +497,11 @@ function kube-down {
   $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > $LOG
   $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
 }
+
+function setup-logging {
+  echo "TODO: setup logging"
+}
+
+function teardown-logging {
+  echo "TODO: teardown logging"
+}
