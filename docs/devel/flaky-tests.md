@@ -12,6 +12,8 @@ There is a testing image ```brendanburns/flake``` up on the docker hub.  We will
 Create a replication controller with the following config:
 ```yaml
 id: flakeController
+kind: ReplicationController
+apiVersion: v1beta1
 desiredState:
   replicas: 24
   replicaSelector:
@@ -37,14 +39,14 @@ labels:
   name: flake
 ```
 
-```./cluster/kubecfg.sh -c controller.yaml create replicaControllers```
+```./cluster/kubectl.sh create -f controller.yaml```
 
 This will spin up 100 instances of the test.  They will run to completion, then exit, the kubelet will restart them, eventually you will have sufficient
-runs for your purposes, and you can stop the replication controller:
+runs for your purposes, and you can stop the replication controller by setting the ```replicas``` field to 0 and then running:
 
 ```sh
-./cluster/kubecfg.sh stop flakeController
-./cluster/kubecfg.sh rm flakeController
+./cluster/kubectl.sh update -f controller.yaml
+./cluster/kubectl.sh delete -f controller.yaml
 ```
 
 Now examine the machines with ```docker ps -a``` and look for tasks that exited with non-zero exit codes (ignore those that exited -1, since that's what happens when you stop the replica controller)
