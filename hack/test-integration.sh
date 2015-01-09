@@ -39,6 +39,7 @@ kube::etcd::start
 
 kube::log::status "Running integration test cases"
 KUBE_GOFLAGS="-tags 'integration no-docker' " \
+  KUBE_RACE="-race" \
   "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
 kube::log::status "Running integration test scenario"
