@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -212,8 +213,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 	if kc.ManifestURL != "" {
 		config.NewSourceURL(kc.ManifestURL, kc.HttpCheckFrequency, cfg.Channel("http"))
 	}
-
-	if kc.EtcdClient != nil {
+	if !reflect.ValueOf(kc.EtcdClient).IsNil() {
 		glog.Infof("Watching for etcd configs at %v", kc.EtcdClient.GetCluster())
 		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel("etcd"))
 	}
