@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -64,6 +65,7 @@ func NewMainKubelet(
 	hostname string,
 	dockerClient dockertools.DockerInterface,
 	etcdClient tools.EtcdClient,
+	kubeClient *client.Client,
 	rootDirectory string,
 	networkContainerImage string,
 	resyncInterval time.Duration,
