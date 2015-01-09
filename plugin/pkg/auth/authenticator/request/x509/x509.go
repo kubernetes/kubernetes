@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
@@ -55,18 +55,18 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	var errors []error
+	var errlist []error
 	for _, cert := range req.TLS.PeerCertificates {
 		chains, err := cert.Verify(a.opts)
 		if err != nil {
-			errors = append(errors, err)
+			errlist = append(errlist, err)
 			continue
 		}
 
 		for _, chain := range chains {
 			user, ok, err := a.user.User(chain)
 			if err != nil {
-				errors = append(errors, err)
+				errlist = append(errlist, err)
 				continue
 			}
 
@@ -75,7 +75,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 			}
 		}
 	}
-	return nil, false, util.SliceToError(errors)
+	return nil, false, errors.NewAggregate(errlist)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

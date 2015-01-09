@@ -21,7 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests
@@ -35,11 +35,11 @@ func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
 // AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.  The first
 // success returns that identity.  Errors are only returned if no matches are found.
 func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	var errors []error
+	var errlist []error
 	for _, currAuthRequestHandler := range authHandler {
 		info, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
 		if err != nil {
-			errors = append(errors, err)
+			errlist = append(errlist, err)
 			continue
 		}
 
@@ -48,5 +48,5 @@ func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request
 		}
 	}
 
-	return nil, false, util.SliceToError(errors)
+	return nil, false, errors.NewAggregate(errlist)
 }
