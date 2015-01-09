@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -234,7 +233,11 @@ func init() {
 			case newer.PodUnknown:
 				*out = PodUnknown
 			default:
-				return errors.New("The string provided is not a valid PodPhase constant value")
+				return &newer.ConversionError{
+					In:      in,
+					Out:     out,
+					Message: "The string provided is not a valid PodPhase constant value",
+				}
 			}
 
 			return nil
@@ -256,7 +259,11 @@ func init() {
 			case PodUnknown:
 				*out = newer.PodUnknown
 			default:
-				return errors.New("The string provided is not a valid PodPhase constant value")
+				return &newer.ConversionError{
+					In:      in,
+					Out:     out,
+					Message: "The string provided is not a valid PodPhase constant value",
+				}
 			}
 			return nil
 		},
@@ -349,7 +356,11 @@ func init() {
 				return err
 			}
 			if in.TemplateRef != nil && in.Template == nil {
-				return errors.New("objects with a template ref cannot be converted to older objects, must populate template")
+				return &newer.ConversionError{
+					In:      in,
+					Out:     out,
+					Message: "objects with a template ref cannot be converted to older objects, must populate template",
+				}
 			}
 			if in.Template != nil {
 				if err := s.Convert(in.Template, &out.PodTemplate, 0); err != nil {
@@ -616,7 +627,10 @@ func init() {
 			for k, v := range *in {
 				fv, err := strconv.ParseFloat(v.String(), 64)
 				if err != nil {
-					return fmt.Errorf("value '%v' of '%v': %v", v, k, err)
+					return &newer.ConversionError{
+						In: in, Out: out,
+						Message: fmt.Sprintf("value '%v' of '%v': %v", v, k, err),
+					}
 				}
 				if k == ResourceCPU {
 					(*out)[newer.ResourceCPU] = *resource.NewMilliQuantity(int64(fv*1000), resource.DecimalSI)
