@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
 	"github.com/golang/glog"
 )
@@ -575,7 +576,7 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 	} else {
 		glog.Errorf("Some errors closing iptables portals for service %q", service)
 	}
-	return util.SliceToError(el)
+	return errors.NewAggregate(el)
 }
 
 func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string) []error {
@@ -646,7 +647,7 @@ func iptablesFlush(ipt iptables.Interface) error {
 	if len(el) != 0 {
 		glog.Errorf("Some errors flushing old iptables portals: %v", el)
 	}
-	return util.SliceToError(el)
+	return errors.NewAggregate(el)
 }
 
 // Used below.

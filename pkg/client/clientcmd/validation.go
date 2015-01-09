@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 var ErrNoContext = errors.New("no context chosen")
@@ -67,7 +68,7 @@ func Validate(config Config) error {
 		validationErrors = append(validationErrors, validateClusterInfo(clusterName, clusterInfo)...)
 	}
 
-	return util.SliceToError(validationErrors)
+	return utilerrors.NewAggregate(validationErrors)
 }
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
@@ -97,7 +98,7 @@ func ConfirmUsable(config Config, passedContextName string) error {
 		validationErrors = append(validationErrors, validateClusterInfo(context.Cluster, config.Clusters[context.Cluster])...)
 	}
 
-	return util.SliceToError(validationErrors)
+	return utilerrors.NewAggregate(validationErrors)
 }
 
 // validateClusterInfo looks for conflicts and errors in the cluster info

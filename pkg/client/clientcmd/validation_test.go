@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
@@ -300,14 +300,14 @@ func (c configValidationTest) testContext(contextName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(util.SliceToError(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, util.SliceToError(errs))
+			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", util.SliceToError(errs))
+			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
 		}
 	}
 }
@@ -357,14 +357,14 @@ func (c configValidationTest) testCluster(clusterName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(util.SliceToError(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, util.SliceToError(errs))
+			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", util.SliceToError(errs))
+			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
 		}
 	}
 }
@@ -377,14 +377,14 @@ func (c configValidationTest) testAuthInfo(authInfoName string, t *testing.T) {
 			t.Errorf("Expected error containing: %v", c.expectedErrorSubstring)
 		}
 		for _, curr := range c.expectedErrorSubstring {
-			if len(errs) != 0 && !strings.Contains(util.SliceToError(errs).Error(), curr) {
-				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, util.SliceToError(errs))
+			if len(errs) != 0 && !strings.Contains(errors.NewAggregate(errs).Error(), curr) {
+				t.Errorf("Expected error containing: %v, but got %v", c.expectedErrorSubstring, errors.NewAggregate(errs))
 			}
 		}
 
 	} else {
 		if len(errs) != 0 {
-			t.Errorf("Unexpected error: %v", util.SliceToError(errs))
+			t.Errorf("Unexpected error: %v", errors.NewAggregate(errs))
 		}
 	}
 }
