@@ -118,8 +118,10 @@ func TestDefaultErrorFunc(t *testing.T) {
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
 	queue := cache.NewFIFO()
 	podBackoff := podBackoff{
-		perPodBackoff: map[string]*backoffEntry{},
-		clock:         &fakeClock{},
+		perPodBackoff:   map[string]*backoffEntry{},
+		clock:           &fakeClock{},
+		defaultDuration: 1 * time.Millisecond,
+		maxDuration:     1 * time.Second,
 	}
 	errFunc := factory.makeDefaultErrorFunc(&podBackoff, queue)
 
@@ -203,8 +205,10 @@ func TestBind(t *testing.T) {
 func TestBackoff(t *testing.T) {
 	clock := fakeClock{}
 	backoff := podBackoff{
-		perPodBackoff: map[string]*backoffEntry{},
-		clock:         &clock,
+		perPodBackoff:   map[string]*backoffEntry{},
+		clock:           &clock,
+		defaultDuration: 1 * time.Second,
+		maxDuration:     60 * time.Second,
 	}
 
 	tests := []struct {
