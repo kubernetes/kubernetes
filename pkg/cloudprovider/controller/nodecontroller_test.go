@@ -102,6 +102,25 @@ func TestSyncStaticCreateNode(t *testing.T) {
 	}
 }
 
+func TestSyncStaticCreateNodeWithHostIP(t *testing.T) {
+	fakeNodeHandler := &FakeNodeHandler{
+		CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
+			return true
+		},
+	}
+	nodeController := NewNodeController(nil, ".*", []string{"10.0.0.1"}, &api.NodeResources{}, fakeNodeHandler)
+	if err := nodeController.SyncStatic(time.Millisecond); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if fakeNodeHandler.CreatedNodes[0].Name != "10.0.0.1" {
+		t.Errorf("unexpect node %v created", fakeNodeHandler.CreatedNodes[0].Name)
+	}
+	if fakeNodeHandler.CreatedNodes[0].Status.HostIP != "10.0.0.1" {
+		t.Errorf("unexpect nil node HostIP for node %v", fakeNodeHandler.CreatedNodes[0].Name)
+	}
+}
+
 func TestSyncStaticCreateNodeWithError(t *testing.T) {
 	fakeNodeHandler := &FakeNodeHandler{
 		CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
