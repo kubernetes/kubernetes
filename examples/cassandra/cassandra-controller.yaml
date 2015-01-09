@@ -12,7 +12,7 @@ desiredState:
         id: cassandra
         containers:
           - name: cassandra
-            image: kubernetes/cassandra
+            image: kubernetes/cassandra:v1
             command:
               - /run.sh
             cpu: 1000
@@ -21,10 +21,17 @@ desiredState:
                 containerPort: 9042
               - name: thrift
                 containerPort: 9160
+            volumeMounts:
+              - name: data
+                mountPath: /cassandra_data
             env:
               - key: MAX_HEAP_SIZE
                 value: 512M
               - key: HEAP_NEWSIZE
                 value: 100M
+        volumes:
+          - name: data
+            source:
+              emptyDir: {}
     labels:
       name: cassandra

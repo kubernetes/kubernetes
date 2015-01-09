@@ -7,7 +7,7 @@ desiredState:
     id: cassandra
     containers:
       - name: cassandra
-        image: kubernetes/cassandra
+        image: kubernetes/cassandra:v1
         command:
           - /run.sh
         cpu: 1000
@@ -29,7 +29,7 @@ desiredState:
     volumes:
       - name: data
         source:
-          emptyDir: ""
+          emptyDir: {}
 labels:
   name: cassandra
 

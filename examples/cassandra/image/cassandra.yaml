@@ -96,12 +96,12 @@ partitioner: org.apache.cassandra.dht.Murmur3Partitioner
 # the configured compaction strategy.
 # If not set, the default directory is $CASSANDRA_HOME/data/data.
 data_file_directories:
-    - /var/lib/cassandra/data
+    - /cassandra_data/data
 
 # commit log.  when running on magnetic HDD, this should be a
 # separate spindle than the data directories.
 # If not set, the default directory is $CASSANDRA_HOME/data/commitlog.
-commitlog_directory: /var/lib/cassandra/commitlog
+commitlog_directory: /cassandra_data/commitlog
 
 # policy for data disk failures:
 # die: shut down gossip and Thrift and kill the JVM for any fs errors or
