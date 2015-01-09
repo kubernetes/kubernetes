@@ -17,8 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"sync"
 	"testing"
 	"time"
+
+	fuzz "github.com/google/gofuzz"
 )
 
 func TestCacheExpire(t *testing.T) {
@@ -59,5 +62,56 @@ func TestCacheNotExpire(t *testing.T) {
 
 	if e, a := 1, calls["foo"]; e != a {
 		t.Errorf("Wrong number of calls for foo: wanted %v, got %v", e, a)
+	}
+}
+
+func TestCacheParallel(t *testing.T) {
+	ff := func(key string) T { time.Sleep(time.Second); return key }
+	clock := &FakeClock{time.Now()}
+	c := NewTimeCache(clock, 60*time.Second, ff)
+
+	// Make some keys
+	keys := []string{}
+	fuzz.New().NilChance(0).NumElements(50, 50).Fuzz(&keys)
+
+	// If we have high parallelism, this will take only a second.
+	var wg sync.WaitGroup
+	wg.Add(len(keys))
+	for _, key := range keys {
+		go func(key string) {
+			c.Get(key)
+			wg.Done()
+		}(key)
+	}
+	wg.Wait()
+}
+
+func TestCacheParallelOneCall(t *testing.T) {
+	calls := 0
+	var callLock sync.Mutex
+	ff := func(key string) T {
+		time.Sleep(time.Second)
+		callLock.Lock()
+		defer callLock.Unlock()
+		calls++
+		return key
+	}
+	clock := &FakeClock{time.Now()}
+	c := NewTimeCache(clock, 60*time.Second, ff)
+
+	// If we have high parallelism, this will take only a second.
+	var wg sync.WaitGroup
+	wg.Add(50)
+	for i := 0; i < 50; i++ {
+		go func(key string) {
+			c.Get(key)
+			wg.Done()
+		}("aoeu")
+	}
+	wg.Wait()
+
+	// And if we wait for existing calls, we should have only one call.
+	if e, a := 1, calls; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
