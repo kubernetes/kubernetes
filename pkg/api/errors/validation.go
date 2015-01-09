@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 )
 
@@ -51,8 +52,8 @@ const (
 	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
 )
 
-// ValueOf converts a ValidationErrorType into its corresponding error message.
-func ValueOf(t ValidationErrorType) string {
+// String converts a ValidationErrorType into its corresponding error message.
+func (t ValidationErrorType) String() string {
 	switch t {
 	case ValidationErrorTypeNotFound:
 		return "not found"
@@ -83,7 +84,7 @@ type ValidationError struct {
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
-	s := fmt.Sprintf("%s: %s '%v'", v.Field, ValueOf(v.Type), v.BadValue)
+	s := spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
 	if v.Detail != "" {
 		s += fmt.Sprintf(": %s", v.Detail)
 	}

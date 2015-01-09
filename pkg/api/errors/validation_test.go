@@ -56,10 +56,39 @@ func TestMakeFuncs(t *testing.T) {
 	}
 }
 
-func TestValidationError(t *testing.T) {
+func TestValidationErrorUsefulMessage(t *testing.T) {
 	s := NewFieldInvalid("foo", "bar", "deet").Error()
-	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, "deet") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
-		t.Errorf("error message did not contain expected values, got %s", s)
+	t.Logf("message: %v", s)
+	for _, part := range []string{"foo", "bar", "deet", ValidationErrorTypeInvalid.String()} {
+		if !strings.Contains(s, part) {
+			t.Errorf("error message did not contain expected part '%v'", part)
+		}
+	}
+
+	type complicated struct {
+		Baz   int
+		Qux   string
+		Inner interface{}
+		KV    map[string]int
+	}
+	s = NewFieldRequired(
+		"foo",
+		&complicated{
+			Baz:   1,
+			Qux:   "aoeu",
+			Inner: &complicated{Qux: "asdf"},
+			KV:    map[string]int{"Billy": 2},
+		},
+	).Error()
+	t.Logf("message: %v", s)
+	for _, part := range []string{
+		"foo", ValidationErrorTypeRequired.String(),
+		"Baz", "Qux", "Inner", "KV",
+		"1", "aoeu", "asdf", "Billy", "2",
+	} {
+		if !strings.Contains(s, part) {
+			t.Errorf("error message did not contain expected part '%v'", part)
+		}
 	}
 }
 
