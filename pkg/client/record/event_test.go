@@ -14,21 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package record_test
+package record
 
 import (
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+func init() {
+	retryEventSleep = 1 * time.Microsecond
+}
 
 type testEventRecorder struct {
 	OnEvent func(e *api.Event) (*api.Event, error)
@@ -142,16 +146,16 @@ func TestEventf(t *testing.T) {
 				return event, nil
 			},
 		}
-		recorder := record.StartRecording(&testEvents, api.EventSource{Component: "eventTest"})
-		logger := record.StartLogging(t.Logf) // Prove that it is useful
-		logger2 := record.StartLogging(func(formatter string, args ...interface{}) {
+		recorder := StartRecording(&testEvents, api.EventSource{Component: "eventTest"})
+		logger := StartLogging(t.Logf) // Prove that it is useful
+		logger2 := StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			called <- struct{}{}
 		})
 
-		record.Eventf(item.obj, item.status, item.reason, item.messageFmt, item.elements...)
+		Eventf(item.obj, item.status, item.reason, item.messageFmt, item.elements...)
 
 		<-called
 		<-called
@@ -204,7 +208,7 @@ func TestWriteEventError(t *testing.T) {
 	}
 	done := make(chan struct{})
 
-	defer record.StartRecording(
+	defer StartRecording(
 		&testEventRecorder{
 			OnEvent: func(event *api.Event) (*api.Event, error) {
 				if event.Message == "finished" {
@@ -227,9 +231,9 @@ func TestWriteEventError(t *testing.T) {
 	).Stop()
 
 	for caseName := range table {
-		record.Event(ref, "Status", "Reason", caseName)
+		Event(ref, "Status", "Reason", caseName)
 	}
-	record.Event(ref, "Status", "Reason", "finished")
+	Event(ref, "Status", "Reason", "finished")
 	<-done
 
 	for caseName, item := range table {

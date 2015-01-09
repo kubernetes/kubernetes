@@ -30,6 +30,9 @@ import (
 	"github.com/golang/glog"
 )
 
+// retryEventSleep is the time between record failures to retry.  Available for test alteration.
+var retryEventSleep = 1 * time.Second
+
 // EventRecorder knows how to store events (client.Client implements it.)
 // EventRecorder must respect the namespace that will be embedded in 'event'.
 // It is assumed that EventRecorder will return the same sorts of errors as
@@ -41,6 +44,7 @@ type EventRecorder interface {
 // StartRecording starts sending events to recorder. Call once while initializing
 // your binary. Subsequent calls will be ignored. The return value can be ignored
 // or used to stop recording, if desired.
+// TODO: make me an object with parameterizable queue length and retry interval
 func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
 	return GetEvents(func(event *api.Event) {
 		// Make a copy before modification, because there could be multiple listeners.
@@ -80,7 +84,7 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 				break
 			}
 			glog.Errorf("Unable to write event: '%v' (will retry in 1 second)", err)
-			time.Sleep(1 * time.Second)
+			time.Sleep(retryEventSleep)
 		}
 	})
 }
