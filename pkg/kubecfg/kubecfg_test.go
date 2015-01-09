@@ -23,6 +23,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -33,6 +34,10 @@ func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T
 	if !reflect.DeepEqual(expectedAction, actualAction) {
 		t.Errorf("Unexpected Action: %#v, expected: %#v", actualAction, expectedAction)
 	}
+}
+
+func init() {
+	updatePollInterval = 1 * time.Millisecond
 }
 
 func TestUpdateWithPods(t *testing.T) {

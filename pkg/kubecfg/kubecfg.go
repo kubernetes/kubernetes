@@ -107,6 +107,12 @@ func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
 	return err
 }
 
+// extracted for test speed
+var (
+	updatePollInterval = 5 * time.Second
+	updatePollTimeout  = 300 * time.Second
+)
+
 // Update performs a rolling update of a collection of pods.
 // 'name' points to a replication controller.
 // 'client' is used for updating pods.
@@ -149,7 +155,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 		}
 		time.Sleep(updatePeriod)
 	}
-	return wait.Poll(time.Second*5, time.Second*300, func() (bool, error) {
+	return wait.Poll(updatePollInterval, updatePollTimeout, func() (bool, error) {
 		podList, err := client.Pods(api.Namespace(ctx)).List(s)
 		if err != nil {
 			return false, err
