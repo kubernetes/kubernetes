@@ -240,8 +240,9 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	if len(containers) > 0 {
 		firstContainer, containers = containers[0], containers[1:]
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+	_, err := fmt.Fprintf(w, "%s/%s\t%s\t%s\t%s\t%s\t%s\n",
 		pod.Name,
+		pod.Status.PodIP,
 		firstContainer.Name,
 		firstContainer.Image,
 		podHostString(pod.Status.Host, pod.Status.HostIP),
