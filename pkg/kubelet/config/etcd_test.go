@@ -33,7 +33,7 @@ func TestEventToPods(t *testing.T) {
 		{
 			input: watch.Event{Object: nil},
 			pods:  []api.BoundPod{},
-			fail:  true,
+			fail:  false,
 		},
 		{
 			input: watch.Event{Object: &api.BoundPods{}},

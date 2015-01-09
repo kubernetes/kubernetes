@@ -69,6 +69,8 @@ func (s *sourceURL) extractFromURL() error {
 		return fmt.Errorf("%v: %v", s.url, resp.Status)
 	}
 	if len(data) == 0 {
+		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{}, kubelet.SET, kubelet.HTTPSource}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the manifest has not changed since the last time it was read.

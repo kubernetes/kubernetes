@@ -1118,9 +1118,6 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 		case <-time.After(kl.resyncInterval):
 			glog.V(4).Infof("Periodic sync")
-			if kl.pods == nil {
-				continue
-			}
 		}
 
 		err := handler.SyncPods(kl.pods)

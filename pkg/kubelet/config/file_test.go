@@ -92,8 +92,14 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	NewSourceFile("random_non_existent_path", time.Millisecond, ch)
 	select {
 	case got := <-ch:
-		t.Errorf("Expected no update, Got %#v", got)
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+		if !api.Semantic.DeepEqual(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
 	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
 	}
 }
 
