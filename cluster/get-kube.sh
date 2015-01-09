@@ -41,7 +41,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-function create-cluster {
+function create_cluster {
   echo "Creating a kubernetes on ${KUBERNETES_PROVIDER:-gce}..."
   (
     cd kubernetes
@@ -54,7 +54,7 @@ function create-cluster {
 }
 
 if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
-  create-cluster
+  create_cluster
   exit 0
 fi
 
@@ -113,5 +113,5 @@ echo "Unpacking kubernetes release ${release}"
 tar -xzf ${file}
 rm ${file}
 
-create-cluster
+create_cluster
 
