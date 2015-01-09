@@ -357,19 +357,20 @@ func (m *Master) init(c *Config) {
 		"bindings": binding.NewREST(m.bindingRegistry),
 	}
 
-	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
-
+	apiVersions := []string{"v1beta1", "v1beta2"}
 	apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1")
 	apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2")
 	if c.EnableV1Beta3 {
 		apiserver.NewAPIGroupVersion(m.API_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3")
-		versionHandler = apiserver.APIVersionHandler("v1beta1", "v1beta2", "v1beta3")
+		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
 	}
 
-	// TODO: InstallREST should register each version automatically
-	m.rootWebService.Route(m.rootWebService.GET(c.APIPrefix).To(versionHandler))
-
 	apiserver.InstallSupport(m.handlerContainer, m.rootWebService)
+	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
+
+	// Register root handler.
+	// We do not register this using restful Webservice since we do not want to surface this in api docs.
+	m.mux.HandleFunc("/", apiserver.HandleIndex)
 
 	// TODO: use go-restful
 	apiserver.InstallValidator(m.mux, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
@@ -377,7 +378,7 @@ func (m *Master) init(c *Config) {
 		apiserver.InstallLogsSupport(m.mux)
 	}
 	if c.EnableUISupport {
-		ui.InstallSupport(m.mux)
+		ui.InstallSupport(m.mux, m.enableSwaggerSupport)
 	}
 
 	// TODO: install runtime/pprof handler

@@ -26,14 +26,16 @@ type MuxInterface interface {
 	Handle(pattern string, handler http.Handler)
 }
 
-func InstallSupport(mux MuxInterface) {
+func InstallSupport(mux MuxInterface, enableSwaggerSupport bool) {
 	// Expose files in www/ on <host>/static/
 	fileServer := http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "www"})
 	prefix := "/static/"
 	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
 
-	// Expose files in third_party/swagger-ui/ on <host>/swagger-ui/
-	fileServer = http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "third_party/swagger-ui"})
-	prefix = "/swagger-ui/"
-	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	if enableSwaggerSupport {
+		// Expose files in third_party/swagger-ui/ on <host>/swagger-ui
+		fileServer = http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "third_party/swagger-ui"})
+		prefix = "/swagger-ui/"
+		mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	}
 }
