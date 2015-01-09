@@ -17,5 +17,6 @@ RUN apt-get -qq -y install cassandra
 COPY cassandra.yaml /etc/cassandra/cassandra.yaml
 COPY run.sh /run.sh
 COPY kubernetes-cassandra.jar /kubernetes-cassandra.jar
+RUN chmod a+x /run.sh
 
 CMD /run.sh
