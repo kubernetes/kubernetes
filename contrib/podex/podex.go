@@ -28,11 +28,9 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -215,11 +213,8 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	if err != nil {
 		return nil, fmt.Errorf("error getting json for image %q: %v", imageID, err)
 	}
-	data, _ := ioutil.ReadAll(resp.Body)
-	buf := bytes.NewBuffer(data)
-	log.Print(string(data))
 	var image imageMetadata
-	if err := json.NewDecoder(buf).Decode(&image); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&image); err != nil {
 		return nil, fmt.Errorf("error decoding image %q metadata: %v", imageID, err)
 	}
 	return &image, nil
