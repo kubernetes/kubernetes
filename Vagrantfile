@@ -17,7 +17,7 @@ END
 end
 
 # The number of minions to provision
-$num_minion = (ENV['NUM_MINIONS'] || 3).to_i
+$num_minion = (ENV['NUM_MINIONS'] || 1).to_i
 
 # ip configuration
 $master_ip = ENV['MASTER_IP']
