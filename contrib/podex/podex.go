@@ -43,10 +43,10 @@ import (
 
 const usage = "usage: podex [-yaml|-json] [-pod|-container] [-id PODNAME] IMAGES..."
 
-var generateYAML = flag.Bool("yaml", false, "generate yaml manifest")
+var generateYAML = flag.Bool("yaml", true, "generate yaml manifest (default)")
 var generateJSON = flag.Bool("json", false, "generate json manifest")
-var pod = flag.Bool("pod", false, "generate pod manifest")
-var container = flag.Bool("container", false, "generate container manifest")
+var generatePod = flag.Bool("pod", true, "generate pod manifest (default)")
+var generateContainer = flag.Bool("container", false, "generate container manifest")
 var id = flag.String("id", "", "set id")
 
 type image struct {
@@ -70,8 +70,11 @@ func main() {
 		_, _, *id, _ = splitDockerImageName(flag.Arg(0))
 	}
 
-	if (!*generateYAML && !*generateJSON) || (*generateYAML && *generateJSON) || (!*pod && !*container) || (*pod && *container) {
-		log.Fatal(usage)
+	if *generateJSON {
+		*generateYAML = false
+	}
+	if *generateContainer {
+		*generatePod = false
 	}
 
 	podContainers := []goyaml.MapSlice{}
@@ -117,12 +120,12 @@ func main() {
 	var data interface{}
 
 	switch {
-	case *container:
+	case *generateContainer:
 		containerManifest = append(goyaml.MapSlice{
 			{Key: "id", Value: *id},
 		}, containerManifest...)
 		data = containerManifest
-	case *pod:
+	case *generatePod:
 		data = goyaml.MapSlice{
 			{Key: "id", Value: *id},
 			{Key: "kind", Value: "Pod"},
@@ -138,8 +141,7 @@ func main() {
 		log.Fatalf("failed to marshal container manifest: %v", err)
 	}
 
-	switch {
-	case *generateJSON:
+	if *generateJSON {
 		bs, err = yaml.YAMLToJSON(bs)
 		if err != nil {
 			log.Fatalf("failed to marshal container manifest into JSON: %v", err)
