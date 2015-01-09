@@ -388,6 +388,7 @@ Additional help topics:
   kubectl namespace     Set and view the current Kubernetes namespace
   kubectl log           Print the logs for a container in a pod.
   kubectl rollingupdate Perform a rolling update of the given ReplicationController
+  kubectl resize        Set a new size for a resizable resource (currently only Replication Controllers)
   kubectl run-container Run a particular image on the cluster.
 
 Use "kubectl help [command]" for more information about that command.
@@ -808,6 +809,59 @@ Usage:
       --timeout="5m0s": Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --token="": Bearer token for authentication to the API server.
       --update-period="1m0s": Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+      --user="": The name of the kubeconfig user to use
+      --v=0: log level for V logs
+      --validate=false: If true, use a schema to validate the input before sending it
+      --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+
+```
+
+#### resize
+Set a new size for a resizable resource (currently only Replication Controllers)
+
+Resize also allows users to specify one or more preconditions for the resize action.
+The new size is specified by --replicas=<n>. You can also specify an optional precondition. 
+The two currently supported options are --current-replicas or --resource-version.
+If a precondition is specified, it is validated before the resize is attempted, and it is 
+guaranteed that the precondition holds true when the resize is sent to the server.
+
+Examples:
+  $ kubectl resize replicationcontrollers foo 3
+  resized
+
+  # will only execute if the current size is 3
+  $ kubectl resize --current-replicas=2 replicationcontrollers foo 3
+
+
+Usage:
+```
+  kubectl resize [---resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id> [flags]
+
+ Available Flags:
+      --alsologtostderr=false: log to standard error as well as files
+      --api-version="": The API version to use when talking to the server
+  -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority="": Path to a cert. file for the certificate authority.
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
+      --cluster="": The name of the kubeconfig cluster to use
+      --context="": The name of the kubeconfig context to use
+      --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to resize
+  -h, --help=false: help for resize
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+      --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
+      --log_dir=: If non-empty, write log files in this directory
+      --log_flush_frequency=5s: Maximum number of seconds between log flushes
+      --logtostderr=true: log to standard error instead of files
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --replicas=-1: The new number desired number of replicas.  Required.
+      --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize
+  -s, --server="": The address of the Kubernetes API server
+      --stderrthreshold=2: logs at or above this threshold go to stderr
+      --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it

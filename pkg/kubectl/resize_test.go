@@ -1,0 +1,182 @@
+/*
+Copyright 2014 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package kubectl
+
+import (
+	//	"strings"
+	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	//	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+)
+
+func TestReplicationControllerResize(t *testing.T) {
+	fake := &client.Fake{}
+	resizer := ReplicationControllerResizer{fake}
+	preconditions := ResizePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	resizer.Resize("default", name, &preconditions, count)
+
+	if len(fake.Actions) != 2 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+	}
+	if fake.Actions[0].Action != "get-controller" || fake.Actions[0].Value != name {
+		t.Errorf("unexpected action: %v, expected get-controller %s", fake.Actions[0], name)
+	}
+	if fake.Actions[1].Action != "update-controller" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
+		t.Errorf("unexpected action %v, expected update-controller with replicas = %d", count)
+	}
+}
+
+func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
+	fake := &client.Fake{
+		Ctrl: api.ReplicationController{
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 10,
+			},
+		},
+	}
+	resizer := ReplicationControllerResizer{fake}
+	preconditions := ResizePrecondition{2, ""}
+	count := uint(3)
+	name := "foo"
+	resizer.Resize("default", name, &preconditions, count)
+
+	if len(fake.Actions) != 1 {
+		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+	}
+	if fake.Actions[0].Action != "get-controller" || fake.Actions[0].Value != name {
+		t.Errorf("unexpected action: %v, expected get-controller %s", fake.Actions[0], name)
+	}
+}
+
+func TestPreconditionValidate(t *testing.T) {
+	tests := []struct {
+		preconditions ResizePrecondition
+		controller    api.ReplicationController
+		expectError   bool
+		test          string
+	}{
+		{
+			preconditions: ResizePrecondition{-1, ""},
+			expectError:   false,
+			test:          "defaults",
+		},
+		{
+			preconditions: ResizePrecondition{-1, ""},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 10,
+				},
+			},
+			expectError: false,
+			test:        "defaults 2",
+		},
+		{
+			preconditions: ResizePrecondition{0, ""},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 0,
+				},
+			},
+			expectError: false,
+			test:        "size matches",
+		},
+		{
+			preconditions: ResizePrecondition{-1, "foo"},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 10,
+				},
+			},
+			expectError: false,
+			test:        "resource version matches",
+		},
+		{
+			preconditions: ResizePrecondition{10, "foo"},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 10,
+				},
+			},
+			expectError: false,
+			test:        "both match",
+		},
+		{
+			preconditions: ResizePrecondition{10, "foo"},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "foo",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 20,
+				},
+			},
+			expectError: true,
+			test:        "size different",
+		},
+		{
+			preconditions: ResizePrecondition{10, "foo"},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "bar",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 10,
+				},
+			},
+			expectError: true,
+			test:        "version different",
+		},
+		{
+			preconditions: ResizePrecondition{10, "foo"},
+			controller: api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					ResourceVersion: "bar",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 20,
+				},
+			},
+			expectError: true,
+			test:        "both different",
+		},
+	}
+	for _, test := range tests {
+		err := test.preconditions.Validate(&test.controller)
+		if err != nil && !test.expectError {
+			t.Errorf("unexpected error: %v (%s)", err, test.test)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("unexpected non-error: %v (%s)", err, test.test)
+		}
+	}
+}

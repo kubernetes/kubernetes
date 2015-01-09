@@ -62,6 +62,8 @@ type Factory struct {
 	Describer func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
+	// Returns a Resizer for changing the size of the specified RESTMapping type or an error
+	Resizer func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Resizer, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(*cobra.Command) (validation.Schema, error)
 }
@@ -111,6 +113,17 @@ func NewFactory() *Factory {
 		},
 		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		},
+		Resizer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Resizer, error) {
+			client, err := clients.ClientForVersion(mapping.APIVersion)
+			if err != nil {
+				return nil, err
+			}
+			resizer, ok := kubectl.ResizerFor(mapping.Kind, client)
+			if !ok {
+				return nil, fmt.Errorf("no resizer has been implemented for %q", mapping.Kind)
+			}
+			return resizer, nil
 		},
 		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
 			if GetFlagBool(cmd, "validate") {
@@ -173,6 +186,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(f.NewCmdLog(out))
 	cmds.AddCommand(f.NewCmdRollingUpdate(out))
+	cmds.AddCommand(f.NewCmdResize(out))
 
 	cmds.AddCommand(f.NewCmdRunContainer(out))
 
