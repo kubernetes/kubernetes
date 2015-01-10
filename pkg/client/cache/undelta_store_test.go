@@ -27,10 +27,9 @@ import (
 type t struct{ int }
 
 var (
-	o1  interface{}   = t{1}
-	o2  interface{}   = t{2}
-	l1  []interface{} = []interface{}{t{1}}
-	l12 []interface{} = []interface{}{t{1}, t{2}}
+	o1 interface{}   = t{1}
+	o2 interface{}   = t{2}
+	l1 []interface{} = []interface{}{t{1}}
 )
 
 func TestUpdateCallsPush(t *testing.T) {
@@ -99,13 +98,12 @@ func TestReplaceCallsPush(t *testing.T) {
 
 	m := make(map[string]interface{})
 	m["1"] = o1
-	m["2"] = o2
 
 	u.Replace(m)
 	if callcount != 1 {
-		t.Errorf("Expected 2 calls, got %d", callcount)
+		t.Errorf("Expected 1 calls, got %d", callcount)
 	}
-	expected := l12
+	expected := l1
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}
