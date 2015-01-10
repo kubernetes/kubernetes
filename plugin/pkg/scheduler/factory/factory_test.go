@@ -48,13 +48,105 @@ func TestCreate(t *testing.T) {
 
 func TestPollMinions(t *testing.T) {
 	table := []struct {
-		minions []api.Node
+		minions       []api.Node
+		expectedCount int
 	}{
 		{
 			minions: []api.Node{
-				{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-				{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReady, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReachable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "baz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReady, Status: api.ConditionFull},
+							{Kind: api.NodeReachable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "baz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReady, Status: api.ConditionFull},
+							{Kind: api.NodeReady, Status: api.ConditionFull},
+						},
+					},
+				},
 			},
+			expectedCount: 4,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReady, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReady, Status: api.ConditionNone},
+						},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReady, Status: api.ConditionFull},
+							{Kind: api.NodeReachable, Status: api.ConditionNone}},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Kind: api.NodeReachable, Status: api.ConditionFull},
+							{Kind: "invalidValue", Status: api.ConditionNone}},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{},
+					},
+				},
+			},
+			expectedCount: 1,
 		},
 	}
 
@@ -80,8 +172,8 @@ func TestPollMinions(t *testing.T) {
 		}
 		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/minions", "GET", nil)
 
-		if e, a := len(item.minions), ce.Len(); e != a {
-			t.Errorf("Expected %v, got %v", e, a)
+		if a := ce.Len(); item.expectedCount != a {
+			t.Errorf("Expected %v, got %v", item.expectedCount, a)
 		}
 	}
 }

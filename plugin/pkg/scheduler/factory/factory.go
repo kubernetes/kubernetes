@@ -99,7 +99,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
 	if false {
-		// Disable this code until minions support watches.
+		// Disable this code until minions support watches. Note when this code is enabled,
+		// we need to make sure minion ListWatcher has proper FieldSelector.
 		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.MinionLister.Store).Run()
 	} else {
 		cache.NewPoller(f.pollMinions, 10*time.Second, f.MinionLister.Store).Run()
@@ -168,14 +169,40 @@ func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
 	}
 }
 
-// pollMinions lists all minions and returns an enumerator for cache.Poller.
+// pollMinions lists all minions and filter out unhealthy ones, then returns
+// an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
-	list := &api.NodeList{}
-	err := factory.Client.Get().Resource("minions").Do().Into(list)
+	allNodes := &api.NodeList{}
+	err := factory.Client.Get().Resource("minions").Do().Into(allNodes)
 	if err != nil {
 		return nil, err
 	}
-	return &nodeEnumerator{list}, nil
+	nodes := &api.NodeList{
+		TypeMeta: allNodes.TypeMeta,
+		ListMeta: allNodes.ListMeta,
+	}
+	for _, node := range allNodes.Items {
+		conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
+		for i := range node.Status.Conditions {
+			cond := node.Status.Conditions[i]
+			conditionMap[cond.Kind] = &cond
+		}
+		if condition, ok := conditionMap[api.NodeReady]; ok {
+			if condition.Status == api.ConditionFull {
+				nodes.Items = append(nodes.Items, node)
+			}
+		} else if condition, ok := conditionMap[api.NodeReachable]; ok {
+			if condition.Status == api.ConditionFull {
+				nodes.Items = append(nodes.Items, node)
+			}
+		} else {
+			// If no condition is set, either node health check is disabled (master
+			// flag "healthCheckMinions" is set to false), or we get unknown condition.
+			// In such cases, we add nodes unconditionally.
+			nodes.Items = append(nodes.Items, node)
+		}
+	}
+	return &nodeEnumerator{nodes}, nil
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
