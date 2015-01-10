@@ -53,11 +53,11 @@ func TestGetContainerID(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "foobar",
-			Names: []string{"/k8s_foo_qux_1234"},
+			Names: []string{"/k8s_foo_qux_1234_42"},
 		},
 		{
 			ID:    "barbar",
-			Names: []string{"/k8s_bar_qux_2565"},
+			Names: []string{"/k8s_bar_qux_2565_42"},
 		},
 	}
 	fakeDocker.Container = &docker.Container{
@@ -99,27 +99,23 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 }
 
 func TestContainerManifestNaming(t *testing.T) {
-	podUID := "d1b925c9-444a-11e4-a576-42010af0a203"
-	verifyPackUnpack(t, "file", podUID, "manifest1234", "container5678")
-	verifyPackUnpack(t, "file", podUID, "mani-fest-1234", "container5678")
+	podUID := "12345678"
+	verifyPackUnpack(t, "file", podUID, "name", "container")
+	verifyPackUnpack(t, "file", podUID, "name-with-dashes", "container")
 	// UID is same as pod name
-	verifyPackUnpack(t, "file", podUID, podUID, "container123")
-	// empty namespace
-	verifyPackUnpack(t, "", podUID, podUID, "container123")
-	// No UID
-	verifyPackUnpack(t, "other", "", podUID, "container456")
+	verifyPackUnpack(t, "file", podUID, podUID, "container")
 	// No Container name
-	verifyPackUnpack(t, "other", "", podUID, "")
+	verifyPackUnpack(t, "other", podUID, "name", "")
 
 	container := &api.Container{Name: "container"}
 	podName := "foo"
 	podNamespace := "test"
-	name := fmt.Sprintf("k8s_%s_%s.%s_12345", container.Name, podName, podNamespace)
-
+	name := fmt.Sprintf("k8s_%s_%s.%s_%s_42", container.Name, podName, podNamespace, podUID)
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	returnedPodFullName, _, returnedContainerName, hash := ParseDockerName(name)
-	if returnedPodFullName != podFullName || returnedContainerName != container.Name || hash != 0 {
-		t.Errorf("unexpected parse: %s %s %d", returnedPodFullName, returnedContainerName, hash)
+
+	returnedPodFullName, returnedPodUID, returnedContainerName, hash := ParseDockerName(name)
+	if returnedPodFullName != podFullName || returnedPodUID != podUID || returnedContainerName != container.Name || hash != 0 {
+		t.Errorf("unexpected parse: %s %s %s %d", returnedPodFullName, returnedPodUID, returnedContainerName, hash)
 	}
 }
 
