@@ -29,12 +29,14 @@ type ListWatch struct {
 	Client        *client.Client
 	FieldSelector labels.Selector
 	Resource      string
+	Namespace     string
 }
 
 // ListWatch knows how to list and watch a set of apiserver resources.
 func (lw *ListWatch) List() (runtime.Object, error) {
 	return lw.Client.
 		Get().
+		Namespace(lw.Namespace).
 		Resource(lw.Resource).
 		SelectorParam("fields", lw.FieldSelector).
 		Do().
@@ -45,6 +47,7 @@ func (lw *ListWatch) Watch(resourceVersion string) (watch.Interface, error) {
 	return lw.Client.
 		Get().
 		Prefix("watch").
+		Namespace(lw.Namespace).
 		Resource(lw.Resource).
 		SelectorParam("fields", lw.FieldSelector).
 		Param("resourceVersion", resourceVersion).
