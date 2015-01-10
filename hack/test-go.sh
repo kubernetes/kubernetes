@@ -44,9 +44,9 @@ kube::test::find_pkgs() {
 }
 
 # -covermode=atomic becomes default with -race in Go >=1.3
-KUBE_COVER="" #${KUBE_COVER:--cover -covermode=atomic}
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 120s}
-KUBE_RACE="" #${KUBE_RACE:--race}
+KUBE_COVER=${KUBE_COVER:-} # use KUBE_COVER="-cover -covermode=atomic" for full coverage
+KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
