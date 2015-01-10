@@ -137,6 +137,10 @@ godep go tool cover -html=target/c.out
 ## Integration tests
 
 You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
+```
+cd kubernetes
+hack/test-integration.sh
+```
 
 ## End-to-End tests
 
