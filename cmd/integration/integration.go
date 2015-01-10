@@ -609,7 +609,7 @@ func main() {
 			createdPods.Insert(p[:n-8])
 		}
 	}
-	// We expect 5: 2 net containers + 2 pods from the replication controller +
+	// We expect 9: 2 net containers + 2 pods from the replication controller +
 	//              1 net container + 2 pods from the URL +
 	//              1 net container + 1 pod from the service test.
 	if len(createdPods) != 9 {

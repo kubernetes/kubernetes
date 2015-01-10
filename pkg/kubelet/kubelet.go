@@ -17,6 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -40,6 +42,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -1007,6 +1010,11 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	for ix := range pods {
 		pod := &pods[ix]
 		podFullName := GetPodFullName(pod)
+		if err := ensureValidUID(pod); err != nil {
+			glog.Errorf("Error validating pod UID, skipping: %v", err)
+			record.Eventf(pod, "", "failedSync", "Error validating pod UID, skipping: %v", err)
+			continue
+		}
 		uuid := pod.UID
 		desiredPods[uuid] = empty{}
 
@@ -1018,8 +1026,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 
 		// Run the sync in an async manifest worker.
 		kl.podWorkers.Run(podFullName, func() {
-			err := kl.syncPod(pod, dockerContainers)
-			if err != nil {
+			if err := kl.syncPod(pod, dockerContainers); err != nil {
 				glog.Errorf("Error syncing pod, skipping: %v", err)
 				record.Eventf(pod, "", "failedSync", "Error syncing pod, skipping: %v", err)
 			}
@@ -1053,6 +1060,19 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	kl.reconcileVolumes(pods)
 
 	return err
+}
+
+func ensureValidUID(pod *api.BoundPod) error {
+	if pod.UID != "" {
+		return nil
+	}
+	// Spew's %#v dereferences and dumps through non-nil pointers (which is
+	// what we want), but does not include the pointer values themselves
+	// (as opposed to %+v).
+	sum := md5.Sum([]byte(spew.Sprintf("%#v", pod)))
+	pod.UID = hex.EncodeToString(sum[0:])
+	glog.V(5).Infof("Generated UID %q for pod %q", pod.UID, GetPodFullName(pod))
+	return nil
 }
 
 func updateBoundPods(changed []api.BoundPod, current []api.BoundPod) []api.BoundPod {
