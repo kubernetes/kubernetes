@@ -46,6 +46,8 @@ const (
 	HTTPSource = "http"
 	// Updates received to the kubelet server
 	ServerSource = "server"
+	// Updates from Kubernetes API Server
+	ApiserverSource = "api"
 	// Updates from all sources
 	AllSource = "*"
 )
