@@ -18,6 +18,7 @@ package record
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -25,13 +26,22 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
 
-// retryEventSleep is the time between record failures to retry.  Available for test alteration.
-var retryEventSleep = 1 * time.Second
+const (
+	maxQueuedEvents  = 1000
+	maxTriesPerEvent = 10
+)
+
+var (
+	minSleep   = float64(1 * time.Second)
+	maxSleep   = float64(15 * time.Second)
+	backoffExp = 1.5
+)
 
 // EventRecorder knows how to store events (client.Client implements it.)
 // EventRecorder must respect the namespace that will be embedded in 'event'.
@@ -46,47 +56,80 @@ type EventRecorder interface {
 // or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
 func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
+	// Set up our own personal buffer of events so that we can clear out GetEvents'
+	// broadcast channel as quickly as possible to avoid causing the relatively more
+	// important event-producing goroutines from blocking while trying to insert events.
+	eventQueue := make(chan *api.Event, maxQueuedEvents)
+
+	// Run a function in the background that grabs events off the queue and tries
+	// to record them, retrying as appropriate to try to avoid dropping any.
+	go func() {
+		defer util.HandleCrash()
+		for event := range eventQueue {
+			tries := 0
+			for {
+				if recordEvent(recorder, event) {
+					break
+				}
+				tries++
+				if tries >= maxTriesPerEvent {
+					glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
+					break
+				}
+				sleepDuration := time.Duration(
+					math.Min(maxSleep, minSleep*math.Pow(backoffExp, float64(tries-1))))
+				time.Sleep(wait.Jitter(sleepDuration, 0.5))
+			}
+		}
+	}()
+
+	// Finally, kick off the watcher that takes events from the channel and puts them
+	// onto the queue.
 	return GetEvents(func(event *api.Event) {
 		// Make a copy before modification, because there could be multiple listeners.
 		// Events are safe to copy like this.
 		eventCopy := *event
 		event = &eventCopy
 		event.Source = source
-		try := 0
-		for {
-			try++
-			_, err := recorder.Create(event)
-			if err == nil {
-				break
-			}
-			// If we can't contact the server, then hold everything while we keep trying.
-			// Otherwise, something about the event is malformed and we should abandon it.
-			giveUp := false
-			switch err.(type) {
-			case *client.RequestConstructionError:
-				// We will construct the request the same next time, so don't keep trying.
-				giveUp = true
-			case *errors.StatusError:
-				// This indicates that the server understood and rejected our request.
-				giveUp = true
-			case *errors.UnexpectedObjectError:
-				// We don't expect this; it implies the server's response didn't match a
-				// known pattern. Go ahead and retry.
-			default:
-				// This case includes actual http transport errors. Go ahead and retry.
-			}
-			if giveUp {
-				glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
-				break
-			}
-			if try >= 3 {
-				glog.Errorf("Unable to write event '%#v': '%v' (retry limit exceeded!)", event, err)
-				break
-			}
-			glog.Errorf("Unable to write event: '%v' (will retry in 1 second)", err)
-			time.Sleep(retryEventSleep)
+		// Drop new events rather than old ones because the old ones may contain
+		// some information explaining why everything is so backed up.
+		if len(eventQueue) == maxQueuedEvents {
+			glog.Errorf("Unable to write event '%#v' (event buffer full!)", event)
+		} else {
+			eventQueue <- event
 		}
 	})
+}
+
+// recordEvent attempts to write event to recorder. It returns true if the event
+// was successfully recorded or discarded, false if it should be retried.
+func recordEvent(recorder EventRecorder, event *api.Event) bool {
+	_, err := recorder.Create(event)
+	if err == nil {
+		return true
+	}
+	// If we can't contact the server, then hold everything while we keep trying.
+	// Otherwise, something about the event is malformed and we should abandon it.
+	giveUp := false
+	switch err.(type) {
+	case *client.RequestConstructionError:
+		// We will construct the request the same next time, so don't keep trying.
+		giveUp = true
+	case *errors.StatusError:
+		// This indicates that the server understood and rejected our request.
+		giveUp = true
+	case *errors.UnexpectedObjectError:
+		// We don't expect this; it implies the server's response didn't match a
+		// known pattern. Go ahead and retry.
+	default:
+		// This case includes actual http transport errors. Go ahead and retry.
+	}
+	if giveUp {
+		glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
+		return true
+	}
+	glog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
+	return false
 }
 
 // StartLogging just logs local events, using the given logging function. The
