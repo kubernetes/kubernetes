@@ -12,7 +12,7 @@
 2. Get or build a [binary release](binary_release.md)
 3. If you want to build your own release, you need to have [Docker
 installed](https://docs.docker.com/installation/).  On Mac OS X you can use
-boot2docker.
+[boot2docker](http://boot2docker.io/).
 
 ### Setup
 The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
