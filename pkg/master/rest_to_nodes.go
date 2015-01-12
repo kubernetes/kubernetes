@@ -33,6 +33,9 @@ import (
 // TODO: considering that the only difference between the various client types
 // and RESTStorage type is the type of the arguments, maybe use "go generate" to
 // write a specialized adaptor for every client type?
+//
+// TODO: this also means that pod and node API endpoints have to be colocated in the same
+// process
 func RESTStorageToNodes(storage apiserver.RESTStorage) client.NodesInterface {
 	return &nodeAdaptor{storage}
 }
@@ -61,7 +64,7 @@ func (n *nodeAdaptor) Create(minion *api.Node) (*api.Node, error) {
 // List lists all the nodes in the cluster.
 func (n *nodeAdaptor) List() (*api.NodeList, error) {
 	ctx := api.NewContext()
-	obj, err := n.storage.List(ctx, labels.Everything(), labels.Everything())
+	obj, err := n.storage.(apiserver.RESTLister).List(ctx, labels.Everything(), labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +74,7 @@ func (n *nodeAdaptor) List() (*api.NodeList, error) {
 // Get gets an existing minion
 func (n *nodeAdaptor) Get(name string) (*api.Node, error) {
 	ctx := api.NewContext()
-	obj, err := n.storage.Get(ctx, name)
+	obj, err := n.storage.(apiserver.RESTGetter).Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}

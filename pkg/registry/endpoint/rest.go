@@ -96,12 +96,11 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}), nil
 }
 
-// Delete satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
-	return nil, errors.NewBadRequest("Endpoints are read-only")
-}
-
 // New implements the RESTStorage interface.
 func (rs REST) New() runtime.Object {
 	return &api.Endpoints{}
+}
+
+func (*REST) NewList() runtime.Object {
+	return &api.EndpointsList{}
 }

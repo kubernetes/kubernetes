@@ -96,14 +96,3 @@ func TestEndpointsRegistryList(t *testing.T) {
 		t.Errorf("Unexpected resource version: %#v", sl)
 	}
 }
-
-func TestEndpointsRegistryDelete(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	storage := NewREST(registry)
-	_, err := storage.Delete(api.NewContext(), "n/a")
-	if err == nil {
-		t.Error("unexpected non-error")
-	} else if !errors.IsBadRequest(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-}

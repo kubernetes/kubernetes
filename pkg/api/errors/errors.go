@@ -159,6 +159,19 @@ func NewBadRequest(reason string) error {
 	}}
 }
 
+// NewMethodNotSupported returns an error indicating the requested action is not supported on this kind.
+func NewMethodNotSupported(kind, action string) error {
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusMethodNotAllowed,
+		Reason: api.StatusReasonMethodNotAllowed,
+		Details: &api.StatusDetails{
+			Kind: kind,
+		},
+		Message: fmt.Sprintf("%s is not supported on resources of kind %q", action, kind),
+	}}
+}
+
 // NewInternalError returns an error indicating the item is invalid and cannot be processed.
 func NewInternalError(err error) error {
 	return &StatusError{api.Status{
@@ -190,6 +203,12 @@ func IsConflict(err error) bool {
 // IsInvalid determines if the err is an error which indicates the provided resource is not valid.
 func IsInvalid(err error) bool {
 	return reasonForError(err) == api.StatusReasonInvalid
+}
+
+// IsMethodNotSupported determines if the err is an error which indicates the provided action could not
+// be performed because it is not supported by the server.
+func IsMethodNotSupported(err error) bool {
+	return reasonForError(err) == api.StatusReasonMethodNotAllowed
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.

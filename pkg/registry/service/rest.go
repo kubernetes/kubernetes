@@ -217,6 +217,10 @@ func (*REST) New() runtime.Object {
 	return &api.Service{}
 }
 
+func (*REST) NewList() runtime.Object {
+	return &api.Service{}
+}
+
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	service := obj.(*api.Service)
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {

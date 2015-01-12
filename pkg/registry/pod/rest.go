@@ -161,6 +161,10 @@ func (*REST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+func (*REST) NewList() runtime.Object {
+	return &api.PodList{}
+}
+
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	pod := obj.(*api.Pod)
 	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {

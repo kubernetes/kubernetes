@@ -222,7 +222,7 @@ func getTestRequests() []struct {
 		{"PUT", "/api/v1beta1/endpoints/a" + syncFlags, aEndpoints, code200},
 		{"GET", "/api/v1beta1/endpoints", "", code200},
 		{"GET", "/api/v1beta1/endpoints/a", "", code200},
-		{"DELETE", "/api/v1beta1/endpoints/a" + syncFlags, "", code400},
+		{"DELETE", "/api/v1beta1/endpoints/a" + syncFlags, "", code405},
 
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200},
@@ -235,7 +235,7 @@ func getTestRequests() []struct {
 		// Normal methods on events
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"POST", "/api/v1beta1/events" + syncFlags, aEvent, code200},
-		{"PUT", "/api/v1beta1/events/a" + syncFlags, aEvent, code500}, // See #2114 about why 500
+		{"PUT", "/api/v1beta1/events/a" + syncFlags, aEvent, code405},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events/a", "", code200},
@@ -245,10 +245,10 @@ func getTestRequests() []struct {
 		{"GET", "/api/v1beta1/bindings", "", code405},            // Bindings are write-only
 		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200}, // Need a pod to bind or you get a 404
 		{"POST", "/api/v1beta1/bindings" + syncFlags, aBinding, code200},
-		{"PUT", "/api/v1beta1/bindings/a" + syncFlags, aBinding, code500}, // See #2114 about why 500
+		{"PUT", "/api/v1beta1/bindings/a" + syncFlags, aBinding, code405},
 		{"GET", "/api/v1beta1/bindings", "", code405},
-		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
-		{"DELETE", "/api/v1beta1/bindings/a" + syncFlags, "", code404},
+		{"GET", "/api/v1beta1/bindings/a", "", code405}, // No bindings instances
+		{"DELETE", "/api/v1beta1/bindings/a" + syncFlags, "", code405},
 
 		// Non-existent object type.
 		{"GET", "/api/v1beta1/foo", "", code404},

@@ -128,7 +128,6 @@ func (*REST) New() runtime.Object {
 	return &api.Event{}
 }
 
-// Update returns an error: Events are not mutable.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	return nil, fmt.Errorf("not allowed: 'Event' objects are not mutable")
+func (*REST) NewList() runtime.Object {
+	return &api.EventList{}
 }

@@ -20,9 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -38,21 +36,6 @@ func NewREST(bindingRegistry Registry) *REST {
 	return &REST{
 		registry: bindingRegistry,
 	}
-}
-
-// List returns an error because bindings are write-only objects.
-func (*REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	return nil, errors.NewNotFound("binding", "list")
-}
-
-// Get returns an error because bindings are write-only objects.
-func (*REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	return nil, errors.NewNotFound("binding", id)
-}
-
-// Delete returns an error because bindings are write-only objects.
-func (*REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
-	return nil, errors.NewNotFound("binding", id)
 }
 
 // New returns a new binding object fit for having data unmarshalled into it.
@@ -72,9 +55,4 @@ func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RES
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil
 	}), nil
-}
-
-// Update returns an error-- this object may not be updated.
-func (b *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	return nil, fmt.Errorf("bindings may not be changed.")
 }

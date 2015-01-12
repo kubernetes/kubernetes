@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -53,7 +54,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", kind)
-		notFound(w, req)
+		errorJSON(errors.NewMethodNotSupported(kind, "redirect"), r.codec, w)
 		return
 	}
 

@@ -122,6 +122,10 @@ func (*REST) New() runtime.Object {
 	return &api.ReplicationController{}
 }
 
+func (*REST) NewList() runtime.Object {
+	return &api.ReplicationControllerList{}
+}
+
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
