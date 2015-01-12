@@ -172,20 +172,6 @@ func TestRESTgetAttrs(t *testing.T) {
 	}
 }
 
-func TestRESTUpdate(t *testing.T) {
-	_, rest := NewTestREST()
-	eventA := testEvent("foo")
-	c, err := rest.Create(api.NewDefaultContext(), eventA)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	<-c
-	_, err = rest.Update(api.NewDefaultContext(), eventA)
-	if err == nil {
-		t.Errorf("unexpected non-error")
-	}
-}
-
 func TestRESTList(t *testing.T) {
 	reg, rest := NewTestREST()
 	eventA := &api.Event{
