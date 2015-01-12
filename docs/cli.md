@@ -125,6 +125,64 @@ Usage:
       --validate=false: If true, use a schema to validate the input before sending it
 ```
 
+### run-container
+Easily run one or more replicas of an image.
+
+Creates a replica controller running the specified image, with one or more replicas.
+
+Examples:
+```sh
+  $ kubectl run-container nginx --image=dockerfile/nginx
+  <starts a single instance of nginx>
+
+  $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
+  <starts a replicated instance of nginx>
+  
+  $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
+  <just print the corresponding API objects, don't actually send them to the apiserver>
+
+Usage: 
+  kubectl run-container <name> --image=<image> [--replicas=replicas] [--dry-run=<bool>] [flags]
+
+ Available Flags:
+      --alsologtostderr=false: log to standard error as well as files
+      --api-version="": The API version to use when talking to the server
+  -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority="": Path to a cert. file for the certificate authority.
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
+      --cluster="": The name of the kubeconfig cluster to use
+      --context="": The name of the kubeconfig context to use
+      --dry-run=false: If true, only print the object that would be sent, don't actually do anything
+      --generator="run-container-controller-v1": The name of the api generator that you want to use.  Default 'run-container-controller-v1'
+  -h, --help=false: help for run-container
+      --image="": The image for the container you wish to run.
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+  -l, --labels="": Labels to apply to the pod(s) created by this call to run.
+      --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
+      --log_dir=: If non-empty, write log files in this directory
+      --log_flush_frequency=5s: Maximum number of seconds between log flushes
+      --logtostderr=true: log to standard error instead of files
+      --match-server-version=false: Require server version to match client version
+  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --no-headers=false: When using the default output, don't print headers
+      --ns-path="/Users/bburns/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -o, --output="": Output format: json|yaml|template|templatefile
+      --output-version="": Output the formatted object with the given version (default api-version)
+  -r, --replicas=1: Number of replicas to create for this container. Default 1
+  -s, --server="": The address of the Kubernetes API server
+      --stderrthreshold=2: logs at or above this threshold go to stderr
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+      --token="": Bearer token for authentication to the API server.
+      --user="": The name of the kubeconfig user to use
+      --v=0: log level for V logs
+      --validate=false: If true, use a schema to validate the input before sending it
+      --vmodule=: comma-separated list of pattern=N settings for file-filtered logging  $ kubectl run nginx dockerfile/nginx
+  <starts a single instance of nginx>
+```
+
+
 #### create
 Create a resource by filename or stdin.
 
