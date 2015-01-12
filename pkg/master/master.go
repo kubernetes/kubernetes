@@ -429,7 +429,8 @@ func (m *Master) init(c *Config) {
 func (m *Master) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
-		WebServices: m.handlerContainer.RegisteredWebServices(),
+		WebServicesUrl: m.readWriteServer,
+		WebServices:    m.handlerContainer.RegisteredWebServices(),
 		// TODO: Parameterize the path?
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
