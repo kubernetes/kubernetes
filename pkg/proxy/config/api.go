@@ -127,9 +127,11 @@ func handleServicesWatch(resourceVersion *string, ch <-chan watch.Event, updates
 				service = obj
 			case *api.Status:
 				glog.Warningf("Got error status on WatchServices channel: %+v", obj)
+				*resourceVersion = ""
 				return
 			default:
 				glog.Errorf("Got unexpected object over WatchServices channel: %+v", obj)
+				*resourceVersion = ""
 				return
 			}
 
@@ -196,9 +198,11 @@ func handleEndpointsWatch(resourceVersion *string, ch <-chan watch.Event, update
 				endpoints = obj
 			case *api.Status:
 				glog.Warningf("Got error status on WatchEndpoints channel: %+v", obj)
+				*resourceVersion = ""
 				return
 			default:
 				glog.Errorf("Got unexpected object over WatchEndpoints channel: %+v", obj)
+				*resourceVersion = ""
 				return
 			}
 			*resourceVersion = endpoints.ResourceVersion
