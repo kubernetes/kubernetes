@@ -98,25 +98,117 @@ func TestKubeletDirs(t *testing.T) {
 	var exp, got string
 
 	got = kubelet.GetPodsDir()
-	exp = root
+	exp = path.Join(root, "pods")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
 	got = kubelet.GetPodDir("abc123")
-	exp = path.Join(root, "abc123")
+	exp = path.Join(root, "pods/abc123")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
 	got = kubelet.GetPodVolumesDir("abc123")
-	exp = path.Join(root, "abc123/volumes")
+	exp = path.Join(root, "pods/abc123/volumes")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
 	got = kubelet.GetPodContainerDir("abc123", "def456")
-	exp = path.Join(root, "abc123/def456")
+	exp = path.Join(root, "pods/abc123/containers/def456")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+}
+
+func TestKubeletDirsCompat(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+	root := kubelet.rootDirectory
+	if err := os.MkdirAll(root, 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+
+	var exp, got string
+
+	// Old-style pod dir.
+	if err := os.MkdirAll(fmt.Sprintf("%s/oldpod", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+	// New-style pod dir.
+	if err := os.MkdirAll(fmt.Sprintf("%s/pods/newpod", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+	// Both-style pod dir.
+	if err := os.MkdirAll(fmt.Sprintf("%s/bothpod", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+	if err := os.MkdirAll(fmt.Sprintf("%s/pods/bothpod", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+
+	got = kubelet.GetPodDir("oldpod")
+	exp = path.Join(root, "oldpod")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodDir("newpod")
+	exp = path.Join(root, "pods/newpod")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodDir("bothpod")
+	exp = path.Join(root, "pods/bothpod")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodDir("neitherpod")
+	exp = path.Join(root, "pods/neitherpod")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	root = kubelet.GetPodDir("newpod")
+
+	// Old-style container dir.
+	if err := os.MkdirAll(fmt.Sprintf("%s/oldctr", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+	// New-style container dir.
+	if err := os.MkdirAll(fmt.Sprintf("%s/containers/newctr", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+	// Both-style container dir.
+	if err := os.MkdirAll(fmt.Sprintf("%s/bothctr", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+	if err := os.MkdirAll(fmt.Sprintf("%s/containers/bothctr", root), 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %s", root, err)
+	}
+
+	got = kubelet.GetPodContainerDir("newpod", "oldctr")
+	exp = path.Join(root, "oldctr")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodContainerDir("newpod", "newctr")
+	exp = path.Join(root, "containers/newctr")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodContainerDir("newpod", "bothctr")
+	exp = path.Join(root, "containers/bothctr")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.GetPodContainerDir("newpod", "neitherctr")
+	exp = path.Join(root, "containers/neitherctr")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
