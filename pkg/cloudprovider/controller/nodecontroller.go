@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -73,12 +74,26 @@ func (s *NodeController) SyncStatic(period time.Duration) error {
 			if registered.Has(nodeID) {
 				continue
 			}
-			_, err := s.kubeClient.Nodes().Create(&api.Node{
+			node := &api.Node{
 				ObjectMeta: api.ObjectMeta{Name: nodeID},
 				Spec: api.NodeSpec{
 					Capacity: s.staticResources.Capacity,
 				},
-			})
+			}
+			addr := net.ParseIP(nodeID)
+			if addr != nil {
+				node.Status.HostIP = nodeID
+			} else {
+				addrs, err := net.LookupIP(nodeID)
+				if err != nil {
+					glog.Errorf("Can't get ip address of node %v", nodeID)
+				} else if len(addrs) == 0 {
+					glog.Errorf("No ip address for node %v", nodeID)
+				} else {
+					node.Status.HostIP = addrs[0].String()
+				}
+			}
+			_, err := s.kubeClient.Nodes().Create(node)
 			if err == nil {
 				registered.Insert(nodeID)
 			}
