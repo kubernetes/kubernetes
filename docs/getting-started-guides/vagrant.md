@@ -8,7 +8,7 @@
 
 ### Setup
 
-By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 512 MB, so make sure you have at least 2 GB of free memory. To start your local cluster, open a shell and run:
+By default, the Vagrant setup will create a single kubernetes-master and 3 kubernetes-minions. Each VM will take 512 MB, so make sure you have at least 2 GB of free memory. To start your local cluster, open a shell and run:
 
 ```
 cd kubernetes
