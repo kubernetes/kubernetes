@@ -28,20 +28,19 @@ source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 MONITORING="${KUBE_ROOT}/cluster/addons/cluster-monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-MONITORING_FIREWALL_RULE="monitoring-test"
+BIGRAND=$(printf "%x\n" $(( $RANDOM << 16 | $RANDOM ))) # random 2^32 in hex
+MONITORING_FIREWALL_RULE="monitoring-test-${BIGRAND}"
 
 function setup {
   # This only has work to do on gce and gke
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     detect-project
-    if ! "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
-      if ! "${GCLOUD}" compute firewall-rules create $MONITORING_FIREWALL_RULE \
-        --project "${PROJECT}" \
-        --network "${NETWORK}" \
-        --quiet \
-        --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
-        echo "Failed to set up firewall for monitoring" && false
-      fi
+    if ! "${GCLOUD}" compute firewall-rules create "${MONITORING_FIREWALL_RULE}" \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --quiet \
+      --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
+      echo "Failed to set up firewall for monitoring" && false
     fi
   fi
 
@@ -58,11 +57,11 @@ function cleanup {
   # This only has work to do on gce and gke
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     detect-project
-    if "${GCLOUD}" compute firewall-rules describe $MONITORING_FIREWALL_RULE &> /dev/null; then
+    if "${GCLOUD}" compute firewall-rules describe "${MONITORING_FIREWALL_RULE}" &> /dev/null; then
       "${GCLOUD}" compute firewall-rules delete \
         --project "${PROJECT}" \
         --quiet \
-        $MONITORING_FIREWALL_RULE || true
+        "${MONITORING_FIREWALL_RULE}" || true
     fi
   fi
 }
@@ -123,4 +122,3 @@ influx-data-exists
 
 echo "monitoring setup works"
 exit 0
-
