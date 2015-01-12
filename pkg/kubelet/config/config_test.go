@@ -52,6 +52,7 @@ func (s sortedPods) Less(i, j int) bool {
 func CreateValidPod(name, namespace, source string) api.BoundPod {
 	return api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
+			UID:         name, // for the purpose of testing, this is unique enough
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: map[string]string{kubelet.ConfigSourceAnnotationKey: source},

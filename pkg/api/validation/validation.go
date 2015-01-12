@@ -559,7 +559,7 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 	} else if !util.IsDNSSubdomain(pod.Name) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, ""))
 	}
-	if len(pod.Name) == 0 {
+	if len(pod.Namespace) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("namespace", pod.Namespace))
 	} else if !util.IsDNSSubdomain(pod.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace, ""))

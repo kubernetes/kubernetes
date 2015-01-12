@@ -53,11 +53,11 @@ func TestGetContainerID(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "foobar",
-			Names: []string{"/k8s_foo_qux_1234"},
+			Names: []string{"/k8s_foo_qux_1234_42"},
 		},
 		{
 			ID:    "barbar",
-			Names: []string{"/k8s_bar_qux_2565"},
+			Names: []string{"/k8s_bar_qux_2565_42"},
 		},
 	}
 	fakeDocker.Container = &docker.Container{
@@ -85,41 +85,37 @@ func TestGetContainerID(t *testing.T) {
 	}
 }
 
-func verifyPackUnpack(t *testing.T, podNamespace, manifestUUID, podName, containerName string) {
+func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName string) {
 	container := &api.Container{Name: containerName}
 	hasher := adler32.New()
 	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	name := BuildDockerName(manifestUUID, podFullName, container)
-	returnedPodFullName, returnedUUID, returnedContainerName, hash := ParseDockerName(name)
-	if podFullName != returnedPodFullName || manifestUUID != returnedUUID || containerName != returnedContainerName || computedHash != hash {
-		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, manifestUUID, containerName, computedHash, returnedPodFullName, returnedUUID, returnedContainerName, hash)
+	name := BuildDockerName(podUID, podFullName, container)
+	returnedPodFullName, returnedUID, returnedContainerName, hash := ParseDockerName(name)
+	if podFullName != returnedPodFullName || podUID != returnedUID || containerName != returnedContainerName || computedHash != hash {
+		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, podUID, containerName, computedHash, returnedPodFullName, returnedUID, returnedContainerName, hash)
 	}
 }
 
 func TestContainerManifestNaming(t *testing.T) {
-	manifestUUID := "d1b925c9-444a-11e4-a576-42010af0a203"
-	verifyPackUnpack(t, "file", manifestUUID, "manifest1234", "container5678")
-	verifyPackUnpack(t, "file", manifestUUID, "mani-fest-1234", "container5678")
-	// UUID is same as pod name
-	verifyPackUnpack(t, "file", manifestUUID, manifestUUID, "container123")
-	// empty namespace
-	verifyPackUnpack(t, "", manifestUUID, manifestUUID, "container123")
-	// No UUID
-	verifyPackUnpack(t, "other", "", manifestUUID, "container456")
+	podUID := "12345678"
+	verifyPackUnpack(t, "file", podUID, "name", "container")
+	verifyPackUnpack(t, "file", podUID, "name-with-dashes", "container")
+	// UID is same as pod name
+	verifyPackUnpack(t, "file", podUID, podUID, "container")
 	// No Container name
-	verifyPackUnpack(t, "other", "", manifestUUID, "")
+	verifyPackUnpack(t, "other", podUID, "name", "")
 
 	container := &api.Container{Name: "container"}
 	podName := "foo"
 	podNamespace := "test"
-	name := fmt.Sprintf("k8s_%s_%s.%s_12345", container.Name, podName, podNamespace)
-
+	name := fmt.Sprintf("k8s_%s_%s.%s_%s_42", container.Name, podName, podNamespace, podUID)
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	returnedPodFullName, _, returnedContainerName, hash := ParseDockerName(name)
-	if returnedPodFullName != podFullName || returnedContainerName != container.Name || hash != 0 {
-		t.Errorf("unexpected parse: %s %s %d", returnedPodFullName, returnedContainerName, hash)
+
+	returnedPodFullName, returnedPodUID, returnedContainerName, hash := ParseDockerName(name)
+	if returnedPodFullName != podFullName || returnedPodUID != podUID || returnedContainerName != container.Name || hash != 0 {
+		t.Errorf("unexpected parse: %s %s %s %d", returnedPodFullName, returnedPodUID, returnedContainerName, hash)
 	}
 }
 

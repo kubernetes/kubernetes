@@ -24,9 +24,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
+	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/golang/glog"
 )
 
@@ -293,21 +295,28 @@ func (s *podStorage) seenSources(sources ...string) bool {
 func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.BoundPod) {
 	names := util.StringSet{}
 	for i := range pods {
-		var errors []error
-		name := podUniqueName(&pods[i])
-		if names.Has(name) {
-			errors = append(errors, apierrs.NewFieldDuplicate("name", pods[i].Name))
+		pod := &pods[i]
+		var errlist []error
+		if errs := validation.ValidateBoundPod(pod); len(errs) != 0 {
+			errlist = append(errlist, errs...)
+			// If validation fails, don't trust it any further -
+			// even Name could be bad.
 		} else {
-			names.Insert(name)
+			name := podUniqueName(pod)
+			if names.Has(name) {
+				errlist = append(errlist, apierrs.NewFieldDuplicate("name", pod.Name))
+			} else {
+				names.Insert(name)
+			}
 		}
-		if errs := validation.ValidateBoundPod(&pods[i]); len(errs) != 0 {
-			errors = append(errors, errs...)
-		}
-		if len(errors) > 0 {
-			glog.Warningf("Pod %d (%s) from %s failed validation, ignoring: %v", i+1, pods[i].Name, source, errors)
+		if len(errlist) > 0 {
+			name := bestPodIdentString(pod)
+			err := utilerrors.NewAggregate(errlist)
+			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
+			record.Eventf(pod, "", "failedValidation", "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
-		filtered = append(filtered, &pods[i])
+		filtered = append(filtered, pod)
 	}
 	return
 }
@@ -337,11 +346,19 @@ func (s *podStorage) MergedState() interface{} {
 }
 
 // podUniqueName returns a value for a given pod that is unique across a source,
-// which is the combination of namespace and ID.
+// which is the combination of namespace and name.
 func podUniqueName(pod *api.BoundPod) string {
+	return fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
+}
+
+func bestPodIdentString(pod *api.BoundPod) string {
 	namespace := pod.Namespace
-	if len(namespace) == 0 {
-		namespace = api.NamespaceDefault
+	if namespace == "" {
+		namespace = "<empty-namespace>"
 	}
-	return fmt.Sprintf("%s.%s", pod.Name, namespace)
+	name := pod.Name
+	if name == "" {
+		name = "<empty-name>"
+	}
+	return fmt.Sprintf("%s.%s", name, namespace)
 }

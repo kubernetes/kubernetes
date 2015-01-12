@@ -20,7 +20,6 @@ package config
 import (
 	"errors"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -105,11 +104,8 @@ func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
 	}
 
 	for _, pod := range boundPods.Items {
-		// TODO: generate random UID if not present
-		if pod.UID == "" && !pod.CreationTimestamp.IsZero() {
-			pod.UID = strconv.FormatInt(pod.CreationTimestamp.Unix(), 10)
-		}
 		// Backwards compatibility with old api servers
+		// TODO: Remove this after 1.0 release.
 		if len(pod.Namespace) == 0 {
 			pod.Namespace = api.NamespaceDefault
 		}

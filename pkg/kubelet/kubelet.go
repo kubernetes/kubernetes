@@ -1056,8 +1056,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 
 		// Run the sync in an async manifest worker.
 		kl.podWorkers.Run(podFullName, func() {
-			err := kl.syncPod(pod, dockerContainers)
-			if err != nil {
+			if err := kl.syncPod(pod, dockerContainers); err != nil {
 				glog.Errorf("Error syncing pod, skipping: %v", err)
 				record.Eventf(pod, "", "failedSync", "Error syncing pod, skipping: %v", err)
 			}
