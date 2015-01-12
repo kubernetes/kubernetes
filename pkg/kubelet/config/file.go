@@ -64,6 +64,8 @@ func (s *sourceFile) extractFromPath() error {
 		if !os.IsNotExist(err) {
 			return err
 		}
+		// Emit an update with an empty PodList to allow FileSource to be marked as seen
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{}, kubelet.SET, kubelet.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 

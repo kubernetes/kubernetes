@@ -59,7 +59,16 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 }
 
 func (s *sourceEtcd) run() {
-	watching := s.helper.Watch(s.key, 0)
+	boundPods := api.BoundPods{}
+	err := s.helper.ExtractToList(s.key, &boundPods)
+	if err != nil {
+		glog.Errorf("etcd failed to retrieve the value for the key %q. Error: %v", s.key, err)
+		return
+	}
+	// Push update. Maybe an empty PodList to allow EtcdSource to be marked as seen
+	s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET, kubelet.EtcdSource}
+	index, _ := s.helper.ResourceVersioner.ResourceVersion(&boundPods)
+	watching := s.helper.Watch(s.key, index)
 	for {
 		select {
 		case event, ok := <-watching.ResultChan():
@@ -87,6 +96,9 @@ func (s *sourceEtcd) run() {
 // It returns a list of containers, or an error if one occurs.
 func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
 	pods := []api.BoundPod{}
+	if ev.Object == nil {
+		return pods, nil
+	}
 	boundPods, ok := ev.Object.(*api.BoundPods)
 	if !ok {
 		return pods, errors.New("unable to parse response as BoundPods")
