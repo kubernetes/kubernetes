@@ -186,8 +186,11 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 // default http.DefaultTransport if no special case behavior is needed.
 func TransportFor(config *Config) (http.RoundTripper, error) {
 	// Set transport level security
-	if config.Transport != nil && (config.CertFile != "" || config.Insecure) {
+	if config.Transport != nil && (config.CAFile != "" || config.CertFile != "" || config.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
+	}
+	if config.CAFile != "" && config.Insecure {
+		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
 	}
 	var transport http.RoundTripper
 	switch {
@@ -195,6 +198,12 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 		transport = config.Transport
 	case config.CertFile != "":
 		t, err := NewClientCertTLSTransport(config.CertFile, config.KeyFile, config.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		transport = t
+	case config.CAFile != "":
+		t, err := NewTLSTransport(config.CAFile)
 		if err != nil {
 			return nil, err
 		}
