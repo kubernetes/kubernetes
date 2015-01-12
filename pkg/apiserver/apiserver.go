@@ -250,7 +250,6 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 	// TODO: eliminate all the restful wrappers
 	// TODO: create a separate handler per verb
 	h := func(req *restful.Request, resp *restful.Response) {
-		glog.V(4).Infof("User-Agent: %s\n", req.HeaderParameter("User-Agent"))
 		strippedHandler.ServeHTTP(resp.ResponseWriter, req.Request)
 	}
 
