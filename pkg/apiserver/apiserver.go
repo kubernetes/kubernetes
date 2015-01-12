@@ -167,8 +167,7 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	if _, ok := storage.(RESTGetter); ok {
 		ws.Route(getRoute.Writes(versionedObject)) // on the response
 	} else {
-		ws.Route(ws.GET(path+"/{name}").To(h).
-			Returns(http.StatusMethodNotAllowed, "reading individual objects is not supported", nil))
+		ws.Route(getRoute.Returns(http.StatusMethodNotAllowed, "reading individual objects is not supported", nil))
 	}
 
 	updateRoute := ws.PUT(path + "/{name}").To(h).
