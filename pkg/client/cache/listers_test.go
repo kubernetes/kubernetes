@@ -59,7 +59,7 @@ func TestStoreToPodLister(t *testing.T) {
 	spl := StoreToPodLister{store}
 
 	for _, id := range ids {
-		got, err := spl.ListPods(labels.Set{"name": id}.AsSelector())
+		got, err := spl.List(labels.Set{"name": id}.AsSelector())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue

@@ -31,7 +31,8 @@ import (
 //
 // Example:
 // s := cache.NewStore()
-// XXX NewReflector(... s ...)
+// lw := cache.ListWatch{Client: c, FieldSelector: sel, Resource: "pods"}
+// r := cache.NewReflector(lw, &api.Pod{}, s).Run()
 // l := StoreToPodLister{s}
 // l.List()
 type StoreToPodLister struct {
@@ -39,10 +40,10 @@ type StoreToPodLister struct {
 }
 
 // TODO Get rid of the selector because that is confusing because the user might not realize that there has already been
-// some selection at the caching stage.  Also, consistency will facilitate code generation.
-// TODO: Rename to List() instead of ListPods() for consistency with other resources and with pkg/client..
-func (s *StoreToPodLister) ListPods(selector labels.Selector) (pods []api.Pod, err error) {
-	for _, m := range s.List() {
+// some selection at the caching stage.  Also, consistency will facilitate code generation.  However, the pkg/client
+// is inconsistent too.
+func (s *StoreToPodLister) List(selector labels.Selector) (pods []api.Pod, err error) {
+	for _, m := range s.Store.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
 			pods = append(pods, *pod)

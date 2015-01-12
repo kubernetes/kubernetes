@@ -198,7 +198,7 @@ func getUsedPorts(pods ...api.Pod) map[int]bool {
 func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
 	machineToPods := map[string][]api.Pod{}
 	// TODO: perform more targeted query...
-	pods, err := lister.ListPods(labels.Everything())
+	pods, err := lister.List(labels.Everything())
 	if err != nil {
 		return map[string][]api.Pod{}, err
 	}
