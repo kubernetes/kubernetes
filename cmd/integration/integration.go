@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -54,9 +55,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
-
-const testRootDir = "/tmp/kubelet"
-const testRootDir2 = "/tmp/kubelet2"
 
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
@@ -192,13 +190,28 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	nodeController.Run(10 * time.Second)
 
 	// Kubelet (localhost)
+	testRootDir := makeTempDirOrDie("kubelet_integ_1.")
+	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	standalone.SimpleRunKubelet(cl, etcdClient, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	standalone.SimpleRunKubelet(cl, etcdClient, &fakeDocker2, machineList[1], testRootDir2, "", "127.0.0.1", 10251)
+	testRootDir = makeTempDirOrDie("kubelet_integ_2.")
+	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
+	standalone.SimpleRunKubelet(cl, etcdClient, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251)
 
 	return apiServer.URL
+}
+
+func makeTempDirOrDie(prefix string) string {
+	tempDir, err := ioutil.TempDir("/tmp", prefix)
+	if err != nil {
+		glog.Fatalf("Can't make a temp rootdir: %v", err)
+	}
+	if err = os.MkdirAll(tempDir, 0750); err != nil {
+		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
+	}
+	return tempDir
 }
 
 // podsOnMinions returns true when all of the selected pods exist on a minion.
