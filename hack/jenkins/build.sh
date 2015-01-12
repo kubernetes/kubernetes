@@ -49,6 +49,6 @@ git clean -fdx
 go run ./hack/e2e.go -v -build
 
 # Push to GCS
-yes | ./build/push-ci-build.sh
+./build/push-ci-build.sh
 
 sha256sum _output/release-tars/kubernetes*.tar.gz
