@@ -104,6 +104,10 @@ func (rs *REST) New() runtime.Object {
 	return &api.Node{}
 }
 
+func (*REST) NewList() runtime.Object {
+	return &api.NodeList{}
+}
+
 // Update satisfies the RESTStorage interface.
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	minion, ok := obj.(*api.Node)

@@ -129,62 +129,70 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
 
-	ws.Route(
-		addParamIf(
-			ws.POST(path).To(h).
-				Doc("create a "+kind).
-				Operation("create"+kind).
-				Reads(versionedObject), // from the request
-			namespaceParam, namespaceScope))
-
-	// TODO: This seems like a hack. Add NewList() to storage?
-	listKind := kind + "List"
-	if _, ok := kinds[listKind]; !ok {
-		glog.V(1).Infof("no list type: %v\n", listKind)
+	createRoute := ws.POST(path).To(h).
+		Doc("create a " + kind).
+		Operation("create" + kind).
+		Reads(versionedObject) // from the request
+	addParamIf(createRoute, namespaceParam, namespaceScope)
+	if _, ok := storage.(RESTCreater); ok {
+		ws.Route(createRoute.Reads(versionedObject)) // from the request
 	} else {
-		versionedListPtr, err := api.Scheme.New(version, listKind)
-		if err != nil {
-			glog.Errorf("error making list: %v\n", err)
-		} else {
-			versionedList := indirectArbitraryPointer(versionedListPtr)
-			glog.V(3).Infoln("type: ", reflect.TypeOf(versionedList))
-			ws.Route(
-				addParamIf(
-					ws.GET(path).To(h).
-						Doc("list objects of kind "+kind).
-						Operation("list"+kind).
-						Returns(http.StatusOK, "OK", versionedList),
-					namespaceParam, namespaceScope))
-		}
+		ws.Route(createRoute.Returns(http.StatusMethodNotAllowed, "creating objects is not supported", nil))
 	}
 
-	ws.Route(
-		addParamIf(
-			ws.GET(path+"/{name}").To(h).
-				Doc("read the specified "+kind).
-				Operation("read"+kind).
-				Param(nameParam).
-				Writes(versionedObject), // on the response
-			namespaceParam, namespaceScope))
+	listRoute := ws.GET(path).To(h).
+		Doc("list objects of kind " + kind).
+		Operation("list" + kind)
+	addParamIf(listRoute, namespaceParam, namespaceScope)
+	if lister, ok := storage.(RESTLister); ok {
+		list := lister.NewList()
+		_, listKind, err := api.Scheme.ObjectVersionAndKind(list)
+		versionedListPtr, err := api.Scheme.New(version, listKind)
+		if err != nil {
+			glog.Errorf("error making list object: %v\n", err)
+			return
+		}
+		versionedList := indirectArbitraryPointer(versionedListPtr)
+		glog.V(3).Infoln("type: ", reflect.TypeOf(versionedList))
+		ws.Route(listRoute.Returns(http.StatusOK, "OK", versionedList))
+	} else {
+		ws.Route(listRoute.Returns(http.StatusMethodNotAllowed, "listing objects is not supported", nil))
+	}
 
-	ws.Route(
-		addParamIf(
-			ws.PUT(path+"/{name}").To(h).
-				Doc("update the specified "+kind).
-				Operation("update"+kind).
-				Param(nameParam).
-				Reads(versionedObject), // from the request
-			namespaceParam, namespaceScope))
+	getRoute := ws.GET(path + "/{name}").To(h).
+		Doc("read the specified " + kind).
+		Operation("read" + kind).
+		Param(nameParam)
+	addParamIf(getRoute, namespaceParam, namespaceScope)
+	if _, ok := storage.(RESTGetter); ok {
+		ws.Route(getRoute.Writes(versionedObject)) // on the response
+	} else {
+		ws.Route(ws.GET(path+"/{name}").To(h).
+			Returns(http.StatusMethodNotAllowed, "reading individual objects is not supported", nil))
+	}
+
+	updateRoute := ws.PUT(path + "/{name}").To(h).
+		Doc("update the specified " + kind).
+		Operation("update" + kind).
+		Param(nameParam)
+	addParamIf(updateRoute, namespaceParam, namespaceScope)
+	if _, ok := storage.(RESTUpdater); ok {
+		ws.Route(updateRoute.Reads(versionedObject)) // from the request
+	} else {
+		ws.Route(updateRoute.Returns(http.StatusMethodNotAllowed, "updating objects is not supported", nil))
+	}
 
 	// TODO: Support PATCH
-
-	ws.Route(
-		addParamIf(
-			ws.DELETE(path+"/{name}").To(h).
-				Doc("delete the specified "+kind).
-				Operation("delete"+kind).
-				Param(nameParam),
-			namespaceParam, namespaceScope))
+	deleteRoute := ws.DELETE(path + "/{name}").To(h).
+		Doc("delete the specified " + kind).
+		Operation("delete" + kind).
+		Param(nameParam)
+	addParamIf(deleteRoute, namespaceParam, namespaceScope)
+	if _, ok := storage.(RESTDeleter); ok {
+		ws.Route(deleteRoute)
+	} else {
+		ws.Route(deleteRoute.Returns(http.StatusMethodNotAllowed, "deleting objects is not supported", nil))
+	}
 }
 
 // Adds the given param to the given route builder if shouldAdd is true. Does nothing if shouldAdd is false.

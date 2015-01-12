@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 
 	"github.com/golang/glog"
 )
@@ -94,7 +95,7 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 	}
 	// Kids, don't do this at home: this is a hack. There's no good way to call the business
 	// logic which lives in the REST object from here.
-	c, err := m.storage["services"].Create(ctx, svc)
+	c, err := m.storage["services"].(apiserver.RESTCreater).Create(ctx, svc)
 	if err != nil {
 		return err
 	}

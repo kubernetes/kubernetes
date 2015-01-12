@@ -105,3 +105,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 func (rs REST) New() runtime.Object {
 	return &api.Endpoints{}
 }
+
+func (*REST) NewList() runtime.Object {
+	return &api.EndpointsList{}
+}

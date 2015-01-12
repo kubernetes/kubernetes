@@ -183,6 +183,10 @@ func (storage *SimpleRESTStorage) New() runtime.Object {
 	return &Simple{}
 }
 
+func (storage *SimpleRESTStorage) NewList() runtime.Object {
+	return &SimpleList{}
+}
+
 func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error) {
 	storage.created = obj.(*Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -284,6 +288,68 @@ func TestNotFound(t *testing.T) {
 
 		if response.StatusCode != v.Status {
 			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v.Method, k, response)
+		}
+	}
+}
+
+type UnimplementedRESTStorage struct{}
+
+func (UnimplementedRESTStorage) New() runtime.Object {
+	return &Simple{}
+}
+
+func TestMethodNotAllowed(t *testing.T) {
+	type T struct {
+		Method string
+		Path   string
+	}
+	cases := map[string]T{
+		"GET object":    {"GET", "/prefix/version/foo/bar"},
+		"GET list":      {"GET", "/prefix/version/foo"},
+		"POST list":     {"POST", "/prefix/version/foo"},
+		"PUT object":    {"PUT", "/prefix/version/foo/bar"},
+		"DELETE object": {"DELETE", "/prefix/version/foo/bar"},
+		//"watch list":      {"GET", "/prefix/version/watch/foo"},
+		//"watch object":    {"GET", "/prefix/version/watch/foo/bar"},
+		"proxy object":    {"GET", "/prefix/version/proxy/foo/bar"},
+		"redirect object": {"GET", "/prefix/version/redirect/foo/bar"},
+	}
+	handler := Handle(map[string]RESTStorage{
+		"foo": UnimplementedRESTStorage{},
+	}, codec, "/prefix", testVersion, selfLinker, admissionControl)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+	for k, v := range cases {
+		request, err := http.NewRequest(v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+			continue
+		}
+		defer response.Body.Close()
+		data, _ := ioutil.ReadAll(response.Body)
+		t.Logf("resp: %s", string(data))
+		if response.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("%s: expected %d for %s, Got %s", k, http.StatusMethodNotAllowed, v.Method, string(data))
+			continue
+		}
+		obj, err := codec.Decode(data)
+		if err != nil {
+			t.Errorf("%s: unexpected decode error: %v", k, err)
+			continue
+		}
+		status, ok := obj.(*api.Status)
+		if !ok {
+			t.Errorf("%s: unexpected object: %#v", k, obj)
+			continue
+		}
+		if status.Reason != api.StatusReasonMethodNotAllowed {
+			t.Errorf("%s: unexpected status: %#v", k, status)
 		}
 	}
 }
