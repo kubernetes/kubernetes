@@ -931,6 +931,11 @@ const (
 	// data was invalid.  API calls that return BadRequest can never succeed.
 	StatusReasonBadRequest StatusReason = "BadRequest"
 
+	// StatusReasonMethodNotAllowed means that the action the client attempted to perform on the
+	// resource was not supported by the code - for instance, attempting to delete a resource that
+	// can only be created. API calls that return MethodNotAllowed can never succeed.
+	StatusReasonMethodNotAllowed StatusReason = "MethodNotAllowed"
+
 	// StatusReasonInternalError indicates that an internal error occurred, it is unexpected
 	// and the outcome of the call is unknown.
 	// Details (optional):
