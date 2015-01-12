@@ -18,8 +18,6 @@ package kubelet
 
 import (
 	"net/http"
-	"os"
-	"path"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -68,17 +66,6 @@ func EtcdClientOrDie(etcdServerList util.StringList, etcdConfigFile string) *etc
 		return etcdClient
 	}
 	return nil
-}
-
-// TODO: move this into pkg/util
-func SetupRootDirectoryOrDie(rootDirectory string) {
-	if rootDirectory == "" {
-		glog.Fatal("Invalid root directory path.")
-	}
-	rootDirectory = path.Clean(rootDirectory)
-	if err := os.MkdirAll(rootDirectory, 0750); err != nil {
-		glog.Fatalf("Error creating root directory: %v", err)
-	}
 }
 
 // TODO: move this into pkg/capabilities
