@@ -1,4 +1,4 @@
-# Kubernetes UX instructions
+# Kubernetes UI instructions
 
 ## Kubernetes User Interface
 Kubernetes currently supports a simple web user interface.
@@ -10,10 +10,10 @@ Start the server:
 cluster/kubecfg.sh -proxy -www $PWD/www
 ```
 
-The UX should now be running on [localhost](http://localhost:8001/static/index.html#/groups//selector)
+The UI should now be running on [localhost](http://localhost:8001/static/index.html#/groups//selector)
 
 ### Running remotely
-When Kubernetes is deployed, the server deploys the UX, you can visit ```/static/index.html#/groups//selector``` on your master server.
+When Kubernetes is deployed, the server deploys the UI, you can visit ```/static/index.html#/groups//selector``` on your master server.
 
 
 ### Interacting with the user interface.
@@ -27,8 +27,8 @@ _GroupBy_ takes a label ```key``` as a parameter, places all objects with the sa
 Select takes a [label selector](./labels.md) and uses it to filter, so only resources which match that label selector are displayed.  For example, ```/groups/host/selector/name=frontend```, shows pods, grouped by host, which have a label with the name `frontend`.
 
 
-## Rebuilding the UX
-The UX relies on [go-bindata](https://github.com/jteeuwen/go-bindata)
+## Rebuilding the UI
+The UI relies on [go-bindata](https://github.com/jteeuwen/go-bindata)
 
 To install go-bindata:
 
@@ -36,7 +36,7 @@ To install go-bindata:
 go get github.com/jteeuwen/go-bindata/...
 ```
 
-To rebuild the UX, run the following:
+To rebuild the UI, run the following:
 
 ```sh
 hack/build-ui.sh
