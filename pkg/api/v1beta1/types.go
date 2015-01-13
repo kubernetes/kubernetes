@@ -264,7 +264,6 @@ type Container struct {
 	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" yaml:"imagePullPolicy"`
-	ExternalName    string  `json:"externalName,omitempty" yaml:"externalName,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -392,6 +391,7 @@ type PodState struct {
 	Host    string `json:"host,omitempty" yaml:"host,omitempty"`
 	HostIP  string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 	PodIP   string `json:"podIP,omitempty" yaml:"podIP,omitempty"`
+	ExternalName    string  `json:"externalName,omitempty" yaml:"externalName,omitempty"`
 
 	// The key of this map is the *name* of the container within the manifest; it has one
 	// entry per container in the manifest. The value of this map is currently the output

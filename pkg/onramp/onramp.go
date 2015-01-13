@@ -101,31 +101,6 @@ func (onrmp *Onramp) freeExternalName(podRef podNameIP) (bool) {
 	return true
 }
 
-func (onrmp *Onramp) scanContainer(podName string, container Container) {
-	if container.ExternalName != "" {
-		glog.Infof("Container needs external IP access for %s!\n", container.ExternalName)
-		ns := api.NamespaceAll
-		pdi := onrmp.kubeClient.Pods(ns)
-
-		pod, err := pdi.Get(podName)
-
-		if (err != nil) {
-			glog.Infof("Error getting pod: %s\n", err)
-			return
-		}
-
-		newPod := podNameIP{ PodName: podName, PodIP: pod.CurrentState.PodIP, NewPod: 1}
-
-		if (onrmp.claimExternalName(newPod) == false) {
-
-		}
-
-		onrmp.podNameLock.Lock()
-		onrmp.podNameList = append(onrmp.podNameList, newPod)
-		onrmp.podNameLock.Unlock()
-	}
-}
-
 func (onrmp *Onramp) scanPods() {
 	ns := api.NamespaceAll
 	pdi := onrmp.kubeClient.Pods(ns)
@@ -137,11 +112,24 @@ func (onrmp *Onramp) scanPods() {
 		return
 	}
 	for m := range pods.Items {
-		var containers = pods.Items[m].DesiredState.Manifest.Containers
+		glog.Infof("Pod External Name is %s\n", pods.Items[m].DesiredState.ExternalName)
 
-		for n := range containers {
-			onrmp.scanContainer(pods.Items[m].Name, Container(containers[n]))
+		if (pods.Items[m].DesiredState.ExternalName == "") {
+			continue
 		}
+
+		// Need to add an External Name
+
+		newPod := podNameIP{ PodName: pods.Items[m].Name, PodIP: pods.Items[m].CurrentState.PodIP, NewPod: 1}
+		if (onrmp.claimExternalName(newPod) == false) {
+			glog.Infof("Unable to claim external name, skipping\n")
+			continue
+		}
+
+		onrmp.podNameLock.Lock()
+		onrmp.podNameList = append(onrmp.podNameList, newPod)
+		onrmp.podNameLock.Unlock()
+		
 	}
 }
 
