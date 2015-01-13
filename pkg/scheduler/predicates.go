@@ -259,7 +259,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.P
 			// just use the first service and get the other pods within the service
 			// TODO: a separate predicate can be created that tries to handle all services for the pod
 			selector := labels.SelectorFromSet(services[0].Spec.Selector)
-			servicePods, err := s.podLister.ListPods(selector)
+			servicePods, err := s.podLister.List(selector)
 			if err != nil {
 				return false, err
 			}

@@ -32,9 +32,8 @@ func NewServiceSpreadPriority(serviceLister ServiceLister) PriorityFunction {
 	return serviceSpread.CalculateSpreadPriority
 }
 
-// CalculateSpreadPriority spreads pods by minimizing the number of pods on the same machine with the same labels.
-// Importantly, if there are services in the system that span multiple heterogenous sets of pods, this spreading priority
-// may not provide optimal spreading for the members of that Service.
+// CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service
+// on the same machine.
 func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var maxCount int
 	var pods []api.Pod
@@ -45,7 +44,7 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
 		selector := labels.SelectorFromSet(services[0].Spec.Selector)
-		pods, err = podLister.ListPods(selector)
+		pods, err = podLister.List(selector)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +104,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podList
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
 		selector := labels.SelectorFromSet(services[0].Spec.Selector)
-		pods, err = podLister.ListPods(selector)
+		pods, err = podLister.List(selector)
 		if err != nil {
 			return nil, err
 		}
