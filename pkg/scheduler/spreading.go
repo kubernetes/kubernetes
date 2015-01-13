@@ -35,7 +35,6 @@ func NewServiceSpreadPriority(serviceLister ServiceLister) PriorityFunction {
 // CalculateSpreadPriority spreads pods by minimizing the number of pods on the same machine with the same labels.
 // Importantly, if there are services in the system that span multiple heterogenous sets of pods, this spreading priority
 // may not provide optimal spreading for the members of that Service.
-// TODO: consider if we want to include Service label sets in the scheduling priority.
 func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var maxCount int
 	var pods []api.Pod
@@ -95,6 +94,9 @@ func NewServiceAntiAffinityPriority(serviceLister ServiceLister, label string) P
 	return antiAffinity.CalculateAntiAffinityPriority
 }
 
+// CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
+// on machines with the same value for a particular label.
+// The label to be considered is provided to the struct (ServiceAntiAffinity).
 func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var pods []api.Pod
 
@@ -128,11 +130,11 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podList
 
 	podCounts := map[string]int{}
 	for _, pod := range pods {
-		zone, exists := labeledMinions[pod.Status.Host]
+		label, exists := labeledMinions[pod.Status.Host]
 		if !exists {
 			continue
 		}
-		podCounts[zone]++
+		podCounts[label]++
 	}
 
 	numServicePods := len(pods)
