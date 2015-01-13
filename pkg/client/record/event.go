@@ -18,7 +18,7 @@ package record
 
 import (
 	"fmt"
-	"math"
+	"math/rand"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -26,19 +26,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
 
-const maxTriesPerEvent = 10
+const maxTriesPerEvent = 12
 
-var (
-	minSleep   = float64(1 * time.Second)
-	maxSleep   = float64(15 * time.Second)
-	backoffExp = 1.5
-)
+var sleepDuration = time.Duration(10 * time.Second)
 
 // EventRecorder knows how to store events (client.Client implements it.)
 // EventRecorder must respect the namespace that will be embedded in 'event'.
@@ -70,9 +65,13 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 				glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
 				break
 			}
-			sleepDuration := time.Duration(
-				math.Min(maxSleep, minSleep*math.Pow(backoffExp, float64(tries-1))))
-			time.Sleep(wait.Jitter(sleepDuration, 0.5))
+			// Randomize the first sleep so that various clients won't all be
+			// synced up if the master goes down.
+			if tries == 1 {
+				time.Sleep(time.Duration(float64(sleepDuration) * rand.Float64()))
+			} else {
+				time.Sleep(sleepDuration)
+			}
 		}
 	})
 }

@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -33,8 +32,7 @@ import (
 
 func init() {
 	// Don't bother sleeping between retries.
-	minSleep = 0
-	maxSleep = 0
+	sleepDuration = 0
 }
 
 type testEventRecorder struct {
@@ -195,12 +193,12 @@ func TestWriteEventError(t *testing.T) {
 		},
 		"retry1": {
 			timesToSendError: 1000,
-			attemptsWanted:   10,
+			attemptsWanted:   12,
 			err:              &errors.UnexpectedObjectError{},
 		},
 		"retry2": {
 			timesToSendError: 1000,
-			attemptsWanted:   10,
+			attemptsWanted:   12,
 			err:              fmt.Errorf("A weird error"),
 		},
 		"succeedEventually": {
