@@ -46,6 +46,7 @@ echo "E2E_CLUSTER_NAME: ${E2E_CLUSTER_NAME}"       # Name of the cluster (e.g. "
 echo "E2E_NETWORK: ${E2E_NETWORK}"                 # Name of the network (e.g. "e2e")
 echo "E2E_ZONE: ${E2E_ZONE}"                       # Name of the GCE zone (e.g. "us-central1-f")
 echo "E2E_OPT: ${E2E_OPT}"                         # hack/e2e.go options
+echo "E2E_SET_CLUSTER_API_VERSION: ${E2E_SET_CLUSTER_API_VERSION:-<not set>}" # optional, for GKE, set CLUSTER_API_VERSION to git hash
 echo "--------------------------------------------------------------------------------"
 
 # GCE variables
@@ -71,8 +72,10 @@ tar -xzf kubernetes.tar.gz
 tar -xzf kubernetes-test.tar.gz
 cd kubernetes
 
-# This variable is only relevant on GKE-CI
-export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
+# Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
+if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
+    export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
+fi
 
 go run ./hack/e2e.go ${E2E_OPT} -v -down
 go run ./hack/e2e.go ${E2E_OPT} -v -up
