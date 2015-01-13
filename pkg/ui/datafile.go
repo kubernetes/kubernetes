@@ -1494,6 +1494,71 @@ func www_titlelogo_svg() (*asset, error) {
 	return a, nil
 }
 
+var _third_party_swagger_ui_license = []byte(`Copyright 2014 Reverb Technologies, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at [apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+`)
+
+func third_party_swagger_ui_license_bytes() ([]byte, error) {
+	return _third_party_swagger_ui_license, nil
+}
+
+func third_party_swagger_ui_license() (*asset, error) {
+	bytes, err := third_party_swagger_ui_license_bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindata_file_info{name: "third_party/swagger-ui/LICENSE", size: 596, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _third_party_swagger_ui_readme_md = []byte(`# Readme
+
+URL: https://github.com/swagger-api/swagger-ui/tree/master/dist
+License: Apache License, Version 2.0
+License File: LICENSE
+
+## Description
+Files from dist folder of https://github.com/swagger-api/swagger-ui.
+These are dependency-free collection of HTML, Javascript, and CSS assets that
+dynamically generate beautiful documentation and sandbox from a
+Swagger-compliant API.
+Instructions on how to use these:
+https://github.com/swagger-api/swagger-ui#how-to-use-it
+
+## Local Modifications
+Updated the url to "../../swaggerapi" as per instructions at:
+https://github.com/swagger-api/swagger-ui#how-to-use-it
+
+LICENSE file has been created for compliance purposes.
+Not included in original distribution.
+`)
+
+func third_party_swagger_ui_readme_md_bytes() ([]byte, error) {
+	return _third_party_swagger_ui_readme_md, nil
+}
+
+func third_party_swagger_ui_readme_md() (*asset, error) {
+	bytes, err := third_party_swagger_ui_readme_md_bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindata_file_info{name: "third_party/swagger-ui/README.md", size: 710, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _third_party_swagger_ui_css_reset_css = []byte(`/* http://meyerweb.com/eric/tools/css/reset/ v2.0 | 20110126 */
 html,
 body,
@@ -1631,7 +1696,7 @@ func third_party_swagger_ui_css_reset_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/reset.css", size: 1066, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/reset.css", size: 1066, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2872,7 +2937,7 @@ func third_party_swagger_ui_css_screen_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/screen.css", size: 42177, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/screen.css", size: 42177, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2889,7 +2954,7 @@ func third_party_swagger_ui_images_explorer_icons_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/explorer_icons.png", size: 5763, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/explorer_icons.png", size: 5763, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2906,7 +2971,7 @@ func third_party_swagger_ui_images_logo_small_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/logo_small.png", size: 770, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/logo_small.png", size: 770, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2923,7 +2988,7 @@ func third_party_swagger_ui_images_pet_store_api_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/pet_store_api.png", size: 824, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/pet_store_api.png", size: 824, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2940,7 +3005,7 @@ func third_party_swagger_ui_images_throbber_gif() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/throbber.gif", size: 9257, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/throbber.gif", size: 9257, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2957,7 +3022,7 @@ func third_party_swagger_ui_images_wordnik_api_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/wordnik_api.png", size: 980, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/wordnik_api.png", size: 980, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3073,7 +3138,7 @@ func third_party_swagger_ui_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3885, mode: os.FileMode(416), modTime: time.Unix(1420491931, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3885, mode: os.FileMode(416), modTime: time.Unix(1420769903, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3128,7 +3193,7 @@ func third_party_swagger_ui_lib_backbone_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/backbone-min.js", size: 16464, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/backbone-min.js", size: 16464, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5423,7 +5488,7 @@ func third_party_swagger_ui_lib_handlebars_1_0_0_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-1.0.0.js", size: 72766, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-1.0.0.js", size: 72766, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5440,7 +5505,7 @@ func third_party_swagger_ui_lib_highlight_7_3_pack_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/highlight.7.3.pack.js", size: 7499, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/highlight.7.3.pack.js", size: 7499, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5458,7 +5523,7 @@ func third_party_swagger_ui_lib_jquery_1_8_0_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery-1.8.0.min.js", size: 92556, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery-1.8.0.min.js", size: 92556, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5492,7 +5557,7 @@ func third_party_swagger_ui_lib_jquery_ba_bbq_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.ba-bbq.min.js", size: 4119, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.ba-bbq.min.js", size: 4119, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5510,7 +5575,7 @@ func third_party_swagger_ui_lib_jquery_slideto_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.slideto.min.js", size: 369, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.slideto.min.js", size: 369, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5534,7 +5599,7 @@ func third_party_swagger_ui_lib_jquery_wiggle_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.wiggle.min.js", size: 762, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.wiggle.min.js", size: 762, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5743,7 +5808,7 @@ func third_party_swagger_ui_lib_shred_content_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred/content.js", size: 6862, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred/content.js", size: 6862, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -8524,7 +8589,7 @@ func third_party_swagger_ui_lib_shred_bundle_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred.bundle.js", size: 88045, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred.bundle.js", size: 88045, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -10047,7 +10112,7 @@ func third_party_swagger_ui_lib_swagger_client_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-client.js", size: 41547, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-client.js", size: 41547, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -10300,7 +10365,7 @@ func third_party_swagger_ui_lib_swagger_oauth_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-oauth.js", size: 7472, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-oauth.js", size: 7472, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -12012,7 +12077,7 @@ func third_party_swagger_ui_lib_swagger_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger.js", size: 53321, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger.js", size: 53321, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -12061,7 +12126,7 @@ func third_party_swagger_ui_lib_underscore_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/underscore-min.js", size: 12821, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/underscore-min.js", size: 12821, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -12092,7 +12157,7 @@ func third_party_swagger_ui_o2c_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/o2c.html", size: 360, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/o2c.html", size: 360, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -13716,7 +13781,7 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       $(this.el).html(Handlebars.templates.main(this.model));
       resources = {};
       counter = 0;
-      _ref3 = this.model.apisArray;
+      _ref3 = _.sortBy(this.model.apisArray, function(resource) { return resource.name;});
       for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
         resource = _ref3[_i];
         id = resource.name;
@@ -13778,7 +13843,9 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       if (this.model.description) {
         this.model.summary = this.model.description;
       }
-      _ref4 = this.model.operationsArray;
+
+      // Sort the operations by path and method (get/post).
+      _ref4 = _.sortBy(this.model.operationsArray, function(operation) { return [operation.path, operation.method];});
       for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
         operation = _ref4[_i];
         counter = 0;
@@ -14806,7 +14873,7 @@ func third_party_swagger_ui_swagger_ui_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.js", size: 105377, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.js", size: 105570, mode: os.FileMode(416), modTime: time.Unix(1421112290, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -14823,7 +14890,7 @@ func third_party_swagger_ui_swagger_ui_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.min.js", size: 58357, mode: os.FileMode(416), modTime: time.Unix(1420491569, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.min.js", size: 58357, mode: os.FileMode(416), modTime: time.Unix(1420569969, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -14877,6 +14944,8 @@ var _bindata = map[string]func() (*asset, error){
 	"www/partials/pod.html":                            www_partials_pod_html,
 	"www/podcontroller.js":                             www_podcontroller_js,
 	"www/titlelogo.svg":                                www_titlelogo_svg,
+	"third_party/swagger-ui/LICENSE":                   third_party_swagger_ui_license,
+	"third_party/swagger-ui/README.md":                 third_party_swagger_ui_readme_md,
 	"third_party/swagger-ui/css/reset.css":             third_party_swagger_ui_css_reset_css,
 	"third_party/swagger-ui/css/screen.css":            third_party_swagger_ui_css_screen_css,
 	"third_party/swagger-ui/images/explorer_icons.png": third_party_swagger_ui_images_explorer_icons_png,
@@ -14946,6 +15015,8 @@ type _bintree_t struct {
 var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"third_party": {nil, map[string]*_bintree_t{
 		"swagger-ui": {nil, map[string]*_bintree_t{
+			"LICENSE":   {third_party_swagger_ui_license, map[string]*_bintree_t{}},
+			"README.md": {third_party_swagger_ui_readme_md, map[string]*_bintree_t{}},
 			"css": {nil, map[string]*_bintree_t{
 				"reset.css":  {third_party_swagger_ui_css_reset_css, map[string]*_bintree_t{}},
 				"screen.css": {third_party_swagger_ui_css_screen_css, map[string]*_bintree_t{}},

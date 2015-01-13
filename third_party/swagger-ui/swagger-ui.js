@@ -1617,7 +1617,7 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       $(this.el).html(Handlebars.templates.main(this.model));
       resources = {};
       counter = 0;
-      _ref3 = this.model.apisArray;
+      _ref3 = _.sortBy(this.model.apisArray, function(resource) { return resource.name;});
       for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
         resource = _ref3[_i];
         id = resource.name;
@@ -1679,7 +1679,9 @@ helpers = this.merge(helpers, Handlebars.helpers); data = data || {};
       if (this.model.description) {
         this.model.summary = this.model.description;
       }
-      _ref4 = this.model.operationsArray;
+
+      // Sort the operations by path and method (get/post).
+      _ref4 = _.sortBy(this.model.operationsArray, function(operation) { return [operation.path, operation.method];});
       for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
         operation = _ref4[_i];
         counter = 0;
