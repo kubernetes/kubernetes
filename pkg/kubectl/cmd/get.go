@@ -74,11 +74,12 @@ Examples:
 // TODO: return an error instead of using glog.Fatal and checkErr
 func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	selector := GetFlagString(cmd, "selector")
+	mapper, typer := f.Object(cmd)
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(f.Mapper, f.Typer, ClientMapperForCommand(cmd, f)).
+		r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
 			NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(args...).
@@ -117,7 +118,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	printer, generic, err := printerForCommand(cmd)
 	checkErr(err)
 
-	b := resource.NewBuilder(f.Mapper, f.Typer, ClientMapperForCommand(cmd, f)).
+	b := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
 		NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(args...).

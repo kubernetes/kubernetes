@@ -48,16 +48,15 @@ type Factory struct {
 	clients *clientCache
 	flags   *pflag.FlagSet
 
-	Mapper meta.RESTMapper
-	Typer  runtime.ObjectTyper
-
+	// Returns interfaces for dealing with arbitrary runtime.Objects.
+	Object func(cmd *cobra.Command) (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func(cmd *cobra.Command) (*client.Client, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func(cmd *cobra.Command) (*client.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
-	RESTClient func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error)
+	RESTClient func(cmd *cobra.Command, mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
@@ -81,16 +80,17 @@ func NewFactory() *Factory {
 		clients: clients,
 		flags:   flags,
 
-		Mapper: mapper,
-		Typer:  api.Scheme,
-
+		Object: func(cmd *cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
+			version := GetFlagString(cmd, "api-version")
+			return kubectl.OutputVersionMapper{mapper, version}, api.Scheme
+		},
 		Client: func(cmd *cobra.Command) (*client.Client, error) {
 			return clients.ClientForVersion("")
 		},
 		ClientConfig: func(cmd *cobra.Command) (*client.Config, error) {
 			return clients.ClientConfigForVersion("")
 		},
-		RESTClient: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
+		RESTClient: func(cmd *cobra.Command, mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
@@ -165,7 +165,6 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdGet(out))
 	cmds.AddCommand(f.NewCmdDescribe(out))
 	cmds.AddCommand(f.NewCmdCreate(out))
-	cmds.AddCommand(f.NewCmdCreateAll(out))
 	cmds.AddCommand(f.NewCmdUpdate(out))
 	cmds.AddCommand(f.NewCmdDelete(out))
 

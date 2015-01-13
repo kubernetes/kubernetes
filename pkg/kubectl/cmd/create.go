@@ -20,11 +20,16 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/spf13/cobra"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
+	flags := &struct {
+		Filenames util.StringList
+	}{}
 	cmd := &cobra.Command{
 		Use:   "create -f filename",
 		Short: "Create a resource by filename or stdin",
@@ -39,29 +44,35 @@ Examples:
   $ cat pod.json | kubectl create -f -
   <create a pod based on the json passed into stdin>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			filename := GetFlagString(cmd, "filename")
-			if len(filename) == 0 {
-				usageError(cmd, "Must specify filename to create")
-			}
 			schema, err := f.Validator(cmd)
 			checkErr(err)
-			mapping, namespace, name, data := ResourceFromFile(cmd, filename, f.Typer, f.Mapper, schema)
-			client, err := f.RESTClient(cmd, mapping)
-			checkErr(err)
 
-			// use the default namespace if not specified, or check for conflict with the file's namespace
-			if len(namespace) == 0 {
-				namespace = GetKubeNamespace(cmd)
-			} else {
-				err = CompareNamespaceFromFile(cmd, namespace)
-				checkErr(err)
-			}
+			mapper, typer := f.Object(cmd)
+			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+				ContinueOnError().
+				NamespaceParam(GetKubeNamespace(cmd)).RequireNamespace().
+				FilenameParam(flags.Filenames...).
+				Flatten().
+				Do()
 
-			err = resource.NewHelper(client, mapping).Create(namespace, true, data)
+			err = r.Visit(func(info *resource.Info) error {
+				data, err := info.Mapping.Codec.Encode(info.Object)
+				if err != nil {
+					return err
+				}
+				if err := schema.ValidateBytes(data); err != nil {
+					return err
+				}
+				if err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data); err != nil {
+					return err
+				}
+				// TODO: if generation of names added to server side, change this to use the server's name
+				fmt.Fprintf(out, "%s\n", info.Name)
+				return nil
+			})
 			checkErr(err)
-			fmt.Fprintf(out, "%s\n", name)
 		},
 	}
-	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the resource")
+	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file to use to create the resource")
 	return cmd
 }

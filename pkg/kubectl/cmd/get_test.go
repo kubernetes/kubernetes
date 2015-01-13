@@ -90,8 +90,8 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
 	f, tf, _ := NewTestFactory()
-	f.Mapper = latest.RESTMapper
-	f.Typer = api.Scheme
+	tf.Mapper = latest.RESTMapper
+	tf.Typer = api.Scheme
 	codec := latest.Codec
 	tf.Printer = &testPrinter{}
 	tf.Client = &client.FakeRESTClient{

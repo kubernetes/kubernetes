@@ -41,8 +41,8 @@ portSpec: 10001:6379
 ```
 Output:
 ```
-$ simplegen redismaster.yaml | cluster/kubectl.sh createall -f -
-$ simplegen redisslave.yaml | cluster/kubectl.sh createall -f -
+$ simplegen redismaster.yaml | cluster/kubectl.sh create -f -
+$ simplegen redisslave.yaml | cluster/kubectl.sh create -f -
 $ cluster/kubectl.sh get services
 NAME                LABELS                      SELECTOR                                  IP                  PORT
 kubernetes-ro                                   component=apiserver,provider=kubernetes   10.0.0.2            80

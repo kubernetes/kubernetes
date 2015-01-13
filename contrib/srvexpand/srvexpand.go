@@ -17,8 +17,8 @@ limitations under the License.
 // srvexpand is a tool to generate non-trivial but regular services
 // from a description free of most boilerplate
 //
-// $ srvexpand myservice.json | kubectl createall -f -
-// $ srvexpand myservice.yaml | kubectl createall -f -
+// $ srvexpand myservice.json | kubectl create -f -
+// $ srvexpand myservice.yaml | kubectl create -f -
 //
 // This is completely separate from kubectl at the moment, until we figure out
 // what the right integration approach is.

@@ -16,8 +16,8 @@ limitations under the License.
 
 // simplegen is a tool to generate simple services from a simple description
 //
-// $ simplegen myservice.json | kubectl createall -f -
-// $ simplegen myservice.yaml | kubectl createall -f -
+// $ simplegen myservice.json | kubectl create -f -
+// $ simplegen myservice.yaml | kubectl create -f -
 //
 // This is completely separate from kubectl at the moment, until we figure out
 // what the right integration approach is.

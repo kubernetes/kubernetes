@@ -24,7 +24,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -39,7 +38,7 @@ func ResourcesFromArgsOrFile(
 	filename, selector string,
 	typer runtime.ObjectTyper,
 	mapper meta.RESTMapper,
-	clientBuilder func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error),
+	clientBuilder func(cmd *cobra.Command, mapping *meta.RESTMapping) (resource.RESTClient, error),
 	schema validation.Schema,
 	requireNames bool,
 ) resource.Visitor {
