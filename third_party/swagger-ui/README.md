@@ -13,8 +13,9 @@ Instructions on how to use these:
 https://github.com/swagger-api/swagger-ui#how-to-use-it
 
 ## Local Modifications
-Updated the url to "../../swaggerapi" as per instructions at:
+- Updated the url to "../../swaggerapi" as per instructions at:
 https://github.com/swagger-api/swagger-ui#how-to-use-it
+- Modified swagger-ui.js to list resources and operations in sorted order.
 
 LICENSE file has been created for compliance purposes.
 Not included in original distribution.
