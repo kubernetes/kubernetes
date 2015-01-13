@@ -325,17 +325,9 @@ func (c *clientCache) ClientConfigForVersion(version string) (*client.Config, er
 		}
 	}
 
-	// TODO: remove when SetKubernetesDefaults gets added
-	if len(version) == 0 {
-		version = c.defaultConfig.Version
-	}
-
 	// TODO: have a better config copy method
 	config := *c.defaultConfig
-
-	// TODO: call new client.SetKubernetesDefaults method
-	// instead of doing this
-	config.Version = version
+	client.SetKubernetesDefaults(&config)
 	return &config, nil
 }
 
