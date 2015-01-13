@@ -59,7 +59,7 @@ Examples:
 			checkErr(err)
 			selector := GetFlagString(cmd, "selector")
 			found := 0
-			ResourcesFromArgsOrFile(cmd, args, filename, selector, f.Typer, f.Mapper, f.RESTClient, schema).Visit(func(r *resource.Info) error {
+			ResourcesFromArgsOrFile(cmd, args, filename, selector, f.Typer, f.Mapper, f.RESTClient, schema, true).Visit(func(r *resource.Info) error {
 				found++
 				if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
 					return err
