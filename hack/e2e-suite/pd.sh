@@ -33,12 +33,34 @@ fi
 disk_name="e2e-$(date +%H-%M-%s)"
 config="/tmp/${disk_name}.yaml"
 
+function delete_pd_pod() {
+  # Delete the pod this should unmount the PD
+  ${KUBECFG} delete pods/testpd
+  for i in $(seq 1 24); do
+    echo "Waiting for pod to be deleted."
+    sleep 5
+    all_running=0
+    for id in $pod_id_list; do
+      current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+      if [[ "$current_status" == "Running" ]]; then
+        all_running=1
+        break
+      fi
+    done
+    if [[ "${all_running}" == 0 ]]; then
+      break
+    fi
+  done
+  if [[ "${all_running}" == 1 ]]; then
+    echo "Pods did not delete in time"
+    exit 1
+  fi
+}
+
 function teardown() {
   echo "Cleaning up test artifacts"
-  ${KUBECFG} delete pods/testpd
+  delete_pd_pod
   rm -rf ${config}
-  echo "Waiting for disk to become unmounted"
-  sleep 20
   gcloud compute disks delete --quiet --zone="${ZONE}" "${disk_name}"
 }
 
@@ -82,27 +104,7 @@ if [[ "${all_running}" == 0 ]]; then
   exit 1
 fi
 
-# Delete the pod this should unmount the PD
-${KUBECFG} delete pods/testpd
-for i in $(seq 1 24); do
-  echo "Waiting for pod to be deleted."
-  sleep 5
-  all_running=0
-  for id in $pod_id_list; do
-    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
-    if [[ "$current_status" == "Running" ]]; then
-      all_running=1
-      break
-    fi
-  done
-  if [[ "${all_running}" == 0 ]]; then
-    break
-  fi
-done
-if [[ "${all_running}" == 1 ]]; then
-  echo "Pods did not delete in time"
-  exit 1
-fi
+delete_pd_pod
 
 # Recreate the pod, this should re-mount the PD
 ${KUBECFG} -c ${config} create pods
