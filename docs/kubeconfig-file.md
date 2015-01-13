@@ -8,36 +8,46 @@ https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
 
 ## Example .kubeconfig file
 ```
-preferences: 
-  colors: true
+apiVersion: v1
 clusters:
-  cow-cluster:
-    server: http://cow.org:8080
+- cluster:
     api-version: v1beta1
-  horse-cluster:
-    server: https://horse.org:4443
+    server: http://cow.org:8080
+  name: cow-cluster
+- cluster:
     certificate-authority: path/to/my/cafile
-  pig-cluster:
-    server: https://pig.org:443
+    server: https://horse.org:4443
+  name: horse-cluster
+- cluster:
     insecure-skip-tls-verify: true
+    server: https://pig.org:443
+  name: pig-cluster
+contexts:
+- context:
+    cluster: horse-cluster
+    namespace: chisel-ns
+    user: green-user
+  name: federal-context
+- context:
+    cluster: pig-cluster
+    namespace: saw-ns
+    user: black-user
+  name: queen-anne-context
+current-context: federal-context
+kind: Config
+preferences:
+  colors: true
 users:
-  black-user:
-    auth-path: path/to/my/existing/.kubernetes_auth file
-  blue-user:
+- name: black-user
+  user:
+    auth-path: path/to/my/existing/.kubernetes_auth_file
+- name: blue-user
+  user:
     token: blue-token
-  green-user:
+- name: green-user
+  user:
     client-certificate: path/to/my/client/cert
     client-key: path/to/my/client/key
-contexts:
-  queen-anne-context:
-    cluster: pig-cluster
-    user: black-user
-    namespace: saw-ns
-  federal-context:
-    cluster: horse-cluster
-    user: green-user
-    namespace: chisel-ns
-current-context: federal-context
 ```
 
 ## Loading and merging rules
@@ -67,3 +77,86 @@ The rules for loading and merging the .kubeconfig files are straightforward, but
 
       The command line flags are: `auth-path`, `client-certificate`, `client-key`, and `token`.  If there are two conflicting techniques, fail.
   1.  For any information still missing, use default values and potentially prompt for authentication information
+
+## Manipulation of .kubeconfig via `kubectl config <subcommand>`
+In order to more easily manipulate .kubeconfig files, there are a series of subcommands to `kubectl config` to help.
+```
+kubectl config set-credentials name --auth-path=path/to/authfile --client-certificate=path/to/cert --client-key=path/to/key --token=string
+  Sets a user entry in .kubeconfig.  If the referenced name already exists, it will be overwritten.
+kubectl config set-cluster name --server=server --skip-tls=bool --certificate-authority=path/to/ca --api-version=string
+  Sets a cluster entry in .kubeconfig.  If the referenced name already exists, it will be overwritten.
+kubectl config set-context name --user=string --cluster=string --namespace=string
+  Sets a config entry in .kubeconfig.  If the referenced name already exists, it will be overwritten.
+kubectl config use-context name
+  Sets current-context to name
+kubectl config set property-name property-value
+  Sets arbitrary value in .kubeconfig
+kubectl config unset property-name
+  Unsets arbitrary value in .kubeconfig
+kubectl config view --local=true --global=false --kubeconfig=specific/filename --merged
+  Displays the merged (or not) result of the specified .kubeconfig file
+
+--local, --global, and --kubeconfig are valid flags for all of these operations.
+```
+
+### Example
+```
+$kubectl config set-credentials myself --auth-path=path/to/my/existing/auth-file
+$kubectl config set-cluster local-server --server=http://localhost:8080
+$kubectl config set-context default-context --cluster=local-server --user=myself
+$kubectl config use-context default-context
+$kubectl config set contexts.default-context.namespace the-right-prefix
+$kubectl config view
+```
+produces this output
+```
+clusters:
+  local-server:
+    server: http://localhost:8080
+contexts:
+  default-context:
+    cluster: local-server
+    namespace: the-right-prefix
+    user: myself
+current-context: default-context
+preferences: {}
+users:
+  myself:
+    auth-path: path/to/my/existing/auth-file
+
+```
+and a .kubeconfig file that looks like this
+```
+apiVersion: v1
+clusters:
+- cluster:
+    server: http://localhost:8080
+  name: local-server
+contexts:
+- context:
+    cluster: local-server
+    namespace: the-right-prefix
+    user: myself
+  name: default-context
+current-context: default-context
+kind: Config
+preferences: {}
+users:
+- name: myself
+  user:
+    auth-path: path/to/my/existing/auth-file
+```
+
+#### Commands for the example file
+```
+$kubectl config set preferences.colors true
+$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1beta1
+$kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
+$kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
+$kubectl config set-credentials black-user --auth-path=path/to/my/existing/.kubernetes_auth_file
+$kubectl config set-credentials blue-user --token=blue-token
+$kubectl config set-credentials green-user --client-certificate=path/to/my/client/cert --client-key=path/to/my/client/key
+$kubectl config set-context queen-anne-context --cluster=pig-cluster --user=black-user --namespace=saw-ns
+$kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
+$kubectl config use-context federal-context
+```

@@ -22,23 +22,24 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 )
 
-func createValidTestConfig() *Config {
+func createValidTestConfig() *clientcmdapi.Config {
 	const (
 		server = "https://anything.com:8080"
 		token  = "the-token"
 	)
 
-	config := NewConfig()
-	config.Clusters["clean"] = Cluster{
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = clientcmdapi.Cluster{
 		Server:     server,
 		APIVersion: latest.Version,
 	}
-	config.AuthInfos["clean"] = AuthInfo{
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
 		Token: token,
 	}
-	config.Contexts["clean"] = Context{
+	config.Contexts["clean"] = clientcmdapi.Context{
 		Cluster:  "clean",
 		AuthInfo: "clean",
 	}

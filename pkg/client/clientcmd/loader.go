@@ -20,8 +20,11 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
-	"gopkg.in/v2/yaml"
+
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	clientcmdlatest "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
 )
 
 const (
@@ -56,8 +59,8 @@ func NewClientConfigLoadingRules() *ClientConfigLoadingRules {
 // This means that the first file to set CurrentContext will have its context preserved.  It also means
 // that if two files specify a "red-user", only values from the first file's red-user are used.  Even
 // non-conflicting entries from the second file's "red-user" are discarded.
-func (rules *ClientConfigLoadingRules) Load() (*Config, error) {
-	config := NewConfig()
+func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
+	config := clientcmdapi.NewConfig()
 
 	mergeConfigWithFile(config, rules.CommandLinePath)
 	mergeConfigWithFile(config, rules.EnvVarPath)
@@ -67,7 +70,7 @@ func (rules *ClientConfigLoadingRules) Load() (*Config, error) {
 	return config, nil
 }
 
-func mergeConfigWithFile(startingConfig *Config, filename string) error {
+func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) error {
 	if len(filename) == 0 {
 		// no work to do
 		return nil
@@ -84,16 +87,15 @@ func mergeConfigWithFile(startingConfig *Config, filename string) error {
 }
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
-func LoadFromFile(filename string) (*Config, error) {
-	config := &Config{}
+func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
+	config := &clientcmdapi.Config{}
 
 	kubeconfigBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	err = yaml.Unmarshal(kubeconfigBytes, &config)
-	if err != nil {
+	if err := clientcmdlatest.Codec.DecodeInto(kubeconfigBytes, config); err != nil {
 		return nil, err
 	}
 
@@ -102,14 +104,18 @@ func LoadFromFile(filename string) (*Config, error) {
 
 // WriteToFile serializes the config to yaml and writes it out to a file.  If no present, it creates the file with 0644.  If it is present
 // it stomps the contents
-func WriteToFile(config Config, filename string) error {
-	content, err := yaml.Marshal(config)
+func WriteToFile(config clientcmdapi.Config, filename string) error {
+	json, err := clientcmdlatest.Codec.Encode(&config)
 	if err != nil {
 		return err
 	}
 
-	err = ioutil.WriteFile(filename, content, 0644)
+	content, err := yaml.JSONToYAML(json)
 	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(filename, content, 0644); err != nil {
 		return err
 	}
 

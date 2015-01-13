@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 )
 
 // DeferredLoadingClientConfig is a ClientConfig interface that is backed by a set of loading rules
@@ -57,6 +58,15 @@ func (config DeferredLoadingClientConfig) createClientConfig() (ClientConfig, er
 	}
 
 	return mergedClientConfig, nil
+}
+
+func (config DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
+	mergedConfig, err := config.createClientConfig()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+
+	return mergedConfig.RawConfig()
 }
 
 // ClientConfig implements ClientConfig

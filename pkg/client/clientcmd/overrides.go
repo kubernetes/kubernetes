@@ -18,13 +18,15 @@ package clientcmd
 
 import (
 	"github.com/spf13/pflag"
+
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 )
 
 // ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't
 // simply use an actual Config object, because Configs hold maps, but overrides are restricted to "at most one"
 type ConfigOverrides struct {
-	AuthInfo       AuthInfo
-	ClusterInfo    Cluster
+	AuthInfo       clientcmdapi.AuthInfo
+	ClusterInfo    clientcmdapi.Cluster
 	Namespace      string
 	CurrentContext string
 	ClusterName    string
@@ -105,8 +107,8 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 	}
 }
 
-// BindFlags is a convenience method to bind the specified flags to their associated variables
-func (authInfo *AuthInfo) BindFlags(flags *pflag.FlagSet, flagNames AuthOverrideFlags) {
+// BindAuthInfoFlags is a convenience method to bind the specified flags to their associated variables
+func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, flagNames AuthOverrideFlags) {
 	// TODO short flag names are impossible to prefix, decide whether to keep them or not
 	flags.StringVarP(&authInfo.AuthPath, flagNames.AuthPath, "a", "", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
 	flags.StringVar(&authInfo.ClientCertificate, flagNames.ClientCertificate, "", "Path to a client key file for TLS.")
@@ -114,8 +116,8 @@ func (authInfo *AuthInfo) BindFlags(flags *pflag.FlagSet, flagNames AuthOverride
 	flags.StringVar(&authInfo.Token, flagNames.Token, "", "Bearer token for authentication to the API server.")
 }
 
-// BindFlags is a convenience method to bind the specified flags to their associated variables
-func (clusterInfo *Cluster) BindFlags(flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
+// BindClusterFlags is a convenience method to bind the specified flags to their associated variables
+func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
 	// TODO short flag names are impossible to prefix, decide whether to keep them or not
 	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, "s", "", "The address of the Kubernetes API server")
 	flags.StringVar(&clusterInfo.APIVersion, flagNames.APIVersion, "", "The API version to use when talking to the server")
@@ -123,10 +125,10 @@ func (clusterInfo *Cluster) BindFlags(flags *pflag.FlagSet, flagNames ClusterOve
 	flags.BoolVar(&clusterInfo.InsecureSkipTLSVerify, flagNames.InsecureSkipTLSVerify, false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 }
 
-// BindFlags is a convenience method to bind the specified flags to their associated variables
-func (overrides *ConfigOverrides) BindFlags(flags *pflag.FlagSet, flagNames ConfigOverrideFlags) {
-	(&overrides.AuthInfo).BindFlags(flags, flagNames.AuthOverrideFlags)
-	(&overrides.ClusterInfo).BindFlags(flags, flagNames.ClusterOverrideFlags)
+// BindOverrideFlags is a convenience method to bind the specified flags to their associated variables
+func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNames ConfigOverrideFlags) {
+	BindAuthInfoFlags(&overrides.AuthInfo, flags, flagNames.AuthOverrideFlags)
+	BindClusterFlags(&overrides.ClusterInfo, flags, flagNames.ClusterOverrideFlags)
 	// TODO not integrated yet
 	// flags.StringVar(&overrides.Namespace, flagNames.Namespace, "", "If present, the namespace scope for this CLI request.")
 	flags.StringVar(&overrides.CurrentContext, flagNames.CurrentContext, "", "The name of the kubeconfig context to use")
