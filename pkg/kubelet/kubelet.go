@@ -56,7 +56,7 @@ type SyncHandler interface {
 	SyncPods([]api.BoundPod) error
 }
 
-type SourcesReadyFn func() bool
+type SourceReadyFn func(source string) bool
 
 type volumeMap map[string]volume.Interface
 
@@ -73,7 +73,7 @@ func NewMainKubelet(
 	pullBurst int,
 	minimumGCAge time.Duration,
 	maxContainerCount int,
-	sourcesReady SourcesReadyFn,
+	sourceReady SourceReadyFn,
 	clusterDomain string,
 	clusterDNS net.IP) (*Kubelet, error) {
 	if resyncInterval <= 0 {
@@ -97,7 +97,7 @@ func NewMainKubelet(
 		pullBurst:             pullBurst,
 		minimumGCAge:          minimumGCAge,
 		maxContainerCount:     maxContainerCount,
-		sourcesReady:          sourcesReady,
+		sourceReady:           sourceReady,
 		clusterDomain:         clusterDomain,
 		clusterDNS:            clusterDNS,
 	}, nil
@@ -116,7 +116,7 @@ type Kubelet struct {
 	podWorkers            *podWorkers
 	resyncInterval        time.Duration
 	pods                  []api.BoundPod
-	sourcesReady          SourcesReadyFn
+	sourceReady           SourceReadyFn
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -1062,18 +1062,19 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 			}
 		})
 	}
-	if !kl.sourcesReady() {
-		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
-		// for sources that haven't reported yet.
-		glog.V(4).Infof("Skipping deletes, sources aren't ready yet.")
-		return nil
-	}
 	// Kill any containers we don't need.
 	for _, container := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
 		podFullName, uuid, containerName, _ := dockertools.ParseDockerName(container.Names[0])
 		if _, found := desiredPods[uuid]; found {
 			// syncPod() will handle this one.
+			continue
+		}
+		_, _, podAnnotations := ParsePodFullName(podFullName)
+		if source := podAnnotations[ConfigSourceAnnotationKey]; !kl.sourceReady(source) {
+			// If the source for this container is not ready, skip deletion, so that we don't accidentally
+			// delete containers for sources that haven't reported yet.
+			glog.V(4).Infof("Skipping delete of container (%q), source (%s) aren't ready yet.", podFullName, source)
 			continue
 		}
 		pc := podContainer{podFullName, uuid, containerName}
