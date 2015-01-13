@@ -80,6 +80,22 @@ func NewClientCertTLSTransport(certFile, keyFile, caFile string) (*http.Transpor
 	}, nil
 }
 
+func NewTLSTransport(caFile string) (*http.Transport, error) {
+	data, err := ioutil.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(data)
+	return &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
+			MinVersion: tls.VersionTLS10,
+			RootCAs:    certPool,
+		},
+	}, nil
+}
+
 func NewUnsafeTLSTransport() *http.Transport {
 	return &http.Transport{
 		TLSClientConfig: &tls.Config{
