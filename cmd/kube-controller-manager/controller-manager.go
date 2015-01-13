@@ -21,7 +21,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"net"
 	"net/http"
 	"strconv"
@@ -38,7 +37,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -74,6 +75,7 @@ func verifyMinionFlags() {
 }
 
 func main() {
+	util.AddAllFlagsToPFlags()
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()

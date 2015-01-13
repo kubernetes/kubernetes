@@ -21,7 +21,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -66,6 +66,7 @@ func newApiClient(addr string, port int) *client.Client {
 }
 
 func main() {
+	util.AddAllFlagsToPFlags()
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()

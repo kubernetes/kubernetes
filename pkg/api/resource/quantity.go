@@ -18,12 +18,12 @@ package resource
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"math/big"
 	"regexp"
 	"strings"
 
+	flag "github.com/spf13/pflag"
 	"speter.net/go/exp/math/dec/inf"
 )
 

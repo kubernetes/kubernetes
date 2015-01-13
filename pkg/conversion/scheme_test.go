@@ -18,7 +18,6 @@ package conversion
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"reflect"
 	"strings"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"
+	flag "github.com/spf13/pflag"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")

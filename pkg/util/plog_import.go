@@ -42,7 +42,13 @@ func wrapFlagValue(v flag.Value) pflag.Value {
 	pv := &flagValueWrapper{
 		inner: v,
 	}
-	pv.flagType = reflect.TypeOf(v).Elem().Name()
+
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Interface || t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	pv.flagType = t.Name()
 	pv.flagType = strings.TrimSuffix(pv.flagType, "Value")
 	return pv
 }
@@ -75,4 +81,9 @@ func AddFlagSetToPFlagSet(fsIn *flag.FlagSet, fsOut *pflag.FlagSet) {
 // Adds all of the top level 'flag' package flags to a 'pflag.FlagSet'.
 func AddAllFlagsToPFlagSet(fs *pflag.FlagSet) {
 	AddFlagSetToPFlagSet(flag.CommandLine, fs)
+}
+
+// Add al of the top level 'flag' package flags to the top level 'pflag' flags.
+func AddAllFlagsToPFlags() {
+	AddFlagSetToPFlagSet(flag.CommandLine, pflag.CommandLine)
 }

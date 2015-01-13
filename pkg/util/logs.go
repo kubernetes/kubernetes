@@ -17,11 +17,11 @@ limitations under the License.
 package util
 
 import (
-	"flag"
 	"log"
 	"time"
 
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var logFlushFreq = flag.Duration("log_flush_frequency", 5*time.Second, "Maximum number of seconds between log flushes")

@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -35,6 +34,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -699,6 +700,7 @@ func TestPodHasServiceEnvVars(c *client.Client) bool {
 }
 
 func main() {
+	util.AddAllFlagsToPFlags()
 	flag.Parse()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
 	util.ReallyCrash = true

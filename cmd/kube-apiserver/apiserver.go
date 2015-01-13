@@ -20,7 +20,6 @@ package main
 
 import (
 	"crypto/tls"
-	"flag"
 	"net"
 	"net/http"
 	"strconv"
@@ -40,6 +39,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -124,6 +124,7 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (helper tool
 }
 
 func main() {
+	util.AddAllFlagsToPFlags()
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()

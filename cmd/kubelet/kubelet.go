@@ -21,7 +21,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"math/rand"
 	"net"
 	"time"
@@ -33,7 +32,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/standalone"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 const defaultRootDir = "/var/lib/kubelet"
@@ -89,6 +90,7 @@ func setupRunOnce() {
 }
 
 func main() {
+	util.AddAllFlagsToPFlags()
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()

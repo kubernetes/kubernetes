@@ -19,7 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -54,6 +53,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -563,6 +563,7 @@ func runServiceTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func main() {
+	util.AddAllFlagsToPFlags()
 	flag.Parse()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	util.ReallyCrash = true
