@@ -277,7 +277,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.RegistryBurst,
 		kc.MinimumGCAge,
 		kc.MaxContainerCount,
-		pc.SeenAllSources,
+		pc.SourceSeen,
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS))
 

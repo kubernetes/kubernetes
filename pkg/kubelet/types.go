@@ -18,8 +18,10 @@ package kubelet
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
@@ -70,4 +72,21 @@ type PodUpdate struct {
 // GetPodFullName returns a name that uniquely identifies a pod across all config sources.
 func GetPodFullName(pod *api.BoundPod) string {
 	return fmt.Sprintf("%s.%s.%s", pod.Name, pod.Namespace, pod.Annotations[ConfigSourceAnnotationKey])
+}
+
+// ParsePodFullName unpacks a pod full name and returns the pod name, namespace, and annotations.
+// If the pod full name is invalid, empty strings are returend.
+func ParsePodFullName(podFullName string) (podName, podNamespace string, podAnnotations map[string]string) {
+	parts := strings.Split(podFullName, ".")
+	expectedNumFields := 3
+	actualNumFields := len(parts)
+	if actualNumFields != expectedNumFields {
+		glog.Warningf("found a podFullName (%q) with too few fields: expected %d, actual %d.", podFullName, expectedNumFields, actualNumFields)
+		return
+	}
+	podName = parts[0]
+	podNamespace = parts[1]
+	podAnnotations = make(map[string]string)
+	podAnnotations[ConfigSourceAnnotationKey] = parts[2]
+	return
 }
