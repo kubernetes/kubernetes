@@ -2,6 +2,6 @@
 {% if grains['os_family'] == 'RedHat' -%}
 	{% set daemon_args = "" -%}
 {% endif -%}
-{% set master="-master=127.0.0.1:8080" -%}
+{% set master="--master=127.0.0.1:8080" -%}
 
 DAEMON_ARGS="{{daemon_args}} {{master}} {{pillar['log_level']}}"

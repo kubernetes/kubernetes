@@ -17,83 +17,83 @@ The kube\-controller\-manager has several options.
 
 .SH OPTIONS
 .PP
-\fB\-address\fP=""
+\fB\-\-address\fP=""
     The address on the local server to listen to. Default 127.0.0.1.
 
 .PP
-\fB\-allow\_privileged\fP="false"
+\fB\-\-allow\_privileged\fP="false"
     If true, allow privileged containers.
 
 .PP
-\fB\-address=\fP"127.0.0.1"
+\fB\-\-address=\fP"127.0.0.1"
     The address to serve from.
 
 .PP
-\fB\-alsologtostderr\fP=false
+\fB\-\-alsologtostderr\fP=false
     log to standard error as well as files.
 
 .PP
-\fB\-api\_version\fP=""
+\fB\-\-api\_version\fP=""
     The API version to use when talking to the server.
 
 .PP
-\fB\-cloud\_config\fP=""
+\fB\-\-cloud\_config\fP=""
     The path to the cloud provider configuration file. Empty string for no configuration file.
 
 .PP
-\fB\-cloud\_provider\fP=""
+\fB\-\-cloud\_provider\fP=""
     The provider for cloud services. Empty string for no provider.
 
 .PP
-\fB\-minion\_regexp\fP=""
+\fB\-\-minion\_regexp\fP=""
     If non empty, and \-cloud\_provider is specified, a regular expression for matching minion VMs.
 
 .PP
-\fB\-insecure\_skip\_tls\_verify\fP=false
+\fB\-\-insecure\_skip\_tls\_verify\fP=false
     If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
 .PP
-\fB\-log\_backtrace\_at\fP=:0
+\fB\-\-log\_backtrace\_at\fP=:0
     when logging hits line file:N, emit a stack trace.
 
 .PP
-\fB\-log\_dir\fP=""
+\fB\-\-log\_dir\fP=""
     If non\-empty, write log files in this directory.
 
 .PP
-\fB\-log\_flush\_frequency\fP=5s
+\fB\-\-log\_flush\_frequency\fP=5s
     Maximum number of seconds between log flushes.
 
 .PP
-\fB\-logtostderr\fP=false
+\fB\-\-logtostderr\fP=false
     log to standard error instead of files.
 
 .PP
-\fB\-machines\fP=[]
-    List of machines to schedule onto, comma separated.
+\fB\-\-machines\fP=[]
+        List of machines to schedule onto, comma separated.
 
 .PP
-\fB\-master\fP=""
+\fB\-\-master\fP=""
     The address of the Kubernetes API server.
 
 .PP
-\fB\-port\fP=10252
+\fB\-\-port\fP=10252
     The port that the controller\-manager's http service runs on.
 
 .PP
-\fB\-stderrthreshold\fP=0
+\fB\-\-stderrthreshold\fP=0
     logs at or above this threshold go to stderr.
 
 .PP
-\fB\-v\fP=0
+\fB\-\-v\fP=0
     log level for V logs.
 
 .PP
-\fB\-version\fP=false
+\fB\-\-version\fP=false
     Print version information and quit.
 
 .PP
-\fB\-vmodule\fP=
+\fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging.
 
 .SH EXAMPLES

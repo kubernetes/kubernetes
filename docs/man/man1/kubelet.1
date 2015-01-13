@@ -28,104 +28,104 @@ HTTP server The kubelet can also listen for HTTP and respond to a simple API (un
 
 .SH OPTIONS
 .PP
-\fB\-address\fP="127.0.0.1"
+\fB\-\-address\fP="127.0.0.1"
     The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces).
 
 .PP
-\fB\-allow\_privileged\fP=false
+\fB\-\-allow\_privileged\fP=false
     If true, allow containers to request privileged mode. [default=false].
 
 .PP
-\fB\-alsologtostderr\fP=false
+\fB\-\-alsologtostderr\fP=false
     log to standard error as well as files.
 
 .PP
-\fB\-config\fP=""
+\fB\-\-config\fP=""
     Path to the config file or directory of files.
 
 .PP
-\fB\-docker\_endpoint\fP=""
+\fB\-\-docker\_endpoint\fP=""
     If non\-empty, use this for the docker endpoint to communicate with.
 
 .PP
-\fB\-enable\_server\fP=true
+\fB\-\-enable\_server\fP=true
     Enable the info server.
 
 .PP
-\fB\-etcd\_servers\fP=[]
+\fB\-\-etcd\_servers\fP=[]
     List of etcd servers to watch (
 \[la]http://ip:port\[ra]), comma separated.
 
 .PP
-\fB\-file\_check\_frequency\fP=20s
+\fB\-\-file\_check\_frequency\fP=20s
     Duration between checking config files for new data.
 
 .PP
-\fB\-hostname\_override\fP=""
+\fB\-\-hostname\_override\fP=""
     If non\-empty, will use this string as identification instead of the actual hostname.
 
 .PP
-\fB\-http\_check\_frequency\fP=20s
+\fB\-\-http\_check\_frequency\fP=20s
     Duration between checking http for new data.
 
 .PP
-\fB\-log\_backtrace\_at\fP=:0
+\fB\-\-log\_backtrace\_at\fP=:0
     when logging hits line file:N, emit a stack trace.
 
 .PP
-\fB\-log\_dir\fP=""
+\fB\-\-log\_dir\fP=""
     If non\-empty, write log files in this directory.
 
 .PP
-\fB\-log\_flush\_frequency\fP=5s
+\fB\-\-log\_flush\_frequency\fP=5s
     Maximum number of seconds between log flushes.
 
 .PP
-\fB\-logtostderr\fP=false
+\fB\-\-logtostderr\fP=false
     log to standard error instead of files.
 
 .PP
-\fB\-manifest\_url\fP=""
+\fB\-\-manifest\_url\fP=""
     URL for accessing the container manifest.
 
 .PP
-\fB\-network\_container\_image\fP="kubernetes/pause:latest"
+\fB\-\-network\_container\_image\fP="kubernetes/pause:latest"
     The image that network containers in each pod will use.
 
 .PP
-\fB\-port\fP=10250
+\fB\-\-port\fP=10250
     The port for the info server to serve on.
 
 .PP
-\fB\-registry\_burst\fP=10
+\fB\-\-registry\_burst\fP=10
     Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry\_qps. Only used if \-\-registry\_qps > 0.
 
 .PP
-\fB\-registry\_qps\fP=0
+\fB\-\-registry\_qps\fP=0
     If > 0, limit registry pull QPS to this value. If 0, unlimited. [default=0.0].
 
 .PP
-\fB\-root\_dir\fP="/var/lib/kubelet"
+\fB\-\-root\_dir\fP="/var/lib/kubelet"
     Directory path for managing kubelet files (volume mounts,etc).
 
 .PP
-\fB\-stderrthreshold\fP=0
+\fB\-\-stderrthreshold\fP=0
     logs at or above this threshold go to stderr.
 
 .PP
-\fB\-sync\_frequency\fP=10s
+\fB\-\-sync\_frequency\fP=10s
     Max period between synchronizing running containers and config.
 
 .PP
-\fB\-v\fP=0
+\fB\-\-v\fP=0
     log level for V logs.
 
 .PP
-\fB\-version\fP=false
+\fB\-\-version\fP=false
     Print version information and quit.
 
 .PP
-\fB\-vmodule\fP=
+\fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging.
 
 .SH EXAMPLES

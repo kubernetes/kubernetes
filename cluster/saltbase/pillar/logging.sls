@@ -1,1 +1,1 @@
-log_level: "-v=2"
+log_level: "--v=2"

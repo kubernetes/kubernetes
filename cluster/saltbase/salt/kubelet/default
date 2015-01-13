@@ -3,35 +3,35 @@
   {% set daemon_args = "" -%}
 {% endif -%}
 {% if grains.etcd_servers is defined -%}
-  {% set etcd_servers = "-etcd_servers=http://" + grains.etcd_servers + ":4001" -%}
+  {% set etcd_servers = "--etcd_servers=http://" + grains.etcd_servers + ":4001" -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set etcd_servers = "-etcd_servers=http://" + ips[0][0] + ":4001" -%}
+  {% set etcd_servers = "--etcd_servers=http://" + ips[0][0] + ":4001" -%}
 {% endif -%}
 
 {% if grains.apiservers is defined -%}
-  {% set apiservers = "-api_servers=https://" + grains.apiservers + ":6443" -%}
+  {% set apiservers = "--api_servers=https://" + grains.apiservers + ":6443" -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set apiservers = "-api_servers=https://" + ips[0][0] + ":6443" -%}
+  {% set apiservers = "--api_servers=https://" + ips[0][0] + ":6443" -%}
 {% endif -%}
 
-{% set address = "-address=0.0.0.0" -%}
-{% set config = "-config=/etc/kubernetes/manifests" -%}
+{% set address = "--address=0.0.0.0" -%}
+{% set config = "--config=/etc/kubernetes/manifests" -%}
 {% set hostname_override = "" -%}
 {% if grains.minion_ip is defined -%}
-  {% set hostname_override = " -hostname_override=" + grains.minion_ip -%}
+  {% set hostname_override = " --hostname_override=" + grains.minion_ip -%}
 {% endif -%}
 
-{% set auth_path = "-auth_path=/var/lib/kubelet/kubernetes_auth" -%}
+{% set auth_path = "--auth_path=/var/lib/kubelet/kubernetes_auth" -%}
 
-{% set registry_qps = "-registry_qps=0.1" %}
+{% set registry_qps = "--registry_qps=0.1" %}
 
 {% set cluster_dns = "" %}
 {% set cluster_domain = "" %}
 {% if pillar['enable_cluster_dns'] is defined and pillar['enable_cluster_dns'] %}
-  {% set cluster_dns = "-cluster_dns=" + pillar['dns_server'] %}
-  {% set cluster_domain = "-cluster_domain=" + pillar['dns_domain'] %}
+  {% set cluster_dns = "--cluster_dns=" + pillar['dns_server'] %}
+  {% set cluster_domain = "--cluster_domain=" + pillar['dns_domain'] %}
 {% endif %}
 
 DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{apiservers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"

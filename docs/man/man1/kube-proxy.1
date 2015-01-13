@@ -17,60 +17,60 @@ The kube\-proxy takes several options.
 
 .SH OPTIONS
 .PP
-\fB\-alsologtostderr\fP=false
+\fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
 
 .PP
-\fB\-api\_version=\fP""
+\fB\-\-api\_version=\fP""
     The API version to use when talking to the server
 
 .PP
-\fB\-bindaddress\fP="0.0.0.0"
+\fB\-\-bindaddress\fP="0.0.0.0"
     The address for the proxy server to serve on (set to 0.0.0.0 or "" for all interfaces)
 
 .PP
-\fB\-etcd\_servers\fP=[]
+\fB\-\-etcd\_servers\fP=[]
     List of etcd servers to watch (
 \[la]http://ip:port\[ra]), comma separated (optional)
 
 .PP
-\fB\-insecure\_skip\_tls\_verify\fP=false
+\fB\-\-insecure\_skip\_tls\_verify\fP=false
     If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
 .PP
-\fB\-log\_backtrace\_at\fP=:0
+\fB\-\-log\_backtrace\_at\fP=:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-log\_dir\fP=""
+\fB\-\-log\_dir\fP=""
     If non\-empty, write log files in this directory
 
 .PP
-\fB\-log\_flush\_frequency\fP=5s
+\fB\-\-log\_flush\_frequency\fP=5s
     Maximum number of seconds between log flushes
 
 .PP
-\fB\-logtostderr\fP=false
+\fB\-\-logtostderr\fP=false
     log to standard error instead of files
 
 .PP
-\fB\-master\fP=""
+\fB\-\-master\fP=""
     The address of the Kubernetes API server
 
 .PP
-\fB\-stderrthreshold\fP=0
+\fB\-\-stderrthreshold\fP=0
     logs at or above this threshold go to stderr
 
 .PP
-\fB\-v\fP=0
+\fB\-\-v\fP=0
     log level for V logs
 
 .PP
-\fB\-version\fP=false
+\fB\-\-version\fP=false
     Print version information and quit
 
 .PP
-\fB\-vmodule\fP=
+\fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 .SH EXAMPLES
