@@ -39,7 +39,7 @@ func TestBroadcaster(t *testing.T) {
 	}
 
 	// The broadcaster we're testing
-	m := NewBroadcaster(0)
+	m := NewBroadcaster(0, WaitIfChannelFull)
 
 	// Add a bunch of watchers
 	const testWatchers = 2
@@ -77,7 +77,7 @@ func TestBroadcaster(t *testing.T) {
 }
 
 func TestBroadcasterWatcherClose(t *testing.T) {
-	m := NewBroadcaster(0)
+	m := NewBroadcaster(0, WaitIfChannelFull)
 	w := m.Watch()
 	w2 := m.Watch()
 	w.Stop()
@@ -95,7 +95,7 @@ func TestBroadcasterWatcherClose(t *testing.T) {
 
 func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 	done := make(chan bool)
-	m := NewBroadcaster(0)
+	m := NewBroadcaster(0, WaitIfChannelFull)
 	go func(w0, w1 Interface) {
 		// We know Broadcaster is in the distribute loop once one watcher receives
 		// an event. Stop the other watcher while distribute is trying to

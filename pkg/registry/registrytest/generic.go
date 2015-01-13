@@ -39,7 +39,7 @@ type GenericRegistry struct {
 func NewGeneric(list runtime.Object) *GenericRegistry {
 	return &GenericRegistry{
 		ObjectList:  list,
-		Broadcaster: watch.NewBroadcaster(0),
+		Broadcaster: watch.NewBroadcaster(0, watch.WaitIfChannelFull),
 	}
 }
 

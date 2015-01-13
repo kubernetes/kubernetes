@@ -32,10 +32,7 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	maxQueuedEvents  = 1000
-	maxTriesPerEvent = 10
-)
+const maxTriesPerEvent = 10
 
 var (
 	minSleep   = float64(1 * time.Second)
@@ -56,47 +53,26 @@ type EventRecorder interface {
 // or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
 func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
-	// Set up our own personal buffer of events so that we can clear out GetEvents'
-	// broadcast channel as quickly as possible to avoid causing the relatively more
-	// important event-producing goroutines from blocking while trying to insert events.
-	eventQueue := make(chan *api.Event, maxQueuedEvents)
-
-	// Run a function in the background that grabs events off the queue and tries
-	// to record them, retrying as appropriate to try to avoid dropping any.
-	go func() {
-		defer util.HandleCrash()
-		for event := range eventQueue {
-			tries := 0
-			for {
-				if recordEvent(recorder, event) {
-					break
-				}
-				tries++
-				if tries >= maxTriesPerEvent {
-					glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
-					break
-				}
-				sleepDuration := time.Duration(
-					math.Min(maxSleep, minSleep*math.Pow(backoffExp, float64(tries-1))))
-				time.Sleep(wait.Jitter(sleepDuration, 0.5))
-			}
-		}
-	}()
-
-	// Finally, kick off the watcher that takes events from the channel and puts them
-	// onto the queue.
 	return GetEvents(func(event *api.Event) {
 		// Make a copy before modification, because there could be multiple listeners.
 		// Events are safe to copy like this.
 		eventCopy := *event
 		event = &eventCopy
 		event.Source = source
-		// Drop new events rather than old ones because the old ones may contain
-		// some information explaining why everything is so backed up.
-		if len(eventQueue) == maxQueuedEvents {
-			glog.Errorf("Unable to write event '%#v' (event buffer full!)", event)
-		} else {
-			eventQueue <- event
+
+		tries := 0
+		for {
+			if recordEvent(recorder, event) {
+				break
+			}
+			tries++
+			if tries >= maxTriesPerEvent {
+				glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
+				break
+			}
+			sleepDuration := time.Duration(
+				math.Min(maxSleep, minSleep*math.Pow(backoffExp, float64(tries-1))))
+			time.Sleep(wait.Jitter(sleepDuration, 0.5))
 		}
 	})
 }
@@ -163,9 +139,9 @@ func GetEvents(f func(*api.Event)) watch.Interface {
 	return w
 }
 
-const queueLen = 1000
+const maxQueuedEvents = 1000
 
-var events = watch.NewBroadcaster(queueLen)
+var events = watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull)
 
 // Event constructs an event from the given information and puts it in the queue for sending.
 // 'object' is the object this event is about. Event will make a reference-- or you may also
