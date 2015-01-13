@@ -12,7 +12,7 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 ```
 aws ec2 run-instances \
---image-id ami-d92377e9 \
+--image-id ami-c484f5ac \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -25,7 +25,7 @@ aws ec2 run-instances \
 ```
 gcloud compute instances create standalone \
 --image-project coreos-cloud \
---image coreos-alpha-509-1-0-v20141124 \
+--image coreos-alpha-557-0-0-v20150109 \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \

@@ -22,7 +22,7 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 ```
 aws ec2 run-instances \
---image-id ami-d92377e9 \
+--image-id ami-c484f5ac \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -45,7 +45,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 ```
 aws ec2 run-instances \
 --count 1 \
---image-id ami-d92377e9 \
+--image-id ami-c484f5ac \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -60,7 +60,7 @@ aws ec2 run-instances \
 ```
 gcloud compute instances create master \
 --image-project coreos-cloud \
---image coreos-alpha-509-1-0-v20141124 \
+--image coreos-alpha-557-0-0-v20150109 \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
@@ -82,7 +82,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 ```
 gcloud compute instances create node1 \
 --image-project coreos-cloud \
---image coreos-alpha-509-1-0-v20141124 \
+--image coreos-alpha-557-0-0-v20150109 \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
