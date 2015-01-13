@@ -49,6 +49,10 @@ ENABLE_NODE_MONITORING=true
 ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
 
+# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_LOGGING=false
+ELASTICSEARCH_LOGGING_REPLICAS=1
+
 ENABLE_CLUSTER_MONITORING=false
 
 # Don't require https for registries in our local RFC1918 network
