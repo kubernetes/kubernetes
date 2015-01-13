@@ -19,10 +19,12 @@ package minion
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type alwaysYes struct{}
@@ -34,10 +36,12 @@ func (alwaysYes) HealthCheck(host string) (health.Status, error) {
 func TestBasicDelegation(t *testing.T) {
 	ctx := api.NewContext()
 	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"}, api.NodeResources{})
-	healthy := HealthyRegistry{
-		delegate: mockMinionRegistry,
-		client:   alwaysYes{},
-	}
+	healthy := NewHealthyRegistry(
+		mockMinionRegistry,
+		alwaysYes{},
+		&util.FakeClock{},
+		60*time.Second,
+	)
 	list, err := healthy.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -82,10 +86,12 @@ func (n *notMinion) HealthCheck(host string) (health.Status, error) {
 func TestFiltering(t *testing.T) {
 	ctx := api.NewContext()
 	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"}, api.NodeResources{})
-	healthy := HealthyRegistry{
-		delegate: mockMinionRegistry,
-		client:   &notMinion{minion: "m1"},
-	}
+	healthy := NewHealthyRegistry(
+		mockMinionRegistry,
+		&notMinion{minion: "m1"},
+		&util.FakeClock{},
+		60*time.Second,
+	)
 	expected := []string{"m1", "m2", "m3"}
 	list, err := healthy.ListMinions(ctx)
 	if err != nil {

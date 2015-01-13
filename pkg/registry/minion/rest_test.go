@@ -18,11 +18,13 @@ package minion
 
 import (
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestMinionRegistryREST(t *testing.T) {
@@ -89,12 +91,14 @@ func TestMinionRegistryREST(t *testing.T) {
 
 func TestMinionRegistryHealthCheck(t *testing.T) {
 	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
-	minionHealthRegistry := HealthyRegistry{
-		delegate: minionRegistry,
-		client:   &notMinion{minion: "m1"},
-	}
+	minionHealthRegistry := NewHealthyRegistry(
+		minionRegistry,
+		&notMinion{minion: "m1"},
+		&util.FakeClock{},
+		60*time.Second,
+	)
 
-	ms := NewREST(&minionHealthRegistry)
+	ms := NewREST(minionHealthRegistry)
 	ctx := api.NewContext()
 
 	c, err := ms.Create(ctx, &api.Node{ObjectMeta: api.ObjectMeta{Name: "m1"}})

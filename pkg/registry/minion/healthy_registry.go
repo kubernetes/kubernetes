@@ -17,23 +17,30 @@ limitations under the License.
 package minion
 
 import (
+	"sync"
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type HealthyRegistry struct {
 	delegate Registry
 	client   client.KubeletHealthChecker
+	cache    util.TimeCache
 }
 
-func NewHealthyRegistry(delegate Registry, client client.KubeletHealthChecker) Registry {
-	return &HealthyRegistry{
+func NewHealthyRegistry(delegate Registry, client client.KubeletHealthChecker, clock util.Clock, ttl time.Duration) Registry {
+	h := &HealthyRegistry{
 		delegate: delegate,
 		client:   client,
 	}
+	h.cache = util.NewTimeCache(clock, ttl, h.doCheck)
+	return h
 }
 
 func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
@@ -61,9 +68,17 @@ func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.Node
 	if err != nil {
 		return nil, err
 	}
+
+	// In case the cache is empty, health check in parallel instead of serially.
+	var wg sync.WaitGroup
+	wg.Add(len(list.Items))
 	for i := range list.Items {
-		list.Items[i] = *r.checkMinion(&list.Items[i])
+		go func(i int) {
+			list.Items[i] = *r.checkMinion(&list.Items[i])
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
 	return list, nil
 }
 
@@ -81,13 +96,7 @@ func (r *HealthyRegistry) WatchMinions(ctx api.Context, label, field labels.Sele
 }
 
 func (r *HealthyRegistry) checkMinion(node *api.Node) *api.Node {
-	condition := api.ConditionFull
-	switch status, err := r.client.HealthCheck(node.Name); {
-	case err != nil:
-		condition = api.ConditionUnknown
-	case status == health.Unhealthy:
-		condition = api.ConditionNone
-	}
+	condition := r.cache.Get(node.Name).(api.NodeConditionStatus)
 	// TODO: distinguish other conditions like Reachable/Live, and begin storing this
 	// data on nodes directly via sync loops.
 	node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
@@ -95,4 +104,16 @@ func (r *HealthyRegistry) checkMinion(node *api.Node) *api.Node {
 		Status: condition,
 	})
 	return node
+}
+
+// This is called to fill the cache.
+func (r *HealthyRegistry) doCheck(key string) util.T {
+	switch status, err := r.client.HealthCheck(key); {
+	case err != nil:
+		return api.ConditionUnknown
+	case status == health.Unhealthy:
+		return api.ConditionNone
+	default:
+		return api.ConditionFull
+	}
 }
