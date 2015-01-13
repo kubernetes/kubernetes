@@ -30,13 +30,13 @@ if [[ "$KUBERNETES_PROVIDER" != "gce" ]] && [[ "$KUBERNETES_PROVIDER" != "gke" ]
   exit 0
 fi
 
-disk_name="e2e-$(date +%H-%M-%s)"
+disk_name="e2e-$(date +%s)"
 config="/tmp/${disk_name}.yaml"
 
 function delete_pd_pod() {
   # Delete the pod this should unmount the PD
   ${KUBECFG} delete pods/testpd
-  for i in $(seq 1 24); do
+  for i in $(seq 1 30); do
     echo "Waiting for pod to be deleted."
     sleep 5
     all_running=0
@@ -61,7 +61,35 @@ function teardown() {
   echo "Cleaning up test artifacts"
   delete_pd_pod
   rm -rf ${config}
-  gcloud compute disks delete --quiet --zone="${ZONE}" "${disk_name}"
+
+  # This should really work immediately after the pod is killed, but
+  # it doesn't (yet). So let's be resilient to that.
+  #
+  # TODO: After
+  # https://github.com/GoogleCloudPlatform/kubernetes/issues/3437 is
+  # fixed, this should be stricter.
+  echo "Trying to delete detached pd."
+  if ! gcloud compute disks delete --quiet --zone="${ZONE}" "${disk_name}"; then
+      echo
+      echo "FAILED TO DELETE PD. AGGRESSIVELY DETACHING ${disk_name}."
+      echo
+      for minion in "${MINION_NAMES[@]}"; do
+	  "${GCLOUD}" compute instances detach-disk --quiet --zone="${ZONE}" --disk="${disk_name}" "${minion}" || true
+      done
+      # This is lame. GCE internals may not finish the actual detach for a little while.
+      deleted="false"
+      for i in $(seq 1 12); do
+	  sleep 5;
+	  if gcloud compute disks delete --quiet --zone="${ZONE}" "${disk_name}"; then
+	      deleted="true"
+	      break
+	  fi
+      done
+      if [[ ${deleted} != "true" ]]; then
+	  # At the end of the day, just give up and leak this thing.
+	  echo "REALLY FAILED TO DELETE PD. LEAKING ${disk_name}."
+      fi
+  fi
 }
 
 trap "teardown" EXIT
@@ -82,9 +110,10 @@ perl -p -e "s/%.*%/${disk_name}/g" ${KUBE_ROOT}/examples/gce-pd/testpd.yaml > ${
 ${KUBECFG} -c ${config} create pods
 
 pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=testpd list pods)
-# Pod turn up on a clean cluster can take a while for the docker image pull.
+# Pod turn up on a clean cluster can take a while for the docker image
+# pull, and even longer if the PD mount takes a bit.
 all_running=0
-for i in $(seq 1 24); do
+for i in $(seq 1 30); do
   echo "Waiting for pod to come up."
   sleep 5
   all_running=1
@@ -112,7 +141,7 @@ ${KUBECFG} -c ${config} create pods
 pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=testpd list pods)
 # Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
-for i in $(seq 1 24); do
+for i in $(seq 1 30); do
   echo "Waiting for pod to come up."
   sleep 5
   all_running=1
