@@ -1,5 +1,12 @@
 #cloud-config
 
+---
+write_files:
+- path: /opt/bin/waiter.sh
+  owner: root
+  content: |
+    #! /usr/bin/bash
+    until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
 hostname: standalone
 coreos:
   units:
@@ -7,10 +14,29 @@ coreos:
       command: start
     - name: fleet.service
       command: start
+    - name: etcd-waiter.service
+      command: start
+      content: |
+        [Unit]
+        Description=etcd waiter
+        Wants=network-online.target
+        Wants=etcd.service
+        After=etcd.service
+        After=network-online.target
+        Before=flannel.service
+        Before=setup-network-environment.service
+
+        [Service]
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/waiter.sh
+        ExecStart=/usr/bin/bash /opt/bin/waiter.sh
+        RemainAfterExit=true
+        Type=oneshot
     - name: flannel.service
       command: start
       content: |
         [Unit]
+        Wants=etcd-waiter.service
+        After=etcd-waiter.service
         Requires=etcd.service
         After=etcd.service
         After=network-online.target
