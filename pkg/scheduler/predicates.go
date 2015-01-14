@@ -125,7 +125,7 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 
 	fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 	fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
-	glog.V(3).Infof("Calculated fit: cpu: %s, memory %s", fitsCPU, fitsMemory)
+	glog.V(3).Infof("Calculated fit: cpu: %v, memory %v", fitsCPU, fitsMemory)
 
 	return fitsCPU && fitsMemory, nil
 }
