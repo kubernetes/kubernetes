@@ -121,10 +121,10 @@ for version in "${kube_api_versions[@]}"; do
   kubectl get pods "${kube_flags[@]}"
   kubectl get pod redis-master "${kube_flags[@]}"
   [ "$(kubectl get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]
-  output_pod=$(kubectl get pod redis-master -o json --output-version=v1beta1 "${kube_flags[@]}")
+  output_pod=$(kubectl get pod redis-master -o yaml --output-version=v1beta1 "${kube_flags[@]}")
   kubectl delete pod redis-master "${kube_flags[@]}"
   before="$(kubectl get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  echo $output_pod | kubectl create -f - "${kube_flags[@]}"
+  echo "${output_pod}" | kubectl create -f - "${kube_flags[@]}"
   after="$(kubectl get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   [ "$((${after} - ${before}))" -eq 1 ]
   kubectl get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: redis-master"
@@ -134,6 +134,10 @@ for version in "${kube_api_versions[@]}"; do
   kube::log::status "Testing kubectl(${version}:services)"
   kubectl get services "${kube_flags[@]}"
   kubectl create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
+  kubectl get services "${kube_flags[@]}"
+  output_service=$(kubectl get service frontend -o json --output-version=v1beta3 "${kube_flags[@]}")
+  kubectl delete service frontend "${kube_flags[@]}"
+  echo "${output_service}" | kubectl create -f - "${kube_flags[@]}"
   kubectl get services "${kube_flags[@]}"
   kubectl delete service frontend "${kube_flags[@]}"
 

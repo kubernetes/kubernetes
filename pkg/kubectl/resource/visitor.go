@@ -17,7 +17,6 @@ limitations under the License.
 package resource
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -31,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -344,7 +344,7 @@ func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, ignoreErrors b
 
 // Visit implements Visitor over a stream.
 func (v *StreamVisitor) Visit(fn VisitorFunc) error {
-	d := json.NewDecoder(v.Reader)
+	d := yaml.NewYAMLOrJSONDecoder(v.Reader, 4096)
 	for {
 		ext := runtime.RawExtension{}
 		if err := d.Decode(&ext); err != nil {
