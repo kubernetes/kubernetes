@@ -418,6 +418,7 @@ type ContainerStatus struct {
 type PodInfo map[string]ContainerStatus
 
 // PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
+// DEPRECATED: Replaced with PodStatusResult
 type PodContainerInfo struct {
 	TypeMeta      `json:",inline"`
 	ObjectMeta    `json:"metadata,omitempty"`
@@ -501,6 +502,15 @@ type PodStatus struct {
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
 	Info PodInfo `json:"info,omitempty"`
+}
+
+// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+type PodStatusResult struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+	// Status represents the current information about a pod. This data may not be up
+	// to date.
+	Status PodStatus `json:"status,omitempty"`
 }
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).

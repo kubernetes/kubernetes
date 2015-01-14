@@ -144,13 +144,13 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		return newStatus, nil
 	}
 
-	info, err := p.containerInfo.GetPodInfo(pod.Status.Host, pod.Namespace, pod.Name)
+	result, err := p.containerInfo.GetPodStatus(pod.Status.Host, pod.Namespace, pod.Name)
 	newStatus.HostIP = p.ipCache.GetInstanceIP(pod.Status.Host)
 
 	if err != nil {
 		newStatus.Phase = api.PodUnknown
 	} else {
-		newStatus.Info = info.ContainerInfo
+		newStatus.Info = result.Status.Info
 		newStatus.Phase = getPhase(&pod.Spec, newStatus.Info)
 		if netContainerInfo, ok := newStatus.Info["net"]; ok {
 			if netContainerInfo.PodIP != "" {
