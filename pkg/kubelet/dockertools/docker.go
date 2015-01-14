@@ -254,7 +254,7 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 // DockerContainers is a map of containers
 type DockerContainers map[DockerID]*docker.APIContainers
 
-func (c DockerContainers) FindPodContainer(podFullName, uuid, containerName string) (*docker.APIContainers, bool, uint64) {
+func (c DockerContainers) FindPodContainer(podFullName string, uid util.UID, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
 		if len(dockerContainer.Names) == 0 {
 			continue
@@ -262,7 +262,7 @@ func (c DockerContainers) FindPodContainer(podFullName, uuid, containerName stri
 		// TODO(proppy): build the docker container name and do a map lookup instead?
 		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
 		if dockerManifestID == podFullName &&
-			(uuid == "" || dockerUUID == uuid) &&
+			(uid == "" || dockerUUID == uid) &&
 			dockerContainerName == containerName {
 			return dockerContainer, true, hash
 		}
@@ -313,8 +313,8 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 }
 
 // GetRecentDockerContainersWithNameAndUUID returns a list of dead docker containers which matches the name
-// and uuid given.
-func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullName, uuid, containerName string) ([]*docker.Container, error) {
+// and uid given.
+func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullName string, uid util.UID, containerName string) ([]*docker.Container, error) {
 	var result []*docker.Container
 	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
@@ -328,7 +328,7 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 		if dockerPodName != podFullName {
 			continue
 		}
-		if uuid != "" && dockerUUID != uuid {
+		if uid != "" && dockerUUID != uid {
 			continue
 		}
 		if dockerContainerName != containerName {
@@ -447,7 +447,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 }
 
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
-func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName, uuid string) (api.PodInfo, error) {
+func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName string, uid util.UID) (api.PodInfo, error) {
 	info := api.PodInfo{}
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -468,7 +468,7 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName,
 		if dockerManifestID != podFullName {
 			continue
 		}
-		if uuid != "" && dockerUUID != uuid {
+		if uid != "" && dockerUUID != uid {
 			continue
 		}
 		c, found := expectedContainers[dockerContainerName]
@@ -545,7 +545,7 @@ func HashContainer(container *api.Container) uint64 {
 }
 
 // Creates a name which can be reversed to identify both full pod name and container name.
-func BuildDockerName(podUID, podFullName string, container *api.Container) string {
+func BuildDockerName(podUID util.UID, podFullName string, container *api.Container) string {
 	containerName := container.Name + "." + strconv.FormatUint(HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%08x",
 		containerNamePrefix,
@@ -557,7 +557,7 @@ func BuildDockerName(podUID, podFullName string, container *api.Container) strin
 
 // Unpacks a container name, returning the pod full name and container name we would have used to
 // construct the docker name. If the docker name isn't the one we created, we may return empty strings.
-func ParseDockerName(name string) (podFullName, podUID, containerName string, hash uint64) {
+func ParseDockerName(name string) (podFullName string, podUID util.UID, containerName string, hash uint64) {
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
 	if name[0] == '/' {
@@ -590,7 +590,7 @@ func ParseDockerName(name string) (podFullName, podUID, containerName string, ha
 	podFullName = parts[2]
 
 	// Pod UID.
-	podUID = parts[3]
+	podUID = util.UID(parts[3])
 
 	return
 }

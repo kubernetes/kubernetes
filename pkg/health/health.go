@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -35,7 +36,7 @@ const (
 
 // HealthChecker defines an abstract interface for checking container health.
 type HealthChecker interface {
-	HealthCheck(podFullName, podUUID string, status api.PodStatus, container api.Container) (Status, error)
+	HealthCheck(podFullName string, podUID util.UID, status api.PodStatus, container api.Container) (Status, error)
 	CanCheck(probe *api.LivenessProbe) bool
 }
 
@@ -78,13 +79,13 @@ func (m *muxHealthChecker) findCheckerFor(probe *api.LivenessProbe) HealthChecke
 
 // HealthCheck delegates the health-checking of the container to one of the bundled implementations.
 // If there is no health checker that can check container it returns Unknown, nil.
-func (m *muxHealthChecker) HealthCheck(podFullName, podUUID string, status api.PodStatus, container api.Container) (Status, error) {
+func (m *muxHealthChecker) HealthCheck(podFullName string, podUID util.UID, status api.PodStatus, container api.Container) (Status, error) {
 	checker := m.findCheckerFor(container.LivenessProbe)
 	if checker == nil {
 		glog.Warningf("Failed to find health checker for %s %+v", container.Name, container.LivenessProbe)
 		return Unknown, nil
 	}
-	return checker.HealthCheck(podFullName, podUUID, status, container)
+	return checker.HealthCheck(podFullName, podUID, status, container)
 }
 
 func (m *muxHealthChecker) CanCheck(probe *api.LivenessProbe) bool {

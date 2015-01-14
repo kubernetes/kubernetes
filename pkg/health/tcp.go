@@ -74,7 +74,7 @@ func DoTCPCheck(addr string) (Status, error) {
 	return Healthy, nil
 }
 
-func (t *TCPHealthChecker) HealthCheck(podFullName, podUUID string, status api.PodStatus, container api.Container) (Status, error) {
+func (t *TCPHealthChecker) HealthCheck(podFullName string, podUID util.UID, status api.PodStatus, container api.Container) (Status, error) {
 	host, port, err := getTCPAddrParts(status, container)
 	if err != nil {
 		return Unknown, err

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	cadvisor "github.com/google/cadvisor/info"
 )
 
@@ -53,7 +54,7 @@ func (kl *Kubelet) statsFromDockerContainer(cc cadvisorInterface, containerId st
 }
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func (kl *Kubelet) GetContainerInfo(podFullName string, uid util.UID, containerName string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
 	cc := kl.GetCadvisorClient()
 	if cc == nil {
 		return nil, nil
@@ -62,7 +63,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req
 	if err != nil {
 		return nil, err
 	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, containerName)
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, containerName)
 	if !found {
 		return nil, fmt.Errorf("couldn't find container")
 	}

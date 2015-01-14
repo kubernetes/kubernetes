@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 const (
@@ -52,7 +53,7 @@ func (s sortedPods) Less(i, j int) bool {
 func CreateValidPod(name, namespace, source string) api.BoundPod {
 	return api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         name, // for the purpose of testing, this is unique enough
+			UID:         util.UID(name), // for the purpose of testing, this is unique enough
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: map[string]string{kubelet.ConfigSourceAnnotationKey: source},

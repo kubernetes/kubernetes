@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Accessor takes an arbitary object pointer and returns meta.Interface.
@@ -151,7 +152,7 @@ func (resourceAccessor) SetName(obj runtime.Object, name string) error {
 	return nil
 }
 
-func (resourceAccessor) UID(obj runtime.Object) (string, error) {
+func (resourceAccessor) UID(obj runtime.Object) (util.UID, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -159,7 +160,7 @@ func (resourceAccessor) UID(obj runtime.Object) (string, error) {
 	return accessor.UID(), nil
 }
 
-func (resourceAccessor) SetUID(obj runtime.Object, uid string) error {
+func (resourceAccessor) SetUID(obj runtime.Object, uid util.UID) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -241,7 +242,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 type genericAccessor struct {
 	namespace       *string
 	name            *string
-	uid             *string
+	uid             *util.UID
 	apiVersion      *string
 	kind            *string
 	resourceVersion *string
@@ -278,14 +279,14 @@ func (a genericAccessor) SetName(name string) {
 	*a.name = name
 }
 
-func (a genericAccessor) UID() string {
+func (a genericAccessor) UID() util.UID {
 	if a.uid == nil {
 		return ""
 	}
 	return *a.uid
 }
 
-func (a genericAccessor) SetUID(uid string) {
+func (a genericAccessor) SetUID(uid util.UID) {
 	if a.uid == nil {
 		return
 	}

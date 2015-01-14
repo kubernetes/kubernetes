@@ -63,7 +63,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 
 	if len(controller.Name) == 0 {
-		controller.Name = util.NewUUID().String()
+		controller.Name = string(util.NewUUID())
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.Name, errs)

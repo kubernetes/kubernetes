@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type FakeExec struct {
@@ -30,7 +31,7 @@ type FakeExec struct {
 	err error
 }
 
-func (f *FakeExec) RunInContainer(podFullName, uuid, container string, cmd []string) ([]byte, error) {
+func (f *FakeExec) RunInContainer(podFullName string, uid util.UID, container string, cmd []string) ([]byte, error) {
 	f.cmd = cmd
 	return f.out, f.err
 }
