@@ -26,6 +26,9 @@ base:
     - sdn
 {% endif %}
     - monit
+{% if grains['os_family'] == 'RedHat' %}
+    - gssproxy
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
@@ -47,6 +50,10 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] == 'vagrant' %}
     - docker
     - sdn
+{% endif %}
+{% if grains['os_family'] == 'RedHat' %}
+    - gssproxy
+    - saslauthd
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':
