@@ -87,9 +87,9 @@ function start_service() {
                                           "containerPort": 9376,
                                           "protocol": "TCP"
                                       }
-                                  ],
+                                  ]
                               }
-                          ],
+                          ]
                       }
                   },
                   "labels": {
