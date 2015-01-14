@@ -76,7 +76,9 @@ func (c *PodConfig) Channel(source string) chan<- interface{} {
 	return c.mux.Channel(source)
 }
 
-func (c *PodConfig) SourceSeen(source string) bool {
+// IsSourceSeen returns true if the specified source string has previously
+// been marked as seen.
+func (c *PodConfig) IsSourceSeen(source string) bool {
 	if c.pods == nil {
 		return false
 	}
