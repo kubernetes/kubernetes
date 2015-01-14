@@ -87,3 +87,12 @@ func AddAllFlagsToPFlagSet(fs *pflag.FlagSet) {
 func AddAllFlagsToPFlags() {
 	AddFlagSetToPFlagSet(flag.CommandLine, pflag.CommandLine)
 }
+
+// Merge all of the flags from fsFrom into fsTo.
+func AddPFlagSetToPFlagSet(fsFrom *pflag.FlagSet, fsTo *pflag.FlagSet) {
+	fsFrom.VisitAll(func(f *pflag.Flag) {
+		if fsTo.Lookup(f.Name) == nil {
+			fsTo.AddFlag(f)
+		}
+	})
+}
