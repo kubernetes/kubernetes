@@ -188,14 +188,9 @@ function detect-master() {
 #   NUM_MINIONS
 #   CLUSTER_NAME
 # Vars set:
-#   MINION_NAMES (array)
+#   (none)
 function detect-minions() {
   echo "... in detect-minions()" >&2
-  # Just get the minion names.
-  MINION_NAMES=()
-  for (( i=1; i<=${NUM_MINIONS}; i++)); do
-    MINION_NAMES+=("k8s-${CLUSTER_NAME}-node-${i}")
-  done
 }
 
 # SSH to a node by name ($1) and run a command ($2).

@@ -21,6 +21,7 @@
 MASTER_NAME="k8s-${CLUSTER_NAME}-master"
 ZONE="${ZONE:-us-central1-f}"
 NUM_MINIONS="${NUM_MINIONS:-2}"
+MINION_NAMES=($(eval echo "k8s-${CLUSTER_NAME}-node-{1..${NUM_MINIONS}}"))
 CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"
 # TODO(mbforbes): Actually plumb this through; this currently only works
 #                 because we use the 'default' network by default.
