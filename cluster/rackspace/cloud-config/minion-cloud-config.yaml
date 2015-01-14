@@ -12,6 +12,14 @@ write_files:
       set) ip route replace $net via $nh dev eth2 metric 900 ;;
       expire) ip route del $net via $nh metric 900 ;;
       esac
+  - path: /opt/bin/regen-apiserver-list.sh
+    permissions: 0755
+    content: |
+      #!/bin/sh
+      m=$(echo $(etcdctl ls --recursive /corekube/apiservers | cut -d/ -f4 | sort) | tr ' ' ,)
+      mkdir -p /run/kubelet
+      echo "APISERVER_IPS=$m" > /run/kubelet/apiservers.env
+      echo "FIRST_APISERVER_URL=http://${m%%\,*}:7080" >> /run/kubelet/apiservers.env
   - path: /opt/bin/download-release.sh
     permissions: 0755
     content: |
@@ -67,8 +75,9 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
+        EnvironmentFile=/run/kubelet/apiserver.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
-        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --config=/opt/kubernetes-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
+        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --api_servers=$FIRST_APISERVER_URL --logtostderr=true --config=/opt/kubernetes-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
         Restart=always
         RestartSec=2
     - name: minion-proxy.service
@@ -84,10 +93,31 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
+        EnvironmentFile=/run/kubelet/apiserver.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
-        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --v=2
+        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --master=$FIRST_APISERVER_URL --logtostderr=true
         Restart=always
         RestartSec=2
+    - name: kubelet-sighup.path
+      command: start
+      content: |
+        [Path]
+        PathChanged=/run/kubelet/apiservers.env
+    - name: kubelet-sighup.service
+      command: start
+      content: |
+        [Service]
+        ExecStart=/usr/bin/pkill -SIGHUP -f kubelet
+    - name: kube-proxy-sighup.path
+      command: start
+      content: |
+        [Path]
+        PathChanged=/run/kubelet/apiservers.env
+    - name: kube-proxy-sighup.service
+      command: start
+      content: |
+        [Service]
+        ExecStart=/usr/bin/pkill -SIGHUP -f kube-proxy
     - name: minion-advertiser.service
       command: start
       content: |
@@ -100,6 +130,20 @@ coreos:
         ExecStart=/bin/sh -c 'while :; do etcdctl set /corekube/minions/$private_ipv4 $private_ipv4 --ttl 300; sleep 120; done'
         Restart=always
         RestartSec=120
+    - name: apiserver-finder.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Apiserver finder
+        After=network-online.target
+        Requires=network-online.target
+        After=etcd.service
+        Requires=etcd.service
+        [Service]
+        ExecStartPre=/opt/bin/regen-apiserver-list.sh
+        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/apiservers -- /opt/bin/regen-apiserver-list.sh
+        Restart=always
+        RestartSec=30
     - name: net-advertiser.service
       command: start
       content: |

@@ -80,6 +80,18 @@ coreos:
         ExecStart=/opt/bin/kube-apiserver --address=127.0.0.1 --port=8080 --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true --cloud_provider=rackspace --cloud_config=/etc/cloud.conf --v=2
         Restart=always
         RestartSec=2
+    - name: apiserver-advertiser.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Apiserver Advertiser
+        After=etcd.service
+        Requires=etcd.service
+        After=master-apiserver.service
+        [Service]
+        ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$private_ipv4 $private_ipv4'
+        Restart=always
+        RestartSec=120
     - name: master-controller-manager.service
       command: start
       content: |
