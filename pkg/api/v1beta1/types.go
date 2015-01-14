@@ -825,7 +825,7 @@ type Event struct {
 	// TODO: provide exact specification for format.
 	Source string `json:"source,omitempty" description:"component reporting this event; short machine understandable string"`
 	// Host name on which the event is generated.
-	Host string `json:"host,omitempty"`
+	Host string `json:"host,omitempty" description:"host name on which this event was generated"`
 
 	// The time at which the client recorded the event. (Time of server receipt is in TypeMeta.)
 	Timestamp util.Time `json:"timestamp,omitempty" description:"time at which the client recorded the event"`
