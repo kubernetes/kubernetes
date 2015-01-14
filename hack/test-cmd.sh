@@ -90,9 +90,9 @@ CTLRMGR_PID=$!
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): " 0.2 25
 
-kube_cmd=(
-  "${KUBE_OUTPUT_HOSTBIN}/kubectl"
-)
+# expose kubectl directly for readability
+PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
+
 kube_api_versions=(
   ""
   v1beta1
@@ -105,56 +105,56 @@ for version in "${kube_api_versions[@]}"; do
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
     )
-    [ "$("${kube_cmd[@]}" get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta1" ]
+    [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta1" ]
   else
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
       --api-version="${version}"
     )
-    [ "$("${kube_cmd[@]}" get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
+    [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
 
   kube::log::status "Testing kubectl(${version}:pods)"
-  "${kube_cmd[@]}" get pods "${kube_flags[@]}"
-  "${kube_cmd[@]}" create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
-  "${kube_cmd[@]}" get pods "${kube_flags[@]}"
-  "${kube_cmd[@]}" get pod redis-master "${kube_flags[@]}"
-  [ "$("${kube_cmd[@]}" get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]
-  output_pod=$("${kube_cmd[@]}" get pod redis-master -o json --output-version=v1beta1 "${kube_flags[@]}")
-  "${kube_cmd[@]}" delete pod redis-master "${kube_flags[@]}"
-  before="$("${kube_cmd[@]}" get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
-  after="$("${kube_cmd[@]}" get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  kubectl get pods "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl get pods "${kube_flags[@]}"
+  kubectl get pod redis-master "${kube_flags[@]}"
+  [ "$(kubectl get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]
+  output_pod=$(kubectl get pod redis-master -o json --output-version=v1beta1 "${kube_flags[@]}")
+  kubectl delete pod redis-master "${kube_flags[@]}"
+  before="$(kubectl get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  echo $output_pod | kubectl create -f - "${kube_flags[@]}"
+  after="$(kubectl get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   [ "$((${after} - ${before}))" -eq 1 ]
-  "${kube_cmd[@]}" get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: redis-master"
-  "${kube_cmd[@]}" describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
-  "${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: redis-master"
+  kubectl describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
+  kubectl delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
 
   kube::log::status "Testing kubectl(${version}:services)"
-  "${kube_cmd[@]}" get services "${kube_flags[@]}"
-  "${kube_cmd[@]}" create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
-  "${kube_cmd[@]}" get services "${kube_flags[@]}"
-  "${kube_cmd[@]}" delete service frontend "${kube_flags[@]}"
+  kubectl get services "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
+  kubectl get services "${kube_flags[@]}"
+  kubectl delete service frontend "${kube_flags[@]}"
 
   kube::log::status "Testing kubectl(${version}:replicationcontrollers)"
-  "${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
-  "${kube_cmd[@]}" create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
-  "${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
-  "${kube_cmd[@]}" describe replicationcontroller frontendController "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
-  "${kube_cmd[@]}" delete rc frontendController "${kube_flags[@]}"
+  kubectl get replicationcontrollers "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+  kubectl get replicationcontrollers "${kube_flags[@]}"
+  kubectl describe replicationcontroller frontendController "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
+  kubectl delete rc frontendController "${kube_flags[@]}"
 
   kube::log::status "Testing kubectl(${version}:nodes)"
-  "${kube_cmd[@]}" get nodes "${kube_flags[@]}"
-  "${kube_cmd[@]}" describe nodes 127.0.0.1 "${kube_flags[@]}"
+  kubectl get nodes "${kube_flags[@]}"
+  kubectl describe nodes 127.0.0.1 "${kube_flags[@]}"
 
   if [[ "${version}" != "v1beta3" ]]; then
     kube::log::status "Testing kubectl(${version}:minions)"
-    "${kube_cmd[@]}" get minions "${kube_flags[@]}"
-    "${kube_cmd[@]}" get minions 127.0.0.1 "${kube_flags[@]}"
-    "${kube_cmd[@]}" get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' "${kube_flags[@]}"
+    kubectl get minions "${kube_flags[@]}"
+    kubectl get minions 127.0.0.1 "${kube_flags[@]}"
+    kubectl get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' "${kube_flags[@]}"
     # TODO: I should be a MinionList instead of List
-    [ "$("${kube_cmd[@]}" get minions -t $'{{ .kind }}' "${kube_flags[@]}")" == "List" ]
+    [ "$(kubectl get minions -t $'{{ .kind }}' "${kube_flags[@]}")" == "List" ]
   fi
 done
 
