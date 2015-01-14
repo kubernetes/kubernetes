@@ -5,7 +5,7 @@ A Volume is a directory, possibly with some data in it, which is accessible to a
 
 A Pod specifies which Volumes its containers need in its [ContainerManifest](https://developers.google.com/compute/docs/containers/container_vms#container_manifest) property.
 
-A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes.  A [Docker image](https://docs.docker.com/userguide/dockerimages/) is at the root of the file hierarchy.  Any Volumes are mounted at points on the Docker image;  Volumes do not mount on other Volumes and do not have hard links to other Volumes.  Each container in the Pod independently specifies where on its its image to mount each Volume.  This is specified a VolumeMounts property.
+A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes.  A [Docker image](https://docs.docker.com/userguide/dockerimages/) is at the root of the file hierarchy.  Any Volumes are mounted at points on the Docker image;  Volumes do not mount on other Volumes and do not have hard links to other Volumes.  Each container in the Pod independently specifies where on its image to mount each Volume.  This is specified a VolumeMounts property.
 
 ## Resources
 
