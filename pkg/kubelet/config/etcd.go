@@ -59,7 +59,7 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 
 func (s *sourceEtcd) run() {
 	boundPods := api.BoundPods{}
-	err := s.helper.ExtractToList(s.key, &boundPods)
+	err := s.helper.ExtractObj(s.key, &boundPods, false)
 	if err != nil {
 		glog.Errorf("etcd failed to retrieve the value for the key %q. Error: %v", s.key, err)
 		return
