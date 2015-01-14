@@ -81,7 +81,7 @@ func ParsePodFullName(podFullName string) (podName, podNamespace string, podAnno
 	expectedNumFields := 3
 	actualNumFields := len(parts)
 	if actualNumFields != expectedNumFields {
-		glog.Warningf("found a podFullName (%q) with too few fields: expected %d, actual %d.", podFullName, expectedNumFields, actualNumFields)
+		glog.Errorf("found a podFullName (%q) with too few fields: expected %d, actual %d.", podFullName, expectedNumFields, actualNumFields)
 		return
 	}
 	podName = parts[0]
