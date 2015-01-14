@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ghodss/yaml"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
@@ -111,6 +113,26 @@ func streamTestData() (io.Reader, *api.PodList, *api.ServiceList) {
 		defer w.Close()
 		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, pods)))
 		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, svc)))
+	}()
+	return r, pods, svc
+}
+
+func JSONToYAMLOrDie(in []byte) []byte {
+	data, err := yaml.JSONToYAML(in)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
+func streamYAMLTestData() (io.Reader, *api.PodList, *api.ServiceList) {
+	pods, svc := testData()
+	r, w := io.Pipe()
+	go func() {
+		defer w.Close()
+		w.Write(JSONToYAMLOrDie([]byte(runtime.EncodeOrDie(latest.Codec, pods))))
+		w.Write([]byte("\n---\n"))
+		w.Write(JSONToYAMLOrDie([]byte(runtime.EncodeOrDie(latest.Codec, svc))))
 	}()
 	return r, pods, svc
 }
@@ -355,6 +377,23 @@ func TestSingleResourceType(t *testing.T) {
 
 func TestStream(t *testing.T) {
 	r, pods, rc := streamTestData()
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").Stream(r, "STDIN").Flatten()
+
+	test := &testVisitor{}
+	singular := false
+
+	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
+	if err != nil || singular || len(test.Infos) != 3 {
+		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
+	}
+	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+		t.Errorf("unexpected visited objects: %#v", test.Objects())
+	}
+}
+
+func TestYAMLStream(t *testing.T) {
+	r, pods, rc := streamYAMLTestData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
