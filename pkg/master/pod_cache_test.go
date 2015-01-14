@@ -36,7 +36,7 @@ type podInfoCall struct {
 
 type podInfoResponse struct {
 	useCount int
-	data     api.PodContainerInfo
+	data     api.PodStatusResult
 	err      error
 }
 
@@ -48,11 +48,11 @@ type FakePodInfoGetter struct {
 
 	// default data/error to return, or you can add
 	// responses to specific calls-- that will take precedence.
-	data api.PodContainerInfo
+	data api.PodStatusResult
 	err  error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, namespace, name string) (api.PodContainerInfo, error) {
+func (f *FakePodInfoGetter) GetPodStatus(host, namespace, name string) (api.PodStatusResult, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -147,7 +147,7 @@ type podCacheTestConfig struct {
 	ipFunc               func(string) string // Construct will set a default if nil
 	nodes                []api.Node
 	pods                 []api.Pod
-	kubeletContainerInfo api.PodInfo
+	kubeletContainerInfo api.PodStatus
 
 	// Construct will fill in these fields
 	fakePodInfo *FakePodInfoGetter
@@ -162,8 +162,8 @@ func (c *podCacheTestConfig) Construct() *PodCache {
 		}
 	}
 	c.fakePodInfo = &FakePodInfoGetter{
-		data: api.PodContainerInfo{
-			ContainerInfo: c.kubeletContainerInfo,
+		data: api.PodStatusResult{
+			Status: c.kubeletContainerInfo,
 		},
 	}
 	c.fakeNodes = &client.Fake{
@@ -209,9 +209,10 @@ func TestPodUpdateAllContainers(t *testing.T) {
 			}
 			return ""
 		},
-		kubeletContainerInfo: api.PodInfo{"bar": api.ContainerStatus{}},
-		nodes:                []api.Node{*makeNode("machine")},
-		pods:                 []api.Pod{*pod, *pod2},
+		kubeletContainerInfo: api.PodStatus{
+			Info: api.PodInfo{"bar": api.ContainerStatus{}}},
+		nodes: []api.Node{*makeNode("machine")},
+		pods:  []api.Pod{*pod, *pod2},
 	}
 	cache := config.Construct()
 
@@ -233,7 +234,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %+v", err)
 	}
-	if e, a := config.kubeletContainerInfo, status.Info; !reflect.DeepEqual(e, a) {
+	if e, a := config.kubeletContainerInfo.Info, status.Info; !reflect.DeepEqual(e, a) {
 		t.Errorf("Unexpected mismatch. Expected: %+v, Got: %+v", e, a)
 	}
 	if e, a := "1.2.3.5", status.HostIP; e != a {
@@ -252,7 +253,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 func TestFillPodStatusNoHost(t *testing.T) {
 	pod := makePod(api.NamespaceDefault, "foo", "", "bar")
 	config := podCacheTestConfig{
-		kubeletContainerInfo: api.PodInfo{},
+		kubeletContainerInfo: api.PodStatus{},
 		nodes:                []api.Node{*makeNode("machine")},
 		pods:                 []api.Pod{*pod},
 	}
@@ -271,7 +272,7 @@ func TestFillPodStatusNoHost(t *testing.T) {
 func TestFillPodStatusMissingMachine(t *testing.T) {
 	pod := makePod(api.NamespaceDefault, "foo", "machine", "bar")
 	config := podCacheTestConfig{
-		kubeletContainerInfo: api.PodInfo{},
+		kubeletContainerInfo: api.PodStatus{},
 		nodes:                []api.Node{},
 		pods:                 []api.Pod{*pod},
 	}
@@ -292,15 +293,21 @@ func TestFillPodStatus(t *testing.T) {
 	expectedIP := "1.2.3.4"
 	expectedTime, _ := time.Parse("2013-Feb-03", "2013-Feb-03")
 	config := podCacheTestConfig{
-		kubeletContainerInfo: api.PodInfo{
-			"net": {
-				State: api.ContainerState{
-					Running: &api.ContainerStateRunning{
-						StartedAt: util.NewTime(expectedTime),
+		kubeletContainerInfo: api.PodStatus{
+			Phase:  api.PodPending,
+			Host:   "machine",
+			HostIP: "ip of machine",
+			PodIP:  expectedIP,
+			Info: api.PodInfo{
+				"net": {
+					State: api.ContainerState{
+						Running: &api.ContainerStateRunning{
+							StartedAt: util.NewTime(expectedTime),
+						},
 					},
+					RestartCount: 1,
+					PodIP:        expectedIP,
 				},
-				RestartCount: 1,
-				PodIP:        expectedIP,
 			},
 		},
 		nodes: []api.Node{*makeNode("machine")},
@@ -313,11 +320,8 @@ func TestFillPodStatus(t *testing.T) {
 	}
 
 	status, err := cache.GetPodStatus(pod.Namespace, pod.Name)
-	if e, a := config.kubeletContainerInfo, status.Info; !reflect.DeepEqual(e, a) {
+	if e, a := &config.kubeletContainerInfo, status; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %+v, Got %+v", e, a)
-	}
-	if status.PodIP != expectedIP {
-		t.Errorf("Expected %s, Got %s\n%+v", expectedIP, status.PodIP, status)
 	}
 }
 
@@ -325,8 +329,13 @@ func TestFillPodInfoNoData(t *testing.T) {
 	pod := makePod(api.NamespaceDefault, "foo", "machine", "bar")
 	expectedIP := ""
 	config := podCacheTestConfig{
-		kubeletContainerInfo: api.PodInfo{
-			"net": {},
+		kubeletContainerInfo: api.PodStatus{
+			Phase:  api.PodPending,
+			Host:   "machine",
+			HostIP: "ip of machine",
+			Info: api.PodInfo{
+				"net": {},
+			},
 		},
 		nodes: []api.Node{*makeNode("machine")},
 		pods:  []api.Pod{*pod},
@@ -338,7 +347,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 	}
 
 	status, err := cache.GetPodStatus(pod.Namespace, pod.Name)
-	if e, a := config.kubeletContainerInfo, status.Info; !reflect.DeepEqual(e, a) {
+	if e, a := &config.kubeletContainerInfo, status; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %+v, Got %+v", e, a)
 	}
 	if status.PodIP != expectedIP {
@@ -411,7 +420,7 @@ func TestPodPhaseWithBadNode(t *testing.T) {
 	}
 	for _, test := range tests {
 		config := podCacheTestConfig{
-			kubeletContainerInfo: test.pod.Status.Info,
+			kubeletContainerInfo: test.pod.Status,
 			nodes:                []api.Node{},
 			pods:                 []api.Pod{*test.pod},
 		}

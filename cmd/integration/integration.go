@@ -61,7 +61,7 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error) {
+func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
 	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podID)
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
@@ -80,7 +80,7 @@ func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodCo
 	default:
 		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
 	}
-	return c.GetPodInfo("localhost", podNamespace, podID)
+	return c.GetPodStatus("localhost", podNamespace, podID)
 }
 
 func (fakeKubeletClient) HealthCheck(host string) (health.Status, error) {
@@ -221,7 +221,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 			if len(host) == 0 {
 				return false, nil
 			}
-			if _, err := podInfo.GetPodInfo(host, namespace, id); err != nil {
+			if _, err := podInfo.GetPodStatus(host, namespace, id); err != nil {
 				return false, nil
 			}
 		}

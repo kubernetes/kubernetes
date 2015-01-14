@@ -435,13 +435,6 @@ type ContainerStatus struct {
 // PodInfo contains one entry for every container with available info.
 type PodInfo map[string]ContainerStatus
 
-// PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
-type PodContainerInfo struct {
-	TypeMeta      `json:",inline"`
-	ObjectMeta    `json:"metadata,omitempty"`
-	ContainerInfo PodInfo `json:"containerInfo" description:"information about each container in this pod"`
-}
-
 type RestartPolicyAlways struct{}
 
 // TODO(dchen1107): Define what kinds of failures should restart.
@@ -509,6 +502,15 @@ type PodStatus struct {
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
 	Info PodInfo `json:"info,omitempty"`
+}
+
+// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+type PodStatusResult struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+	// Status represents the current information about a pod. This data may not be up
+	// to date.
+	Status PodStatus `json:"status,omitempty"`
 }
 
 // Pod is a collection of containers that can run on a host. This resource is created

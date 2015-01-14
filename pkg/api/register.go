@@ -25,9 +25,9 @@ var Scheme = runtime.NewScheme()
 
 func init() {
 	Scheme.AddKnownTypes("",
-		&PodContainerInfo{},
-		&PodList{},
 		&Pod{},
+		&PodList{},
+		&PodStatusResult{},
 		&ReplicationControllerList{},
 		&ReplicationController{},
 		&ServiceList{},
@@ -55,9 +55,9 @@ func init() {
 	Scheme.AddKnownTypeWithName("", "ServerOpList", &OperationList{})
 }
 
-func (*PodContainerInfo) IsAnAPIObject()          {}
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
+func (*PodStatusResult) IsAnAPIObject()           {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}

@@ -375,6 +375,11 @@ type PodState struct {
 	Info PodInfo `json:"info,omitempty" description:"map of container name to container status"`
 }
 
+type PodStatusResult struct {
+	TypeMeta `json:",inline"`
+	State    PodState `json:"state,omitempty" description:"current state of the pod"`
+}
+
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline"`

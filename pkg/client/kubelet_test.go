@@ -31,9 +31,12 @@ import (
 )
 
 func TestHTTPKubeletClient(t *testing.T) {
-	expectObj := api.PodContainerInfo{
-		ContainerInfo: map[string]api.ContainerStatus{
-			"myID": {},
+	expectObj := api.PodStatusResult{
+		Status: api.PodStatus{
+			Info: map[string]api.ContainerStatus{
+				"myID1": {},
+				"myID2": {},
+			},
 		},
 	}
 	body, err := json.Marshal(expectObj)
@@ -64,13 +67,13 @@ func TestHTTPKubeletClient(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	gotObj, err := podInfoGetter.GetPodInfo(parts[0], api.NamespaceDefault, "foo")
+	gotObj, err := podInfoGetter.GetPodStatus(parts[0], api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
-	if len(gotObj.ContainerInfo) != len(expectObj.ContainerInfo) {
+	if len(gotObj.Status.Info) != len(expectObj.Status.Info) {
 		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }
@@ -109,7 +112,7 @@ func TestHTTPKubeletClientNotFound(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	_, err = podInfoGetter.GetPodInfo(parts[0], api.NamespaceDefault, "foo")
+	_, err = podInfoGetter.GetPodStatus(parts[0], api.NamespaceDefault, "foo")
 	if err != ErrPodInfoNotAvailable {
 		t.Errorf("Expected %#v, Got %#v", ErrPodInfoNotAvailable, err)
 	}
