@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -355,6 +356,10 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 				return nil
 			}
 			return err
+		}
+		ext.RawJSON = bytes.TrimSpace(ext.RawJSON)
+		if len(ext.RawJSON) == 0 || bytes.Equal(ext.RawJSON, []byte("null")) {
+			continue
 		}
 		info, err := v.InfoForData(ext.RawJSON, v.Source)
 		if err != nil {

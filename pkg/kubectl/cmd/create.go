@@ -55,6 +55,7 @@ Examples:
 				Flatten().
 				Do()
 
+			count := 0
 			err = r.Visit(func(info *resource.Info) error {
 				data, err := info.Mapping.Codec.Encode(info.Object)
 				if err != nil {
@@ -66,11 +67,15 @@ Examples:
 				if err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data); err != nil {
 					return err
 				}
+				count++
 				// TODO: if generation of names added to server side, change this to use the server's name
 				fmt.Fprintf(out, "%s\n", info.Name)
 				return nil
 			})
 			checkErr(err)
+			if count == 0 {
+				checkErr(fmt.Errorf("no objects passed to create"))
+			}
 		},
 	}
 	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file to use to create the resource")

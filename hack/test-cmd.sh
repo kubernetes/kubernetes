@@ -115,6 +115,9 @@ for version in "${kube_api_versions[@]}"; do
     [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
 
+  # passing no arguments to create is an error
+  [ ! $(kubectl create) ]
+
   kube::log::status "Testing kubectl(${version}:pods)"
   kubectl get pods "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
@@ -144,14 +147,11 @@ for version in "${kube_api_versions[@]}"; do
           "apiVersion": "v1beta1",
           "id": "service-${version}-test",
           "port": 80,
-          "protocol": "TCP",
-          "labels": {
-              "name": "${version}"
-          }
+          "protocol": "TCP"
       }
 __EOF__
-  kubectl get services "something-${version}" "${kube_flags[@]}"
   kubectl get services "${kube_flags[@]}"
+  kubectl get services "service-${version}-test" "${kube_flags[@]}"
   kubectl delete service frontend "${kube_flags[@]}"
 
   kube::log::status "Testing kubectl(${version}:replicationcontrollers)"
