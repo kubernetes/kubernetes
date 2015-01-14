@@ -766,8 +766,14 @@ func chooseHostInterface() (net.IP, error) {
 	i := 0
 	for i = range intfs {
 		if flagsSet(intfs[i].Flags, net.FlagUp) && flagsClear(intfs[i].Flags, net.FlagLoopback|net.FlagPointToPoint) {
-			// This interface should suffice.
-			break
+			addrs, err := intfs[i].Addrs()
+			if err != nil {
+				return nil, err
+			}
+			if len(addrs) > 0 {
+				// This interface should suffice.
+				break
+			}
 		}
 	}
 	if i == len(intfs) {
