@@ -33,6 +33,7 @@ detect-master > /dev/null
 detect-minions > /dev/null
 
 MINIONS_FILE=/tmp/minions
+# Make several attempts to deal with slow cluster birth.
 attempt=0
 while true; do
   "${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' > "${MINIONS_FILE}"
@@ -57,24 +58,14 @@ fi
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
-    # Make several attempts to deal with slow cluster birth.
-    attempt=0
-    while true; do
-      echo -n "Attempt $((attempt+1)) to find ${MINION_NAMES[$i]} ..."
-      count=$(grep -c "${MINION_NAMES[$i]}" "${MINIONS_FILE}") || :
-      if [[ "${count}" == "0" ]]; then
-          if (( attempt > 5 )); then
-            echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
-            exit 1
-          fi
-      else
-        echo -e " ${color_green}[working]${color_norm}"
-        break
-      fi
-      echo -e " ${color_yellow}[not working yet]${color_norm}"
-      attempt=$((attempt+1))
-      sleep 20
-    done
+    count=$(grep -c "${MINION_NAMES[$i]}" "${MINIONS_FILE}") || :
+    if [[ "${count}" == "0" ]]; then
+      echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
+      exit 1
+    else
+      echo -e " ${color_green}[working]${color_norm}"
+      break
+    fi
 
     name="${MINION_NAMES[$i]}"
     if [ "$KUBERNETES_PROVIDER" != "vsphere" ] && [ "$KUBERNETES_PROVIDER" != "vagrant" ]; then
