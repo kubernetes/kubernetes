@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -76,13 +77,16 @@ func NewMainKubelet(
 	sourceReady SourceReadyFn,
 	clusterDomain string,
 	clusterDNS net.IP) (*Kubelet, error) {
+	if rootDirectory == "" {
+		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
+	}
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
 	}
 	if minimumGCAge <= 0 {
 		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
 	}
-	return &Kubelet{
+	klet := &Kubelet{
 		hostname:              hostname,
 		dockerClient:          dockerClient,
 		etcdClient:            etcdClient,
@@ -100,7 +104,13 @@ func NewMainKubelet(
 		sourceReady:           sourceReady,
 		clusterDomain:         clusterDomain,
 		clusterDNS:            clusterDNS,
-	}, nil
+	}
+
+	if err := klet.setupDataDirs(); err != nil {
+		return nil, err
+	}
+
+	return klet, nil
 }
 
 type httpGetter interface {
@@ -232,6 +242,32 @@ func dirExists(path string) bool {
 		return false
 	}
 	return s.IsDir()
+}
+
+func (kl *Kubelet) setupDataDirs() error {
+	kl.rootDirectory = path.Clean(kl.rootDirectory)
+	if err := os.MkdirAll(kl.GetRootDir(), 0750); err != nil {
+		return fmt.Errorf("error creating root directory: %v", err)
+	}
+	if err := os.MkdirAll(kl.GetPodsDir(), 0750); err != nil {
+		return fmt.Errorf("error creating pods directory: %v", err)
+	}
+	return nil
+}
+
+// Get a list of pods that have data directories.
+func (kl *Kubelet) listPodsFromDisk() ([]string, error) {
+	podInfos, err := ioutil.ReadDir(kl.GetPodsDir())
+	if err != nil {
+		return nil, err
+	}
+	pods := []string{}
+	for i := range podInfos {
+		if podInfos[i].IsDir() {
+			pods = append(pods, podInfos[i].Name())
+		}
+	}
+	return pods, nil
 }
 
 type ByCreated []*docker.Container
@@ -834,6 +870,14 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	killedContainers := make(map[dockertools.DockerID]empty)
 	glog.V(4).Infof("Syncing Pod, podFullName: %q, uuid: %q", podFullName, uuid)
 
+	// Make data dirs.
+	if err := os.Mkdir(kl.GetPodDir(uuid), 0750); err != nil && !os.IsExist(err) {
+		return err
+	}
+	if err := os.Mkdir(kl.GetPodVolumesDir(uuid), 0750); err != nil && !os.IsExist(err) {
+		return err
+	}
+
 	// Make sure we have a network container
 	var netID dockertools.DockerID
 	if netDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
@@ -1008,9 +1052,30 @@ func getDesiredVolumes(pods []api.BoundPod) map[string]api.Volume {
 	return desiredVolumes
 }
 
+func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
+	desired := util.NewStringSet()
+	for i := range pods {
+		desired.Insert(pods[i].UID)
+	}
+	found, err := kl.listPodsFromDisk()
+	if err != nil {
+		return err
+	}
+	errlist := []error{}
+	for i := range found {
+		if !desired.Has(found[i]) {
+			glog.V(3).Infof("Orphaned pod %q found, removing", found[i])
+			if err := os.RemoveAll(kl.GetPodDir(found[i])); err != nil {
+				errlist = append(errlist, err)
+			}
+		}
+	}
+	return errors.NewAggregate(errlist)
+}
+
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) reconcileVolumes(pods []api.BoundPod) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := volume.GetCurrentVolumes(kl.rootDirectory)
 	for name, vol := range currentVolumes {
@@ -1087,8 +1152,17 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		}
 	}
 
+	// Remove any orphaned pods.
+	err = kl.cleanupOrphanedPods(pods)
+	if err != nil {
+		return err
+	}
+
 	// Remove any orphaned volumes.
-	kl.reconcileVolumes(pods)
+	err = kl.cleanupOrphanedVolumes(pods)
+	if err != nil {
+		return err
+	}
 
 	return err
 }

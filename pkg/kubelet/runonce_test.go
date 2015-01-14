@@ -66,7 +66,12 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 }
 
 func TestRunOnce(t *testing.T) {
-	kb := &Kubelet{}
+	kb := &Kubelet{
+		rootDirectory: "/tmp/kubelet",
+	}
+	if err := kb.setupDataDirs(); err != nil {
+		t.Errorf("Failed to init data dirs: %v", err)
+	}
 	podContainers := []docker.APIContainers{
 		{
 			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo.new.test_12345678_42"},

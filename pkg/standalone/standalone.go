@@ -179,9 +179,6 @@ func RunKubelet(kcfg *KubeletConfig) {
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
 
 	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
-	if len(kcfg.RootDirectory) > 0 {
-		kubelet.SetupRootDirectoryOrDie(kcfg.RootDirectory)
-	}
 
 	cfg := makePodSourceConfig(kcfg)
 	k, err := createAndInitKubelet(kcfg, cfg)
