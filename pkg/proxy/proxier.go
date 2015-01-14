@@ -764,17 +764,24 @@ func chooseHostInterface() (net.IP, error) {
 		return nil, err
 	}
 	i := 0
+	var addrs []net.Addr
 	for i = range intfs {
 		if flagsSet(intfs[i].Flags, net.FlagUp) && flagsClear(intfs[i].Flags, net.FlagLoopback|net.FlagPointToPoint) {
 			// This interface should suffice.
-			break
+			addrs, err = intfs[i].Addrs()
+			if err != nil {
+				return nil, err
+			}
+			if len(addrs) != 0 {
+				break
+			}
 		}
 	}
 	if i == len(intfs) {
 		return nil, err
 	}
 	glog.V(2).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
-	addrs, err := intfs[i].Addrs()
+	addrs, err = intfs[i].Addrs()
 	if err != nil {
 		return nil, err
 	}
