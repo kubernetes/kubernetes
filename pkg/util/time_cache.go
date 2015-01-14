@@ -80,19 +80,25 @@ func (c *timeCache) Get(key string) T {
 }
 
 // returns the item and true if it is found and not expired, otherwise nil and false.
+// If this returns false, it has locked c.inFlightLock and it is caller's responsibility
+// to unlock that.
 func (c *timeCache) get(key string) (T, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	data, ok := c.cache[key]
 	now := c.clock.Now()
 	if !ok || now.Sub(data.lastUpdate) > c.ttl {
+		// We must lock this while we hold c.lock-- otherwise, a writer could
+		// write to c.cache and remove the channel from c.inFlight before we
+		// manage to read c.inFlight.
+		c.inFlightLock.Lock()
 		return nil, false
 	}
 	return data.item, true
 }
 
+// c.inFlightLock MUST be locked before calling this. fillOrWait will unlock it.
 func (c *timeCache) fillOrWait(key string) chan T {
-	c.inFlightLock.Lock()
 	defer c.inFlightLock.Unlock()
 
 	// Already a call in progress?
@@ -104,7 +110,9 @@ func (c *timeCache) fillOrWait(key string) chan T {
 	result := make(chan T, 1) // non-blocking
 	c.inFlight[key] = result
 	go func() {
-		// Make potentially slow call
+		// Make potentially slow call.
+		// While this call is in flight, fillOrWait will
+		// presumably exit.
 		data := timeCacheEntry{
 			item:       c.fillFunc(key),
 			lastUpdate: c.clock.Now(),
@@ -113,13 +121,13 @@ func (c *timeCache) fillOrWait(key string) chan T {
 
 		// Store in cache
 		c.lock.Lock()
+		defer c.lock.Unlock()
 		c.cache[key] = data
-		c.lock.Unlock()
 
 		// Remove in flight entry
 		c.inFlightLock.Lock()
+		defer c.inFlightLock.Unlock()
 		delete(c.inFlight, key)
-		c.inFlightLock.Unlock()
 	}()
 	return result
 }
