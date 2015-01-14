@@ -386,6 +386,7 @@ type qFlag struct {
 	dest *Quantity
 }
 
+// Sets the value of the internal Quantity. (used by flag & pflag)
 func (qf qFlag) Set(val string) error {
 	q, err := ParseQuantity(val)
 	if err != nil {
@@ -396,8 +397,14 @@ func (qf qFlag) Set(val string) error {
 	return nil
 }
 
+// Converts the value of the internal Quantity to a string. (used by flag & pflag)
 func (qf qFlag) String() string {
 	return qf.dest.String()
+}
+
+// States the type of flag this is (Quantity). (used by pflag)
+func (qf qFlag) Type() string {
+	return "quantity"
 }
 
 // QuantityFlag is a helper that makes a quantity flag (using standard flag package).
