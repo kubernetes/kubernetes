@@ -489,7 +489,6 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
-			out.Status = in.Condition
 			out.Reason = in.Reason
 			out.Message = in.Message
 			out.Source = in.Source.Component
@@ -504,7 +503,6 @@ func init() {
 			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
 				return err
 			}
-			out.Condition = in.Status
 			out.Reason = in.Reason
 			out.Message = in.Message
 			out.Source.Component = in.Source

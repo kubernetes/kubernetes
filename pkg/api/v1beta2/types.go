@@ -782,6 +782,7 @@ type Event struct {
 	// always be used for the same status.
 	// TODO: define a way of making sure these are consistent and don't collide.
 	// TODO: provide exact specification for format.
+	// DEPRECATED: Status (a.k.a Condition) value will be ignored.
 	Status string `json:"status,omitempty" description:"short, machine understandable string that describes the current status of the referred object"`
 
 	// Optional; this should be a short, machine understandable string that gives the reason
