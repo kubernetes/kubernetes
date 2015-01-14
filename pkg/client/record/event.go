@@ -18,6 +18,7 @@ package record
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -30,8 +31,9 @@ import (
 	"github.com/golang/glog"
 )
 
-// retryEventSleep is the time between record failures to retry.  Available for test alteration.
-var retryEventSleep = 1 * time.Second
+const maxTriesPerEvent = 12
+
+var sleepDuration = 10 * time.Second
 
 // EventRecorder knows how to store events (client.Client implements it.)
 // EventRecorder must respect the namespace that will be embedded in 'event'.
@@ -46,47 +48,66 @@ type EventRecorder interface {
 // or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
 func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
+	// The default math/rand package functions aren't thread safe, so create a
+	// new Rand object for each StartRecording call.
+	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return GetEvents(func(event *api.Event) {
 		// Make a copy before modification, because there could be multiple listeners.
 		// Events are safe to copy like this.
 		eventCopy := *event
 		event = &eventCopy
 		event.Source = source
-		try := 0
+
+		tries := 0
 		for {
-			try++
-			_, err := recorder.Create(event)
-			if err == nil {
+			if recordEvent(recorder, event) {
 				break
 			}
-			// If we can't contact the server, then hold everything while we keep trying.
-			// Otherwise, something about the event is malformed and we should abandon it.
-			giveUp := false
-			switch err.(type) {
-			case *client.RequestConstructionError:
-				// We will construct the request the same next time, so don't keep trying.
-				giveUp = true
-			case *errors.StatusError:
-				// This indicates that the server understood and rejected our request.
-				giveUp = true
-			case *errors.UnexpectedObjectError:
-				// We don't expect this; it implies the server's response didn't match a
-				// known pattern. Go ahead and retry.
-			default:
-				// This case includes actual http transport errors. Go ahead and retry.
-			}
-			if giveUp {
-				glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
+			tries++
+			if tries >= maxTriesPerEvent {
+				glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
 				break
 			}
-			if try >= 3 {
-				glog.Errorf("Unable to write event '%#v': '%v' (retry limit exceeded!)", event, err)
-				break
+			// Randomize the first sleep so that various clients won't all be
+			// synced up if the master goes down.
+			if tries == 1 {
+				time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
+			} else {
+				time.Sleep(sleepDuration)
 			}
-			glog.Errorf("Unable to write event: '%v' (will retry in 1 second)", err)
-			time.Sleep(retryEventSleep)
 		}
 	})
+}
+
+// recordEvent attempts to write event to recorder. It returns true if the event
+// was successfully recorded or discarded, false if it should be retried.
+func recordEvent(recorder EventRecorder, event *api.Event) bool {
+	_, err := recorder.Create(event)
+	if err == nil {
+		return true
+	}
+	// If we can't contact the server, then hold everything while we keep trying.
+	// Otherwise, something about the event is malformed and we should abandon it.
+	giveUp := false
+	switch err.(type) {
+	case *client.RequestConstructionError:
+		// We will construct the request the same next time, so don't keep trying.
+		giveUp = true
+	case *errors.StatusError:
+		// This indicates that the server understood and rejected our request.
+		giveUp = true
+	case *errors.UnexpectedObjectError:
+		// We don't expect this; it implies the server's response didn't match a
+		// known pattern. Go ahead and retry.
+	default:
+		// This case includes actual http transport errors. Go ahead and retry.
+	}
+	if giveUp {
+		glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
+		return true
+	}
+	glog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
+	return false
 }
 
 // StartLogging just logs local events, using the given logging function. The
@@ -120,9 +141,9 @@ func GetEvents(f func(*api.Event)) watch.Interface {
 	return w
 }
 
-const queueLen = 1000
+const maxQueuedEvents = 1000
 
-var events = watch.NewBroadcaster(queueLen)
+var events = watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull)
 
 // Event constructs an event from the given information and puts it in the queue for sending.
 // 'object' is the object this event is about. Event will make a reference-- or you may also

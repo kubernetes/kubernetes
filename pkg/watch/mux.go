@@ -22,6 +22,20 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
+// FullChannelBehavior controls how the Broadcaster reacts if a watcher's watch
+// channel is full.
+type FullChannelBehavior int
+
+const (
+	WaitIfChannelFull FullChannelBehavior = iota
+	DropIfChannelFull
+)
+
+// Buffer the incoming queue a little bit even though it should rarely ever accumulate
+// anything, just in case a few events are received in such a short window that
+// Broadcaster can't move them onto the watchers' queues fast enough.
+const incomingQueueLength = 25
+
 // Broadcaster distributes event notifications among any number of watchers. Every event
 // is delivered to every watcher.
 type Broadcaster struct {
@@ -31,17 +45,27 @@ type Broadcaster struct {
 	nextWatcher int64
 
 	incoming chan Event
+
+	// How large to make watcher's channel.
+	watchQueueLength int
+	// If one of the watch channels is full, don't wait for it to become empty.
+	// Instead just deliver it to the watchers that do have space in their
+	// channels and move on to the next event.
+	// It's more fair to do this on a per-watcher basis than to do it on the
+	// "incoming" channel, which would allow one slow watcher to prevent all
+	// other watchers from getting new events.
+	fullChannelBehavior FullChannelBehavior
 }
 
-// NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue.
-// When queueLength is 0, Action will block until any prior event has been
-// completely distributed. It is guaranteed that events will be distibuted in the
-// order in which they ocurr, but the order in which a single event is distributed
-// among all of the watchers is unspecified.
-func NewBroadcaster(queueLength int) *Broadcaster {
+// NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
+// It is guaranteed that events will be distibuted in the order in which they ocur,
+// but the order in which a single event is distributed among all of the watchers is unspecified.
+func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
-		watchers: map[int64]*broadcasterWatcher{},
-		incoming: make(chan Event, queueLength),
+		watchers:            map[int64]*broadcasterWatcher{},
+		incoming:            make(chan Event, incomingQueueLength),
+		watchQueueLength:    queueLength,
+		fullChannelBehavior: fullChannelBehavior,
 	}
 	go m.loop()
 	return m
@@ -56,7 +80,7 @@ func (m *Broadcaster) Watch() Interface {
 	id := m.nextWatcher
 	m.nextWatcher++
 	w := &broadcasterWatcher{
-		result:  make(chan Event),
+		result:  make(chan Event, m.watchQueueLength),
 		stopped: make(chan struct{}),
 		id:      id,
 		m:       m,
@@ -119,10 +143,20 @@ func (m *Broadcaster) loop() {
 func (m *Broadcaster) distribute(event Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	for _, w := range m.watchers {
-		select {
-		case w.result <- event:
-		case <-w.stopped:
+	if m.fullChannelBehavior == DropIfChannelFull {
+		for _, w := range m.watchers {
+			select {
+			case w.result <- event:
+			case <-w.stopped:
+			default: // Don't block if the event can't be queued.
+			}
+		}
+	} else {
+		for _, w := range m.watchers {
+			select {
+			case w.result <- event:
+			case <-w.stopped:
+			}
 		}
 	}
 }

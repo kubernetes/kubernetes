@@ -19,9 +19,9 @@ package record
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -31,7 +31,8 @@ import (
 )
 
 func init() {
-	retryEventSleep = 1 * time.Microsecond
+	// Don't bother sleeping between retries.
+	sleepDuration = 0
 }
 
 type testEventRecorder struct {
@@ -188,12 +189,12 @@ func TestWriteEventError(t *testing.T) {
 		},
 		"retry1": {
 			timesToSendError: 1000,
-			attemptsWanted:   3,
+			attemptsWanted:   12,
 			err:              &errors.UnexpectedObjectError{},
 		},
 		"retry2": {
 			timesToSendError: 1000,
-			attemptsWanted:   3,
+			attemptsWanted:   12,
 			err:              fmt.Errorf("A weird error"),
 		},
 		"succeedEventually": {
@@ -237,4 +238,55 @@ func TestWriteEventError(t *testing.T) {
 			t.Errorf("case %v: wanted %v, got %v attempts", caseName, e, a)
 		}
 	}
+}
+
+func TestLotsOfEvents(t *testing.T) {
+	recorderCalled := make(chan struct{})
+	loggerCalled := make(chan struct{})
+
+	// Fail each event a few times to ensure there's some load on the tested code.
+	var counts [1000]int
+	testEvents := testEventRecorder{
+		OnEvent: func(event *api.Event) (*api.Event, error) {
+			num, err := strconv.Atoi(event.Message)
+			if err != nil {
+				t.Error(err)
+				return event, nil
+			}
+			counts[num]++
+			if counts[num] < 5 {
+				return nil, fmt.Errorf("fake error")
+			}
+			recorderCalled <- struct{}{}
+			return event, nil
+		},
+	}
+	recorder := StartRecording(&testEvents, api.EventSource{Component: "eventTest"})
+	logger := StartLogging(func(formatter string, args ...interface{}) {
+		loggerCalled <- struct{}{}
+	})
+
+	ref := &api.ObjectReference{
+		Kind:       "Pod",
+		Name:       "foo",
+		Namespace:  "baz",
+		UID:        "bar",
+		APIVersion: "v1beta1",
+	}
+	for i := 0; i < maxQueuedEvents; i++ {
+		go Event(ref, "Status", "Reason", strconv.Itoa(i))
+	}
+	// Make sure no events were dropped by either of the listeners.
+	for i := 0; i < maxQueuedEvents; i++ {
+		<-recorderCalled
+		<-loggerCalled
+	}
+	// Make sure that every event was attempted 5 times
+	for i := 0; i < maxQueuedEvents; i++ {
+		if counts[i] < 5 {
+			t.Errorf("Only attempted to record event '%d' %d times.", i, counts[i])
+		}
+	}
+	recorder.Stop()
+	logger.Stop()
 }

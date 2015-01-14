@@ -39,7 +39,7 @@ func TestBroadcaster(t *testing.T) {
 	}
 
 	// The broadcaster we're testing
-	m := NewBroadcaster(0)
+	m := NewBroadcaster(0, WaitIfChannelFull)
 
 	// Add a bunch of watchers
 	const testWatchers = 2
@@ -77,7 +77,7 @@ func TestBroadcaster(t *testing.T) {
 }
 
 func TestBroadcasterWatcherClose(t *testing.T) {
-	m := NewBroadcaster(0)
+	m := NewBroadcaster(0, WaitIfChannelFull)
 	w := m.Watch()
 	w2 := m.Watch()
 	w.Stop()
@@ -95,7 +95,7 @@ func TestBroadcasterWatcherClose(t *testing.T) {
 
 func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 	done := make(chan bool)
-	m := NewBroadcaster(0)
+	m := NewBroadcaster(0, WaitIfChannelFull)
 	go func(w0, w1 Interface) {
 		// We know Broadcaster is in the distribute loop once one watcher receives
 		// an event. Stop the other watcher while distribute is trying to
@@ -115,4 +115,53 @@ func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 	case <-done:
 	}
 	m.Shutdown()
+}
+
+func TestBroadcasterDropIfChannelFull(t *testing.T) {
+	m := NewBroadcaster(1, DropIfChannelFull)
+
+	event1 := Event{Added, &myType{"foo", "hello world 1"}}
+	event2 := Event{Added, &myType{"bar", "hello world 2"}}
+
+	// Add a couple watchers
+	const testWatchers = 2
+	watches := make([]Interface, testWatchers)
+	for i := 0; i < testWatchers; i++ {
+		watches[i] = m.Watch()
+	}
+
+	// Send a couple events before closing the broadcast channel.
+	t.Log("Sending event 1")
+	m.Action(event1.Type, event1.Object)
+	t.Log("Sending event 2")
+	m.Action(event2.Type, event2.Object)
+	m.Shutdown()
+
+	// Pull events from the queue.
+	wg := sync.WaitGroup{}
+	wg.Add(testWatchers)
+	for i := 0; i < testWatchers; i++ {
+		// Verify that each watcher only gets the first event because its watch
+		// queue of length one was full from the first one.
+		go func(watcher int, w Interface) {
+			defer wg.Done()
+			e1, ok := <-w.ResultChan()
+			if !ok {
+				t.Error("Watcher %v failed to retrieve first event.")
+				return
+			}
+			if e, a := event1, e1; !reflect.DeepEqual(e, a) {
+				t.Errorf("Watcher %v: Expected (%v, %#v), got (%v, %#v)",
+					watcher, e.Type, e.Object, a.Type, a.Object)
+			} else {
+				t.Logf("Got (%v, %#v)", e1.Type, e1.Object)
+			}
+			e2, ok := <-w.ResultChan()
+			if ok {
+				t.Error("Watcher %v received second event (%v, %#v) even though it shouldn't have.",
+					watcher, e2.Type, e2.Object)
+			}
+		}(i, watches[i])
+	}
+	wg.Wait()
 }
