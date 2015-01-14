@@ -53,8 +53,7 @@ func init() {
 }
 
 func main() {
-	util.AddAllFlagsToPFlags()
-	flag.Parse()
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 

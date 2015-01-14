@@ -53,7 +53,6 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
-	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -563,8 +562,7 @@ func runServiceTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func main() {
-	util.AddAllFlagsToPFlags()
-	flag.Parse()
+	util.InitFlags()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	util.ReallyCrash = true
 	util.InitLogs()

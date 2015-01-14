@@ -700,8 +700,7 @@ func TestPodHasServiceEnvVars(c *client.Client) bool {
 }
 
 func main() {
-	util.AddAllFlagsToPFlags()
-	flag.Parse()
+	util.InitFlags()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
 	util.ReallyCrash = true
 	util.InitLogs()

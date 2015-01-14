@@ -90,8 +90,7 @@ func setupRunOnce() {
 }
 
 func main() {
-	util.AddAllFlagsToPFlags()
-	flag.Parse()
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 	rand.Seed(time.Now().UTC().UnixNano())

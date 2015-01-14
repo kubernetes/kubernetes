@@ -66,8 +66,7 @@ func newApiClient(addr string, port int) *client.Client {
 }
 
 func main() {
-	util.AddAllFlagsToPFlags()
-	flag.Parse()
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 

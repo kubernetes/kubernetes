@@ -124,8 +124,7 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (helper tool
 }
 
 func main() {
-	util.AddAllFlagsToPFlags()
-	flag.Parse()
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 

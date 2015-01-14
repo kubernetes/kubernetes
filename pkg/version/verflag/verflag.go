@@ -66,6 +66,7 @@ func (v *versionValue) String() string {
 	return fmt.Sprintf("%v", bool(*v == VersionTrue))
 }
 
+// The type of the flag as requred by the pflag.Value interface
 func (v *versionValue) Type() string {
 	return "version"
 }
