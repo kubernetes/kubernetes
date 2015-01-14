@@ -27,9 +27,14 @@ import (
 type FullChannelBehavior int
 
 const (
-	WaitIfChannelFull = iota
-	DropIfChannelFull = iota
+	WaitIfChannelFull FullChannelBehavior = iota
+	DropIfChannelFull
 )
+
+// Buffer the incoming queue a little bit even though it should rarely ever accumulate
+// anything, just in case a few events are received in such a short window that
+// Broadcaster can't move them onto the watchers' queues fast enough.
+const incomingQueueLength = 25
 
 // Broadcaster distributes event notifications among any number of watchers. Every event
 // is delivered to every watcher.
@@ -58,7 +63,7 @@ type Broadcaster struct {
 func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
 	m := &Broadcaster{
 		watchers:            map[int64]*broadcasterWatcher{},
-		incoming:            make(chan Event),
+		incoming:            make(chan Event, incomingQueueLength),
 		watchQueueLength:    queueLength,
 		fullChannelBehavior: fullChannelBehavior,
 	}

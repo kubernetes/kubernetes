@@ -33,7 +33,7 @@ import (
 
 const maxTriesPerEvent = 12
 
-var sleepDuration = time.Duration(10 * time.Second)
+var sleepDuration = 10 * time.Second
 
 // EventRecorder knows how to store events (client.Client implements it.)
 // EventRecorder must respect the namespace that will be embedded in 'event'.
@@ -48,6 +48,9 @@ type EventRecorder interface {
 // or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
 func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
+	// The default math/rand package functions aren't thread safe, so create a
+	// new Rand object for each StartRecording call.
+	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return GetEvents(func(event *api.Event) {
 		// Make a copy before modification, because there could be multiple listeners.
 		// Events are safe to copy like this.
@@ -68,7 +71,7 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 			// Randomize the first sleep so that various clients won't all be
 			// synced up if the master goes down.
 			if tries == 1 {
-				time.Sleep(time.Duration(float64(sleepDuration) * rand.Float64()))
+				time.Sleep(time.Duration(float64(sleepDuration) * randGen.Float64()))
 			} else {
 				time.Sleep(sleepDuration)
 			}
