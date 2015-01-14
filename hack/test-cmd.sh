@@ -94,29 +94,39 @@ kube_cmd=(
   "${KUBE_OUTPUT_HOSTBIN}/kubectl"
 )
 kube_api_versions=(
+  ""
   v1beta1
   v1beta2
   v1beta3
 )
 for version in "${kube_api_versions[@]}"; do
-  kube_flags=(
-    -s "http://127.0.0.1:${API_PORT}"
-    --match-server-version
-    --api-version="${version}"
-  )
+  if [[ -z "${version}" ]]; then
+    kube_flags=(
+      -s "http://127.0.0.1:${API_PORT}"
+      --match-server-version
+    )
+    [ "$("${kube_cmd[@]}" get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta1" ]
+  else
+    kube_flags=(
+      -s "http://127.0.0.1:${API_PORT}"
+      --match-server-version
+      --api-version="${version}"
+    )
+    [ "$("${kube_cmd[@]}" get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
+  fi
 
   kube::log::status "Testing kubectl(${version}:pods)"
   "${kube_cmd[@]}" get pods "${kube_flags[@]}"
   "${kube_cmd[@]}" create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
   "${kube_cmd[@]}" get pods "${kube_flags[@]}"
   "${kube_cmd[@]}" get pod redis-master "${kube_flags[@]}"
-  [[ "$("${kube_cmd[@]}" get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]]
+  [ "$("${kube_cmd[@]}" get pod redis-master -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master" ]
   output_pod=$("${kube_cmd[@]}" get pod redis-master -o json --output-version=v1beta1 "${kube_flags[@]}")
   "${kube_cmd[@]}" delete pod redis-master "${kube_flags[@]}"
   before="$("${kube_cmd[@]}" get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
   after="$("${kube_cmd[@]}" get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [[ "$((${after} - ${before}))" -eq 1 ]]
+  [ "$((${after} - ${before}))" -eq 1 ]
   "${kube_cmd[@]}" get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: redis-master"
   "${kube_cmd[@]}" describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
   "${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
@@ -142,6 +152,9 @@ for version in "${kube_api_versions[@]}"; do
     kube::log::status "Testing kubectl(${version}:minions)"
     "${kube_cmd[@]}" get minions "${kube_flags[@]}"
     "${kube_cmd[@]}" get minions 127.0.0.1 "${kube_flags[@]}"
+    "${kube_cmd[@]}" get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' "${kube_flags[@]}"
+    # TODO: I should be a MinionList instead of List
+    [ "$("${kube_cmd[@]}" get minions -t $'{{ .kind }}' "${kube_flags[@]}")" == "List" ]
   fi
 done
 

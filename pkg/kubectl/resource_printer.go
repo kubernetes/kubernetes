@@ -109,6 +109,9 @@ func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConver
 
 // PrintObj implements ResourcePrinter
 func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	if len(p.version) == 0 {
+		return fmt.Errorf("no version specified, object cannot be converted")
+	}
 	converted, err := p.convertor.ConvertToVersion(obj, p.version)
 	if err != nil {
 		return err

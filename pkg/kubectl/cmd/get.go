@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -126,7 +127,15 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 
 	if generic {
 		// the outermost object will be converted to the output-version
-		printer = kubectl.NewVersionedPrinter(printer, api.Scheme, outputVersion(cmd))
+		version := outputVersion(cmd)
+		if len(version) == 0 {
+			// TODO: add a new ResourceBuilder mode for Object() that attempts to ensure the objects
+			// are in the appropriate version if one exists (and if not, use the best effort).
+			// TODO: ensure api-version is set with the default preferred api version by the client
+			// builder on initialization
+			version = latest.Version
+		}
+		printer = kubectl.NewVersionedPrinter(printer, api.Scheme, version)
 
 		obj, err := b.Flatten().Do().Object()
 		checkErr(err)
@@ -174,7 +183,14 @@ func printerForMapping(f *Factory, cmd *cobra.Command, mapping *meta.RESTMapping
 		return nil, err
 	}
 	if ok {
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, outputVersion(cmd))
+		version := outputVersion(cmd)
+		if len(version) == 0 {
+			version = mapping.APIVersion
+		}
+		if len(version) == 0 {
+			return nil, fmt.Errorf("you must specify an output-version when using this output format")
+		}
+		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version)
 	} else {
 		printer, err = f.Printer(cmd, mapping, GetFlagBool(cmd, "no-headers"))
 		if err != nil {
