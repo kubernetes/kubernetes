@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -337,7 +338,10 @@ type StreamVisitor struct {
 }
 
 // NewStreamVisitor creates a visitor that will return resources that were encoded into the provided
-// stream. If ignoreErrors is set, unrecognized or invalid objects will be skipped and logged.
+// stream. If ignoreErrors is set, unrecognized or invalid objects will be skipped and logged. An
+// empty stream is treated as an error for now.
+// TODO: convert ignoreErrors into a func(data, error, count) bool that consumers can use to decide
+// what to do with ignored errors.
 func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, ignoreErrors bool) Visitor {
 	return &StreamVisitor{r, mapper, source, ignoreErrors}
 }
@@ -353,10 +357,14 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			}
 			return err
 		}
+		ext.RawJSON = bytes.TrimSpace(ext.RawJSON)
+		if len(ext.RawJSON) == 0 || bytes.Equal(ext.RawJSON, []byte("null")) {
+			continue
+		}
 		info, err := v.InfoForData(ext.RawJSON, v.Source)
 		if err != nil {
 			if v.IgnoreErrors {
-				glog.V(2).Infof("Unable to read item from stream %q: %v", err)
+				glog.Warningf("Could not read an encoded object from %s: %v", v.Source, err)
 				glog.V(4).Infof("Unreadable: %s", string(ext.RawJSON))
 				continue
 			}

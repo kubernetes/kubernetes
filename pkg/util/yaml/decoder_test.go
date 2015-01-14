@@ -61,6 +61,21 @@ func TestSplitYAMLDocument(t *testing.T) {
 	}
 }
 
+func TestGuessJSON(t *testing.T) {
+	if r, isJSON := guessJSONStream(bytes.NewReader([]byte(" \n{}")), 100); !isJSON {
+		t.Fatalf("expected stream to be JSON")
+	} else {
+		b := make([]byte, 30)
+		n, err := r.Read(b)
+		if err != nil || n != 4 {
+			t.Fatalf("unexpected body: %d / %v", n, err)
+		}
+		if string(b[:n]) != " \n{}" {
+			t.Fatalf("unexpected body: %q", string(b[:n]))
+		}
+	}
+}
+
 func TestScanYAML(t *testing.T) {
 	s := bufio.NewScanner(bytes.NewReader([]byte(`---
 stuff: 1
@@ -130,7 +145,10 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		{" \na: b", 2, false, false, []generic{
 			{"a": "b"},
 		}},
-		{` \n{"a": "b"}`, 2, false, true, []generic{
+		{" \n{\"a\": \"b\"}", 2, false, true, []generic{
+			{"a": "b"},
+		}},
+		{" \n{\"a\": \"b\"}", 3, true, false, []generic{
 			{"a": "b"},
 		}},
 		{`   {"a":"b"}`, 100, true, false, []generic{
