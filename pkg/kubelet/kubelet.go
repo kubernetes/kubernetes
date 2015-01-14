@@ -641,7 +641,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	dockerContainer, err := kl.dockerClient.CreateContainer(opts)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed", "failed",
+			record.Eventf(ref, "failed",
 				"Failed to create docker container with error: %v", err)
 		}
 		return "", err
@@ -649,7 +649,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	// Remember this reference so we can report events about this container
 	if ref != nil {
 		kl.setRef(dockertools.DockerID(dockerContainer.ID), ref)
-		record.Eventf(ref, "waiting", "created", "Created with docker id %v", dockerContainer.ID)
+		record.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
 	}
 
 	if len(container.TerminationMessagePath) != 0 {
@@ -687,13 +687,13 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	err = kl.dockerClient.StartContainer(dockerContainer.ID, hc)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed", "failed",
+			record.Eventf(ref, "failed",
 				"Failed to start with docker id %v with error: %v", dockerContainer.ID, err)
 		}
 		return "", err
 	}
 	if ref != nil {
-		record.Eventf(ref, "running", "started", "Started with docker id %v", dockerContainer.ID)
+		record.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
@@ -864,7 +864,7 @@ func (kl *Kubelet) killContainerByID(ID, name string) error {
 		glog.Warningf("No ref for pod '%v' - '%v'", ID, name)
 	} else {
 		// TODO: pass reason down here, and state, or move this call up the stack.
-		record.Eventf(ref, "terminated", "killing", "Killing %v - %v", ID, name)
+		record.Eventf(ref, "killing", "Killing %v - %v", ID, name)
 	}
 
 	return err
@@ -896,7 +896,7 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed", "failed", "Failed to inspect image %q", container.Image)
+			record.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
 		}
 		return "", err
 	}
@@ -906,7 +906,7 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 		}
 	}
 	if ref != nil {
-		record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %q", container.Image)
+		record.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
 	return kl.runContainer(pod, container, nil, "")
 }
@@ -916,12 +916,12 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 	defer kl.pullLock.RUnlock()
 	if err := kl.dockerPuller.Pull(img); err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed", "failed", "Failed to pull image %q", img)
+			record.Eventf(ref, "failed", "Failed to pull image %q", img)
 		}
 		return err
 	}
 	if ref != nil {
-		record.Eventf(ref, "waiting", "pulled", "Successfully pulled image %q", img)
+		record.Eventf(ref, "pulled", "Successfully pulled image %q", img)
 	}
 	return nil
 }
@@ -1090,7 +1090,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			latest := dockertools.RequireLatestImage(container.Image)
 			if err != nil {
 				if ref != nil {
-					record.Eventf(ref, "failed", "failed", "Failed to inspect image %q", container.Image)
+					record.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
 				}
 				glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
 				continue
@@ -1222,7 +1222,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		kl.podWorkers.Run(podFullName, func() {
 			if err := kl.syncPod(pod, dockerContainers); err != nil {
 				glog.Errorf("Error syncing pod, skipping: %v", err)
-				record.Eventf(pod, "", "failedSync", "Error syncing pod, skipping: %v", err)
+				record.Eventf(pod, "failedSync", "Error syncing pod, skipping: %v", err)
 			}
 		})
 	}
@@ -1434,5 +1434,5 @@ func (kl *Kubelet) BirthCry() {
 		UID:       util.UID(kl.hostname),
 		Namespace: api.NamespaceDefault,
 	}
-	record.Eventf(ref, "", "starting", "Starting kubelet.")
+	record.Eventf(ref, "starting", "Starting kubelet.")
 }

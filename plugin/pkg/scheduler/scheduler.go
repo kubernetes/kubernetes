@@ -72,7 +72,7 @@ func (s *Scheduler) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
-		record.Eventf(pod, string(api.PodPending), "failedScheduling", "Error scheduling: %v", err)
+		record.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -83,9 +83,9 @@ func (s *Scheduler) scheduleOne() {
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		glog.V(1).Infof("Failed to bind pod: %v", err)
-		record.Eventf(pod, string(api.PodPending), "failedScheduling", "Binding rejected: %v", err)
+		record.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	record.Eventf(pod, string(api.PodPending), "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	record.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 }
