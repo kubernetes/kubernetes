@@ -58,7 +58,7 @@ func ValidateParams(paramSpec []GeneratorParam, params map[string]string) error 
 }
 
 // MakeParams is a utility that creates generator parameters from a command line
-func MakeParams(cmd *cobra.Command, params []GeneratorParam) (map[string]string, error) {
+func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]string {
 	result := map[string]string{}
 	for ix := range params {
 		f := cmd.Flags().Lookup(params[ix].Name)
@@ -66,5 +66,5 @@ func MakeParams(cmd *cobra.Command, params []GeneratorParam) (map[string]string,
 			result[params[ix].Name] = f.Value.String()
 		}
 	}
-	return result, nil
+	return result
 }

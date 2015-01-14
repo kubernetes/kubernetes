@@ -56,7 +56,7 @@ Examples:
 				usageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
 			}
 			names := generator.ParamNames()
-			params, err := kubectl.MakeParams(cmd, names)
+			params := kubectl.MakeParams(cmd, names)
 			params["name"] = args[0]
 
 			err = kubectl.ValidateParams(names, params)
