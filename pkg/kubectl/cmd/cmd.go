@@ -174,6 +174,8 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdLog(out))
 	cmds.AddCommand(f.NewCmdRollingUpdate(out))
 
+	cmds.AddCommand(f.NewCmdRunContainer(out))
+
 	return cmds
 }
 

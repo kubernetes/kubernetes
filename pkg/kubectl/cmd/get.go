@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -60,10 +59,7 @@ Examples:
 			RunGet(f, out, cmd, args)
 		},
 	}
-	cmd.Flags().StringP("output", "o", "", "Output format: json|yaml|template|templatefile")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version)")
-	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers")
-	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=template or -o=templatefile.")
+	AddPrinterFlags(cmd)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requseted object(s), without listing/getting first.")
@@ -90,7 +86,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		mapping, err := r.ResourceMapping()
 		checkErr(err)
 
-		printer, err := printerForMapping(f, cmd, mapping)
+		printer, err := PrinterForMapping(f, cmd, mapping)
 		checkErr(err)
 
 		obj, err := r.Object()
@@ -116,14 +112,13 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		return
 	}
 
-	printer, generic, err := printerForCommand(cmd)
-	checkErr(err)
-
 	b := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
 		NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(args...).
 		Latest()
+	printer, generic, err := PrinterForCommand(cmd)
+	checkErr(err)
 
 	if generic {
 		// the outermost object will be converted to the output-version
@@ -147,55 +142,11 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 
 	// use the default printer for each object
 	err = b.Do().Visit(func(r *resource.Info) error {
-		printer, err := printerForMapping(f, cmd, r.Mapping)
+		printer, err := PrinterForMapping(f, cmd, r.Mapping)
 		if err != nil {
 			return err
 		}
 		return printer.PrintObj(r.Object, out)
 	})
 	checkErr(err)
-}
-
-// outputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
-func outputVersion(cmd *cobra.Command) string {
-	outputVersion := GetFlagString(cmd, "output-version")
-	if len(outputVersion) == 0 {
-		outputVersion = GetFlagString(cmd, "api-version")
-	}
-	return outputVersion
-}
-
-// printerForCommand returns the default printer for this command.
-func printerForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error) {
-	outputFormat := GetFlagString(cmd, "output")
-	templateFile := GetFlagString(cmd, "template")
-	if len(outputFormat) == 0 && len(templateFile) != 0 {
-		outputFormat = "template"
-	}
-
-	return kubectl.GetPrinter(outputFormat, templateFile)
-}
-
-// printerForMapping returns a printer suitable for displaying the provided resource type.
-func printerForMapping(f *Factory, cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.ResourcePrinter, error) {
-	printer, ok, err := printerForCommand(cmd)
-	if err != nil {
-		return nil, err
-	}
-	if ok {
-		version := outputVersion(cmd)
-		if len(version) == 0 {
-			version = mapping.APIVersion
-		}
-		if len(version) == 0 {
-			return nil, fmt.Errorf("you must specify an output-version when using this output format")
-		}
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version)
-	} else {
-		printer, err = f.Printer(cmd, mapping, GetFlagBool(cmd, "no-headers"))
-		if err != nil {
-			return nil, err
-		}
-	}
-	return printer, nil
 }
