@@ -20,6 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type BoundPodFactory interface {
@@ -29,25 +30,49 @@ type BoundPodFactory interface {
 
 type BasicBoundPodFactory struct {
 	// TODO: this should really point at the API rather than a registry
-	ServiceRegistry service.Registry
+	ServiceRegistry        service.Registry
+	MasterServiceNamespace string
 }
 
-// getServiceEnvironmentVariables populates a list of environment variables that are use
+var masterServiceNames = util.NewStringSet("kubernetes", "kubernetes-ro")
+
+// getServiceEnvironmentVariables populates a list of environment variables that are used
 // in the container environment to get access to services.
-func getServiceEnvironmentVariables(ctx api.Context, registry service.Registry, machine string) ([]api.EnvVar, error) {
+func (b *BasicBoundPodFactory) getServiceEnvironmentVariables(ctx api.Context, registry service.Registry, machine string) ([]api.EnvVar, error) {
 	var result []api.EnvVar
-	services, err := registry.ListServices(ctx)
+	servicesInNs, err := registry.ListServices(ctx)
 	if err != nil {
 		return result, err
 	}
-	return envvars.FromServices(services), nil
+
+	masterServices, err := registry.ListServices(api.WithNamespace(api.NewContext(), b.MasterServiceNamespace))
+	if err != nil {
+		return result, err
+	}
+
+	projection := map[string]api.Service{}
+	services := []api.Service{}
+	for _, service := range masterServices.Items {
+		if masterServiceNames.Has(service.Name) {
+			projection[service.Name] = service
+		}
+	}
+	for _, service := range servicesInNs.Items {
+		projection[service.Name] = service
+	}
+	for _, service := range projection {
+		services = append(services, service)
+	}
+
+	return envvars.FromServices(&api.ServiceList{Items: services}), nil
 }
 
 func (b *BasicBoundPodFactory) MakeBoundPod(machine string, pod *api.Pod) (*api.BoundPod, error) {
-	envVars, err := getServiceEnvironmentVariables(api.NewContext(), b.ServiceRegistry, machine)
+	envVars, err := b.getServiceEnvironmentVariables(api.WithNamespace(api.NewContext(), pod.Namespace), b.ServiceRegistry, machine)
 	if err != nil {
 		return nil, err
 	}
+
 	boundPod := &api.BoundPod{}
 	if err := api.Scheme.Convert(pod, boundPod); err != nil {
 		return nil, err

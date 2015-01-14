@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -87,6 +88,7 @@ var (
 		Port:        10250,
 		EnableHttps: false,
 	}
+	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 )
 
 func init() {
@@ -177,25 +179,26 @@ func main() {
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, *admissionControlConfigFile)
 
 	config := &master.Config{
-		Client:                client,
-		Cloud:                 cloud,
-		EtcdHelper:            helper,
-		HealthCheckMinions:    *healthCheckMinions,
-		EventTTL:              *eventTTL,
-		KubeletClient:         kubeletClient,
-		PortalNet:             &n,
-		EnableLogsSupport:     *enableLogsSupport,
-		EnableUISupport:       true,
-		EnableSwaggerSupport:  true,
-		APIPrefix:             *apiPrefix,
-		CorsAllowedOriginList: corsAllowedOriginList,
-		ReadOnlyPort:          *readOnlyPort,
-		ReadWritePort:         *port,
-		PublicAddress:         *publicAddressOverride,
-		Authenticator:         authenticator,
-		Authorizer:            authorizer,
-		AdmissionControl:      admissionController,
-		EnableV1Beta3:         v1beta3,
+		Client:                 client,
+		Cloud:                  cloud,
+		EtcdHelper:             helper,
+		HealthCheckMinions:     *healthCheckMinions,
+		EventTTL:               *eventTTL,
+		KubeletClient:          kubeletClient,
+		PortalNet:              &n,
+		EnableLogsSupport:      *enableLogsSupport,
+		EnableUISupport:        true,
+		EnableSwaggerSupport:   true,
+		APIPrefix:              *apiPrefix,
+		CorsAllowedOriginList:  corsAllowedOriginList,
+		ReadOnlyPort:           *readOnlyPort,
+		ReadWritePort:          *port,
+		PublicAddress:          *publicAddressOverride,
+		Authenticator:          authenticator,
+		Authorizer:             authorizer,
+		AdmissionControl:       admissionController,
+		EnableV1Beta3:          v1beta3,
+		MasterServiceNamespace: *masterServiceNamespace,
 	}
 	m := master.New(config)
 

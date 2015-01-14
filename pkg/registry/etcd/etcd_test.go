@@ -130,7 +130,8 @@ func TestEtcdCreatePod(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -240,7 +241,8 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
 	})
 	if err != nil {
@@ -282,7 +284,8 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -346,7 +349,8 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{

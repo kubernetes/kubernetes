@@ -347,13 +347,13 @@ func TestServiceRegistryList(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
 	})
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo2"},
+		ObjectMeta: api.ObjectMeta{Name: "foo2", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar2": "baz2"},
 		},
@@ -585,7 +585,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	rest1.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Port:     6502,
@@ -595,7 +595,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	c, _ := rest1.Create(ctx, svc)
 	<-c
 	svc = &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Port:     6502,
@@ -609,7 +609,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	rest2.portalMgr.randomAttempts = 0
 
 	svc = &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Port:     6502,

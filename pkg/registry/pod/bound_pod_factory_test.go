@@ -22,13 +22,13 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestMakeBoundPodNoServices(t *testing.T) {
 	registry := registrytest.ServiceRegistry{}
 	factory := &BasicBoundPodFactory{
-		ServiceRegistry: &registry,
+		ServiceRegistry:        &registry,
+		MasterServiceNamespace: api.NamespaceDefault,
 	}
 
 	pod, err := factory.MakeBoundPod("machine", &api.Pod{
@@ -63,13 +63,9 @@ func TestMakeBoundPodServices(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "test"},
+					ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test"},
 					Spec: api.ServiceSpec{
-						Port: 8080,
-						ContainerPort: util.IntOrString{
-							Kind:   util.IntstrInt,
-							IntVal: 900,
-						},
+						Port:     8080,
 						PortalIP: "1.2.3.4",
 					},
 				},
@@ -77,11 +73,12 @@ func TestMakeBoundPodServices(t *testing.T) {
 		},
 	}
 	factory := &BasicBoundPodFactory{
-		ServiceRegistry: &registry,
+		ServiceRegistry:        &registry,
+		MasterServiceNamespace: api.NamespaceDefault,
 	}
 
 	pod, err := factory.MakeBoundPod("machine", &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foobar"},
+		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: "test"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -140,13 +137,9 @@ func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "test"},
+					ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test"},
 					Spec: api.ServiceSpec{
-						Port: 8080,
-						ContainerPort: util.IntOrString{
-							Kind:   util.IntstrInt,
-							IntVal: 900,
-						},
+						Port:     8080,
 						PortalIP: "1.2.3.4",
 					},
 				},
@@ -154,10 +147,12 @@ func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 		},
 	}
 	factory := &BasicBoundPodFactory{
-		ServiceRegistry: &registry,
+		ServiceRegistry:        &registry,
+		MasterServiceNamespace: api.NamespaceDefault,
 	}
 
 	pod, err := factory.MakeBoundPod("machine", &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: "test"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -217,6 +212,241 @@ func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 	for ix := range container.Env {
 		if !reflect.DeepEqual(envs[ix], container.Env[ix]) {
 			t.Errorf("expected %#v, got %#v", envs[ix], container.Env[ix])
+		}
+	}
+}
+
+func TestMakeBoundPodOnlyVisibleServices(t *testing.T) {
+	registry := registrytest.ServiceRegistry{
+		List: api.ServiceList{
+			Items: []api.Service{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "test", Namespace: api.NamespaceDefault},
+					Spec: api.ServiceSpec{
+						Port:     8080,
+						PortalIP: "1.2.3.4",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test"},
+					Spec: api.ServiceSpec{
+						Port:     8081,
+						PortalIP: "1.2.3.5",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "test3", Namespace: "test"},
+					Spec: api.ServiceSpec{
+						Port:     8083,
+						PortalIP: "1.2.3.7",
+					},
+				},
+			},
+		},
+	}
+	factory := &BasicBoundPodFactory{
+		ServiceRegistry:        &registry,
+		MasterServiceNamespace: api.NamespaceDefault,
+	}
+
+	pod, err := factory.MakeBoundPod("machine", &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: "test"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "foo",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	container := pod.Spec.Containers[0]
+	envs := map[string]string{
+		"TEST_SERVICE_HOST":         "1.2.3.5",
+		"TEST_SERVICE_PORT":         "8081",
+		"TEST_PORT":                 "tcp://1.2.3.5:8081",
+		"TEST_PORT_8081_TCP":        "tcp://1.2.3.5:8081",
+		"TEST_PORT_8081_TCP_PROTO":  "tcp",
+		"TEST_PORT_8081_TCP_PORT":   "8081",
+		"TEST_PORT_8081_TCP_ADDR":   "1.2.3.5",
+		"TEST3_SERVICE_HOST":        "1.2.3.7",
+		"TEST3_SERVICE_PORT":        "8083",
+		"TEST3_PORT":                "tcp://1.2.3.7:8083",
+		"TEST3_PORT_8083_TCP":       "tcp://1.2.3.7:8083",
+		"TEST3_PORT_8083_TCP_PROTO": "tcp",
+		"TEST3_PORT_8083_TCP_PORT":  "8083",
+		"TEST3_PORT_8083_TCP_ADDR":  "1.2.3.7",
+	}
+
+	if len(container.Env) != len(envs) {
+		t.Fatalf("Expected %d env vars, got %d: %#v", len(envs), len(container.Env), pod)
+	}
+	for _, env := range container.Env {
+		expectedValue := envs[env.Name]
+		if expectedValue != env.Value {
+			t.Errorf("expected env %v value %v, got %v", env.Name, expectedValue, env.Value)
+		}
+	}
+}
+
+func TestMakeBoundPodMasterServices(t *testing.T) {
+	registry := registrytest.ServiceRegistry{
+		List: api.ServiceList{
+			Items: []api.Service{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: api.NamespaceDefault},
+					Spec: api.ServiceSpec{
+						Port:     8080,
+						PortalIP: "1.2.3.4",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test"},
+					Spec: api.ServiceSpec{
+						Port:     8081,
+						PortalIP: "1.2.3.5",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "test3", Namespace: "test"},
+					Spec: api.ServiceSpec{
+						Port:     8083,
+						PortalIP: "1.2.3.7",
+					},
+				},
+			},
+		},
+	}
+	factory := &BasicBoundPodFactory{
+		ServiceRegistry:        &registry,
+		MasterServiceNamespace: api.NamespaceDefault,
+	}
+
+	pod, err := factory.MakeBoundPod("machine", &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: "test"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "foo",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	container := pod.Spec.Containers[0]
+	envs := map[string]string{
+		"TEST_SERVICE_HOST":              "1.2.3.5",
+		"TEST_SERVICE_PORT":              "8081",
+		"TEST_PORT":                      "tcp://1.2.3.5:8081",
+		"TEST_PORT_8081_TCP":             "tcp://1.2.3.5:8081",
+		"TEST_PORT_8081_TCP_PROTO":       "tcp",
+		"TEST_PORT_8081_TCP_PORT":        "8081",
+		"TEST_PORT_8081_TCP_ADDR":        "1.2.3.5",
+		"TEST3_SERVICE_HOST":             "1.2.3.7",
+		"TEST3_SERVICE_PORT":             "8083",
+		"TEST3_PORT":                     "tcp://1.2.3.7:8083",
+		"TEST3_PORT_8083_TCP":            "tcp://1.2.3.7:8083",
+		"TEST3_PORT_8083_TCP_PROTO":      "tcp",
+		"TEST3_PORT_8083_TCP_PORT":       "8083",
+		"TEST3_PORT_8083_TCP_ADDR":       "1.2.3.7",
+		"KUBERNETES_SERVICE_HOST":        "1.2.3.4",
+		"KUBERNETES_SERVICE_PORT":        "8080",
+		"KUBERNETES_PORT":                "tcp://1.2.3.4:8080",
+		"KUBERNETES_PORT_8080_TCP":       "tcp://1.2.3.4:8080",
+		"KUBERNETES_PORT_8080_TCP_PROTO": "tcp",
+		"KUBERNETES_PORT_8080_TCP_PORT":  "8080",
+		"KUBERNETES_PORT_8080_TCP_ADDR":  "1.2.3.4",
+	}
+
+	if len(container.Env) != len(envs) {
+		t.Fatalf("Expected %d env vars, got %d: %#v", len(envs), len(container.Env), pod)
+	}
+	for _, env := range container.Env {
+		expectedValue := envs[env.Name]
+		if expectedValue != env.Value {
+			t.Errorf("expected env %v value %v, got %v", env.Name, expectedValue, env.Value)
+		}
+	}
+}
+
+func TestMakeBoundPodMasterServiceInNs(t *testing.T) {
+	registry := registrytest.ServiceRegistry{
+		List: api.ServiceList{
+			Items: []api.Service{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: api.NamespaceDefault},
+					Spec: api.ServiceSpec{
+						Port:     8080,
+						PortalIP: "1.2.3.4",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test"},
+					Spec: api.ServiceSpec{
+						Port:     8081,
+						PortalIP: "1.2.3.5",
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "test"},
+					Spec: api.ServiceSpec{
+						Port:     8083,
+						PortalIP: "1.2.3.7",
+					},
+				},
+			},
+		},
+	}
+	factory := &BasicBoundPodFactory{
+		ServiceRegistry:        &registry,
+		MasterServiceNamespace: api.NamespaceDefault,
+	}
+
+	pod, err := factory.MakeBoundPod("machine", &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: "test"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "foo",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	container := pod.Spec.Containers[0]
+	envs := map[string]string{
+		"TEST_SERVICE_HOST":              "1.2.3.5",
+		"TEST_SERVICE_PORT":              "8081",
+		"TEST_PORT":                      "tcp://1.2.3.5:8081",
+		"TEST_PORT_8081_TCP":             "tcp://1.2.3.5:8081",
+		"TEST_PORT_8081_TCP_PROTO":       "tcp",
+		"TEST_PORT_8081_TCP_PORT":        "8081",
+		"TEST_PORT_8081_TCP_ADDR":        "1.2.3.5",
+		"KUBERNETES_SERVICE_HOST":        "1.2.3.7",
+		"KUBERNETES_SERVICE_PORT":        "8083",
+		"KUBERNETES_PORT":                "tcp://1.2.3.7:8083",
+		"KUBERNETES_PORT_8083_TCP":       "tcp://1.2.3.7:8083",
+		"KUBERNETES_PORT_8083_TCP_PROTO": "tcp",
+		"KUBERNETES_PORT_8083_TCP_PORT":  "8083",
+		"KUBERNETES_PORT_8083_TCP_ADDR":  "1.2.3.7",
+	}
+
+	if len(container.Env) != len(envs) {
+		t.Fatalf("Expected %d env vars, got %d: %#v", len(envs), len(container.Env), pod)
+	}
+	for _, env := range container.Env {
+		expectedValue := envs[env.Name]
+		if expectedValue != env.Value {
+			t.Errorf("expected env %v value %v, got %v", env.Name, expectedValue, env.Value)
 		}
 	}
 }

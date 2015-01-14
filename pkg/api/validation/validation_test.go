@@ -878,7 +878,10 @@ func TestValidateService(t *testing.T) {
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Spec: api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true}},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
+						Spec:       api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true},
+					},
 				},
 			},
 			numErrs: 1,
@@ -895,7 +898,10 @@ func TestValidateService(t *testing.T) {
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Spec: api.ServiceSpec{Port: 80}},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
+						Spec:       api.ServiceSpec{Port: 80},
+					},
 				},
 			},
 			numErrs: 0,
@@ -911,7 +917,10 @@ func TestValidateService(t *testing.T) {
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Spec: api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true}},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
+						Spec:       api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true},
+					},
 				},
 			},
 			numErrs: 0,
@@ -927,7 +936,10 @@ func TestValidateService(t *testing.T) {
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Spec: api.ServiceSpec{Port: 80}},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
+						Spec:       api.ServiceSpec{Port: 80},
+					},
 				},
 			},
 			numErrs: 0,

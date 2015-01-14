@@ -62,23 +62,24 @@ import (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Client                *client.Client
-	Cloud                 cloudprovider.Interface
-	EtcdHelper            tools.EtcdHelper
-	HealthCheckMinions    bool
-	EventTTL              time.Duration
-	MinionRegexp          string
-	KubeletClient         client.KubeletClient
-	PortalNet             *net.IPNet
-	EnableLogsSupport     bool
-	EnableUISupport       bool
-	EnableSwaggerSupport  bool
-	EnableV1Beta3         bool
-	APIPrefix             string
-	CorsAllowedOriginList util.StringList
-	Authenticator         authenticator.Request
-	Authorizer            authorizer.Authorizer
-	AdmissionControl      admission.Interface
+	Client                 *client.Client
+	Cloud                  cloudprovider.Interface
+	EtcdHelper             tools.EtcdHelper
+	HealthCheckMinions     bool
+	EventTTL               time.Duration
+	MinionRegexp           string
+	KubeletClient          client.KubeletClient
+	PortalNet              *net.IPNet
+	EnableLogsSupport      bool
+	EnableUISupport        bool
+	EnableSwaggerSupport   bool
+	EnableV1Beta3          bool
+	APIPrefix              string
+	CorsAllowedOriginList  util.StringList
+	Authenticator          authenticator.Request
+	Authorizer             authorizer.Authorizer
+	AdmissionControl       admission.Interface
+	MasterServiceNamespace string
 
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
@@ -231,7 +232,8 @@ func New(c *Config) *Master {
 	minionRegistry := makeMinionRegistry(c)
 	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
 	boundPodFactory := &pod.BasicBoundPodFactory{
-		ServiceRegistry: serviceRegistry,
+		ServiceRegistry:        serviceRegistry,
+		MasterServiceNamespace: c.MasterServiceNamespace,
 	}
 	if c.KubeletClient == nil {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")

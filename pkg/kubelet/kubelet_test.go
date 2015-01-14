@@ -58,6 +58,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *dockertools
 	kubelet.rootDirectory = "/tmp/kubelet"
 	kubelet.podWorkers = newPodWorkers()
 	kubelet.sourceReady = func(source string) bool { return true }
+
 	return kubelet, fakeEtcdClient, fakeDocker
 }
 
@@ -910,31 +911,6 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		(!expectedToStop[fakeDocker.Stopped[0]] &&
 			expectedToStop[fakeDocker.Stopped[0]]) {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-}
-
-func TestMakeEnvVariables(t *testing.T) {
-	container := api.Container{
-		Env: []api.EnvVar{
-			{
-				Name:  "foo",
-				Value: "bar",
-			},
-			{
-				Name:  "baz",
-				Value: "blah",
-			},
-		},
-	}
-	vars := makeEnvironmentVariables(&container)
-	if len(vars) != len(container.Env) {
-		t.Errorf("Vars don't match.  Expected: %#v Found: %#v", container.Env, vars)
-	}
-	for ix, env := range container.Env {
-		value := fmt.Sprintf("%s=%s", env.Name, env.Value)
-		if value != vars[ix] {
-			t.Errorf("Unexpected value: %s.  Expected: %s", vars[ix], value)
-		}
 	}
 }
 
@@ -1933,6 +1909,278 @@ func TestParseResolvConf(t *testing.T) {
 		}
 		if !reflect.DeepEqual(srch, tc.searches) {
 			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
+		}
+	}
+}
+
+type testServiceLister struct {
+	services []api.Service
+}
+
+func (ls testServiceLister) List() (api.ServiceList, error) {
+	return api.ServiceList{
+		Items: ls.services,
+	}, nil
+}
+
+func TestMakeEnvironmentVariables(t *testing.T) {
+	services := []api.Service{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: api.NamespaceDefault},
+			Spec: api.ServiceSpec{
+				Port:     8081,
+				PortalIP: "1.2.3.1",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
+			Spec: api.ServiceSpec{
+				Port:     8082,
+				PortalIP: "1.2.3.2",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test1"},
+			Spec: api.ServiceSpec{
+				Port:     8083,
+				PortalIP: "1.2.3.3",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "test2"},
+			Spec: api.ServiceSpec{
+				Port:     8084,
+				PortalIP: "1.2.3.4",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
+			Spec: api.ServiceSpec{
+				Port:     8085,
+				PortalIP: "1.2.3.5",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "kubernetes"},
+			Spec: api.ServiceSpec{
+				Port:     8086,
+				PortalIP: "1.2.3.6",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: "kubernetes"},
+			Spec: api.ServiceSpec{
+				Port:     8087,
+				PortalIP: "1.2.3.7",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
+			Spec: api.ServiceSpec{
+				Port:     8088,
+				PortalIP: "1.2.3.8",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                   string         // the name of the test case
+		ns                     string         // the namespace to generate environment for
+		container              *api.Container // the container to use
+		masterServiceNamespace string         // the namespace to read master service info from
+		nilLister              bool           // whether the lister should be nil
+		expectedEnvs           util.StringSet // a set of expected environment vars
+		expectedEnvSize        int            // total number of expected env vars
+	}{
+		{
+			"api server = Y, kubelet = Y",
+			"test1",
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "FOO", Value: "BAR"},
+					{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
+					{Name: "TEST_SERVICE_PORT", Value: "8083"},
+					{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
+					{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
+					{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
+					{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
+					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
+				},
+			},
+			api.NamespaceDefault,
+			false,
+			util.NewStringSet("FOO=BAR",
+				"TEST_SERVICE_HOST=1.2.3.3",
+				"TEST_SERVICE_PORT=8083",
+				"TEST_PORT=tcp://1.2.3.3:8083",
+				"TEST_PORT_8083_TCP=tcp://1.2.3.3:8083",
+				"TEST_PORT_8083_TCP_PROTO=tcp",
+				"TEST_PORT_8083_TCP_PORT=8083",
+				"TEST_PORT_8083_TCP_ADDR=1.2.3.3",
+				"KUBERNETES_SERVICE_HOST=1.2.3.1",
+				"KUBERNETES_SERVICE_PORT=8081",
+				"KUBERNETES_PORT=tcp://1.2.3.1:8081",
+				"KUBERNETES_PORT_8081_TCP=tcp://1.2.3.1:8081",
+				"KUBERNETES_PORT_8081_TCP_PROTO=tcp",
+				"KUBERNETES_PORT_8081_TCP_PORT=8081",
+				"KUBERNETES_PORT_8081_TCP_ADDR=1.2.3.1",
+				"KUBERNETES_RO_SERVICE_HOST=1.2.3.2",
+				"KUBERNETES_RO_SERVICE_PORT=8082",
+				"KUBERNETES_RO_PORT=tcp://1.2.3.2:8082",
+				"KUBERNETES_RO_PORT_8082_TCP=tcp://1.2.3.2:8082",
+				"KUBERNETES_RO_PORT_8082_TCP_PROTO=tcp",
+				"KUBERNETES_RO_PORT_8082_TCP_PORT=8082",
+				"KUBERNETES_RO_PORT_8082_TCP_ADDR=1.2.3.2"),
+			22,
+		},
+		{
+			"api server = Y, kubelet = N",
+			"test1",
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "FOO", Value: "BAR"},
+					{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
+					{Name: "TEST_SERVICE_PORT", Value: "8083"},
+					{Name: "TEST_PORT", Value: "tcp://1.2.3.3:8083"},
+					{Name: "TEST_PORT_8083_TCP", Value: "tcp://1.2.3.3:8083"},
+					{Name: "TEST_PORT_8083_TCP_PROTO", Value: "tcp"},
+					{Name: "TEST_PORT_8083_TCP_PORT", Value: "8083"},
+					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
+				},
+			},
+			api.NamespaceDefault,
+			true,
+			util.NewStringSet("FOO=BAR",
+				"TEST_SERVICE_HOST=1.2.3.3",
+				"TEST_SERVICE_PORT=8083",
+				"TEST_PORT=tcp://1.2.3.3:8083",
+				"TEST_PORT_8083_TCP=tcp://1.2.3.3:8083",
+				"TEST_PORT_8083_TCP_PROTO=tcp",
+				"TEST_PORT_8083_TCP_PORT=8083",
+				"TEST_PORT_8083_TCP_ADDR=1.2.3.3"),
+			8,
+		},
+		{
+			"api server = N; kubelet = Y",
+			"test1",
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "FOO", Value: "BAZ"},
+				},
+			},
+			api.NamespaceDefault,
+			false,
+			util.NewStringSet("FOO=BAZ",
+				"TEST_SERVICE_HOST=1.2.3.3",
+				"TEST_SERVICE_PORT=8083",
+				"TEST_PORT=tcp://1.2.3.3:8083",
+				"TEST_PORT_8083_TCP=tcp://1.2.3.3:8083",
+				"TEST_PORT_8083_TCP_PROTO=tcp",
+				"TEST_PORT_8083_TCP_PORT=8083",
+				"TEST_PORT_8083_TCP_ADDR=1.2.3.3",
+				"KUBERNETES_SERVICE_HOST=1.2.3.1",
+				"KUBERNETES_SERVICE_PORT=8081",
+				"KUBERNETES_PORT=tcp://1.2.3.1:8081",
+				"KUBERNETES_PORT_8081_TCP=tcp://1.2.3.1:8081",
+				"KUBERNETES_PORT_8081_TCP_PROTO=tcp",
+				"KUBERNETES_PORT_8081_TCP_PORT=8081",
+				"KUBERNETES_PORT_8081_TCP_ADDR=1.2.3.1",
+				"KUBERNETES_RO_SERVICE_HOST=1.2.3.2",
+				"KUBERNETES_RO_SERVICE_PORT=8082",
+				"KUBERNETES_RO_PORT=tcp://1.2.3.2:8082",
+				"KUBERNETES_RO_PORT_8082_TCP=tcp://1.2.3.2:8082",
+				"KUBERNETES_RO_PORT_8082_TCP_PROTO=tcp",
+				"KUBERNETES_RO_PORT_8082_TCP_PORT=8082",
+				"KUBERNETES_RO_PORT_8082_TCP_ADDR=1.2.3.2"),
+			22,
+		},
+		{
+			"master service in pod ns",
+			"test2",
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "FOO", Value: "ZAP"},
+				},
+			},
+			"kubernetes",
+			false,
+			util.NewStringSet("FOO=ZAP",
+				"TEST_SERVICE_HOST=1.2.3.5",
+				"TEST_SERVICE_PORT=8085",
+				"TEST_PORT=tcp://1.2.3.5:8085",
+				"TEST_PORT_8085_TCP=tcp://1.2.3.5:8085",
+				"TEST_PORT_8085_TCP_PROTO=tcp",
+				"TEST_PORT_8085_TCP_PORT=8085",
+				"TEST_PORT_8085_TCP_ADDR=1.2.3.5",
+				"KUBERNETES_SERVICE_HOST=1.2.3.4",
+				"KUBERNETES_SERVICE_PORT=8084",
+				"KUBERNETES_PORT=tcp://1.2.3.4:8084",
+				"KUBERNETES_PORT_8084_TCP=tcp://1.2.3.4:8084",
+				"KUBERNETES_PORT_8084_TCP_PROTO=tcp",
+				"KUBERNETES_PORT_8084_TCP_PORT=8084",
+				"KUBERNETES_PORT_8084_TCP_ADDR=1.2.3.4",
+				"KUBERNETES_RO_SERVICE_HOST=1.2.3.7",
+				"KUBERNETES_RO_SERVICE_PORT=8087",
+				"KUBERNETES_RO_PORT=tcp://1.2.3.7:8087",
+				"KUBERNETES_RO_PORT_8087_TCP=tcp://1.2.3.7:8087",
+				"KUBERNETES_RO_PORT_8087_TCP_PROTO=tcp",
+				"KUBERNETES_RO_PORT_8087_TCP_PORT=8087",
+				"KUBERNETES_RO_PORT_8087_TCP_ADDR=1.2.3.7"),
+			22,
+		},
+		{
+			"pod in master service ns",
+			"kubernetes",
+			&api.Container{},
+			"kubernetes",
+			false,
+			util.NewStringSet(
+				"NOT_SPECIAL_SERVICE_HOST=1.2.3.8",
+				"NOT_SPECIAL_SERVICE_PORT=8088",
+				"NOT_SPECIAL_PORT=tcp://1.2.3.8:8088",
+				"NOT_SPECIAL_PORT_8088_TCP=tcp://1.2.3.8:8088",
+				"NOT_SPECIAL_PORT_8088_TCP_PROTO=tcp",
+				"NOT_SPECIAL_PORT_8088_TCP_PORT=8088",
+				"NOT_SPECIAL_PORT_8088_TCP_ADDR=1.2.3.8",
+				"KUBERNETES_SERVICE_HOST=1.2.3.6",
+				"KUBERNETES_SERVICE_PORT=8086",
+				"KUBERNETES_PORT=tcp://1.2.3.6:8086",
+				"KUBERNETES_PORT_8086_TCP=tcp://1.2.3.6:8086",
+				"KUBERNETES_PORT_8086_TCP_PROTO=tcp",
+				"KUBERNETES_PORT_8086_TCP_PORT=8086",
+				"KUBERNETES_PORT_8086_TCP_ADDR=1.2.3.6",
+				"KUBERNETES_RO_SERVICE_HOST=1.2.3.7",
+				"KUBERNETES_RO_SERVICE_PORT=8087",
+				"KUBERNETES_RO_PORT=tcp://1.2.3.7:8087",
+				"KUBERNETES_RO_PORT_8087_TCP=tcp://1.2.3.7:8087",
+				"KUBERNETES_RO_PORT_8087_TCP_PROTO=tcp",
+				"KUBERNETES_RO_PORT_8087_TCP_PORT=8087",
+				"KUBERNETES_RO_PORT_8087_TCP_ADDR=1.2.3.7"),
+			21,
+		},
+	}
+
+	for _, tc := range testCases {
+		kl, _, _ := newTestKubelet(t)
+		kl.masterServiceNamespace = tc.masterServiceNamespace
+		if tc.nilLister {
+			kl.serviceLister = nil
+		} else {
+			kl.serviceLister = testServiceLister{services}
+		}
+
+		result, err := kl.makeEnvironmentVariables(tc.ns, tc.container)
+		if err != nil {
+			t.Errorf("[%v] Unexpected error: %v", tc.name, err)
+		}
+
+		resultSet := util.NewStringSet(result...)
+		if !resultSet.IsSuperset(tc.expectedEnvs) {
+			t.Errorf("[%v] Unexpected env entries; expected {%v}, got {%v}", tc.name, tc.expectedEnvs, resultSet)
+		}
+
+		if a := len(resultSet); a != tc.expectedEnvSize {
+			t.Errorf("[%v] Unexpected number of env vars; expected %v, got %v", tc.name, tc.expectedEnvSize, a)
 		}
 	}
 }
