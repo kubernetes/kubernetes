@@ -34,8 +34,8 @@ const (
 func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rollingupdate <old-controller-name> -f <new-controller.json>",
-		Short: "Perform a rolling update of the given replicationController",
-		Long: `Perform a rolling update of the given replicationController.",
+		Short: "Perform a rolling update of the given ReplicationController",
+		Long: `Perform a rolling update of the given ReplicationController.
 
 Replaces named controller with new controller, updating one pod at a time to use the
 new PodTemplate. The new-controller.json must specify the same namespace as the
