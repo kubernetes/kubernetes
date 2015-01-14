@@ -82,9 +82,8 @@ func SetupLogging() {
 	record.StartLogging(glog.Infof)
 }
 
-func SetupEventSending(client *client.Client) {
+func SetupEventSending(client *client.Client, hostname string) {
 	glog.Infof("Sending events to api server.")
-	hostname := util.GetHostname("")
 	record.StartRecording(client.Events(""),
 		api.EventSource{
 			Component: "kubelet",
