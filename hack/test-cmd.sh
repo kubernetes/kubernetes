@@ -138,6 +138,19 @@ for version in "${kube_api_versions[@]}"; do
   output_service=$(kubectl get service frontend -o json --output-version=v1beta3 "${kube_flags[@]}")
   kubectl delete service frontend "${kube_flags[@]}"
   echo "${output_service}" | kubectl create -f - "${kube_flags[@]}"
+  kubectl create -f - "${kube_flags[@]}" << __EOF__
+      {
+          "kind": "Service",
+          "apiVersion": "v1beta1",
+          "id": "service-${version}-test",
+          "port": 80,
+          "protocol": "TCP",
+          "labels": {
+              "name": "${version}"
+          }
+      }
+__EOF__
+  kubectl get services "something-${version}" "${kube_flags[@]}"
   kubectl get services "${kube_flags[@]}"
   kubectl delete service frontend "${kube_flags[@]}"
 

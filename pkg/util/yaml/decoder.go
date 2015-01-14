@@ -149,6 +149,6 @@ func guessJSONStream(r io.Reader, size int) (io.Reader, bool) {
 // Return true if the first non-whitespace bytes in buf is
 // prefix
 func hasPrefix(buf []byte, prefix []byte) bool {
-	buf = bytes.TrimLeftFunc(buf, unicode.IsSpace)
-	return bytes.HasPrefix(buf, prefix)
+	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
+	return bytes.HasPrefix(trim, prefix)
 }
