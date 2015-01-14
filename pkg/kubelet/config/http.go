@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
@@ -147,7 +148,7 @@ func applyDefaults(pod *api.BoundPod, url string) {
 		hasher := md5.New()
 		fmt.Fprintf(hasher, "url:%s", url)
 		util.DeepHashObject(hasher, pod)
-		pod.UID = util.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
+		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q for pod %q from URL %s", pod.UID, pod.Name, url)
 	}
 	if len(pod.Namespace) == 0 {

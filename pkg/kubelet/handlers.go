@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -32,7 +33,7 @@ type execActionHandler struct {
 	kubelet *Kubelet
 }
 
-func (e *execActionHandler) Run(podFullName string, uid util.UID, container *api.Container, handler *api.Handler) error {
+func (e *execActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
 	_, err := e.kubelet.RunInContainer(podFullName, uid, container.Name, handler.Exec.Command)
 	return err
 }
@@ -67,7 +68,7 @@ func ResolvePort(portReference util.IntOrString, container *api.Container) (int,
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (h *httpActionHandler) Run(podFullName string, uid util.UID, container *api.Container, handler *api.Handler) error {
+func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		var info api.PodInfo

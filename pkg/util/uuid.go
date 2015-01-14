@@ -21,12 +21,8 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
-
-// UID is a type that holds unique ID values, including UUIDs.  Because we
-// don't ONLY use UUIDs, this is an alias to string.  Being a type captures
-// intent and helps make sure that UIDs and names do not get conflated.
-type UID string
 
 var uuidLock sync.Mutex
 
@@ -36,12 +32,12 @@ var uuidLock sync.Mutex
  * Blocks in a go routine, so that the caller doesn't have to wait.
  * TODO: save old unused UUIDs so that no one has to block.
  */
-func NewUUID() UID {
+func NewUUID() types.UID {
 	uuidLock.Lock()
 	result := uuid.NewUUID()
 	go func() {
 		time.Sleep(200 * time.Nanosecond)
 		uuidLock.Unlock()
 	}()
-	return UID(result.String())
+	return types.UID(result.String())
 }

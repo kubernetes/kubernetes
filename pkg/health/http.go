@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -105,7 +106,7 @@ func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 }
 
 // HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
-func (h *HTTPHealthChecker) HealthCheck(podFullName string, podUID util.UID, status api.PodStatus, container api.Container) (Status, error) {
+func (h *HTTPHealthChecker) HealthCheck(podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (Status, error) {
 	host, port, path, err := getURLParts(status, container)
 	if err != nil {
 		return Unknown, err

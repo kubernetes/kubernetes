@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -91,7 +92,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	name := BuildDockerName(util.UID(podUID), podFullName, container)
+	name := BuildDockerName(types.UID(podUID), podFullName, container)
 	returnedPodFullName, returnedUID, returnedContainerName, hash := ParseDockerName(name)
 	if podFullName != returnedPodFullName || podUID != string(returnedUID) || containerName != returnedContainerName || computedHash != hash {
 		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, podUID, containerName, computedHash, returnedPodFullName, returnedUID, returnedContainerName, hash)

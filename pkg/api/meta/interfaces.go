@@ -18,7 +18,7 @@ package meta
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
@@ -37,8 +37,8 @@ type Interface interface {
 	SetNamespace(namespace string)
 	Name() string
 	SetName(name string)
-	UID() util.UID
-	SetUID(uid util.UID)
+	UID() types.UID
+	SetUID(uid types.UID)
 	APIVersion() string
 	SetAPIVersion(version string)
 	Kind() string
@@ -72,8 +72,8 @@ type MetadataAccessor interface {
 	Name(obj runtime.Object) (string, error)
 	SetName(obj runtime.Object, name string) error
 
-	UID(obj runtime.Object) (util.UID, error)
-	SetUID(obj runtime.Object, uid util.UID) error
+	UID(obj runtime.Object) (types.UID, error)
+	SetUID(obj runtime.Object, uid types.UID) error
 
 	SelfLink(obj runtime.Object) (string, error)
 	SetSelfLink(obj runtime.Object, selfLink string) error

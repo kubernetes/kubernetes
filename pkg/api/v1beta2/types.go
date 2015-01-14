@@ -18,6 +18,7 @@ package v1beta2
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -260,7 +261,7 @@ type Lifecycle struct {
 type TypeMeta struct {
 	Kind              string    `json:"kind,omitempty" description:"kind of object, in CamelCase"`
 	ID                string    `json:"id,omitempty" description:"name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"`
-	UID               util.UID  `json:"uid,omitempty" description:"UUID assigned by the system upon creation, unique across space and time"`
+	UID               types.UID `json:"uid,omitempty" description:"UUID assigned by the system upon creation, unique across space and time"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; recorded by the system; null for lists"`
 	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object"`
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"`
@@ -749,12 +750,12 @@ type ServerOpList struct {
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
-	Kind            string   `json:"kind,omitempty" description:"kind of the referent"`
-	Namespace       string   `json:"namespace,omitempty" description:"namespace of the referent"`
-	ID              string   `json:"name,omitempty" description:"id of the referent"`
-	UID             util.UID `json:"uid,omitempty" description:"uid of the referent"`
-	APIVersion      string   `json:"apiVersion,omitempty" description:"API version of the referent"`
-	ResourceVersion string   `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any"`
+	Kind            string    `json:"kind,omitempty" description:"kind of the referent"`
+	Namespace       string    `json:"namespace,omitempty" description:"namespace of the referent"`
+	ID              string    `json:"name,omitempty" description:"id of the referent"`
+	UID             types.UID `json:"uid,omitempty" description:"uid of the referent"`
+	APIVersion      string    `json:"apiVersion,omitempty" description:"API version of the referent"`
+	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain information to identify the sub-object. For example, if the object
@@ -825,7 +826,7 @@ type ContainerManifest struct {
 	// TODO: UUID on Manifext is deprecated in the future once we are done
 	// with the API refactory. It is required for now to determine the instance
 	// of a Pod.
-	UUID          util.UID      `json:"uuid,omitempty" description:"manifest UUID"`
+	UUID          types.UID     `json:"uuid,omitempty" description:"manifest UUID"`
 	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
 	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
