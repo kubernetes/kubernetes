@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
@@ -79,6 +80,37 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 
 	if buf.String() != "" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestDeleteNoObjects(t *testing.T) {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/ns/test/pods" && m == "GET":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &api.PodList{})}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	buf := bytes.NewBuffer([]byte{})
+	stderr := bytes.NewBuffer([]byte{})
+
+	cmd := f.NewCmdDelete(buf)
+	cmd.SetOutput(stderr)
+	cmd.Flags().String("namespace", "test", "")
+	cmd.Run(cmd, []string{"pods"})
+
+	if buf.String() != "" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+	if stderr.String() != "No resources found\n" {
+		t.Errorf("unexpected output: %s", stderr.String())
 	}
 }
 

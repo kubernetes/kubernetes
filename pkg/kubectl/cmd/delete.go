@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -70,7 +69,7 @@ Examples:
 				Do()
 
 			found := 0
-			r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
+			err := r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
 				found++
 				if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
 					return err
@@ -78,8 +77,9 @@ Examples:
 				fmt.Fprintf(out, "%s\n", r.Name)
 				return nil
 			})
+			checkErr(err)
 			if found == 0 {
-				glog.V(2).Infof("No resource(s) found")
+				fmt.Fprintf(cmd.Out(), "No resources found\n")
 			}
 		},
 	}
