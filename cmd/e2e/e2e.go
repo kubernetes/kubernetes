@@ -312,7 +312,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 		labels.Everything(),
 		labels.Set{
 			"involvedObject.kind":      "Pod",
-			"involvedObject.uid":       podWithUid.UID,
+			"involvedObject.uid":       string(podWithUid.UID),
 			"involvedObject.namespace": api.NamespaceDefault,
 			"source":                   "scheduler",
 		}.AsSelector(),
@@ -331,7 +331,7 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	events, err = c.Events(api.NamespaceDefault).List(
 		labels.Everything(),
 		labels.Set{
-			"involvedObject.uid":       podWithUid.UID,
+			"involvedObject.uid":       string(podWithUid.UID),
 			"involvedObject.kind":      "BoundPod",
 			"involvedObject.namespace": api.NamespaceDefault,
 			"source":                   "kubelet",

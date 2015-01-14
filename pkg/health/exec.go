@@ -21,13 +21,14 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
 const defaultHealthyOutput = "ok"
 
 type CommandRunner interface {
-	RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
+	RunInContainer(podFullName string, uid util.UID, containerName string, cmd []string) ([]byte, error)
 }
 
 type ExecHealthChecker struct {
@@ -38,11 +39,11 @@ func NewExecHealthChecker(runner CommandRunner) HealthChecker {
 	return &ExecHealthChecker{runner}
 }
 
-func (e *ExecHealthChecker) HealthCheck(podFullName, podUUID string, status api.PodStatus, container api.Container) (Status, error) {
+func (e *ExecHealthChecker) HealthCheck(podFullName string, podUID util.UID, status api.PodStatus, container api.Container) (Status, error) {
 	if container.LivenessProbe.Exec == nil {
 		return Unknown, fmt.Errorf("missing exec parameters")
 	}
-	data, err := e.runner.RunInContainer(podFullName, podUUID, container.Name, container.LivenessProbe.Exec.Command)
+	data, err := e.runner.RunInContainer(podFullName, podUID, container.Name, container.LivenessProbe.Exec.Command)
 	glog.V(1).Infof("container %s health check response: %s", podFullName, string(data))
 	if err != nil {
 		return Unknown, err

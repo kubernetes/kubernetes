@@ -63,7 +63,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", accessor.UID(); e != a {
+	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -162,7 +162,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if e, a := "uid", uid; e != a {
+	if e, a := "uid", string(uid); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	apiVersion, err := accessor.APIVersion(j)
@@ -311,7 +311,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", accessor.UID(); e != a {
+	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -403,7 +403,7 @@ func TestGenericListMeta(t *testing.T) {
 	if e, a := "", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "", accessor.UID(); e != a {
+	if e, a := "", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {

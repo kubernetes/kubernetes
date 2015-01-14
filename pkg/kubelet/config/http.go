@@ -147,7 +147,7 @@ func applyDefaults(pod *api.BoundPod, url string) {
 		hasher := md5.New()
 		fmt.Fprintf(hasher, "url:%s", url)
 		util.DeepHashObject(hasher, pod)
-		pod.UID = hex.EncodeToString(hasher.Sum(nil)[0:])
+		pod.UID = util.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q for pod %q from URL %s", pod.UID, pod.Name, url)
 	}
 	if len(pod.Namespace) == 0 {

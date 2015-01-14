@@ -136,7 +136,7 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 		fields["involvedObject.name"] = ref.Name
 	}
 	if ref.UID != "" {
-		fields["involvedObject.uid"] = ref.UID
+		fields["involvedObject.uid"] = string(ref.UID)
 	}
 	return e.List(labels.Everything(), fields.AsSelector())
 }

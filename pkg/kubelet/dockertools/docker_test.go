@@ -91,9 +91,9 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	name := BuildDockerName(podUID, podFullName, container)
+	name := BuildDockerName(util.UID(podUID), podFullName, container)
 	returnedPodFullName, returnedUID, returnedContainerName, hash := ParseDockerName(name)
-	if podFullName != returnedPodFullName || podUID != returnedUID || containerName != returnedContainerName || computedHash != hash {
+	if podFullName != returnedPodFullName || podUID != string(returnedUID) || containerName != returnedContainerName || computedHash != hash {
 		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, podUID, containerName, computedHash, returnedPodFullName, returnedUID, returnedContainerName, hash)
 	}
 }
@@ -114,7 +114,7 @@ func TestContainerManifestNaming(t *testing.T) {
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
 
 	returnedPodFullName, returnedPodUID, returnedContainerName, hash := ParseDockerName(name)
-	if returnedPodFullName != podFullName || returnedPodUID != podUID || returnedContainerName != container.Name || hash != 0 {
+	if returnedPodFullName != podFullName || string(returnedPodUID) != podUID || returnedContainerName != container.Name || hash != 0 {
 		t.Errorf("unexpected parse: %s %s %s %d", returnedPodFullName, returnedPodUID, returnedContainerName, hash)
 	}
 }

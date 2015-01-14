@@ -23,9 +23,10 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 )
 
-type UUID interface {
-	String() string
-}
+// UID is a type that holds unique ID values, including UUIDs.  Because we
+// don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+// intent and helps make sure that UIDs and names do not get conflated.
+type UID string
 
 var uuidLock sync.Mutex
 
@@ -35,12 +36,12 @@ var uuidLock sync.Mutex
  * Blocks in a go routine, so that the caller doesn't have to wait.
  * TODO: save old unused UUIDs so that no one has to block.
  */
-func NewUUID() UUID {
+func NewUUID() UID {
 	uuidLock.Lock()
 	result := uuid.NewUUID()
 	go func() {
 		time.Sleep(200 * time.Nanosecond)
 		uuidLock.Unlock()
 	}()
-	return result
+	return UID(result.String())
 }
