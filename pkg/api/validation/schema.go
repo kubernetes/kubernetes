@@ -24,7 +24,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
-	"gopkg.in/v2/yaml"
+	"gopkg.in/yaml.v2"
 )
 
 type InvalidTypeError struct {

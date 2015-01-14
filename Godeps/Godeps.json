@@ -109,7 +109,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "4fb5c728a37b361a1e971a3bb3d785fcc96b6ef5"
+			"Rev": "3bc1590d16074751993dd3b1a76e7a8d1a916a11"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
@@ -210,7 +210,7 @@
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
 		},
 		{
-			"ImportPath": "gopkg.in/v2/yaml",
+			"ImportPath": "gopkg.in/yaml.v2",
 			"Rev": "d466437aa4adc35830964cffc5b5f262c63ddcb4"
 		},
 		{
