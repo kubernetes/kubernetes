@@ -531,9 +531,9 @@ func kubecfgArgs() string {
 // kubectl command (begining with a space).
 func kubectlArgs() string {
 	if *checkVersionSkew {
-		return " --match-server-version --v=4"
+		return " --match-server-version"
 	}
-	return " --v=4"
+	return ""
 }
 
 func bashWrap(cmd string) string {
