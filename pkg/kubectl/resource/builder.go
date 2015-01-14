@@ -166,6 +166,7 @@ func (b *Builder) SelectorParam(s string) *Builder {
 	selector, err := labels.ParseSelector(s)
 	if err != nil {
 		b.errs = append(b.errs, fmt.Errorf("the provided selector %q is not valid: %v", s, err))
+		return b
 	}
 	if selector.Empty() {
 		return b
