@@ -170,15 +170,14 @@ func SimpleRunKubelet(client *client.Client, etcdClient tools.EtcdClient, docker
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig) {
+	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
 	if kcfg.KubeClient != nil {
-		kubelet.SetupEventSending(kcfg.KubeClient)
+		kubelet.SetupEventSending(kcfg.KubeClient, kcfg.Hostname)
 	} else {
 		glog.Infof("No api server defined - no events will be sent.")
 	}
 	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
-
-	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
 
 	cfg := makePodSourceConfig(kcfg)
 	k, err := createAndInitKubelet(kcfg, cfg)
