@@ -61,9 +61,6 @@ PROXY_HOST=${ELASTICSEARCH_LOGGING_SERVICE_HOST:-127.0.0.1}
 echo PROXY_HOST=${PROXY_HOST}
 PROXY_PORT=${ELASTICSEARCH_SERVICE_LOGGING_PORT:-9200}
 echo PROXY_PORT=${PROXY_PORT}
-# Test the connection to Elasticsearch
-echo "Running curl http://${PROXY_HOST}:${PROXY_PORT}"
-curl http://${PROXY_HOST}:${PROXY_PORT}
  
 # Create a config.hs that defines the Elasticsearch server to be
 # at http://${ES_HOST}:${ES_PORT}/elasticsearch from the perspective of
