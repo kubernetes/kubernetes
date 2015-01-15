@@ -71,8 +71,8 @@ func TestEtcdSourceExistingBoundPods(t *testing.T) {
 			update.Pods[1].ObjectMeta.Name != "bar" {
 			t.Errorf("Unexpected update response: %#v", update)
 		}
-	case <-time.After(2 * time.Millisecond):
-		t.Errorf("Expected update, timeout insteam")
+	case <-time.After(200 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
 	}
 }
 
