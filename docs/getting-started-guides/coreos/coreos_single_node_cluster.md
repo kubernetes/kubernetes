@@ -2,6 +2,8 @@
 
 Use the [standalone.yaml](cloud-configs/standalone.yaml) cloud-config to provision a single node Kubernetes cluster.
 
+### CoreOS image versions
+
 ### AWS
 
 ```
@@ -10,9 +12,11 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp 
 aws ec2 authorize-security-group-ingress --group-name kubernetes --source-security-group-name kubernetes
 ```
 
+*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
+
 ```
 aws ec2 run-instances \
---image-id ami-c484f5ac \
+--image-id <ami_image_id> \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -22,10 +26,12 @@ aws ec2 run-instances \
 
 ### GCE
 
+*Attention:* Replace ```<gce_image_id>``` bellow for a [suitable version of CoreOS image for GCE](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
+
 ```
 gcloud compute instances create standalone \
 --image-project coreos-cloud \
---image coreos-alpha-557-0-0-v20150109 \
+--image <gce_image_id> \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
