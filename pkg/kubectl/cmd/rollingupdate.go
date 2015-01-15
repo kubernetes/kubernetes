@@ -66,6 +66,10 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 			if mapping.Kind != "ReplicationController" {
 				usageError(cmd, "%s does not specify a valid ReplicationController", filename)
 			}
+			if oldName == newName {
+				usageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
+					filename, oldName)
+			}
 			err = CompareNamespaceFromFile(cmd, namespace)
 			checkErr(err)
 
