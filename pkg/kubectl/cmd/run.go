@@ -38,7 +38,7 @@ Examples:
 
   $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
   <starts a replicated instance of nginx>
-  
+
   $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
   <just print the corresponding API objects, don't actually send them to the apiserver>`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -70,7 +70,9 @@ Examples:
 				controller, err = client.ReplicationControllers(namespace).Create(controller.(*api.ReplicationController))
 				checkErr(err)
 			}
-			PrintObject(cmd, controller, f, out)
+
+			err = PrintObject(cmd, controller, f, out)
+			checkErr(err)
 		},
 	}
 	AddPrinterFlags(cmd)
