@@ -253,7 +253,7 @@ Congratulations!
 The following will run all of the end-to-end testing scenarios assuming you set your environment in cluster/kube-env.sh
 
 ```
-hack/e2e-test.sh
+NUM_MINIONS=3 hack/e2e-test.sh
 ```
 
 ### Troubleshooting
