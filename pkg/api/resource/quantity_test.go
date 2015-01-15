@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	fuzz "github.com/google/gofuzz"
+	"github.com/spf13/pflag"
 	"speter.net/go/exp/math/dec/inf"
 )
 
@@ -484,6 +485,13 @@ func TestQFlagSet(t *testing.T) {
 	qf := qFlag{&Quantity{}}
 	qf.Set("1Ki")
 	if e, a := "1Ki", qf.String(); e != a {
+		t.Errorf("Unexpected result %v != %v", e, a)
+	}
+}
+
+func TestQFlagIsPFlag(t *testing.T) {
+	var pfv pflag.Value = qFlag{}
+	if e, a := "quantity", pfv.Type(); e != a {
 		t.Errorf("Unexpected result %v != %v", e, a)
 	}
 }
