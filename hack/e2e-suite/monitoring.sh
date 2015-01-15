@@ -28,6 +28,7 @@ source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 MONITORING="${KUBE_ROOT}/cluster/addons/cluster-monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+KUBECFG="${KUBE_ROOT}/cluster/kubecfg.sh"
 BIGRAND=$(printf "%x\n" $(( $RANDOM << 16 | $RANDOM ))) # random 2^32 in hex
 MONITORING_FIREWALL_RULE="monitoring-test-${BIGRAND}"
 
@@ -44,15 +45,13 @@ function setup {
     fi
   fi
 
-  "${KUBECTL}" create -f "${MONITORING}/influx-grafana-pod.json"
-  "${KUBECTL}" create -f "${MONITORING}/influx-grafana-service.json"
-  "${KUBECTL}" create -f "${MONITORING}/heapster-pod.json"
+  "${KUBECTL}" create -f "${MONITORING}/"
 }
 
 function cleanup {
-  "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-pod.json" || true
-  "${KUBECTL}" delete -f "${MONITORING}/influx-grafana-service.json" || true
-  "${KUBECTL}" delete -f "${MONITORING}/heapster-pod.json" || true
+  "${KUBECFG}" resize monitoring-influxGrafanaController 0 &> /dev/null || true
+  "${KUBECFG}" resize monitoring-heapsterController 0 &> /dev/null || true
+  "${KUBECTL}" delete -f "${MONITORING}/" &> /dev/null || true
 
   # This only has work to do on gce and gke
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
@@ -69,7 +68,7 @@ function cleanup {
 function influx-data-exists {
   local max_retries=10
   local retry_delay=30 #seconds
-  local influx_ip=$("${KUBECTL}" get -o json pods influx-grafana | grep hostIP | awk '{print $2}' | sed 's/["|,]//g')
+  local influx_ip=$("${KUBECTL}" get pods -l name=influxGrafana -o template -t {{range.items}}{{.currentState.hostIP}}:{{end}} | sed s/://g)
   local influx_url="http://$influx_ip:8086/db/k8s/series?u=root&p=root"
   local ok="false"
   for i in `seq 1 10`; do
@@ -91,8 +90,8 @@ function wait-for-pods {
   local running=false
   for i in `seq 1 20`; do
     sleep 20
-    if "${KUBECTL}" get pods influx-grafana | grep Running &> /dev/null \
-      && "${KUBECTL}" get pods heapster | grep Running &> /dev/null; then
+    if "${KUBECTL}" get pods -l name=influxGrafana -o template -t {{range.items}}{{.currentState.status}}:{{end}} | grep Running &> /dev/null \
+      && "${KUBECTL}" get pods -l name=heapster -o template -t {{range.items}}{{.currentState.status}}:{{end}} | grep Running &> /dev/null; then
       running=true
       break
     fi
