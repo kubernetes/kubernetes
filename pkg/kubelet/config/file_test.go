@@ -28,13 +28,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 	manifest := api.ContainerManifest{
 		ID:   id,
-		UUID: util.UID(id),
+		UUID: types.UID(id),
 		Containers: []api.Container{
 			{
 				Name:  "c" + id,
@@ -54,7 +54,7 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 	expectedPod := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			Name: id,
-			UID:  util.UID(id),
+			UID:  types.UID(id),
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{

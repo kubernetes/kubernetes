@@ -30,6 +30,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
@@ -164,7 +165,7 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		fmt.Fprintf(hasher, "host:%s", hostname)
 		fmt.Fprintf(hasher, "file:%s", filename)
 		util.DeepHashObject(hasher, pod)
-		pod.UID = util.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
+		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q for pod %q from file %s", pod.UID, pod.Name, filename)
 	}
 	if len(pod.Namespace) == 0 {

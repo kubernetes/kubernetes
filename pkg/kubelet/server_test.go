@@ -29,19 +29,19 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/google/cadvisor/info"
 )
 
 type fakeKubelet struct {
 	podByNameFunc     func(namespace, name string) (*api.BoundPod, bool)
 	infoFunc          func(name string) (api.PodInfo, error)
-	containerInfoFunc func(podFullName string, uid util.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	containerInfoFunc func(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	machineInfoFunc   func() (*info.MachineInfo, error)
 	boundPodsFunc     func() ([]api.BoundPod, error)
 	logFunc           func(w http.ResponseWriter, req *http.Request)
-	runFunc           func(podFullName string, uid util.UID, containerName string, cmd []string) ([]byte, error)
+	runFunc           func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	containerLogsFunc func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 }
 
@@ -49,11 +49,11 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetPodInfo(name string, uid util.UID) (api.PodInfo, error) {
+func (fk *fakeKubelet) GetPodInfo(name string, uid types.UID) (api.PodInfo, error) {
 	return fk.infoFunc(name)
 }
 
-func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid util.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	return fk.containerInfoFunc(podFullName, uid, containerName, req)
 }
 
@@ -77,7 +77,7 @@ func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail 
 	return fk.containerLogsFunc(podFullName, containerName, tail, follow, stdout, stderr)
 }
 
-func (fk *fakeKubelet) RunInContainer(podFullName string, uid util.UID, containerName string, cmd []string) ([]byte, error) {
+func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uid, containerName, cmd)
 }
 
@@ -162,7 +162,7 @@ func TestContainerInfo(t *testing.T) {
 	podID := "somepod"
 	expectedPodID := "somepod" + ".default.etcd"
 	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid util.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
 			return nil, fmt.Errorf("bad podID or containerName: podID=%v; containerName=%v", podID, containerName)
 		}
@@ -192,7 +192,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 	expectedPodID := "somepod" + "." + expectedNamespace + ".etcd"
 	expectedContainerName := "goodcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid util.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		if podID != expectedPodID || string(uid) != expectedUid || containerName != expectedContainerName {
 			return nil, fmt.Errorf("bad podID or uid or containerName: podID=%v; uid=%v; containerName=%v", podID, uid, containerName)
 		}
@@ -297,7 +297,7 @@ func TestServeRunInContainer(t *testing.T) {
 	expectedPodName := podName + "." + podNamespace + ".etcd"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
-	fw.fakeKubelet.runFunc = func(podFullName string, uid util.UID, containerName string, cmd []string) ([]byte, error) {
+	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
 		}
@@ -338,7 +338,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	expectedUID := "7e00838d_-_3523_-_11e4_-_8421_-_42010af0a720"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
-	fw.fakeKubelet.runFunc = func(podFullName string, uid util.UID, containerName string, cmd []string) ([]byte, error) {
+	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
 		}
