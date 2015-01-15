@@ -362,14 +362,14 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta1: %v", err)
 	}
-	if err := apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
 	if c.EnableV1Beta3 {
-		if err := apiserver.NewAPIGroupVersion(m.API_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
+		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
@@ -486,8 +486,8 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
-// API_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+// api_v1beta1 returns the resources and codec for API version v1beta1.
+func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
@@ -495,8 +495,8 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec,
 	return storage, v1beta1.Codec, "/api/v1beta1", latest.SelfLinker, m.admissionControl
 }
 
-// API_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+// api_v1beta2 returns the resources and codec for API version v1beta2.
+func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
@@ -504,8 +504,8 @@ func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec,
 	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker, m.admissionControl
 }
 
-// API_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) API_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+// api_v1beta3 returns the resources and codec for API version v1beta3.
+func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		if k == "minions" {
