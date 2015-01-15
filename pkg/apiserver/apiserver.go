@@ -103,28 +103,25 @@ func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, kinds map[string]reflect.Type, h restful.RouteFunction, namespaceScope bool) {
-	glog.V(3).Infof("Installing /%s/%s\n", version, path)
+func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, h restful.RouteFunction, namespaceScope bool) error {
 	object := storage.New()
 	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 	if err != nil {
-		glog.Warningf("error getting kind: %v\n", err)
-		return
+		return err
 	}
 	versionedPtr, err := api.Scheme.New(version, kind)
 	if err != nil {
-		glog.Warningf("error making object: %v\n", err)
-		return
+		return err
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
-	glog.V(3).Infoln("type: ", reflect.TypeOf(versionedObject))
 
 	// See github.com/emicklei/go-restful/blob/master/jsr311.go for routing logic
 	// and status-code behavior
 	if namespaceScope {
 		path = "ns/{namespace}/" + path
 	}
-	glog.V(3).Infof("Installing version=/%s, kind=/%s, path=/%s\n", version, kind, path)
+
+	glog.V(5).Infof("Installing version=/%s, kind=/%s, path=/%s", version, kind, path)
 
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
@@ -149,11 +146,10 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 		_, listKind, err := api.Scheme.ObjectVersionAndKind(list)
 		versionedListPtr, err := api.Scheme.New(version, listKind)
 		if err != nil {
-			glog.Errorf("error making list object: %v\n", err)
-			return
+			return err
 		}
 		versionedList := indirectArbitraryPointer(versionedListPtr)
-		glog.V(3).Infoln("type: ", reflect.TypeOf(versionedList))
+		glog.V(5).Infoln("type: ", reflect.TypeOf(versionedList))
 		ws.Route(listRoute.Returns(http.StatusOK, "OK", versionedList))
 	} else {
 		ws.Route(listRoute.Returns(http.StatusMethodNotAllowed, "listing objects is not supported", nil))
@@ -192,6 +188,8 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	} else {
 		ws.Route(deleteRoute.Returns(http.StatusMethodNotAllowed, "deleting objects is not supported", nil))
 	}
+
+	return nil
 }
 
 // Adds the given param to the given route builder if shouldAdd is true. Does nothing if shouldAdd is false.
@@ -205,7 +203,7 @@ func addParamIf(b *restful.RouteBuilder, parameter *restful.Parameter, shouldAdd
 // InstallREST registers the REST handlers (storage, watch, and operations) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) {
+func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) error {
 	prefix := path.Join(root, version)
 	restHandler := &g.handler
 	strippedHandler := http.StripPrefix(prefix, restHandler)
@@ -233,9 +231,6 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 
 	// TODO: add scheme to APIGroupVersion rather than using api.Scheme
 
-	kinds := api.Scheme.KnownTypes(version)
-	glog.V(4).Infof("InstallREST: %v kinds: %#v", version, kinds)
-
 	// TODO: #2057: Return API resources on "/".
 
 	// TODO: Add status documentation using Returns()
@@ -262,9 +257,13 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 
 	for path, storage := range g.handler.storage {
 		// register legacy patterns where namespace is optional in path
-		registerResourceHandlers(ws, version, path, storage, kinds, h, false)
+		if err := registerResourceHandlers(ws, version, path, storage, h, false); err != nil {
+			return err
+		}
 		// register pattern where namespace is required in path
-		registerResourceHandlers(ws, version, path, storage, kinds, h, true)
+		if err := registerResourceHandlers(ws, version, path, storage, h, true); err != nil {
+			return err
+		}
 	}
 
 	// TODO: port the rest of these. Sadly, if we don't, we'll have inconsistent
@@ -279,6 +278,8 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 	mux.Handle(prefix+"/operations/", http.StripPrefix(prefix+"/operations/", opHandler))
 
 	container.Add(ws)
+
+	return nil
 }
 
 // TODO: Convert to go-restful

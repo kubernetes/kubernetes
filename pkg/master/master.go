@@ -362,10 +362,16 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
-	apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1")
-	apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2")
+	if err := apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
+		glog.Fatalf("Unable to setup API v1beta1: %v", err)
+	}
+	if err := apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
+		glog.Fatalf("Unable to setup API v1beta2: %v", err)
+	}
 	if c.EnableV1Beta3 {
-		apiserver.NewAPIGroupVersion(m.API_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3")
+		if err := apiserver.NewAPIGroupVersion(m.API_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
+			glog.Fatalf("Unable to setup API v1beta3: %v", err)
+		}
 		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
 	}
 
