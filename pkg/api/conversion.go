@@ -17,8 +17,10 @@ limitations under the License.
 package api
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
@@ -27,6 +29,16 @@ var Codec = runtime.CodecFor(Scheme, "")
 
 func init() {
 	Scheme.AddConversionFuncs(
+		func(in *util.Time, out *util.Time, s conversion.Scope) error {
+			// Cannot deep copy these, because time.Time has unexported fields.
+			*out = *in
+			return nil
+		},
+		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
+			// Cannot deep copy these, because inf.Dec has unexported fields.
+			*out = *in.Copy()
+			return nil
+		},
 		// Convert ContainerManifest to BoundPod
 		func(in *ContainerManifest, out *BoundPod, s conversion.Scope) error {
 			out.Spec.Containers = in.Containers

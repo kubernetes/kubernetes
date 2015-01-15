@@ -66,6 +66,46 @@ func TestConverter_DefaultConvert(t *testing.T) {
 	}
 }
 
+func TestConverter_DeepCopy(t *testing.T) {
+	type A struct {
+		Foo *string
+		Bar []string
+		Baz interface{}
+		Qux map[string]string
+	}
+	c := NewConverter()
+	c.Debug = t
+
+	foo, baz := "foo", "baz"
+	x := A{
+		Foo: &foo,
+		Bar: []string{"bar"},
+		Baz: &baz,
+		Qux: map[string]string{"qux": "qux"},
+	}
+	y := A{}
+
+	if err := c.Convert(&x, &y, 0, nil); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	*x.Foo = "foo2"
+	x.Bar[0] = "bar2"
+	*x.Baz.(*string) = "baz2"
+	x.Qux["qux"] = "qux2"
+	if e, a := *x.Foo, *y.Foo; e == a {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+	if e, a := x.Bar, y.Bar; reflect.DeepEqual(e, a) {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+	if e, a := *x.Baz.(*string), *y.Baz.(*string); e == a {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+	if e, a := x.Qux, y.Qux; reflect.DeepEqual(e, a) {
+		t.Errorf("expected difference between %v and %v", e, a)
+	}
+}
+
 func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type A struct {
 		Foo string
