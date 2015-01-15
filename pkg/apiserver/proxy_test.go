@@ -174,6 +174,7 @@ func TestProxy(t *testing.T) {
 		{"PUT", "/some/dir/id", "different question", "answer", "text/css", "default"},
 		{"DELETE", "/some/dir/id", "", "ok", "text/css", "default"},
 		{"GET", "/some/dir/id", "", "answer", "text/css", "other"},
+		{"GET", "/trailing/slash/", "", "answer", "text/css", "default"},
 	}
 
 	for _, item := range table {

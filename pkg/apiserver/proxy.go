@@ -96,6 +96,12 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if len(parts) > 2 {
 		proxyParts := parts[2:]
 		rest = strings.Join(proxyParts, "/")
+		if strings.HasSuffix(req.URL.Path, "/") {
+			// The original path had a trailing slash, which has been stripped
+			// by KindAndNamespace(). We should add it back because some
+			// servers (like etcd) require it.
+			rest = rest + "/"
+		}
 	}
 	storage, ok := r.storage[kind]
 	if !ok {
