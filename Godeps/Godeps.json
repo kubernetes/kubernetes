@@ -312,6 +312,10 @@
 			"Rev": "42ca6cd68aa922bc3f32f1e056e61b65945d9ad7"
 		},
 		{
+			"ImportPath": "github.com/davecgh/go-xdr/xdr2",
+			"Rev": "95e2c801038137f3f52d9f0cf351121faf005f27"
+		},
+		{
 			"ImportPath": "github.com/nalind/gss/pkg/gss/proxy",
 			"Rev": "4a6dff9e91f39dea723a3ee7b125ab04c2888e7e"
 		}
