@@ -74,6 +74,7 @@ function find-release-tars {
 #
 # Vars set:
 #   PROJECT
+#   PROJECT_REPORTED
 function detect-project () {
   if [[ -z "${PROJECT-}" ]]; then
     PROJECT=$(gcloud config list project | tail -n 1 | cut -f 3 -d ' ')
@@ -84,7 +85,11 @@ function detect-project () {
     echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
-  echo "Project: $PROJECT" >&2
+  if [[ -z "${PROJECT_REPORTED-}" ]]; then
+    echo "Project: ${PROJECT}" >&2
+    echo "Zone: ${ZONE}" >&2
+    PROJECT_REPORTED=true
+  fi
 }
 
 
