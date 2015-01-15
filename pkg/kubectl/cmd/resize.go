@@ -26,7 +26,7 @@ import (
 
 func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "resize [---resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>",
+		Use:   "resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>",
 		Short: "Set a new size for a resizable resource (currently only Replication Controllers)",
 		Long: `Set a new size for a resizable resource (currently only Replication Controllers)
 
@@ -37,11 +37,11 @@ If a precondition is specified, it is validated before the resize is attempted, 
 guaranteed that the precondition holds true when the resize is sent to the server.
 
 Examples:
-  $ kubectl resize replicationcontrollers foo 3
+  $ kubectl resize --replicas=3 replicationcontrollers foo
   resized
 
-  # will only execute if the current size is 3
-  $ kubectl resize --current-replicas=2 replicationcontrollers foo 3
+  # will only execute if the current size is 2
+  $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 `,
 		Run: func(cmd *cobra.Command, args []string) {
 			count := GetFlagInt(cmd, "replicas")

@@ -826,16 +826,16 @@ If a precondition is specified, it is validated before the resize is attempted, 
 guaranteed that the precondition holds true when the resize is sent to the server.
 
 Examples:
-  $ kubectl resize replicationcontrollers foo 3
+  $ kubectl resize --replicas=3 replicationcontrollers foo
   resized
 
-  # will only execute if the current size is 3
-  $ kubectl resize --current-replicas=2 replicationcontrollers foo 3
+  # will only execute if the current size is 2
+  $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 
 
 Usage:
 ```
-  kubectl resize [---resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id> [flags]
+  kubectl resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id> [flags]
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
