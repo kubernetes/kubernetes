@@ -394,20 +394,29 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
 
+	if !dv.CanSet() {
+		return scope.error("Cannot set dest. (Tried to deep copy something with unexported fields?)")
+	}
+
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
 		return scope.error(
 			"type names don't match (%v, %v), and no conversion 'func (%v, %v) error' registered.",
 			c.NameFunc(st), c.NameFunc(dt), st, dt)
 	}
 
-	// This should handle all simple types.
-	if st.AssignableTo(dt) {
-		dv.Set(sv)
-		return nil
-	}
-	if st.ConvertibleTo(dt) {
-		dv.Set(sv.Convert(dt))
-		return nil
+	switch st.Kind() {
+	case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:
+		// Don't copy these via assignment/conversion!
+	default:
+		// This should handle all simple types.
+		if st.AssignableTo(dt) {
+			dv.Set(sv)
+			return nil
+		}
+		if st.ConvertibleTo(dt) {
+			dv.Set(sv.Convert(dt))
+			return nil
+		}
 	}
 
 	if c.Debug != nil {
@@ -466,6 +475,18 @@ func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 			}
 			dv.SetMapIndex(dk, dkv)
 		}
+	case reflect.Interface:
+		if sv.IsNil() {
+			// Don't copy a nil interface!
+			dv.Set(reflect.Zero(dt))
+			return nil
+		}
+		tmpdv := reflect.New(sv.Elem().Type()).Elem()
+		if err := c.convert(sv.Elem(), tmpdv, scope); err != nil {
+			return err
+		}
+		dv.Set(reflect.ValueOf(tmpdv.Interface()))
+		return nil
 	default:
 		return scope.error("couldn't copy '%v' into '%v'; didn't understand types", st, dt)
 	}
