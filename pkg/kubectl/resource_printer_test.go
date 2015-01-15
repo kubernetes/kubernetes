@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -505,4 +506,79 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	}
 	out := buffer.String()
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "  " /* columnDelimiter */, t)
+}
+
+func TestPrintMinionStatus(t *testing.T) {
+	printer := NewHumanReadablePrinter(false)
+	table := []struct {
+		minion api.Node
+		status string
+	}{
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+			},
+			status: "Ready",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Kind: api.NodeReady, Status: api.ConditionFull},
+					{Kind: api.NodeReachable, Status: api.ConditionFull}}},
+			},
+			status: "Ready,Reachable",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo3"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Kind: api.NodeReady, Status: api.ConditionFull},
+					{Kind: api.NodeReady, Status: api.ConditionFull}}},
+			},
+			status: "Ready",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo4"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionNone}}},
+			},
+			status: "NotReady",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo5"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: "InvalidValue", Status: api.ConditionFull}}},
+			},
+			status: "Unknown",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo6"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+			},
+			status: "Unknown",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.minion, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Minion: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.status) {
+			t.Fatalf("Expect printing minion %s with status %#v, got: %#v", test.minion.Name, test.status, buffer.String())
+		}
+	}
+}
+
+func contains(fields []string, field string) bool {
+	for _, v := range fields {
+		if v == field {
+			return true
+		}
+	}
+	return false
 }
