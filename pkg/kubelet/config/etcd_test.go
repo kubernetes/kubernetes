@@ -19,10 +19,62 @@ package config
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
+
+func TestEtcdSourceExistingBoundPods(t *testing.T) {
+	// Arrange
+	key := "/registry/nodes/machine/boundpods"
+	fakeEtcdClient := tools.NewFakeEtcdClient(t)
+	updates := make(chan interface{})
+
+	fakeEtcdClient.Set(
+		key,
+		runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
+			Items: []api.BoundPod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "foo",
+						Namespace: "default"},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Image: "foo:v1",
+							}}}},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "bar",
+						Namespace: "default"},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Image: "foo:v1",
+							}}}}}}),
+		0)
+
+	// Act
+	NewSourceEtcd(key, fakeEtcdClient, updates)
+
+	// Assert
+	select {
+	case got := <-updates:
+		update := got.(kubelet.PodUpdate)
+		if len(update.Pods) != 2 ||
+			update.Pods[0].ObjectMeta.Name != "foo" ||
+			update.Pods[1].ObjectMeta.Name != "bar" {
+			t.Errorf("Unexpected update response: %#v", update)
+		}
+	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout insteam")
+	}
+}
 
 func TestEventToPods(t *testing.T) {
 	tests := []struct {
