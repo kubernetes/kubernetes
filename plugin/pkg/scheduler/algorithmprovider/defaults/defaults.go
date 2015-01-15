@@ -31,11 +31,11 @@ func defaultPredicates() util.StringSet {
 	return util.NewStringSet(
 		// Fit is defined based on the absence of port conflicts.
 		factory.RegisterFitPredicate("PodFitsPorts", algorithm.PodFitsPorts),
-		// Fit is determined by resource availability
+		// Fit is determined by resource availability.
 		factory.RegisterFitPredicate("PodFitsResources", algorithm.NewResourceFitPredicate(factory.MinionLister)),
-		// Fit is determined by non-conflicting disk volumes
+		// Fit is determined by non-conflicting disk volumes.
 		factory.RegisterFitPredicate("NoDiskConflict", algorithm.NoDiskConflict),
-		// Fit is determined by node selector query
+		// Fit is determined by node selector query.
 		factory.RegisterFitPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(factory.MinionLister)),
 		// Fit is determined by the presence of the Host parameter and a string match
 		factory.RegisterFitPredicate("HostName", algorithm.PodFitsHost),
@@ -46,8 +46,8 @@ func defaultPriorities() util.StringSet {
 	return util.NewStringSet(
 		// Prioritize nodes by least requested utilization.
 		factory.RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1),
-		// spreads pods by minimizing the number of pods on the same minion with the same labels.
-		factory.RegisterPriorityFunction("SpreadingPriority", algorithm.CalculateSpreadPriority, 1),
+		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
+		factory.RegisterPriorityFunction("ServiceSpreadingPriority", algorithm.NewServiceSpreadPriority(factory.ServiceLister), 1),
 		// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
 		factory.RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 0),
 	)

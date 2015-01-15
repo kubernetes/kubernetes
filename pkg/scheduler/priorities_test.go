@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -233,6 +234,105 @@ func TestLeastRequested(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
+		if !reflect.DeepEqual(test.expectedList, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		}
+	}
+}
+
+func TestNewNodeLabelPriority(t *testing.T) {
+	label1 := map[string]string{"foo": "bar"}
+	label2 := map[string]string{"bar": "foo"}
+	label3 := map[string]string{"bar": "baz"}
+	tests := []struct {
+		pod          api.Pod
+		pods         []api.Pod
+		nodes        []api.Node
+		label        string
+		presence     bool
+		expectedList HostPriorityList
+		test         string
+	}{
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}, {"machine3", 0}},
+			label:        "baz",
+			presence:     true,
+			test:         "no match found, presence true",
+		},
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}, {"machine3", 10}},
+			label:        "baz",
+			presence:     false,
+			test:         "no match found, presence false",
+		},
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 0}, {"machine3", 0}},
+			label:        "foo",
+			presence:     true,
+			test:         "one match found, presence true",
+		},
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 10}, {"machine3", 10}},
+			label:        "foo",
+			presence:     false,
+			test:         "one match found, presence false",
+		},
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 10}, {"machine3", 10}},
+			label:        "bar",
+			presence:     true,
+			test:         "two matches found, presence true",
+		},
+		{
+			nodes: []api.Node{
+				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: label3}},
+			},
+			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 0}, {"machine3", 0}},
+			label:        "bar",
+			presence:     false,
+			test:         "two matches found, presence false",
+		},
+	}
+
+	for _, test := range tests {
+		prioritizer := NodeLabelPrioritizer{
+			label:    test.label,
+			presence: test.presence,
+		}
+		list, err := prioritizer.CalculateNodeLabelPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(api.NodeList{Items: test.nodes}))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		// sort the two lists to avoid failures on account of different ordering
+		sort.Sort(test.expectedList)
+		sort.Sort(list)
 		if !reflect.DeepEqual(test.expectedList, list) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
 		}

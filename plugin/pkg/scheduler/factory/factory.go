@@ -35,8 +35,9 @@ import (
 )
 
 var (
-	PodLister    = &cache.StoreToPodLister{cache.NewStore()}
-	MinionLister = &cache.StoreToNodeLister{cache.NewStore()}
+	PodLister     = &cache.StoreToPodLister{cache.NewStore()}
+	MinionLister  = &cache.StoreToNodeLister{cache.NewStore()}
+	ServiceLister = &cache.StoreToServiceLister{cache.NewStore()}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -48,15 +49,18 @@ type ConfigFactory struct {
 	PodLister *cache.StoreToPodLister
 	// a means to list all minions
 	MinionLister *cache.StoreToNodeLister
+	// a means to list all services
+	ServiceLister *cache.StoreToServiceLister
 }
 
 // NewConfigFactory initializes the factory.
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
-		Client:       client,
-		PodQueue:     cache.NewFIFO(),
-		PodLister:    PodLister,
-		MinionLister: MinionLister,
+		Client:        client,
+		PodQueue:      cache.NewFIFO(),
+		PodLister:     PodLister,
+		MinionLister:  MinionLister,
+		ServiceLister: ServiceLister,
 	}
 }
 
@@ -105,6 +109,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	} else {
 		cache.NewPoller(f.pollMinions, 10*time.Second, f.MinionLister.Store).Run()
 	}
+
+	// Watch and cache all service objects. Scheduler needs to find all pods
+	// created by the same service, so that it can spread them correctly.
+	// Cache this locally.
+	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store).Run()
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -203,6 +212,15 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 		}
 	}
 	return &nodeEnumerator{nodes}, nil
+}
+
+// createServiceLW returns a cache.ListWatch that gets all changes to services.
+func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
+	return &cache.ListWatch{
+		Client:        factory.Client,
+		FieldSelector: parseSelectorOrDie(""),
+		Resource:      "services",
+	}
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {

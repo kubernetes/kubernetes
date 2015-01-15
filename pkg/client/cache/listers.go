@@ -75,17 +75,41 @@ func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
 	return nil, fmt.Errorf("minion '%v' is not in cache", id)
 }
 
-// StoreToServiceLister makes a Store have the List method of the client.ServiceInterface
+// StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
 // The Store must contain (only) Services.
 type StoreToServiceLister struct {
 	Store
 }
 
-func (s *StoreToServiceLister) List() (svcs api.ServiceList, err error) {
+func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
 	for _, m := range s.Store.List() {
-		svcs.Items = append(svcs.Items, *(m.(*api.Service)))
+		services.Items = append(services.Items, *(m.(*api.Service)))
 	}
-	return svcs, nil
+	return services, nil
+}
+
+// TODO: Move this back to scheduler as a helper function that takes a Store,
+// rather than a method of StoreToServiceLister.
+func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
+	var selector labels.Selector
+	var service api.Service
+
+	for _, m := range s.Store.List() {
+		service = *m.(*api.Service)
+		// consider only services that are in the same namespace as the pod
+		if service.Namespace != pod.Namespace {
+			continue
+		}
+		selector = labels.Set(service.Spec.Selector).AsSelector()
+		if selector.Matches(labels.Set(pod.Labels)) {
+			services = append(services, service)
+		}
+	}
+	if len(services) == 0 {
+		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+
+	return
 }
 
 // TODO: add StoreToEndpointsLister for use in kube-proxy.
