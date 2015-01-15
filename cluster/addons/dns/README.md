@@ -47,7 +47,6 @@ between Kubernetes and SkyDNS.  It finds the Kubernetes master through the
 that to etcd for SkyDNS to find.
 
 ## Known issues
-DNS resolution does not work from nodes directly, but it DOES work for
-containers.  As best I (thockin) can figure out, this is some oddity around DNAT and
-localhost in the kernel.  I think I have a workaround, but it's not quite baked
-as of the this writing (11/6/2014).
+Kubernetes installs do not configure the nodes' resolv.conf files to use the
+cluster DNS by default, because that process is inherently distro-specific.
+This should probably be implemented eventually.
