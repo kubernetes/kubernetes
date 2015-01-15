@@ -52,7 +52,7 @@ func fmtHTML(in string) string {
 	return string(out.Bytes())
 }
 
-func TestProxyTransport_fixLinks(t *testing.T) {
+func TestProxyTransport(t *testing.T) {
 	testTransport := &proxyTransport{
 		proxyScheme:      "http",
 		proxyHost:        "foo.com",
@@ -65,40 +65,60 @@ func TestProxyTransport_fixLinks(t *testing.T) {
 	}
 
 	table := map[string]struct {
-		input     string
-		sourceURL string
-		transport *proxyTransport
-		output    string
+		input       string
+		sourceURL   string
+		transport   *proxyTransport
+		output      string
+		contentType string
 	}{
 		"normal": {
-			input:     `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
-			sourceURL: "http://myminion.com/logs/log.log",
-			transport: testTransport,
-			output:    `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			input:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			sourceURL:   "http://myminion.com/logs/log.log",
+			transport:   testTransport,
+			output:      `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			contentType: "text/html",
+		},
+		"content-type charset": {
+			input:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			sourceURL:   "http://myminion.com/logs/log.log",
+			transport:   testTransport,
+			output:      `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			contentType: "text/html; charset=utf-8",
+		},
+		"content-type passthrough": {
+			input:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			sourceURL:   "http://myminion.com/logs/log.log",
+			transport:   testTransport,
+			output:      `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			contentType: "text/plain",
 		},
 		"subdir": {
-			input:     `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
-			sourceURL: "http://myminion.com/whatever/apt/somelog.log",
-			transport: testTransport2,
-			output:    `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a>`,
+			input:       `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
+			sourceURL:   "http://myminion.com/whatever/apt/somelog.log",
+			transport:   testTransport2,
+			output:      `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a>`,
+			contentType: "text/html",
 		},
 		"image": {
-			input:     `<pre><img src="kubernetes.jpg"/></pre>`,
-			sourceURL: "http://myminion.com/",
-			transport: testTransport,
-			output:    `<pre><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes.jpg"/></pre>`,
+			input:       `<pre><img src="kubernetes.jpg"/></pre>`,
+			sourceURL:   "http://myminion.com/",
+			transport:   testTransport,
+			output:      `<pre><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes.jpg"/></pre>`,
+			contentType: "text/html",
 		},
 		"abs": {
-			input:     `<script src="http://google.com/kubernetes.js"/>`,
-			sourceURL: "http://myminion.com/any/path/",
-			transport: testTransport,
-			output:    `<script src="http://google.com/kubernetes.js"/>`,
+			input:       `<script src="http://google.com/kubernetes.js"/>`,
+			sourceURL:   "http://myminion.com/any/path/",
+			transport:   testTransport,
+			output:      `<script src="http://google.com/kubernetes.js"/>`,
+			contentType: "text/html",
 		},
 		"abs but same host": {
-			input:     `<script src="http://myminion.com/kubernetes.js"/>`,
-			sourceURL: "http://myminion.com/any/path/",
-			transport: testTransport,
-			output:    `<script src="http://foo.com/proxy/minion/minion1:10250/kubernetes.js"/>`,
+			input:       `<script src="http://myminion.com/kubernetes.js"/>`,
+			sourceURL:   "http://myminion.com/any/path/",
+			transport:   testTransport,
+			output:      `<script src="http://foo.com/proxy/minion/minion1:10250/kubernetes.js"/>`,
+			contentType: "text/html",
 		},
 	}
 
@@ -106,22 +126,28 @@ func TestProxyTransport_fixLinks(t *testing.T) {
 		// Canonicalize the html so we can diff.
 		item.input = fmtHTML(item.input)
 		item.output = fmtHTML(item.output)
-		req := &http.Request{
-			Method: "GET",
-			URL:    parseURLOrDie(item.sourceURL),
-		}
-		resp := &http.Response{
-			Status:     "200 OK",
-			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(strings.NewReader(item.input)),
-			Close:      true,
-		}
-		updatedResp, err := item.transport.fixLinks(req, resp)
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", item.contentType)
+			fmt.Fprint(w, item.input)
+		}))
+		// Replace source URL with our test server address.
+		sourceURL := parseURLOrDie(item.sourceURL)
+		serverURL := parseURLOrDie(server.URL)
+		item.input = strings.Replace(item.input, sourceURL.Host, serverURL.Host, -1)
+		sourceURL.Host = serverURL.Host
+
+		req, err := http.NewRequest("GET", sourceURL.String(), nil)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
 			continue
 		}
-		body, err := ioutil.ReadAll(updatedResp.Body)
+		resp, err := item.transport.RoundTrip(req)
+		if err != nil {
+			t.Errorf("%v: Unexpected error: %v", name, err)
+			continue
+		}
+		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
 			continue
@@ -129,6 +155,7 @@ func TestProxyTransport_fixLinks(t *testing.T) {
 		if e, a := item.output, string(body); e != a {
 			t.Errorf("%v: expected %v, but got %v", name, e, a)
 		}
+		server.Close()
 	}
 }
 

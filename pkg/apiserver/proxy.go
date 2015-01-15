@@ -174,7 +174,9 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, nil
 	}
 
-	if resp.Header.Get("Content-Type") != "text/html" {
+	cType := resp.Header.Get("Content-Type")
+	cType = strings.TrimSpace(strings.SplitN(cType, ";", 2)[0])
+	if cType != "text/html" {
 		// Do nothing, simply pass through
 		return resp, nil
 	}
