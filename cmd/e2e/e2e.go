@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
+	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
 )
 
@@ -30,6 +31,7 @@ var (
 	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	host       = flag.String("host", "", "The host to connect to")
 	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
+	provider   = flag.String("provider", "", "The name of the Kubernetes provider")
 	testList   util.StringList
 )
 
@@ -40,5 +42,9 @@ func init() {
 func main() {
 	util.InitFlags()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
-	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, testList)
+	if *provider == "" {
+		glog.Error("e2e needs the have the --provider flag set")
+		os.Exit(1)
+	}
+	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, testList)
 }
