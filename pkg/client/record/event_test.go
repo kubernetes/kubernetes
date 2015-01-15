@@ -274,7 +274,7 @@ func TestLotsOfEvents(t *testing.T) {
 		APIVersion: "v1beta1",
 	}
 	for i := 0; i < maxQueuedEvents; i++ {
-		go Event(ref, "Status", "Reason", strconv.Itoa(i))
+		go Event(ref, "Reason", strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
 	for i := 0; i < maxQueuedEvents; i++ {
