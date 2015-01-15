@@ -113,7 +113,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, firstLetterIsB, codec, versioner, nil)
+			w := newEtcdWatcher(true, nil, firstLetterIsB, codec, versioner, nil)
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -151,7 +151,7 @@ func TestWatchInterpretations(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	w := newEtcdWatcher(false, Everything, codec, versioner, nil)
+	w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil)
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -165,7 +165,7 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, Everything, codec, versioner, nil)
+		w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil)
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -179,7 +179,7 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, Everything, codec, versioner, nil)
+		w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil)
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -521,6 +521,51 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	}
 
 	fakeClient.WaitForWatchCompletion()
+	watching.Stop()
+}
+
+func TestWatchListIgnoresRootKey(t *testing.T) {
+	codec := latest.Codec
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+
+	fakeClient := NewFakeEtcdClient(t)
+	h := EtcdHelper{fakeClient, codec, versioner}
+
+	watching, err := h.WatchList("/some/key", 1, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	fakeClient.WaitForWatchCompletion()
+
+	// This is the root directory of the watch, which happens to have a value encoded
+	fakeClient.WatchResponse <- &etcd.Response{
+		Action: "delete",
+		PrevNode: &etcd.Node{
+			Key:           "/some/key",
+			Value:         runtime.EncodeOrDie(codec, pod),
+			CreatedIndex:  1,
+			ModifiedIndex: 1,
+		},
+	}
+	// Delete of the parent directory of a key is an event that a list watch would receive,
+	// but will have no value so the decode will fail.
+	fakeClient.WatchResponse <- &etcd.Response{
+		Action: "delete",
+		PrevNode: &etcd.Node{
+			Key:           "/some/key",
+			Value:         "",
+			CreatedIndex:  1,
+			ModifiedIndex: 1,
+		},
+	}
+	close(fakeClient.WatchStop)
+
+	// the existing node is detected and the index set
+	_, open := <-watching.ResultChan()
+	if open {
+		t.Fatalf("unexpected channel open")
+	}
+
 	watching.Stop()
 }
 
