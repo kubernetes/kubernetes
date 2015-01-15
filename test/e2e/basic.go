@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,13 @@ import (
 	"github.com/golang/glog"
 )
 
-func TestBasic(c *client.Client) bool {
+// A basic test to check the deployment of an image using
+// a replication controller. The image serves its hostname
+// which is checked for each replica.
+func TestBasicImage(c *client.Client, image string) bool {
 	ns := api.NamespaceDefault
+	// TODO(satnam6502): Generate a unique name to allow
+	//                   parallel executions of this test.
 	name := "my-hostname"
 	replicas := 2
 
@@ -45,9 +50,13 @@ func TestBasic(c *client.Client) bool {
 			glog.Infof("Found a straggler %s controller", name)
 			// Delete any pods controlled by this replicaiton controller.
 			cnt.Spec.Replicas = 0
-			c.ReplicationControllers(ns).Update(&cnt)
+			if _, err := c.ReplicationControllers(ns).Update(&cnt); err != nil {
+				glog.Warningf("Failed to resize straggler controller to zero: %v", err)
+			}
 			// Delete the controller
-			c.ReplicationControllers(ns).Delete(name)
+			if err = c.ReplicationControllers(ns).Delete(name); err != nil {
+				glog.Warningf("Failed to delete straggler replicatior controller: %v", err)
+			}
 			break
 		}
 	}
@@ -56,6 +65,7 @@ func TestBasic(c *client.Client) bool {
 	// that serves its hostname on port 8080.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
+	glog.Infof("Creating replication controller %s", name)
 	controller, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -73,7 +83,7 @@ func TestBasic(c *client.Client) bool {
 					Containers: []api.Container{
 						{
 							Name:  name,
-							Image: "kubernetes/serve_hostname",
+							Image: image,
 							Ports: []api.Port{{ContainerPort: 9376, HostPort: 8080}},
 						},
 					},
@@ -151,4 +161,10 @@ func TestBasic(c *client.Client) bool {
 	}
 
 	return true
+}
+
+// TestBasic performs the TestBasicImage check with the
+// image kubernetes/serve_hostname
+func TestBasic(c *client.Client) bool {
+	return TestBasicImage(c, "kubernetes/serve_hostname")
 }

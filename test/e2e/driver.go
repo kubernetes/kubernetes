@@ -51,21 +51,23 @@ func outputTAPSummary(infoList []testInfo) {
 	}
 }
 
-func RunE2ETests(authConfig, certDir, host, repoRoot string, testList []string) {
-	testContext = testContextType{authConfig, certDir, host, repoRoot}
+// Run each Go end-to-end-test. This function assumes the
+// creation of a test cluster.
+func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, testList []string) {
+	testContext = testContextType{authConfig, certDir, host, repoRoot, provider}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
 
+	// TODO: Associate a timeout with each test individually.
 	go func() {
 		defer util.FlushLogs()
-		time.Sleep(5 * time.Minute)
+		time.Sleep(10 * time.Minute)
 		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
 	}()
 
 	c := loadClientOrDie()
 
-	// Define the tests.  Important: for a clean test grid, please keep ids for a test constant.
 	tests := []testSpec{
 		{TestKubernetesROService, "TestKubernetesROService", 1},
 		{TestKubeletSendsEvent, "TestKubeletSendsEvent", 2},
@@ -75,6 +77,7 @@ func RunE2ETests(authConfig, certDir, host, repoRoot string, testList []string) 
 		{TestClusterDNS, "TestClusterDNS", 6},
 		{TestPodHasServiceEnvVars, "TestPodHasServiceEnvVars", 7},
 		{TestBasic, "TestBasic", 8},
+		{TestPrivate, "TestPrivate", 9},
 	}
 
 	validTestNames := util.NewStringSet()
