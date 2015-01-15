@@ -20,14 +20,11 @@ import (
 	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
-
-	"github.com/golang/glog"
 )
 
 func main() {
 	cmd := cmd.NewFactory().NewKubectlCommand(os.Stdout)
 	if err := cmd.Execute(); err != nil {
-		glog.Errorf("error: %v", err)
 		os.Exit(1)
 	}
 }
