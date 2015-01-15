@@ -229,9 +229,13 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
 		config.NewSourceURL(kc.ManifestURL, kc.HttpCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
-	if !reflect.ValueOf(kc.EtcdClient).IsNil() {
+	if kc.EtcdClient != nil && !reflect.ValueOf(kc.EtcdClient).IsNil() {
 		glog.Infof("Watching for etcd configs at %v", kc.EtcdClient.GetCluster())
 		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel(kubelet.EtcdSource))
+	}
+	if kc.KubeClient != nil && !reflect.ValueOf(kc.KubeClient).IsNil() {
+		glog.Infof("Watching apiserver")
+		config.NewSourceApiserver(kc.KubeClient, kc.Hostname, cfg.Channel(kubelet.ApiserverSource))
 	}
 	return cfg
 }

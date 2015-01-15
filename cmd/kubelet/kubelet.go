@@ -57,7 +57,7 @@ var (
 	allowPrivileged         = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
 	registryPullQPS         = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	registryBurst           = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
-	runonce                 = flag.Bool("runonce", false, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --etcd_servers and --enable-server")
+	runonce                 = flag.Bool("runonce", false, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --etcd_servers, --api_servers, and --enable-server")
 	enableDebuggingHandlers = flag.Bool("enable_debugging_handlers", true, "Enables server endpoints for log collection and local running of containers and commands")
 	minimumGCAge            = flag.Duration("minimum_container_ttl_duration", 1*time.Minute, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
@@ -73,14 +73,18 @@ var (
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
-	flag.Var(&apiServerList, "api_servers", "List of Kubernetes API servers to publish events to. (ip:port), comma separated.")
+	flag.Var(&apiServerList, "api_servers", "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	flag.Var(&clusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 }
 
 func setupRunOnce() {
 	if *runonce {
+		// Don't use remote (etcd or apiserver) sources
 		if len(etcdServerList) > 0 {
 			glog.Fatalf("invalid option: --runonce and --etcd_servers are mutually exclusive")
+		}
+		if len(apiServerList) > 0 {
+			glog.Fatalf("invalid option: --runonce and --api_servers are mutually exclusive")
 		}
 		if *enableServer {
 			glog.Infof("--runonce is set, disabling server")
@@ -96,6 +100,18 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	verflag.PrintAndExitIfRequested()
+
+	// Cluster creation scripts support both kubernetes versions that 1) support kublet watching
+	// apiserver for pods, and 2) ones that don't. So they ca set both --etcd_servers and
+	// --api_servers.  The current code will ignore the --etcd_servers flag, while older kubelet
+	// code will use the --etd_servers flag for pods, and use --api_servers for event publising.
+	//
+	// TODO(erictune): convert all cloud provider scripts and Google Container Engine to
+	// use only --api_servers, then delete --etcd_servers flag and the resulting dead code.
+	if len(etcdServerList) > 0 && len(apiServerList) > 0 {
+		glog.Infof("Both --etcd_servers and --api_servers are set.  Not using etcd source.")
+		etcdServerList = util.StringList{}
+	}
 
 	setupRunOnce()
 
