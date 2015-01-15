@@ -54,6 +54,7 @@ type CMServer struct {
 	ResourceQuotaSyncPeriod time.Duration
 	RegisterRetryCount      int
 	MachineList             util.StringList
+	SyncNodeList            bool
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
@@ -72,6 +73,7 @@ func NewCMServer() *CMServer {
 		RegisterRetryCount:      10,
 		NodeMilliCPU:            1000,
 		NodeMemory:              resource.MustParse("3Gi"),
+		SyncNodeList:            true,
 		KubeletConfig: client.KubeletConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: false,
@@ -103,7 +105,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.StringVar(&s.MinionRegexp, "minion_regexp", s.MinionRegexp, "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
+	fs.StringVar(&s.MinionRegexp, "minion_regexp", s.MinionRegexp, "If non empty, and --cloud_provider is specified, a regular expression for matching minion VMs.")
 	fs.DurationVar(&s.NodeSyncPeriod, "node_sync_period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
@@ -111,6 +113,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.RegisterRetryCount, "register_retry_count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
 	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
+	fs.BoolVar(&s.SyncNodeList, "sync_nodes", s.SyncNodeList, "If true, and --cloud_provider is specified, sync nodes from the cloud provider. Default true.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
@@ -119,6 +122,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *CMServer) verifyMinionFlags() {
+	if !s.SyncNodeList && s.MinionRegexp != "" {
+		glog.Info("--minion_regexp is ignored by --sync_nodes=false")
+	}
 	if s.CloudProvider == "" || s.MinionRegexp == "" {
 		if len(s.MachineList) == 0 {
 			glog.Info("No machines specified!")
@@ -155,6 +161,7 @@ func (s *CMServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
+
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
@@ -163,7 +170,7 @@ func (s *CMServer) Run(_ []string) error {
 		},
 	}
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources, kubeClient, kubeletClient)
-	nodeController.Run(s.NodeSyncPeriod, s.RegisterRetryCount)
+	nodeController.Run(s.NodeSyncPeriod, s.RegisterRetryCount, s.SyncNodeList)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)

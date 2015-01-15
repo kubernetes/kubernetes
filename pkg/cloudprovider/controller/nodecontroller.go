@@ -71,14 +71,18 @@ func NewNodeController(
 
 // Run creates initial node list and start syncing instances from cloudprovider if any.
 // It also starts syncing cluster node status.
-func (s *NodeController) Run(period time.Duration, retryCount int) {
+func (s *NodeController) Run(period time.Duration, retryCount int, syncNodeList bool) {
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
 	if s.isRunningCloudProvider() {
-		nodes, err = s.CloudNodes()
-		if err != nil {
-			glog.Errorf("Error loading initial node from cloudprovider: %v", err)
+		if syncNodeList {
+			nodes, err = s.CloudNodes()
+			if err != nil {
+				glog.Errorf("Error loading initial node from cloudprovider: %v", err)
+			}
+		} else {
+			nodes = &api.NodeList{}
 		}
 	} else {
 		nodes, err = s.StaticNodes()
@@ -96,7 +100,7 @@ func (s *NodeController) Run(period time.Duration, retryCount int) {
 	}
 
 	// Start syncing node list from cloudprovider.
-	if s.isRunningCloudProvider() {
+	if syncNodeList && s.isRunningCloudProvider() {
 		go util.Forever(func() {
 			if err = s.SyncCloud(); err != nil {
 				glog.Errorf("Error syncing cloud: %v", err)

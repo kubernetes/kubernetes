@@ -9,6 +9,7 @@
 {% set machines = ""-%}
 {% set cloud_provider = "" -%}
 {% set minion_regexp = "--minion_regexp=.*" -%}
+{% set sync_nodes = "--sync_nodes=true" -%}
 {% if grains.cloud_provider is defined -%}
   {% set cloud_provider = "--cloud_provider=" + grains.cloud_provider -%}
 {% endif -%}
@@ -47,4 +48,4 @@
 {% endif -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{ cloud_config }} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{ sync_nodes }} {{ cloud_config }} {{pillar['log_level']}}"

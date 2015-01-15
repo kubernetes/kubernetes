@@ -36,7 +36,7 @@ The kube-controller-manager has several options.
 	The provider for cloud services. Empty string for no provider.
 
 **--minion_regexp**=""
-	If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.
+	If non empty, and --cloud_provider is specified, a regular expression for matching minion VMs.
 
 **--insecure_skip_tls_verify**=false
 	If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
@@ -55,6 +55,9 @@ The kube-controller-manager has several options.
 
 **--machines**=[]
     List of machines to schedule onto, comma separated.
+
+**--sync_nodes**=true
+        If true, and --cloud_provider is specified, sync nodes from the cloud provider. Default true.
 
 **--master**=""
 	The address of the Kubernetes API server.
