@@ -102,7 +102,7 @@ func NewForbidden(kind, name string, err error) error {
 			Kind: kind,
 			ID:   name,
 		},
-		Message: fmt.Sprintf("%s %q is forbidden", kind, name),
+		Message: fmt.Sprintf("%s %q is forbidden: %v", kind, name, err),
 	}}
 }
 
