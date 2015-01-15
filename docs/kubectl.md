@@ -237,8 +237,8 @@ Examples:
   $ cat pod.json | kubectl update -f -
   <update a pod based on the json passed into stdin>
   
-  $ kubectl update pods my-pod --patch='{ "labels": { "foo": "bar" } }'
-  <update a pod by downloading it, applying the patch, then updating>
+  $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
+  <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>
 
 Usage:
 ```
@@ -264,7 +264,7 @@ Usage:
       --match-server-version=false: Require server version to match client version
   -n, --namespace="": If present, the namespace scope for this CLI request.
       --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
-      --patch="": A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the re-updated
+      --patch="": A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the updated
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.

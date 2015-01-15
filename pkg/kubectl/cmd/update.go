@@ -39,8 +39,8 @@ Examples:
   $ cat pod.json | kubectl update -f -
   <update a pod based on the json passed into stdin>
   
-  $ kubectl update pods my-pod --patch='{ "labels": { "foo": "bar" } }'
-  <update a pod by downloading it, applying the patch, then updating>`,
+  $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
+  <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>`,
 		Run: func(cmd *cobra.Command, args []string) {
 			filename := GetFlagString(cmd, "filename")
 			patch := GetFlagString(cmd, "patch")
@@ -60,7 +60,7 @@ Examples:
 		},
 	}
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to update the resource")
-	cmd.Flags().String("patch", "", "A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the re-updated")
+	cmd.Flags().String("patch", "", "A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the updated")
 	return cmd
 }
 
