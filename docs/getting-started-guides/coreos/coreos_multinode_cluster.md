@@ -47,7 +47,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 ```
 aws ec2 run-instances \
 --count 1 \
---image-id ami-c484f5ac \
+--image-id <ami_image_id> \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
