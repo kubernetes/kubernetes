@@ -85,7 +85,7 @@ if ! hack/verify-gendocs.sh > /dev/null; then
   (
     echo
     echo "# *** ERROR: *** docs are out of sync between cli and markdown"
-    echo "# run hack/gendocs.sh > docs/kubectl.md to regenerate"
+    echo "# run hack/run-gendocs.sh > docs/kubectl.md to regenerate"
     echo
     echo "#"
     echo "# Your commit will be aborted unless you regenerate docs."
