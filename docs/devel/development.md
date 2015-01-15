@@ -238,16 +238,9 @@ git fetch upstream
 git rebase upstream/master
 ```
 
-## Regenerating the API documentation
+## Regenerating the CLI documentation
 
 ```
-cd kubernetes/api
-sudo docker build -t kubernetes/raml2html .
-sudo docker run --name="docgen" kubernetes/raml2html
-sudo docker cp docgen:/data/kubernetes.html .
+hack/run-gendocs.sh
 ```
 
-View the API documentation using htmlpreview (works on your fork, too):
-```
-http://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/blob/master/api/kubernetes.html
-```
