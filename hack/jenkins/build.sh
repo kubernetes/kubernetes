@@ -46,7 +46,7 @@ rm -rf ~/.kube*
 git clean -fdx
 
 # Build
-go run ./hack/e2e.go -v -build
+go run ./hack/e2e.go -v --build
 
 # Push to GCS
 ./build/push-ci-build.sh

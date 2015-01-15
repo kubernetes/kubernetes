@@ -143,6 +143,10 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
 	util.AddAllFlagsToPFlagSet(flags)
 
+	// This is necessary as github.com/spf13/cobra doesn't support "global"
+	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
+	util.AddPFlagSetToPFlagSet(pflag.CommandLine, flags)
+
 	if f.flags != nil {
 		f.flags.VisitAll(func(flag *pflag.Flag) {
 			flags.AddFlag(flag)

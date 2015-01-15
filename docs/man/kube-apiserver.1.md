@@ -14,64 +14,64 @@ The **kubernetes** API server validates and configures data for 3 types of objec
 The the kube-apiserver several options.
 
 # OPTIONS
-**-address**=""
+**--address**=""
 	The address on the local server to listen to. Default 127.0.0.1
 
-**-allow_privileged**=""
+**--allow_privileged**=""
 	If true, allow privileged containers.
 
-**-alsologtostderr**=
+**--alsologtostderr**=
 	log to standard error as well as files. Default is false.
 
-**-api_prefix**="/api"
+**--api_prefix**="/api"
 	The prefix for API requests on the server. Default '/api'
 
-**-cloud_config**=""
+**--cloud_config**=""
 	The path to the cloud provider configuration file. Empty string for no configuration file.
 
-**-cloud_provider**=""
+**--cloud_provider**=""
 	The provider for cloud services. Empty string for no provider.
 
-**-cors_allowed_origins**=[]
+**--cors_allowed_origins**=[]
 	List of allowed origins for CORS, comma separated. An allowed origin can be a regular expression to support subdomain matching. If this list is empty CORS will not be enabled.
 
-**-etcd_servers**=[]
+**--etcd_servers**=[]
 	List of etcd servers to watch (http://ip:port), comma separated
 
-**-health_check_minions**=
+**--health_check_minions**=
 	If true, health check minions and filter unhealthy ones. Default true.
 
-**-log_backtrace_at=**:0
+**--log_backtrace_at=**:0
 	when logging hits line file:N, emit a stack trace
 
-**-log_dir**=""
+**--log_dir**=""
 	If non-empty, write log files in this directory
 
-**-log_flush_frequency**=5s
+**--log_flush_frequency**=5s
 	Maximum number of seconds between log flushes. Default is 5 seconds.
 
-**-logtostderr**=
+**--logtostderr**=
 	log to standard error instead of files. Default is false.
 
-**-kubelet_port**=10250
+**--kubelet_port**=10250
 	The port at which kubelet will be listening on the minions. Default is 10250.
 
-**-port**=8080
+**--port**=8080
 	The port to listen on. Default is 8080.
 
-**-stderrthreshold**=0
+**--stderrthreshold**=0
 	logs at or above this threshold go to stderr. Default is 0.
 
-**-storage_version**=""
+**--storage_version**=""
 	The version to store resources with. Defaults to server preferred.
 
-**-v**=0
+**--v**=0
 	Log level for V logs.
 
-**-version**=false
+**--version**=false
 	Print version information and quit. Default is false.
 
-**-vmodule**=
+**--vmodule**=
 	comma-separated list of pattern=N settings for file-filtered logging
 
 # EXAMPLES

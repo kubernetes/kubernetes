@@ -77,8 +77,8 @@ if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
     export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
 fi
 
-go run ./hack/e2e.go ${E2E_OPT} -v -down
-go run ./hack/e2e.go ${E2E_OPT} -v -up
-go run ./hack/e2e.go -v -ctl="version --match-server-version=false"
-go run ./hack/e2e.go ${E2E_OPT} --test -tap | tee ../e2e.${JOB_NAME}.${BUILD_NUMBER}.${GITHASH}.tap
-go run ./hack/e2e.go ${E2E_OPT} -v -down
+go run ./hack/e2e.go ${E2E_OPT} -v --down
+go run ./hack/e2e.go ${E2E_OPT} -v --up
+go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
+go run ./hack/e2e.go ${E2E_OPT} --test --tap | tee ../e2e.${JOB_NAME}.${BUILD_NUMBER}.${GITHASH}.tap
+go run ./hack/e2e.go ${E2E_OPT} -v --down

@@ -17,84 +17,84 @@ The the kube\-apiserver several options.
 
 .SH OPTIONS
 .PP
-\fB\-address\fP=""
+\fB\-\-address\fP=""
     The address on the local server to listen to. Default 127.0.0.1
 
 .PP
-\fB\-allow\_privileged\fP=""
+\fB\-\-allow\_privileged\fP=""
     If true, allow privileged containers.
 
 .PP
-\fB\-alsologtostderr\fP=
+\fB\-\-alsologtostderr\fP=
     log to standard error as well as files. Default is false.
 
 .PP
-\fB\-api\_prefix\fP="/api"
+\fB\-\-api\_prefix\fP="/api"
     The prefix for API requests on the server. Default '/api'
 
 .PP
-\fB\-cloud\_config\fP=""
+\fB\-\-cloud\_config\fP=""
     The path to the cloud provider configuration file. Empty string for no configuration file.
 
 .PP
-\fB\-cloud\_provider\fP=""
+\fB\-\-cloud\_provider\fP=""
     The provider for cloud services. Empty string for no provider.
 
 .PP
-\fB\-cors\_allowed\_origins\fP=[]
+\fB\-\-cors\_allowed\_origins\fP=[]
     List of allowed origins for CORS, comma separated. An allowed origin can be a regular expression to support subdomain matching. If this list is empty CORS will not be enabled.
 
 .PP
-\fB\-etcd\_servers\fP=[]
+\fB\-\-etcd\_servers\fP=[]
     List of etcd servers to watch (
 \[la]http://ip:port\[ra]), comma separated
 
 .PP
-\fB\-health\_check\_minions\fP=
+\fB\-\-health\_check\_minions\fP=
     If true, health check minions and filter unhealthy ones. Default true.
 
 .PP
-\fB\-log\_backtrace\_at=\fP:0
+\fB\-\-log\_backtrace\_at=\fP:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-log\_dir\fP=""
+\fB\-\-log\_dir\fP=""
     If non\-empty, write log files in this directory
 
 .PP
-\fB\-log\_flush\_frequency\fP=5s
+\fB\-\-log\_flush\_frequency\fP=5s
     Maximum number of seconds between log flushes. Default is 5 seconds.
 
 .PP
-\fB\-logtostderr\fP=
+\fB\-\-logtostderr\fP=
     log to standard error instead of files. Default is false.
 
 .PP
-\fB\-kubelet\_port\fP=10250
+\fB\-\-kubelet\_port\fP=10250
     The port at which kubelet will be listening on the minions. Default is 10250.
 
 .PP
-\fB\-port\fP=8080
+\fB\-\-port\fP=8080
     The port to listen on. Default is 8080.
 
 .PP
-\fB\-stderrthreshold\fP=0
+\fB\-\-stderrthreshold\fP=0
     logs at or above this threshold go to stderr. Default is 0.
 
 .PP
-\fB\-storage\_version\fP=""
+\fB\-\-storage\_version\fP=""
     The version to store resources with. Defaults to server preferred.
 
 .PP
-\fB\-v\fP=0
+\fB\-\-v\fP=0
     Log level for V logs.
 
 .PP
-\fB\-version\fP=false
+\fB\-\-version\fP=false
     Print version information and quit. Default is false.
 
 .PP
-\fB\-vmodule\fP=
+\fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 .SH EXAMPLES
@@ -102,7 +102,7 @@ The the kube\-apiserver several options.
 .RS
 
 .nf
-/usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-address=0.0.0.0 \-\-port=8080 \-\-machines=127.0.0.1 \-\-kubelet\_port=10250 \-\-allow\_privileged=false
+/usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-address=0.0.0.0 \-\-port=8080 \-\-kubelet\_port=10250 \-\-allow\_privileged=false
 
 .fi
 

@@ -19,7 +19,6 @@ package api_test
 import (
 	"encoding/json"
 
-	"flag"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -37,6 +36,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	fuzz "github.com/google/gofuzz"
+	flag "github.com/spf13/pflag"
 	"speter.net/go/exp/math/dec/inf"
 )
 

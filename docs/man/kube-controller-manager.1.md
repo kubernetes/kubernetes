@@ -14,64 +14,64 @@ The **kubernetes** controller manager is really a service that is layered on top
 The kube-controller-manager has several options.
 
 # OPTIONS
-**-address**=""
+**--address**=""
 	The address on the local server to listen to. Default 127.0.0.1.
 
-**-allow_privileged**="false"
+**--allow_privileged**="false"
 	If true, allow privileged containers.
 
-**-address=**"127.0.0.1"
+**--address=**"127.0.0.1"
 	The address to serve from.
 
-**-alsologtostderr**=false
+**--alsologtostderr**=false
 	log to standard error as well as files.
 
-**-api_version**=""
+**--api_version**=""
 	The API version to use when talking to the server.
 
-**-cloud_config**=""
+**--cloud_config**=""
 	The path to the cloud provider configuration file. Empty string for no configuration file.
 
-**-cloud_provider**=""
+**--cloud_provider**=""
 	The provider for cloud services. Empty string for no provider.
 
-**-minion_regexp**=""
+**--minion_regexp**=""
 	If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.
 
-**-insecure_skip_tls_verify**=false
+**--insecure_skip_tls_verify**=false
 	If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
-**-log_backtrace_at**=:0
+**--log_backtrace_at**=:0
 	when logging hits line file:N, emit a stack trace.
 
-**-log_dir**=""
+**--log_dir**=""
 	If non-empty, write log files in this directory.
 
-**-log_flush_frequency**=5s
+**--log_flush_frequency**=5s
 	Maximum number of seconds between log flushes.
 
-**-logtostderr**=false
+**--logtostderr**=false
 	log to standard error instead of files.
 
-**-machines**=[]
+**--machines**=[]
         List of machines to schedule onto, comma separated.
 
-**-master**=""
+**--master**=""
 	The address of the Kubernetes API server.
 
-**-port**=10252
+**--port**=10252
 	The port that the controller-manager's http service runs on.
 
-**-stderrthreshold**=0
+**--stderrthreshold**=0
 	logs at or above this threshold go to stderr.
 
-**-v**=0
+**--v**=0
 	log level for V logs.
 
-**-version**=false
+**--version**=false
 	Print version information and quit.
 
-**-vmodule**=
+**--vmodule**=
 	comma-separated list of pattern=N settings for file-filtered logging.
 
 # EXAMPLES

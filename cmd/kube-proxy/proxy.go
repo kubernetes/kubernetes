@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"net"
 	"net/http"
 	"strconv"
@@ -32,8 +31,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -52,7 +53,7 @@ func init() {
 }
 
 func main() {
-	flag.Parse()
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 

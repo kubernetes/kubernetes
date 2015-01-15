@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"net"
 	"net/http"
 	"strconv"
@@ -33,6 +32,8 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 	"github.com/golang/glog"
+
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -47,7 +48,7 @@ func init() {
 }
 
 func main() {
-	flag.Parse()
+	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 

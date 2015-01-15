@@ -17,8 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"flag"
 	"testing"
+
+	flag "github.com/spf13/pflag"
 )
 
 func TestIP(t *testing.T) {
