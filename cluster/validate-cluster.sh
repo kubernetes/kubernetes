@@ -62,9 +62,6 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     if [[ "${count}" == "0" ]]; then
       echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
       exit 1
-    else
-      echo -e " ${color_green}[working]${color_norm}"
-      break
     fi
 
     name="${MINION_NAMES[$i]}"
