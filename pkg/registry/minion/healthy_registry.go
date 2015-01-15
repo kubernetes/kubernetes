@@ -26,6 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
 )
 
 type HealthyRegistry struct {
@@ -108,12 +110,16 @@ func (r *HealthyRegistry) checkMinion(node *api.Node) *api.Node {
 
 // This is called to fill the cache.
 func (r *HealthyRegistry) doCheck(key string) util.T {
+	var nodeStatus api.NodeConditionStatus
 	switch status, err := r.client.HealthCheck(key); {
 	case err != nil:
-		return api.ConditionUnknown
+		glog.V(2).Infof("HealthyRegistry: node %q health check error: %v", key, err)
+		nodeStatus = api.ConditionUnknown
 	case status == health.Unhealthy:
-		return api.ConditionNone
+		nodeStatus = api.ConditionNone
 	default:
-		return api.ConditionFull
+		nodeStatus = api.ConditionFull
 	}
+	glog.V(3).Infof("HealthyRegistry: node %q status was %q", key, nodeStatus)
+	return nodeStatus
 }
