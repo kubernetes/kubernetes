@@ -14,11 +14,11 @@
             "image": "kubernetes/guestbook",
             "name": "guestbook",
             "ports": [{ "name": "http-server", "containerPort": 3000 }]
-          }],
+          }]
         }
       },
       "labels": { "name": "guestbook" }
-    },
+    }
   },
   "labels": { "name": "guestbook" }
 }
