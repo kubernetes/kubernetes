@@ -40,7 +40,10 @@ Examples:
   <starts a replicated instance of nginx>
   
   $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
-  <just print the corresponding API objects, don't actually send them to the apiserver>`,
+  <just print the corresponding API objects, don't actually send them to the apiserver>
+  
+  $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
+  <start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				usageError(cmd, "<name> is required for run")
@@ -84,6 +87,6 @@ Examples:
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default 1")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, don't actually do anything")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s) created by this call to run.")
-	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object")
+	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.")
 	return cmd
 }

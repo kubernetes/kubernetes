@@ -198,7 +198,7 @@ func Merge(dst runtime.Object, fragment, kind string) error {
 	}
 	codec := runtime.CodecFor(api.Scheme, versionString)
 
-	intermediate.(map[string]interface{})["kind"] = kind
+	dataMap["kind"] = kind
 	data, err := json.Marshal(intermediate)
 	if err != nil {
 		return err
