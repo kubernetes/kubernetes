@@ -885,7 +885,7 @@ Examples:
 
 Usage:
 ```
-  kubectl run-container <name> --image=<image> [--replicas=replicas] [--dry-run=<bool>] [flags]
+  kubectl run-container <name> --image=<image> [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>] [flags]
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -913,6 +913,7 @@ Usage:
       --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
+      --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object
   -r, --replicas=1: Number of replicas to create for this container. Default 1
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr

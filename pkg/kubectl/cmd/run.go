@@ -27,7 +27,7 @@ import (
 
 func (f *Factory) NewCmdRunContainer(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run-container <name> --image=<image> [--replicas=replicas] [--dry-run=<bool>]",
+		Use:   "run-container <name> --image=<image> [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>]",
 		Short: "Run a particular image on the cluster.",
 		Long: `Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s)
@@ -65,6 +65,11 @@ Examples:
 			controller, err := generator.Generate(params)
 			checkErr(err)
 
+			inline := GetFlagString(cmd, "overrides")
+			if len(inline) > 0 {
+				Merge(controller, inline, "ReplicationController")
+			}
+
 			// TODO: extract this flag to a central location, when such a location exists.
 			if !GetFlagBool(cmd, "dry-run") {
 				controller, err = client.ReplicationControllers(namespace).Create(controller.(*api.ReplicationController))
@@ -79,5 +84,6 @@ Examples:
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default 1")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, don't actually do anything")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s) created by this call to run.")
+	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object")
 	return cmd
 }
