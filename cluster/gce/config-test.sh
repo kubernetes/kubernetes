@@ -26,7 +26,7 @@ MINION_DISK_SIZE=10GB
 # TODO(dchen1107): Filed an internal issue to create an alias
 # for containervm image, so that gcloud will expand this
 # to the latest supported image.
-IMAGE=container-vm-v20141208
+IMAGE=container-vm-v20150112
 IMAGE_PROJECT=google-containers
 NETWORK=${KUBE_GCE_NETWORK:-e2e}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
