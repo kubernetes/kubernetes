@@ -25,6 +25,11 @@ import (
 )
 
 func TestNetwork(c *client.Client) bool {
+	if testContext.provider == "vagrant" {
+		glog.Infof("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
+		return true
+	}
+
 	ns := api.NamespaceDefault
 	svc, err := c.Services(ns).Create(loadObjectOrDie(assetPath(
 		"contrib", "for-tests", "network-tester", "service.json",
