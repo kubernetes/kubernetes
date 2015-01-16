@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.4",
 	"Packages": [
 		"./..."
 	],
@@ -13,16 +13,6 @@
 			"ImportPath": "code.google.com/p/go-uuid/uuid",
 			"Comment": "null-12",
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
-		},
-		{
-			"ImportPath": "code.google.com/p/goauth2/compute/serviceaccount",
-			"Comment": "weekly-50",
-			"Rev": "7fc9d958c83464bd7650240569bf93a102266e6a"
-		},
-		{
-			"ImportPath": "code.google.com/p/goauth2/oauth",
-			"Comment": "weekly-50",
-			"Rev": "7fc9d958c83464bd7650240569bf93a102266e6a"
 		},
 		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
@@ -116,6 +106,10 @@
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
 		},
 		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "7f07925444bb51fa4cf9dfe6f7661876f8852275"
+		},
+		{
 			"ImportPath": "github.com/google/cadvisor/client",
 			"Comment": "0.6.2",
 			"Rev": "89088df70eca64cf9d6b9a23a3d2bc21a30916d6"
@@ -144,10 +138,6 @@
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/ec2",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
-		},
-		{
-			"ImportPath": "github.com/mitchellh/goamz/elb",
 			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
 		},
 		{
@@ -208,6 +198,22 @@
 		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2",
+			"Rev": "2e66694fea36dc820636630792a55cdc6987e05b"
+		},
+		{
+			"ImportPath": "google.golang.org/appengine",
+			"Rev": "6aa67407028217c352e215f5af320a429d0bcf5f"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/compute/metadata",
+			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/internal",
+			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
