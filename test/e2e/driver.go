@@ -51,7 +51,7 @@ func outputTAPSummary(infoList []testInfo) {
 	}
 }
 
-func RunE2ETests(authConfig, certDir, host, repoRoot string) {
+func RunE2ETests(authConfig, certDir, host, repoRoot string, testList []string) {
 	testContext = testContextType{authConfig, certDir, host, repoRoot}
 	util.ReallyCrash = true
 	util.InitLogs()
@@ -77,9 +77,30 @@ func RunE2ETests(authConfig, certDir, host, repoRoot string) {
 		{TestBasic, "TestBasic", 8},
 	}
 
+	validTestNames := util.NewStringSet()
+	for _, test := range tests {
+		validTestNames.Insert(test.name)
+	}
+
+	// Check testList for non-existent tests and populate a StringSet with tests to run.
+	runTestNames := util.NewStringSet()
+	for _, testName := range testList {
+		if validTestNames.Has(testName) {
+			runTestNames.Insert(testName)
+		} else {
+			glog.Warningf("Requested test %s does not exist", testName)
+		}
+	}
+
 	info := []testInfo{}
 	passed := true
 	for i, test := range tests {
+		// Check if this test is supposed to run, either if listed explicitly in
+		// a --test flag or if no --test flags were supplied.
+		if len(testList) > 0 && !runTestNames.Has(test.name) {
+			glog.Infof("Skipping test %d %s", i+1, test.name)
+			continue
+		}
 		glog.Infof("Running test %d %s", i+1, test.name)
 		testPassed := test.test(c)
 		if !testPassed {

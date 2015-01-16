@@ -30,10 +30,15 @@ var (
 	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	host       = flag.String("host", "", "The host to connect to")
 	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
+	testList   util.StringList
 )
+
+func init() {
+	flag.VarP(&testList, "test", "t", "Test to execute (may be repeated or comma separated list of tests.) Defaults to running all tests.")
+}
 
 func main() {
 	util.InitFlags()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
-	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot)
+	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, testList)
 }
