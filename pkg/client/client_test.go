@@ -759,6 +759,27 @@ func TestDeleteMinion(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestUpdateMinion(t *testing.T) {
+	requestMinion := &api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+		},
+		Spec: api.NodeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1000m"),
+				api.ResourceMemory: resource.MustParse("1Mi"),
+			},
+		},
+	}
+	c := &testClient{
+		Request:  testRequest{Method: "PUT", Path: "/minions/foo"},
+		Response: Response{StatusCode: 200, Body: requestMinion},
+	}
+	response, err := c.Setup().Nodes().Update(requestMinion)
+	c.Validate(t, response, err)
+}
+
 func TestNewMinionPath(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: "/nodes/foo"},

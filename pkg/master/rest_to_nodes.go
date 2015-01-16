@@ -48,7 +48,7 @@ func (n *nodeAdaptor) Nodes() client.NodeInterface {
 	return n
 }
 
-// Create creates a new minion.
+// Create creates a new node.
 func (n *nodeAdaptor) Create(minion *api.Node) (*api.Node, error) {
 	return nil, errors.New("direct creation not implemented")
 	// TODO: apiserver should expose newOperation to make this easier.
@@ -71,7 +71,7 @@ func (n *nodeAdaptor) List() (*api.NodeList, error) {
 	return obj.(*api.NodeList), nil
 }
 
-// Get gets an existing minion
+// Get gets an existing node.
 func (n *nodeAdaptor) Get(name string) (*api.Node, error) {
 	ctx := api.NewContext()
 	obj, err := n.storage.(apiserver.RESTGetter).Get(ctx, name)
@@ -81,8 +81,13 @@ func (n *nodeAdaptor) Get(name string) (*api.Node, error) {
 	return obj.(*api.Node), nil
 }
 
-// Delete deletes an existing minion.
+// Delete deletes an existing node.
 // TODO: implement
 func (n *nodeAdaptor) Delete(name string) error {
 	return errors.New("direct deletion not implemented")
+}
+
+// Update updates an existing node.
+func (n *nodeAdaptor) Update(minion *api.Node) (*api.Node, error) {
+	return nil, errors.New("direct update not implemented")
 }
