@@ -37,7 +37,7 @@ var (
 )
 
 const (
-	DefaultProvider = "default"
+	DefaultProvider = "DefaultProvider"
 )
 
 type AlgorithmProviderConfig struct {
