@@ -40,6 +40,10 @@ function verify-prereqs {
     fi
   done
 
+  # Set VAGRANT_CWD to KUBE_ROOT so that we find the right Vagrantfile no
+  # matter what directory the tools are called from.
+  export VAGRANT_CWD="${KUBE_ROOT}"
+
   export USING_KUBE_SCRIPTS=true
 }
 
