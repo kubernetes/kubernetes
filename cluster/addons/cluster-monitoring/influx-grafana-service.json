@@ -1,0 +1,12 @@
+{
+  "id": "influx-master",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "port": 8085,
+  "containerPort": 8086,
+  "provider": "kubernetes-default",
+  "component": "influxdb",
+  "selector": {
+    "name": "influxdb"
+  }
+}
