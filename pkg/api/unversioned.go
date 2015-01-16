@@ -24,3 +24,9 @@ package api
 type APIVersions struct {
 	Versions []string `json:"versions"`
 }
+
+// RootPaths lists the paths available at root.
+// For example: "/healthz", "/api".
+type RootPaths struct {
+	Paths []string `json:"paths"`
+}
