@@ -156,7 +156,8 @@ func TestExtractFromHTTP(t *testing.T) {
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log"}},
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "PullIfNotPresent"}},
 					},
 				},
 				api.BoundPod{
@@ -169,7 +170,8 @@ func TestExtractFromHTTP(t *testing.T) {
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log"}},
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "PullIfNotPresent"}},
 					},
 				}),
 		},

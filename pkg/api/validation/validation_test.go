@@ -220,6 +220,54 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 }
 
+func TestValidatePullPolicy(t *testing.T) {
+	type T struct {
+		Container      api.Container
+		ExpectedPolicy api.PullPolicy
+	}
+	testCases := map[string]T{
+		"NotPresent1": {
+			api.Container{Name: "abc", Image: "image:latest", ImagePullPolicy: "PullIfNotPresent"},
+			api.PullIfNotPresent,
+		},
+		"NotPresent2": {
+			api.Container{Name: "abc1", Image: "image", ImagePullPolicy: "PullIfNotPresent"},
+			api.PullIfNotPresent,
+		},
+		"Always1": {
+			api.Container{Name: "123", Image: "image:latest", ImagePullPolicy: "PullAlways"},
+			api.PullAlways,
+		},
+		"Always2": {
+			api.Container{Name: "1234", Image: "image", ImagePullPolicy: "PullAlways"},
+			api.PullAlways,
+		},
+		"Never1": {
+			api.Container{Name: "abc-123", Image: "image:latest", ImagePullPolicy: "PullNever"},
+			api.PullNever,
+		},
+		"Never2": {
+			api.Container{Name: "abc-1234", Image: "image", ImagePullPolicy: "PullNever"},
+			api.PullNever,
+		},
+		"DefaultToNotPresent":  {api.Container{Name: "notPresent", Image: "image"}, api.PullIfNotPresent},
+		"DefaultToNotPresent2": {api.Container{Name: "notPresent1", Image: "image:sometag"}, api.PullIfNotPresent},
+		"DefaultToAlways1":     {api.Container{Name: "always", Image: "image:latest"}, api.PullAlways},
+		"DefaultToAlways2":     {api.Container{Name: "always", Image: "foo.bar.com:5000/my/image:latest"}, api.PullAlways},
+	}
+	for k, v := range testCases {
+		ctr := &v.Container
+		errs := validatePullPolicyWithDefault(ctr)
+		if len(errs) != 0 {
+			t.Errorf("case[%s] expected success, got %#v", k, errs)
+		}
+		if ctr.ImagePullPolicy != v.ExpectedPolicy {
+			t.Errorf("case[%s] expected policy %v, got %v", k, v.ExpectedPolicy, ctr.ImagePullPolicy)
+		}
+	}
+
+}
+
 func TestValidateContainers(t *testing.T) {
 	volumes := util.StringSet{}
 	capabilities.SetForTests(capabilities.Capabilities{
