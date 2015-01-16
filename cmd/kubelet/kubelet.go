@@ -68,6 +68,7 @@ var (
 	clusterDomain           = flag.String("cluster_domain", "", "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	masterServiceNamespace  = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 	clusterDNS              = util.IP(nil)
+	reallyCrashForTesting   = flag.Bool("really_crash_for_testing", false, "If true, crash with panics more often.")
 )
 
 func init() {
@@ -96,6 +97,7 @@ func setupRunOnce() {
 func main() {
 	util.InitFlags()
 	util.InitLogs()
+	util.ReallyCrash = *reallyCrashForTesting
 	defer util.FlushLogs()
 	rand.Seed(time.Now().UTC().UnixNano())
 
