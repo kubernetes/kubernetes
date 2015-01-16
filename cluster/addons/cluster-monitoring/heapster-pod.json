@@ -1,0 +1,20 @@
+{
+  "id": "heapster",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "heapster",
+      "containers": [
+        {
+          "name": "heapster",
+          "image": "kubernetes/heapster"
+        }
+      ]
+    }
+  },
+  "labels": {
+    "name": "heapster"
+  }
+}
