@@ -18,6 +18,7 @@ package factory
 
 import (
 	"fmt"
+	"regexp"
 	"sync"
 
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
@@ -49,6 +50,7 @@ type AlgorithmProviderConfig struct {
 func RegisterFitPredicate(key string, predicate algorithm.FitPredicate) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
+	validateAlgorithmNameOrDie(key)
 	fitPredicateMap[key] = predicate
 	return key
 }
@@ -66,6 +68,7 @@ func IsFitPredicateRegistered(key string) bool {
 func RegisterPriorityFunction(key string, function algorithm.PriorityFunction, weight int) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
+	validateAlgorithmNameOrDie(key)
 	priorityFunctionMap[key] = algorithm.PriorityConfig{Function: function, Weight: weight}
 	return key
 }
@@ -95,6 +98,7 @@ func SetPriorityFunctionWeight(key string, weight int) {
 func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys util.StringSet) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
+	validateAlgorithmNameOrDie(name)
 	algorithmProviderMap[name] = AlgorithmProviderConfig{
 		FitPredicateKeys:     predicateKeys,
 		PriorityFunctionKeys: priorityKeys,
@@ -144,4 +148,12 @@ func getPriorityFunctionConfigs(keys util.StringSet) ([]algorithm.PriorityConfig
 		configs = append(configs, config)
 	}
 	return configs, nil
+}
+
+var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")
+
+func validateAlgorithmNameOrDie(name string) {
+	if !validName.MatchString(name) {
+		glog.Fatalf("algorithm name %v does not match the name validation regexp \"%v\".", name, validName)
+	}
 }
