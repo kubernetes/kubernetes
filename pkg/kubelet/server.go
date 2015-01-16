@@ -67,7 +67,7 @@ type HostInterface interface {
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetBoundPods() ([]api.BoundPod, error)
 	GetPodByName(namespace, name string) (*api.BoundPod, bool)
-	GetPodInfo(name string, uid types.UID) (api.PodInfo, error)
+	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
@@ -189,15 +189,15 @@ func (s *Server) handleBoundPods(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) handlePodInfoOld(w http.ResponseWriter, req *http.Request) {
-	s.handlePodInfo(w, req, false)
+	s.handlePodStatus(w, req, false)
 }
 
 func (s *Server) handlePodInfoVersioned(w http.ResponseWriter, req *http.Request) {
-	s.handlePodInfo(w, req, true)
+	s.handlePodStatus(w, req, true)
 }
 
-// handlePodInfo handles podInfo requests against the Kubelet
-func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request, versioned bool) {
+// handlePodStatus handles podInfo requests against the Kubelet
+func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versioned bool) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		s.error(w, err)
@@ -221,12 +221,12 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request, version
 		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
 	}
-	info, err := s.host.GetPodInfo(GetPodFullName(pod), podUID)
+	status, err := s.host.GetPodStatus(GetPodFullName(pod), podUID)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	data, err := exportPodInfo(info, versioned)
+	data, err := exportPodStatus(status, versioned)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -373,16 +373,16 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func exportPodInfo(info api.PodInfo, versioned bool) ([]byte, error) {
+func exportPodStatus(status api.PodStatus, versioned bool) ([]byte, error) {
 	if versioned {
 		// TODO: support arbitrary versions here
 		codec, err := findCodec("v1beta1")
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(&api.PodContainerInfo{ContainerInfo: info})
+		return codec.Encode(&api.PodStatusResult{Status: status})
 	}
-	return json.Marshal(info)
+	return json.Marshal(status)
 }
 
 func findCodec(version string) (runtime.Codec, error) {

@@ -71,17 +71,17 @@ func ResolvePort(portReference util.IntOrString, container *api.Container) (int,
 func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
-		var info api.PodInfo
-		info, err := h.kubelet.GetPodInfo(podFullName, uid)
+		var status api.PodStatus
+		status, err := h.kubelet.GetPodStatus(podFullName, uid)
 		if err != nil {
 			glog.Errorf("unable to get pod info, event handlers may be invalid.")
 			return err
 		}
-		netInfo, found := info[networkContainerName]
+		netInfo, found := status.Info[networkContainerName]
 		if found {
 			host = netInfo.PodIP
 		} else {
-			return fmt.Errorf("failed to find networking container: %v", info)
+			return fmt.Errorf("failed to find networking container: %v", status)
 		}
 	}
 	var port int

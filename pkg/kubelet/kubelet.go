@@ -1011,12 +1011,11 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		return err
 	}
 
-	podStatus := api.PodStatus{}
-	info, err := kl.GetPodInfo(podFullName, uid)
+	podStatus, err := kl.GetPodStatus(podFullName, uid)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info, health checks may be invalid", podFullName, uid)
 	}
-	netInfo, found := info[networkContainerName]
+	netInfo, found := podStatus.Info[networkContainerName]
 	if found {
 		podStatus.PodIP = netInfo.PodIP
 	}
@@ -1341,11 +1340,11 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 }
 
 // GetKubeletContainerLogs returns logs from the container
-// The second parameter of GetPodInfo and FindPodContainer methods represents pod UUID, which is allowed to be blank
+// The second parameter of GetPodStatus and FindPodContainer methods represents pod UUID, which is allowed to be blank
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
 // or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
-	_, err := kl.GetPodInfo(podFullName, "")
+	_, err := kl.GetPodStatus(podFullName, "")
 	if err == dockertools.ErrNoContainersInPod {
 		return fmt.Errorf("pod not found (%q)\n", podFullName)
 	}
@@ -1377,8 +1376,8 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
 	return nil, false
 }
 
-// GetPodInfo returns information from Docker about the containers in a pod
-func (kl *Kubelet) GetPodInfo(podFullName string, uid types.UID) (api.PodInfo, error) {
+// GetPodStatus returns information from Docker about the containers in a pod
+func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
 	var manifest api.PodSpec
 	for _, pod := range kl.pods {
 		if GetPodFullName(&pod) == podFullName {
@@ -1386,7 +1385,14 @@ func (kl *Kubelet) GetPodInfo(podFullName string, uid types.UID) (api.PodInfo, e
 			break
 		}
 	}
-	return dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uid)
+
+	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uid)
+
+	// TODO(dchen1107): Determine PodPhase here
+	var podStatus api.PodStatus
+	podStatus.Info = info
+
+	return podStatus, err
 }
 
 func (kl *Kubelet) healthy(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {

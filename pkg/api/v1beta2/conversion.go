@@ -345,6 +345,31 @@ func init() {
 			return nil
 		},
 
+		func(in *newer.PodStatusResult, out *PodStatusResult, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.State, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PodStatusResult, out *newer.PodStatusResult, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.State, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
 		func(in *newer.PodSpec, out *PodState, s conversion.Scope) error {
 			if err := s.Convert(&in, &out.Manifest, 0); err != nil {
 				return err
