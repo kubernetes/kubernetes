@@ -184,8 +184,8 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	controllerManager.Run(10 * time.Minute)
 
 	nodeResources := &api.NodeResources{}
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl)
-	nodeController.Run(10 * time.Second)
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{})
+	nodeController.Run(10*time.Second, 10)
 
 	// Kubelet (localhost)
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.")

@@ -184,7 +184,6 @@ func main() {
 		Client:                 client,
 		Cloud:                  cloud,
 		EtcdHelper:             helper,
-		HealthCheckMinions:     *healthCheckMinions,
 		EventTTL:               *eventTTL,
 		KubeletClient:          kubeletClient,
 		PortalNet:              &n,

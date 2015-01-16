@@ -53,18 +53,22 @@ var (
 	nodeSyncPeriod  = flag.Duration("node_sync_period", 10*time.Second, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
+	resourceQuotaSyncPeriod = flag.Duration("resource_quota_sync_period", 10*time.Second, "The period for syncing quota usage status in the system")
+	registerRetryCount      = flag.Int("register_retry_count", 10, ""+
+		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
 	machineList util.StringList
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
-	nodeMilliCPU            = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory              = resource.QuantityFlag("node_memory", "3Gi", "The amount of memory (in bytes) provisioned on each node")
-	resourceQuotaSyncPeriod = flag.Duration("resource_quota_sync_period", 10*time.Second, "The period for syncing quota usage status in the system")
+	nodeMilliCPU  = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory    = resource.QuantityFlag("node_memory", "3Gi", "The amount of memory (in bytes) provisioned on each node")
+	kubeletConfig = client.KubeletConfig{Port: ports.KubeletPort, EnableHttps: false}
 )
 
 func init() {
 	flag.Var(&address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+	client.BindKubeletClientConfigFlags(flag.CommandLine, &kubeletConfig)
 }
 
 func verifyMinionFlags() {
@@ -104,6 +108,10 @@ func main() {
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
 
+	kubeletClient, err := client.NewKubeletClient(&kubeletConfig)
+	if err != nil {
+		glog.Fatalf("Failure to start kubelet client: %v", err)
+	}
 	cloud := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
@@ -111,8 +119,8 @@ func main() {
 			api.ResourceMemory: *nodeMemory,
 		},
 	}
-	nodeController := nodeControllerPkg.NewNodeController(cloud, *minionRegexp, machineList, nodeResources, kubeClient)
-	nodeController.Run(*nodeSyncPeriod)
+	nodeController := nodeControllerPkg.NewNodeController(cloud, *minionRegexp, machineList, nodeResources, kubeClient, kubeletClient)
+	nodeController.Run(*nodeSyncPeriod, *registerRetryCount)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(*resourceQuotaSyncPeriod)

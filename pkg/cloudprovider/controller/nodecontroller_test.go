@@ -17,19 +17,22 @@ limitations under the License.
 package controller
 
 import (
+	"errors"
 	"fmt"
+	"net"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
 
-func newNode(name string) *api.Node {
-	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
-}
-
+// FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface.
 type FakeNodeHandler struct {
 	client.Fake
 	client.FakeNodes
@@ -41,6 +44,7 @@ type FakeNodeHandler struct {
 	// Output
 	CreatedNodes []*api.Node
 	DeletedNodes []*api.Node
+	UpdatedNodes []*api.Node
 	RequestCount int
 }
 
@@ -51,7 +55,8 @@ func (c *FakeNodeHandler) Nodes() client.NodeInterface {
 func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 	defer func() { m.RequestCount++ }()
 	if m.CreateHook == nil || m.CreateHook(m, node) {
-		m.CreatedNodes = append(m.CreatedNodes, node)
+		nodeCopy := *node
+		m.CreatedNodes = append(m.CreatedNodes, &nodeCopy)
 		return node, nil
 	} else {
 		return nil, fmt.Errorf("Create error.")
@@ -60,18 +65,27 @@ func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 
 func (m *FakeNodeHandler) List() (*api.NodeList, error) {
 	defer func() { m.RequestCount++ }()
-	nodes := []api.Node{}
+	var nodes []*api.Node
+	for i := 0; i < len(m.UpdatedNodes); i++ {
+		if !contains(m.UpdatedNodes[i], m.DeletedNodes) {
+			nodes = append(nodes, m.UpdatedNodes[i])
+		}
+	}
 	for i := 0; i < len(m.Existing); i++ {
-		if !contains(m.Existing[i], m.DeletedNodes) {
-			nodes = append(nodes, *m.Existing[i])
+		if !contains(m.Existing[i], m.DeletedNodes) && !contains(m.Existing[i], nodes) {
+			nodes = append(nodes, m.Existing[i])
 		}
 	}
 	for i := 0; i < len(m.CreatedNodes); i++ {
-		if !contains(m.Existing[i], m.DeletedNodes) {
-			nodes = append(nodes, *m.CreatedNodes[i])
+		if !contains(m.Existing[i], m.DeletedNodes) && !contains(m.CreatedNodes[i], nodes) {
+			nodes = append(nodes, m.CreatedNodes[i])
 		}
 	}
-	return &api.NodeList{Items: nodes}, nil
+	nodeList := &api.NodeList{}
+	for _, node := range nodes {
+		nodeList.Items = append(nodeList.Items, *node)
+	}
+	return nodeList, nil
 }
 
 func (m *FakeNodeHandler) Delete(id string) error {
@@ -80,142 +94,377 @@ func (m *FakeNodeHandler) Delete(id string) error {
 	return nil
 }
 
-func TestSyncStaticCreateNode(t *testing.T) {
-	fakeNodeHandler := &FakeNodeHandler{
-		CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
-			return true
+func (m *FakeNodeHandler) Update(node *api.Node) (*api.Node, error) {
+	nodeCopy := *node
+	m.UpdatedNodes = append(m.UpdatedNodes, &nodeCopy)
+	m.RequestCount++
+	return node, nil
+}
+
+// FakeKubeletClient is a fake implementation of KubeletClient.
+type FakeKubeletClient struct {
+	Status probe.Status
+	Err    error
+}
+
+func (c *FakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
+	return api.PodStatusResult{}, errors.New("Not Implemented")
+}
+
+func (c *FakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
+	return c.Status, c.Err
+}
+
+func TestRegisterNodes(t *testing.T) {
+	table := []struct {
+		fakeNodeHandler      *FakeNodeHandler
+		machines             []string
+		retryCount           int
+		expectedRequestCount int
+		expectedCreateCount  int
+		expectedFail         bool
+	}{
+		{
+			// Register two nodes normally.
+			machines: []string{"node0", "node1"},
+			fakeNodeHandler: &FakeNodeHandler{
+				CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool { return true },
+			},
+			retryCount:           1,
+			expectedRequestCount: 2,
+			expectedCreateCount:  2,
+			expectedFail:         false,
+		},
+		{
+			// No machine to register.
+			machines: []string{},
+			fakeNodeHandler: &FakeNodeHandler{
+				CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool { return true },
+			},
+			retryCount:           1,
+			expectedRequestCount: 0,
+			expectedCreateCount:  0,
+			expectedFail:         false,
+		},
+		{
+			// Fail the first two requests.
+			machines: []string{"node0", "node1"},
+			fakeNodeHandler: &FakeNodeHandler{
+				CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
+					if fake.RequestCount == 0 || fake.RequestCount == 1 {
+						return false
+					}
+					return true
+				},
+			},
+			retryCount:           10,
+			expectedRequestCount: 4,
+			expectedCreateCount:  2,
+			expectedFail:         false,
+		},
+		{
+			// The first node always fails.
+			machines: []string{"node0", "node1"},
+			fakeNodeHandler: &FakeNodeHandler{
+				CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
+					if node.Name == "node0" {
+						return false
+					}
+					return true
+				},
+			},
+			retryCount:           2,
+			expectedRequestCount: 3, // 2 for node0, 1 for node1
+			expectedCreateCount:  1,
+			expectedFail:         true,
 		},
 	}
-	nodeController := NewNodeController(nil, ".*", []string{"node0"}, &api.NodeResources{}, fakeNodeHandler)
-	if err := nodeController.SyncStatic(time.Millisecond); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 
-	if fakeNodeHandler.RequestCount != 1 {
-		t.Errorf("Expected 1 call, but got %v.", fakeNodeHandler.RequestCount)
-	}
-	if len(fakeNodeHandler.CreatedNodes) != 1 {
-		t.Errorf("expect only 1 node created, got %v", len(fakeNodeHandler.CreatedNodes))
-	}
-	if fakeNodeHandler.CreatedNodes[0].Name != "node0" {
-		t.Errorf("unexpect node %v created", fakeNodeHandler.CreatedNodes[0].Name)
+	for _, item := range table {
+		nodes := api.NodeList{}
+		for _, machine := range item.machines {
+			nodes.Items = append(nodes.Items, *newNode(machine))
+		}
+		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil)
+		err := nodeController.RegisterNodes(&nodes, item.retryCount, time.Millisecond)
+		if !item.expectedFail && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.expectedFail && err == nil {
+			t.Errorf("unexpected non-error")
+		}
+		if item.fakeNodeHandler.RequestCount != item.expectedRequestCount {
+			t.Errorf("expected %v calls, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+		}
+		if len(item.fakeNodeHandler.CreatedNodes) != item.expectedCreateCount {
+			t.Errorf("expected %v nodes, but got %v.", item.expectedCreateCount, item.fakeNodeHandler.CreatedNodes)
+		}
 	}
 }
 
-func TestSyncStaticCreateNodeWithHostIP(t *testing.T) {
-	fakeNodeHandler := &FakeNodeHandler{
-		CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
-			return true
+func TestCreateStaticNodes(t *testing.T) {
+	table := []struct {
+		machines      []string
+		expectedNodes *api.NodeList
+	}{
+		{
+			machines:      []string{},
+			expectedNodes: &api.NodeList{},
+		},
+		{
+			machines: []string{"node0"},
+			expectedNodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Spec:       api.NodeSpec{},
+						Status:     api.NodeStatus{},
+					},
+				},
+			},
 		},
 	}
-	nodeController := NewNodeController(nil, ".*", []string{"10.0.0.1"}, &api.NodeResources{}, fakeNodeHandler)
-	if err := nodeController.SyncStatic(time.Millisecond); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 
-	if fakeNodeHandler.CreatedNodes[0].Name != "10.0.0.1" {
-		t.Errorf("unexpect node %v created", fakeNodeHandler.CreatedNodes[0].Name)
-	}
-	if fakeNodeHandler.CreatedNodes[0].Status.HostIP != "10.0.0.1" {
-		t.Errorf("unexpect nil node HostIP for node %v", fakeNodeHandler.CreatedNodes[0].Name)
+	for _, item := range table {
+		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, nil, nil)
+		nodes, err := nodeController.StaticNodes()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(item.expectedNodes, nodes) {
+			t.Errorf("expected node list %+v, got %+v", item.expectedNodes, nodes)
+		}
 	}
 }
 
-func TestSyncStaticCreateNodeWithError(t *testing.T) {
-	fakeNodeHandler := &FakeNodeHandler{
-		CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
-			if fake.RequestCount == 0 {
-				return false
-			}
-			return true
+func TestCreateCloudNodes(t *testing.T) {
+	resourceList := api.ResourceList{
+		api.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(3000, resource.DecimalSI),
+	}
+
+	table := []struct {
+		fakeCloud     *fake_cloud.FakeCloud
+		machines      []string
+		expectedNodes *api.NodeList
+	}{
+		{
+			fakeCloud:     &fake_cloud.FakeCloud{},
+			expectedNodes: &api.NodeList{},
+		},
+		{
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines:      []string{"node0"},
+				IP:            net.ParseIP("1.2.3.4"),
+				NodeResources: &api.NodeResources{Capacity: resourceList},
+			},
+			expectedNodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{HostIP: "1.2.3.4"},
+					},
+				},
+			},
 		},
 	}
-	nodeController := NewNodeController(nil, ".*", []string{"node0"}, &api.NodeResources{}, fakeNodeHandler)
-	if err := nodeController.SyncStatic(time.Millisecond); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 
-	if fakeNodeHandler.RequestCount != 2 {
-		t.Errorf("Expected 2 call, but got %v.", fakeNodeHandler.RequestCount)
-	}
-	if len(fakeNodeHandler.CreatedNodes) != 1 {
-		t.Errorf("expect only 1 node created, got %v", len(fakeNodeHandler.CreatedNodes))
-	}
-	if fakeNodeHandler.CreatedNodes[0].Name != "node0" {
-		t.Errorf("unexpect node %v created", fakeNodeHandler.CreatedNodes[0].Name)
+	for _, item := range table {
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil)
+		nodes, err := nodeController.CloudNodes()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(item.expectedNodes, nodes) {
+			t.Errorf("expected node list %+v, got %+v", item.expectedNodes, nodes)
+		}
 	}
 }
 
-func TestSyncCloudCreateNode(t *testing.T) {
-	fakeNodeHandler := &FakeNodeHandler{
-		Existing: []*api.Node{newNode("node0")},
-	}
-	instances := []string{"node0", "node1"}
-	fakeCloud := fake_cloud.FakeCloud{
-		Machines: instances,
-	}
-	nodeController := NewNodeController(&fakeCloud, ".*", nil, nil, fakeNodeHandler)
-	if err := nodeController.SyncCloud(); err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestSyncCloud(t *testing.T) {
+	table := []struct {
+		fakeNodeHandler      *FakeNodeHandler
+		fakeCloud            *fake_cloud.FakeCloud
+		matchRE              string
+		expectedRequestCount int
+		expectedCreated      []string
+		expectedDeleted      []string
+	}{
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0")},
+			},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0", "node1"},
+			},
+			matchRE:              ".*",
+			expectedRequestCount: 2, // List + Create
+			expectedCreated:      []string{"node1"},
+			expectedDeleted:      []string{},
+		},
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0"), newNode("node1")},
+			},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0"},
+			},
+			matchRE:              ".*",
+			expectedRequestCount: 2, // List + Delete
+			expectedCreated:      []string{},
+			expectedDeleted:      []string{"node1"},
+		},
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0")},
+			},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0", "node1", "fake"},
+			},
+			matchRE:              "node[0-9]+",
+			expectedRequestCount: 2, // List + Create
+			expectedCreated:      []string{"node1"},
+			expectedDeleted:      []string{},
+		},
 	}
 
-	if fakeNodeHandler.RequestCount != 2 {
-		t.Errorf("Expected 2 call, but got %v.", fakeNodeHandler.RequestCount)
-	}
-	if len(fakeNodeHandler.CreatedNodes) != 1 {
-		t.Errorf("expect only 1 node created, got %v", len(fakeNodeHandler.CreatedNodes))
-	}
-	if fakeNodeHandler.CreatedNodes[0].Name != "node1" {
-		t.Errorf("unexpect node %v created", fakeNodeHandler.CreatedNodes[0].Name)
+	for _, item := range table {
+		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil)
+		if err := nodeController.SyncCloud(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.fakeNodeHandler.RequestCount != item.expectedRequestCount {
+			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+		}
+		nodes := sortedNodeNames(item.fakeNodeHandler.CreatedNodes)
+		if !reflect.DeepEqual(item.expectedCreated, nodes) {
+			t.Errorf("expected node list %+v, got %+v", item.expectedCreated, nodes)
+		}
+		nodes = sortedNodeNames(item.fakeNodeHandler.DeletedNodes)
+		if !reflect.DeepEqual(item.expectedDeleted, nodes) {
+			t.Errorf("expected node list %+v, got %+v", item.expectedDeleted, nodes)
+		}
 	}
 }
 
-func TestSyncCloudDeleteNode(t *testing.T) {
-	fakeNodeHandler := &FakeNodeHandler{
-		Existing: []*api.Node{newNode("node0"), newNode("node1")},
-	}
-	instances := []string{"node0"}
-	fakeCloud := fake_cloud.FakeCloud{
-		Machines: instances,
-	}
-	nodeController := NewNodeController(&fakeCloud, ".*", nil, nil, fakeNodeHandler)
-	if err := nodeController.SyncCloud(); err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestHealthCheckNode(t *testing.T) {
+	table := []struct {
+		node               *api.Node
+		fakeKubeletClient  *FakeKubeletClient
+		expectedConditions []api.NodeCondition
+	}{
+		{
+			node: newNode("node0"),
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Success,
+				Err:    nil,
+			},
+			expectedConditions: []api.NodeCondition{
+				{
+					Kind:   api.NodeReady,
+					Status: api.ConditionFull,
+				},
+			},
+		},
+		{
+			node: newNode("node0"),
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Failure,
+				Err:    nil,
+			},
+			expectedConditions: []api.NodeCondition{
+				{
+					Kind:   api.NodeReady,
+					Status: api.ConditionNone,
+				},
+			},
+		},
+		{
+			node: newNode("node1"),
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Failure,
+				Err:    errors.New("Error"),
+			},
+			expectedConditions: []api.NodeCondition{
+				{
+					Kind:   api.NodeReady,
+					Status: api.ConditionUnknown,
+				},
+			},
+		},
 	}
 
-	if fakeNodeHandler.RequestCount != 2 {
-		t.Errorf("Expected 2 call, but got %v.", fakeNodeHandler.RequestCount)
-	}
-	if len(fakeNodeHandler.DeletedNodes) != 1 {
-		t.Errorf("expect only 1 node deleted, got %v", len(fakeNodeHandler.DeletedNodes))
-	}
-	if fakeNodeHandler.DeletedNodes[0].Name != "node1" {
-		t.Errorf("unexpect node %v created", fakeNodeHandler.DeletedNodes[0].Name)
+	for _, item := range table {
+		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient)
+		conditions := nodeController.DoCheck(item.node)
+		if !reflect.DeepEqual(item.expectedConditions, conditions) {
+			t.Errorf("expected conditions %+v, got %+v", item.expectedConditions, conditions)
+		}
 	}
 }
 
-func TestSyncCloudRegexp(t *testing.T) {
-	fakeNodeHandler := &FakeNodeHandler{
-		Existing: []*api.Node{newNode("node0")},
-	}
-	instances := []string{"node0", "node1", "fake"}
-	fakeCloud := fake_cloud.FakeCloud{
-		Machines: instances,
-	}
-	nodeController := NewNodeController(&fakeCloud, "node[0-9]+", nil, nil, fakeNodeHandler)
-	if err := nodeController.SyncCloud(); err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestSyncNodeStatus(t *testing.T) {
+	table := []struct {
+		fakeNodeHandler      *FakeNodeHandler
+		fakeKubeletClient    *FakeKubeletClient
+		expectedNodes        []*api.Node
+		expectedRequestCount int
+	}{
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0"), newNode("node1")},
+			},
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Success,
+				Err:    nil,
+			},
+			expectedNodes: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "node0"},
+					Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "node1"},
+					Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+				},
+			},
+			expectedRequestCount: 3, // List + 2xUpdate
+		},
 	}
 
-	if fakeNodeHandler.RequestCount != 2 {
-		t.Errorf("Expected 2 call, but got %v.", fakeNodeHandler.RequestCount)
+	for _, item := range table {
+		nodeController := NewNodeController(nil, "", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient)
+		if err := nodeController.SyncNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.fakeNodeHandler.RequestCount != item.expectedRequestCount {
+			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+		}
+		if !reflect.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
+			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes, item.fakeNodeHandler.UpdatedNodes)
+		}
+		item.fakeNodeHandler.RequestCount = 0
+		if err := nodeController.SyncNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.fakeNodeHandler.RequestCount != 1 {
+			t.Errorf("expected one list for updating same status, but got %v.", item.fakeNodeHandler.RequestCount)
+		}
 	}
-	if len(fakeNodeHandler.CreatedNodes) != 1 {
-		t.Errorf("expect only 1 node created, got %v", len(fakeNodeHandler.CreatedNodes))
+}
+
+func newNode(name string) *api.Node {
+	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
+}
+
+func sortedNodeNames(nodes []*api.Node) []string {
+	nodeNames := []string{}
+	for _, node := range nodes {
+		nodeNames = append(nodeNames, node.Name)
 	}
-	if fakeNodeHandler.CreatedNodes[0].Name != "node1" {
-		t.Errorf("unexpect node %v created", fakeNodeHandler.CreatedNodes[0].Name)
-	}
+	sort.Strings(nodeNames)
+	return nodeNames
 }
 
 func contains(node *api.Node, nodes []*api.Node) bool {

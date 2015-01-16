@@ -17,15 +17,23 @@ limitations under the License.
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net"
+	"reflect"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+)
+
+var (
+	ErrRegistration = errors.New("unable to register all nodes.")
 )
 
 type NodeController struct {
@@ -34,80 +42,100 @@ type NodeController struct {
 	staticResources *api.NodeResources
 	nodes           []string
 	kubeClient      client.Interface
+	kubeletClient   client.KubeletHealthChecker
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
+// TODO: NodeController health checker should be a separate package other than
+// kubeletclient, node health check != kubelet health check.
 func NewNodeController(
 	cloud cloudprovider.Interface,
 	matchRE string,
 	nodes []string,
 	staticResources *api.NodeResources,
-	kubeClient client.Interface) *NodeController {
+	kubeClient client.Interface,
+	kubeletClient client.KubeletHealthChecker) *NodeController {
 	return &NodeController{
 		cloud:           cloud,
 		matchRE:         matchRE,
 		nodes:           nodes,
 		staticResources: staticResources,
 		kubeClient:      kubeClient,
+		kubeletClient:   kubeletClient,
 	}
 }
 
-// Run starts syncing instances from cloudprovider periodically, or create initial node list.
-func (s *NodeController) Run(period time.Duration) {
-	if s.cloud != nil && len(s.matchRE) > 0 {
+// Run creates initial node list and start syncing instances from cloudprovider if any.
+// It also starts syncing cluster node status.
+func (s *NodeController) Run(period time.Duration, retryCount int) {
+	// Register intial set of nodes with their status set.
+	var nodes *api.NodeList
+	var err error
+	if s.isRunningCloudProvider() {
+		nodes, err = s.CloudNodes()
+		if err != nil {
+			glog.Errorf("Error loading initial node from cloudprovider: %v", err)
+		}
+	} else {
+		nodes, err = s.StaticNodes()
+		if err != nil {
+			glog.Errorf("Error loading initial static nodes")
+		}
+	}
+	nodes = s.DoChecks(nodes)
+	if err := s.RegisterNodes(nodes, retryCount, period); err != nil {
+		glog.Errorf("Error registrying node list: %+v", nodes)
+	}
+
+	// Start syncing node list from cloudprovider.
+	if s.isRunningCloudProvider() {
 		go util.Forever(func() {
-			if err := s.SyncCloud(); err != nil {
+			if err = s.SyncCloud(); err != nil {
 				glog.Errorf("Error syncing cloud: %v", err)
 			}
 		}, period)
-	} else {
-		go s.SyncStatic(period)
 	}
+
+	// Start syncing node status.
+	go util.Forever(func() {
+		if err = s.SyncNodeStatus(); err != nil {
+			glog.Errorf("Error syncing status: %v", err)
+		}
+	}, period)
 }
 
-// SyncStatic registers list of machines from command line flag. It returns after successful
-// registration of all machines.
-func (s *NodeController) SyncStatic(period time.Duration) error {
+// RegisterNodes registers the given list of nodes, it keeps retrying for `retryCount` times.
+func (s *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, retryInterval time.Duration) error {
 	registered := util.NewStringSet()
-	for {
-		for _, nodeID := range s.nodes {
-			if registered.Has(nodeID) {
+	for i := 0; i < retryCount; i++ {
+		for _, node := range nodes.Items {
+			if registered.Has(node.Name) {
 				continue
 			}
-			node := &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: nodeID},
-				Spec: api.NodeSpec{
-					Capacity: s.staticResources.Capacity,
-				},
-			}
-			addr := net.ParseIP(nodeID)
-			if addr != nil {
-				node.Status.HostIP = nodeID
-			} else {
-				addrs, err := net.LookupIP(nodeID)
-				if err != nil {
-					glog.Errorf("Can't get ip address of node %v", nodeID)
-				} else if len(addrs) == 0 {
-					glog.Errorf("No ip address for node %v", nodeID)
-				} else {
-					node.Status.HostIP = addrs[0].String()
-				}
-			}
-			_, err := s.kubeClient.Nodes().Create(node)
+			_, err := s.kubeClient.Nodes().Create(&node)
 			if err == nil {
-				registered.Insert(nodeID)
+				registered.Insert(node.Name)
+				glog.Infof("Registered node in registry: %s", node.Name)
+			} else {
+				glog.Errorf("Error registrying node %s, retrying: %s", node.Name, err)
+			}
+			if registered.Len() == len(nodes.Items) {
+				glog.Infof("Successfully Registered all nodes")
+				return nil
 			}
 		}
-		if registered.Len() == len(s.nodes) {
-			return nil
-		}
-		time.Sleep(period)
+		time.Sleep(retryInterval)
+	}
+	if registered.Len() != len(nodes.Items) {
+		return ErrRegistration
+	} else {
+		return nil
 	}
 }
 
-// SyncCloud syncs list of instances from cloudprovider to master etcd registry.
+// SyncCloud synchronizes the list of instances from cloudprovider to master server.
 func (s *NodeController) SyncCloud() error {
-	matches, err := s.cloudNodes()
+	matches, err := s.CloudNodes()
 	if err != nil {
 		return err
 	}
@@ -120,7 +148,7 @@ func (s *NodeController) SyncCloud() error {
 		nodeMap[node.Name] = &node
 	}
 
-	// Create or delete nodes from registry.
+	// Create nodes which have been created in cloud, but not in kubernetes cluster.
 	for _, node := range matches.Items {
 		if _, ok := nodeMap[node.Name]; !ok {
 			glog.Infof("Create node in registry: %s", node.Name)
@@ -132,6 +160,7 @@ func (s *NodeController) SyncCloud() error {
 		delete(nodeMap, node.Name)
 	}
 
+	// Delete nodes which have been deleted from cloud, but not from kubernetes cluster.
 	for nodeID := range nodeMap {
 		glog.Infof("Delete node from registry: %s", nodeID)
 		err = s.kubeClient.Nodes().Delete(nodeID)
@@ -139,29 +168,121 @@ func (s *NodeController) SyncCloud() error {
 			glog.Errorf("Delete node error: %s", nodeID)
 		}
 	}
+
 	return nil
 }
 
-// cloudNodes constructs and returns api.NodeList from cloudprovider.
-func (s *NodeController) cloudNodes() (*api.NodeList, error) {
+// SyncNodeStatus synchronizes cluster nodes status to master server.
+func (s *NodeController) SyncNodeStatus() error {
+	nodes, err := s.kubeClient.Nodes().List()
+	if err != nil {
+		return err
+	}
+	oldNodes := make(map[string]api.Node)
+	for _, node := range nodes.Items {
+		oldNodes[node.Name] = node
+	}
+	nodes = s.DoChecks(nodes)
+	for _, node := range nodes.Items {
+		if reflect.DeepEqual(node, oldNodes[node.Name]) {
+			glog.V(2).Infof("skip updating node %v", node.Name)
+			continue
+		}
+		glog.V(2).Infof("updating node %v", node.Name)
+		_, err = s.kubeClient.Nodes().Update(&node)
+		if err != nil {
+			glog.Errorf("error updating node %s: %v", node.Name, err)
+		}
+	}
+	return nil
+}
+
+// DoChecks performs health checking for given list of nodes.
+func (s *NodeController) DoChecks(nodes *api.NodeList) *api.NodeList {
+	var wg sync.WaitGroup
+	wg.Add(len(nodes.Items))
+	for i := range nodes.Items {
+		go func(node *api.Node) {
+			node.Status.Conditions = s.DoCheck(node)
+			wg.Done()
+		}(&nodes.Items[i])
+	}
+	wg.Wait()
+	return nodes
+}
+
+// DoCheck performs health checking for given node.
+func (s *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
+	var conditions []api.NodeCondition
+	switch status, err := s.kubeletClient.HealthCheck(node.Name); {
+	case err != nil:
+		glog.V(2).Infof("NodeController: node %s health check error: %v", node.Name, err)
+		conditions = append(conditions, api.NodeCondition{
+			Kind:   api.NodeReady,
+			Status: api.ConditionUnknown,
+		})
+	case status == probe.Failure:
+		conditions = append(conditions, api.NodeCondition{
+			Kind:   api.NodeReady,
+			Status: api.ConditionNone,
+		})
+	default:
+		conditions = append(conditions, api.NodeCondition{
+			Kind:   api.NodeReady,
+			Status: api.ConditionFull,
+		})
+	}
+	glog.V(5).Infof("NodeController: node %q status was %+v", node.Name, conditions)
+	return conditions
+}
+
+// StaticNodes constructs and returns api.NodeList for static nodes. If error
+// occurs, an empty NodeList will be returned with a non-nil error info.
+func (s *NodeController) StaticNodes() (*api.NodeList, error) {
+	result := &api.NodeList{}
+	for _, nodeID := range s.nodes {
+		node := api.Node{
+			ObjectMeta: api.ObjectMeta{Name: nodeID},
+			Spec:       api.NodeSpec{Capacity: s.staticResources.Capacity},
+		}
+		addr := net.ParseIP(nodeID)
+		if addr != nil {
+			node.Status.HostIP = nodeID
+		} else {
+			addrs, err := net.LookupIP(nodeID)
+			if err != nil {
+				glog.Errorf("Can't get ip address of node %v", nodeID)
+			} else if len(addrs) == 0 {
+				glog.Errorf("No ip address for node %v", nodeID)
+			} else {
+				node.Status.HostIP = addrs[0].String()
+			}
+		}
+		result.Items = append(result.Items, node)
+	}
+	return result, nil
+}
+
+// CloudNodes constructs and returns api.NodeList from cloudprovider. If error
+// occurs, an empty NodeList will be returned with a non-nil error info.
+func (s *NodeController) CloudNodes() (*api.NodeList, error) {
+	result := &api.NodeList{}
 	instances, ok := s.cloud.Instances()
 	if !ok {
-		return nil, fmt.Errorf("cloud doesn't support instances")
+		return result, fmt.Errorf("cloud doesn't support instances")
 	}
 	matches, err := instances.List(s.matchRE)
 	if err != nil {
-		return nil, err
-	}
-	result := &api.NodeList{
-		Items: make([]api.Node, len(matches)),
+		return result, err
 	}
 	for i := range matches {
-		result.Items[i].Name = matches[i]
+		node := api.Node{}
+		node.Name = matches[i]
 		hostIP, err := instances.IPAddress(matches[i])
 		if err != nil {
 			glog.Errorf("error getting instance ip address for %s: %v", matches[i], err)
 		} else {
-			result.Items[i].Status.HostIP = hostIP.String()
+			node.Status.HostIP = hostIP.String()
 		}
 		resources, err := instances.GetNodeResources(matches[i])
 		if err != nil {
@@ -171,8 +292,14 @@ func (s *NodeController) cloudNodes() (*api.NodeList, error) {
 			resources = s.staticResources
 		}
 		if resources != nil {
-			result.Items[i].Spec.Capacity = resources.Capacity
+			node.Spec.Capacity = resources.Capacity
 		}
+		result.Items = append(result.Items, node)
 	}
 	return result, nil
+}
+
+// isRunningCloudProvider checks if cluster is running with cloud provider.
+func (s *NodeController) isRunningCloudProvider() bool {
+	return s.cloud != nil && len(s.matchRE) > 0
 }

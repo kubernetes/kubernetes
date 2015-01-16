@@ -205,9 +205,8 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 				nodes.Items = append(nodes.Items, node)
 			}
 		} else {
-			// If no condition is set, either node health check is disabled (master
-			// flag "healthCheckMinions" is set to false), or we get unknown condition.
-			// In such cases, we add nodes unconditionally.
+			// If no condition is set, we get unknown node condition. In such cases,
+			// we add nodes unconditionally.
 			nodes.Items = append(nodes.Items, node)
 		}
 	}

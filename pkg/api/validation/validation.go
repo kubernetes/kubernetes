@@ -673,9 +673,11 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldMinion.ObjectMeta, &minion.ObjectMeta).Prefix("metadata")...)
 
-	if !api.Semantic.DeepEqual(minion.Status, api.NodeStatus{}) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("status", minion.Status, "status must be empty"))
-	}
+	// TODO: Enable the code once we have better api object.status update model. Currently,
+	// anyone can update node status.
+	// if !api.Semantic.DeepEqual(minion.Status, api.NodeStatus{}) {
+	// 	allErrs = append(allErrs, errs.NewFieldInvalid("status", minion.Status, "status must be empty"))
+	// }
 
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested

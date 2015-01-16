@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -134,8 +135,9 @@ func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
 		},
 	}
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl)
-	nodeController.Run(10 * time.Second)
+	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, kubeClient)
+	nodeController.Run(10*time.Second, 10)
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
