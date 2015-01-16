@@ -311,7 +311,6 @@ function create-minion {
       --machine-type "${MINION_SIZE}" \
       --boot-disk-type "${MINION_DISK_TYPE}" \
       --boot-disk-size "${MINION_DISK_SIZE}" \
-      --image-project="${IMAGE_PROJECT}" \
       --image "${IMAGE}" \
       --tags "${MINION_TAG}" \
       --network "${NETWORK}" \
@@ -426,7 +425,6 @@ function kube-up {
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
-    --image-project="${IMAGE_PROJECT}" \
     --image "${IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
