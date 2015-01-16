@@ -270,8 +270,9 @@ func validateLifecycle(lifecycle *api.Lifecycle) errs.ValidationErrorList {
 func validatePullPolicyWithDefault(ctr *api.Container) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
 
-	// TODO(dchen1107): Move ParseImageName code to pkg/util
-	if len(ctr.ImagePullPolicy) == 0 {
+	switch ctr.ImagePullPolicy {
+	case "":
+		// TODO(dchen1107): Move ParseImageName code to pkg/util
 		parts := strings.Split(ctr.Image, ":")
 		// Check image tag
 		if parts[len(parts)-1] == "latest" {
@@ -279,10 +280,9 @@ func validatePullPolicyWithDefault(ctr *api.Container) errs.ValidationErrorList 
 		} else {
 			ctr.ImagePullPolicy = api.PullIfNotPresent
 		}
-	}
-	if ctr.ImagePullPolicy != api.PullAlways &&
-		ctr.ImagePullPolicy != api.PullIfNotPresent &&
-		ctr.ImagePullPolicy != api.PullNever {
+	case api.PullAlways, api.PullIfNotPresent, api.PullNever:
+		break
+	default:
 		allErrors = append(allErrors, errs.NewFieldNotSupported("", ctr.ImagePullPolicy))
 	}
 
