@@ -37,6 +37,11 @@ func TestClusterDNS(c *client.Client) bool {
 		return true
 	}
 
+	if testContext.provider == "vagrant" {
+		glog.Infof("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
+		return true
+	}
+
 	podClient := c.Pods(api.NamespaceDefault)
 
 	//TODO: Wait for skyDNS
