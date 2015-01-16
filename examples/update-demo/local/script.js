@@ -46,7 +46,7 @@ var updateServer = function($http, server) {
 };
 
 var updateData = function($scope, $http) {
-  var servers = $scope.servers
+  var servers = $scope.servers;
   for (var i = 0; i < servers.length; ++i) {
     var server = servers[i];
     updateServer($http, server);
@@ -69,6 +69,10 @@ var getServer = function($scope, id) {
   return null;
 };
 
+var isUpdateDemoPod = function(pod) {
+    return pod.labels && pod.labels.name == "update-demo";
+};
+
 var update = function($scope, $http) {
   if (!$http) {
     console.log("No HTTP!");
@@ -79,9 +83,13 @@ var update = function($scope, $http) {
       console.log(data);
       var newServers = [];
       for (var i = 0; i < data.items.length; ++i) {
-        var server = getServer($scope, data.items[i].id);
+        var pod = data.items[i];
+        if (!isUpdateDemoPod(pod)) {
+          continue;
+        }
+        var server = getServer($scope, pod.id);
         if (server == null) {
-          server = { "id": data.items[i].id };
+          server = { "id": pod.id };
         }
         newServers.push(server);
       }

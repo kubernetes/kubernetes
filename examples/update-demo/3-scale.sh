@@ -21,8 +21,8 @@ set -o pipefail
 NEW_SIZE=${1:-4}
 
 export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+export KUBECTL=${KUBECTL-$KUBE_REPO_ROOT/cluster/kubectl.sh}
 
 set -x
 
-$KUBECFG resize update-demo $NEW_SIZE
+$KUBECTL resize rc update-demo-nautilus --replicas=$NEW_SIZE

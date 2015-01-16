@@ -123,6 +123,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"service":                   &api.Service{},
 			"replication-controller":    &api.ReplicationController{},
 		},
+		"../examples/update-demo": {
+			"kitten-rc":   &api.ReplicationController{},
+			"nautilus-rc": &api.ReplicationController{},
+		},
 	}
 
 	for path, expected := range cases {

@@ -23,11 +23,13 @@ if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
   exit 1
 fi
 
-NEW_IMAGE=${1:-kitten}
-TIMING=${2:-10s}
-export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+export KUBE_ROOT=$(dirname $0)/../..
+export KUBECTL=${KUBE_ROOT}/cluster/kubectl.sh
 
 set -x
 
-$KUBECFG -image $DOCKER_HUB_USER/update-demo:$NEW_IMAGE -u $TIMING rollingupdate update-demo
+NEW_IMAGE=${1:-kitten}
+TIMING=${2:-10s}
+SCHEMA=${KUBE_ROOT}/examples/update-demo/kitten-rc.yaml
+
+cat ${SCHEMA} | sed "s/DOCKER_HUB_USER/${DOCKER_HUB_USER}/" | ${KUBECTL} rollingupdate update-demo-nautilus -f - --update-period=10s
