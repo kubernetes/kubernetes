@@ -1,0 +1,7 @@
+apiVersion: "v1beta1"
+kind: "Service"
+id: "monitoring-influxdb"
+port: 8085
+containerPort: 8086
+selector: 
+  name: "influxGrafana"

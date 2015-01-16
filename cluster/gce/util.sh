@@ -737,35 +737,37 @@ function setup-monitoring {
     echo "Setting up cluster monitoring using Heapster."
 
     detect-project
-    if ! gcloud compute firewall-rules --project "{$PROJECT}" describe monitoring-heapster &>/dev/null; then
+    if ! gcloud compute firewall-rules --project "${PROJECT}" describe monitoring-heapster &> /dev/null; then
       if ! gcloud compute firewall-rules create monitoring-heapster \
           --project "${PROJECT}" \
           --target-tags="${MINION_TAG}" \
           --network="${NETWORK}" \
-          --allow tcp:80 tcp:8083 tcp:8086 tcp:9200; then
-        echo "Failed to set up firewall for monitoring" && false
+          --allow tcp:80 tcp:8083 tcp:8086; then
+        echo -e "${color_red}Failed to set up firewall for monitoring ${color_norm}" && false
       fi
     fi
 
-    # Re-use master auth for Grafana
-    get-password
-    ensure-temp-dir
-
-    sed -e "s/{KUBE_USER}/$KUBE_USER/g" \
-        -e "s/{KUBE_PASSWORD}/$KUBE_PASSWORD/g" \
-        "${KUBE_ROOT}/cluster/addons/cluster-monitoring/influx-grafana-pod.json" \
-      > "${KUBE_TEMP}/influx-grafana-pod.json"
     local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-    if "${kubectl}" create -f "${KUBE_TEMP}/influx-grafana-pod.json" &> /dev/null \
-        && "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/cluster-monitoring/influx-grafana-service.json" &> /dev/null \
-        && "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/cluster-monitoring/heapster-pod.json" &> /dev/null; then
-      local dashboard_url="http://$(${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g')"
-      echo
-      echo "Grafana dashboard will be available at $dashboard_url. Wait for the monitoring dashboard to be online."
-      echo "Use the master user name and password for the dashboard."
-      echo
+    local grafana_host=""
+    if "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/cluster-monitoring/" &> /dev/null; then
+      # wait for pods to be scheduled on a node.
+      echo "waiting for monitoring pods to be scheduled."
+      for i in `seq 1 10`; do
+	grafana_host=$("${kubectl}" get pods -l name=influxGrafana -o template -t {{range.items}}{{.currentState.hostIP}}:{{end}} | sed s/://g) 
+	if [[ $grafana_host != *"<"* ]]; then
+	  break
+	fi
+	sleep 10
+      done
+      if [[ $grafana_host != *"<"* ]]; then
+	echo
+	echo -e "${color_green}Grafana dashboard will be available at ${color_yellow}http://$grafana_host${color_green}. Wait for the monitoring dashboard to be online.${color_norm}"
+	echo
+      else
+	echo -e "${color_red}monitoring pods failed to be scheduled.${color_norm}"
+      fi
     else
-      echo "Failed to Setup Monitoring"
+      echo -e "${color_red}Failed to Setup Monitoring ${color_norm}"
       teardown-monitoring
     fi
   fi
@@ -776,9 +778,10 @@ function teardown-monitoring {
     detect-project
 
     local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-    "${kubectl}" delete pods heapster &> /dev/null || true
-    "${kubectl}" delete pods influx-grafana &> /dev/null || true
-    "${kubectl}" delete services influx-master &> /dev/null || true
+    local kubecfg="${KUBE_ROOT}/cluster/kubecfg.sh"
+    "${kubecfg}" resize monitoring-influxGrafanaController 0 &> /dev/null || true
+    "${kubecfg}" resize monitoring-heapsterController 0 &> /dev/null || true
+    "${kubectl}" delete -f "${KUBE_ROOT}/cluster/addons/cluster-monitoring/" &> /dev/null || true
     if gcloud compute firewall-rules describe --project "${PROJECT}" monitoring-heapster &> /dev/null; then
       gcloud compute firewall-rules delete \
           --project "${PROJECT}" \
