@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"reflect"
 	"net/http"
 	"time"
 
@@ -201,7 +202,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 		config.NewSourceURL(kc.ManifestURL, kc.HttpCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
 
-	if kc.EtcdClient != nil {
+	if !reflect.ValueOf(kc.EtcdClient).IsNil() {
 		glog.Infof("Watching for etcd configs at %v", kc.EtcdClient.GetCluster())
 		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel(kubelet.EtcdSource))
 	}
