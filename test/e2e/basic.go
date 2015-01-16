@@ -122,7 +122,11 @@ func TestBasicImage(c *client.Client, image string) bool {
 
 	// Verify that something is listening.
 	for i, pod := range pods.Items {
-		glog.Infof("Pod %s hostIP %s", pod.Name, pod.Status.HostIP)
+		glog.Infof("Pod: %s hostIP: %s", pod.Name, pod.Status.HostIP)
+		if pod.Status.HostIP == "" {
+			glog.Warningf("Skipping test of GET response since hostIP is not available")
+			continue
+		}
 		resp, err := http.Get(fmt.Sprintf("http://%s:8080", pod.Status.HostIP))
 		if err != nil {
 			glog.Errorf("Failed to GET from replica %d: %v", i+1, err)
