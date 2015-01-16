@@ -75,7 +75,7 @@ grains:
   cloud_provider: vagrant
   roles:
     - kubernetes-master
-  admission_control: ResourceDefaults,AlwaysAdmit
+  admission_control: AlwaysAdmit
 EOF
 
 mkdir -p /srv/salt-overlay/pillar
