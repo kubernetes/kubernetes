@@ -1,17 +1,17 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Kubernetes on EC2",
+  "Description": "Kubernetes 0.8.1 on EC2",
   "Mappings": {
       "RegionMap": {
-          "eu-central-1": {"AMI": "ami-54ccfa49"},
-          "ap-northeast-1": {"AMI": "ami-f7b08ff6"},
-          "sa-east-1": {"AMI": "ami-1304b30e"},
-          "ap-southeast-2": {"AMI": "ami-0f117e35"},
-          "ap-southeast-1": {"AMI": "ami-c04f6c92"},
-          "us-east-1": {"AMI": "ami-7ae66812"},
-          "us-west-2": {"AMI": "ami-e18dc5d1"},
-          "us-west-1": {"AMI": "ami-45fbec00"},
-          "eu-west-1": {"AMI": "ami-a27fd5d5"}
+          "eu-central-1": {"AMI": "ami-488ebe55"},
+          "ap-northeast-1": {"AMI": "ami-14273415"},
+          "sa-east-1": {"AMI": "ami-e7b30efa"},
+          "ap-southeast-2": {"AMI": "ami-4d2b5e77"},
+          "ap-southeast-1": {"AMI": "ami-8c032bde"},
+          "us-east-1": {"AMI": "ami-4c651824"},
+          "us-west-2": {"AMI": "ami-ff2679cf"},
+          "us-west-1": {"AMI": "ami-5d4f5118"},
+          "eu-west-1": {"AMI": "ami-5d71f02a"}
       }
   },
   "Parameters": {
