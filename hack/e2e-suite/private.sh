@@ -32,5 +32,5 @@ if [[ "${KUBERNETES_PROVIDER}" != "gce" ]] && [[ "${KUBERNETES_PROVIDER}" != "gk
 fi
 
 # Run the basic.sh test, but using this image.
-export POD_IMG_SRV="container.cloud.google.com/_b_k8s_test/serve_hostname"
+export POD_IMG_SRV="gcr.io/_b_k8s_test/serve_hostname:1.0"
 source "${KUBE_ROOT}/hack/e2e-suite/basic.sh"
