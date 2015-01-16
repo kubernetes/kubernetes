@@ -11,6 +11,8 @@ Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/n
 
 ### AWS
 
+*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
+
 #### Provision the Master
 
 ```
@@ -22,7 +24,7 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 ```
 aws ec2 run-instances \
---image-id ami-d92377e9 \
+--image-id <ami_image_id> \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -45,7 +47,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 ```
 aws ec2 run-instances \
 --count 1 \
---image-id ami-d92377e9 \
+--image-id <ami_image_id> \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -55,12 +57,14 @@ aws ec2 run-instances \
 
 ### GCE
 
+*Attention:* Replace ```<gce_image_id>``` bellow for a [suitable version of CoreOS image for GCE](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
+
 #### Provision the Master
 
 ```
 gcloud compute instances create master \
 --image-project coreos-cloud \
---image coreos-alpha-509-1-0-v20141124 \
+--image <gce_image_id> \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
@@ -82,7 +86,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the pri
 ```
 gcloud compute instances create node1 \
 --image-project coreos-cloud \
---image coreos-alpha-509-1-0-v20141124 \
+--image <gce_image_id> \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
