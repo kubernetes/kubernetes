@@ -82,4 +82,4 @@ else
   auth_config=()
 fi
 
-"${e2e}" "${auth_config[@]:+${auth_config[@]}}" --host="https://${KUBE_MASTER_IP-}"
+"${e2e}" "${auth_config[@]:+${auth_config[@]}}" --host="https://${KUBE_MASTER_IP-}" --provider="${KUBERNETES_PROVIDER}"

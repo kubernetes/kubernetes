@@ -34,6 +34,7 @@ type testContextType struct {
 	certDir    string
 	host       string
 	repoRoot   string
+	provider   string
 }
 
 var testContext testContextType
