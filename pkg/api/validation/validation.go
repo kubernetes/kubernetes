@@ -266,6 +266,29 @@ func validateLifecycle(lifecycle *api.Lifecycle) errs.ValidationErrorList {
 	return allErrs
 }
 
+// TODO(dchen1107): Move this along with other defaulting values
+func validatePullPolicyWithDefault(ctr *api.Container) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+
+	// TODO(dchen1107): Move ParseImageName code to pkg/util
+	if len(ctr.ImagePullPolicy) == 0 {
+		parts := strings.Split(ctr.Image, ":")
+		// Check image tag
+		if parts[len(parts)-1] == "latest" {
+			ctr.ImagePullPolicy = api.PullAlways
+		} else {
+			ctr.ImagePullPolicy = api.PullIfNotPresent
+		}
+	}
+	if ctr.ImagePullPolicy != api.PullAlways &&
+		ctr.ImagePullPolicy != api.PullIfNotPresent &&
+		ctr.ImagePullPolicy != api.PullNever {
+		allErrors = append(allErrors, errs.NewFieldNotSupported("", ctr.ImagePullPolicy))
+	}
+
+	return allErrors
+}
+
 func validateContainers(containers []api.Container, volumes util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
@@ -294,6 +317,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
 		cErrs = append(cErrs, validateVolumeMounts(ctr.VolumeMounts, volumes).Prefix("volumeMounts")...)
+		cErrs = append(cErrs, validatePullPolicyWithDefault(ctr).Prefix("pullPolicy")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
