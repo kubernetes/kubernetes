@@ -18,6 +18,7 @@ package client
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -62,8 +63,20 @@ type Config struct {
 
 	// Server requires TLS client certificate authentication
 	CertFile string
-	KeyFile  string
-	CAFile   string
+	// Server requires TLS client certificate authentication
+	KeyFile string
+	// Trusted root certificates for server
+	CAFile string
+
+	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
+	// CertData takes precedence over CertFile
+	CertData []byte
+	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
+	// KeyData takes precedence over KeyFile
+	KeyData []byte
+	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
+	// CAData takes precedence over CAFile
+	CAData []byte
 
 	// Server should be accessed without verifying the TLS
 	// certificate. For testing only.
@@ -85,6 +98,16 @@ type KubeletConfig struct {
 	KeyFile string
 	// TLS Configuration, only applies if EnableHttps is true.
 	CAFile string
+
+	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
+	// CertData takes precedence over CertFile
+	CertData []byte
+	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
+	// KeyData takes precedence over KeyFile
+	KeyData []byte
+	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
+	// CAData takes precedence over CAFile
+	CAData []byte
 }
 
 // New creates a Kubernetes client for the given config. This client works with pods,
@@ -185,29 +208,48 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 // or transport level security defined by the provided Config. Will return the
 // default http.DefaultTransport if no special case behavior is needed.
 func TransportFor(config *Config) (http.RoundTripper, error) {
+	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
+	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
+
 	// Set transport level security
-	if config.Transport != nil && (config.CAFile != "" || config.CertFile != "" || config.Insecure) {
+	if config.Transport != nil && (hasCA || hasCert || config.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
 	}
-	if config.CAFile != "" && config.Insecure {
+	if hasCA && config.Insecure {
 		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
 	}
 	var transport http.RoundTripper
 	switch {
 	case config.Transport != nil:
 		transport = config.Transport
-	case config.CertFile != "":
-		t, err := NewClientCertTLSTransport(config.CertFile, config.KeyFile, config.CAFile)
-		if err != nil {
+	case hasCert:
+		var (
+			certData, keyData, caData []byte
+			err                       error
+		)
+		if certData, err = dataFromSliceOrFile(config.CertData, config.CertFile); err != nil {
 			return nil, err
 		}
-		transport = t
-	case config.CAFile != "":
-		t, err := NewTLSTransport(config.CAFile)
-		if err != nil {
+		if keyData, err = dataFromSliceOrFile(config.KeyData, config.KeyFile); err != nil {
 			return nil, err
 		}
-		transport = t
+		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
+			return nil, err
+		}
+		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
+			return nil, err
+		}
+	case hasCA:
+		var (
+			caData []byte
+			err    error
+		)
+		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
+			return nil, err
+		}
+		if transport, err = NewTLSTransport(caData); err != nil {
+			return nil, err
+		}
 	case config.Insecure:
 		transport = NewUnsafeTLSTransport()
 	default:
@@ -229,6 +271,19 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	// TODO: use the config context to wrap a transport
 
 	return transport, nil
+}
+
+// dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
+// or an error if an error occurred reading the file
+func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
+	if len(data) > 0 {
+		return data, nil
+	}
+	fileData, err := ioutil.ReadFile(file)
+	if err != nil {
+		return []byte{}, err
+	}
+	return fileData, nil
 }
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
