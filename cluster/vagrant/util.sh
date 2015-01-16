@@ -21,12 +21,12 @@ source "${KUBE_ROOT}/cluster/vagrant/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 function detect-master () {
   KUBE_MASTER_IP=$MASTER_IP
-  echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}"
+  echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
 }
 
 # Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
 function detect-minions {
-  echo "Minions already detected"
+  echo "Minions already detected" 1>&2
   KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
@@ -155,13 +155,15 @@ function verify-cluster {
     done
   done
 
-  echo
-  echo "Kubernetes cluster is running.  The master is running at:"
-  echo
-  echo "  https://${MASTER_IP}"
-  echo
-  echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
-  echo
+  (
+    echo
+    echo "Kubernetes cluster is running.  The master is running at:"
+    echo
+    echo "  https://${MASTER_IP}"
+    echo
+    echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
+    echo
+    )
 }
 
 
@@ -218,19 +220,19 @@ function test-build-release {
 
 # Execute prior to running tests to initialize required structure
 function test-setup {
-  echo "Vagrant test setup complete"
+  echo "Vagrant test setup complete" 1>&2
 }
 
 # Execute after running tests to perform any required clean-up
 function test-teardown {
-  echo "Vagrant ignores tear-down"
+  echo "Vagrant ignores tear-down" 1>&2
 }
 
 # Set the {user} and {password} environment values required to interact with provider
 function get-password {
   export KUBE_USER=vagrant
   export KUBE_PASSWORD=vagrant
-  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD"
+  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD" 1>&2
 }
 
 # Find the minion name based on the IP address
@@ -262,16 +264,16 @@ function restart-kube-proxy {
 }
 
 function setup-monitoring {
-    echo "TODO"
+  echo "TODO" 1>&2
 }
 
 function teardown-monitoring {
-  echo "TODO"
+  echo "TODO" 1>&2
 }
 
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
-  echo "Vagrant doesn't need special preparations for e2e tests"
+  echo "Vagrant doesn't need special preparations for e2e tests" 1>&2
 }
 
 function setup-logging {
