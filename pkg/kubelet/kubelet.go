@@ -1024,6 +1024,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	for _, container := range pod.Spec.Containers {
 		expectedHash := dockertools.HashContainer(&container)
+		dockerContainerName := dockertools.BuildDockerName(uid, podFullName, &container)
 		if dockerContainer, found, hash := dockerContainers.FindPodContainer(podFullName, uid, container.Name); found {
 			containerID := dockertools.DockerID(dockerContainer.ID)
 			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
@@ -1063,27 +1064,27 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		// Check RestartPolicy for container
 		recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, podFullName, uid, container.Name)
 		if err != nil {
-			glog.Errorf("Error listing recent containers with name and uid:%s--%s--%s", podFullName, uid, container.Name)
+			glog.Errorf("Error listing recent containers:%s", dockerContainerName)
 			// TODO(dawnchen): error handling here?
 		}
 
 		if len(recentContainers) > 0 && pod.Spec.RestartPolicy.Always == nil {
 			if pod.Spec.RestartPolicy.Never != nil {
-				glog.V(3).Infof("Already ran container with name %s--%s--%s, do nothing",
-					podFullName, uid, container.Name)
+				glog.V(3).Infof("Already ran container with name %s, do nothing",
+					dockerContainerName)
 				continue
 			}
 			if pod.Spec.RestartPolicy.OnFailure != nil {
 				// Check the exit code of last run
 				if recentContainers[0].State.ExitCode == 0 {
-					glog.V(3).Infof("Already successfully ran container with name %s--%s--%s, do nothing",
-						podFullName, uid, container.Name)
+					glog.V(3).Infof("Already successfully ran container with name %s, do nothing",
+						dockerContainerName)
 					continue
 				}
 			}
 		}
 
-		glog.V(3).Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uid, container.Name, container)
+		glog.V(3).Infof("Container with name %s doesn't exist, creating %#v", dockerContainerName)
 		ref, err := containerRef(pod, &container)
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
