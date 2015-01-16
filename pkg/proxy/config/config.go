@@ -106,8 +106,8 @@ func (c *EndpointsConfig) Channel(source string) chan EndpointsUpdate {
 	return endpointsCh
 }
 
-func (c *EndpointsConfig) Config() map[string]map[string]api.Endpoints {
-	return c.store.MergedState().(map[string]map[string]api.Endpoints)
+func (c *EndpointsConfig) Config() []api.Endpoints {
+	return c.store.MergedState().([]api.Endpoints)
 }
 
 type endpointsStore struct {
@@ -201,8 +201,8 @@ func (c *ServiceConfig) Channel(source string) chan ServiceUpdate {
 	return serviceCh
 }
 
-func (c *ServiceConfig) Config() map[string]map[string]api.Service {
-	return c.store.MergedState().(map[string]map[string]api.Service)
+func (c *ServiceConfig) Config() []api.Service {
+	return c.store.MergedState().([]api.Service)
 }
 
 type serviceStore struct {
