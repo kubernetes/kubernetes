@@ -61,17 +61,33 @@ type HTTPKubeletClient struct {
 func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	transport := http.DefaultTransport
 	if config.CertFile != "" {
-		t, err := NewClientCertTLSTransport(config.CertFile, config.KeyFile, config.CAFile)
-		if err != nil {
+		var (
+			certData, keyData, caData []byte
+			err                       error
+		)
+		if certData, err = dataFromSliceOrFile(config.CertData, config.CertFile); err != nil {
 			return nil, err
 		}
-		transport = t
+		if keyData, err = dataFromSliceOrFile(config.KeyData, config.KeyFile); err != nil {
+			return nil, err
+		}
+		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
+			return nil, err
+		}
+		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
+			return nil, err
+		}
 	} else if config.CAFile != "" {
-		t, err := NewTLSTransport(config.CAFile)
-		if err != nil {
+		var (
+			caData []byte
+			err    error
+		)
+		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
 			return nil, err
 		}
-		transport = t
+		if transport, err = NewTLSTransport(caData); err != nil {
+			return nil, err
+		}
 	}
 
 	c := &http.Client{Transport: transport}
