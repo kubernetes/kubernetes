@@ -37,7 +37,7 @@ type Interface interface {
 
 // New returns a mount.Interface for the current system.
 func New() Interface {
-	return &mounter{}
+	return &Mounter{}
 }
 
 // This represents a single line in /proc/mounts or /etc/fstab.
