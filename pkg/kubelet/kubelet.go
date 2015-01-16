@@ -93,7 +93,9 @@ func NewMainKubelet(
 	}
 
 	serviceStore := cache.NewStore()
-	cache.NewReflector(&cache.ListWatch{kubeClient, labels.Everything(), "services", api.NamespaceAll}, &api.Service{}, serviceStore).Run()
+	if kubeClient != nil {
+		cache.NewReflector(&cache.ListWatch{kubeClient, labels.Everything(), "services", api.NamespaceAll}, &api.Service{}, serviceStore).Run()
+	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
 	klet := &Kubelet{

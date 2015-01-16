@@ -51,9 +51,19 @@ CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 kube::log::status "Running kubectl with no options"
 "${KUBE_OUTPUT_HOSTBIN}/kubectl"
 
-# Start kubelet
-kube::log::status "Starting kubelet"
+kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+  --really_crash_for_testing=true \
+  --root_dir=/tmp/kubelet.$$ \
+  --address="127.0.0.1" \
+  --port="$KUBELET_PORT" 1>&2 &
+KUBELET_PID=$!
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
+kill ${KUBELET_PID} 1>&2 2>/dev/null
+
+kube::log::status "Starting kubelet in masterful mode"
+"${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+  --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --hostname_override="127.0.0.1" \

@@ -24,7 +24,7 @@ import (
 )
 
 // ListWatch knows how to list and watch a set of apiserver resources.  It satisfies the ListerWatcher interface.
-// It is a convenience function for users of NewReflector, etc.
+// It is a convenience function for users of NewReflector, etc.  Client must not be nil.
 type ListWatch struct {
 	Client        *client.Client
 	FieldSelector labels.Selector
