@@ -47,7 +47,7 @@ const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES
 
 var manifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
 var manifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
-var manifestId = flag.String("id", "", "manifest id, default to image base name")
+var manifestName = flag.String("name", "", "manifest name, default to image base name")
 
 func init() {
 	flag.Usage = func() {
@@ -70,12 +70,12 @@ func main() {
 		flag.Usage()
 		log.Fatal("pod: missing image argument")
 	}
-	if *manifestId == "" {
+	if *manifestName == "" {
 		if flag.NArg() > 1 {
 			flag.Usage()
 			log.Fatal("podex: -id arg is required when passing more than one image")
 		}
-		_, _, *manifestId, _ = splitDockerImageName(flag.Arg(0))
+		_, _, *manifestName, _ = splitDockerImageName(flag.Arg(0))
 	}
 
 	podContainers := []goyaml.MapSlice{}
@@ -100,7 +100,12 @@ func main() {
 				log.Fatalf("failed to parse port %q: %v", p.Port(), err)
 			}
 			portEntry := goyaml.MapSlice{{
-				Key: "name", Value: strings.Join([]string{repo, p.Proto(), p.Port()}, "-")}, {Key: "containerPort", Value: port}}
+				Key:   "name",
+				Value: strings.Join([]string{repo, p.Proto(), p.Port()}, "-"),
+			}, {
+				Key:   "containerPort",
+				Value: port,
+			}}
 			portSlice = append(portSlice, portEntry)
 			if p.Proto() != "tcp" {
 				portEntry = append(portEntry, goyaml.MapItem{Key: "protocol", Value: strings.ToUpper(p.Proto())})
@@ -123,12 +128,12 @@ func main() {
 	switch *manifestType {
 	case "container":
 		containerManifest = append(goyaml.MapSlice{
-			{Key: "id", Value: *manifestId},
+			{Key: "id", Value: *manifestName},
 		}, containerManifest...)
 		data = containerManifest
 	case "pod":
 		data = goyaml.MapSlice{
-			{Key: "id", Value: *manifestId},
+			{Key: "id", Value: *manifestName},
 			{Key: "kind", Value: "Pod"},
 			{Key: "apiVersion", Value: "v1beta1"},
 			{Key: "desiredState", Value: goyaml.MapSlice{
