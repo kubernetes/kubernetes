@@ -200,7 +200,6 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
 		config.NewSourceURL(kc.ManifestURL, kc.HttpCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
-
 	if kc.EtcdClient != nil {
 		glog.Infof("Watching for etcd configs at %v", kc.EtcdClient.GetCluster())
 		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel(kubelet.EtcdSource))
