@@ -1440,3 +1440,40 @@ func TestValidateMinionUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateResourceNames(t *testing.T) {
+	longString := "a"
+	for i := 0; i < 6; i++ {
+		longString += longString
+	}
+	table := []struct {
+		input   string
+		success bool
+	}{
+		{"memory", true},
+		{"cpu", true},
+		{"network", false},
+		{"disk", false},
+		{"", false},
+		{".", false},
+		{"..", false},
+		{"kubernetes.io/cpu", true},
+		{"kubernetes.io/disk", false},
+		{"my.favorite.app.co/12345", true},
+		{"my.favorite.app.co/_12345", false},
+		{"my.favorite.app.co/12345_", false},
+		{"kubernetes.io/..", false},
+		{"kubernetes.io/" + longString, false},
+		{"kubernetes.io//", false},
+		{"kubernetes.io", false},
+		{"kubernetes.io/will/not/work/", false},
+	}
+	for _, item := range table {
+		err := ValidateResourceName(item.input)
+		if len(err) != 0 && item.success {
+			t.Errorf("expected no failure for input %q", item.input)
+		} else if len(err) == 0 && !item.success {
+			t.Errorf("expected failure for input %q", item.input)
+		}
+	}
+}

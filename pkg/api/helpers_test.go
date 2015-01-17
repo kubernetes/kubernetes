@@ -67,3 +67,21 @@ func TestSemantic(t *testing.T) {
 		}
 	}
 }
+
+func TestIsStandardResource(t *testing.T) {
+	testCases := []struct {
+		input  string
+		output bool
+	}{
+		{"cpu", true},
+		{"memory", true},
+		{"disk", false},
+		{"blah", false},
+		{"x.y.z", false},
+	}
+	for i, tc := range testCases {
+		if IsStandardResourceName(tc.input) != tc.output {
+			t.Errorf("case[%d], expected: %t, got: %t", i, tc.output, !tc.output)
+		}
+	}
+}
