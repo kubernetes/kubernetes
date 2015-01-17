@@ -1089,9 +1089,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 		}
-		if !api.IsPullNever(container.ImagePullPolicy) {
+		if container.ImagePullPolicy != api.PullNever {
 			present, err := kl.dockerPuller.IsImagePresent(container.Image)
-			latest := dockertools.RequireLatestImage(container.Image)
 			if err != nil {
 				if ref != nil {
 					record.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
@@ -1099,8 +1098,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
 				continue
 			}
-			if api.IsPullAlways(container.ImagePullPolicy) ||
-				(api.IsPullIfNotPresent(container.ImagePullPolicy) && (!present || latest)) {
+			if container.ImagePullPolicy == api.PullAlways ||
+				(container.ImagePullPolicy == api.PullIfNotPresent && (!present)) {
 				if err := kl.pullImage(container.Image, ref); err != nil {
 					continue
 				}
