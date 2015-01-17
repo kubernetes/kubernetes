@@ -622,3 +622,30 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	}
 	return allErrs
 }
+
+// Typename is a generic representation for all compute resource typenames.
+// Refer to docs/resources.md for more details.
+func ValidateResourceName(str string) errs.ValidationErrorList {
+	if !util.IsQualifiedName(str) {
+		return errs.ValidationErrorList{fmt.Errorf("invalid compute resource typename format %q", str)}
+	}
+
+	parts := strings.Split(str, "/")
+	switch len(parts) {
+	case 1:
+		if !api.IsStandardResourceName(parts[0]) {
+			return errs.ValidationErrorList{fmt.Errorf("invalid compute resource typename. %q is neither a standard resource type nor is fully qualified", str)}
+		}
+		break
+	case 2:
+		if parts[0] == api.DefaultResourceNamespace {
+			if !api.IsStandardResourceName(parts[1]) {
+				return errs.ValidationErrorList{fmt.Errorf("invalid compute resource typename. %q contains a compute resource type not supported", str)}
+
+			}
+		}
+		break
+	}
+
+	return errs.ValidationErrorList{}
+}
