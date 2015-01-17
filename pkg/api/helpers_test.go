@@ -59,8 +59,6 @@ func TestSemantic(t *testing.T) {
 			true,
 		},
 		{resource.MustParse("2m"), resource.MustParse("1m"), false},
-		{PullPolicy("NEVER"), PullPolicy("neveR"), true},
-		{PullPolicy("NEVER"), PullPolicy("neveRi"), false},
 	}
 
 	for index, item := range table {
