@@ -21,6 +21,6 @@ MAINTAINER  Joe Beda <jbeda@google.com>
 ENV KUBE_CROSSPLATFORMS \
   linux/386 linux/arm \
   darwin/amd64 darwin/386 \
-  windows/amd64
+  windows/amd64 windows/386
 
 RUN cd /usr/src/go/src && for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
