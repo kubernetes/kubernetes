@@ -18,8 +18,10 @@ package kubectl
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -42,6 +44,7 @@ type Generator interface {
 // TODO: Dynamically create this from a list of template files?
 var Generators map[string]Generator = map[string]Generator{
 	"run-container/v1": BasicReplicationController{},
+	"service/v1":       ServiceGenerator{},
 }
 
 // ValidateParams ensures that all required params are present in the params map
@@ -67,4 +70,30 @@ func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]string {
 		}
 	}
 	return result
+}
+
+func MakeLabels(labels map[string]string) string {
+	out := []string{}
+	for key, value := range labels {
+		out = append(out, fmt.Sprintf("%s=%s", key, value))
+	}
+	return strings.Join(out, ",")
+}
+
+// ParseLabels turns a string representation of a label set into a map[string]string
+func ParseLabels(labelString string) map[string]string {
+	if len(labelString) == 0 {
+		return nil
+	}
+	labels := map[string]string{}
+	labelSpecs := strings.Split(labelString, ",")
+	for ix := range labelSpecs {
+		labelSpec := strings.Split(labelSpecs[ix], "=")
+		if len(labelSpec) != 2 {
+			glog.Errorf("unexpected label spec: %s", labelSpecs[ix])
+			continue
+		}
+		labels[labelSpec[0]] = labelSpec[1]
+	}
+	return labels
 }
