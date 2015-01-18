@@ -342,19 +342,19 @@ kube-up() {
   echo
 }
 
-function setup-monitoring {
+function setup-monitoring-firewall {
     echo "TODO"
 }
 
-function teardown-monitoring {
+function teardown-monitoring-firewall {
   echo "TODO"
 }
 
-function setup-logging {
+function setup-logging-firewall {
   echo "TODO: setup logging"
 }
 
-function teardown-logging {
+function teardown-logging-firewall {
   echo "TODO: teardown logging"
 }
 

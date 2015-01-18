@@ -2,7 +2,7 @@ apiVersion: v1beta1
 kind: ReplicationController
 id: elasticsearch-logging-controller
 desiredState:
-  replicas: {ELASTICSEARCH_LOGGING_REPLICAS}
+  replicas: {{ pillar['elasticsearch_replicas'] }}
   replicaSelector:
     name: elasticsearch-logging
   podTemplate:
