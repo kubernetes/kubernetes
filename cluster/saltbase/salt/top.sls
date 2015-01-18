@@ -36,6 +36,7 @@ base:
     - nginx
     - kube-client-tools
     - logrotate
+    - kube-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}

@@ -27,8 +27,8 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
-teardown-monitoring
-teardown-logging
+teardown-monitoring-firewall
+teardown-logging-firewall
 
 kube-down
 
