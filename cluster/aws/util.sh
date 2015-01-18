@@ -106,14 +106,14 @@ function ensure-temp-dir {
   fi
 }
 
-function setup-monitoring {
+function setup-monitoring-firewall {
   if [[ "${ENABLE_CLUSTER_MONITORING:-false}" == "true" ]]; then
     # TODO: Implement this.
     echo "Monitoring not currently supported on AWS"
   fi
 }
 
-function teardown-monitoring {
+function teardown-monitoring-firewall {
   if [[ "${ENABLE_CLUSTER_MONITORING:-false}" == "true" ]]; then
     # TODO: Implement this.
     echo "Monitoring not currently supported on AWS"
@@ -296,10 +296,14 @@ function kube-up {
     echo "readonly AWS_ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
+    echo "readonly ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING:-false}'"
     echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
+    echo "readonly ENABLE_CLUSTER_LOGGING='${ENABLE_CLUSTER_LOGGING:-false}'"
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
+    echo "readonly ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-}'"
     echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
+    echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
@@ -498,10 +502,10 @@ function kube-down {
   $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
 }
 
-function setup-logging {
+function setup-logging-firewall {
   echo "TODO: setup logging"
 }
 
-function teardown-logging {
+function teardown-logging-firewall {
   echo "TODO: teardown logging"
 }
