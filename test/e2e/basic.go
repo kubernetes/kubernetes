@@ -55,7 +55,7 @@ func TestBasicImage(c *client.Client, image string) bool {
 			}
 			// Delete the controller
 			if err = c.ReplicationControllers(ns).Delete(name); err != nil {
-				glog.Warningf("Failed to delete straggler replicatior controller: %v", err)
+				glog.Warningf("Failed to delete straggler replication controller: %v", err)
 			}
 			break
 		}
@@ -154,7 +154,7 @@ func TestBasicImage(c *client.Client, image string) bool {
 	// Resize the replication controller to zero to get rid of pods.
 	controller.Spec.Replicas = 0
 	if _, err = c.ReplicationControllers(ns).Update(controller); err != nil {
-		glog.Errorf("Failed to resize replication controllert to zero: %v", err)
+		glog.Errorf("Failed to resize replication controller to zero: %v", err)
 		return false
 	}
 

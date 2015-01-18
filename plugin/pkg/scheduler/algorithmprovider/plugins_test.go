@@ -33,7 +33,7 @@ var (
 func TestDefaultConfigExists(t *testing.T) {
 	p, err := factory.GetAlgorithmProvider(factory.DefaultProvider)
 	if err != nil {
-		t.Errorf("error retrivieving default provider: %v", err)
+		t.Errorf("error retrieving default provider: %v", err)
 	}
 	if p == nil {
 		t.Error("algorithm provider config should not be nil")
@@ -47,7 +47,7 @@ func TestAlgorithmProviders(t *testing.T) {
 	for _, pn := range algorithmProviderNames {
 		p, err := factory.GetAlgorithmProvider(pn)
 		if err != nil {
-			t.Errorf("error retrivieving '%s' provider: %v", pn, err)
+			t.Errorf("error retrieving '%s' provider: %v", pn, err)
 			break
 		}
 		if len(p.PriorityFunctionKeys) == 0 {
@@ -55,12 +55,12 @@ func TestAlgorithmProviders(t *testing.T) {
 		}
 		for _, pf := range p.PriorityFunctionKeys.List() {
 			if !factory.IsPriorityFunctionRegistered(pf) {
-				t.Errorf("priority function %s is not registerd but is used in the %s algorithm provider", pf, pn)
+				t.Errorf("priority function %s is not registered but is used in the %s algorithm provider", pf, pn)
 			}
 		}
 		for _, fp := range p.FitPredicateKeys.List() {
 			if !factory.IsFitPredicateRegistered(fp) {
-				t.Errorf("fit predicate %s is not registerd but is used in the %s algorithm provider", fp, pn)
+				t.Errorf("fit predicate %s is not registered but is used in the %s algorithm provider", fp, pn)
 			}
 		}
 	}

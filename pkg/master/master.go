@@ -196,7 +196,7 @@ func setDefaults(c *Config) {
 			break
 		}
 		if !found {
-			glog.Errorf("Unable to find suitible network address in list: '%v'\n"+
+			glog.Errorf("Unable to find suitable network address in list: '%v'\n"+
 				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", addrs)
 			time.Sleep(5 * time.Second)
 		}

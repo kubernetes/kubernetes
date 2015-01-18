@@ -77,7 +77,7 @@ func TestYAMLPrinterPrint(t *testing.T) {
 	var objOut api.Pod
 	err = yaml.Unmarshal([]byte(buf.String()), &objOut)
 	if err != nil {
-		t.Errorf("Unexpeted error: %#v", err)
+		t.Errorf("Unexpected error: %#v", err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {
 		t.Errorf("Unexpected inequality: %#v vs %#v", obj, &objOut)
@@ -100,7 +100,7 @@ func TestIdentityPrinter(t *testing.T) {
 	printer.PrintObj(obj, buff)
 	objOut, err := latest.Codec.Decode([]byte(buff.String()))
 	if err != nil {
-		t.Errorf("Unexpeted error: %#v", err)
+		t.Errorf("Unexpected error: %#v", err)
 	}
 	if !reflect.DeepEqual(obj, objOut) {
 		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)

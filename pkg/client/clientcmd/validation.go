@@ -180,7 +180,7 @@ func validateContext(contextName string, context clientcmdapi.Context, config cl
 	}
 
 	if (len(context.Namespace) != 0) && !util.IsDNS952Label(context.Namespace) {
-		validationErrors = append(validationErrors, fmt.Errorf("namespace, %v, for context %v, does not conform to the kubernetest DNS952 rules", context.Namespace, contextName))
+		validationErrors = append(validationErrors, fmt.Errorf("namespace, %v, for context %v, does not conform to the kubernetes DNS952 rules", context.Namespace, contextName))
 	}
 
 	return validationErrors

@@ -90,7 +90,7 @@ if [[ -z "${KUBECTL_PATH:-}" ]]; then
   fi
 elif [[ ! -x "${KUBECTL_PATH}" ]]; then
   {
-    echo "KUBECTL_PATH enviroment variable set to '${KUBECTL_PATH}', but "
+    echo "KUBECTL_PATH environment variable set to '${KUBECTL_PATH}', but "
     echo "this doesn't seem to be a valid executable."
   } >&2
   exit 1

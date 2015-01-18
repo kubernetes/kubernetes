@@ -47,7 +47,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	}
 
 	// file paths are common to all sub commands
-	cmd.PersistentFlags().BoolVar(&pathOptions.local, "local", true, "use the .kubeconfig in the currect directory")
+	cmd.PersistentFlags().BoolVar(&pathOptions.local, "local", true, "use the .kubeconfig in the current directory")
 	cmd.PersistentFlags().BoolVar(&pathOptions.global, "global", false, "use the .kubeconfig from "+os.Getenv("HOME"))
 	cmd.PersistentFlags().StringVar(&pathOptions.specifiedFile, "kubeconfig", "", "use a particular .kubeconfig file")
 
