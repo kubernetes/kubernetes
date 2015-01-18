@@ -1,7 +1,7 @@
 # Kubernetes Documentation
 
 * [Primary concepts](#primary-concepts)
-* [Additional user guides](#additional-user-guides)
+* [Further reading](#further-reading)
 
 
 Getting started guides are in [getting-started-guides](getting-started-guides).
