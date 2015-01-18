@@ -5,7 +5,7 @@ namespace: default
 labels:
   k8s-app: skydns
 desiredState:
-  replicas: {DNS_REPLICAS}
+  replicas: {{ pillar['dns_replicas'] }}
   replicaSelector:
     k8s-app: skydns
   podTemplate:
@@ -28,7 +28,7 @@ desiredState:
             image: kubernetes/kube2sky:1.0
             command: [
                     # entrypoint = "/kube2sky",
-                    "-domain={DNS_DOMAIN}",
+                    "-domain={{ pillar['dns_domain'] }}",
             ]
           - name: skydns
             image: kubernetes/skydns:2014-12-23-001
@@ -36,7 +36,7 @@ desiredState:
                     # entrypoint = "/skydns",
                     "-machines=http://localhost:4001",
                     "-addr=0.0.0.0:53",
-                    "-domain={DNS_DOMAIN}.",
+                    "-domain={{ pillar['dns_domain'] }}.",
             ]
             ports:
               - name: dns
