@@ -1,10 +1,12 @@
 [Unit]
 Description=Kubernetes Kube-Proxy Server
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+Wants=network.target
 
 [Service]
-EnvironmentFile=-/etc/kubernetes/config
-EnvironmentFile=-/etc/kubernetes/proxy
+EnvironmentFile=-/etc/sysconfig/kubeconfig
+EnvironmentFile=-/etc/sysconfig/kubeproxy
 ExecStart=/usr/bin/kube-proxy \
 	    ${KUBE_LOGTOSTDERR} \
 	    ${KUBE_LOG_LEVEL} \

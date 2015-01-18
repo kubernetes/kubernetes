@@ -1,10 +1,12 @@
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+Wants=network.target
 
 [Service]
-EnvironmentFile=-/etc/kubernetes/config
-EnvironmentFile=-/etc/kubernetes/apiserver
+EnvironmentFile=-/etc/sysconfig/kubeconfig
+EnvironmentFile=-/etc/sysconfig/kubeapiserver
 User=kube
 ExecStart=/usr/bin/kube-apiserver \
 	    ${KUBE_LOGTOSTDERR} \

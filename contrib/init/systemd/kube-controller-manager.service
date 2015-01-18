@@ -1,11 +1,14 @@
 [Unit]
 Description=Kubernetes Controller Manager
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+Wants=network.target
+
 
 [Service]
-EnvironmentFile=-/etc/kubernetes/config
-EnvironmentFile=-/etc/kubernetes/apiserver
-EnvironmentFile=-/etc/kubernetes/controller-manager
+EnvironmentFile=-/etc/sysconfig/kubeconfig
+EnvironmentFile=-/etc/sysconfig/kubeapiserver
+EnvironmentFile=-/etc/sysconfig/kubecontroller-manager
 User=kube
 ExecStart=/usr/bin/kube-controller-manager \
 	    ${KUBE_LOGTOSTDERR} \
