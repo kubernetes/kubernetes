@@ -1086,7 +1086,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Selector: validSelector,
 			},
 		},
-		"read-write presistent disk": {
+		"read-write persistent disk": {
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,

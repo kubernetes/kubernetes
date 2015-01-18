@@ -150,7 +150,7 @@ func TestCreateVolumeCleaners(t *testing.T) {
 			continue
 		}
 		if err != nil {
-			t.Errorf("Unexpected error occured: %v", err)
+			t.Errorf("Unexpected error occurred: %v", err)
 		}
 		actualKind := reflect.TypeOf(vol).Elem().Name()
 		if tt.kind == "empty" && actualKind != "EmptyDir" {

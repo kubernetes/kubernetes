@@ -141,7 +141,7 @@ function kube::build::verify_prereqs() {
         echo
         echo "Possible causes:"
         echo "  - On Mac OS X, boot2docker VM isn't installed or started"
-        echo "  - On Mac OS X, docker env variable isn't set approriately. Run:"
+        echo "  - On Mac OS X, docker env variable isn't set appropriately. Run:"
         echo "      \$(boot2docker shellinit)"
         echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
         echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"

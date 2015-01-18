@@ -169,7 +169,7 @@ func TestDockerContainerCommand(t *testing.T) {
 		t.Errorf("unexpected command CWD: %s", cmd.Dir)
 	}
 	if !reflect.DeepEqual(cmd.Args, []string{"/usr/sbin/nsinit", "exec", "ls"}) {
-		t.Errorf("unexpectd command args: %s", cmd.Args)
+		t.Errorf("unexpected command args: %s", cmd.Args)
 	}
 }
 
