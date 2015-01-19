@@ -123,7 +123,7 @@ var (
 //     update of the image is performed.
 func Update(ctx api.Context, name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
 	// TODO ctx is not needed as input to this function, should just be 'namespace'
-	controller, err := client.ReplicationControllers(api.Namespace(ctx)).Get(name)
+	controller, err := client.ReplicationControllers(api.NamespaceValue(ctx)).Get(name)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 
 	s := labels.Set(controller.Spec.Selector).AsSelector()
 
-	podList, err := client.Pods(api.Namespace(ctx)).List(s)
+	podList, err := client.Pods(api.NamespaceValue(ctx)).List(s)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 		time.Sleep(updatePeriod)
 	}
 	return wait.Poll(updatePollInterval, updatePollTimeout, func() (bool, error) {
-		podList, err := client.Pods(api.Namespace(ctx)).List(s)
+		podList, err := client.Pods(api.NamespaceValue(ctx)).List(s)
 		if err != nil {
 			return false, err
 		}
@@ -172,12 +172,12 @@ func StopController(ctx api.Context, name string, client client.Interface) error
 // ResizeController resizes a controller named 'name' by setting replicas to 'replicas'.
 func ResizeController(ctx api.Context, name string, replicas int, client client.Interface) error {
 	// TODO ctx is not needed, and should just be a namespace
-	controller, err := client.ReplicationControllers(api.Namespace(ctx)).Get(name)
+	controller, err := client.ReplicationControllers(api.NamespaceValue(ctx)).Get(name)
 	if err != nil {
 		return err
 	}
 	controller.Spec.Replicas = replicas
-	controllerOut, err := client.ReplicationControllers(api.Namespace(ctx)).Update(controller)
+	controllerOut, err := client.ReplicationControllers(api.NamespaceValue(ctx)).Update(controller)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 		},
 	}
 
-	controllerOut, err := client.ReplicationControllers(api.Namespace(ctx)).Create(controller)
+	controllerOut, err := client.ReplicationControllers(api.NamespaceValue(ctx)).Create(controller)
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func createService(ctx api.Context, name string, port int, client client.Interfa
 			},
 		},
 	}
-	svc, err := client.Services(api.Namespace(ctx)).Create(svc)
+	svc, err := client.Services(api.NamespaceValue(ctx)).Create(svc)
 	return svc, err
 }
 
@@ -318,12 +318,12 @@ func createService(ctx api.Context, name string, port int, client client.Interfa
 // already be stopped.
 func DeleteController(ctx api.Context, name string, client client.Interface) error {
 	// TODO remove ctx in favor of just namespace string
-	controller, err := client.ReplicationControllers(api.Namespace(ctx)).Get(name)
+	controller, err := client.ReplicationControllers(api.NamespaceValue(ctx)).Get(name)
 	if err != nil {
 		return err
 	}
 	if controller.Spec.Replicas != 0 {
 		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.Spec.Replicas)
 	}
-	return client.ReplicationControllers(api.Namespace(ctx)).Delete(name)
+	return client.ReplicationControllers(api.NamespaceValue(ctx)).Delete(name)
 }

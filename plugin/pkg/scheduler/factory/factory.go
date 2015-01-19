@@ -273,7 +273,7 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Post().Namespace(api.Namespace(ctx)).Resource("bindings").Body(binding).Do().Error()
+	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 }
 
 type clock interface {
