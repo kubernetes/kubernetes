@@ -180,26 +180,25 @@ func main() {
 	}
 }
 
-func TearDown() {
-	runBash("teardown", "test-teardown")
+func TearDown() bool {
+	return runBash("teardown", "test-teardown")
 }
 
+// Up brings an e2e cluster up, recreating it if one is already running.
 func Up() bool {
-	if !tryUp() {
-		log.Printf("kube-up failed; will tear down and retry. (Possibly your cluster was in some partially created state?)")
-		TearDown()
-		return tryUp()
+	if IsUp() {
+		log.Printf("e2e cluster already running; will teardown")
+		if res := TearDown(); !res {
+			return false
+		}
 	}
-	return true
+
+	return runBash("up", path.Join(versionRoot, "/cluster/kube-up.sh; test-setup;"))
 }
 
 // Is the e2e cluster up?
 func IsUp() bool {
 	return runBash("get status", `$KUBECTL version`)
-}
-
-func tryUp() bool {
-	return runBash("up", path.Join(versionRoot, "/cluster/kube-up.sh; test-setup;"))
 }
 
 // PrepareVersion makes sure that the specified release version is locally
@@ -545,7 +544,7 @@ set -o pipefail
 export KUBE_CONFIG_FILE="config-test.sh"
 
 # TODO(jbeda): This will break on usage if there is a space in
-# ${KUBE_ROOT}.  Covert to an array?  Or an exported function?
+# ${KUBE_ROOT}.  Convert to an array?  Or an exported function?
 export KUBECFG="` + versionRoot + `/cluster/kubecfg.sh` + kubecfgArgs() + `"
 export KUBECTL="` + versionRoot + `/cluster/kubectl.sh` + kubectlArgs() + `"
 
