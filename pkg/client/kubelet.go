@@ -60,7 +60,9 @@ type HTTPKubeletClient struct {
 
 func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	transport := http.DefaultTransport
-	if config.CertFile != "" {
+	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
+	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
+	if hasCert {
 		var (
 			certData, keyData, caData []byte
 			err                       error
@@ -77,7 +79,7 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
 			return nil, err
 		}
-	} else if config.CAFile != "" {
+	} else if hasCA {
 		var (
 			caData []byte
 			err    error
