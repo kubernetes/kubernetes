@@ -12,7 +12,7 @@ For the time being, most of the people working on this project are in the US and
 
 ## Code reviews
 
-All changes must be code reviewed.  For non-maintainers this is obvious, since you can't commit anyway.  But even for maintainers, we want all changes to get at least one review, preferably from someone who knows the areas the change touches.  For non-trivial changes we may want two reviewers.  The primary reviewer will make this decision and nominate a second reviewer, if needed.  Except for trivial changes, PRs should sit for at least a 2 hours to allow for wider review.
+All changes must be code reviewed.  For non-maintainers this is obvious, since you can't commit anyway.  But even for maintainers, we want all changes to get at least one review, preferably from someone who knows the areas the change touches.  For non-trivial changes we may want two reviewers.  The primary reviewer will make this decision and nominate a second reviewer, if needed.  Except for trivial changes, PRs should sit for at least 2 hours to allow for wider review.
 
 Most PRs will find reviewers organically.  If a maintainer intends to be the primary reviewer of a PR they should set themselves as the assignee on GitHub and say so in a reply to the PR.  Only the primary reviewer of a change should actually do the merge, except in rare cases (e.g. they are unavailable in a reasonable timeframe).
 
