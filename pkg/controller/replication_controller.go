@@ -21,9 +21,11 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
@@ -121,6 +123,10 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 				// wrong with our etcd watch call. Let the util.Forever()
 				// that called us call us again.
 				return
+			}
+			if event.Type == watch.Error {
+				glog.Errorf("error from watch during sync: %v", errors.FromObject(event.Object))
+				continue
 			}
 			glog.V(4).Infof("Got watch: %#v", event)
 			rc, ok := event.Object.(*api.ReplicationController)
