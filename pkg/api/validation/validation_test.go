@@ -2353,3 +2353,114 @@ func TestValidateResourceQuota(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateNamespace(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	successCases := []api.Namespace{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc", Labels: validLabels},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateNamespace(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := map[string]struct {
+		R api.Namespace
+		D string
+	}{
+		"zero-length name": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{Name: ""}},
+			"",
+		},
+		"defined-namespace": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: "makesnosense"}},
+			"",
+		},
+		"invalid-labels": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{Name: "abc", Labels: invalidLabels}},
+			"",
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateNamespace(&v.R)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestValidateNamespaceUpdate(t *testing.T) {
+	tests := []struct {
+		oldNamespace api.Namespace
+		namespace    api.Namespace
+		valid        bool
+	}{
+		{api.Namespace{}, api.Namespace{}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo"}},
+			api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name: "bar"},
+			}, false},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "bar"},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"bar": "foo"},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"Foo": "baz"},
+			},
+		}, false},
+	}
+	for i, test := range tests {
+		errs := ValidateNamespaceUpdate(&test.oldNamespace, &test.namespace)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+			t.Logf("%#v vs %#v", test.oldNamespace.ObjectMeta, test.namespace.ObjectMeta)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}

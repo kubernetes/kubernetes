@@ -298,7 +298,7 @@ func (r *Request) Body(obj interface{}) *Request {
 func (r *Request) finalURL() string {
 	p := r.path
 	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
-		p = path.Join(p, "ns", r.namespace)
+		p = path.Join(p, "namespaces", r.namespace)
 	}
 	if len(r.resource) != 0 {
 		resource := r.resource

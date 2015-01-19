@@ -294,7 +294,7 @@ func TestProxy(t *testing.T) {
 			server           *httptest.Server
 			proxyTestPattern string
 		}{
-			{namespaceServer, "/prefix/version/proxy/ns/" + item.reqNamespace + "/foo/id" + item.path},
+			{namespaceServer, "/prefix/version/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
 			{legacyNamespaceServer, "/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
 

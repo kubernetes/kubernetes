@@ -107,7 +107,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 	for _, item := range table {
 		simpleStorage.errors["resourceLocation"] = item.err
 		simpleStorage.resourceLocation = item.id
-		resp, err := client.Get(server.URL + "/prefix/version/redirect/ns/other/foo/" + item.id)
+		resp, err := client.Get(server.URL + "/prefix/version/redirect/namespaces/other/foo/" + item.id)
 		if resp == nil {
 			t.Fatalf("Unexpected nil resp")
 		}

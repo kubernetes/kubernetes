@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package event
+package namespace
 
 import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -29,7 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// REST adapts an event registry into apiserver's RESTStorage model.
+// REST provides the RESTStorage access patterns to work with Namespace objects.
 type REST struct {
 	registry generic.Registry
 }
@@ -42,64 +43,58 @@ func NewREST(registry generic.Registry) *REST {
 	}
 }
 
+// Create creates a Namespace object
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
+	namespace := obj.(*api.Namespace)
+	if err := rest.BeforeCreate(rest.Namespaces, ctx, obj); err != nil {
+		return nil, err
 	}
-	if api.NamespaceValue(ctx) != "" {
-		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
-			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
-		}
-	}
-	if errs := validation.ValidateEvent(event); len(errs) > 0 {
-		return nil, errors.NewInvalid("event", event.Name, errs)
-	}
-	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
-
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Create(ctx, event.Name, event)
-		if err != nil {
+		if err := rs.registry.Create(ctx, namespace.Name, namespace); err != nil {
+			err = rest.CheckGeneratedNameError(rest.Namespaces, err, namespace)
 			return nil, err
 		}
-		return rs.registry.Get(ctx, event.Name)
+		return rs.registry.Get(ctx, namespace.Name)
 	}), nil
 }
 
-// Update replaces an existing Event instance in storage.registry, with the given instance.
+// Update updates a Namespace object.
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	event, ok := obj.(*api.Event)
+	namespace, ok := obj.(*api.Namespace)
 	if !ok {
-		return nil, fmt.Errorf("not an event object: %#v", obj)
+		return nil, fmt.Errorf("not a namespace: %#v", obj)
 	}
-	if api.NamespaceValue(ctx) != "" {
-		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
-			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
-		}
+
+	oldObj, err := rs.registry.Get(ctx, namespace.Name)
+	if err != nil {
+		return nil, err
 	}
-	if errs := validation.ValidateEvent(event); len(errs) > 0 {
-		return nil, errors.NewInvalid("event", event.Name, errs)
+
+	oldNamespace := oldObj.(*api.Namespace)
+	if errs := validation.ValidateNamespaceUpdate(oldNamespace, namespace); len(errs) > 0 {
+		return nil, kerrors.NewInvalid("namespace", namespace.Name, errs)
 	}
-	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Update(ctx, event.Name, event)
+		err := rs.registry.Update(ctx, oldNamespace.Name, oldNamespace)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.Get(ctx, event.Name)
+		return rs.registry.Get(ctx, oldNamespace.Name)
 	}), nil
 }
 
+// Delete deletes the Namespace with the specified name
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	obj, err := rs.registry.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	_, ok := obj.(*api.Event)
+	_, ok := obj.(*api.Namespace)
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
+
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
 	}), nil
@@ -110,47 +105,30 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	event, ok := obj.(*api.Event)
+	namespace, ok := obj.(*api.Namespace)
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return event, err
+	return namespace, err
 }
 
 func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, err error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid object type")
-	}
-	// TODO: internal version leaks through here. This should be versioned.
-	return labels.Set{}, labels.Set{
-		"involvedObject.kind":            event.InvolvedObject.Kind,
-		"involvedObject.namespace":       event.InvolvedObject.Namespace,
-		"involvedObject.name":            event.InvolvedObject.Name,
-		"involvedObject.uid":             string(event.InvolvedObject.UID),
-		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
-		"involvedObject.resourceVersion": fmt.Sprintf("%s", event.InvolvedObject.ResourceVersion),
-		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
-		"reason":                         event.Reason,
-		"source":                         event.Source.Component,
-	}, nil
+	return labels.Set{}, labels.Set{}, nil
 }
 
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	return rs.registry.List(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
 }
 
-// Watch returns Events events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
 func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.Watch(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
 }
 
-// New returns a new api.Event
+// New returns a new api.Namespace
 func (*REST) New() runtime.Object {
-	return &api.Event{}
+	return &api.Namespace{}
 }
 
 func (*REST) NewList() runtime.Object {
-	return &api.EventList{}
+	return &api.NamespaceList{}
 }

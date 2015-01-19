@@ -50,6 +50,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
@@ -122,6 +123,7 @@ type Master struct {
 	eventRegistry         generic.Registry
 	limitRangeRegistry    generic.Registry
 	resourceQuotaRegistry resourcequota.Registry
+	namespaceRegistry     generic.Registry
 	storage               map[string]apiserver.RESTStorage
 	client                *client.Client
 	portalNet             *net.IPNet
@@ -279,6 +281,7 @@ func New(c *Config) *Master {
 		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
 		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
+		namespaceRegistry:     namespace.NewEtcdRegistry(c.EtcdHelper),
 		minionRegistry:        minionRegistry,
 		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
 		resourceQuotaRegistry: resourcequota.NewEtcdRegistry(c.EtcdHelper),
@@ -400,6 +403,7 @@ func (m *Master) init(c *Config) {
 		"limitRanges":         limitrange.NewREST(m.limitRangeRegistry),
 		"resourceQuotas":      resourcequota.NewREST(m.resourceQuotaRegistry),
 		"resourceQuotaUsages": resourcequotausage.NewREST(m.resourceQuotaRegistry),
+		"namespaces":          namespace.NewREST(m.namespaceRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

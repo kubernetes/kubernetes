@@ -1,0 +1,10 @@
+{
+  "kind": "Namespace",
+  "apiVersion":"v1beta1",  
+  "id": "production",
+  "spec": {},
+  "status": {},
+  "labels": {
+    "name": "production"
+  },  
+}
