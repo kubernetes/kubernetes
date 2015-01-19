@@ -32,6 +32,8 @@ var (
 	host       = flag.String("host", "", "The host to connect to")
 	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 	provider   = flag.String("provider", "", "The name of the Kubernetes provider")
+	orderseed  = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
+	times      = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	testList   util.StringList
 )
 
@@ -46,5 +48,9 @@ func main() {
 		glog.Error("e2e needs the have the --provider flag set")
 		os.Exit(1)
 	}
-	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, testList)
+	if *times <= 0 {
+		glog.Error("Invalid --times (negative or no testing requested)!")
+		os.Exit(1)
+	}
+	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, *orderseed, *times, testList)
 }
