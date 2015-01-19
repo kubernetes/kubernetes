@@ -169,6 +169,11 @@ type proxyTransport struct {
 }
 
 func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Add reverse proxy headers.
+	req.Header.Set("X-Forwarded-Uri", t.proxyPathPrepend+req.URL.Path)
+	req.Header.Set("X-Forwarded-Host", t.proxyHost)
+	req.Header.Set("X-Forwarded-Proto", t.proxyScheme)
+
 	resp, err := http.DefaultTransport.RoundTrip(req)
 
 	if err != nil {
