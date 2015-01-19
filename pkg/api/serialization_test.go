@@ -163,7 +163,7 @@ func fuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, seed int64) runtime.Object {
 	fuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
 
-	j, err := meta.Accessor(item)
+	j, err := meta.TypeAccessor(item)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, item)
 	}
@@ -264,7 +264,7 @@ func TestRoundTripTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Couldn't make a %v? %v", kind, err)
 			}
-			if _, err := meta.Accessor(item); err != nil {
+			if _, err := meta.TypeAccessor(item); err != nil {
 				t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
 			}
 			roundTripSame(t, item)
