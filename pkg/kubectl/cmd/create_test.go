@@ -114,7 +114,7 @@ func TestCreateDirectory(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontendController\nfrontend\nredis-master\nredis-master\nredisSlaveController\nredisslave\n" {
+	if buf.String() != "frontend-controller\nfrontend\nredis-master\nredis-master\nredis-slave-controller\nredisslave\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

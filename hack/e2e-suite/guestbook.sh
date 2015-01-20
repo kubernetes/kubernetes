@@ -38,10 +38,10 @@ sleep 5
 POD_LIST_1=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
 echo "Pods running: ${POD_LIST_1}"
 
-$KUBECFG stop redisSlaveController
+$KUBECFG stop redis-slave-controller
 # Needed until issue #103 gets fixed
 sleep 25
-$KUBECFG rm redisSlaveController
+$KUBECFG rm redis-slave-controller
 $KUBECFG delete services/redis-master
 $KUBECFG delete pods/redis-master
 
