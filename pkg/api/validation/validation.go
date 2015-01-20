@@ -378,7 +378,7 @@ func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace, ""))
 	}
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, validateLabels(pod.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(pod.Labels, "labels")...)
 	return allErrs
 }
 
@@ -394,11 +394,12 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
-	allErrs = append(allErrs, validateLabels(spec.NodeSelector, "nodeSelector")...)
+	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
 	return allErrs
 }
 
-func validateLabels(labels map[string]string, field string) errs.ValidationErrorList {
+// ValidateLabels validates that a set of labels are correctly defined.
+func ValidateLabels(labels map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	for k := range labels {
 		if !util.IsQualifiedName(k) {
@@ -458,9 +459,9 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	}
 
 	if service.Spec.Selector != nil {
-		allErrs = append(allErrs, validateLabels(service.Spec.Selector, "spec.selector")...)
+		allErrs = append(allErrs, ValidateLabels(service.Spec.Selector, "spec.selector")...)
 	}
-	allErrs = append(allErrs, validateLabels(service.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(service.Labels, "labels")...)
 
 	if service.Spec.CreateExternalLoadBalancer {
 		services, err := lister.ListServices(ctx)
@@ -496,7 +497,7 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.V
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace, ""))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, validateLabels(controller.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(controller.Labels, "labels")...)
 	return allErrs
 }
 
@@ -533,7 +534,7 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 // ValidatePodTemplateSpec validates the spec of a pod template
 func ValidatePodTemplateSpec(spec *api.PodTemplateSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, validateLabels(spec.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(spec.Labels, "labels")...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec).Prefix("spec")...)
 	allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(spec.Spec.Volumes).Prefix("spec.volumes")...)
 	return allErrs
@@ -577,7 +578,7 @@ func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
 	if len(minion.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", minion.Name))
 	}
-	allErrs = append(allErrs, validateLabels(minion.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(minion.Labels, "labels")...)
 	return allErrs
 }
 
