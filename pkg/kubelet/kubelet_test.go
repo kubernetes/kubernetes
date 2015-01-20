@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -32,9 +33,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
 	"github.com/stretchr/testify/mock"
@@ -53,11 +55,21 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient) {
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
-	kubelet.rootDirectory = "/tmp/kubelet"
+	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
+		t.Fatalf("can't make a temp rootdir: %v", err)
+	} else {
+		kubelet.rootDirectory = tempDir
+	}
+	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
+	}
 	kubelet.podWorkers = newPodWorkers()
 	kubelet.sourceReady = func(source string) bool { return true }
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
+	if err := kubelet.setupDataDirs(); err != nil {
+		t.Fatalf("can't initialize kubelet data dirs: %v", err)
+	}
 
 	return kubelet, fakeDocker
 }
@@ -92,31 +104,58 @@ func verifyBoolean(t *testing.T, expected, value bool) {
 func TestKubeletDirs(t *testing.T) {
 	kubelet, _ := newTestKubelet(t)
 	root := kubelet.rootDirectory
-	if err := os.MkdirAll(root, 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %s", root, err)
-	}
 
 	var exp, got string
 
-	got = kubelet.GetPodsDir()
+	got = kubelet.getPodsDir()
 	exp = path.Join(root, "pods")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodDir("abc123")
+	got = kubelet.getPluginsDir()
+	exp = path.Join(root, "plugins")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.getPluginDir("foobar")
+	exp = path.Join(root, "plugins/foobar")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.getPodDir("abc123")
 	exp = path.Join(root, "pods/abc123")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodVolumesDir("abc123")
+	got = kubelet.getPodVolumesDir("abc123")
 	exp = path.Join(root, "pods/abc123/volumes")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodContainerDir("abc123", "def456")
+	got = kubelet.getPodVolumeDir("abc123", "plugin", "foobar")
+	exp = path.Join(root, "pods/abc123/volumes/plugin/foobar")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.getPodPluginsDir("abc123")
+	exp = path.Join(root, "pods/abc123/plugins")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.getPodPluginDir("abc123", "foobar")
+	exp = path.Join(root, "pods/abc123/plugins/foobar")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.getPodContainerDir("abc123", "def456")
 	exp = path.Join(root, "pods/abc123/containers/def456")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
@@ -148,31 +187,31 @@ func TestKubeletDirsCompat(t *testing.T) {
 		t.Fatalf("can't mkdir(%q): %s", root, err)
 	}
 
-	got = kubelet.GetPodDir("oldpod")
+	got = kubelet.getPodDir("oldpod")
 	exp = path.Join(root, "oldpod")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodDir("newpod")
+	got = kubelet.getPodDir("newpod")
 	exp = path.Join(root, "pods/newpod")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodDir("bothpod")
+	got = kubelet.getPodDir("bothpod")
 	exp = path.Join(root, "pods/bothpod")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodDir("neitherpod")
+	got = kubelet.getPodDir("neitherpod")
 	exp = path.Join(root, "pods/neitherpod")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	root = kubelet.GetPodDir("newpod")
+	root = kubelet.getPodDir("newpod")
 
 	// Old-style container dir.
 	if err := os.MkdirAll(fmt.Sprintf("%s/oldctr", root), 0750); err != nil {
@@ -190,25 +229,25 @@ func TestKubeletDirsCompat(t *testing.T) {
 		t.Fatalf("can't mkdir(%q): %s", root, err)
 	}
 
-	got = kubelet.GetPodContainerDir("newpod", "oldctr")
+	got = kubelet.getPodContainerDir("newpod", "oldctr")
 	exp = path.Join(root, "oldctr")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodContainerDir("newpod", "newctr")
+	got = kubelet.getPodContainerDir("newpod", "newctr")
 	exp = path.Join(root, "containers/newctr")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodContainerDir("newpod", "bothctr")
+	got = kubelet.getPodContainerDir("newpod", "bothctr")
 	exp = path.Join(root, "containers/bothctr")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}
 
-	got = kubelet.GetPodContainerDir("newpod", "neitherctr")
+	got = kubelet.getPodContainerDir("newpod", "neitherctr")
 	exp = path.Join(root, "containers/neitherctr")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
@@ -355,7 +394,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 
 	fakeDocker.Lock()
 	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
-	if !matchString(t, kubelet.GetPodContainerDir("12345678", "bar")+"/k8s_bar\\.[a-f0-9]", parts[0]) {
+	if !matchString(t, kubelet.getPodContainerDir("12345678", "bar")+"/k8s_bar\\.[a-f0-9]", parts[0]) {
 		t.Errorf("Unexpected host path: %s", parts[0])
 	}
 	if parts[1] != "/dev/somepath" {
@@ -916,6 +955,8 @@ func TestSyncPodUnhealthy(t *testing.T) {
 
 func TestMountExternalVolumes(t *testing.T) {
 	kubelet, _ := newTestKubelet(t)
+	kubelet.volumePluginMgr.InitPlugins([]volume.Plugin{&volume.FakePlugin{"fake", nil}}, &volumeHost{kubelet})
+
 	pod := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
@@ -925,25 +966,72 @@ func TestMountExternalVolumes(t *testing.T) {
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
 				{
-					Name: "host-dir",
-					Source: &api.VolumeSource{
-						HostDir: &api.HostDir{"/dir/path"},
-					},
+					Name:   "vol1",
+					Source: &api.VolumeSource{},
 				},
 			},
 		},
 	}
-	podVolumes, _ := kubelet.mountExternalVolumes(&pod)
-	expectedPodVolumes := make(volumeMap)
-	expectedPodVolumes["host-dir"] = &volume.HostDir{"/dir/path"}
+	podVolumes, err := kubelet.mountExternalVolumes(&pod)
+	if err != nil {
+		t.Errorf("Expected sucess: %v", err)
+	}
+	expectedPodVolumes := []string{"vol1"}
 	if len(expectedPodVolumes) != len(podVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
 	}
-	for name, expectedVolume := range expectedPodVolumes {
+	for _, name := range expectedPodVolumes {
 		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.BoundPod volumes map is missing key: %s. %#v", expectedVolume, podVolumes)
+			t.Errorf("api.BoundPod volumes map is missing key: %s. %#v", name, podVolumes)
 		}
 	}
+}
+
+func TestGetPodVolumesFromDisk(t *testing.T) {
+	kubelet, _ := newTestKubelet(t)
+	plug := &volume.FakePlugin{"fake", nil}
+	kubelet.volumePluginMgr.InitPlugins([]volume.Plugin{plug}, &volumeHost{kubelet})
+
+	volsOnDisk := []struct {
+		podUID  types.UID
+		volName string
+	}{
+		{"pod1", "vol1"},
+		{"pod1", "vol2"},
+		{"pod2", "vol1"},
+	}
+
+	expectedPaths := []string{}
+	for i := range volsOnDisk {
+		fv := volume.FakeVolume{volsOnDisk[i].podUID, volsOnDisk[i].volName, plug}
+		fv.SetUp()
+		expectedPaths = append(expectedPaths, fv.GetPath())
+	}
+
+	volumesFound := kubelet.getPodVolumesFromDisk()
+	if len(volumesFound) != len(expectedPaths) {
+		t.Errorf("Expected to find %d cleaners, got %d", len(expectedPaths), len(volumesFound))
+	}
+	for _, ep := range expectedPaths {
+		found := false
+		for _, cl := range volumesFound {
+			if ep == cl.GetPath() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Could not find a volume with path %s", ep)
+		}
+	}
+}
+
+type stubVolume struct {
+	path string
+}
+
+func (f *stubVolume) GetPath() string {
+	return f.path
 }
 
 func TestMakeVolumesAndBinds(t *testing.T) {
@@ -981,9 +1069,9 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 	}
 
 	podVolumes := volumeMap{
-		"disk":  &volume.HostDir{"/mnt/disk"},
-		"disk4": &volume.HostDir{"/mnt/host"},
-		"disk5": &volume.EmptyDir{"disk5", "podID", "/var/lib/kubelet"},
+		"disk":  &stubVolume{"/mnt/disk"},
+		"disk4": &stubVolume{"/mnt/host"},
+		"disk5": &stubVolume{"/var/lib/kubelet/podID/volumes/empty/disk5"},
 	}
 
 	binds := makeBinds(&pod, &container, podVolumes)

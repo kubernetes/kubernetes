@@ -25,6 +25,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -152,6 +153,7 @@ func main() {
 		KubeClient:              client,
 		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
 		MasterServiceNamespace:  *masterServiceNamespace,
+		VolumePlugins:           app.ProbeVolumePlugins(),
 	}
 
 	standalone.RunKubelet(&kcfg)

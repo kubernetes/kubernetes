@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -54,7 +55,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string
 	standalone.RunControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
 	dockerClient := util.ConnectToDockerOrDie(*dockerEndpoint)
-	standalone.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace)
+	standalone.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins())
 }
 
 func newApiClient(addr string, port int) *client.Client {

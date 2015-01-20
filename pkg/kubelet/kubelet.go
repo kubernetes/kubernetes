@@ -39,12 +39,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -81,7 +81,8 @@ func NewMainKubelet(
 	sourceReady SourceReadyFn,
 	clusterDomain string,
 	clusterDNS net.IP,
-	masterServiceNamespace string) (*Kubelet, error) {
+	masterServiceNamespace string,
+	volumePlugins []volume.Plugin) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -122,6 +123,9 @@ func NewMainKubelet(
 	}
 
 	if err := klet.setupDataDirs(); err != nil {
+		return nil, err
+	}
+	if err := klet.volumePluginMgr.InitPlugins(volumePlugins, &volumeHost{klet}); err != nil {
 		return nil, err
 	}
 
@@ -191,34 +195,52 @@ type Kubelet struct {
 
 	masterServiceNamespace string
 	serviceLister          serviceLister
+
+	// Volume plugins.
+	volumePluginMgr volume.PluginMgr
 }
 
-// GetRootDir returns the full path to the directory under which kubelet can
+// getRootDir returns the full path to the directory under which kubelet can
 // store data.  These functions are useful to pass interfaces to other modules
 // that may need to know where to write data without getting a whole kubelet
 // instance.
-func (kl *Kubelet) GetRootDir() string {
+func (kl *Kubelet) getRootDir() string {
 	return kl.rootDirectory
 }
 
-// GetPodsDir returns the full path to the directory under which pod
+// getPodsDir returns the full path to the directory under which pod
 // directories are created.
-func (kl *Kubelet) GetPodsDir() string {
-	return path.Join(kl.GetRootDir(), "pods")
+func (kl *Kubelet) getPodsDir() string {
+	return path.Join(kl.getRootDir(), "pods")
 }
 
-// GetPodDir returns the full path to the per-pod data directory for the
+// getPluginsDir returns the full path to the directory under which plugin
+// directories are created.  Plugins can use these directories for data that
+// they need to persist.  Plugins should create subdirectories under this named
+// after their own names.
+func (kl *Kubelet) getPluginsDir() string {
+	return path.Join(kl.getRootDir(), "plugins")
+}
+
+// getPluginDir returns a data directory name for a given plugin name.
+// Plugins can use these directories to store data that they need to persist.
+// For per-pod plugin data, see getPodPluginDir.
+func (kl *Kubelet) getPluginDir(pluginName string) string {
+	return path.Join(kl.getPluginsDir(), pluginName)
+}
+
+// getPodDir returns the full path to the per-pod data directory for the
 // specified pod.  This directory may not exist if the pod does not exist.
-func (kl *Kubelet) GetPodDir(podUID types.UID) string {
+func (kl *Kubelet) getPodDir(podUID types.UID) string {
 	// Backwards compat.  The "old" stuff should be removed before 1.0
 	// release.  The thinking here is this:
 	//     !old && !new = use new
 	//     !old && new  = use new
 	//     old && !new  = use old
 	//     old && new   = use new (but warn)
-	oldPath := path.Join(kl.GetRootDir(), string(podUID))
+	oldPath := path.Join(kl.getRootDir(), string(podUID))
 	oldExists := dirExists(oldPath)
-	newPath := path.Join(kl.GetPodsDir(), string(podUID))
+	newPath := path.Join(kl.getPodsDir(), string(podUID))
 	newExists := dirExists(newPath)
 	if oldExists && !newExists {
 		return oldPath
@@ -229,26 +251,47 @@ func (kl *Kubelet) GetPodDir(podUID types.UID) string {
 	return newPath
 }
 
-// GetPodVolumesDir returns the full path to the per-pod data directory under
+// getPodVolumesDir returns the full path to the per-pod data directory under
 // which volumes are created for the specified pod.  This directory may not
 // exist if the pod does not exist.
-func (kl *Kubelet) GetPodVolumesDir(podUID types.UID) string {
-	return path.Join(kl.GetPodDir(podUID), "volumes")
+func (kl *Kubelet) getPodVolumesDir(podUID types.UID) string {
+	return path.Join(kl.getPodDir(podUID), "volumes")
 }
 
-// GetPodContainerDir returns the full path to the per-pod data directory under
+// getPodVolumeDir returns the full path to the directory which represents the
+// named volume under the named plugin for specified pod.  This directory may not
+// exist if the pod does not exist.
+func (kl *Kubelet) getPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
+	return path.Join(kl.getPodVolumesDir(podUID), pluginName, volumeName)
+}
+
+// getPodPluginsDir returns the full path to the per-pod data directory under
+// which plugins may store data for the specified pod.  This directory may not
+// exist if the pod does not exist.
+func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
+	return path.Join(kl.getPodDir(podUID), "plugins")
+}
+
+// getPodPluginDir returns a data directory name for a given plugin name for a
+// given pod UID.  Plugins can use these directories to store data that they
+// need to persist.  For non-per-pod plugin data, see getPluginDir.
+func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
+	return path.Join(kl.getPodPluginsDir(podUID), pluginName)
+}
+
+// getPodContainerDir returns the full path to the per-pod data directory under
 // which container data is held for the specified pod.  This directory may not
 // exist if the pod or container does not exist.
-func (kl *Kubelet) GetPodContainerDir(podUID types.UID, ctrName string) string {
+func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	// Backwards compat.  The "old" stuff should be removed before 1.0
 	// release.  The thinking here is this:
 	//     !old && !new = use new
 	//     !old && new  = use new
 	//     old && !new  = use old
 	//     old && new   = use new (but warn)
-	oldPath := path.Join(kl.GetPodDir(podUID), ctrName)
+	oldPath := path.Join(kl.getPodDir(podUID), ctrName)
 	oldExists := dirExists(oldPath)
-	newPath := path.Join(kl.GetPodDir(podUID), "containers", ctrName)
+	newPath := path.Join(kl.getPodDir(podUID), "containers", ctrName)
 	newExists := dirExists(newPath)
 	if oldExists && !newExists {
 		return oldPath
@@ -269,18 +312,21 @@ func dirExists(path string) bool {
 
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
-	if err := os.MkdirAll(kl.GetRootDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
 		return fmt.Errorf("error creating root directory: %v", err)
 	}
-	if err := os.MkdirAll(kl.GetPodsDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating pods directory: %v", err)
+	}
+	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
+		return fmt.Errorf("error creating plugins directory: %v", err)
 	}
 	return nil
 }
 
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
-	podInfos, err := ioutil.ReadDir(kl.GetPodsDir())
+	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
 	if err != nil {
 		return nil, err
 	}
@@ -508,27 +554,6 @@ func milliCPUToShares(milliCPU int64) int64 {
 	return shares
 }
 
-func (kl *Kubelet) mountExternalVolumes(pod *api.BoundPod) (volumeMap, error) {
-	podVolumes := make(volumeMap)
-	for _, vol := range pod.Spec.Volumes {
-		extVolume, err := volume.CreateVolumeBuilder(&vol, pod.Name, kl.rootDirectory)
-		if err != nil {
-			return nil, err
-		}
-		// TODO(jonesdl) When the default volume behavior is no longer supported, this case
-		// should never occur and an error should be thrown instead.
-		if extVolume == nil {
-			continue
-		}
-		podVolumes[vol.Name] = extVolume
-		err = extVolume.SetUp()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return podVolumes, nil
-}
-
 // A basic interface that knows how to execute handlers
 type actionHandler interface {
 	Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error
@@ -657,7 +682,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	}
 
 	if len(container.TerminationMessagePath) != 0 {
-		p := kl.GetPodContainerDir(pod.UID, container.Name)
+		p := kl.getPodContainerDir(pod.UID, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			glog.Errorf("Error on creating %q: %v", p, err)
 		} else {
@@ -974,10 +999,13 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	glog.V(4).Infof("Syncing Pod, podFullName: %q, uid: %q", podFullName, uid)
 
 	// Make data dirs.
-	if err := os.Mkdir(kl.GetPodDir(uid), 0750); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
-	if err := os.Mkdir(kl.GetPodVolumesDir(uid), 0750); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(kl.getPodVolumesDir(uid), 0750); err != nil && !os.IsExist(err) {
+		return err
+	}
+	if err := os.Mkdir(kl.getPodPluginsDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -1148,7 +1176,7 @@ func getDesiredVolumes(pods []api.BoundPod) map[string]api.Volume {
 	desiredVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Spec.Volumes {
-			identifier := path.Join(pod.Name, volume.Name)
+			identifier := path.Join(string(pod.UID), volume.Name)
 			desiredVolumes[identifier] = volume
 		}
 	}
@@ -1168,7 +1196,7 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 	for i := range found {
 		if !desired.Has(string(found[i])) {
 			glog.V(3).Infof("Orphaned pod %q found, removing", found[i])
-			if err := os.RemoveAll(kl.GetPodDir(found[i])); err != nil {
+			if err := os.RemoveAll(kl.getPodDir(found[i])); err != nil {
 				errlist = append(errlist, err)
 			}
 		}
@@ -1180,7 +1208,7 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 // If an active volume does not have a respective desired volume, clean it up.
 func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod) error {
 	desiredVolumes := getDesiredVolumes(pods)
-	currentVolumes := volume.GetCurrentVolumes(kl.rootDirectory)
+	currentVolumes := kl.getPodVolumesFromDisk()
 	for name, vol := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
