@@ -590,6 +590,36 @@ func init() {
 			}
 			return nil
 		},
+		func(in *newer.VolumeSource, out *VolumeSource, s conversion.Scope) error {
+			if err := s.Convert(&in.EmptyDir, &out.EmptyDir, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.GitRepo, &out.GitRepo, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.HostPath, &out.HostDir, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *VolumeSource, out *newer.VolumeSource, s conversion.Scope) error {
+			if err := s.Convert(&in.EmptyDir, &out.EmptyDir, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.GitRepo, &out.GitRepo, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.HostDir, &out.HostPath, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
