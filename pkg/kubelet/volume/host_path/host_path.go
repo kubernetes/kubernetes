@@ -46,14 +46,14 @@ func (plugin *hostPathPlugin) Name() string {
 }
 
 func (plugin *hostPathPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.Source != nil && spec.Source.HostDir != nil {
+	if spec.Source != nil && spec.Source.HostPath != nil {
 		return true
 	}
 	return false
 }
 
 func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
-	return &hostPath{spec.Source.HostDir.Path}, nil
+	return &hostPath{spec.Source.HostPath.Path}, nil
 }
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {

@@ -170,12 +170,13 @@ type Volume struct {
 // VolumeSource represents the source location of a valume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
-	// HostDir represents a pre-existing directory on the host machine that is directly
-	// exposed to the container. This is generally used for system agents or other privileged
-	// things that are allowed to see the host machine. Most containers will NOT need this.
+	// HostPath represents a pre-existing file or directory on the host
+	// machine that is directly exposed to the container. This is generally
+	// used for system agents or other privileged things that are allowed
+	// to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
 	// mount host directories as read/write.
-	HostDir *HostDir `json:"hostDir"`
+	HostPath *HostPath `json:"hostPath"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDir `json:"emptyDir"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
@@ -185,8 +186,8 @@ type VolumeSource struct {
 	GitRepo *GitRepo `json:"gitRepo"`
 }
 
-// HostDir represents bare host directory volume.
-type HostDir struct {
+// HostPath represents bare host directory volume.
+type HostPath struct {
 	Path string `json:"path"`
 }
 
