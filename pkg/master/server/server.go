@@ -47,7 +47,7 @@ import (
 type APIServer struct {
 	Port                       int
 	Address                    util.IP
-	PublicAddressOverride      string
+	PublicAddressOverride      util.IP
 	ReadOnlyPort               int
 	APIRate                    float32
 	APIBurst                   int
@@ -80,6 +80,7 @@ func NewAPIServer() *APIServer {
 	s := APIServer{
 		Port:                   8080,
 		Address:                util.IP(net.ParseIP("127.0.0.1")),
+		PublicAddressOverride:  util.IP(net.ParseIP("")),
 		ReadOnlyPort:           7080,
 		APIRate:                10.0,
 		APIBurst:               200,
@@ -127,11 +128,10 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"further assumed that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
 	fs.Var(&s.Address, "address", "The IP address on to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&s.PublicAddressOverride, "public_address_override", s.PublicAddressOverride, ""+
-		"Public serving address. Read only port will be opened on this address, "+
-		"and it is assumed that port 443 at this address will be proxied/redirected "+
-		"to '-address':'-port'. If blank, the address in the first listed interface "+
-		"will be used.")
+	fs.Var(&s.PublicAddressOverride, "public_address_override", "Public serving address."+
+		"Read only port will be opened on this address, and it is assumed that port "+
+		"443 at this address will be proxied/redirected to '-address':'-port'. If "+
+		"blank, the address in the first listed interface will be used.")
 	fs.IntVar(&s.ReadOnlyPort, "read_only_port", s.ReadOnlyPort, ""+
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
 		"read-only address. It is assumed that firewall rules are set up such that "+
@@ -251,7 +251,7 @@ func (s *APIServer) Run(_ []string) error {
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadOnlyPort:           s.ReadOnlyPort,
 		ReadWritePort:          s.Port,
-		PublicAddress:          s.PublicAddressOverride,
+		PublicAddress:          net.IP(s.PublicAddressOverride),
 		Authenticator:          authenticator,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
@@ -263,11 +263,11 @@ func (s *APIServer) Run(_ []string) error {
 	// We serve on 3 ports.  See docs/reaching_the_api.md
 	roLocation := ""
 	if s.ReadOnlyPort != 0 {
-		roLocation = net.JoinHostPort(config.PublicAddress, strconv.Itoa(config.ReadOnlyPort))
+		roLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(config.ReadOnlyPort))
 	}
 	secureLocation := ""
 	if s.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(config.PublicAddress, strconv.Itoa(s.SecurePort))
+		secureLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.SecurePort))
 	}
 	rwLocation := net.JoinHostPort(s.Address.String(), strconv.Itoa(int(s.Port)))
 
@@ -317,7 +317,7 @@ func (s *APIServer) Run(_ []string) error {
 				if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 					s.TLSCertFile = "/var/run/kubernetes/apiserver.crt"
 					s.TLSPrivateKeyFile = "/var/run/kubernetes/apiserver.key"
-					if err := util.GenerateSelfSignedCert(config.PublicAddress, s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
+					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 						glog.Errorf("Unable to generate self signed cert: %v", err)
 					} else {
 						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)

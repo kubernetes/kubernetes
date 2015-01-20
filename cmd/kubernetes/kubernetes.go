@@ -22,6 +22,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 
 	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -46,7 +47,7 @@ var (
 	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 )
 
-func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string, port int) {
+func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
 	machineList := []string{"localhost"}
 
 	standalone.RunApiServer(cl, etcdClient, addr, port, *masterServiceNamespace)
@@ -57,7 +58,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string
 	standalone.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins())
 }
 
-func newApiClient(addr string, port int) *client.Client {
+func newApiClient(addr net.IP, port int) *client.Client {
 	apiServerURL := fmt.Sprintf("http://%s:%d", addr, port)
 	cl := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
 	return cl
@@ -73,7 +74,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to connect to etcd: %v", err)
 	}
-	startComponents(etcdClient, newApiClient(*addr, *port), *addr, *port)
+	address := net.ParseIP(*addr)
+	startComponents(etcdClient, newApiClient(address, *port), address, *port)
 	glog.Infof("Kubernetes API Server is up and running on http://%s:%d", *addr, *port)
 
 	select {}

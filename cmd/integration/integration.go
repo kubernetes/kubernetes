@@ -162,7 +162,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 		ReadWritePort:     portNumber,
 		ReadOnlyPort:      portNumber,
-		PublicAddress:     host,
+		PublicAddress:     net.ParseIP(host),
 	})
 	handler.delegate = m.Handler
 
