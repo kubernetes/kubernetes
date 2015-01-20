@@ -225,29 +225,7 @@ func (kl *Kubelet) GarbageCollectLoop() {
 		if err := kl.GarbageCollectContainers(); err != nil {
 			glog.Errorf("Garbage collect failed: %v", err)
 		}
-		if err := kl.GarbageCollectImages(); err != nil {
-			glog.Errorf("Garbage collect images failed: %v", err)
-		}
 	}, time.Minute*1)
-}
-
-func (kl *Kubelet) getUnusedImages() ([]string, error) {
-	kl.pullLock.Lock()
-	defer kl.pullLock.Unlock()
-	return dockertools.GetUnusedImages(kl.dockerClient)
-}
-
-func (kl *Kubelet) GarbageCollectImages() error {
-	images, err := kl.getUnusedImages()
-	if err != nil {
-		return err
-	}
-	for ix := range images {
-		if err := kl.dockerClient.RemoveImage(images[ix]); err != nil {
-			glog.Errorf("Failed to remove image: %q (%v)", images[ix], err)
-		}
-	}
-	return nil
 }
 
 // TODO: Also enforce a maximum total number of containers.
