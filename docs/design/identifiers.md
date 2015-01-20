@@ -12,10 +12,10 @@ Name
 : A non-empty string guaranteed to be unique within a given scope at a particular time; used in resource URLs; provided by clients at creation time and encouraged to be human friendly; intended to facilitate creation idempotence and space-uniqueness of singleton objects, distinguish distinct entities, and reference particular entities across operations.
 
 [rfc1035](http://www.ietf.org/rfc/rfc1035.txt)/[rfc1123](http://www.ietf.org/rfc/rfc1123.txt) label (DNS_LABEL)
-: An alphanumeric (a-z, A-Z, and 0-9) string, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character, suitable for use as a hostname or segment in a domain name
+: An alphanumeric (a-z, and 0-9) string, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character, suitable for use as a hostname or segment in a domain name
 
 [rfc1035](http://www.ietf.org/rfc/rfc1035.txt)/[rfc1123](http://www.ietf.org/rfc/rfc1123.txt) subdomain (DNS_SUBDOMAIN)
-: One or more rfc1035/rfc1123 labels separated by '.' with a maximum length of 253 characters
+: One or more lowercase rfc1035/rfc1123 labels separated by '.' with a maximum length of 253 characters
 
 [rfc4122](http://www.ietf.org/rfc/rfc4122.txt) universally unique identifier (UUID)
 : A 128 bit generated value that is extremely unlikely to collide across time and space and requires no central coordination
