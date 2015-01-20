@@ -1,4 +1,4 @@
-id: nginxController
+id: nginx-controller
 apiVersion: v1beta1
 kind: ReplicationController
 desiredState:

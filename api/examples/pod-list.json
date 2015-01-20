@@ -5,8 +5,8 @@
         {
             "id": "my-pod-1",
             "labels": {
-                "name": "testRun",
-                "replicationcontroller": "testRun"
+                "name": "test-run",
+                "replicationcontroller": "test-run"
             },
             "desiredState": {
               "manifest": {
@@ -29,8 +29,8 @@
         {
             "id": "my-pod-2",
             "labels": {
-                "name": "testRun",
-                "replicationcontroller": "testRun"
+                "name": "test-run",
+                "replicationcontroller": "test-run"
             },
             "desiredState": {
               "manifest": {

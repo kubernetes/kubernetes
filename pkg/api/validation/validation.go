@@ -446,7 +446,9 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	} else if !util.IsDNS952Label(service.Name) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", service.Name, ""))
 	}
-	if !util.IsDNSSubdomain(service.Namespace) {
+	if len(service.Namespace) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", service.Namespace))
+	} else if !util.IsDNSSubdomain(service.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace, ""))
 	}
 	if !util.IsValidPortNum(service.Spec.Port) {
@@ -492,8 +494,12 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.V
 	allErrs := errs.ValidationErrorList{}
 	if len(controller.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", controller.Name))
+	} else if !util.IsDNSSubdomain(controller.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", controller.Name, ""))
 	}
-	if !util.IsDNSSubdomain(controller.Namespace) {
+	if len(controller.Namespace) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", controller.Namespace))
+	} else if !util.IsDNSSubdomain(controller.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace, ""))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
@@ -572,11 +578,13 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 // ValidateMinion tests if required fields in the minion are set.
 func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(minion.Namespace) != 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace, ""))
-	}
 	if len(minion.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", minion.Name))
+	} else if !util.IsDNSSubdomain(minion.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", minion.Name, ""))
+	}
+	if len(minion.Namespace) != 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace, ""))
 	}
 	allErrs = append(allErrs, ValidateLabels(minion.Labels, "labels")...)
 	return allErrs
