@@ -1345,10 +1345,10 @@ func TestRunInContainer(t *testing.T) {
 		containerName,
 		cmd)
 	if fakeCommandRunner.ID != containerID {
-		t.Errorf("unexected Name: %s", fakeCommandRunner.ID)
+		t.Errorf("unexpected Name: %s", fakeCommandRunner.ID)
 	}
 	if !reflect.DeepEqual(fakeCommandRunner.Cmd, cmd) {
-		t.Errorf("unexpected commnd: %s", fakeCommandRunner.Cmd)
+		t.Errorf("unexpected command: %s", fakeCommandRunner.Cmd)
 	}
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

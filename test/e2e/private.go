@@ -27,7 +27,7 @@ import (
 // for the providers GCE and GKE.
 func TestPrivate(c *client.Client) bool {
 	if testContext.provider != "gce" && testContext.provider != "gke" {
-		glog.Infof("Skipping test private which is only supported for proivders gce and gke (not %s)", testContext.provider)
+		glog.Infof("Skipping test private which is only supported for providers gce and gke (not %s)", testContext.provider)
 		return true
 	}
 	glog.Info("Calling out to TestBasic")

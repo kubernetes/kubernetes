@@ -72,7 +72,7 @@ func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client
 	}
 	// TODO: adapt Kube client to support LB over several servers
 	if len(apiServerList) > 1 {
-		glog.Infof("Mulitple api servers specified.  Picking first one")
+		glog.Infof("Multiple api servers specified.  Picking first one")
 	}
 	clientConfig.Host = apiServerList[0]
 	c, err := client.New(&clientConfig)

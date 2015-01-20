@@ -137,7 +137,7 @@ Usage:
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
   -w, --watch=false: After listing/getting the requested object, watch for changes.
-      --watch-only=false: Watch for changes to the requseted object(s), without listing/getting first.
+      --watch-only=false: Watch for changes to the requested object(s), without listing/getting first.
 
 ```
 
@@ -364,7 +364,7 @@ Available Commands:
       --global=false: use the .kubeconfig from /home/username
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -418,7 +418,7 @@ Usage:
   -h, --help=false: help for view
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -460,7 +460,7 @@ Usage:
   -h, --help=false: help for set-cluster
       --insecure-skip-tls-verify=false: insecure-skip-tls-verify for the cluster entry in .kubeconfig
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -501,7 +501,7 @@ Usage:
   -h, --help=false: help for set-credentials
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -542,7 +542,7 @@ Usage:
   -h, --help=false: help for set-context
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -585,7 +585,7 @@ Usage:
   -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -626,7 +626,7 @@ Usage:
   -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -664,7 +664,7 @@ Usage:
   -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=true: use the .kubeconfig in the currect directory
+      --local=true: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
