@@ -77,6 +77,8 @@ func NewMainKubelet(
 	pullQPS float32,
 	pullBurst int,
 	minimumGCAge time.Duration,
+	imageGCLockFile string,
+	containerGCLockFile string,
 	maxContainerCount int,
 	sourceReady SourceReadyFn,
 	clusterDomain string,
@@ -114,6 +116,8 @@ func NewMainKubelet(
 		pullQPS:                pullQPS,
 		pullBurst:              pullBurst,
 		minimumGCAge:           minimumGCAge,
+		imageGCLockFile:        imageGCLockFile,
+		containerGCLockFile:    containerGCLockFile,
 		maxContainerCount:      maxContainerCount,
 		sourceReady:            sourceReady,
 		clusterDomain:          clusterDomain,
@@ -184,8 +188,10 @@ type Kubelet struct {
 	cadvisorLock   sync.RWMutex
 
 	// Optional, minimum age required for garbage collection.  If zero, no limit.
-	minimumGCAge      time.Duration
-	maxContainerCount int
+	minimumGCAge        time.Duration
+	maxContainerCount   int
+	imageGCLockFile     string
+	containerGCLockFile string
 
 	// If non-empty, use this for container DNS search.
 	clusterDomain string
@@ -389,6 +395,10 @@ func (kl *Kubelet) getUnusedImages() ([]string, error) {
 }
 
 func (kl *Kubelet) GarbageCollectImages() error {
+	if _, err := os.Stat(kl.imageGCLockFile); err == nil {
+		return nil
+	}
+
 	images, err := kl.getUnusedImages()
 	if err != nil {
 		return err
@@ -404,6 +414,9 @@ func (kl *Kubelet) GarbageCollectImages() error {
 // TODO: Also enforce a maximum total number of containers.
 func (kl *Kubelet) GarbageCollectContainers() error {
 	if kl.maxContainerCount == 0 {
+		return nil
+	}
+	if _, err := os.Stat(kl.containerGCLockFile); err == nil {
 		return nil
 	}
 	containers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, true)
