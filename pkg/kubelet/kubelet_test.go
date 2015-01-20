@@ -1934,29 +1934,6 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	fakeDocker.Unlock()
 }
 
-func TestGarbageCollectImages(t *testing.T) {
-	kubelet, fakeDocker := newTestKubelet(t)
-
-	fakeDocker.Images = []docker.APIImages{
-		{
-			ID: "foo",
-		},
-		{
-			ID: "bar",
-		},
-	}
-
-	if err := kubelet.GarbageCollectImages(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if len(fakeDocker.RemovedImages) != 2 ||
-		!fakeDocker.RemovedImages.Has("foo") ||
-		!fakeDocker.RemovedImages.Has("bar") {
-		t.Errorf("unexpected images removed: %v", fakeDocker.RemovedImages)
-	}
-}
-
 func TestParseResolvConf(t *testing.T) {
 	testCases := []struct {
 		data        string

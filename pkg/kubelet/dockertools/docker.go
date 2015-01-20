@@ -622,21 +622,3 @@ func parseImageName(image string) (string, string) {
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
 }
-
-func GetUnusedImages(client DockerInterface) ([]string, error) {
-	// IMPORTANT: this is _unsafe_ to do while there are active pulls
-	// See https://github.com/docker/docker/issues/8926 for details
-	images, err := client.ListImages(docker.ListImagesOptions{
-		Filters: map[string][]string{
-			"dangling": {"true"},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	result := make([]string, len(images))
-	for ix := range images {
-		result[ix] = images[ix].ID
-	}
-	return result, nil
-}
