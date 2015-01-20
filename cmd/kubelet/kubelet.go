@@ -60,6 +60,8 @@ var (
 	runonce                 = flag.Bool("runonce", false, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --etcd_servers, --api_servers, and --enable-server")
 	enableDebuggingHandlers = flag.Bool("enable_debugging_handlers", true, "Enables server endpoints for log collection and local running of containers and commands")
 	minimumGCAge            = flag.Duration("minimum_container_ttl_duration", 1*time.Minute, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
+	imageGCLockFile         = flag.String("image_gc_lock_file_path", "", "Path to a file to indicate suspend garbage collection for images while it exists")
+	containerGCLockFile     = flag.String("container_gc_lock_file_path", "", "Path to a file to indicate suspend garbage collection for containers while it exists")
 	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	authPath                = flag.String("auth_path", "", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	cAdvisorPort            = flag.Uint("cadvisor_port", 4194, "The port of the localhost cAdvisor endpoint")
@@ -140,6 +142,8 @@ func main() {
 		RegistryPullQPS:         *registryPullQPS,
 		RegistryBurst:           *registryBurst,
 		MinimumGCAge:            *minimumGCAge,
+		ImageGCLockFile:         *imageGCLockFile,
+		ContainerGCLockFile:     *containerGCLockFile,
 		MaxContainerCount:       *maxContainerCount,
 		ClusterDomain:           *clusterDomain,
 		ClusterDNS:              clusterDNS,

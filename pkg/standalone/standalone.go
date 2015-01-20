@@ -259,6 +259,8 @@ type KubeletConfig struct {
 	RegistryPullQPS         float64
 	RegistryBurst           int
 	MinimumGCAge            time.Duration
+	ImageGCLockFile         string
+	ContainerGCLockFile     string
 	MaxContainerCount       int
 	ClusterDomain           string
 	ClusterDNS              util.IP
@@ -284,6 +286,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
 		kc.MinimumGCAge,
+		kc.ImageGCLockFile,
+		kc.ContainerGCLockFile,
 		kc.MaxContainerCount,
 		pc.IsSourceSeen,
 		kc.ClusterDomain,

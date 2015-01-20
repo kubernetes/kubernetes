@@ -1642,6 +1642,58 @@ func TestKubeletGarbageCollection(t *testing.T) {
 	}
 }
 
+func TestKubeletGarbageCollectionLock(t *testing.T) {
+	kubelet, fakeDocker := newTestKubelet(t)
+	var err error
+
+	kubelet.containerGCLockFile = "/tmp/kubelet.gc.container.lock"
+	kubelet.maxContainerCount = 5
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// network container
+			Names: []string{"/k8s_net_foo.new.test_.deadbeef_42"},
+			ID:    "1876",
+		},
+	}
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"1876": {
+			State: docker.State{
+				Running: false,
+			},
+			ID:      "1876",
+			Created: time.Now(),
+		},
+	}
+
+	defer func() {
+		if _, err := os.Stat(kubelet.containerGCLockFile); err != nil {
+			return
+		}
+		if err = os.Remove(kubelet.containerGCLockFile); err != nil {
+			t.Errorf("unexpected error while removing %s: %v", kubelet.containerGCLockFile, err)
+		}
+	}()
+	lockFile, err := os.OpenFile(kubelet.containerGCLockFile, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if _, err = lockFile.WriteString("\n"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err = lockFile.Close(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	err = kubelet.GarbageCollectContainers()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(fakeDocker.Removed) != 0 {
+		t.Errorf("expected nothing removed, but got: %v", fakeDocker.Removed)
+	}
+}
+
 func TestPurgeOldest(t *testing.T) {
 	created := time.Now()
 	tests := []struct {
@@ -1865,6 +1917,47 @@ func TestGarbageCollectImages(t *testing.T) {
 	if len(fakeDocker.RemovedImages) != 2 ||
 		!fakeDocker.RemovedImages.Has("foo") ||
 		!fakeDocker.RemovedImages.Has("bar") {
+		t.Errorf("unexpected images removed: %v", fakeDocker.RemovedImages)
+	}
+}
+
+func TestGarbageCollectImagesLock(t *testing.T) {
+	var err error
+	kubelet, fakeDocker := newTestKubelet(t)
+	kubelet.imageGCLockFile = "/tmp/kubelet.gc.image.lock"
+
+	fakeDocker.Images = []docker.APIImages{
+		{
+			ID: "foo",
+		},
+		{
+			ID: "bar",
+		},
+	}
+
+	defer func() {
+		if _, err = os.Stat(kubelet.imageGCLockFile); err != nil {
+			return
+		}
+		if err = os.Remove(kubelet.imageGCLockFile); err != nil {
+			t.Errorf("unexpected error while removing %s: %v", kubelet.imageGCLockFile, err)
+		}
+	}()
+	lockFile, err := os.OpenFile(kubelet.imageGCLockFile, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if _, err = lockFile.WriteString("\n"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err = lockFile.Close(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if err = kubelet.GarbageCollectImages(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(fakeDocker.RemovedImages) != 0 {
 		t.Errorf("unexpected images removed: %v", fakeDocker.RemovedImages)
 	}
 }
