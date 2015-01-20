@@ -53,7 +53,7 @@ func TestValidateLabels(t *testing.T) {
 		{"1.2.3.4/5678": "bar"},
 	}
 	for i := range successCases {
-		errs := validateLabels(successCases[i], "field")
+		errs := ValidateLabels(successCases[i], "field")
 		if len(errs) != 0 {
 			t.Errorf("case[%d] expected success, got %#v", i, errs)
 		}
@@ -67,7 +67,7 @@ func TestValidateLabels(t *testing.T) {
 		{strings.Repeat("a", 254): "bar"},
 	}
 	for i := range errorCases {
-		errs := validateLabels(errorCases[i], "field")
+		errs := ValidateLabels(errorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		}
