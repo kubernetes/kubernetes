@@ -82,12 +82,7 @@ Which exact stateful applications are TBD. Candidates include:
   3. OS + kernel + Docker
 
 ### Workload deployment and management
-1. Kubectl fully replaces kubecfg [#2144](https://github.com/GoogleCloudPlatform/kubernetes/issues/2144)
-  1. Graceful termination. [#1535](https://github.com/GoogleCloudPlatform/kubernetes/issues/1535)
-  2. Resize. [#1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)
-  3. Config generators integrated into kubectl.
-  4. Rolling updates. [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
-2. Kubectl can perform bulk operations (e.g., delete) on streams of API objects [#1905](https://github.com/GoogleCloudPlatform/kubernetes/issues/1905)
+See the [CLI/configuration roadmap](cli-roadmap.md) for details.
 
 ## Productionization
 1. Scalability
