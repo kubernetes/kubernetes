@@ -333,7 +333,7 @@
           "        [Service]\n",
           "        EnvironmentFile=/run/flannel/subnet.env\n",
           "        ExecStartPre=/bin/mount --make-rprivate /\n",
-          "        ExecStart=/usr/bin/docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=btrfs -H fd://\n\n",
+          "        ExecStart=/usr/bin/docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=overlay -H fd://\n\n",
           "        [Install]\n",
           "        WantedBy=multi-user.target\n",
           "    - name: setup-network-environment.service\n",
