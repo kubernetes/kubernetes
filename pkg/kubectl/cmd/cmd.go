@@ -71,11 +71,18 @@ type Factory struct {
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
-func NewFactory() *Factory {
+// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
+// if optionalClientConfig is not nil, then this factory will make use of it.
+func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	clientConfig := DefaultClientConfig(flags)
+
+	clientConfig := optionalClientConfig
+	if optionalClientConfig == nil {
+		clientConfig = DefaultClientConfig(flags)
+	}
+
 	clients := &clientCache{
 		clients: make(map[string]*client.Client),
 		loader:  clientConfig,

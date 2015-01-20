@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	cmd := cmd.NewFactory().NewKubectlCommand(os.Stdout)
+	cmd := cmd.NewFactory(nil).NewKubectlCommand(os.Stdout)
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
