@@ -235,7 +235,12 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	flags.StringVar(&loadingRules.CommandLinePath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &clientcmd.ConfigOverrides{}
-	clientcmd.BindOverrideFlags(overrides, flags, clientcmd.RecommendedConfigOverrideFlags(""))
+	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
+	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
+	flagNames.AuthOverrideFlags.AuthPathShort = "a"
+	flagNames.ClusterOverrideFlags.APIServerShort = "s"
+
+	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
