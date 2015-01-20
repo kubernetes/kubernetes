@@ -59,6 +59,29 @@ func TestStringSet(t *testing.T) {
 	}
 }
 
+func TestStringSetDeleteMultiples(t *testing.T) {
+	s := StringSet{}
+	s.Insert("a", "b", "c")
+	if len(s) != 3 {
+		t.Errorf("Expected len=3: %d", len(s))
+	}
+
+	s.Delete("a", "c")
+	if len(s) != 1 {
+		t.Errorf("Expected len=1: %d", len(s))
+	}
+	if s.Has("a") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if s.Has("c") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if !s.Has("b") {
+		t.Errorf("Missing contents: %#v", s)
+	}
+
+}
+
 func TestNewStringSet(t *testing.T) {
 	s := NewStringSet("a", "b", "c")
 	if len(s) != 3 {
