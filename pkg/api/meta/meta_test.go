@@ -79,6 +79,17 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	typeAccessor, err := TypeAccessor(&j)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if e, a := "a", accessor.APIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "b", accessor.Kind(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
 	accessor.SetNamespace("baz")
 	accessor.SetName("bar")
 	accessor.SetUID("other")
@@ -107,6 +118,15 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "google.com", j.SelfLink; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	typeAccessor.SetAPIVersion("d")
+	typeAccessor.SetKind("e")
+	if e, a := "d", j.APIVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "e", j.Kind; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
