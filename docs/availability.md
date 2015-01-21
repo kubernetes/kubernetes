@@ -4,13 +4,13 @@ This document collects advice on reasoning about and provisioning for high-avail
 
 ## Failure modes
 
-This is an incomplete list of things that could go wrong, and how to deal with it.
+This is an incomplete list of things that could go wrong, and how to deal with them.
 
 Root causes:
   - VM(s) shutdown
   - network partition within cluster, or between cluster and users.
   - crashes in Kubernetes software 
-  - data loss or unavailability from storage
+  - data loss or unavailability of persistent storage (e.g. GCE PD or AWS EBS volume).
   - operator error misconfigures kubernetes software or application software.
 
 Specific scenarios:
@@ -18,21 +18,11 @@ Specific scenarios:
     - Results
       - unable to stop, update, or start new pods, services, replication controller
       - existing pods and services should continue to work normally, unless they depend on the Kubernetes API
-    - Mitigations
-      - Use cloud provider best practices for improving availability of a VM, such as automatic restart and reliable
-        storage for writeable state (GCE PD or AWS EBS volume).
-      - High-availability (replicated) APIserver is a planned feature for Kubernetes.  Will tolerate one or more
-        similtaneous apiserver failures.
-      - Multiple independent clusters will tolerate failure of all apiservers in one cluster.  
   - Apiserver backing storage lost
     - Results
       - apiserver should fail to come up.
       - kubelets will not be able to reach it but will continute to run the same pods and provide the same service proxying.
       - manual recovery or recreation of apiserver state necessary before apiserver is restarted.
-    - Mitigations
-      - High-availability (replicated) APIserver is a planned feature for Kubernetes.  Each apiserver has independent
-        storage.  Etcd will recover from loss of one member.  Risk of total data loss greatly reduced.
-      - snapshot PD/EBS-volume periodically
   - Supporting services (node controller, replication controller manager, scheduler, etc) VM shutdown or crashes
     - currently those are colocated with the apiserver, and their unavailability has similar consequences as apiserver
     - in future, these will be replicated as well and may not be co-located
@@ -40,27 +30,48 @@ Specific scenarios:
   - Node (thing that runs kubelet and kube-proxy and pods) shutdown
     - Results
       - pods on that Node stop running
-    - Mitigations
-      - replication controller should be used to restart copy of the pod elsewhere
-      - service should be used to hide changes in the pod IP address after restart
-      - applications (containers) should tolerate unexpected restarts
   - Kubelet software fault
     - Results
       - crashing kubelet cannot start new pods on the node
       - kubelet might delete the pods or not
       - node marked unhealthy
       - replication controllers start new pods elsewhere
-    - Mitigations
-      - same as for Node shutdown case
   - Cluster operator error
     - Results:
       - loss of pods, services, etc
       - lost of apiserver backing store
       - users unable to read API
       - etc
-    - Mitigations
-      - run additional cluster(s) and do not make changes to all at once.
-      - snapshot apiserver PD/EBS-volume periodically
+
+Mitigations:
+- Action: Use IaaS providers automatic VM restarting feature for IaaS VMs.
+  - Mitigates: Apiserver VM shutdown or apiserver crashing
+  - Mitigates: Supporting services VM shutdown or crashes
+
+- Action use IaaS providers reliable storage (e.g GCE PD or AWS EBS volume) for VMs with apiserver+etcd.
+  - Mitigates: Apiserver backing storage lost
+
+- Action: Use Replicated APIserver feature (when complete: feature is planned but not implemented)
+  - Mitigates: Apiserver VM shutdown or apiserver crashing
+    - Will tolerate one or more similtaneous apiserver failures.
+  - Mitigates: Apiserver backing storage lost
+    - Each apiserver has independent storage.  Etcd will recover from loss of one member.  Risk of total data loss greatly reduced.
+
+- Action: Snapshot apiserver PDs/EBS-volumes periodically
+  - Mitigates: Apiserver backing storage lost
+  - Mitigates: Some cases of operator error
+  - Mitigates: Some cases of kubernetes software fault
+
+- Action: use replication controller and services in front of pods
+  - Mitigates: Node shutdown
+  - Mitigates: Kubelet software fault
+
+- Action: applications (containers) designed to tolerate unexpected restarts
+  - Mitigates: Node shutdown
+  - Mitigates: Kubelet software fault
+
+- Action: Multiple independent clusters (and avoid making risky changes to all clusters at once)
+  - Mitigates: Everything listed above.
 
 ## Chosing Multiple Kubernetes Clusters
 
