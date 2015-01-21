@@ -73,7 +73,7 @@ func TestClusterDNS(c *client.Client) bool {
 			Volumes: []api.Volume{
 				{
 					Name: "results",
-					Source: &api.VolumeSource{
+					Source: api.VolumeSource{
 						EmptyDir: &api.EmptyDir{},
 					},
 				},

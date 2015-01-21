@@ -63,7 +63,7 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if spec.Source != nil && spec.Source.GCEPersistentDisk != nil {
+	if spec.Source.GCEPersistentDisk != nil {
 		return true
 	}
 	return false

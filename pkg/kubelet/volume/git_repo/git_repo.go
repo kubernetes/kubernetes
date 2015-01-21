@@ -63,7 +63,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if spec.Source != nil && spec.Source.GitRepo != nil {
+	if spec.Source.GitRepo != nil {
 		return true
 	}
 	return false
