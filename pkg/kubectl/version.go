@@ -33,7 +33,7 @@ func GetVersion(w io.Writer, kubeClient client.Interface) {
 	}
 
 	GetClientVersion(w)
-	fmt.Fprintf(w, "Server Version: %#v\n", serverVersion)
+	fmt.Fprintf(w, "Server Version: %#v\n", *serverVersion)
 }
 
 func GetClientVersion(w io.Writer) {
