@@ -212,10 +212,10 @@ func TestTemplateStrings(t *testing.T) {
 			},
 			"false",
 		},
-		"netExists": {
+		"podExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"net": api.ContainerStatus{}},
+					Info: api.PodInfo{"POD": api.ContainerStatus{}},
 				},
 			},
 			"false",
@@ -225,7 +225,7 @@ func TestTemplateStrings(t *testing.T) {
 				Status: api.PodStatus{
 					Info: api.PodInfo{
 						"update-demo": api.ContainerStatus{},
-						"net":         api.ContainerStatus{},
+						"POD":         api.ContainerStatus{},
 					},
 				},
 			},
@@ -236,7 +236,7 @@ func TestTemplateStrings(t *testing.T) {
 				Status: api.PodStatus{
 					Info: api.PodInfo{
 						"update-demo": api.ContainerStatus{},
-						"net": api.ContainerStatus{
+						"POD": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -259,7 +259,7 @@ func TestTemplateStrings(t *testing.T) {
 								},
 							},
 						},
-						"net": api.ContainerStatus{
+						"POD": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -276,7 +276,7 @@ func TestTemplateStrings(t *testing.T) {
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
 	tmpl :=
-		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "net" "state" "running")}}`
+		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "POD" "state" "running")}}`
 	useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}

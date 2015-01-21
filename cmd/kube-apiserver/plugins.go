@@ -28,5 +28,6 @@ import (
 
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/deny"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/limitranger"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/resourcedefaults"
 )

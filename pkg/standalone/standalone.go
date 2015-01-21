@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -153,13 +154,13 @@ func SimpleRunKubelet(client *client.Client,
 	masterServiceNamespace string,
 	volumePlugins []volume.Plugin) {
 	kcfg := KubeletConfig{
-		KubeClient:            client,
-		EtcdClient:            etcdClient,
-		DockerClient:          dockerClient,
-		HostnameOverride:      hostname,
-		RootDirectory:         rootDir,
-		ManifestURL:           manifestURL,
-		NetworkContainerImage: kubelet.NetworkContainerImage,
+		KubeClient:             client,
+		EtcdClient:             etcdClient,
+		DockerClient:           dockerClient,
+		HostnameOverride:       hostname,
+		RootDirectory:          rootDir,
+		ManifestURL:            manifestURL,
+		PodInfraContainerImage: kubelet.PodInfraContainerImage,
 		Port:                    port,
 		Address:                 util.IP(net.ParseIP(address)),
 		EnableServer:            true,
@@ -187,6 +188,8 @@ func RunKubelet(kcfg *KubeletConfig) {
 	}
 	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
+
+	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
 	cfg := makePodSourceConfig(kcfg)
 	k, err := createAndInitKubelet(kcfg, cfg)
@@ -256,7 +259,7 @@ type KubeletConfig struct {
 	FileCheckFrequency      time.Duration
 	HttpCheckFrequency      time.Duration
 	Hostname                string
-	NetworkContainerImage   string
+	PodInfraContainerImage  string
 	SyncFrequency           time.Duration
 	RegistryPullQPS         float64
 	RegistryBurst           int
@@ -282,7 +285,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.EtcdClient,
 		kc.KubeClient,
 		kc.RootDirectory,
-		kc.NetworkContainerImage,
+		kc.PodInfraContainerImage,
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,

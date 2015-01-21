@@ -19,6 +19,7 @@ package tools
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -132,7 +133,21 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 		return &etcd.Response{}, EtcdErrorNotFound
 	}
 	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
+
+	// Sort response, note this will alter resutl.R.
+	if result.R.Node != nil && result.R.Node.Nodes != nil && sort {
+		f.sortResponse(result.R.Node.Nodes)
+	}
 	return result.R, result.E
+}
+
+func (f *FakeEtcdClient) sortResponse(nodes etcd.Nodes) {
+	for i := range nodes {
+		if nodes[i].Dir {
+			f.sortResponse(nodes[i].Nodes)
+		}
+	}
+	sort.Sort(nodes)
 }
 
 func (f *FakeEtcdClient) nodeExists(key string) bool {

@@ -894,3 +894,45 @@ type List struct {
 	TypeMeta `json:",inline"`
 	Items    []runtime.RawExtension `json:"items" description:"list of objects"`
 }
+
+// A type of object that is limited
+type LimitType string
+
+const (
+	// Limit that applies to all pods in a namespace
+	LimitTypePod LimitType = "Pod"
+	// Limit that applies to all containers in a namespace
+	LimitTypeContainer LimitType = "Container"
+)
+
+// LimitRangeItem defines a min/max usage limit for any resource that matches on kind
+type LimitRangeItem struct {
+	// Type of resource that this limit applies to
+	Type LimitType `json:"type,omitempty"`
+	// Max usage constraints on this kind by resource name
+	Max ResourceList `json:"max,omitempty"`
+	// Min usage constraints on this kind by resource name
+	Min ResourceList `json:"min,omitempty"`
+}
+
+// LimitRangeSpec defines a min/max usage limit for resources that match on kind
+type LimitRangeSpec struct {
+	// Limits is the list of LimitRangeItem objects that are enforced
+	Limits []LimitRangeItem `json:"limits"`
+}
+
+// LimitRange sets resource usage limits for each kind of resource in a Namespace
+type LimitRange struct {
+	TypeMeta `json:",inline"`
+
+	// Spec defines the limits enforced
+	Spec LimitRangeSpec `json:"spec,omitempty"`
+}
+
+// LimitRangeList is a list of LimitRange items.
+type LimitRangeList struct {
+	TypeMeta `json:",inline"`
+
+	// Items is a list of LimitRange objects
+	Items []LimitRange `json:"items"`
+}
