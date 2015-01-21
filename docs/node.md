@@ -58,7 +58,8 @@ objects. It performs two major functions: cluster-wide node synchronization
 and single node life-cycle management.
 
 Node controller has a sync loop that creates/deletes `Node`s from Kubernetes
-based on all matching VM instances listed from cloud provider. If a new instance
+based on all matching VM instances listed from cloud provider. The sync period
+can be controlled via flag "--node_sync_period". If a new instance
 gets created, Node Controller creates a representation for it. If an existing
 instance gets deleted, Node Controller deletes the representation. Note however,
 Node Controller is unable to provision the node for you, i.e. it won't install
