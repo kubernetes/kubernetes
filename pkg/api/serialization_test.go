@@ -146,7 +146,6 @@ func fuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				c.RandString(): c.RandString(),
 			}
 		},
-
 		func(q *resource.Quantity, c fuzz.Continue) {
 			// Real Quantity fuzz testing is done elsewhere;
 			// this limited subset of functionality survives
@@ -155,6 +154,10 @@ func fuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			q.Format = resource.DecimalExponent
 			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
 			q.Amount.SetUnscaled(c.Int63n(1000))
+		},
+		func(p *api.PullPolicy, c fuzz.Continue) {
+			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
+			*p = policies[c.Rand.Intn(len(policies))]
 		},
 	)
 	return f

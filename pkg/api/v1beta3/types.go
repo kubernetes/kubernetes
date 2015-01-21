@@ -309,11 +309,11 @@ type PullPolicy string
 
 const (
 	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
-	PullAlways PullPolicy = "PullAlways"
+	PullAlways PullPolicy = "Always"
 	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
-	PullNever PullPolicy = "PullNever"
+	PullNever PullPolicy = "Never"
 	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
-	PullIfNotPresent PullPolicy = "PullIfNotPresent"
+	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
 // Container represents a single container that is expected to be run on the host.
