@@ -51,7 +51,7 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 # KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
 readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-readonly KUBE_BUILD_GOLANG_VERSION=1.3
+readonly KUBE_BUILD_GOLANG_VERSION=1.4
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
 # Here we map the output directories across both the local and remote _output
@@ -261,7 +261,7 @@ function kube::build::build_image_built() {
 }
 
 function kube::build::ensure_golang() {
-  kube::build::docker_image_exists golang 1.3 || {
+  kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
       echo "You don't have a local copy of the golang docker image. This image is 450MB."
       read -p "Download it now? [y/n] " -r
