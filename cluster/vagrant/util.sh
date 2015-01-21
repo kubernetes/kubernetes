@@ -240,7 +240,7 @@ function get-password {
 }
 
 # Find the minion name based on the IP address
-function find-minion-by-ip {
+function find-vagrant-name-by-ip {
   local ip="$1"
   local ip_pattern="${MINION_IP_BASE}(.*)"
 
@@ -253,12 +253,32 @@ function find-minion-by-ip {
   echo "minion-$((${BASH_REMATCH[1]} - 1))"
 }
 
-# SSH to a node by name ($1) and run a command ($2).
+# Find the vagrant machien name based on the host name of the minion
+function find-vagrant-name-by-minion-name {
+  local ip="$1"
+  local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
+
+  [[ $ip =~ $ip_pattern ]] || {
+    return 1
+  }
+
+  echo "minion-${BASH_REMATCH[1]}"
+}
+
+
+# SSH to a node by name or IP ($1) and run a command ($2).
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
   local machine
-  machine=$(find-minion-by-ip $node)
+
+  machine=$(find-vagrant-name-by-ip $node) || true
+  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-minion-name $node) || true
+  [[ -n ${machine-} ]] || {
+    echo "Cannot find machine to ssh to: $1"
+    return 1
+  }
+
   vagrant ssh "${machine}" -c "${cmd}" | grep -v "Connection to.*closed"
 }
 
