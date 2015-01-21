@@ -126,7 +126,7 @@ calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in th
 
 ## Working with multiple clusters
 
-When you have multiple clusters, you would typically copies of a given service in each cluster and put each of those
+When you have multiple clusters, you would typically create services with the same config in each cluster and put each of those
 service instances behind a load balancer (AWS Elastic Load Balancer, GCE Forwarding Rule or HTTP Load Balancer), so that
 failures of a single cluster are not visible to end users.
 
