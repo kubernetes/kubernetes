@@ -43,7 +43,7 @@ Design docs are in [design](design).
 * **Accessing the API** ([accessing_the_api.md](accessing_the_api.md)):
   Ports, IPs, proxies, and firewall rules.
 
-* **Kubernetes Web Interface** ([ux.md](ux.md)): Accessing the Kubernetes
+* **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
   web user interface.
 
 * **Kubecfg Command Line Interface** ([cli.md](cli.md)):
