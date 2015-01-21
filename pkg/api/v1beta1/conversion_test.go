@@ -270,3 +270,49 @@ func TestServiceEmptySelector(t *testing.T) {
 		t.Errorf("unexpected selector: %#v", obj)
 	}
 }
+
+func TestPullPolicyConversion(t *testing.T) {
+	table := []struct {
+		versioned current.PullPolicy
+		internal  newer.PullPolicy
+	}{
+		{
+			versioned: current.PullAlways,
+			internal:  newer.PullAlways,
+		}, {
+			versioned: current.PullNever,
+			internal:  newer.PullNever,
+		}, {
+			versioned: current.PullIfNotPresent,
+			internal:  newer.PullIfNotPresent,
+		}, {
+			versioned: "",
+			internal:  "",
+		}, {
+			versioned: "invalid value",
+			internal:  "invalid value",
+		},
+	}
+	for _, item := range table {
+		var got newer.PullPolicy
+		err := Convert(&item.versioned, &got)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+		if e, a := item.internal, got; e != a {
+			t.Errorf("Expected: %q, got %q", e, a)
+		}
+	}
+	for _, item := range table {
+		var got current.PullPolicy
+		err := Convert(&item.internal, &got)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+		if e, a := item.versioned, got; e != a {
+			t.Errorf("Expected: %q, got %q", e, a)
+		}
+	}
+}

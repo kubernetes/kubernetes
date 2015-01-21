@@ -118,6 +118,10 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 			c.RandString(): c.RandString(),
 		}
 	},
+	func(p *api.PullPolicy, c fuzz.Continue) {
+		policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
+		*p = policies[c.Rand.Intn(len(policies))]
+	},
 )
 
 func TestLoad(t *testing.T) {

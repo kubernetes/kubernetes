@@ -131,6 +131,10 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 			c.RandString(): c.RandString(),
 		}
 	},
+	func(p *internal.PullPolicy, c fuzz.Continue) {
+		policies := []internal.PullPolicy{internal.PullAlways, internal.PullNever, internal.PullIfNotPresent}
+		*p = policies[c.Rand.Intn(len(policies))]
+	},
 )
 
 func TestInternalRoundTrip(t *testing.T) {

@@ -227,27 +227,27 @@ func TestValidatePullPolicy(t *testing.T) {
 	}
 	testCases := map[string]T{
 		"NotPresent1": {
-			api.Container{Name: "abc", Image: "image:latest", ImagePullPolicy: "PullIfNotPresent"},
+			api.Container{Name: "abc", Image: "image:latest", ImagePullPolicy: "IfNotPresent"},
 			api.PullIfNotPresent,
 		},
 		"NotPresent2": {
-			api.Container{Name: "abc1", Image: "image", ImagePullPolicy: "PullIfNotPresent"},
+			api.Container{Name: "abc1", Image: "image", ImagePullPolicy: "IfNotPresent"},
 			api.PullIfNotPresent,
 		},
 		"Always1": {
-			api.Container{Name: "123", Image: "image:latest", ImagePullPolicy: "PullAlways"},
+			api.Container{Name: "123", Image: "image:latest", ImagePullPolicy: "Always"},
 			api.PullAlways,
 		},
 		"Always2": {
-			api.Container{Name: "1234", Image: "image", ImagePullPolicy: "PullAlways"},
+			api.Container{Name: "1234", Image: "image", ImagePullPolicy: "Always"},
 			api.PullAlways,
 		},
 		"Never1": {
-			api.Container{Name: "abc-123", Image: "image:latest", ImagePullPolicy: "PullNever"},
+			api.Container{Name: "abc-123", Image: "image:latest", ImagePullPolicy: "Never"},
 			api.PullNever,
 		},
 		"Never2": {
-			api.Container{Name: "abc-1234", Image: "image", ImagePullPolicy: "PullNever"},
+			api.Container{Name: "abc-1234", Image: "image", ImagePullPolicy: "Never"},
 			api.PullNever,
 		},
 		"DefaultToNotPresent":  {api.Container{Name: "notPresent", Image: "image"}, api.PullIfNotPresent},
