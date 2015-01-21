@@ -18,8 +18,10 @@ package proxy
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -170,6 +172,15 @@ func filterValidEndpoints(endpoints []string) []string {
 	return result
 }
 
+func shuffleEndpoints(endpoints []string) []string {
+	shuffled := make([]string, len(endpoints))
+	perm := rand.Perm(len(endpoints))
+	for i, v := range perm {
+		shuffled[v] = endpoints[i]
+	}
+	return shuffled
+}
+
 //remove any session affinity records associated to a particular endpoint (for example when a pod goes down).
 func removeSessionAffinityByEndpoint(lb *LoadBalancerRR, service string, endpoint string) {
 	for _, affinityDetail := range lb.serviceDtlMap[service].sessionAffinityMap {
@@ -210,6 +221,10 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	for _, endpoint := range endpoints {
 		existingEndpoints, exists := lb.endpointsMap[endpoint.Name]
 		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
+		// Need to compare sorted endpoints here, since they are shuffled below
+		// before being put into endpointsMap
+		sort.Strings(existingEndpoints)
+		sort.Strings(validEndpoints)
 		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
 			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.Name, endpoint.Endpoints)
 			updateServiceDetailMap(lb, endpoint.Name, validEndpoints)
@@ -217,7 +232,7 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 			// to be safe we will call it here.  A new service will only be created
 			// if one does not already exist.
 			lb.NewService(endpoint.Name, api.AffinityTypeNone, 0)
-			lb.endpointsMap[endpoint.Name] = validEndpoints
+			lb.endpointsMap[endpoint.Name] = shuffleEndpoints(validEndpoints)
 
 			// Reset the round-robin index.
 			lb.rrIndex[endpoint.Name] = 0
