@@ -172,6 +172,21 @@ func filterValidEndpoints(endpoints []string) []string {
 	return result
 }
 
+func endpointsAreEqual(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+
+	leftSorted := make([]string, len(left))
+	copy(leftSorted, left)
+	sort.Strings(leftSorted)
+	rightSorted := make([]string, len(right))
+	copy(rightSorted, right)
+	sort.Strings(rightSorted)
+
+	return reflect.DeepEqual(leftSorted, rightSorted)
+}
+
 func shuffleEndpoints(endpoints []string) []string {
 	shuffled := make([]string, len(endpoints))
 	perm := rand.Perm(len(endpoints))
@@ -221,11 +236,7 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	for _, endpoint := range endpoints {
 		existingEndpoints, exists := lb.endpointsMap[endpoint.Name]
 		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
-		// Need to compare sorted endpoints here, since they are shuffled below
-		// before being put into endpointsMap
-		sort.Strings(existingEndpoints)
-		sort.Strings(validEndpoints)
-		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
+		if !exists || !endpointsAreEqual(existingEndpoints, validEndpoints) {
 			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.Name, endpoint.Endpoints)
 			updateServiceDetailMap(lb, endpoint.Name, validEndpoints)
 			// On update can be called without NewService being called externally.
