@@ -212,6 +212,7 @@ function wait_for_service_up() {
         set -e;
         for i in $(seq -s' ' 1 $4); do
           curl -s --connect-timeout 1 http://$2:$3;
+          echo;
         done | sort | uniq
         "))
 
@@ -258,7 +259,8 @@ function verify_from_container() {
             ok=false
             for j in $(seq -s' ' 1 10); do
               if wget -q -T 1 -O - http://$2:$3; then
-		ok=true
+                echo
+                ok=true
                 break
               fi
               sleep 1
