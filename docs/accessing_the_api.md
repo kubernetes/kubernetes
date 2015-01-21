@@ -31,7 +31,7 @@ HTTP on 3 ports:
 Additionally, in typical configurations (i.e. GCE), there is a proxy (nginx) running
 on the same machine as the apiserver process.  The proxy serves HTTPS protected
 by Basic Auth on port 443, and proxies to the apiserver on localhost:8080.
-Typically, firewall rules will allow HTTPs access to port 443.
+Typically, firewall rules will allow HTTPS access to port 443.
 
 The above are defaults and reflect how Kubernetes is deployed to GCE using
 kube-up.sh.  Other cloud providers may vary.
