@@ -1,7 +1,7 @@
 all: skydns
 
 skydns:
-	CGO_ENABLED=0 go build -a --ldflags '-w' github.com/skynetservices/skydns
+	CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' github.com/skynetservices/skydns
 
 container: skydns
 	sudo docker build -t kubernetes/skydns .
