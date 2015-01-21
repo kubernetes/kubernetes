@@ -112,11 +112,10 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 // BindAuthInfoFlags is a convenience method to bind the specified flags to their associated variables
 func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, flagNames AuthOverrideFlags) {
 	// TODO short flag names are impossible to prefix.  code gets cleaner if we remove them
-	authPathUsage := "Path to the auth info file. If missing, prompt the user. Only used if using https."
 	if len(flagNames.AuthPathShort) > 0 {
-		flags.StringVarP(&authInfo.AuthPath, flagNames.AuthPath, flagNames.AuthPathShort, "", authPathUsage)
+		flags.StringVarP(&authInfo.AuthPath, flagNames.AuthPath, flagNames.AuthPathShort, "", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
 	} else {
-		flags.StringVar(&authInfo.AuthPath, flagNames.AuthPath, "", authPathUsage)
+		flags.StringVar(&authInfo.AuthPath, flagNames.AuthPath, "", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
 	}
 	flags.StringVar(&authInfo.ClientCertificate, flagNames.ClientCertificate, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.ClientKey, flagNames.ClientKey, "", "Path to a client key file for TLS.")
@@ -126,11 +125,10 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
 	// TODO short flag names are impossible to prefix.  code gets cleaner if we remove them
-	apiServerUsage := "The address of the Kubernetes API server"
 	if len(flagNames.APIServerShort) > 0 {
-		flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", apiServerUsage)
+		flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address of the Kubernetes API server")
 	} else {
-		flags.StringVar(&clusterInfo.Server, flagNames.APIServer, "", apiServerUsage)
+		flags.StringVar(&clusterInfo.Server, flagNames.APIServer, "", "The address of the Kubernetes API server")
 	}
 	flags.StringVar(&clusterInfo.APIVersion, flagNames.APIVersion, "", "The API version to use when talking to the server")
 	flags.StringVar(&clusterInfo.CertificateAuthority, flagNames.CertificateAuthority, "", "Path to a cert. file for the certificate authority.")
