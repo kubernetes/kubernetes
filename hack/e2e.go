@@ -67,6 +67,7 @@ const (
 	downloadDirName = "_output/downloads"
 	tarDirName      = "server"
 	tempDirName     = "upgrade-e2e-temp-dir"
+	minMinionCount  = 3
 )
 
 var (
@@ -196,6 +197,26 @@ func Up() bool {
 	return runBash("up", path.Join(versionRoot, "/cluster/kube-up.sh; test-setup;"))
 }
 
+// Ensure that the cluster is large engough to run the e2e tests.
+func ValidateClusterSize() {
+	// Check that there are at least 3 minions running
+	res, stdout, _ := runBashWithOutputs(
+		"validate cluster size",
+		"cluster/kubectl.sh get minions --no-headers | wc -l")
+	if !res {
+		log.Fatal("Could not get nodes to validate cluster size")
+	}
+
+	numNodes, err := strconv.Atoi(strings.TrimSpace(stdout))
+	if err != nil {
+		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
+	}
+
+	if numNodes < minMinionCount {
+		log.Fatalf("Cluster size (%d) is too small to run e2e tests.  %d Minions are required.", numNodes, minMinionCount)
+	}
+}
+
 // Is the e2e cluster up?
 func IsUp() bool {
 	return runBash("get status", `$KUBECTL version`)
@@ -263,6 +284,8 @@ func Test() (results ResultsByTest) {
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
 	}
+
+	ValidateClusterSize()
 
 	// run tests!
 	dir, err := os.Open(filepath.Join(*root, "hack", "e2e-suite"))
@@ -440,8 +463,8 @@ func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
 	log.Printf("Running: %v", stepName)
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 	if *verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		cmd.Stdout = io.MultiWriter(os.Stdout, stdout)
+		cmd.Stderr = io.MultiWriter(os.Stderr, stderr)
 	} else {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
@@ -462,13 +485,9 @@ func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
 
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
-		if !*verbose {
-			return false, string(stdout.Bytes()), string(stderr.Bytes())
-		} else {
-			return false, "", ""
-		}
+		return false, string(stdout.Bytes()), string(stderr.Bytes())
 	}
-	return true, "", ""
+	return true, string(stdout.Bytes()), string(stderr.Bytes())
 }
 
 func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bool) {
