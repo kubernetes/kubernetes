@@ -17,4 +17,4 @@
 set -e
 set -x
 
-CGO_ENABLED=0 go build  -a -ldflags '-extldflags "-static" -s' hello.go
+CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags '-extldflags "-static" -s' hello.go
