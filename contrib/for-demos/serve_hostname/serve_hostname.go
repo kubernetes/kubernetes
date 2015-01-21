@@ -44,7 +44,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error from os.Hostname(): %s", err)
 	}
-	hostname += "\n"
 
 	if *doTcp {
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
