@@ -64,10 +64,10 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 #### Launch the master
 
-*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
 ```
-aws ec2 run-instances --image-id <ami_image_id> —key-name <keypair> \
+aws ec2 run-instances --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://master.yaml
 ```
@@ -103,7 +103,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the **p
 
 ### Launch 3 worker nodes
 
-*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
 ```
 aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
@@ -113,7 +113,7 @@ aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
 
 ### Add additional worker nodes
 
-*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
 ```
 aws ec2 run-instances --count 1 --image-id <ami_image_id> --key-name <keypair> \
