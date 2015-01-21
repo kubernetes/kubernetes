@@ -32,8 +32,11 @@ func (f *Factory) NewCmdDescribe(out io.Writer) *cobra.Command {
 This command joins many API calls together to form a detailed description of a
 given resource.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdNamespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+
 			mapper, _ := f.Object(cmd)
-			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper)
+			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			describer, err := f.Describer(cmd, mapping)
 			checkErr(err)

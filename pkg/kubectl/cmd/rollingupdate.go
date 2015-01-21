@@ -61,8 +61,13 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 			oldName := args[0]
 			schema, err := f.Validator(cmd)
 			checkErr(err)
+
+			clientConfig, err := f.ClientConfig(cmd)
+			checkErr(err)
+			cmdApiVersion := clientConfig.Version
+
 			mapper, typer := f.Object(cmd)
-			mapping, namespace, newName, data := ResourceFromFile(cmd, filename, typer, mapper, schema)
+			mapping, namespace, newName, data := ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
 			if mapping.Kind != "ReplicationController" {
 				usageError(cmd, "%s does not specify a valid ReplicationController", filename)
 			}
@@ -70,7 +75,10 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 				usageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
 					filename, oldName)
 			}
-			err = CompareNamespaceFromFile(cmd, namespace)
+
+			cmdNamespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+			err = CompareNamespace(cmdNamespace, namespace)
 			checkErr(err)
 
 			client, err := f.Client(cmd)
