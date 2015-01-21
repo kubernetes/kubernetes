@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"net"
+	"sort"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -56,6 +57,26 @@ func TestFilterWorks(t *testing.T) {
 	}
 }
 
+func TestShuffleWorks(t *testing.T) {
+	endpoints := []string{"foobar:1", "foobar:2", "foobar:3"}
+	shuffled := shuffleEndpoints(endpoints)
+
+	if len(shuffled) != 3 {
+		t.Errorf("Failed to shuffle to the correct size")
+	}
+
+	sort.Strings(shuffled)
+	if shuffled[0] != "foobar:1" {
+		t.Errorf("Index zero is not foobar:1")
+	}
+	if shuffled[1] != "foobar:2" {
+		t.Errorf("Index one is not foobar:2")
+	}
+	if shuffled[2] != "foobar:3" {
+		t.Errorf("Index two is not foobar:3")
+	}
+}
+
 func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	var endpoints []api.Endpoints
@@ -75,7 +96,7 @@ func expectEndpoint(t *testing.T, loadBalancer *LoadBalancerRR, service string, 
 		t.Errorf("Didn't find a service for %s, expected %s, failed with: %v", service, expected, err)
 	}
 	if endpoint != expected {
-		t.Errorf("Didn't get expected endpoint for service %s, expected %s, got: %s", service, expected, endpoint)
+		t.Errorf("Didn't get expected endpoint for service %s client %v, expected %s, got: %s", service, netaddr, expected, endpoint)
 	}
 }
 
@@ -109,10 +130,11 @@ func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", nil)
+	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
 }
 
 func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
@@ -127,21 +149,23 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", nil)
+	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], nil)
 	// Then update the configuration with one fewer endpoints, make sure
 	// we start in the beginning again
 	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"endpoint:8", "endpoint:9"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:8", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:9", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:8", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:9", nil)
+	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], nil)
 	// Clear endpoints
 	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}}
 	loadBalancer.OnUpdate(endpoints)
@@ -168,17 +192,19 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 		Endpoints:  []string{"endpoint:4", "endpoint:5"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", nil)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", nil)
+	shuffledFooEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[2], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[1], nil)
 
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", nil)
+	shuffledBarEndpoints := loadBalancer.endpointsMap["bar"]
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], nil)
 
 	// Then update the configuration by removing foo
 	loadBalancer.OnUpdate(endpoints[1:])
@@ -188,10 +214,10 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	}
 
 	// but bar is still there, and we continue RR from where we left off.
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", nil)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[1], nil)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], nil)
 }
 
 func TestStickyLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
@@ -232,14 +258,15 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpoints(t *testing.T) {
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
+	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
 }
 
 func TestStickyLoadBalanaceWorksWithMultipleEndpointsStickyNone(t *testing.T) {
@@ -259,14 +286,15 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsStickyNone(t *testing.T) {
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client1)
+	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client1)
 }
 
 func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
@@ -289,32 +317,45 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
+	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	client1Endpoint := shuffledEndpoints[0]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	client2Endpoint := shuffledEndpoints[1]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client3)
+	client3Endpoint := shuffledEndpoints[2]
 
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Endpoints:  []string{"endpoint:1", "endpoint:2"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client3)
+	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
+	if client1Endpoint == "endpoint:3" {
+		client1Endpoint = shuffledEndpoints[0]
+	} else if client2Endpoint == "endpoint:3" {
+		client2Endpoint = shuffledEndpoints[0]
+	} else if client3Endpoint == "endpoint:3" {
+		client3Endpoint = shuffledEndpoints[0]
+	}
+	expectEndpoint(t, loadBalancer, "foo", client1Endpoint, client1)
+	expectEndpoint(t, loadBalancer, "foo", client2Endpoint, client2)
+	expectEndpoint(t, loadBalancer, "foo", client3Endpoint, client3)
 
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:4"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client4)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client5)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:4", client6)
+	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", client1Endpoint, client1)
+	expectEndpoint(t, loadBalancer, "foo", client2Endpoint, client2)
+	expectEndpoint(t, loadBalancer, "foo", client3Endpoint, client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client4)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client5)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client6)
 }
 
 func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
@@ -334,24 +375,26 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
+	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[2], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
 	// Then update the configuration with one fewer endpoints, make sure
 	// we start in the beginning again
 	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"endpoint:4", "endpoint:5"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:5", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:5", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:5", client2)
+	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
 
 	// Clear endpoints
 	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}}
@@ -384,19 +427,21 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 		Endpoints:  []string{"endpoint:4", "endpoint:5"},
 	}
 	loadBalancer.OnUpdate(endpoints)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:3", client3)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
-	expectEndpoint(t, loadBalancer, "foo", "endpoint:2", client2)
+	shuffledFooEndpoints := loadBalancer.endpointsMap["foo"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[2], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[2], client3)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[1], client2)
 
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", client2)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", client2)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
+	shuffledBarEndpoints := loadBalancer.endpointsMap["bar"]
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "foo", shuffledFooEndpoints[0], client1)
 
 	// Then update the configuration by removing foo
 	loadBalancer.OnUpdate(endpoints[1:])
@@ -406,10 +451,11 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	}
 
 	// but bar is still there, and we continue RR from where we left off.
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", client2)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:5", client2)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
-	expectEndpoint(t, loadBalancer, "bar", "endpoint:4", client1)
+	shuffledBarEndpoints = loadBalancer.endpointsMap["bar"]
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[1], client2)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], client1)
+	expectEndpoint(t, loadBalancer, "bar", shuffledBarEndpoints[0], client1)
 }
