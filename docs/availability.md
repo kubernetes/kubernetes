@@ -76,7 +76,7 @@ Mitigations:
 ## Chosing Multiple Kubernetes Clusters
 
 You may want to set up multiple kubernetes clusters, both to
- to have clusters in different regions to be nearer to your users; and to tolerate failures and/or invasive maintenance.
+have clusters in different regions to be nearer to your users; and to tolerate failures and/or invasive maintenance.
 
 ### Scope of a single cluster
 
@@ -93,10 +93,11 @@ We suggest that all the VMs in a Kubernetes cluster should be in the same availa
 It is okay to have multiple clusters per availability zone, though on balance we think fewer is better.
 Reasons to prefer fewer clusters are:
   - improved bin packing of Pods in some cases with more nodes in one cluster.
-  - reduced operational overhead, though advanatage diminished as ops tooling and processes matures.
-  - reduced costs for per-cluster CPU, Memory, and Disk needs (apiserver etc...); though small as a percentage
-    of overall cluster cost for medium to large clusters.
-Reasons you might want multiple clusters:
+  - reduced operational overhead (though the advantage is diminished as ops tooling and processes matures).
+  - reduced costs for per-cluster fixed resource costs, e.g. apiserver VMs (but small as a percentage
+    of overall cluster cost for medium to large clusters).
+
+Reasons to have multiple clusters include:
   - strict security policies requiring isolation of one class of work from another (but, see Partitioning Clusters
     below).
   - test clusters to canary new Kubernetes releases or other cluster software.
