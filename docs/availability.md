@@ -109,20 +109,17 @@ load and growth.
 
 To pick the number of clusters, first, decide which regions you need to be in to have adequete latency to all your end users, for services that will run
 on Kubernetes (if you use a Content Distribution Network, the latency requirements for the CDN-hosted content need not
-be considered).  For example, a company with a global customer base might decide to have clusters in US, EU, AP, and SA regions.   That is the minimum number of
-Kubernetes clusters.  Call this `R`
+be considered).  Legal issues might influence this as well. For example, a company with a global customer base might decide to have clusters in US, EU, AP, and SA regions. 
+Call the number of regions to be in `R`.
 
-Second, decide how many clusters should be able to be unavailable at the same time, in order to meet your availability
-goals.  If you are not sure, then 1 is a good number.  Call this `U`.   Reasons for unavailability include:
- - IaaS provider unavailable
- - cluster operator error
- - Kubernetes software fault
+Second, decide how many clusters should be able to be unavailable at the same time, while still being available.  Call
+the number that can be unavailable `U`.  If you are not sure, then 1 is a fine choice.
 
-If you are able and willing to fail over to a different region than some customers in the event of a cluster failure,
-then you need R + U clusters.  If you want to ensure low latency for all users in the event of a cluster failure, you
-need to have R*U clusters (U in each of R regions).  In either case, put each cluster in a different zone.
+If it is allowable for load-balancing to direct traffic to any region in the event of a cluster failure, then 
+then you need `R + U` clusters.  If it is not (e.g you want to ensure low latency for all users in the event of a
+cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
-Finally, if any of your clusters would need to be larger than the maximum number of nodes for a Kubernetes cluster, then
+Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
 you may need even more clusters.  Our roadmap (
 https://github.com/GoogleCloudPlatform/kubernetes/blob/24e59de06e4da61f5dafd4cd84c9340a2c0d112f/docs/roadmap.md)
 calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in the middle of 2015.
