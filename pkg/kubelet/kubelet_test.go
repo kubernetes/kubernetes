@@ -967,7 +967,7 @@ func TestMountExternalVolumes(t *testing.T) {
 			Volumes: []api.Volume{
 				{
 					Name:   "vol1",
-					Source: &api.VolumeSource{},
+					Source: api.VolumeSource{},
 				},
 			},
 		},

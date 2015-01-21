@@ -46,7 +46,7 @@ func (plugin *hostPathPlugin) Name() string {
 }
 
 func (plugin *hostPathPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.Source != nil && spec.Source.HostPath != nil {
+	if spec.Source.HostPath != nil {
 		return true
 	}
 	return false

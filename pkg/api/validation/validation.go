@@ -40,14 +40,7 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationError
 	allNames := util.StringSet{}
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
-		el := errs.ValidationErrorList{}
-		if vol.Source == nil {
-			// TODO: Enforce that a source is set once we deprecate the implied form.
-			vol.Source = &api.VolumeSource{
-				EmptyDir: &api.EmptyDir{},
-			}
-		}
-		el = validateSource(vol.Source).Prefix("source")
+		el := validateSource(&vol.Source).Prefix("source")
 		if len(vol.Name) == 0 {
 			el = append(el, errs.NewFieldRequired("name", vol.Name))
 		} else if !util.IsDNSLabel(vol.Name) {
@@ -83,7 +76,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
-	if numVolumes != 1 {
+	if numVolumes == 0 {
+		// TODO: Enforce that a source is set once we deprecate the implied form.
+		source.EmptyDir = &api.EmptyDir{}
+	} else if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
 	return allErrs
