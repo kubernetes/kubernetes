@@ -67,7 +67,7 @@ const (
 	downloadDirName = "_output/downloads"
 	tarDirName      = "server"
 	tempDirName     = "upgrade-e2e-temp-dir"
-	minMinionCount  = 3
+	minMinionCount  = 2
 )
 
 var (
