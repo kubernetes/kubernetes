@@ -487,7 +487,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
-					{Name: "bar"},
+					{Name: "bar", Image: "something", ImagePullPolicy: "PullIfNotPresent"},
 				},
 			},
 		},
@@ -502,7 +502,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 
 	fakeDocker.Lock()
 
-	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", ""}) {
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "something"}) {
 		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
 	}
 
@@ -1924,7 +1924,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 
 	fakeDocker.Lock()
 
-	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "pull_always_image", "pull_if_not_present_image", "want:latest"}) {
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "pull_always_image", "pull_if_not_present_image"}) {
 		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
 	}
 
