@@ -114,6 +114,7 @@ type Master struct {
 	portalNet          *net.IPNet
 
 	mux                   apiserver.Mux
+	muxHelper             *apiserver.MuxHelper
 	handlerContainer      *restful.Container
 	rootWebService        *restful.WebService
 	enableLogsSupport     bool
@@ -274,6 +275,7 @@ func New(c *Config) *Master {
 		m.mux = mux
 		m.handlerContainer = NewHandlerContainer(mux)
 	}
+	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
 
 	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
 	m.init(c)
@@ -289,7 +291,7 @@ func (m *Master) HandleWithAuth(pattern string, handler http.Handler) {
 	// sensible policy defaults for plugged-in endpoints.  This will be different
 	// for generic endpoints versus REST object endpoints.
 	// TODO: convert to go-restful
-	m.mux.Handle(pattern, handler)
+	m.muxHelper.Handle(pattern, handler)
 }
 
 // HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
@@ -297,7 +299,7 @@ func (m *Master) HandleWithAuth(pattern string, handler http.Handler) {
 // to the request is used for the master's built-in endpoints.
 func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
 	// TODO: convert to go-restful
-	m.mux.HandleFunc(pattern, handler)
+	m.muxHelper.HandleFunc(pattern, handler)
 }
 
 func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
@@ -362,33 +364,33 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta1"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta1: %v", err)
 	}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta2"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
 	if c.EnableV1Beta3 {
-		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
+		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta3"); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
 	}
 
-	apiserver.InstallSupport(m.handlerContainer, m.rootWebService)
+	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	m.mux.HandleFunc("/", apiserver.HandleIndex)
+	m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
 
 	// TODO: use go-restful
-	apiserver.InstallValidator(m.mux, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
+	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
 	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(m.mux)
+		apiserver.InstallLogsSupport(m.muxHelper)
 	}
 	if c.EnableUISupport {
-		ui.InstallSupport(m.mux, m.enableSwaggerSupport)
+		ui.InstallSupport(m.muxHelper, m.enableSwaggerSupport)
 	}
 
 	// TODO: install runtime/pprof handler
