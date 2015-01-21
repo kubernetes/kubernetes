@@ -195,7 +195,7 @@ func addParamIf(b *restful.RouteBuilder, parameter *restful.Parameter, shouldAdd
 	return b.Param(parameter)
 }
 
-// InstallREST registers the REST handlers (storage, watch, and operations) into a restful Container.
+// InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
 func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, root string, version string) error {
@@ -210,7 +210,6 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 	}
 	proxyHandler := &ProxyHandler{prefix + "/proxy/", g.handler.storage, g.handler.codec}
 	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
-	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
 
 	// Create a new WebService for this APIGroupVersion at the specified path prefix
 	// TODO: Pass in more descriptive documentation
@@ -269,8 +268,6 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 	mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
 	mux.Handle(prefix+"/proxy/", http.StripPrefix(prefix+"/proxy/", proxyHandler))
 	mux.Handle(prefix+"/redirect/", http.StripPrefix(prefix+"/redirect/", redirectHandler))
-	mux.Handle(prefix+"/operations", http.StripPrefix(prefix+"/operations", opHandler))
-	mux.Handle(prefix+"/operations/", http.StripPrefix(prefix+"/operations/", opHandler))
 
 	container.Add(ws)
 
