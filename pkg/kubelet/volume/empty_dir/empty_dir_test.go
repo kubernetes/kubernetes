@@ -36,10 +36,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}}) {
+	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&api.Volume{Source: nil}) {
+	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -54,7 +54,7 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name:   "vol1",
-		Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}},
+		Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}},
 	}
 	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
 	if err != nil {
@@ -107,8 +107,7 @@ func TestPluginBackCompat(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	spec := &api.Volume{
-		Name:   "vol1",
-		Source: nil,
+		Name: "vol1",
 	}
 	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
 	if err != nil {
@@ -135,11 +134,11 @@ func TestPluginLegacy(t *testing.T) {
 	if plug.Name() != "empty" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&api.Volume{Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}}) {
+	if plug.CanSupport(&api.Volume{Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}}, types.UID("poduid")); err == nil {
+	if _, err := plug.NewBuilder(&api.Volume{Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}, types.UID("poduid")); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

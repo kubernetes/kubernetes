@@ -77,11 +77,11 @@ func TestValidateLabels(t *testing.T) {
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
-		{Name: "123", Source: &api.VolumeSource{HostPath: &api.HostPath{"/mnt/path2"}}},
-		{Name: "abc-123", Source: &api.VolumeSource{HostPath: &api.HostPath{"/mnt/path3"}}},
-		{Name: "empty", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
-		{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
-		{Name: "gitrepo", Source: &api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
+		{Name: "123", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path2"}}},
+		{Name: "abc-123", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path3"}}},
+		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
+		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -414,8 +414,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol1"}}},
-				{Name: "vol2", Source: &api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol2"}}}},
+			Volumes: []api.Volume{{Name: "vol1", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol1"}}},
+				{Name: "vol2", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol2"}}}},
 			Containers: []api.Container{
 				{
 					Name:       "abc",
@@ -1061,7 +1061,7 @@ func TestValidateReplicationController(t *testing.T) {
 	invalidVolumePodTemplate := api.PodTemplate{
 		Spec: api.PodTemplateSpec{
 			Spec: api.PodSpec{
-				Volumes: []api.Volume{{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
+				Volumes: []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
 			},
 		},
 	}
