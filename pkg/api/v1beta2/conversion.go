@@ -620,6 +620,39 @@ func init() {
 			}
 			return nil
 		},
+
+		func(in *newer.PullPolicy, out *PullPolicy, s conversion.Scope) error {
+			switch *in {
+			case newer.PullAlways:
+				*out = PullAlways
+			case newer.PullNever:
+				*out = PullNever
+			case newer.PullIfNotPresent:
+				*out = PullIfNotPresent
+			case "":
+				*out = ""
+			default:
+				// Let unknown values through - they will get caught by validation
+				*out = PullPolicy(*in)
+			}
+			return nil
+		},
+		func(in *PullPolicy, out *newer.PullPolicy, s conversion.Scope) error {
+			switch *in {
+			case PullAlways:
+				*out = newer.PullAlways
+			case PullNever:
+				*out = newer.PullNever
+			case PullIfNotPresent:
+				*out = newer.PullIfNotPresent
+			case "":
+				*out = ""
+			default:
+				// Let unknown values through - they will get caught by validation
+				*out = newer.PullPolicy(*in)
+			}
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

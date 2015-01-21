@@ -487,7 +487,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
-					{Name: "bar", Image: "something", ImagePullPolicy: "PullIfNotPresent"},
+					{Name: "bar", Image: "something", ImagePullPolicy: "IfNotPresent"},
 				},
 			},
 		},
