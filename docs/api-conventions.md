@@ -31,7 +31,7 @@ The standard REST verbs (defined below) MUST return singular JSON objects. Some 
 All singular JSON resources returned by an API MUST have the following fields:
 
 * kind: a string that identifies the schema this object should have
-* apiVersion: a string that identifiers the version of the schema the object should have
+* apiVersion: a string that identifies the version of the schema the object should have
 
 
 ### Objects
