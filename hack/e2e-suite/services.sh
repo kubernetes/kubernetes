@@ -24,6 +24,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  echo "WARNING: Skipping services.sh for ${KUBERNETES_PROVIDER}.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/3655"
+  exit 0
+fi
+
 function error() {
   echo "$@" >&2
   exit 1
@@ -50,6 +55,7 @@ function join() {
 svcs_to_clean=()
 function do_teardown() {
   local svc
+  return
   for svc in "${svcs_to_clean[@]:+${svcs_to_clean[@]}}"; do
     stop_service "${svc}"
   done
