@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.9
+### Features
+ - Various improvements to kubectl
+ - Improvements to API Server caching
+
+### Bug fixes
+ - Disable image GC since it was causing docker pull problems
+ - Various small bug fixes
+
+## 0.8
+### Features 
+ - Docker 1.4.1
+ - Optional session affinity for Services
+ - Better information on out of memory errors
+ - Scheduling pods on specific machines
+ - Improve performance of Pod listing
+ - Image garbage collection
+ - Automatic internal DNS for Services
+ - Swagger UI for the API
+ - Update cAdvisor Manifest to use google/cadvisor:0.7.1 image
+
+### Bug fixes
+ - Fix Docker exec liveness health checks
+ - Fix a bug where the service proxy would ignore new events
+ - Fix a crash for kubelet when without EtcdClient
+
 ## 0.7
 ### Features
   - Make updating node labels easier
