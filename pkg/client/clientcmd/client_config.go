@@ -29,9 +29,12 @@ import (
 )
 
 var (
+	// DefaultCluster is the cluster config used when no other config is specified
 	// TODO: eventually apiserver should start on 443 and be secure by default
-	defaultCluster = clientcmdapi.Cluster{Server: "http://localhost:8080"}
-	envVarCluster  = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
+	DefaultCluster = clientcmdapi.Cluster{Server: "http://localhost:8080"}
+
+	// EnvVarCluster allows overriding the DefaultCluster using an envvar for the server name
+	EnvVarCluster = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
 )
 
 // ClientConfig is used to make it easy to get an api server client
@@ -283,8 +286,8 @@ func (config DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfoName := config.getClusterName()
 
 	var mergedClusterInfo clientcmdapi.Cluster
-	mergo.Merge(&mergedClusterInfo, defaultCluster)
-	mergo.Merge(&mergedClusterInfo, envVarCluster)
+	mergo.Merge(&mergedClusterInfo, DefaultCluster)
+	mergo.Merge(&mergedClusterInfo, EnvVarCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
 		mergo.Merge(&mergedClusterInfo, configClusterInfo)
 	}
