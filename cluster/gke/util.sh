@@ -115,8 +115,8 @@ function kube-up() {
 }
 
 # Called during cluster/kube-up.sh
-function setup-monitoring() {
-  echo "... in setup-monitoring()" >&2
+function setup-monitoring-firewall() {
+  echo "... in setup-monitoring-firewall()" >&2
   # TODO(mbforbes): This isn't currently supported in GKE.
 }
 
@@ -239,8 +239,8 @@ function test-teardown() {
 }
 
 # Tears down monitoring.
-function teardown-monitoring() {
-  echo "... in teardown-monitoring()" >&2
+function teardown-monitoring-firewall() {
+  echo "... in teardown-monitoring-firewall()" >&2
   # TODO(mbforbes): This isn't currently supported in GKE.
 }
 
@@ -257,10 +257,10 @@ function kube-down() {
     --zone="${ZONE}" "${CLUSTER_NAME}"
 }
 
-function setup-logging {
+function setup-logging-firewall {
   echo "TODO: setup logging"
 }
 
-function teardown-logging {
+function teardown-logging-firewall {
   echo "TODO: teardown logging"
 }

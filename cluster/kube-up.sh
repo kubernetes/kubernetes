@@ -39,22 +39,10 @@ kube-up
 echo "... calling validate-cluster" >&2
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
 
-echo "... calling setup-monitoring" >&2
-setup-monitoring
+echo "... calling setup-monitoring-firewall" >&2
+setup-monitoring-firewall
 
-if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
-  echo "... setting up cluster DNS"
-  sed -e "s/{DNS_DOMAIN}/$DNS_DOMAIN/g" \
-      -e "s/{DNS_REPLICAS}/$DNS_REPLICAS/g" \
-      "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" \
-      | "${KUBE_ROOT}/cluster/kubectl.sh" create -f -
-
-  sed -e "s/{DNS_SERVER_IP}/$DNS_SERVER_IP/g" \
-      "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" \
-      | "${KUBE_ROOT}/cluster/kubectl.sh" create -f -
-fi
-
-echo "... calling setup-logging" >&2
-setup-logging
+echo "... calling setup-logging-firewall" >&2
+setup-logging-firewall
 
 echo "Done" >&2

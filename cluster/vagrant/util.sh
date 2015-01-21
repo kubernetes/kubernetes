@@ -287,11 +287,11 @@ function restart-kube-proxy {
   ssh-to-node "$1" "sudo systemctl restart kube-proxy"
 }
 
-function setup-monitoring {
+function setup-monitoring-firewall {
   echo "TODO" 1>&2
 }
 
-function teardown-monitoring {
+function teardown-monitoring-firewall {
   echo "TODO" 1>&2
 }
 
@@ -300,10 +300,10 @@ function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests" 1>&2
 }
 
-function setup-logging {
+function setup-logging-firewall {
   echo "TODO: setup logging"
 }
 
-function teardown-logging {
+function teardown-logging-firewall {
   echo "TODO: teardown logging"
 }
