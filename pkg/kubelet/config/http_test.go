@@ -157,7 +157,7 @@ func TestExtractFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "PullIfNotPresent"}},
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				},
 				api.BoundPod{
@@ -171,7 +171,7 @@ func TestExtractFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "PullIfNotPresent"}},
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				}),
 		},
