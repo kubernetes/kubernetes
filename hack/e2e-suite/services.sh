@@ -206,7 +206,7 @@ function wait_for_service_up() {
         set -e;
         for i in $(seq -s' ' 1 $4); do
           curl -s --connect-timeout 1 http://$2:$3;
-          echo
+          echo;
         done | sort | uniq
         "))
 
