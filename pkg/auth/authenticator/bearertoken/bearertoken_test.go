@@ -26,25 +26,25 @@ import (
 )
 
 func TestAuthenticateRequest(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	auth := New(authenticator.TokenFunc(func(token string) (user.Info, http.Header, bool, error) {
 		if token != "token" {
 			t.Errorf("unexpected token: %s", token)
 		}
-		return &user.DefaultInfo{Name: "user"}, true, nil
+		return &user.DefaultInfo{Name: "user"}, nil, true, nil
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	user, challenge, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
-	if !ok || user == nil || err != nil {
+	if !ok || user == nil || challenge != nil || err != nil {
 		t.Errorf("expected valid user")
 	}
 }
 
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
-		return nil, false, nil
+	auth := New(authenticator.TokenFunc(func(token string) (user.Info, http.Header, bool, error) {
+		return nil, http.Header{"WWW-Authenticate": {"Bearer"}}, false, nil
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	user, _, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
 	if ok || user != nil || err != nil {
@@ -53,10 +53,10 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenError(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
-		return nil, false, errors.New("error")
+	auth := New(authenticator.TokenFunc(func(token string) (user.Info, http.Header, bool, error) {
+		return nil, nil, false, errors.New("error")
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	user, _, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
 	if ok || user != nil || err == nil {
@@ -74,11 +74,11 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer: token"}}}},
 	}
 	for i, testCase := range testCases {
-		auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+		auth := New(authenticator.TokenFunc(func(token string) (user.Info, http.Header, bool, error) {
 			t.Errorf("authentication should not have been called")
-			return nil, false, nil
+			return nil, http.Header{"WWW-Authenticate": {"Bearer"}}, false, nil
 		}))
-		user, ok, err := auth.AuthenticateRequest(testCase.Req)
+		user, _, ok, err := auth.AuthenticateRequest(testCase.Req)
 		if ok || user != nil || err != nil {
 			t.Errorf("%d: expected not authenticated (no token)", i)
 		}

@@ -36,11 +36,15 @@ type testPassword struct {
 	Err  error
 }
 
-func (t *testPassword) AuthenticatePassword(user, password string) (user.Info, bool, error) {
+func (t *testPassword) GetRealm() string {
+	return "default"
+}
+
+func (t *testPassword) AuthenticatePassword(user, password string) (user.Info, http.Header, bool, error) {
 	t.Called = true
 	t.Username = user
 	t.Password = password
-	return t.User, t.OK, t.Err
+	return t.User, http.Header{"WWW-Authenticate": {"Basic realm=\"" + t.GetRealm() + "\""}}, t.OK, t.Err
 }
 
 func TestBasicAuth(t *testing.T) {
@@ -116,7 +120,7 @@ func TestBasicAuth(t *testing.T) {
 			req.Header.Set("Authorization", testCase.Header)
 		}
 
-		user, ok, err := auth.AuthenticateRequest(req)
+		user, _, ok, err := auth.AuthenticateRequest(req)
 
 		if testCase.ExpectedCalled != password.Called {
 			t.Fatalf("%s: Expected called=%v, got %v", k, testCase.ExpectedCalled, password.Called)

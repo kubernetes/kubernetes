@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -53,12 +54,19 @@ func NewSaslAuthd(defaultRealm, socketPath, serviceName string) (authenticator.P
 	return saslAuthdAuthenticator{serviceName: serviceName, socketPath: socketPath, defaultRealm: defaultRealm}, nil
 }
 
+// GetRealm returns the realm name for use in constructing a challenge for
+// Basic authentication.
+func (s saslAuthdAuthenticator) GetRealm() string {
+	return s.defaultRealm
+}
+
 // AuthenticatePassword implements authenticator.Password by handing it off to
 // saslauthd, using the specified username as the login ID.  If successful, a
 // user.DefaultInfo is returned.  That structure will contain the username, an
 // empty UID, and no group information.
-func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) (user.Info, bool, error) {
+func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) (user.Info, http.Header, bool, error) {
 	var replen uint16
+	challenge := http.Header{"WWW-Authenticate": {"Basic " + "realm=\"" + s.defaultRealm + "\""}}
 	realm := s.defaultRealm
 	index := strings.LastIndex(username, "@")
 	if index >= 0 {
@@ -67,16 +75,16 @@ func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) 
 	}
 	service := s.serviceName
 	if len(username) >= 256 {
-		return nil, false, errors.New("User name would be too long for saslauthd")
+		return nil, challenge, false, errors.New("User name would be too long for saslauthd")
 	}
 	if len(password) >= 256 {
-		return nil, false, errors.New("Password would be too long for saslauthd")
+		return nil, challenge, false, errors.New("Password would be too long for saslauthd")
 	}
 	if len(realm) >= 256 {
-		return nil, false, errors.New("Realm name would be too long for saslauthd")
+		return nil, challenge, false, errors.New("Realm name would be too long for saslauthd")
 	}
 	if len(service) >= 256 {
-		return nil, false, errors.New("Service name would be too long for saslauthd")
+		return nil, challenge, false, errors.New("Service name would be too long for saslauthd")
 	}
 	path := s.socketPath
 	if path == "" {
@@ -84,7 +92,7 @@ func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) 
 	} else {
 		fi, err := os.Stat(path)
 		if err != nil {
-			return nil, false, err
+			return nil, challenge, false, err
 		}
 		if fi.IsDir() {
 			path = path + "/mux"
@@ -92,12 +100,12 @@ func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) 
 	}
 	conn, err := net.Dial("unix", path)
 	if err != nil {
-		return nil, false, err
+		return nil, challenge, false, err
 	}
 	defer conn.Close()
 	req := new(bytes.Buffer)
 	if req == nil {
-		return nil, false, nil
+		return nil, challenge, false, nil
 	}
 	binary.Write(req, binary.BigEndian, uint16(len(username)))
 	req.WriteString(username)
@@ -110,14 +118,14 @@ func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) 
 	rb := req.Bytes()
 	n, err := conn.Write(rb)
 	if n < len(rb) {
-		return nil, false, errors.New("Error sending request to saslauthd")
+		return nil, challenge, false, errors.New("Error sending request to saslauthd")
 	}
 	binary.Read(conn, binary.BigEndian, &replen)
 	if replen < 2 {
-		return nil, false, errors.New("Response from saslauthd would be too short")
+		return nil, challenge, false, errors.New("Response from saslauthd would be too short")
 	}
 	if replen > 1024 {
-		return nil, false, errors.New("Response from saslauthd would be too long")
+		return nil, challenge, false, errors.New("Response from saslauthd would be too long")
 	}
 	rep := make([]byte, replen)
 	n, err = conn.Read(rep)
@@ -129,10 +137,10 @@ func (s saslAuthdAuthenticator) AuthenticatePassword(username, password string) 
 		}
 	}
 	if rep[0] == 'O' && rep[1] == 'K' {
-		return &user.DefaultInfo{Name: username + "@" + realm}, true, nil
+		return &user.DefaultInfo{Name: username + "@" + realm}, nil, true, nil
 	}
 	if rep[0] == 'N' && rep[1] == 'O' {
-		return nil, false, errors.New(fmt.Sprintf("Authentication rejected by saslauthd: %s", bytes.NewBuffer(rep).String()))
+		return nil, challenge, false, errors.New(fmt.Sprintf("Authentication rejected by saslauthd: %s", bytes.NewBuffer(rep).String()))
 	}
-	return nil, false, errors.New("Unknown error authenticating with saslauthd")
+	return nil, challenge, false, errors.New("Unknown error authenticating with saslauthd")
 }

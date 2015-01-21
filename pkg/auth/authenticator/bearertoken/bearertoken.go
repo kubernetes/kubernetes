@@ -32,14 +32,15 @@ func New(auth authenticator.Token) *Authenticator {
 	return &Authenticator{auth}
 }
 
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error) {
+	challenge := http.Header{"WWW-Authenticate": {"Bearer"}}
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
 	if auth == "" {
-		return nil, false, nil
+		return nil, challenge, false, nil
 	}
 	parts := strings.Split(auth, " ")
 	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	token := parts[1]

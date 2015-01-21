@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net"
+	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
@@ -48,45 +49,50 @@ func NewGssProxy(proxyPath string, userConversion UserConversion) (authenticator
 	}, nil
 }
 
-func (a *GssProxyAuthenticator) AuthenticateToken(b64token string) (user.Info, bool, error) {
+func (a *GssProxyAuthenticator) AuthenticateToken(b64token string) (user.Info, http.Header, bool, error) {
+	challenge := http.Header{"WWW-Authenticate": {"Negotiate"}}
 	var callCtx proxy.CallCtx
 	var secCtx proxy.SecCtx
 	if len(b64token) == 0 {
-		return nil, false, errors.New("Requested Negotiate auth, but provided no auth data")
+		return nil, challenge, false, errors.New("Requested Negotiate auth, but provided no auth data")
 	}
 	token, err := base64.StdEncoding.DecodeString(b64token)
 	if err != nil {
-		return nil, false, err
+		return nil, challenge, false, err
 	}
 	conn, err := net.Dial("unix", a.proxyPath)
 	if err != nil {
-		return nil, false, errors.New("Error contacting gss-proxy: " + err.Error())
+		return nil, nil, false, errors.New("Error contacting gss-proxy: " + err.Error())
 	}
 	defer conn.Close()
 	gccr, err := proxy.GetCallContext(&conn, &callCtx, nil)
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	if gccr.Status.MajorStatus != proxy.S_COMPLETE {
-		return nil, false, errors.New("Error returned from gss-proxy GetCallContext function: " + gccr.Status.MajorStatusString + "/" + gccr.Status.MinorStatusString)
+		return nil, nil, false, errors.New("Error returned from gss-proxy GetCallContext function: " + gccr.Status.MajorStatusString + "/" + gccr.Status.MinorStatusString)
 	}
 	ascr, err := proxy.AcceptSecContext(&conn, &callCtx, &secCtx, nil, token, nil, false, nil)
 	if err != nil {
-		return nil, false, err
+		return nil, challenge, false, err
 	}
 	if secCtx.NeedsRelease {
 		defer proxy.ReleaseSecCtx(&conn, &callCtx, &secCtx)
 	}
 	if ascr.Status.MajorStatus == proxy.S_CONTINUE_NEEDED {
 		// We can't handle multiple-round-trip requests right.
-		return nil, false, errors.New("Negotiate authentication canceled (incomplete): " + ascr.Status.MajorStatusString + "/" + ascr.Status.MinorStatusString)
+		return nil, nil, false, errors.New("Negotiate authentication canceled (incomplete): " + ascr.Status.MajorStatusString + "/" + ascr.Status.MinorStatusString)
 	}
 	if ascr.Status.MajorStatus != proxy.S_COMPLETE {
 		// Authentication failed.
-		return nil, false, errors.New("Negotiate authentication failed: " + ascr.Status.MajorStatusString + "/" + ascr.Status.MinorStatusString)
+		return nil, nil, false, errors.New("Negotiate authentication failed: " + ascr.Status.MajorStatusString + "/" + ascr.Status.MinorStatusString)
 	}
-	// We also don't have a method for returning ascr.OutputToken to the client yet.
-	return a.userConvert.User(secCtx)
+	headers := http.Header{}
+	if ascr.OutputToken != nil {
+		headers = http.Header{"WWW-Authenticate": {"Negotiate " + base64.StdEncoding.EncodeToString(*ascr.OutputToken)}}
+	}
+	user, ok, err := a.userConvert.User(secCtx)
+	return user, headers, ok, err
 }
 
 var DefaultUserInfo UserConversionFunc = func(context proxy.SecCtx) (user.Info, bool, error) {

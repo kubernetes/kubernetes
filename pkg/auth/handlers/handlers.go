@@ -31,7 +31,12 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 	return api.NewRequestContextFilter(
 		mapper,
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			user, ok, err := auth.AuthenticateRequest(req)
+			user, headers, ok, err := auth.AuthenticateRequest(req)
+			for hkey, hvals := range headers {
+				for _, hval := range hvals {
+					w.Header().Add(hkey, hval)
+				}
+			}
 			if err != nil || !ok {
 				if err != nil {
 					glog.Errorf("Unable to authenticate the request due to an error: %v", err)

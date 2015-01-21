@@ -519,7 +519,7 @@ func TestX509(t *testing.T) {
 
 		a := New(testCase.Opts, testCase.User)
 
-		user, ok, err := a.AuthenticateRequest(req)
+		user, _, ok, err := a.AuthenticateRequest(req)
 
 		if testCase.ExpectErr && err == nil {
 			t.Errorf("%s: Expected error, got none", k)

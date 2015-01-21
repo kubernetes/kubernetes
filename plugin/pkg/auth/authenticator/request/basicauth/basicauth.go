@@ -37,24 +37,25 @@ func New(auth authenticator.Password) *Authenticator {
 }
 
 // AuthenticateRequest authenticates the request using the "Authorization: Basic" header in the request
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error) {
+	challenge := http.Header{"WWW-Authenticate": {"Basic realm=\"" + a.auth.GetRealm() + "\""}}
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
 	if auth == "" {
-		return nil, false, nil
+		return nil, challenge, false, nil
 	}
 	parts := strings.Split(auth, " ")
 	if len(parts) < 2 || strings.ToLower(parts[0]) != "basic" {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	payload, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, false, err
+		return nil, challenge, false, err
 	}
 
 	pair := strings.SplitN(string(payload), ":", 2)
 	if len(pair) != 2 {
-		return nil, false, errors.New("malformed basic auth header")
+		return nil, challenge, false, errors.New("malformed basic auth header")
 	}
 
 	username := pair[0]

@@ -32,8 +32,8 @@ func TestAuthenticateRequest(t *testing.T) {
 	contextMapper := api.NewRequestContextMapper()
 	auth, err := NewRequestAuthenticator(
 		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-			return &user.DefaultInfo{Name: "user"}, true, nil
+		authenticator.RequestFunc(func(req *http.Request) (user.Info, http.Header, bool, error) {
+			return &user.DefaultInfo{Name: "user"}, nil, true, nil
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			t.Errorf("unexpected call to failed")
@@ -68,8 +68,8 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 	contextMapper := api.NewRequestContextMapper()
 	auth, err := NewRequestAuthenticator(
 		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-			return nil, false, nil
+		authenticator.RequestFunc(func(req *http.Request) (user.Info, http.Header, bool, error) {
+			return nil, nil, false, nil
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
@@ -96,8 +96,8 @@ func TestAuthenticateRequestError(t *testing.T) {
 	contextMapper := api.NewRequestContextMapper()
 	auth, err := NewRequestAuthenticator(
 		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-			return nil, false, errors.New("failure")
+		authenticator.RequestFunc(func(req *http.Request) (user.Info, http.Header, bool, error) {
+			return nil, nil, false, errors.New("failure")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)

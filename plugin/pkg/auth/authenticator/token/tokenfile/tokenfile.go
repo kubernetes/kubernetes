@@ -20,6 +20,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
@@ -63,10 +64,10 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 	}, nil
 }
 
-func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
+func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, http.Header, bool, error) {
 	user, ok := a.tokens[value]
 	if !ok {
-		return nil, false, nil
+		return nil, http.Header{"WWW-Authenticate": {"Bearer error=\"invalid_token\""}}, false, nil
 	}
-	return user, true, nil
+	return user, nil, true, nil
 }

@@ -16,7 +16,11 @@ limitations under the License.
 
 package tokentest
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+import (
+	"net/http"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+)
 
 type TokenAuthenticator struct {
 	Tokens map[string]*user.DefaultInfo
@@ -27,10 +31,10 @@ func New() *TokenAuthenticator {
 		Tokens: make(map[string]*user.DefaultInfo),
 	}
 }
-func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
+func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, http.Header, bool, error) {
 	user, ok := a.Tokens[value]
 	if !ok {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
-	return user, true, nil
+	return user, nil, true, nil
 }
