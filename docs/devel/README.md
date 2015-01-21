@@ -4,7 +4,7 @@ Docs in this directory relate to developing Kubernetes.
 
 * **On Collaborative Development** ([collab.md](collab.md)): info on pull requests and code reviews.
 
-* **Development Guide** ([development.md](development.md)): Setting up your environment; tests.
+* **Development Guide** ([development.md](development.md)): Setting up your environment tests.
 
 * **Hunting flaky tests** ([flaky-tests.md](flaky-tests.md)): We have a goal of 99.9% flake free tests.
   Here's how to run your tests many times.
