@@ -50,7 +50,7 @@ var (
 	address                 = util.IP(net.ParseIP("127.0.0.1"))
 	port                    = flag.Uint("port", ports.KubeletPort, "The port for the info server to serve on")
 	hostnameOverride        = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
-	networkContainerImage   = flag.String("network_container_image", kubelet.NetworkContainerImage, "The image that network containers in each pod will use.")
+	podInfraContainerImage  = flag.String("pod_infra_container_image", kubelet.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	dockerEndpoint          = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 	etcdServerList          util.StringList
 	etcdConfigFile          = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
@@ -136,7 +136,7 @@ func main() {
 		ManifestURL:             *manifestURL,
 		FileCheckFrequency:      *fileCheckFrequency,
 		HttpCheckFrequency:      *httpCheckFrequency,
-		NetworkContainerImage:   *networkContainerImage,
+		PodInfraContainerImage:  *podInfraContainerImage,
 		SyncFrequency:           *syncFrequency,
 		RegistryPullQPS:         *registryPullQPS,
 		RegistryBurst:           *registryBurst,

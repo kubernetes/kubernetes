@@ -153,13 +153,13 @@ func SimpleRunKubelet(client *client.Client,
 	masterServiceNamespace string,
 	volumePlugins []volume.Plugin) {
 	kcfg := KubeletConfig{
-		KubeClient:            client,
-		EtcdClient:            etcdClient,
-		DockerClient:          dockerClient,
-		HostnameOverride:      hostname,
-		RootDirectory:         rootDir,
-		ManifestURL:           manifestURL,
-		NetworkContainerImage: kubelet.NetworkContainerImage,
+		KubeClient:             client,
+		EtcdClient:             etcdClient,
+		DockerClient:           dockerClient,
+		HostnameOverride:       hostname,
+		RootDirectory:          rootDir,
+		ManifestURL:            manifestURL,
+		PodInfraContainerImage: kubelet.PodInfraContainerImage,
 		Port:                    port,
 		Address:                 util.IP(net.ParseIP(address)),
 		EnableServer:            true,
@@ -256,7 +256,7 @@ type KubeletConfig struct {
 	FileCheckFrequency      time.Duration
 	HttpCheckFrequency      time.Duration
 	Hostname                string
-	NetworkContainerImage   string
+	PodInfraContainerImage  string
 	SyncFrequency           time.Duration
 	RegistryPullQPS         float64
 	RegistryBurst           int
@@ -282,7 +282,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.EtcdClient,
 		kc.KubeClient,
 		kc.RootDirectory,
-		kc.NetworkContainerImage,
+		kc.PodInfraContainerImage,
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
