@@ -54,10 +54,13 @@ The kube-controller-manager has several options.
 	log to standard error instead of files.
 
 **--machines**=[]
-        List of machines to schedule onto, comma separated.
+    List of machines to schedule onto, comma separated.
 
 **--master**=""
 	The address of the Kubernetes API server.
+
+**--node_sync_peroid**=10s
+    The period for syncing nodes from cloudprovider.
 
 **--port**=10252
 	The port that the controller-manager's http service runs on.
