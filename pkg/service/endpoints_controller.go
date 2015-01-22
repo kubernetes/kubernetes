@@ -56,10 +56,10 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			continue
 		}
 
-		glog.V(3).Infof("About to update endpoints for service %v", service.Name)
+		glog.V(5).Infof("About to update endpoints for service %s/%s", service.Namespace, service.Name)
 		pods, err := e.client.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelector())
 		if err != nil {
-			glog.Errorf("Error syncing service: %#v, skipping.", service)
+			glog.Errorf("Error syncing service: %s/%s, skipping", service.Namespace, service.Name)
 			resultErr = err
 			continue
 		}
@@ -68,11 +68,11 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		for _, pod := range pods.Items {
 			port, err := findPort(&pod, service.Spec.ContainerPort)
 			if err != nil {
-				glog.Errorf("Failed to find port for service: %v, %v", service, err)
+				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
 			}
 			if len(pod.Status.PodIP) == 0 {
-				glog.Errorf("Failed to find an IP for pod: %v", pod)
+				glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
 			endpoints = append(endpoints, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(port)))
@@ -100,7 +100,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		} else {
 			// Pre-existing
 			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(3).Infof("endpoints are equal for %s, skipping update", service.Name)
+				glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
