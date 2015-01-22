@@ -59,6 +59,6 @@ techdetails:
         label: API Documentation
         url: http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html
     kubecfg:
-        label: Kubecfg Command Tool
-        url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md
+        label: Kubectl Command Tool
+        url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md
 ---
