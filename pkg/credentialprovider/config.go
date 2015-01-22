@@ -51,7 +51,6 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 	if err != nil {
 		glog.Errorf("while trying to canonicalize %s: %v", dockerConfigFileLocation, err)
 	}
-	absDockerConfigFileLocation, err = filepath.Abs(dockerConfigFileLocation)
 	glog.V(2).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
 	contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
 	if os.IsNotExist(err) {
