@@ -173,8 +173,8 @@ func setDefaults(c *Config) {
 		c.ReadWritePort = 443
 	}
 	for c.PublicAddress == "" {
-                defaultPublicAddress := "0.0.0.0"
-                glog.Infof("Public Address unspecified. Defaulting to %v.", defaultPublicAddress)
+		defaultPublicAddress := "0.0.0.0"
+		glog.Infof("Public Address unspecified. Defaulting to %v.", defaultPublicAddress)
 		c.PublicAddress = defaultPublicAddress
 	}
 }
