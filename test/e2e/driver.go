@@ -69,7 +69,11 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 	// TODO: Associate a timeout with each test individually.
 	go func() {
 		defer util.FlushLogs()
-		time.Sleep(10 * time.Minute)
+		// TODO: We should modify testSpec to include an estimated running time
+		//       for each test and use that information to estimate a timeout
+		//       value. Until then, as we add more tests (and before we move to
+		//       parallel testing) we need to adjust this value as we add more tests.
+		time.Sleep(15 * time.Minute)
 		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
 	}()
 
