@@ -683,18 +683,6 @@ const (
 	// Status code 500.
 	StatusReasonUnknown StatusReason = ""
 
-	// StatusReasonWorking means the server is processing this request and will complete
-	// at a future time.
-	// Details (optional):
-	//   "kind" string - the name of the resource being referenced ("operation" today)
-	//   "id"   string - the identifier of the Operation resource where updates
-	//                   will be returned
-	// Headers (optional):
-	//   "Location" - HTTP header populated with a URL that can retrieved the final
-	//                status of this operation.
-	// Status code 202
-	StatusReasonWorking StatusReason = "Working"
-
 	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
 	// Details (optional):

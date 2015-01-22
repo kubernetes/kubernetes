@@ -55,7 +55,6 @@ type RESTClient struct {
 	// be called.
 	Poller PollFunc
 
-	Sync       bool
 	PollPeriod time.Duration
 	Timeout    time.Duration
 }
@@ -80,10 +79,7 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 
 		LegacyBehavior: legacyBehavior,
 
-		// Make asynchronous requests by default
-		Sync: false,
-
-		// Poll frequently when asynchronous requests are provided
+		// Poll frequently
 		PollPeriod: time.Second * 2,
 	}
 }
@@ -110,7 +106,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if poller == nil {
 		poller = c.DefaultPoll
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Poller(poller).Sync(c.Sync).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Poller(poller).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -135,7 +131,7 @@ func (c *RESTClient) Delete() *Request {
 
 // PollFor makes a request to do a single poll of the completion of the given operation.
 func (c *RESTClient) Operation(name string) *Request {
-	return c.Get().Resource("operations").Name(name).Sync(false).NoPoll()
+	return c.Get().Resource("operations").Name(name).NoPoll()
 }
 
 // DefaultPoll performs a polling action based on the PollPeriod set on the Client.
