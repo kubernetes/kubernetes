@@ -43,28 +43,29 @@ import (
 )
 
 var (
-	serverVersion = verflag.Version("server_version", verflag.VersionFalse, "Print the server's version information and quit")
-	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
-	config        = flag.String("c", "", "Path or URL to the config file, or '-' to read from STDIN")
-	selector      = flag.String("l", "", "Selector (label query) to use for listing")
-	fieldSelector = flag.String("fields", "", "Selector (field query) to use for listing")
-	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
-	portSpec      = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
-	servicePort   = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
-	authConfig    = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
-	json          = flag.Bool("json", false, "If true, print raw JSON for responses")
-	yaml          = flag.Bool("yaml", false, "If true, print raw YAML for responses")
-	verbose       = flag.Bool("verbose", false, "If true, print extra information")
-	validate      = flag.Bool("validate", false, "If true, try to validate the passed in object using a swagger schema on the api server")
-	proxy         = flag.Bool("proxy", false, "If true, run a proxy to the api server")
-	www           = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
-	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
-	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
-	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
-	clientConfig  = &client.Config{}
-	openBrowser   = flag.Bool("open_browser", true, "If true, and -proxy is specified, open a browser pointed at the Kubernetes UX. Default true.")
-	ns            = flag.String("ns", "", "If present, the namespace scope for this request.")
-	nsFile        = flag.String("ns_file", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace file")
+	serverVersion    = flag.Bool("server_version", false, "Print the server's version information and quit")
+	rawServerVersion = flag.Bool("raw_server_version", false, "Print the server's raw version information and quit")
+	preventSkew      = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
+	config           = flag.String("c", "", "Path or URL to the config file, or '-' to read from STDIN")
+	selector         = flag.String("l", "", "Selector (label query) to use for listing")
+	fieldSelector    = flag.String("fields", "", "Selector (field query) to use for listing")
+	updatePeriod     = flag.Duration("u", 60*time.Second, "Update interval period")
+	portSpec         = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
+	servicePort      = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
+	authConfig       = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
+	json             = flag.Bool("json", false, "If true, print raw JSON for responses")
+	yaml             = flag.Bool("yaml", false, "If true, print raw YAML for responses")
+	verbose          = flag.Bool("verbose", false, "If true, print extra information")
+	validate         = flag.Bool("validate", false, "If true, try to validate the passed in object using a swagger schema on the api server")
+	proxy            = flag.Bool("proxy", false, "If true, run a proxy to the api server")
+	www              = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
+	templateFile     = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
+	templateStr      = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
+	imageName        = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
+	clientConfig     = &client.Config{}
+	openBrowser      = flag.Bool("open_browser", true, "If true, and -proxy is specified, open a browser pointed at the Kubernetes UX. Default true.")
+	ns               = flag.String("ns", "", "If present, the namespace scope for this request.")
+	nsFile           = flag.String("ns_file", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace file")
 )
 
 func init() {
@@ -241,13 +242,13 @@ func main() {
 		glog.Fatalf("Can't configure client: %v", err)
 	}
 
-	if *serverVersion != verflag.VersionFalse {
+	if *serverVersion || *rawServerVersion {
 		got, err := kubeClient.ServerVersion()
 		if err != nil {
 			fmt.Printf("Couldn't read version from server: %v\n", err)
 			os.Exit(1)
 		}
-		if *serverVersion == verflag.VersionRaw {
+		if *rawServerVersion {
 			fmt.Printf("%#v\n", *got)
 			os.Exit(0)
 		} else {
