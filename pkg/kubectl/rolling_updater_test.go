@@ -26,18 +26,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-type updaterFake struct {
+type customFake struct {
 	*client.Fake
 	ctrl client.ReplicationControllerInterface
 }
 
-func (c *updaterFake) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
+func (c *customFake) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
 	return c.ctrl
 }
 
 func fakeClientFor(namespace string, responses []fakeResponse) client.Interface {
 	fake := client.Fake{}
-	return &updaterFake{
+	return &customFake{
 		&fake,
 		&fakeRc{
 			&client.FakeReplicationControllers{

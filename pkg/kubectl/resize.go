@@ -58,12 +58,12 @@ type Resizer interface {
 	Resize(namespace, name string, preconditions *ResizePrecondition, newSize uint) (string, error)
 }
 
-func ResizerFor(kind string, c client.Interface) (Resizer, error) {
+func ResizerFor(kind string, c *client.Client) (Resizer, bool) {
 	switch kind {
 	case "ReplicationController":
-		return &ReplicationControllerResizer{c}, nil
+		return &ReplicationControllerResizer{c}, true
 	}
-	return nil, fmt.Errorf("no resizer has been implemented for %q", kind)
+	return nil, false
 }
 
 type ReplicationControllerResizer struct {
