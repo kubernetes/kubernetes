@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -66,7 +67,7 @@ func TestClusterDNS(c *client.Client) bool {
 			APIVersion: "v1beta1",
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name: "dns-test",
+			Name: "dns-test-" + string(util.NewUUID()),
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
@@ -104,7 +105,7 @@ func TestClusterDNS(c *client.Client) bool {
 	}
 	_, err := podClient.Create(pod)
 	if err != nil {
-		glog.Errorf("Failed to create dns-test pod: %v", err)
+		glog.Errorf("Failed to create %s pod: %v", pod.Name, err)
 		return false
 	}
 	defer podClient.Delete(pod.Name)
@@ -112,7 +113,7 @@ func TestClusterDNS(c *client.Client) bool {
 	waitForPodRunning(c, pod.Name)
 	pod, err = podClient.Get(pod.Name)
 	if err != nil {
-		glog.Errorf("Failed to get pod: %v", err)
+		glog.Errorf("Failed to get pod %s: %v", pod.Name, err)
 		return false
 	}
 
@@ -130,22 +131,22 @@ func TestClusterDNS(c *client.Client) bool {
 				Do().Raw()
 			if err != nil {
 				failed = append(failed, name)
-				glog.V(4).Infof("Lookup for %s failed: %v", name, err)
+				glog.V(4).Infof("Lookup using %s for %s failed: %v", pod.Name, name, err)
 			}
 		}
 		if len(failed) == 0 {
 			break
 		}
-		glog.Infof("lookups failed for: %v", failed)
-		time.Sleep(3 * time.Second)
+		glog.Infof("lookups using %s failed for: %v", pod.Name, failed)
+		time.Sleep(10 * time.Second)
 	}
 	if len(failed) != 0 {
-		glog.Errorf("DNS failed for: %v", failed)
+		glog.Errorf("DNS using %s failed for: %v", pod.Name, failed)
 		return false
 	}
 
 	// TODO: probe from the host, too.
 
-	glog.Info("DNS probes succeeded")
+	glog.Infof("DNS probes using %s succeeded", pod.Name)
 	return true
 }
