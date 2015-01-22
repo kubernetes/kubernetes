@@ -91,6 +91,11 @@ func (s *sourceURL) extractFromURL() error {
 		if err := api.Scheme.Convert(&manifest, &pod); err != nil {
 			return err
 		}
+		// This is required for backward compatibility, and should be removed once we
+		// completely deprecate ContainerManifest.
+		if len(pod.Name) == 0 {
+			pod.Name = "1"
+		}
 		if len(pod.Namespace) == 0 {
 			pod.Namespace = api.NamespaceDefault
 		}

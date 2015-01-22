@@ -156,6 +156,12 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	if len(pod.UID) == 0 {
 		pod.UID = simpleSubdomainSafeHash(filename)
 	}
+	// This is required for backward compatibility, and should be removed once we
+	// completely deprecate ContainerManifest.
+	if len(pod.Name) == 0 {
+		pod.Name = string(pod.UID)
+		glog.V(5).Infof("Generated Name %q for UID %q from file %s", pod.Name, pod.UID, filename)
+	}
 	if len(pod.Namespace) == 0 {
 		pod.Namespace = api.NamespaceDefault
 	}
