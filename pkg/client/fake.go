@@ -34,15 +34,20 @@ type FakeAction struct {
 // Fake implements Interface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type Fake struct {
-	Actions       []FakeAction
-	PodsList      api.PodList
-	Ctrl          api.ReplicationController
-	ServiceList   api.ServiceList
-	EndpointsList api.EndpointsList
-	MinionsList   api.NodeList
-	EventsList    api.EventList
-	Err           error
-	Watch         watch.Interface
+	Actions         []FakeAction
+	PodsList        api.PodList
+	Ctrl            api.ReplicationController
+	ServiceList     api.ServiceList
+	EndpointsList   api.EndpointsList
+	MinionsList     api.NodeList
+	EventsList      api.EventList
+	LimitRangesList api.LimitRangeList
+	Err             error
+	Watch           watch.Interface
+}
+
+func (c *Fake) LimitRanges(namespace string) LimitRangeInterface {
+	return &FakeLimitRanges{Fake: c, Namespace: namespace}
 }
 
 func (c *Fake) ReplicationControllers(namespace string) ReplicationControllerInterface {

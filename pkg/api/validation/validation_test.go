@@ -1552,3 +1552,92 @@ func TestValidateResourceNames(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateLimitRange(t *testing.T) {
+	successCases := []api.LimitRange{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Kind: "pods",
+						Max: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100"),
+							api.ResourceMemory: resource.MustParse("10000"),
+						},
+						Min: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateLimitRange(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.LimitRange{
+		"zero-length Name": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "",
+				Namespace: "foo",
+			},
+			Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Kind: "pods",
+						Max: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100"),
+							api.ResourceMemory: resource.MustParse("10000"),
+						},
+						Min: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
+		"zero-length-namespace": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "",
+			},
+			Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Kind: "pods",
+						Max: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100"),
+							api.ResourceMemory: resource.MustParse("10000"),
+						},
+						Min: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateLimitRange(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+		for i := range errs {
+			field := errs[i].(*errors.ValidationError).Field
+			if field != "name" &&
+				field != "namespace" {
+				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
+		}
+	}
+}

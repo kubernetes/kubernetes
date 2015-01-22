@@ -640,3 +640,29 @@ func ValidateResourceName(str string) errs.ValidationErrorList {
 
 	return errs.ValidationErrorList{}
 }
+
+// ValidateLimitRange tests if required fields in the LimitRange are set.
+func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(limitRange.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", limitRange.Name))
+	} else if !util.IsDNSSubdomain(limitRange.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", limitRange.Name, ""))
+	}
+	if len(limitRange.Namespace) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", limitRange.Namespace))
+	} else if !util.IsDNSSubdomain(limitRange.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", limitRange.Namespace, ""))
+	}
+	// ensure resource names are properly qualified per docs/resources.md
+	for i := range limitRange.Spec.Limits {
+		limit := limitRange.Spec.Limits[i]
+		for k, _ := range limit.Max {
+			allErrs = append(allErrs, ValidateResourceName(k))
+		}
+		for k, _ := range limit.Min {
+			allErrs = append(allErrs, ValidateResourceName(k))
+		}
+	}
+	return allErrs
+}

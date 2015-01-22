@@ -1138,3 +1138,37 @@ type List struct {
 
 	Items []runtime.Object `json:"items"`
 }
+
+// LimitRangeItem defines a min/max usage limit for any resource that matches on kind
+type LimitRangeItem struct {
+	// Kind is the resource kind that this limit range is applied (i.e. pods, etc.)
+	Kind string
+	// Max usage constraints on this kind by resource name
+	Max ResourceList `json:"max,omitempty"`
+	// Min usage constraints on this kind by resource name
+	Min ResourceList `json:"min,omitempty"`
+}
+
+// LimitRangeSpec defines a min/max usage limit for resources that match on kind
+type LimitRangeSpec struct {
+	// Limits is the list of LimitRangeItem objects that are enforced
+	Limits []LimitRangeItem `json:"limits"`
+}
+
+// LimitRange sets resource usage limits for each kind of resource in a Namespace
+type LimitRange struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the limits enforced
+	Spec LimitRangeSpec `json:"spec,omitempty"`
+}
+
+// LimitRangeList is a list of LimitRange items.
+type LimitRangeList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of LimitRange objects
+	Items []LimitRange `json:"items"`
+}
