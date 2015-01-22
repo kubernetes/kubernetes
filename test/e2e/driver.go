@@ -88,6 +88,8 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 		{TestPodHasServiceEnvVars, "TestPodHasServiceEnvVars"},
 		{TestBasic, "TestBasic"},
 		{TestPrivate, "TestPrivate"},
+		{TestLivenessHttp, "TestLivenessHttp"},
+		{TestLivenessExec, "TestLivenessExec"},
 	}
 
 	// Check testList for non-existent tests and populate a StringSet with tests to run.
