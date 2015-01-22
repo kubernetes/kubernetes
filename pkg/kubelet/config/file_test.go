@@ -170,6 +170,99 @@ func TestReadFromFile(t *testing.T) {
 	}
 }
 
+func TestReadFromFileWithoutID(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta1",
+			"uuid": "12345",
+			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "",
+				UID:       "12345",
+				Namespace: "",
+				SelfLink:  "",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        api.PullAlways,
+					},
+				},
+			},
+		})
+
+		if len(update.Pods[0].ObjectMeta.Name) == 0 {
+			t.Errorf("Name did not get defaulted")
+		}
+		update.Pods[0].ObjectMeta.Name = ""
+		update.Pods[0].ObjectMeta.Namespace = ""
+		update.Pods[0].ObjectMeta.SelfLink = ""
+
+		if !api.Semantic.DeepEqual(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadV1Beta2FromFile(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta2",
+			"uuid": "12345",
+			"id": "test",
+			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "test",
+				UID:       "12345",
+				Namespace: "",
+				SelfLink:  "",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        api.PullAlways,
+					},
+				},
+			},
+		})
+
+		update.Pods[0].ObjectMeta.Namespace = ""
+		update.Pods[0].ObjectMeta.SelfLink = ""
+
+		if !api.Semantic.DeepEqual(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
 func TestReadFromFileWithDefaults(t *testing.T) {
 	file := writeTestFile(t, os.TempDir(), "test_pod_config",
 		`{
