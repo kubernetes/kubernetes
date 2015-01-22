@@ -547,6 +547,7 @@ func addMapDumpTests() {
 	klen := fmt.Sprintf("%d", len(k)) // not kLen to shut golint up
 	kkLen := fmt.Sprintf("%d", len(kk))
 	mLen := fmt.Sprintf("%d", len(m))
+	nilMap := map[string]int(nil)
 	nm := (*map[string]int)(nil)
 	pm := &m
 	mAddr := fmt.Sprintf("%p", pm)
@@ -566,6 +567,7 @@ func addMapDumpTests() {
 	addDumpTest(&pm, "(**"+mt+")("+pmAddr+"->"+mAddr+")("+ms+")\n",
 		"(**"+mt+")("+pmAddr+"->"+mAddr+")("+ms2+")\n")
 	addDumpTest(nm, "(*"+mt+")(<nil>)\n")
+	addDumpTest(nilMap, "("+mt+") <nil>\n")
 
 	// Map with custom formatter type on pointer receiver only keys and vals.
 	k2 := pstringer("one")
@@ -574,6 +576,7 @@ func addMapDumpTests() {
 	k2Len := fmt.Sprintf("%d", len(k2))
 	v2Len := fmt.Sprintf("%d", len(v2))
 	m2Len := fmt.Sprintf("%d", len(m2))
+	nilMap2 := map[pstringer]pstringer(nil)
 	nm2 := (*map[pstringer]pstringer)(nil)
 	pm2 := &m2
 	m2Addr := fmt.Sprintf("%p", pm2)
@@ -587,12 +590,14 @@ func addMapDumpTests() {
 	addDumpTest(pm2, "(*"+m2t+")("+m2Addr+")("+m2s+")\n")
 	addDumpTest(&pm2, "(**"+m2t+")("+pm2Addr+"->"+m2Addr+")("+m2s+")\n")
 	addDumpTest(nm2, "(*"+m2t+")(<nil>)\n")
+	addDumpTest(nilMap2, "("+m2t+") <nil>\n")
 
 	// Map with interface keys and values.
 	k3 := "one"
 	k3Len := fmt.Sprintf("%d", len(k3))
 	m3 := map[interface{}]interface{}{k3: 1}
 	m3Len := fmt.Sprintf("%d", len(m3))
+	nilMap3 := map[interface{}]interface{}(nil)
 	nm3 := (*map[interface{}]interface{})(nil)
 	pm3 := &m3
 	m3Addr := fmt.Sprintf("%p", pm3)
@@ -606,12 +611,14 @@ func addMapDumpTests() {
 	addDumpTest(pm3, "(*"+m3t+")("+m3Addr+")("+m3s+")\n")
 	addDumpTest(&pm3, "(**"+m3t+")("+pm3Addr+"->"+m3Addr+")("+m3s+")\n")
 	addDumpTest(nm3, "(*"+m3t+")(<nil>)\n")
+	addDumpTest(nilMap3, "("+m3t+") <nil>\n")
 
 	// Map with nil interface value.
 	k4 := "nil"
 	k4Len := fmt.Sprintf("%d", len(k4))
 	m4 := map[string]interface{}{k4: nil}
 	m4Len := fmt.Sprintf("%d", len(m4))
+	nilMap4 := map[string]interface{}(nil)
 	nm4 := (*map[string]interface{})(nil)
 	pm4 := &m4
 	m4Addr := fmt.Sprintf("%p", pm4)
@@ -625,6 +632,7 @@ func addMapDumpTests() {
 	addDumpTest(pm4, "(*"+m4t+")("+m4Addr+")("+m4s+")\n")
 	addDumpTest(&pm4, "(**"+m4t+")("+pm4Addr+"->"+m4Addr+")("+m4s+")\n")
 	addDumpTest(nm4, "(*"+m4t+")(<nil>)\n")
+	addDumpTest(nilMap4, "("+m4t+") <nil>\n")
 }
 
 func addStructDumpTests() {

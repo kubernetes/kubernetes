@@ -367,6 +367,12 @@ func (d *dumpState) dump(v reflect.Value) {
 		// been handled above.
 
 	case reflect.Map:
+		// nil maps should be indicated as different than empty maps
+		if v.IsNil() {
+			d.w.Write(nilAngleBytes)
+			break
+		}
+
 		d.w.Write(openBraceNewlineBytes)
 		d.depth++
 		if (d.cs.MaxDepth != 0) && (d.depth > d.cs.MaxDepth) {
