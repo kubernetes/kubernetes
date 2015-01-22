@@ -168,6 +168,12 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q for pod %q from file %s", pod.UID, pod.Name, filename)
 	}
+	// This is required for backward compatibility, and should be removed once we
+	// completely deprecate ContainerManifest.
+	if len(pod.Name) == 0 {
+		pod.Name = string(pod.UID)
+		glog.V(5).Infof("Generated Name %q for UID %q from file %s", pod.Name, pod.UID, filename)
+	}
 	if len(pod.Namespace) == 0 {
 		hasher := adler32.New()
 		fmt.Fprint(hasher, filename)
