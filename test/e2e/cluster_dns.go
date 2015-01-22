@@ -131,6 +131,7 @@ func TestClusterDNS(c *client.Client) bool {
 				Do().Raw()
 			if err != nil {
 				failed = append(failed, name)
+				glog.V(4).Infof("Lookup for %s failed: %v", name, err)
 			}
 		}
 		if len(failed) == 0 {
