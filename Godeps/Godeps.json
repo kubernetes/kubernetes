@@ -41,7 +41,7 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "83f84dc933714d51504ceed59f43ead21d096fe7"
+			"Rev": "1aaf839fb07e099361e445273993ccd9adc21b07"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/archive",
