@@ -245,6 +245,10 @@ func (f *flagVar) Set(value string) error {
 	return nil
 }
 
+func (f *flagVar) Type() string {
+	return "flagVar"
+}
+
 func TestUserDefined(t *testing.T) {
 	var flags FlagSet
 	flags.Init("test", ContinueOnError)
