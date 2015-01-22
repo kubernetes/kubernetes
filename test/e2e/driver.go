@@ -73,8 +73,6 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
 	}()
 
-	c := loadClientOrDie()
-
 	tests := []testSpec{
 		/*  Disable TestKubernetesROService due to rate limiter issues.
 		    TODO: Add this test back when rate limiting is working properly.
@@ -133,6 +131,8 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 		// between runs.)
 		orderseed = time.Now().UnixNano() & (1<<32 - 1)
 	}
+	// TODO(satnam6502): When the tests are run in parallel we will
+	//                   no longer need the shuffle.
 	shuffleTests(tests, rand.New(rand.NewSource(orderseed)))
 	glog.Infof("Tests shuffled with orderseed %#x\n", orderseed)
 
@@ -140,7 +140,10 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 	passed := true
 	for i, test := range tests {
 		glog.Infof("Running test %d %s", i+1, test.name)
-		testPassed := test.test(c)
+		// A client is made for each test. This allows us to attribute
+		// issues with rate ACLs etc. to a specific test and supports
+		// parallel testing.
+		testPassed := test.test(loadClientOrDie())
 		if !testPassed {
 			glog.Infof("        test %d failed", i+1)
 			passed = false
