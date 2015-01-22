@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -145,13 +146,26 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		return pod, err
 	}
 
-	manifest := &api.ContainerManifest{}
 	// TODO: use api.Scheme.DecodeInto
-	if err := yaml.Unmarshal(data, manifest); err != nil {
+	// This is awful.  DecodeInto() expects to find an APIObject, which
+	// Manifest is not.  We keep reading manifest for now for compat, but
+	// we will eventually change it to read Pod (at which point this all
+	// becomes nicer).  Until then, we assert that the ContainerManifest
+	// structure on disk is always v1beta1.  Read that, convert it to a
+	// "current" ContainerManifest (should be ~identical), then convert
+	// that to a BoundPod (which is a well-understood conversion).  This
+	// avoids writing a v1beta1.ContainerManifest -> api.BoundPod
+	// conversion which would be identical to the api.ContainerManifest ->
+	// api.BoundPod conversion.
+	oldManifest := &v1beta1.ContainerManifest{}
+	if err := yaml.Unmarshal(data, oldManifest); err != nil {
 		return pod, fmt.Errorf("can't unmarshal file %q: %v", filename, err)
 	}
-
-	if err := api.Scheme.Convert(manifest, &pod); err != nil {
+	newManifest := &api.ContainerManifest{}
+	if err := api.Scheme.Convert(oldManifest, newManifest); err != nil {
+		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
+	}
+	if err := api.Scheme.Convert(newManifest, &pod); err != nil {
 		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
 	}
 

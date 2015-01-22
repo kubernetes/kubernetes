@@ -26,27 +26,28 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
-	manifest := api.ContainerManifest{
+func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) {
+	manifest := v1beta1.ContainerManifest{
 		ID:   id,
 		UUID: types.UID(id),
-		Containers: []api.Container{
+		Containers: []v1beta1.Container{
 			{
 				Name:  "c" + id,
 				Image: "foo",
 				TerminationMessagePath: "/somepath",
 			},
 		},
-		Volumes: []api.Volume{
+		Volumes: []v1beta1.Volume{
 			{
 				Name: "host-dir",
-				Source: &api.VolumeSource{
-					HostPath: &api.HostPath{"/dir/path"},
+				Source: v1beta1.VolumeSource{
+					HostDir: &v1beta1.HostPath{"/dir/path"},
 				},
 			},
 		},
@@ -120,7 +121,7 @@ func TestReadFromFile(t *testing.T) {
 			"version": "v1beta1",
 			"uuid": "12345",
 			"id": "test",
-			"containers": [{ "image": "test/image" }]
+			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
 		}`)
 	defer os.Remove(file.Name())
 
@@ -137,7 +138,13 @@ func TestReadFromFile(t *testing.T) {
 				SelfLink:  "",
 			},
 			Spec: api.PodSpec{
-				Containers: []api.Container{{Image: "test/image", TerminationMessagePath: "/dev/termination-log"}},
+				Containers: []api.Container{
+					{
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        api.PullAlways,
+					},
+				},
 			},
 		})
 
@@ -317,7 +324,7 @@ func TestExtractFromDir(t *testing.T) {
 	manifest, expectedPod := ExampleManifestAndPod("1")
 	manifest2, expectedPod2 := ExampleManifestAndPod("2")
 
-	manifests := []api.ContainerManifest{manifest, manifest2}
+	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
 	pods := []api.BoundPod{expectedPod, expectedPod2}
 	files := make([]*os.File, len(manifests))
 
