@@ -39,7 +39,7 @@ var binaryAbbrs = []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB",
 
 // HumanSize returns a human-readable approximation of a size
 // using SI standard (eg. "44kB", "17MB")
-func HumanSize(size int64) string {
+func HumanSize(size float64) string {
 	return intToString(float64(size), 1000.0, decimapAbbrs)
 }
 

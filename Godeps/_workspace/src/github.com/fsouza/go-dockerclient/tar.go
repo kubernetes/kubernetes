@@ -27,9 +27,9 @@ func createTarStream(srcPath string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	tarOpts := &archive.TarOptions{
-		Excludes:    excludes,
-		Compression: archive.Uncompressed,
-		NoLchown:    true,
+		ExcludePatterns: excludes,
+		Compression:     archive.Uncompressed,
+		NoLchown:        true,
 	}
 	return archive.TarWithOptions(srcPath, tarOpts)
 }
