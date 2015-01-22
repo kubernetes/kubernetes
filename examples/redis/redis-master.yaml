@@ -7,7 +7,7 @@ desiredState:
     id: redis-master
     containers:
       - name: master
-        image: kubernetes/redis
+        image: kubernetes/redis:v1
         cpu: 1000
         ports:
           - name: api
@@ -19,7 +19,7 @@ desiredState:
           - key: MASTER
             value: "true"
       - name: sentinel
-        image: kubernetes/redis
+        image: kubernetes/redis:v1
         ports:
           - name: api
             containerPort: 26379

@@ -7,7 +7,7 @@ desiredState:
     id: redis-proxy
     containers:
       - name: proxy
-        image: kubernetes/redis-proxy
+        image: kubernetes/redis-proxy:v1
         ports:
           - name: api
             containerPort: 6379

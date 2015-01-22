@@ -7,7 +7,7 @@ desiredState:
     id: redis-slave
     containers:
       - name: slave
-        image: kubernetes/redis
+        image: kubernetes/redis:v1
         cpu: 1000
         ports:
           - name: api

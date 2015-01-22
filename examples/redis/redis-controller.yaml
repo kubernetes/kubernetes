@@ -12,7 +12,7 @@ desiredState:
         id: redis
         containers:
           - name: redis
-            image: kubernetes/redis
+            image: kubernetes/redis:v1
             cpu: 1000
             ports:
               - name: api

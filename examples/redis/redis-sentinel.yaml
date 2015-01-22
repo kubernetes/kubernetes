@@ -7,7 +7,7 @@ desiredState:
     id: redis-sentinel
     containers:
       - name: sentinel
-        image: kubernetes/redis
+        image: kubernetes/redis:v1
         ports:
           - name: api
             containerPort: 26379
