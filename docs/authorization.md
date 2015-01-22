@@ -101,3 +101,86 @@ to a remote authorization service.  Authorization modules can implement
 their own caching to reduce the cost of repeated authorization calls with the
 same or similar arguments.  Developers should then consider the interaction between
 caching and revocation of permissions.
+
+## External APIs
+
+### /api/{version}/ns/{namespace}/resourceAccessReview
+This API answers the question: which users and groups can perform the specified verb on the specified resourceKind.
+
+ResourceAccessReview is a runtime.Object with associated RESTStorage that only accepts creates.  The caller POSTs a ResourceAccessReview to this URL with the `spec` values filled in.  He gets a ResourceAccessReview back, with the `status` values completed.  Here is an example of a call and its corresponding return.
+```
+// input
+{
+  "kind": "ResourceAccessReview",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "list-replicationController-check",
+    "namespace": "default"
+    },
+  "spec": {
+    "verb": "list",
+    "resourceKind": "replicationControllers"
+  }
+}
+
+// POSTed like this
+curl -X POST /api/{version}/ns/{namespace}/resourceAccessReviews -d @resource-access-review.json
+// or 
+accessReviewResult, err := Client.ResourceAccessReviews(namespace).Create(resourceAccessReviewObject)
+
+// output
+{
+  "kind": "ResourceAccessReview",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "list-replicationController-check",
+    "namespace": "default"
+    },
+  "spec": {
+    "verb": "list",
+    "resourceKind": "replicationControllers"
+  },
+  "status": {
+    "users": ["Clark", "Hubert"],
+    "groups": ["cluster-admins"]
+  }
+}
+```
+
+The actual Go objects look like this:
+```
+type ResourceAccessReviewSpec struct{
+  // Verb is one of: get, list, watch, create, update, delete
+  Verb string
+
+  // ResourceKind is one of the existing resource types
+  ResourceKind string
+
+  // Content is the actual content of the request for create and update
+  Content runtime.EmbeddedObject
+
+  // ResourceName is the name of the resource being requested for a "get" or deleted for a "delete"
+  ResourceName string
+}
+
+type ResourceAccessReviewStatus struct{
+  // Users is the list of users who can perform the action
+  Users []string
+
+  // Groups is the list of groups who can perform the action
+  Groups []string
+
+  // EvaluationError is optional.  It indicates why a ResourceAccessReview failed during evaluation
+  EvaluationError string
+}
+
+type ResourceAccessReview struct {
+  kapi.TypeMeta
+  kapi.ObjectMeta
+
+  Spec    ResourceAccessReviewSpec
+  Status  ResourceAccessReviewStatus
+}
+```
+
+
