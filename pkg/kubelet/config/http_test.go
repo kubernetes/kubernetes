@@ -139,6 +139,23 @@ func TestExtractFromHTTP(t *testing.T) {
 				}),
 		},
 		{
+			desc:      "Single manifest without ID",
+			manifests: api.ContainerManifest{Version: "v1beta1", UUID: "111"},
+			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.HTTPSource,
+				api.BoundPod{
+					ObjectMeta: api.ObjectMeta{
+						UID:       "111",
+						Name:      "111",
+						Namespace: "foobar",
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						DNSPolicy:     api.DNSClusterFirst,
+					},
+				}),
+		},
+		{
 			desc: "Multiple manifests",
 			manifests: []api.ContainerManifest{
 				{Version: "v1beta1", ID: "foo", UUID: "111", Containers: []api.Container{{Name: "1", Image: "foo"}}},
