@@ -18,15 +18,14 @@ package proxy
 
 import (
 	"errors"
-	"math/rand"
 	"net"
 	"reflect"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/slice"
 	"github.com/golang/glog"
 )
 
@@ -172,30 +171,6 @@ func filterValidEndpoints(endpoints []string) []string {
 	return result
 }
 
-func endpointsAreEqual(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-
-	leftSorted := make([]string, len(left))
-	copy(leftSorted, left)
-	sort.Strings(leftSorted)
-	rightSorted := make([]string, len(right))
-	copy(rightSorted, right)
-	sort.Strings(rightSorted)
-
-	return reflect.DeepEqual(leftSorted, rightSorted)
-}
-
-func shuffleEndpoints(endpoints []string) []string {
-	shuffled := make([]string, len(endpoints))
-	perm := rand.Perm(len(endpoints))
-	for i, v := range perm {
-		shuffled[v] = endpoints[i]
-	}
-	return shuffled
-}
-
 //remove any session affinity records associated to a particular endpoint (for example when a pod goes down).
 func removeSessionAffinityByEndpoint(lb *LoadBalancerRR, service string, endpoint string) {
 	for _, affinityDetail := range lb.serviceDtlMap[service].sessionAffinityMap {
@@ -236,14 +211,14 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	for _, endpoint := range endpoints {
 		existingEndpoints, exists := lb.endpointsMap[endpoint.Name]
 		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
-		if !exists || !endpointsAreEqual(existingEndpoints, validEndpoints) {
+		if !exists || !reflect.DeepEqual(slice.SortStrings(slice.CopyStrings(existingEndpoints)), slice.SortStrings(validEndpoints)) {
 			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.Name, endpoint.Endpoints)
 			updateServiceDetailMap(lb, endpoint.Name, validEndpoints)
 			// On update can be called without NewService being called externally.
 			// to be safe we will call it here.  A new service will only be created
 			// if one does not already exist.
 			lb.NewService(endpoint.Name, api.AffinityTypeNone, 0)
-			lb.endpointsMap[endpoint.Name] = shuffleEndpoints(validEndpoints)
+			lb.endpointsMap[endpoint.Name] = slice.ShuffleStrings(validEndpoints)
 
 			// Reset the round-robin index.
 			lb.rrIndex[endpoint.Name] = 0

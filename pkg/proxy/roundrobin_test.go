@@ -18,7 +18,6 @@ package proxy
 
 import (
 	"net"
-	"sort"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -53,26 +52,6 @@ func TestFilterWorks(t *testing.T) {
 		t.Errorf("Index one is not foobar:2")
 	}
 	if filtered[2] != "foobar:3" {
-		t.Errorf("Index two is not foobar:3")
-	}
-}
-
-func TestShuffleWorks(t *testing.T) {
-	endpoints := []string{"foobar:1", "foobar:2", "foobar:3"}
-	shuffled := shuffleEndpoints(endpoints)
-
-	if len(shuffled) != 3 {
-		t.Errorf("Failed to shuffle to the correct size")
-	}
-
-	sort.Strings(shuffled)
-	if shuffled[0] != "foobar:1" {
-		t.Errorf("Index zero is not foobar:1")
-	}
-	if shuffled[1] != "foobar:2" {
-		t.Errorf("Index one is not foobar:2")
-	}
-	if shuffled[2] != "foobar:3" {
 		t.Errorf("Index two is not foobar:3")
 	}
 }
