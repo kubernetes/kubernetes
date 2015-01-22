@@ -19,7 +19,7 @@ Other details:
 
 * [API](api-conventions.md)
 * [Client libraries](client-libraries.md)
-* [Command-line interface](cli.md)
+* [Command-line interface](kubectl.md)
 * [UI](ux.md)
 * [Images and registries](images.md)
 * [Container environment](container-environment.md)
