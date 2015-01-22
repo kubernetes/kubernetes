@@ -46,8 +46,8 @@ Design docs are in [design](design).
 * **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
   web user interface.
 
-* **Kubecfg Command Line Interface** ([cli.md](cli.md)):
-  The `kubecfg` command line reference.
+* **Kubectl Command Line Interface** ([kubectl.md](kubectl.md)):
+  The `kubectl` command line reference.
 
 * **Roadmap** ([roadmap.md](roadmap.md)): The set of supported use cases, features,
   docs, and patterns that are required before Kubernetes 1.0.
