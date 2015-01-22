@@ -286,7 +286,7 @@ func TestApplyLayer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ApplyLayer(src, layerCopy); err != nil {
+	if _, err := ApplyLayer(src, layerCopy); err != nil {
 		t.Fatal(err)
 	}
 
