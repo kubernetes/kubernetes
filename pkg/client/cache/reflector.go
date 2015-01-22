@@ -72,6 +72,12 @@ func (r *Reflector) Run() {
 	go util.Forever(func() { r.listAndWatch() }, r.period)
 }
 
+// RunUntil starts a watch and handles watch events. Will restart the watch if it is closed.
+// RunUntil starts a goroutine and returns immediately. It will exit when stopCh is closed.
+func (r *Reflector) RunUntil(stopCh <-chan struct{}) {
+	go util.Until(func() { r.listAndWatch() }, r.period, stopCh)
+}
+
 func (r *Reflector) listAndWatch() {
 	var resourceVersion string
 
