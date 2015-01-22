@@ -54,6 +54,27 @@ func waitForPodRunning(c *client.Client, id string) {
 	}
 }
 
+// waitForPodNotPending returns false if it took too long for the pod to go out of pending state.
+func waitForPodNotPending(c *client.Client, podName string) bool {
+	for i := 0; i < 10; i++ {
+		if i > 0 {
+			time.Sleep(5 * time.Second)
+		}
+		pod, err := c.Pods(api.NamespaceDefault).Get(podName)
+		if err != nil {
+			glog.Warningf("Get pod %s failed: %v", podName, err)
+			continue
+		}
+		if pod.Status.Phase != api.PodPending {
+			glog.Infof("Saw pod %s out of pending state (found %q)", podName, pod.Status.Phase)
+			return true
+		}
+		glog.Infof("Waiting for pod %s status to be !%q (found %q)", podName, api.PodPending, pod.Status.Phase)
+	}
+	glog.Warningf("Gave up waiting for pod %s status to go out of pending", podName)
+	return false
+}
+
 // waitForPodSuccess returns true if the pod reached state success, or false if it reached failure or ran too long.
 func waitForPodSuccess(c *client.Client, podName string, contName string) bool {
 	for i := 0; i < 10; i++ {
