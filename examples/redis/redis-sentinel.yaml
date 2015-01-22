@@ -1,0 +1,22 @@
+id: redis-sentinel
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: redis-sentinel
+    containers:
+      - name: sentinel
+        image: kubernetes/redis
+        ports:
+          - name: api
+            containerPort: 26379
+        env:
+          - key: SENTINEL
+            value: "true"
+labels:
+  name: redis-sentinel
+  role: sentinel
+  redis-sentinel: "true"
+
+    
