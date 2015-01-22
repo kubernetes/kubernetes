@@ -1089,3 +1089,83 @@ func TestDefaultHandler(t *testing.T) {
 		t.Fatalf("DefaultHandler: Expected to return server.mux, got: %#v", server.DefaultHandler())
 	}
 }
+
+func TestCreateExecContainer(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 2)
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	body := `{"Cmd": ["bash", "-c", "ls"]}`
+	path := fmt.Sprintf("/containers/%s/exec", server.containers[0].ID)
+	request, _ := http.NewRequest("POST", path, strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("CreateExec: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	serverExec := server.execs[0]
+	var got docker.Exec
+	err := json.NewDecoder(recorder.Body).Decode(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != serverExec.ID {
+		t.Errorf("CreateExec: wrong value. Want %#v. Got %#v.", serverExec.ID, got.ID)
+	}
+	expected := docker.ExecInspect{
+		ID: got.ID,
+		ProcessConfig: docker.ExecProcessConfig{
+			EntryPoint: "bash",
+			Arguments:  []string{"-c", "ls"},
+		},
+		Container: *server.containers[0],
+	}
+	if !reflect.DeepEqual(*serverExec, expected) {
+		t.Errorf("InspectContainer: wrong value. Want:\n%#v\nGot:\n%#v\n", expected, *serverExec)
+	}
+}
+
+func TestInspectExecContainer(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 1)
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	body := `{"Cmd": ["bash", "-c", "ls"]}`
+	path := fmt.Sprintf("/containers/%s/exec", server.containers[0].ID)
+	request, _ := http.NewRequest("POST", path, strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("CreateExec: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	var got docker.Exec
+	err := json.NewDecoder(recorder.Body).Decode(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path = fmt.Sprintf("/exec/%s/json", got.ID)
+	request, _ = http.NewRequest("GET", path, nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("CreateExec: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	var got2 docker.ExecInspect
+	err = json.NewDecoder(recorder.Body).Decode(&got2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := docker.ExecInspect{
+		ID: got.ID,
+		ProcessConfig: docker.ExecProcessConfig{
+			EntryPoint: "bash",
+			Arguments:  []string{"-c", "ls"},
+		},
+		Container: *server.containers[0],
+	}
+	got2.Container.State.StartedAt = expected.Container.State.StartedAt
+	got2.Container.State.FinishedAt = expected.Container.State.FinishedAt
+	got2.Container.Config = expected.Container.Config
+	got2.Container.Created = expected.Container.Created
+	got2.Container.NetworkSettings = expected.Container.NetworkSettings
+	if !reflect.DeepEqual(got2, expected) {
+		t.Errorf("InspectContainer: wrong value. Want:\n%#v\nGot:\n%#v\n", expected, got2)
+	}
+}

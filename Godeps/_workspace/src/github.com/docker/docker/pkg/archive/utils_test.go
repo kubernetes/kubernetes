@@ -17,7 +17,8 @@ var testUntarFns = map[string]func(string, io.Reader) error{
 		return Untar(r, dest, nil)
 	},
 	"applylayer": func(dest string, r io.Reader) error {
-		return ApplyLayer(dest, ArchiveReader(r))
+		_, err := ApplyLayer(dest, ArchiveReader(r))
+		return err
 	},
 }
 
