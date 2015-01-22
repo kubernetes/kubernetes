@@ -165,8 +165,8 @@ func TestTarUntar(t *testing.T) {
 		Gzip,
 	} {
 		changes, err := tarUntar(t, origin, &TarOptions{
-			Compression: c,
-			Excludes:    []string{"3"},
+			Compression:     c,
+			ExcludePatterns: []string{"3"},
 		})
 
 		if err != nil {
@@ -196,8 +196,8 @@ func TestTarWithOptions(t *testing.T) {
 		opts       *TarOptions
 		numChanges int
 	}{
-		{&TarOptions{Includes: []string{"1"}}, 1},
-		{&TarOptions{Excludes: []string{"2"}}, 1},
+		{&TarOptions{IncludeFiles: []string{"1"}}, 1},
+		{&TarOptions{ExcludePatterns: []string{"2"}}, 1},
 	}
 	for _, testCase := range cases {
 		changes, err := tarUntar(t, origin, testCase.opts)
