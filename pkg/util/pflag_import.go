@@ -65,6 +65,18 @@ func (v *flagValueWrapper) Type() string {
 	return v.flagType
 }
 
+type boolFlag interface {
+	flag.Value
+	IsBoolFlag() bool
+}
+
+func (v *flagValueWrapper) IsBoolFlag() bool {
+	if bv, ok := v.inner.(boolFlag); ok {
+		return bv.IsBoolFlag()
+	}
+	return false
+}
+
 // Imports a 'flag.Flag' into a 'pflag.FlagSet'.  The "short" option is unset
 // and the type is inferred using reflection.
 func AddFlagToPFlagSet(f *flag.Flag, fs *pflag.FlagSet) {
