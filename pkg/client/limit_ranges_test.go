@@ -34,7 +34,7 @@ func TestLimitRangeCreate(t *testing.T) {
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
 				{
-					Kind: "pods",
+					Type: api.LimitTypePod,
 					Max: api.ResourceList{
 						api.ResourceCPU:    resource.MustParse("100"),
 						api.ResourceMemory: resource.MustParse("10000"),
@@ -70,7 +70,7 @@ func TestLimitRangeGet(t *testing.T) {
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
 				{
-					Kind: "pods",
+					Type: api.LimitTypePod,
 					Max: api.ResourceList{
 						api.ResourceCPU:    resource.MustParse("100"),
 						api.ResourceMemory: resource.MustParse("10000"),
@@ -130,7 +130,7 @@ func TestLimitRangeUpdate(t *testing.T) {
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
 				{
-					Kind: "pods",
+					Type: api.LimitTypePod,
 					Max: api.ResourceList{
 						api.ResourceCPU:    resource.MustParse("100"),
 						api.ResourceMemory: resource.MustParse("10000"),
@@ -160,7 +160,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
 				{
-					Kind: "pods",
+					Type: api.LimitTypePod,
 					Max: api.ResourceList{
 						api.ResourceCPU:    resource.MustParse("100"),
 						api.ResourceMemory: resource.MustParse("10000"),

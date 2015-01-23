@@ -68,11 +68,10 @@ func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", limitRange.Name)
-		fmt.Fprintf(out, "Kind\tResource\tMin\tMax\n")
+		fmt.Fprintf(out, "Type\tResource\tMin\tMax\n")
 		fmt.Fprintf(out, "----\t--------\t---\t---\n")
 		for i, _ := range limitRange.Spec.Limits {
 			item := limitRange.Spec.Limits[i]
-			kind := item.Kind
 			maxResources := item.Max
 			minResources := item.Min
 
@@ -100,7 +99,7 @@ func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
 				}
 
 				msg := "%v\t%v\t%v\t%v\n"
-				fmt.Fprintf(out, msg, kind, k, minValue, maxValue)
+				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue)
 			}
 		}
 		return nil

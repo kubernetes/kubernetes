@@ -5,7 +5,7 @@
   "spec": {
     "limits": [
     {
-      "kind": "pods",
+      "type": "Pod",
       "max": {
         "memory": "1073741824",
         "cpu": "2",
@@ -16,7 +16,7 @@
       }
     },
     {
-      "kind": "containers",
+      "type": "Container",
       "max": {
         "memory": "1073741824",
         "cpu": "2",

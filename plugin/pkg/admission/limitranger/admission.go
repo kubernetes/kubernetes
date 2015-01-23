@@ -131,21 +131,21 @@ func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) e
 			switch k {
 			case api.ResourceMemory:
 				enforced = v.Value()
-				switch limit.Kind {
-				case "pods":
+				switch limit.Type {
+				case api.LimitTypePod:
 					observed = podMem
 					err = fmt.Errorf("Maximum memory usage per pod is %s", v.String())
-				case "containers":
+				case api.LimitTypeContainer:
 					observed = maxContainerMem
 					err = fmt.Errorf("Maximum memory usage per container is %s", v.String())
 				}
 			case api.ResourceCPU:
 				enforced = v.MilliValue()
-				switch limit.Kind {
-				case "pods":
+				switch limit.Type {
+				case api.LimitTypePod:
 					observed = podCPU
 					err = fmt.Errorf("Maximum CPU usage per pod is %s, but requested %s", v.String(), resource.NewMilliQuantity(observed, resource.DecimalSI))
-				case "containers":
+				case api.LimitTypeContainer:
 					observed = maxContainerCPU
 					err = fmt.Errorf("Maximum CPU usage per container is %s", v.String())
 				}
@@ -161,21 +161,21 @@ func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) e
 			switch k {
 			case api.ResourceMemory:
 				enforced = v.Value()
-				switch limit.Kind {
-				case "pods":
+				switch limit.Type {
+				case api.LimitTypePod:
 					observed = podMem
 					err = fmt.Errorf("Minimum memory usage per pod is %s", v.String())
-				case "containers":
+				case api.LimitTypeContainer:
 					observed = maxContainerMem
 					err = fmt.Errorf("Minimum memory usage per container is %s", v.String())
 				}
 			case api.ResourceCPU:
 				enforced = v.MilliValue()
-				switch limit.Kind {
-				case "pods":
+				switch limit.Type {
+				case api.LimitTypePod:
 					observed = podCPU
 					err = fmt.Errorf("Minimum CPU usage per pod is %s", v.String())
-				case "containers":
+				case api.LimitTypeContainer:
 					observed = maxContainerCPU
 					err = fmt.Errorf("Minimum CPU usage per container is %s", v.String())
 				}

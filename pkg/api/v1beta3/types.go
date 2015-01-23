@@ -1067,10 +1067,17 @@ type List struct {
 	Items []runtime.RawExtension `json:"items" description:"list of objects"`
 }
 
+const (
+	// Limit that applies to all pods in a namespace
+	LimitTypePod string = "Pod"
+	// Limit that applies to all containers in a namespace
+	LimitTypeContainer string = "Container"
+)
+
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind
 type LimitRangeItem struct {
-	// Kind is the resource kind that this limit range is applied (i.e. pods, etc.)
-	Kind string
+	// Type of resource that this limit applies to
+	Type string `json:"type,omitempty"`
 	// Max usage constraints on this kind by resource name
 	Max ResourceList `json:"max,omitempty"`
 	// Min usage constraints on this kind by resource name

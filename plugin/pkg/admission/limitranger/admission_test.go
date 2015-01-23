@@ -31,7 +31,7 @@ func TestPodLimitFunc(t *testing.T) {
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
 				{
-					Kind: "pods",
+					Type: api.LimitTypePod,
 					Max: api.ResourceList{
 						api.ResourceCPU:    resource.MustParse("200m"),
 						api.ResourceMemory: resource.MustParse("4Gi"),
@@ -42,7 +42,7 @@ func TestPodLimitFunc(t *testing.T) {
 					},
 				},
 				{
-					Kind: "containers",
+					Type: api.LimitTypeContainer,
 					Max: api.ResourceList{
 						api.ResourceCPU:    resource.MustParse("100m"),
 						api.ResourceMemory: resource.MustParse("2Gi"),
