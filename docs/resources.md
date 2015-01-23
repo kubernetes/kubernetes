@@ -21,13 +21,12 @@ Note that the resource model currently prohibits over-committing resources; we w
 
 All resources have a _type_ that is identified by their _typename_ (a string, e.g., "memory").  Several resource types are predefined by Kubernetes (a full list is below), although only two will be supported at first: CPU and memory.  Users and system administrators can define their own resource types if they wish (e.g., Hadoop slots).
 
-A fully-qualified resource typename is constructed from a DNS-style _subdomain_ with at least one dot, a slash `/`, and a path comprised of one or more segments separated by slashes.
-* The subdomain must conform to [RFC 1035 section 2.3.1 'subdomain' syntax](http://tools.ietf.org/html/rfc1035) (e.g., `kubernetes.io`, `myveryown.org`).
-* The path must conform to [RFC 3986 URI `path-rootless` syntax](http://tools.ietf.org/html/rfc3986#section-3.3)  (e.g., `memory`, `shinyNewResource/v2`), save that it must not use dot-segments (`.` and `..`).
-* As a shorthand, any resource typename that does not start with a subdomain and a slash will automatically be prefixed with the built-in Kubernetes _namespace_, `kubernetes.io/resources/` in order to fully-qualify it.  This namespace is reserved for code in the open source Kubernetes repository; as a result, all user typenames MUST be fully qualified, and cannot be created in this namespace.
-* Typenames are treated as literal strings, and neither escaped nor case-converted.  This means that case is signifcant (unlike RFC 1035 subdomains) and paths should avoid characters that need percent-encoding.
+A fully-qualified resource typename is constructed from a DNS-style _subdomain_, followed by a slash `/`, followed by a DNS Label.
+* The subdomain must conform to [RFC 1035 section 2.3.1 'subdomain' syntax](http://tools.ietf.org/html/rfc1035) / [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) (e.g., `kubernetes.io`, `myveryown.org`).
+* The DNS label must conform to [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) - alphanumeric characters, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character.
+* As a shorthand, any resource typename that does not start with a subdomain and a slash will automatically be prefixed with the built-in Kubernetes _namespace_, `kubernetes.io/` in order to fully-qualify it.  This namespace is reserved for code in the open source Kubernetes repository; as a result, all user typenames MUST be fully qualified, and cannot be created in this namespace.
 
-The recommended best practice is to use a lowercase subdomain and Go-like ASCII camelCase for path components.  Some example typenames include `memory` (which will be fully-qualified as `kubernetes.io/resources/memory`), and `myveryown.org/shinyNewResource/v2`.
+Some example typenames include `memory` (which will be fully-qualified as `kubernetes.io/memory`), and `myveryown.org/shiny-new-resource`.
 
 For future reference, note that some resources, such as CPU and network bandwidth, are _compressible_, which means that their usage can potentially be throttled in a relatively benign manner. All other resources are _incompressible_, which means that any attempt to throttle them is likely to cause grief.  This distinction will be important if a Kubernetes implementation supports over-committing of resources.
 
@@ -84,10 +83,10 @@ Where:
 
 
 ## Kubernetes-defined resource types
-The following resource types are predefined ("reserved") by Kubernetes in the `resources.kubernetes.io` namespace, and so cannot be used for user-defined resources.  Note that the syntax of all resource types in the resource spec is deliberately similar, but some resource types (e.g., CPU) may receive significantly more support than simply tracking quantities in the schedulers and/or the Kubelet.
+The following resource types are predefined ("reserved") by Kubernetes in the `kubernetes.io` namespace, and so cannot be used for user-defined resources.  Note that the syntax of all resource types in the resource spec is deliberately similar, but some resource types (e.g., CPU) may receive significantly more support than simply tracking quantities in the schedulers and/or the Kubelet.
 
 ### Processor cycles
-  * Name: `cpu` (or `kubernetes.io/resources/cpu`)
+  * Name: `cpu` (or `kubernetes.io/cpu`)
   * Units: Kubernetes Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "Kubernetes CPU")
   * Internal representation: milli-KCUs
   * Compressible? yes
@@ -101,7 +100,7 @@ Note that requesting 2 KCU won't guarantee that precisely 2 physical cores will 
 
 
 ### Memory
-  * Name: `memory` (or `kubernetes.io/resources/memory`)
+  * Name: `memory` (or `kubernetes.io/memory`)
   * Units: bytes
   * Compressible? no (at least initially)
 
@@ -115,13 +114,13 @@ rather than decimal ones: "64MiB" rather than "64MB".
 A resource type may have an associated read-only ResourceType structure, that contains metadata about the type.  For example:
 ```
 resourceTypes: [
-  "kubernetes.io/resources/memory": [
+  "kubernetes.io/memory": [
     isCompressible: false, ... 
   ]
-  "kubernetes.io/resources/cpu": [
+  "kubernetes.io/cpu": [
     isCompressible: true, internalScaleExponent: 3, ...
   ]
-  "kubernetes.io/resources/diskSpace": [ ... }
+  "kubernetes.io/disk-space": [ ... }
 ]
 ```
 
@@ -131,7 +130,7 @@ The defined properties are as follows:
 
 | field name | type | contents |
 | ---------- | ---- | -------- |
-| name | string, required | the typename, as a fully-qualified string (e.g., `kubernetes.io/resources/cpu`) |
+| name | string, required | the typename, as a fully-qualified string (e.g., `kubernetes.io/cpu`) |
 | internalScaleExponent | int, default=0 | external values are multiplied by 10 to this power for internal storage (e.g., 3 for milli-units) |
 | units | string, required | format: `unit* [per unit+]` (e.g., `second`, `byte per second`). An empty unit field means "dimensionless". |
 | isCompressible | bool, default=false | true if the resource type is compressible |
@@ -179,24 +178,24 @@ and predicted
 ## Future resource types
 
 ### _[future] Network bandwidth_
-  * Name: "networkBandwidth" (or `kubernetes.io/resources/networkBandwidth`)
+  * Name: "network-bandwidth" (or `kubernetes.io/network-bandwidth`)
   * Units: bytes per second
   * Compressible? yes
 
 ### _[future] Network operations_
-  * Name: "networkIOPS" (or `kubernetes.io/resources/networkOperations`)
+  * Name: "network-iops" (or `kubernetes.io/network-iops`)
   * Units: operations (messages) per second
   * Compressible? yes
 
 ### _[future] Storage space_
-  * Name: "storageSpace" (or `kubernetes.io/resources/storageSpace`)
+  * Name: "storage-space" (or `kubernetes.io/storage-space`)
   * Units: bytes
   * Compressible? no
 
 The amount of secondary storage space available to a container.  The main target is local disk drives and SSDs, although this could also be used to qualify remotely-mounted volumes.   Specifying whether a resource is a raw disk, an SSD, a disk array, or a file system fronting any of these, is left for future work.
 
 ### _[future] Storage time_
-  * Name: storageTime (or `kubernetes.io/resources/storageTime`)
+  * Name: storage-time (or `kubernetes.io/storage-time`)
   * Units: seconds per second of disk time
   * Internal representation: milli-units
   * Compressible? yes
@@ -204,26 +203,6 @@ The amount of secondary storage space available to a container.  The main target
 This is the amount of time a container spends accessing disk, including actuator and transfer time.  A standard disk drive provides 1.0 diskTime seconds per second.
 
 ### _[future] Storage operations_
-  * Name: "storageIOPS" (or `kubernetes.io/resources/storageIOPS`)
+  * Name: "storage-iops" (or `kubernetes.io/storage-iops`)
   * Units: operations per second
   * Compressible? yes
-
-
-## Named, individual resources
-
-This is primarily important for things like disks, flash and network
-cards, where there can be multiple, separate resource suppliers, and
-the aprtition of the request across them may matter.  (Note that the
-unadorned `storageSpace` resource type doesn't imply a particular
-disk.)  Such resources will be identified by extending the resource
-typename with the instance identifier. For example:
-
-resources: [
-  request: [
-    cpu: 2.3, memory: "4Gi",
-    "storageSpace/hda":  "0.5Ti", "storageTime/hda":  0.3,
-    "storageSpace/ssd1": "0.1Ti", "storageTime/ssd1": 0.9,
- ],
-]
-
-Note that this does make it hard to parse typenames (e.g., is "foo.com/a/b" a type named "a/b" or a type named "a" with an subdivision of "b"?).  Comments welcome.
