@@ -1,0 +1,10 @@
+id: redis-master
+kind: Service
+apiVersion: v1beta1
+port: 6379
+selector:
+  name: redis
+  role: master
+labels:
+  name: master
+  role: service
