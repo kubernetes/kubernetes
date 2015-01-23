@@ -25,15 +25,18 @@ The following implementations are available, and are selected by flag:
 ## ABAC Mode
 ### Request Attributes
 
-A request has 4 attributes that can be considered for authorization:
-  - user (the user-string which a user was authenticated as).
-  - whether the request is readonly (GETs are readonly)
+A request has 7 attributes that can be considered for authorization:
+  - user - the user-string which a user was authenticated as
+  - groups - the groups to which the user belongs
+  - verb - string describing the requestion action.  Today we have: get, list, watch, create, update, and delete
   - what kind of object is being accessed 
     - applies only to the API endpoints, such as 
         `/api/v1beta1/pods`.  For miscelaneous endpoints, like `/version`, the
         kind is the empty string.
   - the namespace of the object being access, or the empty string if the
         endpoint does not support namespaced objects.
+  - content - the runtime.Object being submitted.  This only has content for creates and updates
+  - resourceName - the name of the resource being gotten (get-ed) or deleted.
 
 We anticipate adding more attributes to allow finer grained access control and
 to assist in policy management.
@@ -88,7 +91,7 @@ Other implementations can be developed fairly easily.
 The APIserver calls the Authorizer interface:
 ```go
 type Authorizer interface {
-  Authorize(a Attributes) error
+  Authorize(a Attributes) (allowed bool, allowReason string, denyReason string, evaluationError error)
 }
 ```
 to determine whether or not to allow each API action.
