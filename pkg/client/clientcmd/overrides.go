@@ -56,7 +56,6 @@ type ContextOverrideFlags struct {
 	Namespace    string
 	// allow the potential for shorter namespace flags for commands that tend to work across namespaces
 	NamespaceShort string
-	NamespacePath  string
 }
 
 // ClusterOverride holds the flag names to be used for binding command line flags for Cluster objects
@@ -69,19 +68,18 @@ type ClusterOverrideFlags struct {
 }
 
 const (
-	FlagClusterName   = "cluster"
-	FlagAuthInfoName  = "user"
-	FlagContext       = "context"
-	FlagNamespace     = "namespace"
-	FlagNamespacePath = "ns-path"
-	FlagAPIServer     = "server"
-	FlagAPIVersion    = "api-version"
-	FlagAuthPath      = "auth-path"
-	FlagInsecure      = "insecure-skip-tls-verify"
-	FlagCertFile      = "client-certificate"
-	FlagKeyFile       = "client-key"
-	FlagCAFile        = "certificate-authority"
-	FlagBearerToken   = "token"
+	FlagClusterName  = "cluster"
+	FlagAuthInfoName = "user"
+	FlagContext      = "context"
+	FlagNamespace    = "namespace"
+	FlagAPIServer    = "server"
+	FlagAPIVersion   = "api-version"
+	FlagAuthPath     = "auth-path"
+	FlagInsecure     = "insecure-skip-tls-verify"
+	FlagCertFile     = "client-certificate"
+	FlagKeyFile      = "client-key"
+	FlagCAFile       = "certificate-authority"
+	FlagBearerToken  = "token"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -117,10 +115,9 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 // RecommendedContextOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
-		ClusterName:   prefix + FlagClusterName,
-		AuthInfoName:  prefix + FlagAuthInfoName,
-		Namespace:     prefix + FlagNamespace,
-		NamespacePath: prefix + FlagNamespacePath,
+		ClusterName:  prefix + FlagClusterName,
+		AuthInfoName: prefix + FlagAuthInfoName,
+		Namespace:    prefix + FlagNamespace,
 	}
 }
 
@@ -153,5 +150,4 @@ func BindContextFlags(contextInfo *clientcmdapi.Context, flags *pflag.FlagSet, f
 	flags.StringVar(&contextInfo.Cluster, flagNames.ClusterName, "", "The name of the kubeconfig cluster to use")
 	flags.StringVar(&contextInfo.AuthInfo, flagNames.AuthInfoName, "", "The name of the kubeconfig user to use")
 	flags.StringVarP(&contextInfo.Namespace, flagNames.Namespace, flagNames.NamespaceShort, "", "If present, the namespace scope for this CLI request.")
-	flags.StringVar(&contextInfo.NamespacePath, flagNames.NamespacePath, "", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
 }
