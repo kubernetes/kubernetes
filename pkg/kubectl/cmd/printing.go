@@ -56,10 +56,10 @@ func PrintObject(cmd *cobra.Command, obj runtime.Object, f *Factory, out io.Writ
 }
 
 // outputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
-func outputVersion(cmd *cobra.Command) string {
+func outputVersion(cmd *cobra.Command, defaultVersion string) string {
 	outputVersion := GetFlagString(cmd, "output-version")
 	if len(outputVersion) == 0 {
-		outputVersion = GetFlagString(cmd, "api-version")
+		outputVersion = defaultVersion
 	}
 	return outputVersion
 }
@@ -84,7 +84,11 @@ func PrinterForMapping(f *Factory, cmd *cobra.Command, mapping *meta.RESTMapping
 		return nil, err
 	}
 	if ok {
-		version := outputVersion(cmd)
+		clientConfig, err := f.ClientConfig(cmd)
+		checkErr(err)
+		defaultVersion := clientConfig.Version
+
+		version := outputVersion(cmd, defaultVersion)
 		if len(version) == 0 {
 			version = mapping.APIVersion
 		}

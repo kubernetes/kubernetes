@@ -82,10 +82,14 @@ mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
   cert_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
   enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
+  enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
   enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
   logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
+  elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
   enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+  dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
   dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
   dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 EOF

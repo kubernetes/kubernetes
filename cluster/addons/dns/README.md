@@ -1,6 +1,6 @@
 # DNS in Kubernetes
-This directory holds an example of how to run
-[SkyDNS](https://github.com/skynetservices/skydns) in a Kubernetes cluster.
+[SkyDNS](https://github.com/skynetservices/skydns) can be configured
+to automatically run in a Kubernetes cluster.
 
 ## What things get DNS names?
 The only objects to which we are assigning DNS names are Services.  Every
@@ -18,23 +18,14 @@ Of course, giving services a name is just half of the problem - DNS names need a
 domain also.  This implementation uses the variable `DNS_DOMAIN` (see below).
 You can configure your docker daemon with the flag `--dns-search`.
 
-## How do I run it?
-The first thing you have to do is substitute the variables into the
-configuration.  You can then feed the result into `kubectl`.
+## How do I configure it?
+The following environment variables are used at cluster startup to create the SkyDNS pods and configure the kubelets. If you need to, you can reconfigure your provider as necessary (e.g. `cluster/gce/config-default.sh`):
 
 ```shell
-DNS_SERVER_IP=10.0.0.10
-DNS_DOMAIN=kubernetes.local
-DNS_REPLICAS=2
-
-sed -e "s/{DNS_DOMAIN}/$DNS_DOMAIN/g" \
-    -e "s/{DNS_REPLICAS}/$DNS_REPLICAS/g" \
-    ./cluster/addons/dns/skydns-rc.yaml.in \
-    | ./cluster/kubectl.sh create -f -
-
-sed -e "s/{DNS_SERVER_IP}/$DNS_SERVER_IP/g" \
-    ./cluster/addons/dns/skydns-svc.yaml.in \
-    | ./cluster/kubectl.sh create -f -
+ENABLE_CLUSTER_DNS=true
+DNS_SERVER_IP="10.0.0.10"
+DNS_DOMAIN="kubernetes.local"
+DNS_REPLICAS=1
 ```
 
 ## How does it work?

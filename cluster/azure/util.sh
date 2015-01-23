@@ -558,18 +558,18 @@ function restart-kube-proxy {
 }
 
 # Setup monitoring using heapster and InfluxDB
-function setup-monitoring {
+function setup-monitoring-firewall {
     echo "not implemented"  >/dev/null
 }
 
-function teardown-monitoring {
+function teardown-monitoring-firewall {
     echo "not implemented"  >/dev/null
 }
 
-function setup-logging {
+function setup-logging-firewall {
   echo "TODO: setup logging"
 }
 
-function teardown-logging {
+function teardown-logging-firewall {
   echo "TODO: teardown logging"
 }

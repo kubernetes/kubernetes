@@ -23,25 +23,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func (f *Factory) NewCmdDescribe(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "describe <resource> <id>",
-		Short: "Show details of a specific resource",
-		Long: `Show details of a specific resource.
+		Use:   "stop <resource> <id>",
+		Short: "Gracefully shutdown a resource",
+		Long: `Gracefully shutdown a resource
 
-This command joins many API calls together to form a detailed description of a
-given resource.`,
+Attempts to shutdown and delete a resource that supports graceful termination.
+If the resource is resizable it will be resized to 0 before deletion.
+
+Examples:
+  $ kubectl stop replicationcontroller foo
+  foo stopped
+`,
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) != 2 {
+				usageError(cmd, "<resource> <id>")
+			}
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
-
 			mapper, _ := f.Object(cmd)
 			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
-			describer, err := f.Describer(cmd, mapping)
+			reaper, err := f.Reaper(cmd, mapping)
 			checkErr(err)
 
-			s, err := describer.Describe(namespace, name)
+			s, err := reaper.Stop(namespace, name)
 			checkErr(err)
 			fmt.Fprintf(out, "%s\n", s)
 		},

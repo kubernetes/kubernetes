@@ -56,6 +56,7 @@ Examples:
 			} else {
 				name = updateWithPatch(cmd, args, f, patch)
 			}
+
 			fmt.Fprintf(out, "%s\n", name)
 		},
 	}
@@ -65,8 +66,11 @@ Examples:
 }
 
 func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string) string {
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	checkErr(err)
+
 	mapper, _ := f.Object(cmd)
-	mapping, namespace, name := ResourceFromArgs(cmd, args, mapper)
+	mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	client, err := f.RESTClient(cmd, mapping)
 	checkErr(err)
 
@@ -89,12 +93,18 @@ func updateWithFile(cmd *cobra.Command, f *Factory, filename string) string {
 	checkErr(err)
 	mapper, typer := f.Object(cmd)
 
-	mapping, namespace, name, data := ResourceFromFile(cmd, filename, typer, mapper, schema)
+	clientConfig, err := f.ClientConfig(cmd)
+	checkErr(err)
+	cmdApiVersion := clientConfig.Version
+
+	mapping, namespace, name, data := ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
 
 	client, err := f.RESTClient(cmd, mapping)
 	checkErr(err)
 
-	err = CompareNamespaceFromFile(cmd, namespace)
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	checkErr(err)
+	err = CompareNamespace(cmdNamespace, namespace)
 	checkErr(err)
 
 	err = resource.NewHelper(client, mapping).Update(namespace, name, true, data)

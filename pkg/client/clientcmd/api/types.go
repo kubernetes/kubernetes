@@ -83,6 +83,8 @@ type Context struct {
 	AuthInfo string `json:"user"`
 	// Namespace is the default namespace to use on unspecified requests
 	Namespace string `json:"namespace,omitempty"`
+	// NamespacePath is the path to a kubernetes ns file (~/.kubernetes_ns)
+	NamespacePath string `json:"namespace-path,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions map[string]runtime.EmbeddedObject `json:"extensions,omitempty"`
 }

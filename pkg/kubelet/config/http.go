@@ -151,6 +151,12 @@ func applyDefaults(pod *api.BoundPod, url string) {
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q for pod %q from URL %s", pod.UID, pod.Name, url)
 	}
+	// This is required for backward compatibility, and should be removed once we
+	// completely deprecate ContainerManifest.
+	if len(pod.Name) == 0 {
+		pod.Name = string(pod.UID)
+		glog.V(5).Infof("Generate Name %q from UID %q from URL %s", pod.Name, pod.UID, url)
+	}
 	if len(pod.Namespace) == 0 {
 		hasher := adler32.New()
 		fmt.Fprint(hasher, url)

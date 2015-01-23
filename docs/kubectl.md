@@ -29,8 +29,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -65,8 +65,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -p, --port=8001: The port on which to run the proxy
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -122,9 +122,9 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --namespace="": If present, the namespace scope for this CLI request.
       --no-headers=false: When using the default output, don't print headers
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
   -l, --selector="": Selector (label query) to filter on
@@ -167,8 +167,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -213,8 +213,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -262,8 +262,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --patch="": A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the updated
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -322,8 +322,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -l, --selector="": Selector (label query) to filter on
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -370,8 +370,8 @@ Available Commands:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -394,6 +394,7 @@ Additional help topics:
   kubectl rollingupdate Perform a rolling update of the given ReplicationController
   kubectl resize        Set a new size for a resizable resource (currently only Replication Controllers)
   kubectl run-container Run a particular image on the cluster.
+  kubectl stop          Gracefully shutdown a resource
 
 Use "kubectl help [command]" for more information about that command.
 ```
@@ -425,8 +426,8 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --merge=false: merge together the full hierarchy of .kubeconfig files
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -466,8 +467,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --server="": server for the cluster entry in .kubeconfig
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -507,8 +508,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": token for the user entry in .kubeconfig
@@ -549,7 +550,7 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": namespace for the context entry in .kubeconfig
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -591,8 +592,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -632,8 +633,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -670,8 +671,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -714,8 +715,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -757,8 +758,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -805,8 +806,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -859,8 +860,8 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --replicas=-1: The new number desired number of replicas.  Required.
       --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize
   -s, --server="": The address of the Kubernetes API server
@@ -915,9 +916,9 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-  -n, --namespace="": If present, the namespace scope for this CLI request.
+      --namespace="": If present, the namespace scope for this CLI request.
       --no-headers=false: When using the default output, don't print headers
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
       --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.
@@ -925,6 +926,49 @@ Usage:
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+      --token="": Bearer token for authentication to the API server.
+      --user="": The name of the kubeconfig user to use
+      --v=0: log level for V logs
+      --validate=false: If true, use a schema to validate the input before sending it
+      --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+
+```
+
+#### stop
+Gracefully shutdown a resource
+
+Attempts to shutdown and delete a resource that supports graceful termination.
+If the resource is resizable it will be resized to 0 before deletion.
+
+Examples:
+  $ kubectl stop replicationcontroller foo
+  foo stopped
+
+
+Usage:
+```
+  kubectl stop <resource> <id> [flags]
+
+ Available Flags:
+      --alsologtostderr=false: log to standard error as well as files
+      --api-version="": The API version to use when talking to the server
+  -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority="": Path to a cert. file for the certificate authority.
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
+      --cluster="": The name of the kubeconfig cluster to use
+      --context="": The name of the kubeconfig context to use
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+      --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
+      --log_dir=: If non-empty, write log files in this directory
+      --log_flush_frequency=5s: Maximum number of seconds between log flushes
+      --logtostderr=true: log to standard error instead of files
+      --match-server-version=false: Require server version to match client version
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
