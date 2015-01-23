@@ -152,7 +152,7 @@ hack/e2e-test.sh
 
 Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with this command:
 ```
-go run e2e.go --down
+go run hack/e2e.go --down
 ```
 
 ### Flag options
@@ -160,28 +160,28 @@ See the flag definitions in `hack/e2e.go` for more options, such as reusing an e
 
 ```sh
 # Build binaries for testing
-go run e2e.go --build
+go run hack/e2e.go --build
 
 # Create a fresh cluster.  Deletes a cluster first, if it exists
-go run e2e.go --up
+go run hack/e2e.go --up
 
 # Create a fresh cluster at a specific release version.
-go run e2e.go --up --version=0.7.0
+go run hack/e2e.go --up --version=0.7.0
 
 # Test if a cluster is up.
-go run e2e.go --isup
+go run hack/e2e.go --isup
 
 # Push code to an existing cluster
-go run e2e.go --push
+go run hack/e2e.go --push
 
 # Push to an existing cluster, or bring up a cluster if it's down.
-go run e2e.go --pushup
+go run hack/e2e.go --pushup
 
 # Run all tests
-go run e2e.go --test
+go run hack/e2e.go --test
 
 # Run tests matching a glob.
-go run e2e.go --tests=...
+go run hack/e2e.go --tests=...
 ```
 
 ### Combining flags
