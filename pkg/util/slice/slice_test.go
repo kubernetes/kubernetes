@@ -43,14 +43,28 @@ func TestSortStrings(t *testing.T) {
 	if !reflect.DeepEqual(dest, expected) {
 		t.Errorf("SortString didn't sort the strings")
 	}
-}
-
-func TestSortStringsSortsInPlace(t *testing.T) {
-	src := []string{"a", "c", "b"}
-	_ = SortStrings(src)
-	expected := []string{"a", "b", "c"}
 
 	if !reflect.DeepEqual(src, expected) {
 		t.Errorf("SortString didn't sort in place")
+	}
+}
+
+func TestShuffleStrings(t *testing.T) {
+	src := []string{"a", "b", "c", "d", "e", "f"}
+	dest := ShuffleStrings(src)
+
+	if len(src) != len(dest) {
+		t.Errorf("Shuffled slice is wrong length, expected %v got %v", len(src), len(dest))
+	}
+
+	m := make(map[string]bool, len(dest))
+	for _, s := range dest {
+		m[s] = true
+	}
+
+	for _, k := range src {
+		if _, exists := m[k]; !exists {
+			t.Errorf("Element %v missing from shuffled slice", k)
+		}
 	}
 }
