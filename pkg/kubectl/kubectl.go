@@ -149,6 +149,7 @@ func expandResourceShortcut(resource string) string {
 		"mi":     "minions",
 		"ev":     "events",
 		"limits": "limitRanges",
+		"quota":  "resourceQuotas",
 	}
 	if expanded, ok := shortForms[resource]; ok {
 		return expanded

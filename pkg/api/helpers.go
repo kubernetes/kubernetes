@@ -62,7 +62,13 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 )
 
-var standardResources = util.NewStringSet(string(ResourceMemory), string(ResourceCPU))
+var standardResources = util.NewStringSet(
+	string(ResourceMemory),
+	string(ResourceCPU),
+	string(ResourcePods),
+	string(ResourceQuotas),
+	string(ResourceServices),
+	string(ResourceReplicationControllers))
 
 func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)

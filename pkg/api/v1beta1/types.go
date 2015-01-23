@@ -893,6 +893,7 @@ type List struct {
 	Items    []runtime.RawExtension `json:"items" description:"list of objects"`
 }
 
+<<<<<<< HEAD
 // A type of object that is limited
 type LimitType string
 
@@ -933,4 +934,58 @@ type LimitRangeList struct {
 
 	// Items is a list of LimitRange objects
 	Items []LimitRange `json:"items"`
+}
+
+// The following identify resource constants for Kubernetes object types
+const (
+	// Pods, number
+	ResourcePods ResourceName = "pods"
+	// Services, number
+	ResourceServices ResourceName = "services"
+	// ReplicationControllers, number
+	ResourceReplicationControllers ResourceName = "replicationcontrollers"
+	// ResourceQuotas, number
+	ResourceQuotas ResourceName = "resourcequotas"
+)
+
+// ResourceQuotaSpec defines the desired hard limits to enforce for Quota
+type ResourceQuotaSpec struct {
+	// Hard is the set of desired hard limits for each named resource
+	Hard ResourceList `json:"hard,omitempty"`
+}
+
+// ResourceQuotaStatus defines the enforced hard limits and observed use
+type ResourceQuotaStatus struct {
+	// Hard is the set of enforced hard limits for each named resource
+	Hard ResourceList `json:"hard,omitempty"`
+	// Used is the current observed total usage of the resource in the namespace
+	Used ResourceList `json:"used,omitempty"`
+}
+
+// ResourceQuota sets aggregate quota restrictions enforced per namespace
+type ResourceQuota struct {
+	TypeMeta `json:",inline"`
+
+	// Spec defines the desired quota
+	Spec ResourceQuotaSpec `json:"spec,omitempty"`
+
+	// Status defines the actual enforced quota and its current usage
+	Status ResourceQuotaStatus `json:"status,omitempty"`
+}
+
+// ResourceQuotaUsage captures system observed quota status per namespace
+// It is used to enforce atomic updates of a backing ResourceQuota.Status field in storage
+type ResourceQuotaUsage struct {
+	TypeMeta `json:",inline"`
+
+	// Status defines the actual enforced quota and its current usage
+	Status ResourceQuotaStatus `json:"status,omitempty"`
+}
+
+// ResourceQuotaList is a list of ResourceQuota items
+type ResourceQuotaList struct {
+	TypeMeta `json:",inline"`
+
+	// Items is a list of ResourceQuota objects
+	Items []ResourceQuota `json:"items"`
 }

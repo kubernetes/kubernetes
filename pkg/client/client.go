@@ -38,6 +38,8 @@ type Interface interface {
 	NodesInterface
 	EventNamespacer
 	LimitRangesNamespacer
+	ResourceQuotasNamespacer
+	ResourceQuotaUsagesNamespacer
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -66,6 +68,14 @@ func (c *Client) Services(namespace string) ServiceInterface {
 
 func (c *Client) LimitRanges(namespace string) LimitRangeInterface {
 	return newLimitRanges(c, namespace)
+}
+
+func (c *Client) ResourceQuotas(namespace string) ResourceQuotaInterface {
+	return newResourceQuotas(c, namespace)
+}
+
+func (c *Client) ResourceQuotaUsages(namespace string) ResourceQuotaUsageInterface {
+	return newResourceQuotaUsages(c, namespace)
 }
 
 // VersionInterface has a method to retrieve the server version.
