@@ -74,10 +74,7 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 	}()
 
 	tests := []testSpec{
-		/*  Disable TestKubernetesROService due to rate limiter issues.
-		    TODO: Add this test back when rate limiting is working properly.
-				{TestKubernetesROService, "TestKubernetesROService"},
-		*/
+		{TestKubernetesROService, "TestKubernetesROService"},
 		{TestKubeletSendsEvent, "TestKubeletSendsEvent"},
 		{TestImportantURLs, "TestImportantURLs"},
 		{TestPodUpdate, "TestPodUpdate"},
