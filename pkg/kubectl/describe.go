@@ -70,20 +70,20 @@ func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "Name:\t%s\n", limitRange.Name)
 		fmt.Fprintf(out, "Type\tResource\tMin\tMax\n")
 		fmt.Fprintf(out, "----\t--------\t---\t---\n")
-		for i, _ := range limitRange.Spec.Limits {
+		for i := range limitRange.Spec.Limits {
 			item := limitRange.Spec.Limits[i]
 			maxResources := item.Max
 			minResources := item.Min
 
 			set := map[api.ResourceName]bool{}
-			for k, _ := range maxResources {
+			for k := range maxResources {
 				set[k] = true
 			}
-			for k, _ := range minResources {
+			for k := range minResources {
 				set[k] = true
 			}
 
-			for k, _ := range set {
+			for k := range set {
 				// if no value is set, we output -
 				maxValue := "-"
 				minValue := "-"
