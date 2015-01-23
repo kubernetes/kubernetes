@@ -18,7 +18,9 @@ package e2e
 
 import (
 	"io/ioutil"
+	"math/rand"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -182,4 +184,13 @@ func parseServiceOrDie(json string) *api.Service {
 		glog.Fatalf("Failed to cast service: %v", obj)
 	}
 	return service
+}
+
+// TODO: Allow service names to have the same form as names
+//       for pods and replication controllers so we don't
+//       need to use such a function and can instead
+//       use the UUID utilty function.
+func randomSuffix() string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return strconv.Itoa(r.Int() % 10000)
 }
