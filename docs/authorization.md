@@ -101,3 +101,106 @@ to a remote authorization service.  Authorization modules can implement
 their own caching to reduce the cost of repeated authorization calls with the
 same or similar arguments.  Developers should then consider the interaction between
 caching and revocation of permissions.
+
+
+## External APIs
+
+### /api/{version}/ns/{namespace}/subjectAccessReview
+This API answers the question: can a user or group (use authenticated user if none is specified) perform a given action?
+
+SubjectAccessReview is runtime.Object with associated RESTStorage that only accepts creates.  The caller POSTs a SubjectAccessReview to this URL with the `spec` values filled in.  He gets a SubjectAccessReview back, with the `status` values completed.  Here is an example of a call and its corresponding return.
+```
+// input
+{
+  "kind": "SubjectAccessReview",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "clark-create-check",
+    "namespace": "default",
+    },
+  "spec": {
+    "verb": "create",
+    "resourceKind": "pods",
+    "user": "Clark",
+    "content": {
+      "kind": "Pod",
+      "apiVersion": "v1beta3"
+      // rest of pod content
+    }
+  }
+}
+
+// POSTed like this
+curl -X POST /api/{version}/ns/{namespace}/subjectAccessReviews -d @subject-access-review.json
+// or 
+accessReviewResult, err := Client.SubjectAccessReviews(namespace).Create(subjectAccessReviewObject)
+
+// output
+{
+  "kind": "SubjectAccessReview",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "clark-create-check",
+    "namespace": "default",
+    },
+  "spec": {
+    "verb": "create",
+    "resourceKind": "pods",
+    "user": "Clark",
+    "content": {
+      "kind": "Pod",
+      "apiVersion": "v1beta3"
+      // rest of pod content
+    }
+  }
+  "status": {
+    "allowed": true
+  }
+}
+```
+
+The actual Go objects look like this:
+```
+type SubjectAccessReviewSpec struct{
+  // Verb is one of: get, list, watch, create, update, delete
+  Verb string
+
+  // ResourceKind is one of the existing resource types
+  ResourceKind string
+
+  // User is optional and mutually exclusive to Group.  If both User and Group are empty,
+  // the current authenticated user is used.
+  User string
+
+  // Group is optional and mutually exclusive to User.
+  Group string
+
+  // Content is the actual content of the request for create and update
+  Content runtime.EmbeddedObject
+
+  // ResourceName is the name of the resource being requested for a "get" or deleted for a "delete"
+  ResourceName string
+}
+
+type SubjectAccessReviewStatus struct{
+  // Allowed is required.  True if the action would be allowed, false otherwise.
+  Allowed bool
+
+  // DenyReason is optional.  It indicates why a request was denied.
+  DenyReason string
+
+  // AllowReason is optional.  It indicates why a request was allowed.
+  AllowReason string
+
+  // EvaluationError is optional.  It indicates why a SubjectAccessReview failed during evaluation
+  EvaluationError string
+}
+
+type SubjectAccessReview struct {
+  kapi.TypeMeta
+  kapi.ObjectMeta
+
+  Spec    SubjectAccessReviewSpec
+  Status  SubjectAccessReviewStatus
+}
+```
