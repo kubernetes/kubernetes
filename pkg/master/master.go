@@ -95,7 +95,7 @@ type Config struct {
 	// Defaults to 443 if not set.
 	ReadWritePort int
 
-	// If empty, the first result from net.InterfaceAddrs will be used.
+	// If empty, Defaults to 0.0.0.0.
 	PublicAddress string
 }
 
