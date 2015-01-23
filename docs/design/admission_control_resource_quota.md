@@ -77,7 +77,7 @@ The **ResourceQuota** plug-in introspects all incoming admission requests.
 It makes decisions by evaluating the incoming object against all defined **ResourceQuota.Status.Hard** resource limits in the request
 namespace.  If acceptance of the resource would cause the total usage of a named resource to exceed its hard limit, the request is denied.
 
-The following resource limits are imposed as part of core Kubernetes:
+The following resource limits are imposed as part of core Kubernetes at the namespace level:
 
 | ResourceName | Description |
 | ------------ | ----------- |
@@ -97,6 +97,10 @@ If the incoming request does not cause the total usage to exceed any of the enum
 **ResourceQuota.ResourceVersion**.  This keeps incremental usage atomically consistent, but does introduce a bottleneck (intentionally)
 into the system.
 
+To optimize system performance, it is encouraged that all resource quotas are tracked on the same **ResourceQuota** document.  As a result,
+its encouraged to actually impose a cap on the total number of individual quotas that are tracked in the **Namespace** to 1 by explicitly
+capping it in **ResourceQuota** document.
+
 ## kube-apiserver
 
 The server is updated to be aware of **ResourceQuota** objects.
@@ -109,7 +113,9 @@ $ kube-apiserver -admission_control=ResourceQuota
 
 ## kube-controller-manager
 
-A new controller is defined that runs a synch loop to run usage stats across the namespace.
+A new controller is defined that runs a synch loop to calculate quota usage across the namespace.
+
+**ResourceQuota** usage is only calculated if a namespace has a **ResourceQuota** object.
 
 If the observed usage is different than the recorded usage, the controller sends a **ResourceQuotaUsage** resource
 to the server to atomically update.
