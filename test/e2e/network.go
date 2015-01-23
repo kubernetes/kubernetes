@@ -21,7 +21,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -32,12 +31,9 @@ func TestNetwork(c *client.Client) bool {
 	}
 
 	ns := api.NamespaceDefault
-	s := loadObjectOrDie(assetPath("contrib", "for-tests", "network-tester", "service.json")).(*api.Service)
-	// TODO(satnam6502): Replace call of randomSuffix with call to NewUUID when service
-	//                   names have the same form as pod and replication controller names.
-	s.Name += "-" + randomSuffix()
-	glog.Infof("Creating service with name %s", s.Name)
-	svc, err := c.Services(ns).Create(s)
+	svc, err := c.Services(ns).Create(loadObjectOrDie(assetPath(
+		"contrib", "for-tests", "network-tester", "service.json",
+	)).(*api.Service))
 	if err != nil {
 		glog.Errorf("unable to create test service: %v", err)
 		return false
@@ -49,9 +45,9 @@ func TestNetwork(c *client.Client) bool {
 		}
 	}()
 
-	r := loadObjectOrDie(assetPath("contrib", "for-tests", "network-tester", "rc.json")).(*api.ReplicationController)
-	r.Name += "-" + string(util.NewUUID())
-	rc, err := c.ReplicationControllers(ns).Create(r)
+	rc, err := c.ReplicationControllers(ns).Create(loadObjectOrDie(assetPath(
+		"contrib", "for-tests", "network-tester", "rc.json",
+	)).(*api.ReplicationController))
 	if err != nil {
 		glog.Errorf("unable to create test rc: %v", err)
 		return false
@@ -70,7 +66,7 @@ func TestNetwork(c *client.Client) bool {
 	}()
 	const maxAttempts = 60
 	for i := 0; i < maxAttempts; i++ {
-		time.Sleep(2 * time.Second)
+		time.Sleep(time.Second)
 		body, err := c.Get().Prefix("proxy").Resource("services").Name(svc.Name).Suffix("status").Do().Raw()
 		if err != nil {
 			glog.Infof("Attempt %v/%v: service/pod still starting. (error: '%v')", i, maxAttempts, err)
