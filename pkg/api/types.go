@@ -764,6 +764,8 @@ type NodeResources struct {
 type ResourceName string
 
 const (
+	// The default compute resource namespace for all standard resource types.
+	DefaultResourceNamespace = "kubernetes.io"
 	// CPU, in cores. (500m = .5 cores)
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)

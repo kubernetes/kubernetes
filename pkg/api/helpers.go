@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -60,3 +61,9 @@ var Semantic = conversion.EqualitiesOrDie(
 		return a.Amount.Cmp(b.Amount) == 0
 	},
 )
+
+var standardResources = util.NewStringSet(string(ResourceMemory), string(ResourceCPU))
+
+func IsStandardResourceName(str string) bool {
+	return standardResources.Has(str)
+}
