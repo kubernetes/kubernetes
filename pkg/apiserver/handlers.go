@@ -72,7 +72,6 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Header().Set("Retry-After", "1")
 		fmt.Fprintf(w, "Rate limit exceeded.")
 	})
 }
