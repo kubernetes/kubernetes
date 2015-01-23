@@ -35,7 +35,7 @@ func newRedFederalCowHammerConfig() clientcmdapi.Config {
 		Clusters: map[string]clientcmdapi.Cluster{
 			"cow-cluster": {Server: "http://cow.org:8080"}},
 		Contexts: map[string]clientcmdapi.Context{
-			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"}},
+			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"}},
 	}
 }
 
@@ -166,11 +166,11 @@ func TestAdditionalAuth(t *testing.T) {
 	test.run(t)
 }
 
-func TestOverwriteExistingAuth(t *testing.T) {
+func TestMergeExistingAuth(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo := expectedConfig.AuthInfos["red-user"]
 	authInfo.AuthPath = "auth-path"
-	expectedConfig.AuthInfos["red-user"] = *authInfo
+	expectedConfig.AuthInfos["red-user"] = authInfo
 	test := configCommandTest{
 		args:           []string{"set-credentials", "red-user", "--" + clientcmd.FlagAuthPath + "=auth-path"},
 		startingConfig: newRedFederalCowHammerConfig(),
@@ -252,14 +252,14 @@ func TestAdditionalContext(t *testing.T) {
 	test.run(t)
 }
 
-func TestOverwriteExistingContext(t *testing.T) {
+func TestMergeExistingContext(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	context := *clientcmdapi.NewContext()
-	context.Cluster = "clustername"
+	context := expectedConfig.Contexts["federal-context"]
+	context.Namespace = "hammer"
 	expectedConfig.Contexts["federal-context"] = context
 
 	test := configCommandTest{
-		args:           []string{"set-context", "federal-context", "--" + clientcmd.FlagClusterName + "=clustername"},
+		args:           []string{"set-context", "federal-context", "--" + clientcmd.FlagNamespace + "=hammer"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}

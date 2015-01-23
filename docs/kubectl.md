@@ -344,13 +344,13 @@ Usage:
   kubectl config [command]
 
 Available Commands: 
-  view                                                                                       displays the specified .kubeconfig file or a merged result
-  set-cluster name [server] [insecure-skip-tls-verify] [certificate-authority] [api-version] Sets a cluster entry in .kubeconfig
-  set-credentials name                                                                       Sets a user entry in .kubeconfig
-  set-context name                                                                           Sets a context entry in .kubeconfig
-  set property-name property-value                                                           Sets an individual value in a .kubeconfig file
-  unset property-name                                                                        Unsets an individual value in a .kubeconfig file
-  use-context context-name                                                                   Sets the current-context in a .kubeconfig file
+  view                                                                                                                                                              displays the specified .kubeconfig file or a merged result
+  set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]            Sets a cluster entry in .kubeconfig
+  set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] Sets a user entry in .kubeconfig
+  set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]                                                                      Sets a context entry in .kubeconfig
+  set property-name property-value                                                                                                                                  Sets an individual value in a .kubeconfig file
+  unset property-name                                                                                                                                               Unsets an individual value in a .kubeconfig file
+  use-context context-name                                                                                                                                          Sets the current-context in a .kubeconfig file
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -440,19 +440,21 @@ Usage:
 
 #### config set-cluster
 Sets a cluster entry in .kubeconfig
-
-		Specifying a name that already exists overwrites that cluster entry.
+	Specifying a name that already exists will merge new fields on top of existing values for those fields.
+	e.g. 
+		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/.kubernetes.ca.cert
+		only sets the certificate-authority field on the e2e cluster entry without touching other values.
 		
 
 Usage:
 ```
-  kubectl config set-cluster name [server] [insecure-skip-tls-verify] [certificate-authority] [api-version] [flags]
+  kubectl config set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true] [flags]
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
-      --api-version="": api-version for the cluster entry in .kubeconfig
+      --api-version=: api-version for the cluster entry in .kubeconfig
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
-      --certificate-authority="": certificate-authority for the cluster entry in .kubeconfig
+      --certificate-authority=: certificate-authority for the cluster entry in .kubeconfig
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
@@ -469,7 +471,7 @@ Usage:
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
-      --server="": server for the cluster entry in .kubeconfig
+      --server=: server for the cluster entry in .kubeconfig
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
@@ -481,21 +483,23 @@ Usage:
 
 #### config set-credentials
 Sets a user entry in .kubeconfig
-
-		Specifying a name that already exists overwrites that user entry.
+	Specifying a name that already exists will merge new fields on top of existing values for those fields.
+	e.g. 
+		kubectl config set-credentials cluster-admin --client-key=~/.kube/cluster-admin/.kubecfg.key
+		only sets the client-key field on the cluster-admin user entry without touching other values.
 		
 
 Usage:
 ```
-  kubectl config set-credentials name [flags]
+  kubectl config set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] [flags]
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
-      --auth-path="": auth-path for the user entry in .kubeconfig
+      --auth-path=: auth-path for the user entry in .kubeconfig
       --certificate-authority="": Path to a cert. file for the certificate authority.
-      --client-certificate="": client-certificate for the user entry in .kubeconfig
-      --client-key="": client-key for the user entry in .kubeconfig
+      --client-certificate=: client-certificate for the user entry in .kubeconfig
+      --client-key=: client-key for the user entry in .kubeconfig
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
       --global=false: use the .kubeconfig from /home/username
@@ -512,7 +516,7 @@ Usage:
       --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-      --token="": token for the user entry in .kubeconfig
+      --token=: token for the user entry in .kubeconfig
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
@@ -522,13 +526,15 @@ Usage:
 
 #### config set-context
 Sets a context entry in .kubeconfig
-
-		Specifying a name that already exists overwrites that context entry.
+	Specifying a name that already exists will merge new fields on top of existing values for those fields.
+	e.g. 
+		kubectl config set-context gce --user=cluster-admin
+		only sets the user field on the gce context entry without touching other values.
 		
 
 Usage:
 ```
-  kubectl config set-context name [flags]
+  kubectl config set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace] [flags]
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -537,7 +543,7 @@ Usage:
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
-      --cluster="": cluster for the context entry in .kubeconfig
+      --cluster=: cluster for the context entry in .kubeconfig
       --context="": The name of the kubeconfig context to use
       --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for set-context
@@ -549,12 +555,12 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-      --namespace="": namespace for the context entry in .kubeconfig
+      --namespace=: namespace for the context entry in .kubeconfig
       --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
-      --user="": user for the context entry in .kubeconfig
+      --user=: user for the context entry in .kubeconfig
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
