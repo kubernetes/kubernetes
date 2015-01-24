@@ -24,6 +24,7 @@ dimensions, such as:
    - `tier=frontend`, `tier=backend`, ...
    - `partition=customerA`, `partition=customerB`, ...
    - `track=daily`, `track=weekly`
+
 These are just examples; you are free to develop your own conventions.
 
 Label selectors permit very simple filtering by label keys and values.   Currently, label selectors only support these forms:
