@@ -50,10 +50,6 @@ type defaultAPIServer struct {
 	group *APIGroupVersion
 }
 
-const (
-	StatusUnprocessableEntity = 422
-)
-
 // Handle returns a Handler function that exposes the provided storage interfaces
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
