@@ -657,11 +657,11 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	// ensure resource names are properly qualified per docs/resources.md
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
-		for k, _ := range limit.Max {
-			allErrs = append(allErrs, ValidateResourceName(k))
+		for k := range limit.Max {
+			allErrs = append(allErrs, ValidateResourceName(string(k))...)
 		}
-		for k, _ := range limit.Min {
-			allErrs = append(allErrs, ValidateResourceName(k))
+		for k := range limit.Min {
+			allErrs = append(allErrs, ValidateResourceName(string(k))...)
 		}
 	}
 	return allErrs
