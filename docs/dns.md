@@ -35,4 +35,4 @@ time.
 
 ## For more information
 
-See [the docs for the cluster addon](cluster/addons/dns/README.md).
+See [the docs for the cluster addon](../cluster/addons/dns/README.md).
