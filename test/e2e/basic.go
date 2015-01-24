@@ -187,5 +187,5 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 // TestBasic performs the TestBasicImage check with the
 // image kubernetes/serve_hostname
 func TestBasic(c *client.Client) bool {
-	return TestBasicImage(c, "basic", "kubernetes/serve_hostname:1.0")
+	return TestBasicImage(c, "basic", "kubernetes/serve_hostname:1.1")
 }
