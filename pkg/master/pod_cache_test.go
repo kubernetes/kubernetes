@@ -186,21 +186,31 @@ func makePod(namespace, name, host string, containers ...string) *api.Pod {
 		Status:     api.PodStatus{Host: host},
 	}
 	for _, c := range containers {
-		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
-			Name: c,
-		})
+		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{Name: c})
 	}
 	return pod
 }
 
-func makeNode(name string) *api.Node {
+func makeHealthyNode(name string) *api.Node {
 	return &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: name},
+		Status: api.NodeStatus{Conditions: []api.NodeCondition{
+			{Kind: api.NodeReady, Status: api.ConditionFull},
+		}},
+	}
+}
+
+func makeUnhealthyNode(name string) *api.Node {
+	return &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: name},
+		Status: api.NodeStatus{Conditions: []api.NodeCondition{
+			{Kind: api.NodeReady, Status: api.ConditionNone},
+		}},
 	}
 }
 
 func TestPodUpdateAllContainers(t *testing.T) {
-	pod := makePod(api.NamespaceDefault, "foo", "machine", "bar")
+	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
 	pod2 := makePod(api.NamespaceDefault, "baz", "machine", "qux")
 	config := podCacheTestConfig{
 		ipFunc: func(host string) string {
@@ -211,8 +221,8 @@ func TestPodUpdateAllContainers(t *testing.T) {
 		},
 		kubeletContainerInfo: api.PodStatus{
 			Info: api.PodInfo{"bar": api.ContainerStatus{}}},
-		nodes: []api.Node{*makeNode("machine")},
-		pods:  []api.Pod{*pod, *pod2},
+		nodes: []api.Node{*makeHealthyNode("machine")},
+		pods:  []api.Pod{*pod1, *pod2},
 	}
 	cache := config.Construct()
 
@@ -254,7 +264,7 @@ func TestFillPodStatusNoHost(t *testing.T) {
 	pod := makePod(api.NamespaceDefault, "foo", "", "bar")
 	config := podCacheTestConfig{
 		kubeletContainerInfo: api.PodStatus{},
-		nodes:                []api.Node{*makeNode("machine")},
+		nodes:                []api.Node{*makeHealthyNode("machine")},
 		pods:                 []api.Pod{*pod},
 	}
 	cache := config.Construct()
@@ -283,7 +293,7 @@ func TestFillPodStatusMissingMachine(t *testing.T) {
 	}
 
 	status, err := cache.GetPodStatus(pod.Namespace, pod.Name)
-	if e, a := api.PodFailed, status.Phase; e != a {
+	if e, a := api.PodUnknown, status.Phase; e != a {
 		t.Errorf("Expected: %+v, Got %+v", e, a)
 	}
 }
@@ -310,7 +320,7 @@ func TestFillPodStatus(t *testing.T) {
 				},
 			},
 		},
-		nodes: []api.Node{*makeNode("machine")},
+		nodes: []api.Node{*makeHealthyNode("machine")},
 		pods:  []api.Pod{*pod},
 	}
 	cache := config.Construct()
@@ -337,7 +347,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 				"net": {},
 			},
 		},
-		nodes: []api.Node{*makeNode("machine")},
+		nodes: []api.Node{*makeHealthyNode("machine")},
 		pods:  []api.Pod{*pod},
 	}
 	cache := config.Construct()
@@ -376,6 +386,7 @@ func TestPodPhaseWithBadNode(t *testing.T) {
 
 	tests := []struct {
 		pod    *api.Pod
+		nodes  []api.Node
 		status api.PodPhase
 		test   string
 	}{
@@ -383,10 +394,11 @@ func TestPodPhaseWithBadNode(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Host: "machine-2",
+					Host: "machine-two",
 				},
 			},
-			api.PodFailed,
+			[]api.Node{},
+			api.PodUnknown,
 			"no info, but bad machine",
 		},
 		{
@@ -400,7 +412,8 @@ func TestPodPhaseWithBadNode(t *testing.T) {
 					Host: "machine-two",
 				},
 			},
-			api.PodFailed,
+			[]api.Node{},
+			api.PodUnknown,
 			"all running but minion is missing",
 		},
 		{
@@ -414,14 +427,45 @@ func TestPodPhaseWithBadNode(t *testing.T) {
 					Host: "machine-two",
 				},
 			},
-			api.PodFailed,
+			[]api.Node{},
+			api.PodUnknown,
 			"all stopped but minion missing",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": runningState,
+					},
+					Host: "machine-two",
+				},
+			},
+			[]api.Node{*makeUnhealthyNode("machine-two")},
+			api.PodUnknown,
+			"all running but minion is unhealthy",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": stoppedState,
+						"containerB": stoppedState,
+					},
+					Host: "machine-two",
+				},
+			},
+			[]api.Node{*makeUnhealthyNode("machine-two")},
+			api.PodUnknown,
+			"all stopped but minion is unhealthy",
 		},
 	}
 	for _, test := range tests {
 		config := podCacheTestConfig{
 			kubeletContainerInfo: test.pod.Status,
-			nodes:                []api.Node{},
+			nodes:                test.nodes,
 			pods:                 []api.Pod{*test.pod},
 		}
 		cache := config.Construct()

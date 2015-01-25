@@ -19,5 +19,5 @@ script:
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
 
-notifications:
-  irc: "chat.freenode.net#google-containers"
+# notifications:
+#   irc: "chat.freenode.net#google-containers"
