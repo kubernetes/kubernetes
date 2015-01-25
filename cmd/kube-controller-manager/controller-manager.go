@@ -34,6 +34,7 @@ import (
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
@@ -55,8 +56,9 @@ var (
 	machineList util.StringList
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
-	nodeMilliCPU = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory   = resource.QuantityFlag("node_memory", "3Gi", "The amount of memory (in bytes) provisioned on each node")
+	nodeMilliCPU            = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory              = resource.QuantityFlag("node_memory", "3Gi", "The amount of memory (in bytes) provisioned on each node")
+	resourceQuotaSyncPeriod = flag.Duration("resource_quota_sync_period", 10*time.Second, "The period for syncing quota usage status in the system")
 )
 
 func init() {
@@ -111,6 +113,9 @@ func main() {
 	}
 	nodeController := nodeControllerPkg.NewNodeController(cloud, *minionRegexp, machineList, nodeResources, kubeClient)
 	nodeController.Run(*nodeSyncPeriod)
+
+	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
+	resourceQuotaManager.Run(*resourceQuotaSyncPeriod)
 
 	select {}
 }
