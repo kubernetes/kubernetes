@@ -135,16 +135,26 @@ if [[ $iterations -gt 1 ]]; then
 fi
 
 if [[ -n "${1-}" ]]; then
-  covdir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
-  kube::log::status "Saving coverage output in '${covdir}'"
+  cover_report_dir=""
+  if [[ -n "${KUBE_COVER}" ]]; then
+    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+    kube::log::status "Saving coverage output in '${cover_report_dir}'"
+  fi
+
   for arg; do
     trap 'exit 1' SIGINT
-    mkdir -p "${covdir}/${arg}"
     pkg=${KUBE_GO_PACKAGE}/${arg}
+
+    cover_params=()
+    if [[ -n "${KUBE_COVER}" ]]; then
+      mkdir -p "${cover_report_dir}/${arg}"
+      cover_params=(${KUBE_COVER} -coverprofile="${cover_report_dir}/${arg}/coverage.out")
+    fi
+
     go test "${goflags[@]:+${goflags[@]}}" \
         ${KUBE_RACE} \
         ${KUBE_TIMEOUT} \
-        ${KUBE_COVER} -coverprofile="${covdir}/${arg}/coverage.out" \
+        "${cover_params[@]+${cover_params[@]}}" \
         "${pkg}"
   done
   exit 0
