@@ -67,7 +67,11 @@ func extractPort(param util.IntOrString, container api.Container) (int, error) {
 	var err error
 	switch param.Kind {
 	case util.IntstrInt:
-		return param.IntVal, nil
+		port := param.IntVal
+		if port > 0 && port < 65536 {
+			return port, nil
+		}
+		return port, fmt.Errorf("invalid port number: %v", port)
 	case util.IntstrString:
 		port = findPortByName(container, param.StrVal)
 		if port == -1 {
@@ -76,7 +80,10 @@ func extractPort(param util.IntOrString, container api.Container) (int, error) {
 				return port, err
 			}
 		}
-		return port, nil
+		if port > 0 && port < 65536 {
+			return port, nil
+		}
+		return port, fmt.Errorf("invalid port number: %v", port)
 	default:
 		return port, fmt.Errorf("IntOrString had no kind: %+v", param)
 	}
