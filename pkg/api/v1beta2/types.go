@@ -216,6 +216,11 @@ type Capabilities struct {
 	Drop []CapabilityType `json:"drop,omitempty" description:"droped capabilities"`
 }
 
+type ResourceRequirementSpec struct {
+	// Limits describes the maximum amount of compute resources required.
+	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
+}
+
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
@@ -226,13 +231,14 @@ type Container struct {
 	// Optional: Defaults to whatever is defined in the image.
 	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; defaults to entrypoint or command in the image"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir string   `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default"`
-	Ports      []Port   `json:"ports,omitempty" description:"list of ports to expose from the container"`
-	Env        []EnvVar `json:"env,omitempty" description:"list of environment variables to set in the container"`
+	WorkingDir string                  `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default"`
+	Ports      []Port                  `json:"ports,omitempty" description:"list of ports to expose from the container"`
+	Env        []EnvVar                `json:"env,omitempty" description:"list of environment variables to set in the container"`
+	Resources  ResourceRequirementSpec `json:"resources,omitempty" description:"Compute Resources required by this container"`
 	// Optional: Defaults to unlimited.
-	Memory int64 `json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
+	CPU int `json:"cpu,omitempty" description:"CPU share in thousandths of a core"`
 	// Optional: Defaults to unlimited.
-	CPU           int            `json:"cpu,omitempty" description:"CPU share in thousandths of a core"`
+	Memory        int64          `json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
 	VolumeMounts  []VolumeMount  `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesystem"`
 	LivenessProbe *LivenessProbe `json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails"`
 	Lifecycle     *Lifecycle     `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events"`

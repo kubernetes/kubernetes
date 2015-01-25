@@ -444,7 +444,140 @@ func init() {
 			}
 			return nil
 		},
-
+		// Converts internal Container to v1beta1.Container.
+		// Fields 'CPU' and 'Memory' are not present in the internal Container object.
+		// Hence the need for a custom conversion function.
+		func(in *newer.Container, out *Container, s conversion.Scope) error {
+			if err := s.Convert(&in.Name, &out.Name, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Image, &out.Image, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Command, &out.Command, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.WorkingDir, &out.WorkingDir, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Ports, &out.Ports, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Env, &out.Env, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(in.Resources.Limits.Cpu(), &out.CPU, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(in.Resources.Limits.Memory(), &out.Memory, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.VolumeMounts, &out.VolumeMounts, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LivenessProbe, &out.LivenessProbe, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Lifecycle, &out.Lifecycle, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TerminationMessagePath, &out.TerminationMessagePath, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Privileged, &out.Privileged, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ImagePullPolicy, &out.ImagePullPolicy, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		// Internal API does not support CPU to be specified via an explicit field.
+		// Hence it must be stored in Container.Resources.
+		func(in *int, out *newer.ResourceList, s conversion.Scope) error {
+			if *in <= 0 {
+				return nil
+			}
+			quantity := resource.Quantity{}
+			if err := s.Convert(in, &quantity, 0); err != nil {
+				return err
+			}
+			(*out)[newer.ResourceCPU] = quantity
+			return nil
+		},
+		// Internal API does not support Memory to be specified via an explicit field.
+		// Hence it must be stored in Container.Resources.
+		func(in *int64, out *newer.ResourceList, s conversion.Scope) error {
+			if *in <= 0 {
+				return nil
+			}
+			quantity := resource.Quantity{}
+			if err := s.Convert(in, &quantity, 0); err != nil {
+				return err
+			}
+			(*out)[newer.ResourceMemory] = quantity
+			return nil
+		},
+		// Converts v1beta1.Container to internal Container.
+		// Fields 'CPU' and 'Memory' are not present in the internal Container object.
+		// Hence the need for a custom conversion function.
+		func(in *Container, out *newer.Container, s conversion.Scope) error {
+			if err := s.Convert(&in.Name, &out.Name, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Image, &out.Image, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Command, &out.Command, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.WorkingDir, &out.WorkingDir, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Ports, &out.Ports, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Env, &out.Env, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.CPU, &out.Resources.Limits, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Memory, &out.Resources.Limits, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.VolumeMounts, &out.VolumeMounts, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LivenessProbe, &out.LivenessProbe, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Lifecycle, &out.Lifecycle, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TerminationMessagePath, &out.TerminationMessagePath, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Privileged, &out.Privileged, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ImagePullPolicy, &out.ImagePullPolicy, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		func(in *newer.PodSpec, out *ContainerManifest, s conversion.Scope) error {
 			if err := s.Convert(&in.Volumes, &out.Volumes, 0); err != nil {
 				return err

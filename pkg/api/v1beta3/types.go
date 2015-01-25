@@ -322,6 +322,12 @@ type Capabilities struct {
 	Drop []CapabilityType `json:"drop,omitempty"`
 }
 
+// ResourceRequirementSpec describes the compute resource requirements.
+type ResourceRequirementSpec struct {
+	// Limits describes the maximum amount of compute resources required.
+	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
+}
+
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
@@ -332,16 +338,13 @@ type Container struct {
 	// Optional: Defaults to whatever is defined in the image.
 	Command []string `json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir string   `json:"workingDir,omitempty"`
-	Ports      []Port   `json:"ports,omitempty"`
-	Env        []EnvVar `json:"env,omitempty"`
-	// Optional: Defaults to unlimited. Units: bytes.
-	Memory resource.Quantity `json:"memory,omitempty"`
-	// Optional: Defaults to unlimited. Units: Cores. (500m == 1/2 core)
-	CPU           resource.Quantity `json:"cpu,omitempty"`
-	VolumeMounts  []VolumeMount     `json:"volumeMounts,omitempty"`
-	LivenessProbe *Probe            `json:"livenessProbe,omitempty"`
-	Lifecycle     *Lifecycle        `json:"lifecycle,omitempty"`
+	WorkingDir    string                  `json:"workingDir,omitempty"`
+	Ports         []Port                  `json:"ports,omitempty"`
+	Env           []EnvVar                `json:"env,omitempty"`
+	Resources     ResourceRequirementSpec `json:"resources,omitempty" description:"Compute Resources required by this container"`
+	VolumeMounts  []VolumeMount           `json:"volumeMounts,omitempty"`
+	LivenessProbe *Probe                  `json:"livenessProbe,omitempty"`
+	Lifecycle     *Lifecycle              `json:"lifecycle,omitempty"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.
@@ -796,8 +799,6 @@ type NodeCondition struct {
 type ResourceName string
 
 const (
-	// The default compute resource namespace for all standard resource types.
-	DefaultResourceNamespace = "kubernetes.io"
 	// CPU, in cores. (500m = .5 cores)
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)

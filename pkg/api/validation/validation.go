@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -395,6 +396,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
 		cErrs = append(cErrs, validateVolumeMounts(ctr.VolumeMounts, volumes).Prefix("volumeMounts")...)
 		cErrs = append(cErrs, validatePullPolicyWithDefault(ctr).Prefix("pullPolicy")...)
+		cErrs = append(cErrs, validateResourceRequirements(ctr).Prefix("resources")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
@@ -696,28 +698,17 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	return allErrs
 }
 
-// Typename is a generic representation for all compute resource typenames.
+// Validate compute resource typename.
 // Refer to docs/resources.md for more details.
-func ValidateResourceName(str string) errs.ValidationErrorList {
+func validateResourceName(str string) errs.ValidationErrorList {
 	if !util.IsQualifiedName(str) {
 		return errs.ValidationErrorList{fmt.Errorf("invalid compute resource typename format %q", str)}
 	}
 
-	parts := strings.Split(str, "/")
-	switch len(parts) {
-	case 1:
-		if !api.IsStandardResourceName(parts[0]) {
+	if len(strings.Split(str, "/")) == 1 {
+		if !api.IsStandardResourceName(str) {
 			return errs.ValidationErrorList{fmt.Errorf("invalid compute resource typename. %q is neither a standard resource type nor is fully qualified", str)}
 		}
-		break
-	case 2:
-		if parts[0] == api.DefaultResourceNamespace {
-			if !api.IsStandardResourceName(parts[1]) {
-				return errs.ValidationErrorList{fmt.Errorf("invalid compute resource typename. %q contains a compute resource type not supported", str)}
-
-			}
-		}
-		break
 	}
 
 	return errs.ValidationErrorList{}
@@ -740,12 +731,34 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		for k := range limit.Max {
-			allErrs = append(allErrs, ValidateResourceName(string(k))...)
+			allErrs = append(allErrs, validateResourceName(string(k))...)
 		}
 		for k := range limit.Min {
-			allErrs = append(allErrs, ValidateResourceName(string(k))...)
+			allErrs = append(allErrs, validateResourceName(string(k))...)
 		}
 	}
+	return allErrs
+}
+
+func validateBasicResource(quantity resource.Quantity) errs.ValidationErrorList {
+	if quantity.Value() < 0 {
+		return errs.ValidationErrorList{fmt.Errorf("%v is not a valid resource quantity", quantity.Value())}
+	}
+	return errs.ValidationErrorList{}
+}
+
+// Validates resource requirement spec.
+func validateResourceRequirements(container *api.Container) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for resourceName, quantity := range container.Resources.Limits {
+		// Validate resource name.
+		errs := validateResourceName(resourceName.String())
+		if api.IsStandardResourceName(resourceName.String()) {
+			errs = append(errs, validateBasicResource(quantity).Prefix(fmt.Sprintf("Resource %s: ", resourceName))...)
+		}
+		allErrs = append(allErrs, errs...)
+	}
+
 	return allErrs
 }
 
@@ -763,13 +776,13 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", resourceQuota.Namespace, ""))
 	}
 	for k := range resourceQuota.Spec.Hard {
-		allErrs = append(allErrs, ValidateResourceName(string(k))...)
+		allErrs = append(allErrs, validateResourceName(string(k))...)
 	}
 	for k := range resourceQuota.Status.Hard {
-		allErrs = append(allErrs, ValidateResourceName(string(k))...)
+		allErrs = append(allErrs, validateResourceName(string(k))...)
 	}
 	for k := range resourceQuota.Status.Used {
-		allErrs = append(allErrs, ValidateResourceName(string(k))...)
+		allErrs = append(allErrs, validateResourceName(string(k))...)
 	}
 	return allErrs
 }
