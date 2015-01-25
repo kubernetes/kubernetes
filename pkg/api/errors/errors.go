@@ -148,14 +148,10 @@ func NewInvalid(kind, name string, errs ValidationErrorList) error {
 // NewBadRequest creates an error that indicates that the request is invalid and can not be processed.
 func NewBadRequest(reason string) error {
 	return &StatusError{api.Status{
-		Status: api.StatusFailure,
-		Code:   http.StatusBadRequest,
-		Reason: api.StatusReasonBadRequest,
-		Details: &api.StatusDetails{
-			Causes: []api.StatusCause{
-				{Message: reason},
-			},
-		},
+		Status:  api.StatusFailure,
+		Code:    http.StatusBadRequest,
+		Reason:  api.StatusReasonBadRequest,
+		Message: reason,
 	}}
 }
 
