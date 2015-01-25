@@ -84,11 +84,27 @@ type ValidationError struct {
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
-	s := spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
-	if v.Detail != "" {
+	var s string
+	if v.Type == ValidationErrorTypeRequired && isEmpty(v.BadValue) {
+		s = spew.Sprintf("%s: %s", v.Field, v.Type)
+	} else {
+		s = spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
+	}
+	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
 	}
 	return s
+}
+
+func isEmpty(obj interface{}) bool {
+	if obj == nil {
+		return true
+	}
+	switch t := obj.(type) {
+	case string:
+		return len(t) == 0
+	}
+	return false
 }
 
 // NewFieldRequired returns a *ValidationError indicating "value required"
