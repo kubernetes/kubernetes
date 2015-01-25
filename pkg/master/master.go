@@ -55,7 +55,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 )
@@ -127,7 +127,6 @@ type Master struct {
 	admissionControl      admission.Interface
 	masterCount           int
 	v1beta3               bool
-	nodeIPCache           IPGetter
 
 	readOnlyServer  string
 	readWriteServer string
@@ -260,7 +259,6 @@ func New(c *Config) *Master {
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
 		v1beta3:               c.EnableV1Beta3,
-		nodeIPCache:           NewIPCache(c.Cloud, util.RealClock{}, 30*time.Second),
 
 		masterCount:     c.MasterCount,
 		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
@@ -325,7 +323,6 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 func makeMinionRegistry(c *Config) minion.Registry {
 	var minionRegistry minion.Registry = etcd.NewRegistry(c.EtcdHelper, nil)
-	// TODO: plumb in nodeIPCache here
 	if c.HealthCheckMinions {
 		minionRegistry = minion.NewHealthyRegistry(minionRegistry, c.KubeletClient, util.RealClock{}, 20*time.Second)
 	}
@@ -339,7 +336,6 @@ func (m *Master) init(c *Config) {
 
 	nodeRESTStorage := minion.NewREST(m.minionRegistry)
 	podCache := NewPodCache(
-		m.nodeIPCache,
 		c.KubeletClient,
 		RESTStorageToNodes(nodeRESTStorage).Nodes(),
 		m.podRegistry,

@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
@@ -28,14 +27,9 @@ import (
 	"github.com/golang/glog"
 )
 
-type IPGetter interface {
-	GetInstanceIP(host string) (ip string)
-}
-
 // PodCache contains both a cache of container information, as well as the mechanism for keeping
 // that cache up to date.
 type PodCache struct {
-	ipCache       IPGetter
 	containerInfo client.PodInfoGetter
 	pods          pod.Registry
 	// For confirming existance of a node
@@ -47,7 +41,7 @@ type PodCache struct {
 	podStatus map[objKey]api.PodStatus
 	// nodes that we know exist. Cleared at the beginning of each
 	// UpdateAllPods call.
-	currentNodes map[objKey]bool
+	currentNodes map[objKey]api.NodeStatus
 }
 
 type objKey struct {
@@ -57,13 +51,12 @@ type objKey struct {
 // NewPodCache returns a new PodCache which watches container information
 // registered in the given PodRegistry.
 // TODO(lavalamp): pods should be a client.PodInterface.
-func NewPodCache(ipCache IPGetter, info client.PodInfoGetter, nodes client.NodeInterface, pods pod.Registry) *PodCache {
+func NewPodCache(info client.PodInfoGetter, nodes client.NodeInterface, pods pod.Registry) *PodCache {
 	return &PodCache{
-		ipCache:       ipCache,
 		containerInfo: info,
 		pods:          pods,
 		nodes:         nodes,
-		currentNodes:  map[objKey]bool{},
+		currentNodes:  map[objKey]api.NodeStatus{},
 		podStatus:     map[objKey]api.PodStatus{},
 	}
 }
@@ -80,37 +73,34 @@ func (p *PodCache) GetPodStatus(namespace, name string) (*api.PodStatus, error) 
 	return &value, nil
 }
 
-func (p *PodCache) nodeExistsInCache(name string) (exists, cacheHit bool) {
+func (p *PodCache) getNodeStatusInCache(name string) (*api.NodeStatus, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	exists, cacheHit = p.currentNodes[objKey{"", name}]
-	return exists, cacheHit
+	nodeStatus, cacheHit := p.currentNodes[objKey{"", name}]
+	return &nodeStatus, cacheHit
 }
 
 // lock must *not* be held
-func (p *PodCache) nodeExists(name string) bool {
-	exists, cacheHit := p.nodeExistsInCache(name)
+func (p *PodCache) getNodeStatus(name string) (*api.NodeStatus, error) {
+	nodeStatus, cacheHit := p.getNodeStatusInCache(name)
 	if cacheHit {
-		return exists
+		return nodeStatus, nil
 	}
 	// TODO: suppose there's N concurrent requests for node "foo"; in that case
 	// it might be useful to block all of them and only look up "foo" once.
 	// (This code will make up to N lookups.) One way of doing that would be to
 	// have a pool of M mutexes and require that before looking up "foo" you must
 	// lock mutex hash("foo") % M.
-	_, err := p.nodes.Get(name)
-	exists = true
+	node, err := p.nodes.Get(name)
 	if err != nil {
-		exists = false
-		if !errors.IsNotFound(err) {
-			glog.Errorf("Unexpected error type verifying minion existence: %+v", err)
-		}
+		glog.Errorf("Unexpected error verifying node existence: %+v", err)
+		return nil, err
 	}
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.currentNodes[objKey{"", name}] = exists
-	return exists
+	p.currentNodes[objKey{"", name}] = node.Status
+	return &node.Status, nil
 }
 
 // TODO: once Host gets moved to spec, this can take a podSpec + metadata instead of an
@@ -138,14 +128,28 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		return newStatus, nil
 	}
 
-	if !p.nodeExists(pod.Status.Host) {
-		// Assigned to non-existing node.
-		newStatus.Phase = api.PodFailed
+	nodeStatus, err := p.getNodeStatus(pod.Status.Host)
+
+	// Assigned to non-existing node.
+	if err != nil || len(nodeStatus.Conditions) == 0 {
+		newStatus.Phase = api.PodUnknown
 		return newStatus, nil
 	}
 
+	// Assigned to an unhealthy node.
+	for _, condition := range nodeStatus.Conditions {
+		if condition.Kind == api.NodeReady && condition.Status == api.ConditionNone {
+			newStatus.Phase = api.PodUnknown
+			return newStatus, nil
+		}
+		if condition.Kind == api.NodeReachable && condition.Status == api.ConditionNone {
+			newStatus.Phase = api.PodUnknown
+			return newStatus, nil
+		}
+	}
+
 	result, err := p.containerInfo.GetPodStatus(pod.Status.Host, pod.Namespace, pod.Name)
-	newStatus.HostIP = p.ipCache.GetInstanceIP(pod.Status.Host)
+	newStatus.HostIP = nodeStatus.HostIP
 
 	if err != nil {
 		newStatus.Phase = api.PodUnknown
@@ -161,10 +165,10 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	return newStatus, err
 }
 
-func (p *PodCache) resetNodeExistenceCache() {
+func (p *PodCache) resetNodeStatusCache() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.currentNodes = map[objKey]bool{}
+	p.currentNodes = map[objKey]api.NodeStatus{}
 }
 
 // UpdateAllContainers updates information about all containers.
@@ -172,7 +176,7 @@ func (p *PodCache) resetNodeExistenceCache() {
 // calling again, or risk having new info getting clobbered by delayed
 // old info.
 func (p *PodCache) UpdateAllContainers() {
-	p.resetNodeExistenceCache()
+	p.resetNodeStatusCache()
 
 	ctx := api.NewContext()
 	pods, err := p.pods.ListPods(ctx, labels.Everything())
