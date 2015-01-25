@@ -27,14 +27,9 @@ import (
 	"github.com/golang/glog"
 )
 
-type IPGetter interface {
-	GetInstanceIP(host string) (ip string)
-}
-
 // PodCache contains both a cache of container information, as well as the mechanism for keeping
 // that cache up to date.
 type PodCache struct {
-	ipCache       IPGetter
 	containerInfo client.PodInfoGetter
 	pods          pod.Registry
 	// For confirming existance of a node
@@ -56,9 +51,8 @@ type objKey struct {
 // NewPodCache returns a new PodCache which watches container information
 // registered in the given PodRegistry.
 // TODO(lavalamp): pods should be a client.PodInterface.
-func NewPodCache(ipCache IPGetter, info client.PodInfoGetter, nodes client.NodeInterface, pods pod.Registry) *PodCache {
+func NewPodCache(info client.PodInfoGetter, nodes client.NodeInterface, pods pod.Registry) *PodCache {
 	return &PodCache{
-		ipCache:       ipCache,
 		containerInfo: info,
 		pods:          pods,
 		nodes:         nodes,
@@ -155,7 +149,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	result, err := p.containerInfo.GetPodStatus(pod.Status.Host, pod.Namespace, pod.Name)
-	newStatus.HostIP = p.ipCache.GetInstanceIP(pod.Status.Host)
+	newStatus.HostIP = nodeStatus.HostIP
 
 	if err != nil {
 		newStatus.Phase = api.PodUnknown
