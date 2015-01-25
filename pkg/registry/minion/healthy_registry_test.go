@@ -22,15 +22,15 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type alwaysYes struct{}
 
-func (alwaysYes) HealthCheck(host string) (health.Status, error) {
-	return health.Healthy, nil
+func (alwaysYes) HealthCheck(host string) (probe.Status, error) {
+	return probe.Healthy, nil
 }
 
 func TestBasicDelegation(t *testing.T) {
@@ -75,11 +75,11 @@ type notMinion struct {
 	minion string
 }
 
-func (n *notMinion) HealthCheck(host string) (health.Status, error) {
+func (n *notMinion) HealthCheck(host string) (probe.Status, error) {
 	if host != n.minion {
-		return health.Healthy, nil
+		return probe.Healthy, nil
 	} else {
-		return health.Unhealthy, nil
+		return probe.Unhealthy, nil
 	}
 }
 

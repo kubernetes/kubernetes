@@ -22,8 +22,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -115,7 +115,7 @@ func (r *HealthyRegistry) doCheck(key string) util.T {
 	case err != nil:
 		glog.V(2).Infof("HealthyRegistry: node %q health check error: %v", key, err)
 		nodeStatus = api.ConditionUnknown
-	case status == health.Unhealthy:
+	case status == probe.Unhealthy:
 		nodeStatus = api.ConditionNone
 	default:
 		nodeStatus = api.ConditionFull

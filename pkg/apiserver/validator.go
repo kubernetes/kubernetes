@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -45,29 +45,30 @@ type validator struct {
 	client  httpGet
 }
 
-func (s *Server) check(client httpGet) (health.Status, string, error) {
+// TODO: can this use pkg/probe/http
+func (s *Server) check(client httpGet) (probe.Status, string, error) {
 	resp, err := client.Get("http://" + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
 	if err != nil {
-		return health.Unknown, "", err
+		return probe.Unknown, "", err
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return health.Unknown, string(data), err
+		return probe.Unknown, string(data), err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return health.Unhealthy, string(data),
+		return probe.Unhealthy, string(data),
 			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
 	}
-	return health.Healthy, string(data), nil
+	return probe.Healthy, string(data), nil
 }
 
 type ServerStatus struct {
-	Component  string        `json:"component,omitempty"`
-	Health     string        `json:"health,omitempty"`
-	HealthCode health.Status `json:"healthCode,omitempty"`
-	Msg        string        `json:"msg,omitempty"`
-	Err        string        `json:"err,omitempty"`
+	Component  string       `json:"component,omitempty"`
+	Health     string       `json:"health,omitempty"`
+	HealthCode probe.Status `json:"healthCode,omitempty"`
+	Msg        string       `json:"msg,omitempty"`
+	Err        string       `json:"err,omitempty"`
 }
 
 func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {

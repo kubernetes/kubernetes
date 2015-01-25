@@ -32,7 +32,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func (kl *Kubelet) makeLivenessProbeRunner(p *api.LivenessProbe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
+func (kl *Kubelet) probeContainer(p *api.LivenessProbe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
 	if p.Exec != nil {
 		return execprobe.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
