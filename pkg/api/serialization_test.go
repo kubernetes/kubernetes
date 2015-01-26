@@ -91,7 +91,6 @@ func fuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				j.Template = &api.PodTemplateSpec{}
 			}
 			j.Template.ObjectMeta = api.ObjectMeta{Labels: j.Template.ObjectMeta.Labels}
-			j.Template.Spec.NodeSelector = nil
 			c.Fuzz(&j.Selector)
 			j.Replicas = int(c.RandUint64())
 		},

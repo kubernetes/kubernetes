@@ -410,6 +410,9 @@ func init() {
 				return err
 			}
 			out.DesiredState.Host = in.Spec.Host
+			if err := s.Convert(&in.Spec.NodeSelector, &out.NodeSelector, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.ObjectMeta.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
@@ -420,6 +423,9 @@ func init() {
 				return err
 			}
 			out.Spec.Host = in.DesiredState.Host
+			if err := s.Convert(&in.NodeSelector, &out.Spec.NodeSelector, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
 				return err
 			}
