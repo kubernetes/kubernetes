@@ -21,10 +21,14 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
 )
 
 func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
+	flags := &struct {
+		Filenames util.StringList
+	}{}
 	cmd := &cobra.Command{
 		Use:   "update -f filename",
 		Short: "Update a resource by filename or stdin",
@@ -42,25 +46,52 @@ Examples:
   $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
   <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			filename := GetFlagString(cmd, "filename")
+			schema, err := f.Validator(cmd)
+			checkErr(err)
+
+			cmdNamespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+
+			mapper, typer := f.Object(cmd)
+			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+				ContinueOnError().
+				NamespaceParam(cmdNamespace).RequireNamespace().
+				FilenameParam(flags.Filenames...).
+				Flatten().
+				Do()
+
 			patch := GetFlagString(cmd, "patch")
-			if len(filename) == 0 && len(patch) == 0 {
+			if len(flags.Filenames) == 0 && len(patch) == 0 {
 				usageError(cmd, "Must specify --filename or --patch to update")
 			}
-			if len(filename) != 0 && len(patch) != 0 {
+			if len(flags.Filenames) != 0 && len(patch) != 0 {
 				usageError(cmd, "Can not specify both --filename and --patch")
 			}
-			var name string
-			if len(filename) > 0 {
-				name = updateWithFile(cmd, f, filename)
+			if len(flags.Filenames) > 0 {
+				err := r.Visit(func(info *resource.Info) error {
+					data, err := info.Mapping.Codec.Encode(info.Object)
+					if err != nil {
+						return err
+					}
+					if err := schema.ValidateBytes(data); err != nil {
+						return err
+					}
+					if err := resource.NewHelper(info.Client, info.Mapping).
+						Update(info.Namespace, info.Name, true, data); err != nil {
+						return err
+					}
+					fmt.Fprintf(out, "%s\n", info.Name)
+					return nil
+				})
+				checkErr(err)
 			} else {
-				name = updateWithPatch(cmd, args, f, patch)
+				name := updateWithPatch(cmd, args, f, patch)
+				fmt.Fprintf(out, "%s\n", name)
 			}
 
-			fmt.Fprintf(out, "%s\n", name)
 		},
 	}
-	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to update the resource")
+	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file to use to update the resource")
 	cmd.Flags().String("patch", "", "A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the updated")
 	return cmd
 }
@@ -85,30 +116,5 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string
 
 	err = helper.Update(namespace, name, true, data)
 	checkErr(err)
-	return name
-}
-
-func updateWithFile(cmd *cobra.Command, f *Factory, filename string) string {
-	schema, err := f.Validator(cmd)
-	checkErr(err)
-	mapper, typer := f.Object(cmd)
-
-	clientConfig, err := f.ClientConfig(cmd)
-	checkErr(err)
-	cmdApiVersion := clientConfig.Version
-
-	mapping, namespace, name, data := ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
-
-	client, err := f.RESTClient(cmd, mapping)
-	checkErr(err)
-
-	cmdNamespace, err := f.DefaultNamespace(cmd)
-	checkErr(err)
-	err = CompareNamespace(cmdNamespace, namespace)
-	checkErr(err)
-
-	err = resource.NewHelper(client, mapping).Update(namespace, name, true, data)
-	checkErr(err)
-
 	return name
 }
