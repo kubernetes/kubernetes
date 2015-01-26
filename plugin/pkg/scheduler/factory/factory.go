@@ -35,9 +35,9 @@ import (
 )
 
 var (
-	PodLister     = &cache.StoreToPodLister{cache.NewStore()}
-	MinionLister  = &cache.StoreToNodeLister{cache.NewStore()}
-	ServiceLister = &cache.StoreToServiceLister{cache.NewStore()}
+	PodLister     = &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	MinionLister  = &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	ServiceLister = &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -57,7 +57,7 @@ type ConfigFactory struct {
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
 		Client:        client,
-		PodQueue:      cache.NewFIFO(),
+		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		PodLister:     PodLister,
 		MinionLister:  MinionLister,
 		ServiceLister: ServiceLister,
@@ -242,7 +242,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				return
 			}
 			if pod.Status.Host == "" {
-				podQueue.Add(pod.Name, pod)
+				podQueue.Add(pod)
 			}
 		}()
 	}
@@ -262,8 +262,8 @@ func (ne *nodeEnumerator) Len() int {
 }
 
 // Get returns the item (and ID) with the particular index.
-func (ne *nodeEnumerator) Get(index int) (string, interface{}) {
-	return ne.Items[index].Name, &ne.Items[index]
+func (ne *nodeEnumerator) Get(index int) interface{} {
+	return &ne.Items[index]
 }
 
 type binder struct {

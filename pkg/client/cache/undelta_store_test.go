@@ -24,15 +24,28 @@ import (
 // store_test.go checks that UndeltaStore conforms to the Store interface
 // behavior.  This test just tests that it calls the push func in addition.
 
-type t struct{ int }
+type testUndeltaObject struct {
+	name string
+	val  interface{}
+}
 
+func testUndeltaKeyFunc(obj interface{}) (string, error) {
+	return obj.(testUndeltaObject).name, nil
+}
+
+/*
 var (
 	o1 interface{}   = t{1}
 	o2 interface{}   = t{2}
 	l1 []interface{} = []interface{}{t{1}}
 )
+*/
 
 func TestUpdateCallsPush(t *testing.T) {
+	mkObj := func(name string, val interface{}) testUndeltaObject {
+		return testUndeltaObject{name: name, val: val}
+	}
+
 	var got []interface{}
 	var callcount int = 0
 	push := func(m []interface{}) {
@@ -40,19 +53,25 @@ func TestUpdateCallsPush(t *testing.T) {
 		got = m
 	}
 
-	u := NewUndeltaStore(push)
+	u := NewUndeltaStore(push, testUndeltaKeyFunc)
 
-	u.Add("a", o2)
-	u.Update("a", o1)
+	u.Add(mkObj("a", 2))
+	u.Update(mkObj("a", 1))
 	if callcount != 2 {
 		t.Errorf("Expected 2 calls, got %d", callcount)
 	}
-	if !reflect.DeepEqual(l1, got) {
-		t.Errorf("Expected %#v, Got %#v", l1, got)
+
+	l := []interface{}{mkObj("a", 1)}
+	if !reflect.DeepEqual(l, got) {
+		t.Errorf("Expected %#v, Got %#v", l, got)
 	}
 }
 
 func TestDeleteCallsPush(t *testing.T) {
+	mkObj := func(name string, val interface{}) testUndeltaObject {
+		return testUndeltaObject{name: name, val: val}
+	}
+
 	var got []interface{}
 	var callcount int = 0
 	push := func(m []interface{}) {
@@ -60,10 +79,10 @@ func TestDeleteCallsPush(t *testing.T) {
 		got = m
 	}
 
-	u := NewUndeltaStore(push)
+	u := NewUndeltaStore(push, testUndeltaKeyFunc)
 
-	u.Add("a", o2)
-	u.Delete("a")
+	u.Add(mkObj("a", 2))
+	u.Delete(mkObj("a", ""))
 	if callcount != 2 {
 		t.Errorf("Expected 2 calls, got %d", callcount)
 	}
@@ -78,15 +97,18 @@ func TestReadsDoNotCallPush(t *testing.T) {
 		t.Errorf("Unexpected call to push!")
 	}
 
-	u := NewUndeltaStore(push)
+	u := NewUndeltaStore(push, testUndeltaKeyFunc)
 
 	// These should not call push.
 	_ = u.List()
-	_ = u.ContainedIDs()
-	_, _ = u.Get("1")
+	_, _, _ = u.Get(testUndeltaObject{"a", ""})
 }
 
 func TestReplaceCallsPush(t *testing.T) {
+	mkObj := func(name string, val interface{}) testUndeltaObject {
+		return testUndeltaObject{name: name, val: val}
+	}
+
 	var got []interface{}
 	var callcount int = 0
 	push := func(m []interface{}) {
@@ -94,16 +116,15 @@ func TestReplaceCallsPush(t *testing.T) {
 		got = m
 	}
 
-	u := NewUndeltaStore(push)
+	u := NewUndeltaStore(push, testUndeltaKeyFunc)
 
-	m := make(map[string]interface{})
-	m["1"] = o1
+	m := []interface{}{mkObj("a", 1)}
 
 	u.Replace(m)
 	if callcount != 1 {
 		t.Errorf("Expected 1 calls, got %d", callcount)
 	}
-	expected := l1
+	expected := []interface{}{mkObj("a", 1)}
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}

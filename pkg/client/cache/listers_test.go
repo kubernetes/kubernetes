@@ -25,10 +25,10 @@ import (
 )
 
 func TestStoreToMinionLister(t *testing.T) {
-	store := NewStore()
+	store := NewStore(MetaNamespaceKeyFunc)
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(id, &api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
+		store.Add(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
 	sml := StoreToNodeLister{store}
 
@@ -46,10 +46,10 @@ func TestStoreToMinionLister(t *testing.T) {
 }
 
 func TestStoreToPodLister(t *testing.T) {
-	store := NewStore()
+	store := NewStore(MetaNamespaceKeyFunc)
 	ids := []string{"foo", "bar", "baz"}
 	for _, id := range ids {
-		store.Add(id, &api.Pod{
+		store.Add(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   id,
 				Labels: map[string]string{"name": id},

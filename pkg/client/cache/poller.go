@@ -27,7 +27,7 @@ import (
 // one object at a time.
 type Enumerator interface {
 	Len() int
-	Get(index int) (ID string, object interface{})
+	Get(index int) (object interface{})
 }
 
 // GetFunc should return an enumerator that you wish the Poller to proccess.
@@ -76,14 +76,11 @@ func (p *Poller) run() {
 }
 
 func (p *Poller) sync(e Enumerator) {
-	current := p.store.ContainedIDs()
+	items := []interface{}{}
 	for i := 0; i < e.Len(); i++ {
-		id, object := e.Get(i)
-		p.store.Update(id, object)
-		current.Delete(id)
+		object := e.Get(i)
+		items = append(items, object)
 	}
-	// Delete all the objects not found.
-	for id := range current {
-		p.store.Delete(id)
-	}
+
+	p.store.Replace(items)
 }
