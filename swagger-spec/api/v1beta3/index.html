@@ -1,0 +1,3264 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "v1beta3",
+  "basePath": "172.17.130.36:8282",
+  "resourcePath": "/api/v1beta3",
+  "apis": [
+   {
+    "path": "/api/v1beta3/pods",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Pod",
+      "nickname": "createPod",
+      "parameters": [
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Pod",
+      "nickname": "listPod",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.PodList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/pods",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Pod",
+      "nickname": "createPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Pod",
+      "nickname": "listPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.PodList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/services/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Service",
+      "method": "GET",
+      "summary": "read the specified Service",
+      "nickname": "readService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Service",
+      "nickname": "updateService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Service",
+      "nickname": "deleteService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/services",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Service",
+      "nickname": "createService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Service",
+      "nickname": "listService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Service"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/nodes",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Node",
+      "nickname": "createNode",
+      "parameters": [
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Node",
+      "nickname": "listNode",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.NodeList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/bindings",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Binding",
+      "nickname": "createBinding",
+      "parameters": [
+       {
+        "type": "v1beta3.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Binding",
+      "nickname": "listBinding",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "listing objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/replicationcontrollers/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ReplicationController",
+      "method": "GET",
+      "summary": "read the specified ReplicationController",
+      "nickname": "readReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified ReplicationController",
+      "nickname": "updateReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified ReplicationController",
+      "nickname": "deleteReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/services",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Service",
+      "nickname": "createService",
+      "parameters": [
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Service",
+      "nickname": "listService",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Service"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/services/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Service",
+      "method": "GET",
+      "summary": "read the specified Service",
+      "nickname": "readService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Service",
+      "nickname": "updateService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Service",
+      "nickname": "deleteService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/nodes",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Node",
+      "nickname": "createNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Node",
+      "nickname": "listNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.NodeList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/nodes/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Node",
+      "method": "GET",
+      "summary": "read the specified Node",
+      "nickname": "readNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Node",
+      "nickname": "updateNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Node",
+      "nickname": "deleteNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/bindings/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "read the specified Binding",
+      "nickname": "readBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "reading individual objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Binding",
+      "nickname": "updateBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "updating objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Binding",
+      "nickname": "deleteBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "deleting objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/endpoints/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Endpoints",
+      "method": "GET",
+      "summary": "read the specified Endpoints",
+      "nickname": "readEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Endpoints",
+      "nickname": "updateEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Endpoints",
+      "nickname": "deleteEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "deleting objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/events",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Event",
+      "nickname": "createEvent",
+      "parameters": [
+       {
+        "type": "v1beta3.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Event",
+      "nickname": "listEvent",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.EventList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/events",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Event",
+      "nickname": "createEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Event",
+      "nickname": "listEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.EventList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/replicationcontrollers",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a ReplicationController",
+      "nickname": "createReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind ReplicationController",
+      "nickname": "listReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ReplicationControllerList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/endpoints",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Endpoints",
+      "nickname": "createEndpoints",
+      "parameters": [
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Endpoints",
+      "nickname": "listEndpoints",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.EndpointsList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/replicationcontrollers",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a ReplicationController",
+      "nickname": "createReplicationController",
+      "parameters": [
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind ReplicationController",
+      "nickname": "listReplicationController",
+      "parameters": [],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ReplicationControllerList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/nodes/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Node",
+      "method": "GET",
+      "summary": "read the specified Node",
+      "nickname": "readNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Node",
+      "nickname": "updateNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Node",
+      "nickname": "deleteNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/events/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Event",
+      "method": "GET",
+      "summary": "read the specified Event",
+      "nickname": "readEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Event",
+      "nickname": "updateEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "updating objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Event",
+      "nickname": "deleteEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/bindings/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "read the specified Binding",
+      "nickname": "readBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "reading individual objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Binding",
+      "nickname": "updateBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "updating objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Binding",
+      "nickname": "deleteBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "deleting objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/pods/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Pod",
+      "method": "GET",
+      "summary": "read the specified Pod",
+      "nickname": "readPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Pod",
+      "nickname": "updatePod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Pod",
+      "nickname": "deletePod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/bindings",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Binding",
+      "nickname": "createBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Binding",
+      "nickname": "listBinding",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "listing objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/replicationcontrollers/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ReplicationController",
+      "method": "GET",
+      "summary": "read the specified ReplicationController",
+      "nickname": "readReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified ReplicationController",
+      "nickname": "updateReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified ReplicationController",
+      "nickname": "deleteReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/endpoints/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Endpoints",
+      "method": "GET",
+      "summary": "read the specified Endpoints",
+      "nickname": "readEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Endpoints",
+      "nickname": "updateEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Endpoints",
+      "nickname": "deleteEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "deleting objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/endpoints",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Endpoints",
+      "nickname": "createEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "list objects of kind Endpoints",
+      "nickname": "listEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.EndpointsList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/events/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Event",
+      "method": "GET",
+      "summary": "read the specified Event",
+      "nickname": "readEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Event",
+      "nickname": "updateEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 405,
+        "message": "updating objects is not supported"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Event",
+      "nickname": "deleteEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/ns/{namespace}/pods/{name}",
+    "description": "API at /api, version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Pod",
+      "method": "GET",
+      "summary": "read the specified Pod",
+      "nickname": "readPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "update the specified Pod",
+      "nickname": "updatePod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete the specified Pod",
+      "nickname": "deletePod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {
+   "v1beta3.Binding": {
+    "id": "v1beta3.Binding",
+    "required": [
+     "podID",
+     "host"
+    ],
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "host": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "podID": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.Container": {
+    "id": "v1beta3.Container",
+    "required": [
+     "name",
+     "image",
+     "imagePullPolicy"
+    ],
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "string"
+       }
+      ]
+     },
+     "cpu": {
+      "type": "string"
+     },
+     "env": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.EnvVar"
+       }
+      ]
+     },
+     "image": {
+      "type": "string"
+     },
+     "imagePullPolicy": {
+      "type": "v1beta3.PullPolicy"
+     },
+     "lifecycle": {
+      "type": "v1beta3.Lifecycle"
+     },
+     "livenessProbe": {
+      "type": "v1beta3.LivenessProbe"
+     },
+     "memory": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "ports": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Port"
+       }
+      ]
+     },
+     "privileged": {
+      "type": "boolean"
+     },
+     "terminationMessagePath": {
+      "type": "string"
+     },
+     "volumeMounts": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.VolumeMount"
+       }
+      ]
+     },
+     "workingDir": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.EmptyDir": {
+    "id": "v1beta3.EmptyDir",
+    "properties": {}
+   },
+   "v1beta3.Endpoints": {
+    "id": "v1beta3.Endpoints",
+    "required": [
+     "endpoints"
+    ],
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "endpoints": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "string"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.EndpointsList": {
+    "id": "v1beta3.EndpointsList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Endpoints"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.EnvVar": {
+    "id": "v1beta3.EnvVar",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.Event": {
+    "id": "v1beta3.Event",
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "involvedObject": {
+      "type": "v1beta3.ObjectReference"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "message": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "source": {
+      "type": "v1beta3.EventSource"
+     },
+     "timestamp": {
+      "type": "string"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.EventList": {
+    "id": "v1beta3.EventList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Event"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.EventSource": {
+    "id": "v1beta3.EventSource",
+    "properties": {
+     "component": {
+      "type": "string"
+     },
+     "host": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.ExecAction": {
+    "id": "v1beta3.ExecAction",
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "string"
+       }
+      ]
+     }
+    }
+   },
+   "v1beta3.GCEPersistentDisk": {
+    "id": "v1beta3.GCEPersistentDisk",
+    "required": [
+     "pdName"
+    ],
+    "properties": {
+     "fsType": {
+      "type": "string"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "pdName": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "v1beta3.GitRepo": {
+    "id": "v1beta3.GitRepo",
+    "required": [
+     "repository",
+     "revision"
+    ],
+    "properties": {
+     "repository": {
+      "type": "string"
+     },
+     "revision": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.HTTPGetAction": {
+    "id": "v1beta3.HTTPGetAction",
+    "properties": {
+     "host": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "port": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.Handler": {
+    "id": "v1beta3.Handler",
+    "properties": {
+     "exec": {
+      "type": "v1beta3.ExecAction"
+     },
+     "httpGet": {
+      "type": "v1beta3.HTTPGetAction"
+     }
+    }
+   },
+   "v1beta3.HostDir": {
+    "id": "v1beta3.HostDir",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.Lifecycle": {
+    "id": "v1beta3.Lifecycle",
+    "properties": {
+     "postStart": {
+      "type": "v1beta3.Handler"
+     },
+     "preStop": {
+      "type": "v1beta3.Handler"
+     }
+    }
+   },
+   "v1beta3.LivenessProbe": {
+    "id": "v1beta3.LivenessProbe",
+    "properties": {
+     "exec": {
+      "type": "v1beta3.ExecAction"
+     },
+     "httpGet": {
+      "type": "v1beta3.HTTPGetAction"
+     },
+     "initialDelaySeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
+     "tcpSocket": {
+      "type": "v1beta3.TCPSocketAction"
+     }
+    }
+   },
+   "v1beta3.Node": {
+    "id": "v1beta3.Node",
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "spec": {
+      "type": "v1beta3.NodeSpec"
+     },
+     "status": {
+      "type": "v1beta3.NodeStatus"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.NodeCondition": {
+    "id": "v1beta3.NodeCondition",
+    "required": [
+     "kind",
+     "status"
+    ],
+    "properties": {
+     "kind": {
+      "type": "v1beta3.NodeConditionKind"
+     },
+     "lastTransitionTime": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "status": {
+      "type": "v1beta3.NodeConditionStatus"
+     }
+    }
+   },
+   "v1beta3.NodeList": {
+    "id": "v1beta3.NodeList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Node"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.NodeSpec": {
+    "id": "v1beta3.NodeSpec",
+    "properties": {
+     "capacity": {
+      "type": "v1beta3.ResourceList"
+     }
+    }
+   },
+   "v1beta3.NodeStatus": {
+    "id": "v1beta3.NodeStatus",
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.NodeCondition"
+       }
+      ]
+     },
+     "hostIP": {
+      "type": "string"
+     },
+     "phase": {
+      "type": "v1beta3.NodePhase"
+     }
+    }
+   },
+   "v1beta3.ObjectReference": {
+    "id": "v1beta3.ObjectReference",
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "fieldPath": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.Pod": {
+    "id": "v1beta3.Pod",
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "spec": {
+      "type": "v1beta3.PodSpec"
+     },
+     "status": {
+      "type": "v1beta3.PodStatus"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.PodList": {
+    "id": "v1beta3.PodList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Pod"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.PodSpec": {
+    "id": "v1beta3.PodSpec",
+    "required": [
+     "volumes",
+     "containers"
+    ],
+    "properties": {
+     "containers": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Container"
+       }
+      ]
+     },
+     "dnsPolicy": {
+      "type": "v1beta3.DNSPolicy"
+     },
+     "host": {
+      "type": "string",
+      "description": "host requested for this pod"
+     },
+     "nodeSelector": {
+      "type": "v1beta3.PodSpec.nodeSelector"
+     },
+     "restartPolicy": {
+      "type": "v1beta3.RestartPolicy"
+     },
+     "volumes": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.Volume"
+       }
+      ]
+     }
+    }
+   },
+   "v1beta3.PodSpec.nodeSelector": {
+    "id": "v1beta3.PodSpec.nodeSelector",
+    "properties": {}
+   },
+   "v1beta3.PodStatus": {
+    "id": "v1beta3.PodStatus",
+    "properties": {
+     "host": {
+      "type": "string"
+     },
+     "hostIP": {
+      "type": "string"
+     },
+     "info": {
+      "type": "v1beta3.PodInfo"
+     },
+     "message": {
+      "type": "string"
+     },
+     "phase": {
+      "type": "v1beta3.PodPhase"
+     },
+     "podIP": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.PodTemplateSpec": {
+    "id": "v1beta3.PodTemplateSpec",
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "spec": {
+      "type": "v1beta3.PodSpec"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.Port": {
+    "id": "v1beta3.Port",
+    "required": [
+     "containerPort"
+    ],
+    "properties": {
+     "containerPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "hostIP": {
+      "type": "string"
+     },
+     "hostPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "name": {
+      "type": "string"
+     },
+     "protocol": {
+      "type": "v1beta3.Protocol"
+     }
+    }
+   },
+   "v1beta3.ReplicationController": {
+    "id": "v1beta3.ReplicationController",
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "spec": {
+      "type": "v1beta3.ReplicationControllerSpec"
+     },
+     "status": {
+      "type": "v1beta3.ReplicationControllerStatus"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.ReplicationControllerList": {
+    "id": "v1beta3.ReplicationControllerList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta3.ReplicationController"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.ReplicationControllerSpec": {
+    "id": "v1beta3.ReplicationControllerSpec",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "type": "v1beta3.ReplicationControllerSpec.selector"
+     },
+     "template": {
+      "type": "v1beta3.PodTemplateSpec"
+     },
+     "templateRef": {
+      "type": "v1beta3.ObjectReference"
+     }
+    }
+   },
+   "v1beta3.ReplicationControllerSpec.selector": {
+    "id": "v1beta3.ReplicationControllerSpec.selector",
+    "properties": {}
+   },
+   "v1beta3.ReplicationControllerStatus": {
+    "id": "v1beta3.ReplicationControllerStatus",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v1beta3.RestartPolicy": {
+    "id": "v1beta3.RestartPolicy",
+    "properties": {
+     "always": {
+      "type": "v1beta3.RestartPolicyAlways"
+     },
+     "never": {
+      "type": "v1beta3.RestartPolicyNever"
+     },
+     "onFailure": {
+      "type": "v1beta3.RestartPolicyOnFailure"
+     }
+    }
+   },
+   "v1beta3.RestartPolicyAlways": {
+    "id": "v1beta3.RestartPolicyAlways",
+    "properties": {}
+   },
+   "v1beta3.RestartPolicyNever": {
+    "id": "v1beta3.RestartPolicyNever",
+    "properties": {}
+   },
+   "v1beta3.RestartPolicyOnFailure": {
+    "id": "v1beta3.RestartPolicyOnFailure",
+    "properties": {}
+   },
+   "v1beta3.Service": {
+    "id": "v1beta3.Service",
+    "properties": {
+     "annotations": {
+      "type": "v1beta3.ObjectMeta.annotations"
+     },
+     "apiVersion": {
+      "type": "string"
+     },
+     "creationTimestamp": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "labels": {
+      "type": "v1beta3.ObjectMeta.labels"
+     },
+     "name": {
+      "type": "string"
+     },
+     "namespace": {
+      "type": "string"
+     },
+     "resourceVersion": {
+      "type": "string"
+     },
+     "selfLink": {
+      "type": "string"
+     },
+     "spec": {
+      "type": "v1beta3.ServiceSpec"
+     },
+     "status": {
+      "type": "v1beta3.ServiceStatus"
+     },
+     "uid": {
+      "type": "types.UID"
+     }
+    }
+   },
+   "v1beta3.ServiceSpec": {
+    "id": "v1beta3.ServiceSpec",
+    "required": [
+     "port",
+     "selector"
+    ],
+    "properties": {
+     "containerPort": {
+      "type": "string"
+     },
+     "createExternalLoadBalancer": {
+      "type": "boolean"
+     },
+     "port": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "portalIP": {
+      "type": "string"
+     },
+     "protocol": {
+      "type": "v1beta3.Protocol"
+     },
+     "proxyPort": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "publicIPs": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "string"
+       }
+      ]
+     },
+     "selector": {
+      "type": "v1beta3.ServiceSpec.selector"
+     },
+     "sessionAffinity": {
+      "type": "v1beta3.AffinityType"
+     }
+    }
+   },
+   "v1beta3.ServiceSpec.selector": {
+    "id": "v1beta3.ServiceSpec.selector",
+    "properties": {}
+   },
+   "v1beta3.ServiceStatus": {
+    "id": "v1beta3.ServiceStatus",
+    "properties": {}
+   },
+   "v1beta3.TCPSocketAction": {
+    "id": "v1beta3.TCPSocketAction",
+    "properties": {
+     "port": {
+      "type": "string"
+     }
+    }
+   },
+   "v1beta3.Volume": {
+    "id": "v1beta3.Volume",
+    "required": [
+     "name",
+     "source"
+    ],
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "source": {
+      "type": "v1beta3.VolumeSource"
+     }
+    }
+   },
+   "v1beta3.VolumeMount": {
+    "id": "v1beta3.VolumeMount",
+    "required": [
+     "name",
+     "mountPath"
+    ],
+    "properties": {
+     "mountPath": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "readOnly": {
+      "type": "boolean"
+     }
+    }
+   },
+   "v1beta3.VolumeSource": {
+    "id": "v1beta3.VolumeSource",
+    "required": [
+     "hostDir",
+     "emptyDir",
+     "persistentDisk",
+     "gitRepo"
+    ],
+    "properties": {
+     "emptyDir": {
+      "type": "v1beta3.EmptyDir"
+     },
+     "gitRepo": {
+      "type": "v1beta3.GitRepo"
+     },
+     "hostDir": {
+      "type": "v1beta3.HostDir"
+     },
+     "persistentDisk": {
+      "type": "v1beta3.GCEPersistentDisk"
+     }
+    }
+   }
+  }
+ }
