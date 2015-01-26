@@ -19,7 +19,6 @@ package json
 import (
 	"encoding/json"
 	"io"
-	"reflect"
 	"testing"
 	"time"
 
@@ -58,7 +57,7 @@ func TestDecoder(t *testing.T) {
 			if e, a := eventType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
-			if e, a := expect, got; !reflect.DeepEqual(e, a) {
+			if e, a := expect, got; !api.Semantic.DeepDerivative(e, a) {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
 			t.Logf("Exited read")

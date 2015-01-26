@@ -73,11 +73,17 @@ func TestParsePod(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "test pod"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
-				{Name: "my container"},
+				{
+					Name:                   "my container",
+					ImagePullPolicy:        api.PullIfNotPresent,
+					TerminationMessagePath: api.TerminationMessagePathDefault,
+				},
 			},
 			Volumes: []api.Volume{
-				{Name: "volume"},
+				{Name: "volume", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
 			},
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}, v1beta1.Codec, testParser)
 }
@@ -96,6 +102,8 @@ func TestParseService(t *testing.T) {
 			Selector: map[string]string{
 				"area": "staging",
 			},
+			Protocol:        "TCP",
+			SessionAffinity: "None",
 		},
 	}, v1beta1.Codec, testParser)
 }
@@ -109,11 +117,17 @@ func TestParseController(t *testing.T) {
 			Template: &api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						{Name: "my container"},
+						{
+							Name:                   "my container",
+							ImagePullPolicy:        api.PullIfNotPresent,
+							TerminationMessagePath: api.TerminationMessagePathDefault,
+						},
 					},
 					Volumes: []api.Volume{
-						{Name: "volume"},
+						{Name: "volume", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
 					},
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},

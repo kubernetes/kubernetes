@@ -252,6 +252,11 @@ type Container struct {
 	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container"`
 }
 
+const (
+	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
+	TerminationMessagePathDefault string = "/dev/termination-log"
+)
+
 // Handler defines a specific action that should be taken
 // TODO: pass structured data to these actions, and document that data here.
 type Handler struct {

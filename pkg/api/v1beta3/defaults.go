@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta3
 
 import (
 	"strings"
@@ -58,19 +58,14 @@ func init() {
 			}
 		},
 		func(obj *Service) {
-			if obj.Protocol == "" {
-				obj.Protocol = ProtocolTCP
+			if obj.Spec.Protocol == "" {
+				obj.Spec.Protocol = ProtocolTCP
 			}
-			if obj.SessionAffinity == "" {
-				obj.SessionAffinity = AffinityTypeNone
+			if obj.Spec.SessionAffinity == "" {
+				obj.Spec.SessionAffinity = AffinityTypeNone
 			}
 		},
 		func(obj *PodSpec) {
-			if obj.DNSPolicy == "" {
-				obj.DNSPolicy = DNSClusterFirst
-			}
-		},
-		func(obj *ContainerManifest) {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
 			}

@@ -90,8 +90,10 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 		Spec: api.ServiceSpec{
 			Port: servicePort,
 			// maintained by this code, not by the pod selector
-			Selector: nil,
-			PortalIP: serviceIP.String(),
+			Selector:        nil,
+			PortalIP:        serviceIP.String(),
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	// Kids, don't do this at home: this is a hack. There's no good way to call the business

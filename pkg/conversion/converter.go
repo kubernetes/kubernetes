@@ -68,7 +68,6 @@ func NewConverter() *Converter {
 	return &Converter{
 		conversionFuncs:    map[typePair]reflect.Value{},
 		defaultingFuncs:    map[reflect.Type]reflect.Value{},
-		funcs:              map[typePair]reflect.Value{},
 		nameFunc:           func(t reflect.Type) string { return t.Name() },
 		structFieldDests:   map[typeNamePair][]typeNamePair{},
 		structFieldSources: map[typeNamePair][]typeNamePair{},
@@ -221,7 +220,7 @@ func (s *scope) error(message string, args ...interface{}) error {
 // used if recursive conversion calls are desired).  It must return an error.
 //
 // Example:
-// c.RegisteConversionFuncr(
+// c.RegisteConversionFunc(
 //         func(in *Pod, out *v1beta1.Pod, s Scope) error {
 //                 // conversion logic...
 //                 return nil
@@ -279,7 +278,7 @@ func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName st
 // defaultingFunc must take one parameters: a pointer to the input type.
 //
 // Example:
-// c.RegisteDefaultingFuncr(
+// c.RegisteDefaultingFunc(
 //         func(in *v1beta1.Pod) {
 //                 // defaulting logic...
 //          })
@@ -415,7 +414,6 @@ func (c *Converter) callCustom(sv, dv, custom reflect.Value, scope *scope) error
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
-
 	// Apply default values.
 	if fv, ok := c.defaultingFuncs[st]; ok {
 		if c.Debug != nil {

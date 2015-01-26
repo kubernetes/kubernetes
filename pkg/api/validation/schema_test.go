@@ -103,18 +103,17 @@ var invalidPod2 = `{
     "manifest": {
       "version": "v1beta1",
       "id": "apache-php",
-      "containers": [
-             {
-           "name": "apache-php",
-           "image": "php:5.6.2-apache",
-           "ports": [{ "name": "apache", "containerPort": 80, "hostPort":"13380", "protocol":"TCP" }],
-           "volumeMounts": [{"name": "shared-disk","mountPath": "/var/www/html", "readOnly": false}]
-        }
-           ]
+      "containers": [{
+         "name": "apache-php",
+         "image": "php:5.6.2-apache",
+         "ports": [{ "name": "apache", "containerPort": 80, "hostPort":"13380", "protocol":"TCP" }],
+         "volumeMounts": [{"name": "shared-disk","mountPath": "/var/www/html", "readOnly": false}]
+      }]
     }
   },
   "labels": { "name": "apache-php" },
   "restartPolicy": {"always": {}},
+  "dnsPolicy": "ClusterFirst",
   "volumes": [
     "name": "shared-disk",
     "source": {
@@ -134,18 +133,17 @@ var invalidPod3 = `{
     "manifest": {
       "version": "v1beta1",
       "id": "apache-php",
-      "containers": [
-             {
-           "name": "apache-php",
-           "image": "php:5.6.2-apache",
-           "ports": [{ "name": "apache", "containerPort": 80, "hostPort":"13380", "protocol":"TCP" }],
-           "volumeMounts": [{"name": "shared-disk","mountPath": "/var/www/html", "readOnly": false}]
-        }
-           ]
+      "containers": [{
+         "name": "apache-php",
+         "image": "php:5.6.2-apache",
+         "ports": [{ "name": "apache", "containerPort": 80, "hostPort":"13380", "protocol":"TCP" }],
+         "volumeMounts": [{"name": "shared-disk","mountPath": "/var/www/html", "readOnly": false}]
+      }]
     }
   },
   "labels": { "name": "apache-php" },
   "restartPolicy": {"always": {}},
+  "dnsPolicy": "ClusterFirst",
   "volumes": [
     {
       "name": "shared-disk",

@@ -341,6 +341,11 @@ type ResourceRequirementSpec struct {
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
 }
 
+const (
+	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
+	TerminationMessagePathDefault string = "/dev/termination-log"
+)
+
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must

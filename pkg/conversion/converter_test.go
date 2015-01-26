@@ -36,11 +36,11 @@ func TestConverter_DefaultConvert(t *testing.T) {
 	}
 	c := NewConverter()
 	c.Debug = t
-	c.NameFunc = func(t reflect.Type) string { return "MyType" }
+	c.nameFunc = func(t reflect.Type) string { return "MyType" }
 
 	// Ensure conversion funcs can call DefaultConvert to get default behavior,
 	// then fixup remaining fields manually
-	err := c.Register(func(in *A, out *B, s Scope) error {
+	err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
 		if err := s.DefaultConvert(in, out, IgnoreMissingFields); err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	}
 	c := NewConverter()
 	c.Debug = t
-	err := c.Register(
+	err := c.RegisterConversionFunc(
 		func(in *int, out *string, s Scope) error {
 			*out = fmt.Sprintf("%v", *in)
 			return nil
@@ -233,7 +233,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Register(
+	err = c.RegisterConversionFunc(
 		func(in *string, out *int, s Scope) error {
 			if str, err := strconv.Atoi(*in); err != nil {
 				return err

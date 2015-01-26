@@ -195,7 +195,13 @@ func makeURL(suffix string) string {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"}}
+	testPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+	}
 	handler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),

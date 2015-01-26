@@ -158,6 +158,10 @@ func TestEncode_Ptr(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
 		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	obj := runtime.Object(pod)
 	data, err := latest.Codec.Encode(obj)
@@ -169,7 +173,7 @@ func TestEncode_Ptr(t *testing.T) {
 		t.Fatalf("Got wrong type")
 	}
 	if !api.Semantic.DeepEqual(obj2, pod) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &pod, obj2)
+		t.Errorf("Expected:\n %#v,\n Got:\n %#v", pod, obj2)
 	}
 }
 

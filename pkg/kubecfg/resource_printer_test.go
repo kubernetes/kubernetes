@@ -71,6 +71,10 @@ func TestYAMLPrinterPrint(t *testing.T) {
 
 	obj := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	buf.Reset()
 	printer.PrintObj(obj, buf)
@@ -95,6 +99,10 @@ func TestIdentityPrinter(t *testing.T) {
 
 	obj := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	buff.Reset()
 	printer.PrintObj(obj, buff)

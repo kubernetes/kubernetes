@@ -26,7 +26,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"reflect"
+	// "reflect"
 	"strings"
 	"testing"
 	"time"
@@ -62,7 +62,7 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	if changed != &r {
 		t.Errorf("returned request should point to the same object")
 	}
-	if !reflect.DeepEqual(&original, changed) {
+	if !api.Semantic.DeepDerivative(changed, &original) {
 		t.Errorf("expected %#v, got %#v", &original, changed)
 	}
 }
@@ -148,7 +148,7 @@ func TestRequestParseSelectorParam(t *testing.T) {
 
 func TestRequestParam(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
-	if !reflect.DeepEqual(map[string]string{"foo": "a"}, r.params) {
+	if !api.Semantic.DeepDerivative(r.params, map[string]string{"foo": "a"}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 }
@@ -218,7 +218,7 @@ func TestTransformResponse(t *testing.T) {
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
 		}
-		if !(test.Data == nil && response == nil) && !reflect.DeepEqual(test.Data, response) {
+		if !(test.Data == nil && response == nil) && !api.Semantic.DeepDerivative(test.Data, response) {
 			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)
 		}
 		if test.Created != created {
@@ -491,7 +491,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &reqBody)
@@ -526,7 +526,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
@@ -562,7 +562,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
@@ -611,7 +611,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if wasCreated {
@@ -653,7 +653,7 @@ func TestWasCreated(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if !wasCreated {
@@ -790,7 +790,7 @@ func checkAuth(t *testing.T, expect *Config, r *http.Request) {
 	foundAuth, found := authFromReq(r)
 	if !found {
 		t.Errorf("no auth found")
-	} else if e, a := expect, foundAuth; !reflect.DeepEqual(e, a) {
+	} else if e, a := expect, foundAuth; !api.Semantic.DeepDerivative(e, a) {
 		t.Fatalf("Wrong basic auth: wanted %#v, got %#v", e, a)
 	}
 }
@@ -849,7 +849,7 @@ func TestWatch(t *testing.T) {
 		if e, a := item.t, got.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
-		if e, a := item.obj, got.Object; !reflect.DeepEqual(e, a) {
+		if e, a := item.obj, got.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}

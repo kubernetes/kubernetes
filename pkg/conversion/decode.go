@@ -103,27 +103,19 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		dataVersion = objVersion
 	}
 
-	if objVersion == dataVersion {
-		// Easy case!
-		err = yaml.Unmarshal(data, obj)
-		if err != nil {
-			return err
-		}
-	} else {
-		external, err := s.NewObject(dataVersion, dataKind)
-		if err != nil {
-			return err
-		}
-		// yaml is a superset of json, so we use it to decode here. That way,
-		// we understand both.
-		err = yaml.Unmarshal(data, external)
-		if err != nil {
-			return err
-		}
-		err = s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion))
-		if err != nil {
-			return err
-		}
+	external, err := s.NewObject(dataVersion, dataKind)
+	if err != nil {
+		return err
+	}
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, external)
+	if err != nil {
+		return err
+	}
+	err = s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion))
+	if err != nil {
+		return err
 	}
 
 	// Version and Kind should be blank in memory.

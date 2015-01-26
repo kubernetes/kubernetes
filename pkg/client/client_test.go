@@ -96,7 +96,7 @@ func (c *testClient) Setup() *testClient {
 func (c *testClient) Validate(t *testing.T, received runtime.Object, err error) {
 	c.ValidateCommon(t, err)
 
-	if c.Response.Body != nil && !api.Semantic.DeepEqual(c.Response.Body, received) {
+	if c.Response.Body != nil && !api.Semantic.DeepDerivative(c.Response.Body, received) {
 		t.Errorf("bad response for request %#v: expected %#v, got %#v", c.Request, c.Response.Body, received)
 	}
 }

@@ -319,6 +319,8 @@ func runSelfLinkTest(c *client.Client) {
 				Selector: map[string]string{
 					"foo": "bar",
 				},
+				Protocol:        "TCP",
+				SessionAffinity: "None",
 			},
 		},
 	).Do().Into(&svc)
@@ -381,6 +383,8 @@ func runAtomicPutTest(c *client.Client) {
 				Selector: map[string]string{
 					"foo": "bar",
 				},
+				Protocol:        "TCP",
+				SessionAffinity: "None",
 			},
 		},
 	).Do().Into(&svc)
@@ -521,8 +525,11 @@ func runServiceTest(client *client.Client) {
 					Ports: []api.Port{
 						{ContainerPort: 1234},
 					},
+					ImagePullPolicy: "PullIfNotPresent",
 				},
 			},
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 		Status: api.PodStatus{
 			PodIP: "1.2.3.4",
@@ -541,7 +548,9 @@ func runServiceTest(client *client.Client) {
 			Selector: map[string]string{
 				"name": "thisisalonglabel",
 			},
-			Port: 8080,
+			Port:            8080,
+			Protocol:        "TCP",
+			SessionAffinity: "None",
 		},
 	}
 	_, err = client.Services(api.NamespaceDefault).Create(&svc1)
@@ -558,7 +567,9 @@ func runServiceTest(client *client.Client) {
 			Selector: map[string]string{
 				"name": "thisisalonglabel",
 			},
-			Port: 8080,
+			Port:            8080,
+			Protocol:        "TCP",
+			SessionAffinity: "None",
 		},
 	}
 	_, err = client.Services(api.NamespaceDefault).Create(&svc2)
