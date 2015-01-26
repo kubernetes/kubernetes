@@ -12,14 +12,24 @@ is received.
 
 An idled service is a service with zero endpoints.  The process of creating new pods for an idled
 service in response to a new request to that service is called "unidling".  This proposal covers
-how unidling should be performed in Kubernetes.
+how unidling should be performed in Kubernetes and how external proxies and routing components
+can trigger unidling.
 
 Idling is the process of determining which pods to stop and stopping them. Idling will be dealt
 with in a separate proposal and is out of scope here.  
 
+## Relation to Autoscaling
+
+Unidling is closely related to the problem of autoscaling
+(see [#2863](https://github.com/GoogleCloudPlatform/kubernetes/pull/2863)). This proposal addresses
+unidling in an isolated way to keep the problem scope manageable.  The hypothetical unidler daemon
+in this proposal could easily be the same as the auto-scaler controller proposed in 
+[#2863](https://github.com/GoogleCloudPlatform/kubernetes/pull/2863).  This proposal is meant to
+call out problems specific to unidling rather than to be a prescriptive description of a single
+proposed implementation.
+
 ## Constraints and Assumptions
 
-- Unidling should be orthogonal to autoscaling and idling
 - No specific idling mechanism or autoscaler is assumed
 - The case where a service is backed by pods which are not managed by a replication controller: 
   - Not covered by this proposal at all
@@ -67,15 +77,21 @@ This is the minimum amount of information required; as unidler implementations b
 sophisticated there may be additional information carried by the event such as the time the event
 creator will wait for pods to be created before returning a 503 to the requester.
 
-### What does a service proxy need to do?
+### Triggering unidle
 
-A service proxy, such as the kube-proxy, should implement the following behavior to support
-unidling services:
+A system component that wishes to trigger unidle of a pod, such as the kube-proxy, signals that a
+pod should be unidled by creating `WantPods` event to signal to the unidler that a pod should be
+unidled.  It is the responsibility of the signaling component to handle the user request while the
+pod is unidled, implement timeouts, etc.  
+
+For example, the kube-proxy respond to a request to an idled pod as follows:
 
 1.  Create a `WantPods` event for S
 2.  Block until the kube-proxy receives endpoint information for S or a timeout is reached
 3.  If endpoints are created before the timeout, dispatch requests to S
 4.  If the timeout elapses before endpoints are created, return a 503 to the requester
+
+### 
 
 ### The unidler and its algorithm
 
