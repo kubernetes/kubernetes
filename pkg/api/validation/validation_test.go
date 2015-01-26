@@ -567,6 +567,24 @@ func TestValidatePod(t *testing.T) {
 				Containers: []api.Container{{}},
 			},
 		},
+		"bad label": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+		},
+		"bad annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
@@ -612,6 +630,26 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			true,
 			"labels",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Annotations: map[string]string{
+						"bar": "foo",
+					},
+				},
+			},
+			true,
+			"annotations",
 		},
 		{
 			api.Pod{
@@ -1009,6 +1047,22 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "invalid annotation",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "abc123",
+					Namespace: api.NamespaceDefault,
+					Annotations: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Port: 8675,
+				},
+			},
+			numErrs: 1,
+		},
+		{
 			name: "invalid selector",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -1173,6 +1227,19 @@ func TestValidateReplicationController(t *testing.T) {
 				Template: &invalidPodTemplate.Spec,
 			},
 		},
+		"invalid_annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+				Annotations: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
+			},
+		},
 		"invalid restart policy 1": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "abc-123",
@@ -1227,7 +1294,8 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.replicas" &&
 				field != "spec.template.labels" &&
-				field != "labels" {
+				field != "labels" &&
+				field != "annotations" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1294,6 +1362,12 @@ func TestValidateMinion(t *testing.T) {
 				Labels: invalidSelector,
 			},
 		},
+		"invalid-annotations": {
+			ObjectMeta: api.ObjectMeta{
+				Name:        "abc-123",
+				Annotations: invalidSelector,
+			},
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateMinion(&v)
@@ -1303,7 +1377,8 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if field != "name" &&
-				field != "labels" {
+				field != "labels" &&
+				field != "annotations" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
