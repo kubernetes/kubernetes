@@ -30,11 +30,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-type fakeClientGetSet struct {
-	get func(key string, sort, recursive bool) (*etcd.Response, error)
-	set func(key, value string, ttl uint64) (*etcd.Response, error)
-}
-
 type TestResource struct {
 	api.TypeMeta   `json:",inline"`
 	api.ObjectMeta `json:"metadata"`
@@ -72,17 +67,24 @@ func TestExtractToList(t *testing.T) {
 		R: &etcd.Response{
 			EtcdIndex: 10,
 			Node: &etcd.Node{
+				Dir: true,
 				Nodes: []*etcd.Node{
 					{
+						Key:           "/foo",
 						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+						Dir:           false,
 						ModifiedIndex: 1,
 					},
 					{
+						Key:           "/bar",
 						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
+						Dir:           false,
 						ModifiedIndex: 2,
 					},
 					{
+						Key:           "/baz",
 						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
+						Dir:           false,
 						ModifiedIndex: 3,
 					},
 				},
@@ -92,9 +94,10 @@ func TestExtractToList(t *testing.T) {
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			// We expect items to be sorted by its name.
 			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
 			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
 		},
 	}
 
@@ -116,22 +119,34 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 		R: &etcd.Response{
 			EtcdIndex: 10,
 			Node: &etcd.Node{
+				Dir: true,
 				Nodes: []*etcd.Node{
 					{
+						Key:   "/directory1",
 						Value: `{"name": "directory1"}`,
 						Dir:   true,
 						Nodes: []*etcd.Node{
 							{
+								Key:           "/foo",
 								Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+								Dir:           false,
+								ModifiedIndex: 1,
+							},
+							{
+								Key:           "/baz",
+								Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
+								Dir:           false,
 								ModifiedIndex: 1,
 							},
 						},
 					},
 					{
+						Key:   "/directory2",
 						Value: `{"name": "directory2"}`,
 						Dir:   true,
 						Nodes: []*etcd.Node{
 							{
+								Key:           "/bar",
 								Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
 								ModifiedIndex: 2,
 							},
@@ -144,6 +159,8 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
+			// We expect list to be sorted by directory (e.g. namespace) first, then by name.
+			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "1"}},
 			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
 			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
 		},
@@ -166,20 +183,25 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 		R: &etcd.Response{
 			EtcdIndex: 10,
 			Node: &etcd.Node{
+				Dir: true,
 				Nodes: []*etcd.Node{
 					{
+						Key:           "/foo",
 						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 1,
 					},
 					{
+						Key:           "/bar",
 						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 2,
 					},
 					{
+						Key:           "/baz",
 						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 3,
 					},
 					{
+						Key:   "/directory",
 						Value: `{"name": "directory"}`,
 						Dir:   true,
 					},
@@ -190,9 +212,9 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
 			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
 			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
 		},
 	}
 
