@@ -36,6 +36,7 @@ type FakeAction struct {
 type Fake struct {
 	Actions            []FakeAction
 	PodsList           api.PodList
+	CtrlList           api.ReplicationControllerList
 	Ctrl               api.ReplicationController
 	ServiceList        api.ServiceList
 	EndpointsList      api.EndpointsList

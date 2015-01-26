@@ -32,12 +32,16 @@ import (
 
 func init() {
 	admission.RegisterPlugin("ResourceQuota", func(client client.Interface, config io.Reader) (admission.Interface, error) {
-		return &quota{client: client}, nil
+		return NewResourceQuota(client), nil
 	})
 }
 
 type quota struct {
 	client client.Interface
+}
+
+func NewResourceQuota(client client.Interface) admission.Interface {
+	return &quota{client: client}
 }
 
 var kindToResourceName = map[string]api.ResourceName{

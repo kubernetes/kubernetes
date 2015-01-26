@@ -31,7 +31,7 @@ type FakeReplicationControllers struct {
 
 func (c *FakeReplicationControllers) List(selector labels.Selector) (*api.ReplicationControllerList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-controllers"})
-	return &api.ReplicationControllerList{}, nil
+	return api.Scheme.CopyOrDie(&c.Fake.CtrlList).(*api.ReplicationControllerList), nil
 }
 
 func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationController, error) {
