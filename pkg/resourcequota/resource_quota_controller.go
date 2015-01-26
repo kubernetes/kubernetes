@@ -130,17 +130,13 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 		case api.ResourceMemory:
 			val := int64(0)
 			for i := range pods.Items {
-				for j := range pods.Items[i].Spec.Containers {
-					val = val + pods.Items[i].Spec.Containers[j].Memory.Value()
-				}
+				val = val + PodMemory(&pods.Items[i]).Value()
 			}
 			value = resource.NewQuantity(int64(val), resource.DecimalSI)
 		case api.ResourceCPU:
 			val := int64(0)
 			for i := range pods.Items {
-				for j := range pods.Items[i].Spec.Containers {
-					val = val + pods.Items[i].Spec.Containers[j].CPU.MilliValue()
-				}
+				val = val + PodCPU(&pods.Items[i]).MilliValue()
 			}
 			value = resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 		case api.ResourceServices:
@@ -177,4 +173,22 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 		return rm.kubeClient.ResourceQuotaUsages(usage.Namespace).Create(&usage)
 	}
 	return nil
+}
+
+// PodCPU computes total cpu usage of a pod
+func PodCPU(pod *api.Pod) *resource.Quantity {
+	val := int64(0)
+	for j := range pod.Spec.Containers {
+		val = val + pod.Spec.Containers[j].CPU.MilliValue()
+	}
+	return resource.NewMilliQuantity(int64(val), resource.DecimalSI)
+}
+
+// PodMemory computes the memory usage of a pod
+func PodMemory(pod *api.Pod) *resource.Quantity {
+	val := int64(0)
+	for j := range pod.Spec.Containers {
+		val = val + pod.Spec.Containers[j].Memory.Value()
+	}
+	return resource.NewQuantity(int64(val), resource.DecimalSI)
 }
