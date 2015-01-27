@@ -151,6 +151,13 @@ type gcePersistentDisk struct {
 	legacyMode bool
 }
 
+func detachDiskLogError(pd *gcePersistentDisk) {
+	err := pd.manager.DetachDisk(pd, "/dev/disk/by-id/google-"+pd.pdName)
+	if err != nil {
+		glog.Warningf("Failed to detach disk: %v (%v)", pd, err)
+	}
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (pd *gcePersistentDisk) SetUp() error {
 	if pd.legacyMode {
@@ -178,6 +185,8 @@ func (pd *gcePersistentDisk) SetUp() error {
 
 	volPath := pd.GetPath()
 	if err := os.MkdirAll(volPath, 0750); err != nil {
+		// TODO: we should really eject the attach/detach out into its own control loop.
+		detachDiskLogError(pd)
 		return err
 	}
 
@@ -186,6 +195,8 @@ func (pd *gcePersistentDisk) SetUp() error {
 	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
 	if err != nil {
 		os.RemoveAll(pd.GetPath())
+		// TODO: we should really eject the attach/detach out into its own control loop.
+		detachDiskLogError(pd)
 		return err
 	}
 
