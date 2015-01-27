@@ -34,24 +34,51 @@ import (
 // For testing, bypass HandleCrash.
 var ReallyCrash bool
 
+// PanicHandlers is a list of functions which will be invoked when a panic happens.
+var PanicHandlers = []func(interface{}){logPanic}
+
 // HandleCrash simply catches a crash and logs an error. Meant to be called via defer.
 func HandleCrash() {
 	if ReallyCrash {
 		return
 	}
-
-	r := recover()
-	if r != nil {
-		callers := ""
-		for i := 0; true; i++ {
-			_, file, line, ok := runtime.Caller(i)
-			if !ok {
-				break
-			}
-			callers = callers + fmt.Sprintf("%v:%v\n", file, line)
+	if r := recover(); r != nil {
+		for _, fn := range PanicHandlers {
+			fn(r)
 		}
-		glog.Infof("Recovered from panic: %#v (%v)\n%v", r, r, callers)
 	}
+}
+
+// logPanic logs the caller tree when a panic occurs.
+func logPanic(r interface{}) {
+	callers := ""
+	for i := 0; true; i++ {
+		_, file, line, ok := runtime.Caller(i)
+		if !ok {
+			break
+		}
+		callers = callers + fmt.Sprintf("%v:%v\n", file, line)
+	}
+	glog.Infof("Recovered from panic: %#v (%v)\n%v", r, r, callers)
+}
+
+// ErrorHandlers is a list of functions which will be invoked when an unreturnable
+// error occurs.
+var ErrorHandlers = []func(error){logError}
+
+// HandlerError is a method to invoke when a non-user facing piece of code cannot
+// return an error and needs to indicate it has been ignored. Invoking this method
+// is preferable to logging the error - the default behavior is to log but the
+// errors may be sent to a remote server for analysis.
+func HandleError(err error) {
+	for _, fn := range ErrorHandlers {
+		fn(err)
+	}
+}
+
+// logError prints an error with the call stack of the location it was reported
+func logError(err error) {
+	glog.ErrorDepth(2, err)
 }
 
 // Forever loops forever running f every period.  Catches any panics, and keeps going.
