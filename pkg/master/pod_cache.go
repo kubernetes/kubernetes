@@ -79,6 +79,13 @@ func (p *PodCache) GetPodStatus(namespace, name string) (*api.PodStatus, error) 
 	return &value, nil
 }
 
+func (p *PodCache) ClearPodStatus(namespace, name string) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	delete(p.podStatus, objKey{namespace, name})
+}
+
 func (p *PodCache) getNodeStatusInCache(name string) (*api.NodeStatus, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
