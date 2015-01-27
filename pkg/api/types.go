@@ -1139,17 +1139,20 @@ type List struct {
 	Items []runtime.Object `json:"items"`
 }
 
+// A type of object that is limited
+type LimitType string
+
 const (
 	// Limit that applies to all pods in a namespace
-	LimitTypePod string = "Pod"
+	LimitTypePod LimitType = "Pod"
 	// Limit that applies to all containers in a namespace
-	LimitTypeContainer string = "Container"
+	LimitTypeContainer LimitType = "Container"
 )
 
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind
 type LimitRangeItem struct {
 	// Type of resource that this limit applies to
-	Type string `json:"type,omitempty"`
+	Type LimitType `json:"type,omitempty"`
 	// Max usage constraints on this kind by resource name
 	Max ResourceList `json:"max,omitempty"`
 	// Min usage constraints on this kind by resource name

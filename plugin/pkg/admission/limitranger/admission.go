@@ -49,6 +49,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 
 	// look for a limit range in current namespace that requires enforcement
+	// TODO: Move to cache when issue is resolved: https://github.com/GoogleCloudPlatform/kubernetes/issues/2294
 	items, err := l.client.LimitRanges(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
 		return err
@@ -123,68 +124,52 @@ func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) e
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
-		// enforce max
-		for k, v := range limit.Max {
-			observed := int64(0)
-			enforced := int64(0)
-			var err error
-			switch k {
-			case api.ResourceMemory:
-				enforced = v.Value()
-				switch limit.Type {
-				case api.LimitTypePod:
-					observed = podMem
-					err = fmt.Errorf("Maximum memory usage per pod is %s", v.String())
-				case api.LimitTypeContainer:
-					observed = maxContainerMem
-					err = fmt.Errorf("Maximum memory usage per container is %s", v.String())
-				}
-			case api.ResourceCPU:
-				enforced = v.MilliValue()
-				switch limit.Type {
-				case api.LimitTypePod:
-					observed = podCPU
-					err = fmt.Errorf("Maximum CPU usage per pod is %s, but requested %s", v.String(), resource.NewMilliQuantity(observed, resource.DecimalSI))
-				case api.LimitTypeContainer:
-					observed = maxContainerCPU
-					err = fmt.Errorf("Maximum CPU usage per container is %s", v.String())
-				}
+		for _, minOrMax := range []string{"Min", "Max"} {
+			var rl api.ResourceList
+			switch minOrMax {
+			case "Min":
+				rl = limit.Min
+			case "Max":
+				rl = limit.Max
 			}
-			if observed > enforced {
-				return apierrors.NewForbidden(kind, pod.Name, err)
-			}
-		}
-		for k, v := range limit.Min {
-			observed := int64(0)
-			enforced := int64(0)
-			var err error
-			switch k {
-			case api.ResourceMemory:
-				enforced = v.Value()
-				switch limit.Type {
-				case api.LimitTypePod:
-					observed = podMem
-					err = fmt.Errorf("Minimum memory usage per pod is %s", v.String())
-				case api.LimitTypeContainer:
-					observed = maxContainerMem
-					err = fmt.Errorf("Minimum memory usage per container is %s", v.String())
+			for k, v := range rl {
+				observed := int64(0)
+				enforced := int64(0)
+				var err error
+				switch k {
+				case api.ResourceMemory:
+					enforced = v.Value()
+					switch limit.Type {
+					case api.LimitTypePod:
+						observed = podMem
+						err = fmt.Errorf("%simum memory usage per pod is %s", minOrMax, v.String())
+					case api.LimitTypeContainer:
+						observed = maxContainerMem
+						err = fmt.Errorf("%simum memory usage per container is %s", minOrMax, v.String())
+					}
+				case api.ResourceCPU:
+					enforced = v.MilliValue()
+					switch limit.Type {
+					case api.LimitTypePod:
+						observed = podCPU
+						err = fmt.Errorf("%simum CPU usage per pod is %s, but requested %s", minOrMax, v.String(), resource.NewMilliQuantity(observed, resource.DecimalSI))
+					case api.LimitTypeContainer:
+						observed = maxContainerCPU
+						err = fmt.Errorf("%simum CPU usage per container is %s", minOrMax, v.String())
+					}
 				}
-			case api.ResourceCPU:
-				enforced = v.MilliValue()
-				switch limit.Type {
-				case api.LimitTypePod:
-					observed = podCPU
-					err = fmt.Errorf("Minimum CPU usage per pod is %s", v.String())
-				case api.LimitTypeContainer:
-					observed = maxContainerCPU
-					err = fmt.Errorf("Minimum CPU usage per container is %s", v.String())
+				switch minOrMax {
+				case "Min":
+					if observed < enforced {
+						return apierrors.NewForbidden(kind, pod.Name, err)
+					}
+				case "Max":
+					if observed > enforced {
+						return apierrors.NewForbidden(kind, pod.Name, err)
+					}
 				}
-			}
-			if observed < enforced {
-				return apierrors.NewForbidden(kind, pod.Name, err)
 			}
 		}
 	}
-
 	return nil
 }

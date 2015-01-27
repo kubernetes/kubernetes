@@ -531,7 +531,7 @@ func init() {
 		},
 		func(in *newer.LimitRangeItem, out *LimitRangeItem, s conversion.Scope) error {
 			*out = LimitRangeItem{}
-			out.Type = in.Type
+			out.Type = LimitType(in.Type)
 			if err := s.Convert(&in.Max, &out.Max, 0); err != nil {
 				return err
 			}
@@ -542,7 +542,7 @@ func init() {
 		},
 		func(in *LimitRangeItem, out *newer.LimitRangeItem, s conversion.Scope) error {
 			*out = newer.LimitRangeItem{}
-			out.Type = in.Type
+			out.Type = newer.LimitType(in.Type)
 			if err := s.Convert(&in.Max, &out.Max, 0); err != nil {
 				return err
 			}
