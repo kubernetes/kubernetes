@@ -60,15 +60,34 @@
       "Default": "0.0.0.0/0",
       "Type": "String"
     },
-    "KeyPair" : {
+    "KeyPair": {
       "Description": "The name of an EC2 Key Pair to allow SSH access to the instance.",
       "Type": "String"
-    }
+    },
+    "VpcId": {
+       "Description": "The ID of the VPC to launch into.",
+       "Type": "String",
+       "Default": ""
+     },
+     "SubnetId": {
+       "Description": "The ID of the VPC to launch into (that must be within the supplied VPC)",
+       "Type": "String",
+       "Default": ""
+     },
+     "SubnetAZ": {
+       "Description": "The availability zone of the subnet supplied (for example eu-west-1a)",
+       "Type": "String",
+       "Default": ""
+     }
+  },
+  "Conditions": {
+     "UseEC2Classic": {"Fn::Equals": [{"Ref": "VpcId"}, ""]}
   },
   "Resources": {
     "KubernetesSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
+        "VpcId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "VpcId"}]},
         "GroupDescription": "Kubernetes SecurityGroup",
         "SecurityGroupIngress": [
           {
@@ -83,7 +102,7 @@
     "KubernetesIngress": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
-        "GroupName": {"Ref": "KubernetesSecurityGroup"},
+        "GroupId": {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]},
         "IpProtocol": "tcp",
         "FromPort": "1",
         "ToPort": "65535",
@@ -95,7 +114,7 @@
     "KubernetesIngressUDP": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
-        "GroupName": {"Ref": "KubernetesSecurityGroup"},
+        "GroupId": {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]},
         "IpProtocol": "udp",
         "FromPort": "1",
         "ToPort": "65535",
@@ -107,6 +126,7 @@
     "KubernetesMasterInstance": {
       "Type": "AWS::EC2::Instance",
       "Properties": {
+        "SubnetId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]},
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI"]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
@@ -292,6 +312,7 @@
     "KubernetesNodeLaunchConfig": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
+        "SubnetId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]},
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
@@ -395,7 +416,8 @@
     "KubernetesAutoScalingGroup": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
-        "AvailabilityZones": {"Fn::GetAZs": ""},
+        "AvailabilityZones": {"Fn::If": ["UseEC2Classic", {"Fn::GetAZs": ""}, [{"Ref": "SubnetAZ"}]]},
+        "VPCZoneIdentifier": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, [{"Ref": "SubnetId"}]]},
         "LaunchConfigurationName": {"Ref": "KubernetesNodeLaunchConfig"},
         "MinSize": "3",
         "MaxSize": "12",
