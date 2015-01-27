@@ -17,12 +17,13 @@ limitations under the License.
 package kubectl
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // VerifyDatesInOrder checks the start of each line for a RFC1123Z date
