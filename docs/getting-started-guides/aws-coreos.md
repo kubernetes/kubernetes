@@ -10,7 +10,7 @@ The example below creates an elastic Kubernetes cluster with 3 worker nodes and 
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config)
 * Cross container networking with [flannel](https://github.com/coreos/flannel#flannel)
 * Auto worker registration with [kube-register](https://github.com/kelseyhightower/kube-register#kube-register)
-* Kubernetes v0.8.1 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.8.1)
+* Kubernetes v0.9.1 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.9.1)
 
 ## Prerequisites
 
