@@ -41,6 +41,10 @@ type ListerWatcher interface {
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
+// Two objects from the ListerWatcher are considered different versions of the same thing,
+// and appear only once in the Store, if they have the same Namespace and Name().  This may not be what you want if you
+// are watching multiple Kinds or care about different UIDs of the same name.
+// TODO: make more general (issue #2294)
 type Reflector struct {
 	// The type of object we expect to place in the store.
 	expectedType reflect.Type
