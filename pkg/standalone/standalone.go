@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -187,6 +188,8 @@ func RunKubelet(kcfg *KubeletConfig) {
 	}
 	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
+
+	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
 	cfg := makePodSourceConfig(kcfg)
 	k, err := createAndInitKubelet(kcfg, cfg)

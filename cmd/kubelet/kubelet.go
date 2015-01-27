@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -126,6 +127,8 @@ func main() {
 	if err != nil && len(apiServerList) > 0 {
 		glog.Warningf("No API client: %v", err)
 	}
+
+	credentialprovider.SetPreferredDockercfgPath(*rootDirectory)
 
 	kcfg := standalone.KubeletConfig{
 		Address:                 address,
