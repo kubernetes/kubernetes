@@ -65,8 +65,10 @@ func TestGetURLParts(t *testing.T) {
 		state := api.PodStatus{PodIP: "127.0.0.1"}
 		container := api.Container{
 			Ports: []api.Port{{Name: "found", HostPort: 93}},
-			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: test.probe,
+			LivenessProbe: &api.Probe{
+				Handler: api.Handler{
+					HTTPGet: test.probe,
+				},
 			},
 		}
 		p, err := extractPort(test.probe.Port, container)
@@ -106,8 +108,10 @@ func TestGetTCPAddrParts(t *testing.T) {
 		host := "1.2.3.4"
 		container := api.Container{
 			Ports: []api.Port{{Name: "found", HostPort: 93}},
-			LivenessProbe: &api.LivenessProbe{
-				TCPSocket: test.probe,
+			LivenessProbe: &api.Probe{
+				Handler: api.Handler{
+					TCPSocket: test.probe,
+				},
 			},
 		}
 		port, err := extractPort(test.probe.Port, container)

@@ -270,14 +270,16 @@ type Container struct {
 }
 
 // Handler defines a specific action that should be taken
-// TODO: merge this with liveness probing?
 // TODO: pass structured data to these actions, and document that data here.
 type Handler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
-	Exec *ExecAction `json:"exec,omitempty" description:"exec-based hook handler"`
+	Exec *ExecAction `json:"exec,omitempty" description:"exec-based handler"`
 	// HTTPGet specifies the http request to perform.
-	HTTPGet *HTTPGetAction `json:"httpGet,omitempty" description:"HTTP-based hook handler"`
+	HTTPGet *HTTPGetAction `json:"httpGet,omitempty" description:"HTTP-based handler"`
+	// TCPSocket specifies an action involving a TCP port.
+	// TODO: implement a realistic TCP lifecycle hook
+	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty"  description:"TCP-based handler; TCP hooks not yet supported"`
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle

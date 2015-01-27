@@ -724,6 +724,33 @@ func init() {
 			}
 			return nil
 		},
+
+		func(in *newer.Probe, out *LivenessProbe, s conversion.Scope) error {
+			if err := s.Convert(&in.Exec, &out.Exec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.HTTPGet, &out.HTTPGet, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TCPSocket, &out.TCPSocket, 0); err != nil {
+				return err
+			}
+			out.InitialDelaySeconds = in.InitialDelaySeconds
+			return nil
+		},
+		func(in *LivenessProbe, out *newer.Probe, s conversion.Scope) error {
+			if err := s.Convert(&in.Exec, &out.Exec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.HTTPGet, &out.HTTPGet, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TCPSocket, &out.TCPSocket, 0); err != nil {
+				return err
+			}
+			out.InitialDelaySeconds = in.InitialDelaySeconds
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
