@@ -30,7 +30,7 @@ type ServiceGenerator struct{}
 func (ServiceGenerator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"labels", true},
+		{"selector", true},
 		{"port", true},
 		{"public-ip", false},
 		{"create-external-load-balancer", false},
@@ -40,11 +40,11 @@ func (ServiceGenerator) ParamNames() []GeneratorParam {
 }
 
 func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, error) {
-	labelString, found := params["labels"]
-	if !found || len(labelString) == 0 {
-		return nil, fmt.Errorf("'labels' is a required parameter.")
+	selectorString, found := params["selector"]
+	if !found || len(selectorString) == 0 {
+		return nil, fmt.Errorf("'selector' is a required parameter.")
 	}
-	labels := ParseLabels(labelString)
+	selector := ParseLabels(selectorString)
 	name, found := params["name"]
 	if !found {
 		return nil, fmt.Errorf("'name' is a required parameter.")
@@ -55,13 +55,12 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	}
 	service := api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name:   name,
-			Labels: labels,
+			Name: name,
 		},
 		Spec: api.ServiceSpec{
 			Port:     port,
 			Protocol: api.Protocol(params["protocol"]),
-			Selector: labels,
+			Selector: selector,
 		},
 	}
 	containerPort, found := params["container-port"]

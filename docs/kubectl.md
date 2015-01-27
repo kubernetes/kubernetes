@@ -394,11 +394,8 @@ Additional help topics:
   kubectl rollingupdate Perform a rolling update of the given ReplicationController
   kubectl resize        Set a new size for a resizable resource (currently only Replication Controllers)
   kubectl run-container Run a particular image on the cluster.
-<<<<<<< HEAD
   kubectl stop          Gracefully shutdown a resource
-=======
   kubectl expose        Take a replicated application and expose it as Kubernetes Service
->>>>>>> Add a service generator and a command to easily expose services.
 
 Use "kubectl help [command]" for more information about that command.
 ```
@@ -920,6 +917,7 @@ Usage:
       --image="": The image for the container you wish to run.
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+  -l, --labels="": Labels to apply to the pod(s) created by this call to run-container.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -945,7 +943,6 @@ Usage:
 
 ```
 
-<<<<<<< HEAD
 #### stop
 Gracefully shutdown a resource
 
@@ -955,7 +952,40 @@ If the resource is resizable it will be resized to 0 before deletion.
 Examples:
   $ kubectl stop replicationcontroller foo
   foo stopped
-=======
+
+
+Usage:
+```
+  kubectl stop <resource> <id> [flags]
+
+ Available Flags:
+      --alsologtostderr=false: log to standard error as well as files
+      --api-version="": The API version to use when talking to the server
+  -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority="": Path to a cert. file for the certificate authority.
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
+      --cluster="": The name of the kubeconfig cluster to use
+      --context="": The name of the kubeconfig context to use
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+      --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
+      --log_dir=: If non-empty, write log files in this directory
+      --log_flush_frequency=5s: Maximum number of seconds between log flushes
+      --logtostderr=true: log to standard error instead of files
+      --match-server-version=false: Require server version to match client version
+      --namespace="": If present, the namespace scope for this CLI request.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -s, --server="": The address of the Kubernetes API server
+      --stderrthreshold=2: logs at or above this threshold go to stderr
+      --token="": Bearer token for authentication to the API server.
+      --user="": The name of the kubeconfig user to use
+      --v=0: log level for V logs
+      --validate=false: If true, use a schema to validate the input before sending it
+      --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+
+```
+
 #### expose
 Take a replicated application and expose it as Kubernetes Service.
 		
@@ -968,16 +998,11 @@ $ kubectl expose nginx --port=80 --container-port=8000
 
 $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 <create a service for a replicated streaming application on port 4100 balancing UDP traffic and is named 'video-stream'>
->>>>>>> Add a service generator and a command to easily expose services.
 
 
 Usage:
 ```
-<<<<<<< HEAD
-  kubectl stop <resource> <id> [flags]
-=======
   kubectl expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer] [flags]
->>>>>>> Add a service generator and a command to easily expose services.
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -987,11 +1012,6 @@ Usage:
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
-<<<<<<< HEAD
-      --context="": The name of the kubeconfig context to use
-      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
-=======
       --container-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
       --context="": The name of the kubeconfig context to use
       --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default false
@@ -1000,32 +1020,25 @@ Usage:
   -h, --help=false: help for expose
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
-  -l, --labels="": Labels to apply to the pod(s) created by this call to run.
->>>>>>> Add a service generator and a command to easily expose services.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-<<<<<<< HEAD
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
-  -s, --server="": The address of the Kubernetes API server
-      --stderrthreshold=2: logs at or above this threshold go to stderr
-=======
-  -n, --namespace="": If present, the namespace scope for this CLI request.
       --no-headers=false: When using the default output, don't print headers
-      --ns-path="/home/username/.kubernetes_ns": Path to the namespace info file that holds the namespace context to use for CLI requests.
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
       --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.
       --port=-1: The port that the service should serve on. Required.
       --protocol="TCP": The network protocol for the service you want to be created. Default 'tcp'
+      --public-ip="": Name of a public ip address to set for the service.  The service will be assigned this IP in addition to its generated service IP.
+      --selector="": A label selector to use for this service.  If empty (the default) infer the selector from the replication controller
   -s, --server="": The address of the Kubernetes API server
-      --service-name="": The name for the newly create service.
+      --service-name="": The name for the newly created service.
       --stderrthreshold=2: logs at or above this threshold go to stderr
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
->>>>>>> Add a service generator and a command to easily expose services.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs

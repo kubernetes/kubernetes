@@ -93,5 +93,6 @@ Examples:
 	cmd.Flags().String("public-ip", "", "A public IP address to use for this service.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().Int("port", -1, "The port that this container exposes.")
+	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s) created by this call to run-container.")
 	return cmd
 }

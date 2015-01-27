@@ -46,7 +46,8 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 				usageError(cmd, "<name> is required for expose")
 			}
 
-			namespace := GetKubeNamespace(cmd)
+			namespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
 			client, err := f.Client(cmd)
 			checkErr(err)
 
@@ -68,7 +69,9 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 			} else {
 				params["name"] = GetFlagString(cmd, "service-name")
 			}
-			params["labels"] = kubectl.MakeLabels(rc.Spec.Selector)
+			if _, found := params["selector"]; !found {
+				params["selector"] = kubectl.MakeLabels(rc.Spec.Selector)
+			}
 			if GetFlagBool(cmd, "create-external-load-balancer") {
 				params["create-external-load-balancer"] = "true"
 			}
@@ -99,10 +102,11 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service you want to be created. Default 'tcp'")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default false")
-	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s) created by this call to run.")
+	cmd.Flags().String("selector", "", "A label selector to use for this service.  If empty (the default) infer the selector from the replication controller")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, don't actually do anything")
 	cmd.Flags().String("container-port", "", "Name or number for the port on the container that the service should direct traffic to. Optional.")
+	cmd.Flags().String("public-ip", "", "Name of a public ip address to set for the service.  The service will be assigned this IP in addition to its generated service IP.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.")
-	cmd.Flags().String("service-name", "", "The name for the newly create service.")
+	cmd.Flags().String("service-name", "", "The name for the newly created service.")
 	return cmd
 }

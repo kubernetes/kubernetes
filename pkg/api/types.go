@@ -654,6 +654,7 @@ type ServiceSpec struct {
 	PublicIPs []string `json:"publicIPs,omitempty"`
 
 	// ContainerPort is the name of the port on the container to direct traffic to.
+	// Optional, if unspecified use the first port on the container.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
