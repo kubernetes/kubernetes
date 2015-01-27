@@ -42,6 +42,7 @@ type healthCheckTest struct {
 }
 
 func TestExec(t *testing.T) {
+	prober := New()
 	fake := FakeCmd{}
 	tests := []healthCheckTest{
 		// Ok
@@ -54,7 +55,7 @@ func TestExec(t *testing.T) {
 	for _, test := range tests {
 		fake.out = test.output
 		fake.err = test.err
-		status, err := Probe(&fake)
+		status, err := prober.Probe(&fake)
 		if status != test.expectedStatus {
 			t.Errorf("expected %v, got %v", test.expectedStatus, status)
 		}

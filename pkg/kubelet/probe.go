@@ -32,23 +32,29 @@ import (
 	"github.com/golang/glog"
 )
 
+var (
+	execprober = execprobe.New()
+	httprober  = httprobe.New()
+	tcprober   = tcprobe.New()
+)
+
 func (kl *Kubelet) probeContainer(p *api.LivenessProbe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
 	if p.Exec != nil {
-		return execprobe.Probe(kl.newExecInContainer(podFullName, podUID, container))
+		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
 	if p.HTTPGet != nil {
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return httprobe.Probe(extractGetParams(p.HTTPGet, status, port))
+		return httprober.Probe(extractGetParams(p.HTTPGet, status, port))
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return tcprobe.Probe(status.PodIP, port)
+		return tcprober.Probe(status.PodIP, port)
 	}
 	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)
 	return probe.Unknown, nil

@@ -27,7 +27,13 @@ import (
 
 const defaultHealthyOutput = "ok"
 
-func Probe(e uexec.Cmd) (probe.Status, error) {
+func New() ExecProber {
+	return ExecProber{}
+}
+
+type ExecProber struct{}
+
+func (pr ExecProber) Probe(e uexec.Cmd) (probe.Status, error) {
 	data, err := e.CombinedOutput()
 	glog.V(4).Infof("health check response: %s", string(data))
 	if err != nil {

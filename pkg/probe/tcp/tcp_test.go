@@ -28,6 +28,7 @@ import (
 )
 
 func TestTcpHealthChecker(t *testing.T) {
+	prober := New()
 	tests := []struct {
 		expectedStatus probe.Status
 		usePort        bool
@@ -58,7 +59,7 @@ func TestTcpHealthChecker(t *testing.T) {
 		if !test.usePort {
 			p = -1
 		}
-		status, err := Probe(host, p)
+		status, err := prober.Probe(host, p)
 		if status != test.expectedStatus {
 			t.Errorf("expected: %v, got: %v", test.expectedStatus, status)
 		}

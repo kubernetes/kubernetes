@@ -25,7 +25,13 @@ import (
 	"github.com/golang/glog"
 )
 
-func Probe(host string, port int) (probe.Status, error) {
+func New() TCPProber {
+	return TCPProber{}
+}
+
+type TCPProber struct{}
+
+func (pr TCPProber) Probe(host string, port int) (probe.Status, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)))
 }
 

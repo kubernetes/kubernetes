@@ -27,11 +27,17 @@ import (
 	"github.com/golang/glog"
 )
 
-var client = &http.Client{}
+func New() HTTPProber {
+	return HTTPProber{&http.Client{}}
+}
+
+type HTTPProber struct {
+	client HTTPGetInterface
+}
 
 // Probe returns a ProbeRunner capable of running an http check.
-func Probe(host string, port int, path string) (probe.Status, error) {
-	return DoHTTPProbe(formatURL(host, port, path), client)
+func (pr *HTTPProber) Probe(host string, port int, path string) (probe.Status, error) {
+	return DoHTTPProbe(formatURL(host, port, path), pr.client)
 }
 
 type HTTPGetInterface interface {

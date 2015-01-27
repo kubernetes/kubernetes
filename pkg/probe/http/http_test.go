@@ -46,6 +46,7 @@ func TestFormatURL(t *testing.T) {
 }
 
 func TestHTTPProbeChecker(t *testing.T) {
+	prober := New()
 	testCases := []struct {
 		status int
 		health probe.Status
@@ -70,7 +71,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		health, err := Probe(host, p, "")
+		health, err := prober.Probe(host, p, "")
 		if test.health == probe.Unknown && err == nil {
 			t.Errorf("Expected error")
 		}
