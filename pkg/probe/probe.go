@@ -20,17 +20,17 @@ type Status int
 
 // Status values must be one of these constants.
 const (
-	Healthy Status = iota
-	Unhealthy
+	Success Status = iota
+	Failure
 	Unknown
 )
 
 func (s Status) String() string {
 	switch s {
-	case Healthy:
-		return "healthy"
-	case Unhealthy:
-		return "unhealthy"
+	case Success:
+		return "success"
+	case Failure:
+		return "failure"
 	default:
 		return "unknown"
 	}

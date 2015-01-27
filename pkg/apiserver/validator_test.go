@@ -59,8 +59,8 @@ func TestValidate(t *testing.T) {
 		expectErr      bool
 	}{
 		{fmt.Errorf("test error"), "", probe.Unknown, 500 /*ignored*/, true},
-		{nil, "foo", probe.Healthy, 200, false},
-		{nil, "foo", probe.Unhealthy, 500, true},
+		{nil, "foo", probe.Success, 200, false},
+		{nil, "foo", probe.Failure, 500, true},
 	}
 
 	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}

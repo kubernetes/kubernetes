@@ -1039,7 +1039,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				if healthy == probe.Healthy {
+				if healthy == probe.Success {
 					containersToKeep[containerID] = empty{}
 					continue
 				}
@@ -1401,10 +1401,10 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
-		return probe.Healthy, nil
+		return probe.Success, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return probe.Healthy, nil
+		return probe.Success, nil
 	}
 	return kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
 }

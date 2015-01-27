@@ -85,7 +85,7 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 }
 
 func (fakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
-	return probe.Healthy, nil
+	return probe.Success, nil
 }
 
 type delegateHandler struct {

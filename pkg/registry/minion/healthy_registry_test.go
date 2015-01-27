@@ -30,7 +30,7 @@ import (
 type alwaysYes struct{}
 
 func (alwaysYes) HealthCheck(host string) (probe.Status, error) {
-	return probe.Healthy, nil
+	return probe.Success, nil
 }
 
 func TestBasicDelegation(t *testing.T) {
@@ -77,9 +77,9 @@ type notMinion struct {
 
 func (n *notMinion) HealthCheck(host string) (probe.Status, error) {
 	if host != n.minion {
-		return probe.Healthy, nil
+		return probe.Success, nil
 	} else {
-		return probe.Unhealthy, nil
+		return probe.Failure, nil
 	}
 }
 

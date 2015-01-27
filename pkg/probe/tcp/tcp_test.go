@@ -35,8 +35,8 @@ func TestTcpHealthChecker(t *testing.T) {
 		expectError    bool
 	}{
 		// The probe will be filled in below.  This is primarily testing that a connection is made.
-		{probe.Healthy, true, false},
-		{probe.Unhealthy, false, false},
+		{probe.Success, true, false},
+		{probe.Failure, false, false},
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

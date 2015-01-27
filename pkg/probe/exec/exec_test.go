@@ -46,11 +46,11 @@ func TestExec(t *testing.T) {
 	fake := FakeCmd{}
 	tests := []healthCheckTest{
 		// Ok
-		{probe.Healthy, false, []byte("OK"), nil},
+		{probe.Success, false, []byte("OK"), nil},
 		// Run returns error
 		{probe.Unknown, true, []byte("OK, NOT"), fmt.Errorf("test error")},
 		// Unhealthy
-		{probe.Unhealthy, false, []byte("Fail"), nil},
+		{probe.Failure, false, []byte("Fail"), nil},
 	}
 	for _, test := range tests {
 		fake.out = test.output

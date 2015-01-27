@@ -134,8 +134,8 @@ func TestNewKubeletClient(t *testing.T) {
 
 	host := "127.0.0.1"
 	healthStatus, err := client.HealthCheck(host)
-	if healthStatus != probe.Unhealthy {
-		t.Errorf("Expected %v and got %v.", probe.Unhealthy, healthStatus)
+	if healthStatus != probe.Failure {
+		t.Errorf("Expected %v and got %v.", probe.Failure, healthStatus)
 	}
 	if err != nil {
 		t.Error("Expected a nil error")

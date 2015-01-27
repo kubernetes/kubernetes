@@ -52,8 +52,8 @@ func TestHTTPProbeChecker(t *testing.T) {
 		health probe.Status
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
-		{http.StatusOK, probe.Healthy},
-		{-1, probe.Unhealthy},
+		{http.StatusOK, probe.Success},
+		{-1, probe.Failure},
 	}
 	for _, test := range testCases {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

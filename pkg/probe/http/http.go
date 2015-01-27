@@ -52,14 +52,14 @@ func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Status, error) {
 	res, err := client.Get(url)
 	if err != nil {
 		glog.V(1).Infof("HTTP probe error: %v", err)
-		return probe.Unhealthy, nil
+		return probe.Failure, nil
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return probe.Healthy, nil
+		return probe.Success, nil
 	}
 	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-	return probe.Unhealthy, nil
+	return probe.Failure, nil
 }
 
 // formatURL formats a URL from args.  For testability.

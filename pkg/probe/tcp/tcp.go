@@ -42,11 +42,11 @@ func (pr TCPProber) Probe(host string, port int) (probe.Status, error) {
 func DoTCPProbe(addr string) (probe.Status, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		return probe.Unhealthy, nil
+		return probe.Failure, nil
 	}
 	err = conn.Close()
 	if err != nil {
 		glog.Errorf("unexpected error closing health check socket: %v (%#v)", err, err)
 	}
-	return probe.Healthy, nil
+	return probe.Success, nil
 }

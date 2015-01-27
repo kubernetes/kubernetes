@@ -40,7 +40,7 @@ func (pr ExecProber) Probe(e uexec.Cmd) (probe.Status, error) {
 		return probe.Unknown, err
 	}
 	if strings.ToLower(string(data)) != defaultHealthyOutput {
-		return probe.Unhealthy, nil
+		return probe.Failure, nil
 	}
-	return probe.Healthy, nil
+	return probe.Success, nil
 }

@@ -57,10 +57,10 @@ func (s *Server) check(client httpGet) (probe.Status, string, error) {
 		return probe.Unknown, string(data), err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return probe.Unhealthy, string(data),
+		return probe.Failure, string(data),
 			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
 	}
-	return probe.Healthy, string(data), nil
+	return probe.Success, string(data), nil
 }
 
 type ServerStatus struct {

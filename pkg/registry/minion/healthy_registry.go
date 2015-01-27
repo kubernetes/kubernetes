@@ -115,7 +115,7 @@ func (r *HealthyRegistry) doCheck(key string) util.T {
 	case err != nil:
 		glog.V(2).Infof("HealthyRegistry: node %q health check error: %v", key, err)
 		nodeStatus = api.ConditionUnknown
-	case status == probe.Unhealthy:
+	case status == probe.Failure:
 		nodeStatus = api.ConditionNone
 	default:
 		nodeStatus = api.ConditionFull
