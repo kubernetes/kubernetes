@@ -86,14 +86,14 @@ func TestExtractListGeneric(t *testing.T) {
 }
 
 type fakePtrInterfaceList struct {
-	Items []*runtime.Object
+	Items *[]runtime.Object
 }
 
 func (f fakePtrInterfaceList) IsAnAPIObject() {}
 
 func TestExtractListOfInterfacePtrs(t *testing.T) {
 	pl := &fakePtrInterfaceList{
-		Items: []*runtime.Object{},
+		Items: &[]runtime.Object{},
 	}
 	list, err := runtime.ExtractList(pl)
 	if err != nil {
