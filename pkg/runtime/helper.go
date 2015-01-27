@@ -43,6 +43,10 @@ func GetItemsPtr(list Object) (interface{}, error) {
 	}
 	switch items.Kind() {
 	case reflect.Interface, reflect.Ptr:
+		target := reflect.TypeOf(items.Interface()).Elem()
+		if target.Kind() != reflect.Slice {
+			return nil, fmt.Errorf("items: Expected slice, got %s", target.Kind())
+		}
 		return items.Interface(), nil
 	case reflect.Slice:
 		return items.Addr().Interface(), nil
