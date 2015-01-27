@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -373,6 +374,7 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
 
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext
 func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) {
+	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
 	output, err := codec.Encode(status)
 	if err != nil {
@@ -387,7 +389,6 @@ func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) {
 
 // writeRawJSON writes a non-API object in JSON.
 func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	// PR #2243: Pretty-print JSON by default.
 	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

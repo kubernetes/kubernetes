@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/golang/glog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // statusError is an object that can be converted into an api.Status
@@ -49,7 +49,7 @@ func errToAPIStatus(err error) *api.Status {
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		glog.V(1).Infof("An unchecked error was received: %v", err)
+		util.HandleError(fmt.Errorf("apiserver received an error that is not an api.Status: %v", err))
 		return &api.Status{
 			Status:  api.StatusFailure,
 			Code:    status,
