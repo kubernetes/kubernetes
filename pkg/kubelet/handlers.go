@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -77,7 +78,7 @@ func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *ap
 			glog.Errorf("unable to get pod info, event handlers may be invalid.")
 			return err
 		}
-		netInfo, found := status.Info[networkContainerName]
+		netInfo, found := status.Info[dockertools.PodInfraContainerName]
 		if found {
 			host = netInfo.PodIP
 		} else {

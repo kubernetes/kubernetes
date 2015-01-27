@@ -72,7 +72,7 @@ func NewMainKubelet(
 	etcdClient tools.EtcdClient,
 	kubeClient *client.Client,
 	rootDirectory string,
-	networkContainerImage string,
+	podInfraContainerImage string,
 	resyncInterval time.Duration,
 	pullQPS float32,
 	pullBurst int,
@@ -106,7 +106,7 @@ func NewMainKubelet(
 		kubeClient:             kubeClient,
 		rootDirectory:          rootDirectory,
 		resyncInterval:         resyncInterval,
-		networkContainerImage:  networkContainerImage,
+		podInfraContainerImage: podInfraContainerImage,
 		podWorkers:             newPodWorkers(),
 		dockerIDToRef:          map[dockertools.DockerID]*api.ObjectReference{},
 		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
@@ -142,15 +142,15 @@ type serviceLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	hostname              string
-	dockerClient          dockertools.DockerInterface
-	kubeClient            *client.Client
-	rootDirectory         string
-	networkContainerImage string
-	podWorkers            *podWorkers
-	resyncInterval        time.Duration
-	pods                  []api.BoundPod
-	sourceReady           SourceReadyFn
+	hostname               string
+	dockerClient           dockertools.DockerInterface
+	kubeClient             *client.Client
+	rootDirectory          string
+	podInfraContainerImage string
+	podWorkers             *podWorkers
+	resyncInterval         time.Duration
+	pods                   []api.BoundPod
+	sourceReady            SourceReadyFn
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -583,7 +583,7 @@ func containerRef(pod *api.BoundPod, container *api.Container) (*api.ObjectRefer
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {
 		// TODO: figure out intelligent way to refer to containers that we implicitly
-		// start (like the network container). This is not a good way, ugh.
+		// start (like the pod infra container). This is not a good way, ugh.
 		fieldPath = "implicitly required container " + container.Name
 	}
 	ref, err := api.GetPartialReference(pod, fieldPath)
@@ -619,7 +619,7 @@ func (kl *Kubelet) getRef(id dockertools.DockerID) (ref *api.ObjectReference, ok
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, podVolumes volumeMap, netMode string) (id dockertools.DockerID, err error) {
+func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (id dockertools.DockerID, err error) {
 	ref, err := containerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -684,6 +684,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
+		IpcMode:      ipcMode,
 		Privileged:   privileged,
 	}
 	if pod.Spec.DNSPolicy == api.DNSClusterFirst {
@@ -878,21 +879,20 @@ func (kl *Kubelet) killContainerByID(ID, name string) error {
 }
 
 const (
-	networkContainerName  = "net"
-	NetworkContainerImage = "kubernetes/pause:latest"
+	PodInfraContainerImage = "kubernetes/pause:latest"
 )
 
-// createNetworkContainer starts the network container for a pod. Returns the docker container ID of the newly created container.
-func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.DockerID, error) {
+// createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
+func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.DockerID, error) {
 	var ports []api.Port
-	// Docker only exports ports from the network container.  Let's
+	// Docker only exports ports from the pod infra container.  Let's
 	// collect all of the relevant ports and export them.
 	for _, container := range pod.Spec.Containers {
 		ports = append(ports, container.Ports...)
 	}
 	container := &api.Container{
-		Name:  networkContainerName,
-		Image: kl.networkContainerImage,
+		Name:  dockertools.PodInfraContainerName,
+		Image: kl.podInfraContainerImage,
 		Ports: ports,
 	}
 	ref, err := containerRef(pod, container)
@@ -915,7 +915,7 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 	if ref != nil {
 		record.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
-	return kl.runContainer(pod, container, nil, "")
+	return kl.runContainer(pod, container, nil, "", "")
 }
 
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
@@ -987,19 +987,19 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		return err
 	}
 
-	// Make sure we have a network container
-	var netID dockertools.DockerID
-	if netDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, networkContainerName); found {
-		netID = dockertools.DockerID(netDockerContainer.ID)
+	// Make sure we have a pod infra container
+	var podInfraContainerID dockertools.DockerID
+	if podInfraDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+		podInfraContainerID = dockertools.DockerID(podInfraDockerContainer.ID)
 	} else {
 		glog.V(2).Infof("Network container doesn't exist for pod %q, killing and re-creating the pod", podFullName)
 		count, err := kl.killContainersInPod(pod, dockerContainers)
 		if err != nil {
 			return err
 		}
-		netID, err = kl.createNetworkContainer(pod)
+		podInfraContainerID, err = kl.createPodInfraContainer(pod)
 		if err != nil {
-			glog.Errorf("Failed to introspect network container: %v; Skipping pod %q", err, podFullName)
+			glog.Errorf("Failed to introspect pod infra container: %v; Skipping pod %q", err, podFullName)
 			return err
 		}
 		if count > 0 {
@@ -1011,7 +1011,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 		}
 	}
-	containersToKeep[netID] = empty{}
+	containersToKeep[podInfraContainerID] = empty{}
 
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
@@ -1023,7 +1023,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info, health checks may be invalid", podFullName, uid)
 	}
-	netInfo, found := podStatus.Info[networkContainerName]
+	netInfo, found := podStatus.Info[dockertools.PodInfraContainerName]
 	if found {
 		podStatus.PodIP = netInfo.PodIP
 	}
@@ -1058,10 +1058,10 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 			killedContainers[containerID] = empty{}
 
-			// Also kill associated network container
-			if netContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, networkContainerName); found {
-				if err := kl.killContainer(netContainer); err != nil {
-					glog.V(1).Infof("Failed to kill network container %q: %v", netContainer.ID, err)
+			// Also kill associated pod infra container
+			if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+				if err := kl.killContainer(podInfraContainer); err != nil {
+					glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
 					continue
 				}
 			}
@@ -1112,7 +1112,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 		}
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
-		containerID, err := kl.runContainer(pod, &container, podVolumes, "container:"+string(netID))
+		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
+		containerID, err := kl.runContainer(pod, &container, podVolumes, namespaceMode, namespaceMode)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
 			glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
@@ -1222,7 +1223,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		desiredPods[uid] = empty{}
 
 		// Add all containers (including net) to the map.
-		desiredContainers[podContainer{podFullName, uid, networkContainerName}] = empty{}
+		desiredContainers[podContainer{podFullName, uid, dockertools.PodInfraContainerName}] = empty{}
 		for _, cont := range pod.Spec.Containers {
 			desiredContainers[podContainer{podFullName, uid, cont.Name}] = empty{}
 		}
