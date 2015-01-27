@@ -83,6 +83,9 @@ func newReplicationController(replicas int) api.ReplicationController {
 							Image: "foo/bar",
 						},
 					},
+					NodeSelector: map[string]string{
+						"baz": "blah",
+					},
 				},
 			},
 		},
@@ -208,6 +211,9 @@ func TestCreateReplica(t *testing.T) {
 						{
 							Image: "foo/bar",
 						},
+					},
+					NodeSelector: map[string]string{
+						"foo": "bar",
 					},
 				},
 			},
