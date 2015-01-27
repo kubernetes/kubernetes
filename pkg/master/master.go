@@ -47,6 +47,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -109,6 +110,7 @@ type Master struct {
 	minionRegistry     minion.Registry
 	bindingRegistry    binding.Registry
 	eventRegistry      generic.Registry
+	limitRangeRegistry generic.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 	portalNet          *net.IPNet
@@ -248,6 +250,7 @@ func New(c *Config) *Master {
 		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:        minionRegistry,
+		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
 		client:                c.Client,
 		portalNet:             c.PortalNet,
 		rootWebService:        new(restful.WebService),
@@ -361,6 +364,8 @@ func (m *Master) init(c *Config) {
 
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
+
+		"limitRanges": limitrange.NewREST(m.limitRangeRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

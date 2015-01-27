@@ -568,7 +568,72 @@ func init() {
 			out.Status.HostIP = in.HostIP
 			return s.Convert(&in.NodeResources.Capacity, &out.Spec.Capacity, 0)
 		},
-
+		func(in *newer.LimitRange, out *LimitRange, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *LimitRange, out *newer.LimitRange, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.LimitRangeSpec, out *LimitRangeSpec, s conversion.Scope) error {
+			*out = LimitRangeSpec{}
+			out.Limits = make([]LimitRangeItem, len(in.Limits), len(in.Limits))
+			for i := range in.Limits {
+				if err := s.Convert(&in.Limits[i], &out.Limits[i], 0); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		func(in *LimitRangeSpec, out *newer.LimitRangeSpec, s conversion.Scope) error {
+			*out = newer.LimitRangeSpec{}
+			out.Limits = make([]newer.LimitRangeItem, len(in.Limits), len(in.Limits))
+			for i := range in.Limits {
+				if err := s.Convert(&in.Limits[i], &out.Limits[i], 0); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		func(in *newer.LimitRangeItem, out *LimitRangeItem, s conversion.Scope) error {
+			*out = LimitRangeItem{}
+			out.Type = LimitType(in.Type)
+			if err := s.Convert(&in.Max, &out.Max, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Min, &out.Min, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *LimitRangeItem, out *newer.LimitRangeItem, s conversion.Scope) error {
+			*out = newer.LimitRangeItem{}
+			out.Type = newer.LimitType(in.Type)
+			if err := s.Convert(&in.Max, &out.Max, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Min, &out.Min, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		// Object ID <-> Name
 		// TODO: amend the conversion package to allow overriding specific fields.
 		func(in *ObjectReference, out *newer.ObjectReference, s conversion.Scope) error {
