@@ -36,6 +36,8 @@ import (
 type fakeCache struct {
 	requestedNamespace string
 	requestedName      string
+	clearedNamespace   string
+	clearedName        string
 
 	statusToReturn *api.PodStatus
 	errorToReturn  error
@@ -45,6 +47,11 @@ func (f *fakeCache) GetPodStatus(namespace, name string) (*api.PodStatus, error)
 	f.requestedNamespace = namespace
 	f.requestedName = name
 	return f.statusToReturn, f.errorToReturn
+}
+
+func (f *fakeCache) ClearPodStatus(namespace, name string) {
+	f.clearedNamespace = namespace
+	f.clearedName = name
 }
 
 func expectApiStatusError(t *testing.T, ch <-chan apiserver.RESTResult, msg string) {
@@ -581,5 +588,33 @@ func TestResourceLocation(t *testing.T) {
 		if location != tc.location {
 			t.Errorf("Expected %v, but got %v", tc.location, location)
 		}
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pod = &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Status:     api.PodStatus{Host: "machine"},
+	}
+	fakeCache := &fakeCache{}
+	storage := REST{
+		registry: podRegistry,
+		podCache: fakeCache,
+	}
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Delete(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	var result apiserver.RESTResult
+	select {
+	case result = <-channel:
+		// Do nothing, this is expected.
+	case <-time.After(time.Millisecond * 100):
+		t.Error("Unexpected timeout on async channel")
+	}
+	if fakeCache.clearedNamespace != "default" || fakeCache.clearedName != "foo" {
+		t.Errorf("Unexpeceted cache delete: %s %s %#v", fakeCache.clearedName, fakeCache.clearedNamespace, result.Object)
 	}
 }

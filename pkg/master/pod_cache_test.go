@@ -125,6 +125,36 @@ func TestPodCacheGet(t *testing.T) {
 	}
 }
 
+func TestPodCacheDelete(t *testing.T) {
+	cache := NewPodCache(nil, nil, nil, nil)
+
+	expected := api.PodStatus{
+		Info: api.PodInfo{
+			"foo": api.ContainerStatus{},
+		},
+	}
+	cache.podStatus[objKey{api.NamespaceDefault, "foo"}] = expected
+
+	info, err := cache.GetPodStatus(api.NamespaceDefault, "foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %+v", err)
+	}
+	if !reflect.DeepEqual(info, &expected) {
+		t.Errorf("Unexpected mismatch. Expected: %+v, Got: %+v", &expected, info)
+	}
+
+	cache.ClearPodStatus(api.NamespaceDefault, "foo")
+
+	_, err = cache.GetPodStatus(api.NamespaceDefault, "foo")
+	if err == nil {
+		t.Errorf("Unexpected non-error after deleting")
+	}
+	if err != client.ErrPodInfoNotAvailable {
+		t.Errorf("Unexpected error: %v, expecting: %v", err, client.ErrPodInfoNotAvailable)
+	}
+
+}
+
 func TestPodCacheGetMissing(t *testing.T) {
 	cache := NewPodCache(nil, nil, nil, nil)
 
