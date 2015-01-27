@@ -147,7 +147,7 @@ func etcdErrorIndex(err error) (uint64, bool) {
 }
 
 func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
-	result, err := h.Client.Get(key, false, true)
+	result, err := h.Client.Get(key, true, true)
 	if err != nil {
 		index, ok := etcdErrorIndex(err)
 		if !ok {
