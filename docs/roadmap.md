@@ -149,3 +149,54 @@ Allow the client to be authenticated to multiple clusters (https://github.com/Go
 * Issue [#3138](https://github.com/GoogleCloudPlatform/kubernetes/issues/3138) [davidopp] A way to record a real workload and replay it deterministically
 * Issue [#3139](https://github.com/GoogleCloudPlatform/kubernetes/issues/3139) [davidopp] A way to generate a synthetic workload and play it
 * Issue [#2852](https://github.com/GoogleCloudPlatform/kubernetes/issues/2852) and Issue [#3067](https://github.com/GoogleCloudPlatform/kubernetes/issues/3067) [vishnuk] Protect system services against kernel OOM kills and resource starvation. 
+
+# Performance
+Currently we are conflating performance of any size of Kubernetes cluster with scalability. Later we may wish to tease apart these two concerns. As part of overall performance, we also consider the performance of the build and test processes. The main current pain point is the we have no systematic performance measurement mechanism or process.
+
+The goals of the performance related activities are:
+* A collection of performance regression tests that measure the effect of code changes.
+* A dashboard or some other form of storing and querying historical performance information.
+
+Things we could measure:
+
+1. Time to build from source.
+2. Time to run each test in the end to end suite (or a mean plus standard deviation).
+3. Time taken to perform API operations e.g.
+ 1. List pods, for a varying number of pods (no labels).
+ 2. List pods, using various label constraints.
+ 3. Delete pods.
+ 4. Create service.
+ 5. Create/Delete pod N times.
+ 6. Schedule pod (in a system with various numbers of existing pods)
+4. Time taken to perform above during concurrent access scenarios (i.e. 10, 50, 100 concurrent users)
+5. Time taken to perform the above when using an etcd cluster size of 3 with various snapshot intervals
+6. Overhead of running some kind of application on a Kubernetes cluster vs. a hand-spun version directly on a cloud platform or other cluster.
+7. Network performance.
+ 1. Create a series of layered services (e.g. the onion router network) and measure RTT time for requests to succeed through N layers of services
+8. Memory consumption of kube components on master at varying sizes.
+ 1. What happens if I have LIST queries that return 1000s of results per request from apiserver with go heap.
+ 2. How efficient is serialization / deserialization of large lists of items
+9. Open questions:
+ 1. Synthetic Workloads vs. Real workloads
+ 2. How much of the performance testing will/should be cloud provider specific?
+ 3. Are there any any open source tools / frameworks we can use use?
+ 4. Storage performance?
+
+## Work Items
+
+* Issue [#3118](https://github.com/GoogleCloudPlatform/kubernetes/issues/3118) Build/find a dashboard to record performance metrics. The dashboard should have graphs of metrics over time and be queriable.
+* Issue [#3119](https://github.com/GoogleCloudPlatform/kubernetes/issues/3119) Decide how to archive information.
+* Issue [#3120](https://github.com/GoogleCloudPlatform/kubernetes/issues/3120) Configure and automated hourly build and record the time it takes to build kubernetes from source. Export information into the dashboard.
+* Issue [#3121](https://github.com/GoogleCloudPlatform/kubernetes/issues/3121) Configure the automated e2e test runner (jenkins) to export the time for each test to complete into the dashboard.
+* Issue [#3122](https://github.com/GoogleCloudPlatform/kubernetes/issues/3122) When e2e tests run on multiple cloud providers, break out the test performance by provider so that regressions can be tracked on each cloud provider individually.  
+* Issue [#3123](https://github.com/GoogleCloudPlatform/kubernetes/issues/3123) Measure the time for each Go test in the e2e test suite individually rather than in aggregate.
+* Issue [#3124](https://github.com/GoogleCloudPlatform/kubernetes/issues/3124) Develop synthetic workload tests to measure basic Kubernetes API performance. Since tests will run on shared resources (e.g. GCE) individual tests should be run N times to weed out any statistical outliers from the performance results. 
+Issue [#3125](https://github.com/GoogleCloudPlatform/kubernetes/issues/3125) Curate a small number of “applications” that can be used to measure performance at a higher level (QPS for high level requests).
+Work out how to specify performance regression tests (e.g. decide on thresholds).
+Issue [#3126](https://github.com/GoogleCloudPlatform/kubernetes/issues/3126) Measure the time taken to create and tear down clusters of various sizes
+Issue [#3127](https://github.com/GoogleCloudPlatform/kubernetes/issues/3127) Create a network performance test.
+Issue [#3128](https://github.com/GoogleCloudPlatform/kubernetes/issues/3128) Measure memory consumption of kubernetes master components
+* What happens if I have LIST queries that return 1000s of results per request from apiserver with go heap
+* How efficient is serialization / deserialization of large lists of items
+
+
