@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/httpcontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
@@ -148,7 +149,7 @@ func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
 func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage, namespace, kind string) {
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := api.WithNamespace(httpcontext.For(req), namespace)
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {

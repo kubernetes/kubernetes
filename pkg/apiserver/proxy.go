@@ -31,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/httpcontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -86,7 +87,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		notFound(w, req)
 		return
 	}
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := api.WithNamespace(httpcontext.For(req), namespace)
 	if len(parts) < 2 {
 		notFound(w, req)
 		return
@@ -151,6 +152,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	newReq.Header = req.Header
+	httpcontext.AddToRequest(newReq, ctx)
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: destURL.Host})
 	proxy.Transport = &proxyTransport{
