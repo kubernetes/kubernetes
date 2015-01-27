@@ -11,9 +11,52 @@ doc for more details.
 
 ## Node Status
 
-Node Status is still under development. See:
-[#2164](https://github.com/GoogleCloudPlatform/kubernetes/issues/2164),
-[#2315](https://github.com/GoogleCloudPlatform/kubernetes/pull/2315).
+Node status describes current status of a node. For now, there are three
+pieces of information:
+
+### HostIP
+
+Host IP address is queried from cloudprovider and stored as part of node
+status. If kubernetes runs without cloudprovider, node's ID will be used.
+IP address can change, and there are different kind of IPs, e.g. public
+IP, private IP, dynamic IP, ipv6, etc. It makes more sense to save it as
+a status rather than spec.
+
+### Node Phase
+
+Node Phase is the current lifecycle phase of node, one of `Pending`,
+`Running` and `Terminated`. Node Phase management is under development,
+here is a brief overview: In kubernetes, node will be created in `Pending`
+phase, until it is discovered and checked in by kubernetes, at which time,
+kubernetes will mark it as `Running`. The end of a node's lifecycle is
+`Terminated`. A terminated node will not receive any scheduling request,
+and any running pods will be removed from the node.
+
+Node with `Running` phase is necessary but not sufficient requirement for
+scheduling Pods. For a node to be considered a scheduling candidate, it
+must have appropriate conditions, see below.
+
+### Node Condition
+Node Condition describes the conditions of `Running` nodes. Current valid
+conditions are `NodeReachable` and `NodeReady`. In the future, we plan to
+add more. `NodeReachable` means the node can be reached within the cluster.
+`NodeReady` means the kubelet returns StatusOK for HTTP health check. Different
+condition provides different level of understanding for node health. Kubernetes
+will make a comprehensive scheduling decision based on the information. Node
+condition is represented as a json object. For example, the following conditions
+mean the node is reachable from its cluster, but not ready to accept pods:
+```json
+"conditions": [
+  {
+    "kind": "Reachable",
+    "status": "Full",
+  },
+  {
+    "kind": "Ready",
+    "status": "None",
+  }
+]
+```
 
 ## Node Management
 
