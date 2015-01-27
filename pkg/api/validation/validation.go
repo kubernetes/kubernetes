@@ -485,21 +485,6 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	allErrs = append(allErrs, ValidateLabels(service.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateLabels(service.Annotations, "annotations")...)
 
-	if service.Spec.CreateExternalLoadBalancer {
-		services, err := lister.ListServices(ctx)
-		if err != nil {
-			allErrs = append(allErrs, errs.NewInternalError(err))
-		} else {
-			for i := range services.Items {
-				if services.Items[i].Name != service.Name &&
-					services.Items[i].Spec.CreateExternalLoadBalancer &&
-					services.Items[i].Spec.Port == service.Spec.Port {
-					allErrs = append(allErrs, errs.NewConflict("service", service.Name, fmt.Errorf("port: %d is already in use", service.Spec.Port)))
-					break
-				}
-			}
-		}
-	}
 	if service.Spec.SessionAffinity == "" {
 		service.Spec.SessionAffinity = api.AffinityTypeNone
 	} else if !supportedSessionAffinityType.Has(string(service.Spec.SessionAffinity)) {

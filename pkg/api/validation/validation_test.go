@@ -953,7 +953,7 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid port in use",
+			name: "external port in use",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
@@ -970,7 +970,7 @@ func TestValidateService(t *testing.T) {
 					},
 				},
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "same port in use, but not external",
