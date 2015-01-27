@@ -128,8 +128,7 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 
 	createRoute := ws.POST(path).To(h).
 		Doc("create a " + kind).
-		Operation("create" + kind).
-		Reads(versionedObject) // from the request
+		Operation("create" + kind)
 	addParamIf(createRoute, namespaceParam, namespaceScope)
 	if _, ok := storage.(RESTCreater); ok {
 		ws.Route(createRoute.Reads(versionedObject)) // from the request
