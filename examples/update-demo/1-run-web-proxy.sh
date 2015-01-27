@@ -26,4 +26,4 @@ echo
 
 set -x
 
-../../cluster/kubecfg.sh -proxy -www local/
+../../cluster/kubectl.sh proxy --www local/
