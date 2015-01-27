@@ -74,13 +74,26 @@ type ListMeta struct {
 }
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
-// users must create. A resource may have only one of {ObjectMeta, ListMeta}.
+// users must create.
 type ObjectMeta struct {
 	// Name is unique within a namespace.  Name is required when creating resources, although
 	// some resources may allow a client to request the generation of an appropriate name
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
 	Name string `json:"name,omitempty"`
+
+	// GenerateName indicates that the name should be made unique by the server prior to persisting
+	// it. A non-empty value for the field indicates the name will be made unique (and the name
+	// returned to the client will be different than the name passed). The value of this field will
+	// be combined with a unique suffix on the server if the Name field has not been provided.
+	// The provided value must be valid within the rules for Name, and may be truncated by the length
+	// of the suffix required to make the value unique on the server.
+	//
+	// If this field is specified, and Name is not present, the server will NOT return a 409 if the
+	// generated name exists - instead, it will either return 201 Created or 500 with Reason
+	// TryAgainLater indicating a unique name could not be found in the time allotted, and the client
+	// should retry (optionally after the time indicated in the Retry-After header).
+	GenerateName string `json:"generateName,omitempty"`
 
 	// Namespace defines the space within which name must be unique. An empty namespace is
 	// equivalent to the "default" namespace, but "default" is the canonical representation.

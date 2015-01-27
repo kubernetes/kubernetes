@@ -53,11 +53,24 @@ func ValidateAnnotations(annotations map[string]string, field string) errs.Valid
 }
 
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names.
-type ValidateNameFunc func(name string) (bool, string)
+// Not all resources have the same validation rules for names. Prefix is true if the
+// name will have a value appended to it.
+type ValidateNameFunc func(name string, prefix bool) (bool, string)
+
+// maskTrailingDash replaces the final character of a string with a subdomain safe
+// value if is a dash.
+func maskTrailingDash(name string) string {
+	if strings.HasSuffix(name, "-") {
+		return name[:len(name)-2] + "a"
+	}
+	return name
+}
 
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func nameIsDNSSubdomain(name string) (bool, string) {
+func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
 	if util.IsDNSSubdomain(name) {
 		return true, ""
 	}
@@ -65,23 +78,36 @@ func nameIsDNSSubdomain(name string) (bool, string) {
 }
 
 // nameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func nameIsDNS952Label(name string) (bool, string) {
+func nameIsDNS952Label(name string, prefix bool) (bool, string) {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
 	if util.IsDNS952Label(name) {
 		return true, ""
 	}
 	return false, "name must be lowercase letters, numbers, and dashes"
 }
 
-// ValidateObjectMeta validates an object's metadata.
+// ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
+// been performed.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
+
+	if len(meta.GenerateName) != 0 {
+		if ok, qualifier := nameFn(meta.GenerateName, true); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("generateName", meta.GenerateName, qualifier))
+		}
+	}
+	// if the generated name validates, but the calculated value does not, it's a problem with generation, and we
+	// report it here. This may confuse users, but indicates a programming bug and still must be validated.
 	if len(meta.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", meta.Name))
 	} else {
-		if ok, qualifier := nameFn(meta.Name); !ok {
+		if ok, qualifier := nameFn(meta.Name, false); !ok {
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, qualifier))
 		}
 	}
+
 	if requiresNamespace {
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, errs.NewFieldRequired("namespace", meta.Namespace))
@@ -95,10 +121,6 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	}
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, "annotations")...)
-
-	// Clear self link internally
-	// TODO: move to its own area
-	meta.SelfLink = ""
 
 	return allErrs
 }
@@ -130,10 +152,6 @@ func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorLis
 
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, "annotations")...)
-
-	// Clear self link internally
-	// TODO: move to its own area
-	meta.SelfLink = ""
 
 	return allErrs
 }
@@ -660,7 +678,7 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 	if len(pod.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
 	} else {
-		if ok, qualifier := nameIsDNSSubdomain(pod.Name); !ok {
+		if ok, qualifier := nameIsDNSSubdomain(pod.Name, false); !ok {
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, qualifier))
 		}
 	}

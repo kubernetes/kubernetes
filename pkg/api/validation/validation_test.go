@@ -37,6 +37,30 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ValidationErrorList) 
 	}
 }
 
+// Ensure custom name functions are allowed
+func TestValidateObjectMetaCustomName(t *testing.T) {
+	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", GenerateName: "foo"}, false, func(s string, prefix bool) (bool, string) {
+		if s == "test" {
+			return true, ""
+		}
+		return false, "name-gen"
+	})
+	if len(errs) != 1 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "name-gen") {
+		t.Errorf("unexpected error message: %v", errs)
+	}
+}
+
+// Ensure trailing slash is allowed in generate name
+func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
+	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", GenerateName: "foo-"}, false, nameIsDNSSubdomain)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+}
+
 func TestValidateLabels(t *testing.T) {
 	successCases := []map[string]string{
 		{"simple": "bar"},
@@ -953,13 +977,45 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid id",
 			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "123abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: api.ObjectMeta{Name: "-123abc", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
 					Port:     8675,
 					Selector: map[string]string{"foo": "bar"},
 				},
 			},
 			// Should fail because the ID is invalid.
+			numErrs: 1,
+		},
+		{
+			name: "invalid generate.base",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:         "valid",
+					GenerateName: "-123abc",
+					Namespace:    api.NamespaceDefault,
+				},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
+			},
+			// Should fail because the Base value for generation is invalid
+			numErrs: 1,
+		},
+		{
+			name: "invalid generateName",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:         "valid",
+					GenerateName: "abc1234567abc1234567abc1234567abc1234567abc1234567abc1234567",
+					Namespace:    api.NamespaceDefault,
+				},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
+			},
+			// Should fail because the generate name type is invalid.
 			numErrs: 1,
 		},
 		{
@@ -1426,7 +1482,9 @@ func TestValidateMinion(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			ObjectMeta: api.ObjectMeta{
+				Name: "abc",
+			},
 			Status: api.NodeStatus{
 				HostIP: "something",
 			},
