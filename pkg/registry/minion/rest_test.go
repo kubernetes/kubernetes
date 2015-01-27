@@ -42,7 +42,7 @@ func TestMinionRegistryREST(t *testing.T) {
 
 	c, err := ms.Create(ctx, &api.Node{ObjectMeta: api.ObjectMeta{Name: "baz"}})
 	if err != nil {
-		t.Errorf("insert failed")
+		t.Fatalf("insert failed: %v", err)
 	}
 	obj := <-c
 	if !api.HasObjectMetaSystemFieldValues(&obj.Object.(*api.Node).ObjectMeta) {
@@ -57,7 +57,7 @@ func TestMinionRegistryREST(t *testing.T) {
 
 	c, err = ms.Delete(ctx, "bar")
 	if err != nil {
-		t.Errorf("delete failed")
+		t.Fatalf("delete failed")
 	}
 	obj = <-c
 	if s, ok := obj.Object.(*api.Status); !ok || s.Status != api.StatusSuccess {
@@ -69,7 +69,7 @@ func TestMinionRegistryREST(t *testing.T) {
 
 	_, err = ms.Delete(ctx, "bar")
 	if err != ErrDoesNotExist {
-		t.Errorf("delete returned wrong error")
+		t.Fatalf("delete returned wrong error")
 	}
 
 	list, err := ms.List(ctx, labels.Everything(), labels.Everything())
@@ -103,7 +103,7 @@ func TestMinionRegistryHealthCheck(t *testing.T) {
 
 	c, err := ms.Create(ctx, &api.Node{ObjectMeta: api.ObjectMeta{Name: "m1"}})
 	if err != nil {
-		t.Errorf("insert failed")
+		t.Fatalf("insert failed: %v", err)
 	}
 	result := <-c
 	if m, ok := result.Object.(*api.Node); !ok || m.Name != "m1" {

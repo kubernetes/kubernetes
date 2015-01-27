@@ -71,7 +71,7 @@ func TestValidationErrorUsefulMessage(t *testing.T) {
 		Inner interface{}
 		KV    map[string]int
 	}
-	s = NewFieldRequired(
+	s = NewFieldInvalid(
 		"foo",
 		&complicated{
 			Baz:   1,
@@ -79,11 +79,12 @@ func TestValidationErrorUsefulMessage(t *testing.T) {
 			Inner: &complicated{Qux: "asdf"},
 			KV:    map[string]int{"Billy": 2},
 		},
+		"detail",
 	).Error()
 	t.Logf("message: %v", s)
 	for _, part := range []string{
-		"foo", ValidationErrorTypeRequired.String(),
-		"Baz", "Qux", "Inner", "KV",
+		"foo", ValidationErrorTypeInvalid.String(),
+		"Baz", "Qux", "Inner", "KV", "detail",
 		"1", "aoeu", "asdf", "Billy", "2",
 	} {
 		if !strings.Contains(s, part) {

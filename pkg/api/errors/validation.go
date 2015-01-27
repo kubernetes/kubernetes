@@ -85,9 +85,10 @@ var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
 	var s string
-	if v.Type == ValidationErrorTypeRequired && isEmpty(v.BadValue) {
+	switch v.Type {
+	case ValidationErrorTypeRequired:
 		s = spew.Sprintf("%s: %s", v.Field, v.Type)
-	} else {
+	default:
 		s = spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
 	}
 	if len(v.Detail) != 0 {
@@ -96,18 +97,8 @@ func (v *ValidationError) Error() string {
 	return s
 }
 
-func isEmpty(obj interface{}) bool {
-	if obj == nil {
-		return true
-	}
-	switch t := obj.(type) {
-	case string:
-		return len(t) == 0
-	}
-	return false
-}
-
 // NewFieldRequired returns a *ValidationError indicating "value required"
+// TODO: remove "value"
 func NewFieldRequired(field string, value interface{}) *ValidationError {
 	return &ValidationError{ValidationErrorTypeRequired, field, value, ""}
 }
