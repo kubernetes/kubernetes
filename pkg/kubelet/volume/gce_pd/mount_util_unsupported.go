@@ -1,4 +1,4 @@
-// +build !linux
+// +build windows
 
 /*
 Copyright 2014 Google Inc. All rights reserved.
