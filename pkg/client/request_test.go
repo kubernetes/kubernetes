@@ -64,8 +64,7 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 		NoPoll().
 		Body("foo").
 		Poller(skipPolling).
-		Timeout(time.Millisecond).
-		Sync(true)
+		Timeout(time.Millisecond)
 	if changed != &r {
 		t.Errorf("returned request should point to the same object")
 	}
@@ -501,7 +500,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	} else if !reflect.DeepEqual(obj, expectedObj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo", "POST", &reqBody)
+	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &reqBody)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -524,7 +523,6 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Name("baz").
 		Prefix("foo").
 		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
-		Sync(true).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
 		Do().Get()
@@ -538,7 +536,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo&sync=true&timeout=1s", "POST", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -574,7 +572,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -626,7 +624,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("expected object was not created")
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -669,7 +667,7 @@ func TestWasCreated(t *testing.T) {
 	}
 
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "PUT", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "PUT", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -700,22 +698,6 @@ func TestAbsPath(t *testing.T) {
 	}
 }
 
-func TestSync(t *testing.T) {
-	c := NewOrDie(&Config{})
-	r := c.Get()
-	if r.sync {
-		t.Errorf("sync has wrong default")
-	}
-	r.Sync(false)
-	if r.sync {
-		t.Errorf("'Sync' doesn't work")
-	}
-	r.Sync(true)
-	if !r.sync {
-		t.Errorf("'Sync' doesn't work")
-	}
-}
-
 func TestUintParam(t *testing.T) {
 	table := []struct {
 		name      string
@@ -742,7 +724,6 @@ func TestUnacceptableParamNames(t *testing.T) {
 		testVal       string
 		expectSuccess bool
 	}{
-		{"sync", "foo", false},
 		{"timeout", "42", false},
 	}
 

@@ -91,8 +91,6 @@ func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, can
 		selfLinker:       selfLinker,
 		ops:              NewOperations(),
 		admissionControl: admissionControl,
-		// Delay just long enough to handle most simple write operations
-		asyncOpWait: time.Millisecond * 25,
 	}}
 }
 

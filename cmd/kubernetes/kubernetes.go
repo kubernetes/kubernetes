@@ -62,7 +62,6 @@ func newApiClient(addr string, port int) *client.Client {
 	apiServerURL := fmt.Sprintf("http://%s:%d", addr, port)
 	cl := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
 	cl.PollPeriod = time.Second * 1
-	cl.Sync = true
 	return cl
 }
 

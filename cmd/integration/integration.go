@@ -136,7 +136,6 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
 	cl.PollPeriod = time.Millisecond * 100
-	cl.Sync = true
 
 	helper, err := master.NewEtcdHelper(etcdClient, "")
 	if err != nil {

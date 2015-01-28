@@ -879,18 +879,6 @@ const (
 	// Status code 500.
 	StatusReasonUnknown StatusReason = ""
 
-	// StatusReasonWorking means the server is processing this request and will complete
-	// at a future time.
-	// Details (optional):
-	//   "kind" string - the name of the resource being referenced ("operation" today)
-	//   "id"   string - the identifier of the Operation resource where updates
-	//                   will be returned
-	// Headers (optional):
-	//   "Location" - HTTP header populated with a URL that can retrieved the final
-	//                status of this operation.
-	// Status code 202
-	StatusReasonWorking StatusReason = "Working"
-
 	// StatusReasonForbidden means the server can be reached and understood the request, but refuses
 	// to take any further action.  It is the result of the server being configured to deny access for some reason
 	// to the requested resource by the client.
@@ -938,6 +926,12 @@ const (
 	//                   field attributes will be set.
 	// Status code 422
 	StatusReasonInvalid StatusReason = "Invalid"
+
+	// StatusReasonTimeout means that the request could not be completed within the given time.
+	// Clients can get this response only when they specified a timeout param in the request.
+	// The request might succeed with an increased value of timeout param.
+	// Status code 504
+	StatusReasonTimeout StatusReason = "Timeout"
 
 	// StatusReasonBadRequest means that the request itself was invalid, because the request
 	// doesn't make any sense, for example deleting a read-only object.  This is different than
