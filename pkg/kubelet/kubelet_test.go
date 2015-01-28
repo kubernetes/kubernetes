@@ -459,7 +459,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("Custom net container not found: %v", fakeDocker.ContainerList)
+		t.Errorf("Custom pod infra container not found: %v", fakeDocker.ContainerList)
 	}
 
 	if len(fakeDocker.Created) != 2 ||

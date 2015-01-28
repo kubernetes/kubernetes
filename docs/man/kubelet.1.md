@@ -65,8 +65,8 @@ There are 4 ways that a container manifest can be provided to the Kubelet:
 **--manifest_url**=""
 	URL for accessing the container manifest.
 
-**--network_container_image**="kubernetes/pause:latest"
-	The image that network containers in each pod will use.
+**--pod_infra_container_image**="kubernetes/pause:latest"
+	The image that pod infra containers in each pod will use.
 
 **--port**=10250
 	The port for the info server to serve on.

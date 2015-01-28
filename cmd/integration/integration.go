@@ -621,9 +621,9 @@ func main() {
 			createdPods.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 net containers + 2 pods from the replication controller +
-	//              1 net container + 2 pods from the URL +
-	//              1 net container + 1 pod from the service test.
+	// We expect 9: 2 pod infra containers + 2 pods from the replication controller +
+	//              1 pod infra container + 2 pods from the URL +
+	//              1 pod infra container + 1 pod from the service test.
 	if len(createdPods) != 9 {
 		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
