@@ -895,7 +895,6 @@ type List struct {
 	Items    []runtime.RawExtension `json:"items" description:"list of objects"`
 }
 
-<<<<<<< HEAD
 // A type of object that is limited
 type LimitType string
 

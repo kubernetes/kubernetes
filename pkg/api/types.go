@@ -1133,7 +1133,6 @@ type List struct {
 	Items []runtime.Object `json:"items"`
 }
 
-<<<<<<< HEAD
 // A type of object that is limited
 type LimitType string
 
