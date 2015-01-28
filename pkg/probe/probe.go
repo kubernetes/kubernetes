@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package health contains utilities for health checking, as well as health status information.
-package health
+package probe
+
+type Status int
+
+// Status values must be one of these constants.
+const (
+	Success Status = iota
+	Failure
+	Unknown
+)
+
+func (s Status) String() string {
+	switch s {
+	case Success:
+		return "success"
+	case Failure:
+		return "failure"
+	default:
+		return "unknown"
+	}
+}

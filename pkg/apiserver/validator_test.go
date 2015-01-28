@@ -25,7 +25,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -54,13 +54,13 @@ func TestValidate(t *testing.T) {
 	tests := []struct {
 		err            error
 		data           string
-		expectedStatus health.Status
+		expectedStatus probe.Status
 		code           int
 		expectErr      bool
 	}{
-		{fmt.Errorf("test error"), "", health.Unknown, 500 /*ignored*/, true},
-		{nil, "foo", health.Healthy, 200, false},
-		{nil, "foo", health.Unhealthy, 500, true},
+		{fmt.Errorf("test error"), "", probe.Unknown, 500 /*ignored*/, true},
+		{nil, "foo", probe.Success, 200, false},
+		{nil, "foo", probe.Failure, 500, true},
 	}
 
 	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}

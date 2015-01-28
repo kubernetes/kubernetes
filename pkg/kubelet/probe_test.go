@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package health
+package kubelet
 
 import (
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+func TestFindPortByName(t *testing.T) {
+	container := api.Container{
+		Ports: []api.Port{
+			{
+				Name:     "foo",
+				HostPort: 8080,
+			},
+			{
+				Name:     "bar",
+				HostPort: 9000,
+			},
+		},
+	}
+	want := 8080
+	got := findPortByName(container, "foo")
+	if got != want {
+		t.Errorf("Expected %v, got %v", want, got)
+	}
+}
 
 func TestGetURLParts(t *testing.T) {
 	testCases := []struct {
@@ -53,12 +69,13 @@ func TestGetURLParts(t *testing.T) {
 				HTTPGet: test.probe,
 			},
 		}
-		host, port, path, err := getURLParts(state, container)
-		if !test.ok && err == nil {
-			t.Errorf("Expected error for %+v, got %s:%d/%s", test, host, port, path)
-		}
+		p, err := extractPort(test.probe.Port, container)
 		if test.ok && err != nil {
 			t.Errorf("Unexpected error: %v", err)
+		}
+		host, port, path := extractGetParams(test.probe, state, p)
+		if !test.ok && err == nil {
+			t.Errorf("Expected error for %+v, got %s:%d/%s", test, host, port, path)
 		}
 		if test.ok {
 			if host != test.host || port != test.port || path != test.path {
@@ -69,69 +86,41 @@ func TestGetURLParts(t *testing.T) {
 	}
 }
 
-func TestFormatURL(t *testing.T) {
+func TestGetTCPAddrParts(t *testing.T) {
 	testCases := []struct {
-		host   string
-		port   int
-		path   string
-		result string
+		probe *api.TCPSocketAction
+		ok    bool
+		host  string
+		port  int
 	}{
-		{"localhost", 93, "", "http://localhost:93"},
-		{"localhost", 93, "/path", "http://localhost:93/path"},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromInt(-1)}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("")}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("-1")}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("not-found")}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("found")}, true, "1.2.3.4", 93},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromInt(76)}, true, "1.2.3.4", 76},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("118")}, true, "1.2.3.4", 118},
 	}
-	for _, test := range testCases {
-		url := formatURL(test.host, test.port, test.path)
-		if url != test.result {
-			t.Errorf("Expected %s, got %s", test.result, url)
-		}
-	}
-}
 
-func TestHTTPHealthChecker(t *testing.T) {
-	testCases := []struct {
-		probe  *api.HTTPGetAction
-		status int
-		health Status
-	}{
-		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
-		{&api.HTTPGetAction{}, http.StatusOK, Healthy},
-		{&api.HTTPGetAction{}, -1, Unhealthy},
-		{nil, -1, Unknown},
-	}
-	hc := &HTTPHealthChecker{
-		client: &http.Client{},
-	}
 	for _, test := range testCases {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(test.status)
-		}))
-		u, err := url.Parse(ts.URL)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		host, port, err := net.SplitHostPort(u.Host)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
+		host := "1.2.3.4"
 		container := api.Container{
+			Ports: []api.Port{{Name: "found", HostPort: 93}},
 			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: test.probe,
+				TCPSocket: test.probe,
 			},
 		}
-		params := container.LivenessProbe.HTTPGet
-		if params != nil {
-			params.Port = util.NewIntOrStringFromString(port)
-			params.Host = host
+		port, err := extractPort(test.probe.Port, container)
+		if !test.ok && err == nil {
+			t.Errorf("Expected error for %+v, got %s:%d", test, host, port)
 		}
-		health, err := hc.HealthCheck("test", "", api.PodStatus{PodIP: host}, container)
-		if test.health == Unknown && err == nil {
-			t.Errorf("Expected error")
-		}
-		if test.health != Unknown && err != nil {
+		if test.ok && err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		if health != test.health {
-			t.Errorf("Expected %v, got %v", test.health, health)
+		if test.ok {
+			if host != test.host || port != test.port {
+				t.Errorf("Expected %s:%d, got %s:%d", test.host, test.port, host, port)
+			}
 		}
 	}
 }

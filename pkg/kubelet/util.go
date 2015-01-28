@@ -17,14 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -44,15 +42,6 @@ func MonitorCAdvisor(k *Kubelet, cp uint) {
 	}
 	glog.V(1).Infof("Successfully created cadvisor client.")
 	k.SetCadvisorClient(cadvisorClient)
-}
-
-// TODO: move this into the kubelet itself
-func InitHealthChecking(k *Kubelet) {
-	// TODO: These should probably become more plugin-ish: register a factory func
-	// in each checker's init(), iterate those here.
-	health.AddHealthChecker(health.NewExecHealthChecker(k))
-	health.AddHealthChecker(health.NewHTTPHealthChecker(&http.Client{}))
-	health.AddHealthChecker(&health.TCPHealthChecker{})
 }
 
 // TODO: move this into a pkg/tools/etcd_tools

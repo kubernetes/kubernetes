@@ -39,11 +39,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/standalone"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -84,8 +84,8 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 	return c.GetPodStatus("localhost", podNamespace, podID)
 }
 
-func (fakeKubeletClient) HealthCheck(host string) (health.Status, error) {
-	return health.Healthy, nil
+func (fakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
+	return probe.Success, nil
 }
 
 type delegateHandler struct {

@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -134,8 +134,8 @@ func TestNewKubeletClient(t *testing.T) {
 
 	host := "127.0.0.1"
 	healthStatus, err := client.HealthCheck(host)
-	if healthStatus != health.Unhealthy {
-		t.Errorf("Expected %v and got %v.", health.Unhealthy, healthStatus)
+	if healthStatus != probe.Failure {
+		t.Errorf("Expected %v and got %v.", probe.Failure, healthStatus)
 	}
 	if err != nil {
 		t.Error("Expected a nil error")

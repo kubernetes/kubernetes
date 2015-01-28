@@ -305,7 +305,6 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 
 	go k.GarbageCollectLoop()
 	go kubelet.MonitorCAdvisor(k, kc.CAdvisorPort)
-	kubelet.InitHealthChecking(k)
 
 	return k, nil
 }

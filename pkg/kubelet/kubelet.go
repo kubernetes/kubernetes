@@ -36,11 +36,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -164,8 +164,6 @@ type Kubelet struct {
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
-	// Optional, defaults to simple implementaiton
-	healthChecker health.HealthChecker
 	// Optional, defaults to simple Docker implementation
 	dockerPuller dockertools.DockerPuller
 	// Optional, defaults to /logs/ from /var/log
@@ -426,9 +424,6 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	}
 	if kl.dockerPuller == nil {
 		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
-	}
-	if kl.healthChecker == nil {
-		kl.healthChecker = health.NewHealthChecker()
 	}
 	kl.syncLoop(updates, kl)
 }
@@ -1038,13 +1033,13 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			// look for changes in the container.
 			if hash == 0 || hash == expectedHash {
 				// TODO: This should probably be separated out into a separate goroutine.
-				healthy, err := kl.healthy(podFullName, uid, podStatus, container, dockerContainer)
+				healthy, err := kl.probeLiveness(podFullName, uid, podStatus, container, dockerContainer)
 				if err != nil {
 					glog.V(1).Infof("health check errored: %v", err)
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				if healthy == health.Healthy {
+				if healthy == probe.Success {
 					containersToKeep[containerID] = empty{}
 					continue
 				}
@@ -1404,18 +1399,15 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	return podStatus, err
 }
 
-func (kl *Kubelet) healthy(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
+func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
-		return health.Healthy, nil
+		return probe.Success, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return health.Healthy, nil
+		return probe.Success, nil
 	}
-	if kl.healthChecker == nil {
-		return health.Healthy, nil
-	}
-	return kl.healthChecker.HealthCheck(podFullName, podUID, status, container)
+	return kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
 }
 
 // Returns logs of current machine.

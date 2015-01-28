@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
@@ -845,19 +844,8 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	}
 }
 
-type FalseHealthChecker struct{}
-
-func (f *FalseHealthChecker) HealthCheck(podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (health.Status, error) {
-	return health.Unhealthy, nil
-}
-
-func (f *FalseHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
-	return true
-}
-
 func TestSyncPodBadHash(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
-	kubelet.healthChecker = &FalseHealthChecker{}
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
@@ -904,7 +892,6 @@ func TestSyncPodBadHash(t *testing.T) {
 
 func TestSyncPodUnhealthy(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
-	kubelet.healthChecker = &FalseHealthChecker{}
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
