@@ -17,12 +17,14 @@ limitations under the License.
 package e2e
 
 import (
+	"path"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 )
 
@@ -32,7 +34,7 @@ func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
-func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed int64, times int, testList []string) {
+func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed int64, times int, reportDir string, testList []string) {
 	testContext = testContextType{authConfig, certDir, host, repoRoot, provider}
 	util.ReallyCrash = true
 	util.InitLogs()
@@ -57,7 +59,14 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Turn of colors for now to make it easier to collect console output in Jenkins
 	config.DefaultReporterConfig.NoColor = true
-	ginkgo.RunSpecs(&passed, "Kubernetes e2e Suite")
+	var r []ginkgo.Reporter
+	if reportDir != "" {
+		// TODO: When we start using parallel tests we need to change this to "junit_%d.xml",
+		// see ginkgo docs for more details.
+		r = append(r, reporters.NewJUnitReporter(path.Join(reportDir, "junit.xml")))
+	}
+	// Run the existing tests with output to console + JUnit for Jenkins
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, "Kubernetes e2e Suite", r)
 
 	if !passed {
 		glog.Fatalf("At least one test failed")

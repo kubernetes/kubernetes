@@ -29,6 +29,7 @@ import (
 var (
 	authConfig = flag.String("auth_config", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.")
 	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
+	reportDir  = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	host       = flag.String("host", "", "The host to connect to")
 	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 	provider   = flag.String("provider", "", "The name of the Kubernetes provider")
@@ -52,5 +53,5 @@ func main() {
 		glog.Error("Invalid --times (negative or no testing requested)!")
 		os.Exit(1)
 	}
-	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, *orderseed, *times, testList)
+	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, *orderseed, *times, *reportDir, testList)
 }
