@@ -21,6 +21,8 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
+NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
@@ -138,15 +140,48 @@ function upload-server-tars() {
   SALT_TAR_URL="${salt_gs_url/gs:\/\//https://storage.googleapis.com/}"
 }
 
+# Detect minions created in the minion group
+#
+# Assumed vars:
+#   NODE_INSTANCE_PREFIX
+# Vars set:
+#   MINION_NAMES
+function detect-minion-names {
+  detect-project
+  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
+    --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
+    | cut -d'/' -f11))
+  echo "MINION_NAMES=${MINION_NAMES[*]}"
+}
+
+# Waits until the number of running nodes in the instance group is equal to NUM_NODES
+#
+# Assumed vars:
+#   NODE_INSTANCE_PREFIX
+#   NUM_MINIONS
+function wait-for-minions-to-run {
+  detect-project
+  local running_minions=0
+  while [[ "${NUM_MINIONS}" != "${running_minions}" ]]; do
+    echo -e -n "${color_yellow}Waiting for minions to run. "
+    echo -e "${running_minions} out of ${NUM_MINIONS} running. Retrying.${color_norm}"
+    sleep 5
+    running_minions=$(gcloud preview --project "${PROJECT}" instance-groups \
+      --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
+      --running | wc -l)
+  done
+}
+
 # Detect the information about the minions
 #
 # Assumed vars:
-#   MINION_NAMES
 #   ZONE
 # Vars set:
+#   MINION_NAMES
 #   KUBE_MINION_IP_ADDRESSES (array)
 function detect-minions () {
   detect-project
+  detect-minion-names
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -263,7 +298,7 @@ function create-firewall-rule {
         echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}"
         attempt=$(($attempt+1))
     else
-       break
+        break
     fi
   done
 }
@@ -288,22 +323,21 @@ function create-route {
         echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create route $1. Retrying.${color_norm}"
         attempt=$(($attempt+1))
     else
-       break
+        break
     fi
   done
 }
 
-# Robustly try to create an instance.
-# $1: The name of the instance.
+# Robustly try to create an instance template.
+# $1: The name of the instance template.
 # $2: The scopes flag.
-# $3: The minion start script.
-function create-minion {
+# $3: The minion start script metadata from file.
+function create-node-template {
   detect-project
   local attempt=0
   while true; do
-    if ! gcloud compute instances create "$1" \
+    if ! gcloud compute instance-templates create "$1" \
       --project "${PROJECT}" \
-      --zone "${ZONE}" \
       --machine-type "${MINION_SIZE}" \
       --boot-disk-type "${MINION_DISK_TYPE}" \
       --boot-disk-size "${MINION_DISK_SIZE}" \
@@ -315,16 +349,36 @@ function create-minion {
       --can-ip-forward \
       --metadata-from-file "$3"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create instance $1 ${color_norm}"
+          echo -e "${color_red}Failed to create instance template $1 ${color_norm}"
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create node $1. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create instance template $1. Retrying.${color_norm}"
         attempt=$(($attempt+1))
-        # Attempt to delete the disk for this node (the disk may have been created even
-        # if the instance creation failed).
-        gcloud compute disks delete "$1" --project "${PROJECT}" --zone "${ZONE}" --quiet || true
-     else
-       break
+    else
+        break
+    fi
+  done
+}
+
+# Robustly try to add metadata on an instance.
+# $1: The name of the instace.
+# $2: The metadata key=value pair to add.
+function add-instance-metadata {
+  detect-project
+  local attempt=0
+  while true; do
+    if ! gcloud compute instances add-metadata "$1" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --metadata "$2"; then
+        if (( attempt > 5 )); then
+          echo -e "${color_red}Failed to add instance metadata in $1 ${color_norm}"
+          exit 2
+        fi
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in $1. Retrying.${color_norm}"
+        attempt=$(($attempt+1))
+    else
+        break
     fi
   done
 }
@@ -384,7 +438,7 @@ function kube-up {
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
-    echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
+    echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
@@ -440,43 +494,51 @@ function kube-up {
   # Wait for last batch of jobs.
   wait-for-jobs
 
-  # Create the routes, 10 at a time.
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    create-route "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" &
-
-    if [ $i -ne 0 ] && [ $((i%10)) -eq 0 ]; then
-      echo Waiting for a batch of routes at $i...
-      wait-for-jobs
-    fi
-
-  done
-  # Wait for last batch of jobs.
-  wait-for-jobs
-
   local -a scope_flags=()
   if (( "${#MINION_SCOPES[@]}" > 0 )); then
     scope_flags=("--scopes" "${MINION_SCOPES[@]}")
   else
     scope_flags=("--no-scopes")
   fi
-  # Create the instances, 5 at a time.
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    (
+
+  (
       echo "#! /bin/bash"
       echo "ZONE='${ZONE}'"
       echo "MASTER_NAME='${MASTER_NAME}'"
-      echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+      echo "until MINION_IP_RANGE=\$(curl --fail --silent -H 'Metadata-Flavor: Google'\\"
+      echo "        http://metadata/computeMetadata/v1/instance/attributes/node-ip-range); do"
+      echo "    echo 'Waiting for metadata MINION_IP_RANGE...'"
+      echo "    sleep 3"
+      echo "done"
       echo "EXTRA_DOCKER_OPTS='${EXTRA_DOCKER_OPTS}'"
       echo "ENABLE_DOCKER_REGISTRY_CACHE='${ENABLE_DOCKER_REGISTRY_CACHE:-false}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+    ) > "${KUBE_TEMP}/minion-start.sh"
 
-    local scopes_flag="${scope_flags[@]}"
-    create-minion "${MINION_NAMES[$i]}" "${scopes_flag}" "startup-script=${KUBE_TEMP}/minion-start-${i}.sh" &
+  create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
+      "startup-script=${KUBE_TEMP}/minion-start.sh"
+
+  gcloud preview managed-instance-groups --zone "${ZONE}" \
+      create "${NODE_INSTANCE_PREFIX}-group" \
+      --project "${PROJECT}" \
+      --base-instance-name "${NODE_INSTANCE_PREFIX}" \
+      --size "${NUM_MINIONS}" \
+      --template "${NODE_INSTANCE_PREFIX}-template" || true;
+  # TODO: this should be true when the above create managed-instance-group
+  # command returns, but currently it returns before the instances come up due
+  # to gcloud's deficiency.
+  wait-for-minions-to-run
+
+  detect-minion-names
+
+  # Create the routes and set IP ranges to instance metadata, 5 instances at a time.
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    create-route "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" &
+    add-instance-metadata "${MINION_NAMES[$i]}" "node-ip-range=${MINION_IP_RANGES[$i]}" &
 
     if [ $i -ne 0 ] && [ $((i%5)) -eq 0 ]; then
-      echo Waiting for creation of a batch of instances at $i...
+      echo Waiting for a batch of routes at $i...
       wait-for-jobs
     fi
 
@@ -595,7 +657,7 @@ EOF
 #
 # Assumed vars:
 #   MASTER_NAME
-#   INSTANCE_PREFIX
+#   NODE_INSTANCE_PREFIX
 #   ZONE
 # This function tears down cluster resources 10 at a time to avoid issuing too many
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
@@ -604,6 +666,16 @@ function kube-down {
   detect-project
 
   echo "Bringing down cluster"
+
+  gcloud preview managed-instance-groups --zone "${ZONE}" delete \
+    --project "${PROJECT}" \
+    --quiet \
+    "${NODE_INSTANCE_PREFIX}-group" || true
+
+  gcloud compute instance-templates delete \
+    --project "${PROJECT}" \
+    --quiet \
+    "${NODE_INSTANCE_PREFIX}-template" || true
 
   # First delete the master (if it exists).
   gcloud compute instances delete \
@@ -616,7 +688,7 @@ function kube-down {
   local -a minions
   minions=( $(gcloud compute instances list \
                 --project "${PROJECT}" --zone "${ZONE}" \
-                --regexp "${INSTANCE_PREFIX}-minion-[0-9]+" \
+                --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                 | awk 'NR >= 2 { print $1 }') )
   # If any minions are running, delete them in batches.
   while (( "${#minions[@]}" > 0 )); do
@@ -645,7 +717,7 @@ function kube-down {
   # Delete routes.
   local -a routes
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-              --regexp "${INSTANCE_PREFIX}-minion-[0-9]+" | awk 'NR >= 2 { print $1 }') )
+              --regexp "${NODE_INSTANCE_PREFIX}-.+" | awk 'NR >= 2 { print $1 }') )
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
     gcloud compute routes delete \

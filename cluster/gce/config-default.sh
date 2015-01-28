@@ -33,7 +33,6 @@ INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 
 # Compute IP addresses for nodes.
 function increment_ipv4 {
