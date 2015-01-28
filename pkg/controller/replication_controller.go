@@ -61,8 +61,10 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 		desiredLabels[k] = v
 	}
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Labels: desiredLabels,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Labels: desiredLabels,
+			},
 		},
 	}
 	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.Spec); err != nil {

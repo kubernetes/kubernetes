@@ -67,7 +67,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if len(endpoints.Name) == 0 {
 		return nil, fmt.Errorf("id is required: %#v", obj)
 	}
-	if !api.ValidNamespace(ctx, &endpoints.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &endpoints.NSObjectMeta) {
 		return nil, errors.NewConflict("endpoints", endpoints.Namespace, fmt.Errorf("Endpoints.Namespace does not match the provided context"))
 	}
 	api.FillObjectMetaSystemFields(ctx, &endpoints.ObjectMeta)

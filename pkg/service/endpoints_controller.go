@@ -81,8 +81,9 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		if err != nil {
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
-					ObjectMeta: api.ObjectMeta{
-						Name: service.Name,
+					NSObjectMeta: api.NSObjectMeta{
+						ObjectMeta: api.ObjectMeta{
+							Name: service.Name},
 					},
 				}
 			} else {

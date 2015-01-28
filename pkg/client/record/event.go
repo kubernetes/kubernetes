@@ -163,8 +163,10 @@ func Event(object runtime.Object, reason, message string) {
 	t := util.Now()
 
 	e := &api.Event{
-		ObjectMeta: api.ObjectMeta{
-			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Name: fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+			},
 			Namespace: ref.Namespace,
 		},
 		InvolvedObject: *ref,

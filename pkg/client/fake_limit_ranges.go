@@ -35,7 +35,7 @@ func (c *FakeLimitRanges) List(selector labels.Selector) (*api.LimitRangeList, e
 
 func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-limitRange", Value: name})
-	return &api.LimitRange{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
+	return &api.LimitRange{NSObjectMeta: api.NSObjectMeta{ObjectMeta: api.ObjectMeta{Name: name}, Namespace: c.Namespace}}, nil
 }
 
 func (c *FakeLimitRanges) Delete(name string) error {

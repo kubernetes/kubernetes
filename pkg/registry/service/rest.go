@@ -81,7 +81,7 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	service := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &service.NSObjectMeta) {
 		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateService(service, rs.registry, ctx); len(errs) > 0 {
@@ -223,7 +223,7 @@ func (*REST) NewList() runtime.Object {
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	service := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &service.NSObjectMeta) {
 		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateService(service, rs.registry, ctx); len(errs) > 0 {

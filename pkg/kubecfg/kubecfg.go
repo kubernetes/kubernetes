@@ -243,8 +243,8 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 		return err
 	}
 	controller := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{Name: name},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
@@ -252,9 +252,11 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 				"name": name,
 			},
 			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{
-						"name": name,
+				NSObjectMeta: api.NSObjectMeta{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{
+							"name": name,
+						},
 					},
 				},
 				Spec: api.PodSpec{
@@ -297,10 +299,12 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 func createService(ctx api.Context, name string, port int, client client.Interface) (*api.Service, error) {
 	// TODO remove context in favor of just namespace string
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"name": name,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": name,
+				},
 			},
 		},
 		Spec: api.ServiceSpec{

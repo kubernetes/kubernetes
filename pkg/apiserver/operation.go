@@ -126,7 +126,7 @@ func (ops *Operations) List() *api.OperationList {
 	sort.StringSlice(ids).Sort()
 	ol := &api.OperationList{}
 	for _, id := range ids {
-		ol.Items = append(ol.Items, api.Operation{ObjectMeta: api.ObjectMeta{Name: id}})
+		ol.Items = append(ol.Items, api.Operation{NSObjectMeta: api.NSObjectMeta{ObjectMeta: api.ObjectMeta{Name: id}}})
 	}
 	return ol
 }

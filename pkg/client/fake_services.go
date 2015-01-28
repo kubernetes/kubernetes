@@ -36,7 +36,7 @@ func (c *FakeServices) List(selector labels.Selector) (*api.ServiceList, error) 
 
 func (c *FakeServices) Get(name string) (*api.Service, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-service", Value: name})
-	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
+	return &api.Service{NSObjectMeta: api.NSObjectMeta{ObjectMeta: api.ObjectMeta{Name: name}, Namespace: c.Namespace}}, nil
 }
 
 func (c *FakeServices) Create(service *api.Service) (*api.Service, error) {

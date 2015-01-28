@@ -66,8 +66,8 @@ func TestClusterDNS(c *client.Client) bool {
 			Kind:       "Pod",
 			APIVersion: "v1beta1",
 		},
-		ObjectMeta: api.ObjectMeta{
-			Name: "dns-test-" + string(util.NewUUID()),
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{Name: "dns-test-" + string(util.NewUUID())},
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{

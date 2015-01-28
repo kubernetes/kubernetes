@@ -74,10 +74,22 @@ func init() {
 			}
 			return nil
 		},
-
+		func(in *TypeMeta, out *newer.NSObjectMeta, s conversion.Scope) error {
+			out.Namespace = in.Namespace
+			if err := s.Convert(in, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.NSObjectMeta, out *TypeMeta, s conversion.Scope) error {
+			out.Namespace = in.Namespace
+			if err := s.Convert(&in.ObjectMeta, out, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		// ObjectMeta must be converted to TypeMeta
 		func(in *newer.ObjectMeta, out *TypeMeta, s conversion.Scope) error {
-			out.Namespace = in.Namespace
 			out.ID = in.Name
 			out.UID = in.UID
 			out.CreationTimestamp = in.CreationTimestamp
@@ -92,7 +104,6 @@ func init() {
 			return s.Convert(&in.Annotations, &out.Annotations, 0)
 		},
 		func(in *TypeMeta, out *newer.ObjectMeta, s conversion.Scope) error {
-			out.Namespace = in.Namespace
 			out.Name = in.ID
 			out.UID = in.UID
 			out.CreationTimestamp = in.CreationTimestamp

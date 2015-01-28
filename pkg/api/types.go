@@ -74,19 +74,13 @@ type ListMeta struct {
 }
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
-// users must create. A resource may have only one of {ObjectMeta, ListMeta}.
+// users must create. A resource may have only one of {NSObjectMeta, ObjectMeta, ListMeta}.
 type ObjectMeta struct {
 	// Name is unique within a namespace.  Name is required when creating resources, although
 	// some resources may allow a client to request the generation of an appropriate name
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
 	Name string `json:"name,omitempty"`
-
-	// Namespace defines the space within which name must be unique. An empty namespace is
-	// equivalent to the "default" namespace, but "default" is the canonical representation.
-	// Not all objects are required to be scoped to a namespace - the value of this field for
-	// those objects will be empty.
-	Namespace string `json:"namespace,omitempty"`
 
 	// SelfLink is a URL representing this object.
 	SelfLink string `json:"selfLink,omitempty"`
@@ -124,6 +118,17 @@ type ObjectMeta struct {
 	// objects.  Annotation keys have the same formatting restrictions as Label keys. See the
 	// comments on Labels for details.
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// NSObjectMeta is metadata that all persisted namespace-scoped resources must have
+// A resource may have only one of {ObjectMeta, ListMeta, NSObjectMeta}.
+type NSObjectMeta struct {
+
+	// ObjectMeta is metadata that all persisted resources must have, which includes all objects
+	ObjectMeta
+
+	// Namespace defines the space within which ObjectMeta.Name must be unique.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 const (
@@ -422,7 +427,7 @@ type PodInfo map[string]ContainerStatus
 // DEPRECATED: Replaced with PodStatusResult
 type PodContainerInfo struct {
 	TypeMeta      `json:",inline"`
-	ObjectMeta    `json:"metadata,omitempty"`
+	NSObjectMeta  `json:"metadata,omitempty"`
 	ContainerInfo PodInfo `json:"containerInfo"`
 }
 
@@ -507,8 +512,8 @@ type PodStatus struct {
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 type PodStatusResult struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
 	Status PodStatus `json:"status,omitempty"`
@@ -516,8 +521,8 @@ type PodStatusResult struct {
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty"`
@@ -530,7 +535,7 @@ type Pod struct {
 // PodTemplateSpec describes the data a pod should have when created from a template
 type PodTemplateSpec struct {
 	// Metadata of the pods created from this template.
-	ObjectMeta `json:"metadata,omitempty"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty"`
@@ -538,8 +543,8 @@ type PodTemplateSpec struct {
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the pods that will be created from this template
 	Spec PodTemplateSpec `json:"spec,omitempty"`
@@ -584,8 +589,8 @@ type ReplicationControllerStatus struct {
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the desired behavior of this replication controller.
 	Spec ReplicationControllerSpec `json:"spec,omitempty"`
@@ -665,8 +670,8 @@ type ServiceSpec struct {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a service.
 	Spec ServiceSpec `json:"spec,omitempty"`
@@ -678,8 +683,8 @@ type Service struct {
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	Endpoints []string `json:"endpoints,omitempty"`
 }
@@ -809,8 +814,8 @@ type NodeList struct {
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
 type Binding struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	PodID string `json:"podID"`
 	Host  string `json:"host"`
@@ -1004,8 +1009,8 @@ const (
 
 // Operation is an operation delivered to API clients.
 type Operation struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 }
 
 // OperationList is a list of operations, as delivered to API clients.
@@ -1046,8 +1051,8 @@ type EventSource struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty"`
@@ -1111,8 +1116,8 @@ type ContainerManifestList struct {
 // defines how a Pod may change after a Binding is created. A Pod is a request to
 // execute a pod, whereas a BoundPod is the specification that would be run on a server.
 type BoundPod struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty"`
@@ -1121,8 +1126,8 @@ type BoundPod struct {
 // BoundPods is a list of Pods bound to a common server. The resource version of
 // the pod list is guaranteed to only change when the list of bound pods changes.
 type BoundPods struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Host is the name of a node that these pods were bound to.
 	Host string `json:"host"`
@@ -1167,8 +1172,8 @@ type LimitRangeSpec struct {
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
 type LimitRange struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	TypeMeta     `json:",inline"`
+	NSObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the limits enforced
 	Spec LimitRangeSpec `json:"spec,omitempty"`

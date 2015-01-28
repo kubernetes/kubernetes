@@ -56,7 +56,7 @@ func NewREST(config *RESTConfig) *REST {
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	pod := obj.(*api.Pod)
-	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &pod.NSObjectMeta) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	api.FillObjectMetaSystemFields(ctx, &pod.ObjectMeta)
@@ -174,7 +174,7 @@ func (*REST) NewList() runtime.Object {
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	pod := obj.(*api.Pod)
-	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &pod.NSObjectMeta) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
