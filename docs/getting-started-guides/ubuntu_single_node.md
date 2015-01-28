@@ -1,13 +1,13 @@
 ## Getting started on Ubuntu 
 
-This document describes how to get started to run kubernetes services on a single host (whihch is acting both as master and minion) for ubuntu systems. It consistes of three steps
+This document describes how to get started to run kubernetes services on a single host (which is acting both as master and minion) for ubuntu systems. It consists of three steps
 
 1. Make kubernetes and etcd binaries
 2. Install upstart scripts
 3. Customizing ubuntu launch
 
 ### 1. Make kubernetes and etcd binaries
-Either build or download the latest [kubernetest binaries] (https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/binary_release.md) 
+Either build or download the latest [kubernetes binaries] (https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/binary_release.md)
 
 Copy the kube binaries into `/opt/bin` or a path of your choice
 
@@ -25,7 +25,7 @@ $ sudo ./util.sh
 
 After this the kubernetes and `etcd` services would be up and running. You can use `service start/stop/restart/force-reload` on the services.
 
-Luanching and scheduling containers using kubecfg can also be used at this point, as explained mentioned in the [examples](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook)
+Launching and scheduling containers using kubecfg can also be used at this point, as explained mentioned in the [examples](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook)
 
 ### 3. Customizing the ubuntu launch
 To customize the defaults you will need to tweak `/etc/default/kube*` files and restart the appropriate services. This is needed if the binaries are copied in a place other than `/opt/bin`. A run could look like
@@ -40,7 +40,7 @@ $ sudo cat /etc/default/etcd
 # Use ETCD_OPTS to modify the start/restart options
 ETCD_OPTS="-listen-client-urls=http://127.0.0.1:4001"
 
-# Add more envionrment settings used by etcd here
+# Add more environment settings used by etcd here
 
 $ sudo service etcd status
 etcd start/running, process 834
