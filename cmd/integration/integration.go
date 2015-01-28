@@ -73,7 +73,7 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 			Client: http.DefaultClient,
 			Port:   10250,
 		}
-	case "machine":
+	case "127.0.0.1":
 		c = &client.HTTPKubeletClient{
 			Client: http.DefaultClient,
 			Port:   10251,
@@ -81,7 +81,18 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 	default:
 		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
 	}
-	return c.GetPodStatus("localhost", podNamespace, podID)
+	r, err := c.GetPodStatus("localhost", podNamespace, podID)
+	if err != nil {
+		return r, err
+	}
+	r.Status.PodIP = "1.2.3.4"
+	m := make(api.PodInfo)
+	for k, v := range r.Status.Info {
+		v.PodIP = "1.2.3.4"
+		m[k] = v
+	}
+	r.Status.Info = m
+	return r, nil
 }
 
 func (fakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
@@ -104,7 +115,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// Setup
 	servers := []string{"http://localhost:4001"}
 	glog.Infof("Creating etcd client pointing to %v", servers)
-	machineList := []string{"localhost", "machine"}
+	machineList := []string{"localhost", "127.0.0.1"}
 
 	handler := delegateHandler{}
 	apiServer := httptest.NewServer(&handler)
@@ -163,6 +174,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		ReadWritePort:     portNumber,
 		ReadOnlyPort:      portNumber,
 		PublicAddress:     net.ParseIP(host),
+		CacheTimeout:      2 * time.Second,
 	})
 	handler.delegate = m.Handler
 
@@ -185,7 +197,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	nodeResources := &api.NodeResources{}
 	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{})
-	nodeController.Run(10*time.Second, 10)
+	nodeController.Run(5*time.Second, 10)
 
 	// Kubelet (localhost)
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.")
