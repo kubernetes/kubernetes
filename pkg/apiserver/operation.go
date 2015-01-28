@@ -199,9 +199,8 @@ func (op *Operation) StatusOrResult() (description RESTResult, finished bool) {
 
 	if op.finished == nil {
 		return RESTResult{Object: &api.Status{
-			Status:  api.StatusWorking,
-			Reason:  api.StatusReasonWorking,
-			Details: &api.StatusDetails{ID: op.ID, Kind: "operation"},
+			Status: api.StatusFailure,
+			Reason: api.StatusReasonTimeout,
 		}}, false
 	}
 	return op.result, true

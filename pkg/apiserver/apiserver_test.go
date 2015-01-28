@@ -689,88 +689,6 @@ func TestUpdateMissing(t *testing.T) {
 	}
 }
 
-func TestCreate(t *testing.T) {
-	wait := sync.WaitGroup{}
-	wait.Add(1)
-	simpleStorage := &SimpleRESTStorage{
-		injectedFunction: func(obj runtime.Object) (returnObj runtime.Object, err error) {
-			wait.Wait()
-			return &Simple{}, nil
-		},
-	}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/prefix", testVersion, selfLinker, admissionControl)
-	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
-	server := httptest.NewServer(handler)
-	defer server.Close()
-	client := http.Client{}
-
-	simple := &Simple{
-		Other: "foo",
-	}
-	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
-	}
-
-	var itemOut api.Status
-	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
-		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
-	}
-	wait.Done()
-}
-
-func TestCreateInvokesAdmissionControl(t *testing.T) {
-	wait := sync.WaitGroup{}
-	wait.Add(1)
-	simpleStorage := &SimpleRESTStorage{
-		injectedFunction: func(obj runtime.Object) (returnObj runtime.Object, err error) {
-			wait.Wait()
-			return &Simple{}, nil
-		},
-	}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny())
-	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
-	server := httptest.NewServer(handler)
-	defer server.Close()
-	client := http.Client{}
-
-	simple := &Simple{
-		Other: "foo",
-	}
-	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusForbidden {
-		t.Errorf("Unexpected response %#v", response)
-	}
-}
-
 func TestCreateNotFound(t *testing.T) {
 	handler := Handle(map[string]RESTStorage{
 		"simple": &SimpleRESTStorage{
@@ -831,7 +749,7 @@ func (s *setTestSelfLinker) SetSelfLink(obj runtime.Object, selfLink string) err
 	return nil
 }
 
-func TestSyncCreate(t *testing.T) {
+func TestCreate(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			time.Sleep(5 * time.Millisecond)
@@ -855,7 +773,7 @@ func TestSyncCreate(t *testing.T) {
 		Other: "bar",
 	}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/ns/other/foo?sync=true", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/ns/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -889,6 +807,51 @@ func TestSyncCreate(t *testing.T) {
 	}
 }
 
+func TestCreateInvokesAdmissionControl(t *testing.T) {
+	storage := SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+			time.Sleep(5 * time.Millisecond)
+			return obj, nil
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		name:        "bar",
+		namespace:   "other",
+		expectedSet: "/prefix/version/ns/other/foo/bar",
+	}
+	handler := Handle(map[string]RESTStorage{
+		"foo": &storage,
+	}, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny())
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{
+		Other: "bar",
+	}
+	data, _ := codec.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/ns/other/foo", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		wg.Done()
+	}()
+	wg.Wait()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusForbidden {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusForbidden, response)
+	}
+}
+
 func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *api.Status {
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
@@ -913,77 +876,19 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *a
 	return &status
 }
 
-func TestAsyncDelayReturnsError(t *testing.T) {
+func TestDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
 	}
 	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix", testVersion, selfLinker, admissionControl)
-	handler.(*defaultAPIServer).group.handler.asyncOpWait = time.Millisecond / 2
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != api.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != api.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
-	}
-}
-
-func TestAsyncCreateError(t *testing.T) {
-	ch := make(chan struct{})
-	storage := SimpleRESTStorage{
-		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
-			<-ch
-			return nil, apierrs.NewAlreadyExists("foo", "bar")
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		name:        "bar",
-		expectedSet: "/prefix/version/foo/bar",
-	}
-	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix", testVersion, selfLinker, admissionControl)
-	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	simple := &Simple{Other: "bar"}
-	data, _ := codec.Encode(simple)
-
-	status := expectApiStatus(t, "POST", fmt.Sprintf("%s/prefix/version/foo", server.URL), data, http.StatusAccepted)
-	if status.Status != api.StatusWorking || status.Details == nil || status.Details.ID == "" {
-		t.Errorf("Unexpected status %#v", status)
-	}
-
-	otherStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s", server.URL, status.Details.ID), []byte{}, http.StatusAccepted)
-	if !reflect.DeepEqual(status, otherStatus) {
-		t.Errorf("Expected %#v, Got %#v", status, otherStatus)
-	}
-
-	ch <- struct{}{}
-	time.Sleep(time.Millisecond)
-
-	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details.ID), []byte{}, http.StatusOK)
-	expectedErr := apierrs.NewAlreadyExists("foo", "bar")
-	expectedStatus := &api.Status{
-		Status:  api.StatusFailure,
-		Code:    http.StatusConflict,
-		Reason:  "AlreadyExists",
-		Message: expectedErr.Error(),
-		Details: &api.StatusDetails{
-			Kind: "foo",
-			ID:   "bar",
-		},
-	}
-	if !reflect.DeepEqual(expectedStatus, finalStatus) {
-		t.Errorf("Expected %#v, Got %#v", expectedStatus, finalStatus)
-		if finalStatus.Details != nil {
-			t.Logf("Details %#v, Got %#v", *expectedStatus.Details, *finalStatus.Details)
-		}
-	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
 	}
 }
 
@@ -1031,7 +936,7 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	}
 }
 
-func TestSyncCreateTimeout(t *testing.T) {
+func TestCreateTimeout(t *testing.T) {
 	testOver := make(chan struct{})
 	defer close(testOver)
 	storage := SimpleRESTStorage{
@@ -1049,8 +954,8 @@ func TestSyncCreateTimeout(t *testing.T) {
 
 	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
-	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
-	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
+	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?timeout=4ms", data, http.StatusAccepted)
+	if itemOut.Status != api.StatusFailure || itemOut.Reason != api.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
 }

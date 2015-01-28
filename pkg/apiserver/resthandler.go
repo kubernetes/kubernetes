@@ -37,7 +37,6 @@ type RESTHandler struct {
 	canonicalPrefix  string
 	selfLinker       runtime.SelfLinker
 	ops              *Operations
-	asyncOpWait      time.Duration
 	admissionControl admission.Interface
 }
 
@@ -144,12 +143,11 @@ func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(
 //   DELETE     /foo/bar      delete 'bar'
 // Returns 404 if the method/pattern doesn't match one of these entries
 // The s accepts several query parameters:
-//    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
-//    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
+//    timeout=<duration> Timeout for synchronous requests
 //    labels=<label-selector> Used for filtering list operations
 func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage, namespace, kind string) {
 	ctx := api.WithNamespace(api.NewContext(), namespace)
-	sync := req.URL.Query().Get("sync") == "true"
+	// TODO: Document the timeout query parameter.
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {
 	case "GET":
@@ -235,7 +233,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout, curry(h.setSelfLinkAddName, req))
+		op := h.createOperation(out, timeout, curry(h.setSelfLinkAddName, req))
 		h.finishReq(op, req, w)
 
 	case "DELETE":
@@ -261,7 +259,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout, nil)
+		op := h.createOperation(out, timeout, nil)
 		h.finishReq(op, req, w)
 
 	case "PUT":
@@ -299,7 +297,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout, curry(h.setSelfLink, req))
+		op := h.createOperation(out, timeout, curry(h.setSelfLink, req))
 		h.finishReq(op, req, w)
 
 	default:
@@ -308,13 +306,9 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 }
 
 // createOperation creates an operation to process a channel response.
-func (h *RESTHandler) createOperation(out <-chan RESTResult, sync bool, timeout time.Duration, onReceive func(RESTResult)) *Operation {
+func (h *RESTHandler) createOperation(out <-chan RESTResult, timeout time.Duration, onReceive func(RESTResult)) *Operation {
 	op := h.ops.NewOperation(out, onReceive)
-	if sync {
-		op.WaitFor(timeout)
-	} else if h.asyncOpWait != 0 {
-		op.WaitFor(h.asyncOpWait)
-	}
+	op.WaitFor(timeout)
 	return op
 }
 
