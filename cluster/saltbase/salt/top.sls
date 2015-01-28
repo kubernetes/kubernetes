@@ -33,6 +33,7 @@ base:
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
+    - monit
     - nginx
     - kube-client-tools
     - logrotate

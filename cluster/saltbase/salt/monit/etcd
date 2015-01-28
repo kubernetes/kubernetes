@@ -1,0 +1,10 @@
+check process etcd with pidfile /var/run/etcd.pid
+group etcd 
+start program = "/etc/init.d/etcd start"
+stop program = "/etc/init.d/etcd stop"
+if failed
+  host 127.0.0.1
+  port 4001
+  protocol http
+  request "/v2/keys/"
+then restart
