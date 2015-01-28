@@ -987,7 +987,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	if podInfraDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
 		podInfraContainerID = dockertools.DockerID(podInfraDockerContainer.ID)
 	} else {
-		glog.V(2).Infof("Network container doesn't exist for pod %q, killing and re-creating the pod", podFullName)
+		glog.V(2).Infof("Pod infra container doesn't exist for pod %q, killing and re-creating the pod", podFullName)
 		count, err := kl.killContainersInPod(pod, dockerContainers)
 		if err != nil {
 			return err

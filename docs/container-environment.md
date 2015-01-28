@@ -59,7 +59,7 @@ This hook is called immediately before a container is terminated.  This event h
 A single parameter named reason is passed to the handler which contains the reason for termination.  Currently the valid values for reason are:
 * ●	```Delete``` - indicating an API call to delete the pod containing this container.
 * ●	```Health``` - indicating that a health check of the container failed.
-* ●	```Dependency``` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the network container crashing, or persistent disk failing for a container that mounts PD.
+* ●	```Dependency``` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the pod infra container crashing, or persistent disk failing for a container that mounts PD.
 
 Eventually, user specified reasons may be [added to the API](https://github.com/GoogleCloudPlatform/kubernetes/issues/137).
 
