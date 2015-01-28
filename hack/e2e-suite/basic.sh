@@ -34,7 +34,7 @@ function teardown() {
 trap "teardown" EXIT
 
 # Determine which pod image to launch (e.g. private.sh launches a different one).
-pod_img_srv="${POD_IMG_SRV:-kubernetes/serve_hostname}"
+pod_img_srv="${POD_IMG_SRV:-kubernetes/serve_hostname:1.1}"
 
 # Launch some pods.
 num_pods=2
