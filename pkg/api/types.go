@@ -673,6 +673,8 @@ type Service struct {
 
 	// Status represents the current status of a service.
 	Status ServiceStatus `json:"status,omitempty"`
+
+	Pods []string `json:"pods,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

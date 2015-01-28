@@ -514,6 +514,8 @@ type Service struct {
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
+
+	Pods []string `json:"pods,omitempty" description:"list of selected Pods"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

@@ -692,6 +692,8 @@ type Service struct {
 
 	// Status represents the current status of a service.
 	Status ServiceStatus `json:"status,omitempty"`
+
+	Pods []string `json:"pods,omitempty"`
 }
 
 // ServiceList holds a list of services.
