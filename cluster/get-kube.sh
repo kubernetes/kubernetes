@@ -24,6 +24,8 @@
 #  Set KUBERNETES_PROVIDER to choose between different providers:
 #  Google Compute Engine [default]
 #   * export KUBERNETES_PROVIDER=gce; wget -q -O - https://get.k8s.io | sh
+#  Google Container Engine
+#   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | sh
 #  Amazon EC2
 #   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | sh
 #  Microsoft Azure
@@ -58,7 +60,7 @@ if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   exit 0
 fi
 
-release=v0.7.2
+release=v0.8.1
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
