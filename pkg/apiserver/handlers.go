@@ -73,8 +73,8 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 			return
 		}
 		// Return a 429 status indicating "Too Many Requests"
-		w.WriteHeader(errors.StatusTooManyRequests)
 		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(errors.StatusTooManyRequests)
 		fmt.Fprintf(w, "Rate limit is 1 QPS or a burst of 20")
 	})
 }
