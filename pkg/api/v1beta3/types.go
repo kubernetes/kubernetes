@@ -181,7 +181,7 @@ type VolumeSource struct {
 	EmptyDir *EmptyDir `json:"emptyDir"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk"`
+	GCEPersistentDisk *GCEPersistentDisk `json:"gcePersistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepo `json:"gitRepo"`
 }
