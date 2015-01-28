@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -251,14 +252,16 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 		strippedHandler.ServeHTTP(resp.ResponseWriter, req.Request)
 	}
 
+	registrationErrors := make([]error, 0)
+
 	for path, storage := range g.handler.storage {
 		// register legacy patterns where namespace is optional in path
 		if err := registerResourceHandlers(ws, version, path, storage, h, false); err != nil {
-			return err
+			registrationErrors = append(registrationErrors, err)
 		}
 		// register pattern where namespace is required in path
 		if err := registerResourceHandlers(ws, version, path, storage, h, true); err != nil {
-			return err
+			registrationErrors = append(registrationErrors, err)
 		}
 	}
 
@@ -273,7 +276,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 
 	container.Add(ws)
 
-	return nil
+	return errors.NewAggregate(registrationErrors)
 }
 
 // TODO: Convert to go-restful
