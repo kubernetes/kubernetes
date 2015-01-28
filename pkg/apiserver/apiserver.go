@@ -62,9 +62,9 @@ func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, ve
 	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker, admissionControl)
 	container := restful.NewContainer()
 	mux := container.ServeMux
-	group.InstallREST(container, root, version)
+	group.InstallREST(container, mux, root, version)
 	ws := new(restful.WebService)
-	InstallSupport(container, ws)
+	InstallSupport(mux, ws)
 	container.Add(ws)
 	return &defaultAPIServer{mux, group}
 }
@@ -200,7 +200,7 @@ func addParamIf(b *restful.RouteBuilder, parameter *restful.Parameter, shouldAdd
 // InstallREST registers the REST handlers (storage, watch, and operations) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, root string, version string) error {
 	prefix := path.Join(root, version)
 	restHandler := &g.handler
 	strippedHandler := http.StripPrefix(prefix, restHandler)
@@ -265,8 +265,6 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, root string,
 
 	// TODO: port the rest of these. Sadly, if we don't, we'll have inconsistent
 	// API behavior, as well as lack of documentation
-	mux := container.ServeMux
-
 	// Note: update GetAttribs() when adding a handler.
 	mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
 	mux.Handle(prefix+"/proxy/", http.StripPrefix(prefix+"/proxy/", proxyHandler))
@@ -293,9 +291,9 @@ func InstallValidator(mux Mux, servers func() map[string]Server) {
 
 // TODO: document all handlers
 // InstallSupport registers the APIServer support functions
-func InstallSupport(container *restful.Container, ws *restful.WebService) {
+func InstallSupport(mux Mux, ws *restful.WebService) {
 	// TODO: convert healthz to restful and remove container arg
-	healthz.InstallHandler(container.ServeMux)
+	healthz.InstallHandler(mux)
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")
