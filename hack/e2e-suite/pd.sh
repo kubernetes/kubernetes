@@ -135,6 +135,11 @@ fi
 
 delete_pd_pod
 
+# This is really horrible, but the PD detach doesn't always complete in time, and
+# checking if it is detached via the GCE API is fairly unfriendly.  So we sleep *sigh*
+sleep 20
+
+
 # Recreate the pod, this should re-mount the PD
 ${KUBECFG} -c ${config} create pods
 
