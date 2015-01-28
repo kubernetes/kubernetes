@@ -98,7 +98,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(2 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -165,7 +165,7 @@ func TestReadFromFile(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(2 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -213,7 +213,7 @@ func TestReadFromFileWithoutID(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(2 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -258,7 +258,7 @@ func TestReadV1Beta2FromFile(t *testing.T) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(2 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -281,7 +281,7 @@ func TestReadFromFileWithDefaults(t *testing.T) {
 			t.Errorf("Unexpected UID: %s", update.Pods[0].ObjectMeta.UID)
 		}
 
-	case <-time.After(2 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
