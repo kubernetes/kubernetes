@@ -257,10 +257,6 @@ func getTestRequests() []struct {
 		{"GET", "/api/v1beta1/foo/a", "", code404},
 		{"DELETE", "/api/v1beta1/foo" + timeoutFlag, "", code404},
 
-		// Operations
-		{"GET", "/api/v1beta1/operations", "", code200},
-		{"GET", "/api/v1beta1/operations/1234567890", "", code404},
-
 		// Special verbs on nodes
 		// TODO: Will become 405 once these are converted to go-restful
 		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},

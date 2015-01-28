@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"net/http"
 	"sort"
 	"strconv"
 	"sync"
@@ -25,42 +24,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
-
-type OperationHandler struct {
-	ops   *Operations
-	codec runtime.Codec
-}
-
-func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	parts := splitPath(req.URL.Path)
-	if len(parts) > 1 || req.Method != "GET" {
-		notFound(w, req)
-		return
-	}
-	if len(parts) == 0 {
-		// List outstanding operations.
-		list := h.ops.List()
-		writeJSON(http.StatusOK, h.codec, list, w)
-		return
-	}
-
-	op := h.ops.Get(parts[0])
-	if op == nil {
-		notFound(w, req)
-		return
-	}
-
-	result, complete := op.StatusOrResult()
-	obj := result.Object
-	if complete {
-		writeJSON(http.StatusOK, h.codec, obj, w)
-	} else {
-		writeJSON(http.StatusAccepted, h.codec, obj, w)
-	}
-}
 
 // Operation represents an ongoing action which the server is performing.
 type Operation struct {
