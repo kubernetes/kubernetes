@@ -33,16 +33,22 @@ import (
 	"github.com/golang/glog"
 )
 
+// PodLister is anything that knows how to list pods.
+type PodLister interface {
+	ListPods(ctx api.Context, labels labels.Selector) (*api.PodList, error)
+}
+
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
 	registry  Registry
 	cloud     cloudprovider.Interface
 	machines  minion.Registry
 	portalMgr *ipAllocator
+	podLister PodLister
 }
 
 // NewREST returns a new REST.
-func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet) *REST {
+func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet, podLister PodLister) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
 	if ipa == nil {
@@ -55,6 +61,7 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 		cloud:     cloud,
 		machines:  machines,
 		portalMgr: ipa,
+		podLister: podLister,
 	}
 }
 
@@ -183,9 +190,25 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 	}), nil
 }
 
+func (rs *REST) fillServicePods(ctx api.Context, service *api.Service) error {
+	if service.Spec.Selector != nil {
+		podList, err := rs.podLister.ListPods(ctx, labels.Set(service.Spec.Selector).AsSelector())
+		if err != nil {
+			return err
+		}
+		for _, pod := range podList.Items {
+			service.Pods = append(service.Pods, pod.Name)
+		}
+	}
+	return nil
+}
+
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	service, err := rs.registry.GetService(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+	if err2 := rs.fillServicePods(ctx, service); err2 != nil {
 		return nil, err
 	}
 	return service, err
@@ -200,6 +223,9 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	var filtered []api.Service
 	for _, service := range list.Items {
 		if label.Matches(labels.Set(service.Labels)) {
+			if err := rs.fillServicePods(ctx, &service); err != nil {
+				return nil, err
+			}
 			filtered = append(filtered, service)
 		}
 	}

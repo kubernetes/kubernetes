@@ -356,7 +356,7 @@ func (m *Master) init(c *Config) {
 			Registry: m.podRegistry,
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
+		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet, m.podRegistry),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                nodeRESTStorage,
 		"nodes":                  nodeRESTStorage,
