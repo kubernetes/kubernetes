@@ -68,7 +68,7 @@ func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
-		glog.V(1).Infof("Unable to parse Docker config file: %v", err)
+		glog.V(4).Infof("Unable to parse Docker config file: %v", err)
 	}
 	return DockerConfig{}
 }
