@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -37,20 +38,23 @@ type PodStatusGetter interface {
 
 // REST implements the RESTStorage interface in terms of a PodRegistry.
 type REST struct {
-	podCache PodStatusGetter
-	registry Registry
+	podCache        PodStatusGetter
+	registry        Registry
+	serviceRegistry service.Registry
 }
 
 type RESTConfig struct {
-	PodCache PodStatusGetter
-	Registry Registry
+	PodCache        PodStatusGetter
+	Registry        Registry
+	ServiceRegistry service.Registry
 }
 
 // NewREST returns a new REST.
 func NewREST(config *RESTConfig) *REST {
 	return &REST{
-		podCache: config.PodCache,
-		registry: config.Registry,
+		podCache:        config.PodCache,
+		registry:        config.Registry,
+		serviceRegistry: config.ServiceRegistry,
 	}
 }
 
@@ -68,6 +72,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.Name, errs)
 	}
+
+	if errs := rs.validateServicePredeclarations(pod); len(errs) > 0 {
+		return nil, errors.NewPreconditionNotMetAggregate("pod", pod.Name, errs)
+	}
+
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := rs.registry.CreatePod(ctx, pod); err != nil {
 			return nil, err
@@ -108,6 +117,35 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	// TODO: move host to spec
 	pod.Status.Host = host
 	return pod, err
+}
+
+func (rs *REST) validateServicePredeclarations(pod *api.Pod) errors.ValidationErrorList {
+	allErrs := errors.ValidationErrorList{}
+	context := api.WithNamespace(api.NewDefaultContext(), pod.Namespace)
+
+	for key, _ := range pod.Annotations {
+		serviceName, isServiceDependency := parseServiceDependencyAnnotation(key)
+		if isServiceDependency {
+			_, err := rs.serviceRegistry.GetService(context, serviceName)
+			if err != nil {
+				allErrs = append(allErrs, errors.NewPreconditionNotMet(serviceDependencyDomain, serviceName))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+const (
+	serviceDependencyDomain = "depends.on"
+)
+
+func parseServiceDependencyAnnotation(key string) (serviceName string, isServiceDependency bool) {
+	if strings.HasPrefix(key, serviceDependencyDomain) {
+		return strings.TrimPrefix(key, serviceDependencyDomain+"/"), true
+	}
+
+	return "", false
 }
 
 func PodToSelectableFields(pod *api.Pod) labels.Set {

@@ -352,8 +352,9 @@ func (m *Master) init(c *Config) {
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewREST(&pod.RESTConfig{
-			PodCache: podCache,
-			Registry: m.podRegistry,
+			PodCache:        podCache,
+			Registry:        m.podRegistry,
+			ServiceRegistry: m.serviceRegistry,
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),

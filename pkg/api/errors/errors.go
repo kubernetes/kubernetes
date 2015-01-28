@@ -126,6 +126,30 @@ func NewConflict(kind, name string, err error) error {
 	}}
 }
 
+func NewPreconditionNotMetAggregate(kind, name string, errs ValidationErrorList) error {
+	causes := make([]api.StatusCause, 0, len(errs))
+	for i := range errs {
+		if err, ok := errs[i].(*ValidationError); ok {
+			causes = append(causes, api.StatusCause{
+				Type:    api.CauseType(err.Type),
+				Message: err.Error(),
+				Field:   err.Field,
+			})
+		}
+	}
+
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   422, // RFC 4918: StatusUnprocessableEntity
+		Reason: api.StatusReasonPreconditionNotMet,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+		},
+		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, errors.NewAggregate(errs)),
+	}}
+}
+
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
 func NewInvalid(kind, name string, errs ValidationErrorList) error {
 	causes := make([]api.StatusCause, 0, len(errs))
