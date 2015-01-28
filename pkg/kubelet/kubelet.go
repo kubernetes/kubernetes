@@ -740,7 +740,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 
 		switch service.Namespace {
 		// for the case whether the master service namespace is the namespace the pod
-		// is in, pod should receive all the pods in the namespace.
+		// is in, the pod should receive all the services in the namespace.
 		//
 		// ordering of the case clauses below enforces this
 		case ns:
