@@ -914,7 +914,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{Name: "bar",
-					LivenessProbe: &api.LivenessProbe{
+					LivenessProbe: &api.Probe{
 					// Always returns healthy == false
 					},
 				},

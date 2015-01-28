@@ -273,15 +273,10 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// LivenessProbe describes a liveness probe to be examined to the container.
-// TODO: pass structured data to the actions, and document that data here.
-type LivenessProbe struct {
-	// HTTPGetProbe parameters, required if Type == 'http'
-	HTTPGet *HTTPGetAction `json:"httpGet,omitempty"`
-	// TCPSocketProbe parameter, required if Type == 'tcp'
-	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty"`
-	// ExecProbe parameter, required if Type == 'exec'
-	Exec *ExecAction `json:"exec,omitempty"`
+// Probe describes a liveness probe to be examined to the container.
+type Probe struct {
+	// The action taken to determine the health of a container
+	Handler `json:",inline"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
 }
@@ -316,7 +311,7 @@ type Container struct {
 	// Optional: Defaults to unlimited.
 	CPU           resource.Quantity `json:"cpu,omitempty"`
 	VolumeMounts  []VolumeMount     `json:"volumeMounts,omitempty"`
-	LivenessProbe *LivenessProbe    `json:"livenessProbe,omitempty"`
+	LivenessProbe *Probe            `json:"livenessProbe,omitempty"`
 	Lifecycle     *Lifecycle        `json:"lifecycle,omitempty"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
@@ -334,6 +329,9 @@ type Handler struct {
 	Exec *ExecAction `json:"exec,omitempty"`
 	// HTTPGet specifies the http request to perform.
 	HTTPGet *HTTPGetAction `json:"httpGet,omitempty"`
+	// TCPSocket specifies an action involving a TCP port.
+	// TODO: implement a realistic TCP lifecycle hook
+	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty"`
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
