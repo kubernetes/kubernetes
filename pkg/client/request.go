@@ -483,7 +483,8 @@ func (r *Request) Do() Result {
 			continue
 		}
 
-		if resp.StatusCode == http.StatusServiceUnavailable {
+		// Check to see if we got a 429 Too Many Requests response code.
+		if resp.StatusCode == errors.StatusTooManyRequests {
 			if retries < 10 {
 				retries++
 				if waitFor := resp.Header.Get("Retry-After"); waitFor != "" {
