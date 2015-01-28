@@ -50,6 +50,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -103,17 +105,18 @@ type Config struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	podRegistry        pod.Registry
-	controllerRegistry controller.Registry
-	serviceRegistry    service.Registry
-	endpointRegistry   endpoint.Registry
-	minionRegistry     minion.Registry
-	bindingRegistry    binding.Registry
-	eventRegistry      generic.Registry
-	limitRangeRegistry generic.Registry
-	storage            map[string]apiserver.RESTStorage
-	client             *client.Client
-	portalNet          *net.IPNet
+	podRegistry           pod.Registry
+	controllerRegistry    controller.Registry
+	serviceRegistry       service.Registry
+	endpointRegistry      endpoint.Registry
+	minionRegistry        minion.Registry
+	bindingRegistry       binding.Registry
+	eventRegistry         generic.Registry
+	limitRangeRegistry    generic.Registry
+	resourceQuotaRegistry resourcequota.Registry
+	storage               map[string]apiserver.RESTStorage
+	client                *client.Client
+	portalNet             *net.IPNet
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -251,6 +254,7 @@ func New(c *Config) *Master {
 		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:        minionRegistry,
 		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
+		resourceQuotaRegistry: resourcequota.NewEtcdRegistry(c.EtcdHelper),
 		client:                c.Client,
 		portalNet:             c.PortalNet,
 		rootWebService:        new(restful.WebService),
@@ -365,7 +369,9 @@ func (m *Master) init(c *Config) {
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
 
-		"limitRanges": limitrange.NewREST(m.limitRangeRegistry),
+		"limitRanges":         limitrange.NewREST(m.limitRangeRegistry),
+		"resourceQuotas":      resourcequota.NewREST(m.resourceQuotaRegistry),
+		"resourceQuotaUsages": resourcequotausage.NewREST(m.resourceQuotaRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

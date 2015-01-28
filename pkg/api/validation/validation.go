@@ -666,3 +666,28 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	}
 	return allErrs
 }
+
+// ValidateResourceQuota tests if required fields in the ResourceQuota are set.
+func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(resourceQuota.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", resourceQuota.Name))
+	} else if !util.IsDNSSubdomain(resourceQuota.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", resourceQuota.Name, ""))
+	}
+	if len(resourceQuota.Namespace) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", resourceQuota.Namespace))
+	} else if !util.IsDNSSubdomain(resourceQuota.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", resourceQuota.Namespace, ""))
+	}
+	for k := range resourceQuota.Spec.Hard {
+		allErrs = append(allErrs, ValidateResourceName(string(k))...)
+	}
+	for k := range resourceQuota.Status.Hard {
+		allErrs = append(allErrs, ValidateResourceName(string(k))...)
+	}
+	for k := range resourceQuota.Status.Used {
+		allErrs = append(allErrs, ValidateResourceName(string(k))...)
+	}
+	return allErrs
+}

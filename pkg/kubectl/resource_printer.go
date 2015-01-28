@@ -222,6 +222,7 @@ var minionColumns = []string{"NAME", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"TIME", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME"}
+var resourceQuotaColumns = []string{"NAME"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -238,6 +239,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(eventColumns, printEventList)
 	h.Handler(limitRangeColumns, printLimitRange)
 	h.Handler(limitRangeColumns, printLimitRangeList)
+	h.Handler(resourceQuotaColumns, printResourceQuota)
+	h.Handler(resourceQuotaColumns, printResourceQuotaList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -424,6 +427,24 @@ func printLimitRange(limitRange *api.LimitRange, w io.Writer) error {
 func printLimitRangeList(list *api.LimitRangeList, w io.Writer) error {
 	for i := range list.Items {
 		if err := printLimitRange(&list.Items[i], w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer) error {
+	_, err := fmt.Fprintf(
+		w, "%s\n",
+		resourceQuota.Name,
+	)
+	return err
+}
+
+// Prints the ResourceQuotaList in a human-friendly format.
+func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer) error {
+	for i := range list.Items {
+		if err := printResourceQuota(&list.Items[i], w); err != nil {
 			return err
 		}
 	}

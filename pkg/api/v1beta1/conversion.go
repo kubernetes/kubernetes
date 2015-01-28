@@ -634,6 +634,94 @@ func init() {
 			}
 			return nil
 		},
+		func(in *newer.ResourceQuota, out *ResourceQuota, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ResourceQuota, out *newer.ResourceQuota, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.ResourceQuotaUsage, out *ResourceQuotaUsage, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ResourceQuotaUsage, out *newer.ResourceQuotaUsage, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.ResourceQuotaSpec, out *ResourceQuotaSpec, s conversion.Scope) error {
+			*out = ResourceQuotaSpec{}
+			if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ResourceQuotaSpec, out *newer.ResourceQuotaSpec, s conversion.Scope) error {
+			*out = newer.ResourceQuotaSpec{}
+			if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.ResourceQuotaStatus, out *ResourceQuotaStatus, s conversion.Scope) error {
+			*out = ResourceQuotaStatus{}
+			if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Used, &out.Used, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ResourceQuotaStatus, out *newer.ResourceQuotaStatus, s conversion.Scope) error {
+			*out = newer.ResourceQuotaStatus{}
+			if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Used, &out.Used, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		// Object ID <-> Name
 		// TODO: amend the conversion package to allow overriding specific fields.
 		func(in *ObjectReference, out *newer.ObjectReference, s conversion.Scope) error {

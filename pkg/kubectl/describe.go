@@ -49,6 +49,8 @@ func DescriberFor(kind string, c *client.Client) (Describer, bool) {
 		return &MinionDescriber{c}, true
 	case "LimitRange":
 		return &LimitRangeDescriber{c}, true
+	case "ResourceQuota":
+		return &ResourceQuotaDescriber{c}, true
 	}
 	return nil, false
 }
@@ -101,6 +103,41 @@ func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
 				msg := "%v\t%v\t%v\t%v\n"
 				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue)
 			}
+		}
+		return nil
+	})
+}
+
+// ResourceQuotaDescriber generates information about a resource quota
+type ResourceQuotaDescriber struct {
+	client.Interface
+}
+
+func (d *ResourceQuotaDescriber) Describe(namespace, name string) (string, error) {
+	rq := d.ResourceQuotas(namespace)
+
+	resourceQuota, err := rq.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", resourceQuota.Name)
+		fmt.Fprintf(out, "Resource\tUsed\tHard\n")
+		fmt.Fprintf(out, "--------\t----\t----\n")
+
+		resources := []api.ResourceName{}
+		for resource := range resourceQuota.Status.Hard {
+			resources = append(resources, resource)
+		}
+		sort.Sort(SortableResourceNames(resources))
+
+		msg := "%v\t%v\t%v\n"
+		for i := range resources {
+			resource := resources[i]
+			hardQuantity := resourceQuota.Status.Hard[resource]
+			usedQuantity := resourceQuota.Status.Used[resource]
+			fmt.Fprintf(out, msg, resource, usedQuantity.String(), hardQuantity.String())
 		}
 		return nil
 	})
