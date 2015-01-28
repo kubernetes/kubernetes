@@ -77,7 +77,7 @@ func TestYAMLPrinterPrint(t *testing.T) {
 	var objOut api.Pod
 	err = yaml.Unmarshal([]byte(buf.String()), &objOut)
 	if err != nil {
-		t.Errorf("Unexpeted error: %#v", err)
+		t.Errorf("Unexpected error: %#v", err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {
 		t.Errorf("Unexpected inequality: %#v vs %#v", obj, &objOut)
@@ -100,7 +100,7 @@ func TestIdentityPrinter(t *testing.T) {
 	printer.PrintObj(obj, buff)
 	objOut, err := latest.Codec.Decode([]byte(buff.String()))
 	if err != nil {
-		t.Errorf("Unexpeted error: %#v", err)
+		t.Errorf("Unexpected error: %#v", err)
 	}
 	if !reflect.DeepEqual(obj, objOut) {
 		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)
@@ -212,10 +212,10 @@ func TestTemplateStrings(t *testing.T) {
 			},
 			"false",
 		},
-		"netExists": {
+		"podExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"net": api.ContainerStatus{}},
+					Info: api.PodInfo{"POD": api.ContainerStatus{}},
 				},
 			},
 			"false",
@@ -225,7 +225,7 @@ func TestTemplateStrings(t *testing.T) {
 				Status: api.PodStatus{
 					Info: api.PodInfo{
 						"update-demo": api.ContainerStatus{},
-						"net":         api.ContainerStatus{},
+						"POD":         api.ContainerStatus{},
 					},
 				},
 			},
@@ -236,7 +236,7 @@ func TestTemplateStrings(t *testing.T) {
 				Status: api.PodStatus{
 					Info: api.PodInfo{
 						"update-demo": api.ContainerStatus{},
-						"net": api.ContainerStatus{
+						"POD": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -259,7 +259,7 @@ func TestTemplateStrings(t *testing.T) {
 								},
 							},
 						},
-						"net": api.ContainerStatus{
+						"POD": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -276,7 +276,7 @@ func TestTemplateStrings(t *testing.T) {
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
 	tmpl :=
-		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "net" "state" "running")}}`
+		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "POD" "state" "running")}}`
 	useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}

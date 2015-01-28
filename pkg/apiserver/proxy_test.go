@@ -56,69 +56,77 @@ func TestProxyTransport(t *testing.T) {
 	testTransport := &proxyTransport{
 		proxyScheme:      "http",
 		proxyHost:        "foo.com",
-		proxyPathPrepend: "/proxy/minion/minion1:10250/",
+		proxyPathPrepend: "/proxy/minion/minion1:10250",
 	}
 	testTransport2 := &proxyTransport{
 		proxyScheme:      "https",
 		proxyHost:        "foo.com",
-		proxyPathPrepend: "/proxy/minion/minion1:8080/",
+		proxyPathPrepend: "/proxy/minion/minion1:8080",
 	}
 
 	table := map[string]struct {
-		input       string
-		sourceURL   string
-		transport   *proxyTransport
-		output      string
-		contentType string
+		input        string
+		sourceURL    string
+		transport    *proxyTransport
+		output       string
+		contentType  string
+		forwardedURI string
 	}{
 		"normal": {
-			input:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
-			sourceURL:   "http://myminion.com/logs/log.log",
-			transport:   testTransport,
-			output:      `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
-			contentType: "text/html",
+			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			sourceURL:    "http://myminion.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"content-type charset": {
-			input:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
-			sourceURL:   "http://myminion.com/logs/log.log",
-			transport:   testTransport,
-			output:      `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
-			contentType: "text/html; charset=utf-8",
+			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			sourceURL:    "http://myminion.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			contentType:  "text/html; charset=utf-8",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"content-type passthrough": {
-			input:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
-			sourceURL:   "http://myminion.com/logs/log.log",
-			transport:   testTransport,
-			output:      `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
-			contentType: "text/plain",
+			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			sourceURL:    "http://myminion.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			contentType:  "text/plain",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"subdir": {
-			input:       `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
-			sourceURL:   "http://myminion.com/whatever/apt/somelog.log",
-			transport:   testTransport2,
-			output:      `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a>`,
-			contentType: "text/html",
+			input:        `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
+			sourceURL:    "http://myminion.com/whatever/apt/somelog.log",
+			transport:    testTransport2,
+			output:       `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:8080/whatever/apt/somelog.log",
 		},
 		"image": {
-			input:       `<pre><img src="kubernetes.jpg"/></pre>`,
-			sourceURL:   "http://myminion.com/",
-			transport:   testTransport,
-			output:      `<pre><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes.jpg"/></pre>`,
-			contentType: "text/html",
+			input:        `<pre><img src="kubernetes.jpg"/></pre>`,
+			sourceURL:    "http://myminion.com/",
+			transport:    testTransport,
+			output:       `<pre><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes.jpg"/></pre>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/",
 		},
 		"abs": {
-			input:       `<script src="http://google.com/kubernetes.js"/>`,
-			sourceURL:   "http://myminion.com/any/path/",
-			transport:   testTransport,
-			output:      `<script src="http://google.com/kubernetes.js"/>`,
-			contentType: "text/html",
+			input:        `<script src="http://google.com/kubernetes.js"/>`,
+			sourceURL:    "http://myminion.com/any/path/",
+			transport:    testTransport,
+			output:       `<script src="http://google.com/kubernetes.js"/>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/any/path/",
 		},
 		"abs but same host": {
-			input:       `<script src="http://myminion.com/kubernetes.js"/>`,
-			sourceURL:   "http://myminion.com/any/path/",
-			transport:   testTransport,
-			output:      `<script src="http://foo.com/proxy/minion/minion1:10250/kubernetes.js"/>`,
-			contentType: "text/html",
+			input:        `<script src="http://myminion.com/kubernetes.js"/>`,
+			sourceURL:    "http://myminion.com/any/path/",
+			transport:    testTransport,
+			output:       `<script src="http://foo.com/proxy/minion/minion1:10250/kubernetes.js"/>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/any/path/",
 		},
 	}
 
@@ -127,7 +135,19 @@ func TestProxyTransport(t *testing.T) {
 		item.input = fmtHTML(item.input)
 		item.output = fmtHTML(item.output)
 
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check request headers.
+			if got, want := r.Header.Get("X-Forwarded-Uri"), item.forwardedURI; got != want {
+				t.Errorf("%v: X-Forwarded-Uri = %q, want %q", name, got, want)
+			}
+			if got, want := r.Header.Get("X-Forwarded-Host"), item.transport.proxyHost; got != want {
+				t.Errorf("%v: X-Forwarded-Host = %q, want %q", name, got, want)
+			}
+			if got, want := r.Header.Get("X-Forwarded-Proto"), item.transport.proxyScheme; got != want {
+				t.Errorf("%v: X-Forwarded-Proto = %q, want %q", name, got, want)
+			}
+
+			// Send response.
 			w.Header().Set("Content-Type", item.contentType)
 			fmt.Fprint(w, item.input)
 		}))

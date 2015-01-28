@@ -26,9 +26,9 @@ var Codec = runtime.CodecFor(api.Scheme, "v1beta3")
 
 func init() {
 	api.Scheme.AddKnownTypes("v1beta3",
-		&PodContainerInfo{},
 		&Pod{},
 		&PodList{},
+		&PodStatusResult{},
 		&PodTemplate{},
 		&PodTemplateList{},
 		&BoundPod{},
@@ -48,6 +48,8 @@ func init() {
 		&Event{},
 		&EventList{},
 		&List{},
+		&LimitRange{},
+		&LimitRangeList{},
 	)
 	// Legacy names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta3", "Minion", &Node{})
@@ -56,9 +58,9 @@ func init() {
 	api.Scheme.AddKnownTypeWithName("v1beta3", "ServerOpList", &OperationList{})
 }
 
-func (*PodContainerInfo) IsAnAPIObject()          {}
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
+func (*PodStatusResult) IsAnAPIObject()           {}
 func (*PodTemplate) IsAnAPIObject()               {}
 func (*PodTemplateList) IsAnAPIObject()           {}
 func (*BoundPod) IsAnAPIObject()                  {}
@@ -78,3 +80,5 @@ func (*OperationList) IsAnAPIObject()             {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
 func (*List) IsAnAPIObject()                      {}
+func (*LimitRange) IsAnAPIObject()                {}
+func (*LimitRangeList) IsAnAPIObject()            {}

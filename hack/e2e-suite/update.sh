@@ -60,7 +60,7 @@ function validate() {
       # This template is unit-tested in kubec{tl|fg}, so if you change it, update the unit test.
       #
       # You can read about the syntax here: http://golang.org/pkg/text/template/
-      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"net\" \"state\" \"running\")}}"
+      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"POD\" \"state\" \"running\")}}"
       current_status=$($KUBECFG -template="${template_string}" get "pods/$id") || {
         if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
           echo "  $id no longer exists"
@@ -76,7 +76,7 @@ function validate() {
         continue
       fi
 
-      echo "  $id is created and both net and update-demo containers are running: $current_status"
+      echo "  $id is created and both POD and update-demo containers are running: $current_status"
 
       template_string="{{(index .currentState.info \"${CONTROLLER_NAME}\").image}}"
       current_image=$($KUBECFG -template="${template_string}" get "pods/$id") || true

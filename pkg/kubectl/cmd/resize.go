@@ -48,8 +48,12 @@ Examples:
 			if len(args) != 2 || count < 0 {
 				usageError(cmd, "--replicas=<count> <resource> <id>")
 			}
+
+			cmdNamespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+
 			mapper, _ := f.Object(cmd)
-			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper)
+			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			resizer, err := f.Resizer(cmd, mapping)
 			checkErr(err)

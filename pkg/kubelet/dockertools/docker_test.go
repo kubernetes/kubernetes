@@ -169,7 +169,7 @@ func TestDockerContainerCommand(t *testing.T) {
 		t.Errorf("unexpected command CWD: %s", cmd.Dir)
 	}
 	if !reflect.DeepEqual(cmd.Args, []string{"/usr/sbin/nsinit", "exec", "ls"}) {
-		t.Errorf("unexpectd command args: %s", cmd.Args)
+		t.Errorf("unexpected command args: %s", cmd.Args)
 	}
 }
 
@@ -248,6 +248,50 @@ func TestDockerKeyringLookup(t *testing.T) {
 		// no host match
 		{"example.com", empty, false},
 		{"foo.example.com", empty, false},
+	}
+
+	for i, tt := range tests {
+		match, ok := dk.Lookup(tt.image)
+		if tt.ok != ok {
+			t.Errorf("case %d: expected ok=%t, got %t", i, tt.ok, ok)
+		}
+
+		if !reflect.DeepEqual(tt.match, match) {
+			t.Errorf("case %d: expected match=%#v, got %#v", i, tt.match, match)
+		}
+	}
+}
+
+// This validates that dockercfg entries with a scheme and url path are properly matched
+// by images that only match the hostname.
+// NOTE: the above covers the case of a more specific match trumping just hostname.
+func TestIssue3797(t *testing.T) {
+	rex := docker.AuthConfiguration{
+		Username: "rex",
+		Password: "tiny arms",
+		Email:    "rex@example.com",
+	}
+
+	dk := &credentialprovider.BasicDockerKeyring{}
+	dk.Add(credentialprovider.DockerConfig{
+		"https://quay.io/v1/": credentialprovider.DockerConfigEntry{
+			Username: rex.Username,
+			Password: rex.Password,
+			Email:    rex.Email,
+		},
+	})
+
+	tests := []struct {
+		image string
+		match docker.AuthConfiguration
+		ok    bool
+	}{
+		// direct match
+		{"quay.io", rex, true},
+
+		// partial matches
+		{"quay.io/foo", rex, true},
+		{"quay.io/foo/bar", rex, true},
 	}
 
 	for i, tt := range tests {

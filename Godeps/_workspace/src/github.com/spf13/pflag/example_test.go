@@ -29,6 +29,10 @@ func (i *interval) String() string {
 	return fmt.Sprint(*i)
 }
 
+func (i *interval) Type() string {
+	return "interval"
+}
+
 // Set is the method to set the flag value, part of the flag.Value interface.
 // Set's argument is a string to be parsed to set the flag.
 // It's a comma-separated list, so we split it.

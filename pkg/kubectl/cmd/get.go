@@ -62,7 +62,7 @@ Examples:
 	AddPrinterFlags(cmd)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
-	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requseted object(s), without listing/getting first.")
+	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	return cmd
 }
 
@@ -73,11 +73,14 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	selector := GetFlagString(cmd, "selector")
 	mapper, typer := f.Object(cmd)
 
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	checkErr(err)
+
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
-			NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
+			NamespaceParam(cmdNamespace).DefaultNamespace().
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(args...).
 			SingleResourceType().
@@ -113,7 +116,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	}
 
 	b := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
-		NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(args...).
 		Latest()
@@ -121,8 +124,12 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	checkErr(err)
 
 	if generic {
+		clientConfig, err := f.ClientConfig(cmd)
+		checkErr(err)
+		defaultVersion := clientConfig.Version
+
 		// the outermost object will be converted to the output-version
-		version := outputVersion(cmd)
+		version := outputVersion(cmd, defaultVersion)
 		if len(version) == 0 {
 			// TODO: add a new ResourceBuilder mode for Object() that attempts to ensure the objects
 			// are in the appropriate version if one exists (and if not, use the best effort).

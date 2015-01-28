@@ -10,13 +10,13 @@ The example below creates an elastic Kubernetes cluster with 3 worker nodes and 
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config)
 * Cross container networking with [flannel](https://github.com/coreos/flannel#flannel)
 * Auto worker registration with [kube-register](https://github.com/kelseyhightower/kube-register#kube-register)
-* Kubernetes v0.4.2 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.4.2)
+* Kubernetes v0.9.1 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.9.1)
 
 ## Prerequisites
 
 * [kubecfg CLI](aws/kubecfg.md)
 * [aws CLI](http://aws.amazon.com/cli)
-* CoreOS 490.0.0+
+* [CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel)
 
 ## Starting a Cluster
 
@@ -46,7 +46,7 @@ aws cloudformation describe-stacks --stack-name kubernetes
 
 ### Manually
 
-The following commands use the CoreOS 490.0.0 alpha AMI `ami-e18dc5d1` from the `us-west-2` region. For a list of different regions and corresponding AMI IDs see the [CoreOS EC2 cloud provider documentation](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+The following commands shall use the latest CoreOS alpha AMI for the `us-west-2` region. For a list of different regions and corresponding AMI IDs see the [CoreOS EC2 cloud provider documentation](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
 #### Create the Kubernetes Security Group
 
@@ -64,8 +64,10 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 #### Launch the master
 
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+
 ```
-aws ec2 run-instances --image-id ami-e18dc5d1 --key-name <keypair> \
+aws ec2 run-instances --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://master.yaml
 ```
@@ -101,16 +103,20 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the **p
 
 ### Launch 3 worker nodes
 
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+
 ```
-aws ec2 run-instances --count 3 --image-id ami-e18dc5d1 --key-name <keypair> \
+aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://node.yaml
 ```
 
 ### Add additional worker nodes
 
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
+
 ```
-aws ec2 run-instances --count 1 --image-id ami-e18dc5d1 --key-name <keypair> \
+aws ec2 run-instances --count 1 --image-id <ami_image_id> --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://node.yaml
 ```

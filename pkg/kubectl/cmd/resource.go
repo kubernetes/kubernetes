@@ -41,18 +41,20 @@ func ResourcesFromArgsOrFile(
 	clientBuilder func(cmd *cobra.Command, mapping *meta.RESTMapping) (resource.RESTClient, error),
 	schema validation.Schema,
 	requireNames bool,
+	cmdNamespace,
+	cmdVersion string,
 ) resource.Visitor {
 
 	// handling filename & resource id
 	if len(selector) == 0 {
 		if requireNames || len(filename) > 0 {
-			mapping, namespace, name := ResourceFromArgsOrFile(cmd, args, filename, typer, mapper, schema)
+			mapping, namespace, name := ResourceFromArgsOrFile(cmd, args, filename, typer, mapper, schema, cmdNamespace, cmdVersion)
 			client, err := clientBuilder(cmd, mapping)
 			checkErr(err)
 			return resource.NewInfo(client, mapping, namespace, name)
 		}
 		if len(args) == 2 {
-			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, mapper)
+			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, mapper, cmdNamespace, cmdVersion)
 			client, err := clientBuilder(cmd, mapping)
 			checkErr(err)
 			return resource.NewInfo(client, mapping, namespace, name)
@@ -62,7 +64,7 @@ func ResourcesFromArgsOrFile(
 	labelSelector, err := labels.ParseSelector(selector)
 	checkErr(err)
 
-	namespace := GetKubeNamespace(cmd)
+	namespace := cmdNamespace
 	visitors := resource.VisitorList{}
 
 	if len(args) < 1 {
@@ -94,7 +96,7 @@ func ResourcesFromArgsOrFile(
 // ResourceFromArgsOrFile expects two arguments or a valid file with a given type, and extracts
 // the fields necessary to uniquely locate a resource. Displays a usageError if that contract is
 // not satisfied, or a generic error if any other problems occur.
-func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema) (mapping *meta.RESTMapping, namespace, name string) {
+func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema, cmdNamespace, cmdVersion string) (mapping *meta.RESTMapping, namespace, name string) {
 	// If command line args are passed in, use those preferentially.
 	if len(args) > 0 && len(args) != 2 {
 		usageError(cmd, "If passing in command line parameters, must be resource and name")
@@ -102,7 +104,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 
 	if len(args) == 2 {
 		resource := args[0]
-		namespace = GetKubeNamespace(cmd)
+		namespace = cmdNamespace
 		name = args[1]
 		if len(name) == 0 || len(resource) == 0 {
 			usageError(cmd, "Must specify filename or command line params")
@@ -113,8 +115,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 			// The error returned by mapper is "no resource defined", which is a usage error
 			usageError(cmd, err.Error())
 		}
-		version := GetFlagString(cmd, "api-version")
-		mapping, err = mapper.RESTMapping(kind, version, defaultVersion)
+		mapping, err = mapper.RESTMapping(kind, cmdVersion, defaultVersion)
 		checkErr(err)
 		return
 	}
@@ -123,7 +124,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 		usageError(cmd, "Must specify filename or command line params")
 	}
 
-	mapping, namespace, name, _ = ResourceFromFile(cmd, filename, typer, mapper, schema)
+	mapping, namespace, name, _ = ResourceFromFile(filename, typer, mapper, schema, cmdVersion)
 	if len(name) == 0 {
 		checkErr(fmt.Errorf("the resource in the provided file has no name (or ID) defined"))
 	}
@@ -134,13 +135,13 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 // ResourceFromArgs expects two arguments with a given type, and extracts the fields necessary
 // to uniquely locate a resource. Displays a usageError if that contract is not satisfied, or
 // a generic error if any other problems occur.
-func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string) {
+func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper, cmdNamespace string) (mapping *meta.RESTMapping, namespace, name string) {
 	if len(args) != 2 {
 		usageError(cmd, "Must provide resource and name command line params")
 	}
 
 	resource := args[0]
-	namespace = GetKubeNamespace(cmd)
+	namespace = cmdNamespace
 	name = args[1]
 	if len(name) == 0 || len(resource) == 0 {
 		usageError(cmd, "Must provide resource and name command line params")
@@ -157,7 +158,7 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper)
 // ResourceFromArgs expects two arguments with a given type, and extracts the fields necessary
 // to uniquely locate a resource. Displays a usageError if that contract is not satisfied, or
 // a generic error if any other problems occur.
-func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string) {
+func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper, cmdNamespace, cmdVersion string) (mapping *meta.RESTMapping, namespace, name string) {
 	if len(args) == 0 || len(args) > 2 {
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}
@@ -167,7 +168,7 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 		usageError(cmd, "Must provide resource or a resource and name as command line params")
 	}
 
-	namespace = GetKubeNamespace(cmd)
+	namespace = cmdNamespace
 	if len(args) == 2 {
 		name = args[1]
 		if len(name) == 0 {
@@ -178,8 +179,7 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 	defaultVersion, kind, err := mapper.VersionAndKindForResource(resource)
 	checkErr(err)
 
-	version := GetFlagString(cmd, "api-version")
-	mapping, err = mapper.RESTMapping(kind, version, defaultVersion)
+	mapping, err = mapper.RESTMapping(kind, cmdVersion, defaultVersion)
 	checkErr(err)
 
 	return
@@ -188,7 +188,7 @@ func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTM
 // ResourceFromFile retrieves the name and namespace from a valid file. If the file does not
 // resolve to a known type an error is returned. The returned mapping can be used to determine
 // the correct REST endpoint to modify this resource with.
-func ResourceFromFile(cmd *cobra.Command, filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
+func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema, cmdVersion string) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
 	configData, err := ReadConfigData(filename)
 	checkErr(err)
 	data = configData
@@ -218,20 +218,18 @@ func ResourceFromFile(cmd *cobra.Command, filename string, typer runtime.ObjectT
 	checkErr(err)
 
 	// if the preferred API version differs, get a different mapper
-	version := GetFlagString(cmd, "api-version")
-	if version != objVersion {
-		mapping, err = mapper.RESTMapping(kind, version)
+	if cmdVersion != objVersion {
+		mapping, err = mapper.RESTMapping(kind, cmdVersion)
 		checkErr(err)
 	}
 
 	return
 }
 
-// CompareNamespaceFromFile returns an error if the namespace the user has provided on the CLI
+// CompareNamespace returns an error if the namespace the user has provided on the CLI
 // or via the default namespace file does not match the namespace of an input file. This
 // prevents a user from unintentionally updating the wrong namespace.
-func CompareNamespaceFromFile(cmd *cobra.Command, namespace string) error {
-	defaultNamespace := GetKubeNamespace(cmd)
+func CompareNamespace(defaultNamespace, namespace string) error {
 	if len(namespace) > 0 {
 		if defaultNamespace != namespace {
 			return fmt.Errorf("the namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)

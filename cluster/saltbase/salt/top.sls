@@ -33,9 +33,11 @@ base:
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
+    - monit
     - nginx
     - kube-client-tools
     - logrotate
+    - kube-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}

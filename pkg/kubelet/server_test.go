@@ -35,7 +35,7 @@ import (
 
 type fakeKubelet struct {
 	podByNameFunc     func(namespace, name string) (*api.BoundPod, bool)
-	infoFunc          func(name string) (api.PodInfo, error)
+	statusFunc        func(name string) (api.PodStatus, error)
 	containerInfoFunc func(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	machineInfoFunc   func() (*info.MachineInfo, error)
@@ -49,8 +49,8 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetPodInfo(name string, uid types.UID) (api.PodInfo, error) {
-	return fk.infoFunc(name)
+func (fk *fakeKubelet) GetPodStatus(name string, uid types.UID) (api.PodStatus, error) {
+	return fk.statusFunc(name)
 }
 
 func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
@@ -128,16 +128,18 @@ func readResp(resp *http.Response) (string, error) {
 	return string(body), err
 }
 
-func TestPodInfo(t *testing.T) {
+func TestPodStatus(t *testing.T) {
 	fw := newServerTest()
-	expected := api.PodInfo{
-		"goodpod": api.ContainerStatus{},
+	expected := api.PodStatus{
+		Info: map[string]api.ContainerStatus{
+			"goodpod": {},
+		},
 	}
-	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
+	fw.fakeKubelet.statusFunc = func(name string) (api.PodStatus, error) {
 		if name == "goodpod.default.etcd" {
 			return expected, nil
 		}
-		return nil, fmt.Errorf("bad pod %s", name)
+		return api.PodStatus{}, fmt.Errorf("bad pod %s", name)
 	}
 	resp, err := http.Get(fw.testHTTPServer.URL + "/podInfo?podID=goodpod&podNamespace=default")
 	if err != nil {

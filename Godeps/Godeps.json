@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.4",
 	"Packages": [
 		"./..."
 	],
@@ -13,16 +13,6 @@
 			"ImportPath": "code.google.com/p/go-uuid/uuid",
 			"Comment": "null-12",
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
-		},
-		{
-			"ImportPath": "code.google.com/p/goauth2/compute/serviceaccount",
-			"Comment": "weekly-50",
-			"Rev": "7fc9d958c83464bd7650240569bf93a102266e6a"
-		},
-		{
-			"ImportPath": "code.google.com/p/goauth2/oauth",
-			"Comment": "weekly-50",
-			"Rev": "7fc9d958c83464bd7650240569bf93a102266e6a"
 		},
 		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
@@ -51,47 +41,47 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "83f84dc933714d51504ceed59f43ead21d096fe7"
+			"Rev": "1aaf839fb07e099361e445273993ccd9adc21b07"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/archive",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/fileutils",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/ioutils",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/pools",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/promise",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/system",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/units",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
 			"Comment": "v1.4.1-108-g364720b",
-			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
@@ -104,8 +94,7 @@
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Comment": "0.2.1-334-g9c377ff",
-			"Rev": "9c377ffd9aed48a012adf1c3fd517fe98394120b"
+			"Rev": "d19717788084716e4adff0515be6289aa04bec46"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -114,6 +103,10 @@
 		{
 			"ImportPath": "github.com/golang/glog",
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "7f07925444bb51fa4cf9dfe6f7661876f8852275"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
@@ -147,10 +140,6 @@
 			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
 		},
 		{
-			"ImportPath": "github.com/mitchellh/goamz/elb",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
-		},
-		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
@@ -179,7 +168,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "463bdc838f2b35e9307e91d480878bda5fff7232"
+			"Rev": "f82776d6cc998e3c026baef7b24409ff49fe5c8d"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
@@ -208,6 +197,22 @@
 		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2",
+			"Rev": "2e66694fea36dc820636630792a55cdc6987e05b"
+		},
+		{
+			"ImportPath": "google.golang.org/appengine",
+			"Rev": "6aa67407028217c352e215f5af320a429d0bcf5f"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/compute/metadata",
+			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/internal",
+			"Rev": "2e43671e4ad874a7bca65746ff3edb38e6e93762"
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",

@@ -1,0 +1,31 @@
+{
+  "id": "limits",
+  "kind": "LimitRange",
+  "apiVersion": "v1beta1",
+  "spec": {
+    "limits": [
+    {
+      "type": "Pod",
+      "max": {
+        "memory": "1073741824",
+        "cpu": "2",
+      },
+      "min": {
+        "memory": "1048576",
+        "cpu": "0.25"
+      }
+    },
+    {
+      "type": "Container",
+      "max": {
+        "memory": "1073741824",
+        "cpu": "2",
+      },
+      "min": {
+        "memory": "1048576",
+        "cpu": "0.25"
+      }
+    },
+    ],
+  }
+}

@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -84,40 +85,25 @@ func (s *sourceURL) extractFromURL() error {
 	s.data = data
 
 	// First try as if it's a single manifest
-	var manifest api.ContainerManifest
-	// TODO: should be api.Scheme.Decode
-	singleErr := yaml.Unmarshal(data, &manifest)
-	if singleErr == nil {
-		if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
-			singleErr = fmt.Errorf("invalid manifest: %v", errs)
+	parsed, manifest, pod, singleErr := tryDecodeSingle(data)
+	if parsed {
+		if singleErr != nil {
+			// It parsed but could not be used.
+			return singleErr
 		}
-	}
-	if singleErr == nil {
-		pod := api.BoundPod{}
-		if err := api.Scheme.Convert(&manifest, &pod); err != nil {
-			return err
-		}
+		// It parsed!
 		applyDefaults(&pod, s.url)
 		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
 	// That didn't work, so try an array of manifests.
-	var manifests []api.ContainerManifest
-	// TODO: should be api.Scheme.Decode
-	multiErr := yaml.Unmarshal(data, &manifests)
-	// We're not sure if the person reading the logs is going to care about the single or
-	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
-	// done at the end. Hence not returning early here.
-	if multiErr == nil {
-		for _, manifest := range manifests {
-			if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
-				multiErr = fmt.Errorf("invalid manifest: %v", errs)
-				break
-			}
+	parsed, manifests, pods, multiErr := tryDecodeList(data)
+	if parsed {
+		if multiErr != nil {
+			// It parsed but could not be used.
+			return multiErr
 		}
-	}
-	if multiErr == nil {
 		// A single manifest that did not pass semantic validation will yield an empty
 		// array of manifests (and no error) when unmarshaled as such.  In that case,
 		// if the single manifest at least had a Version, we return the single-manifest
@@ -125,22 +111,73 @@ func (s *sourceURL) extractFromURL() error {
 		if len(manifests) == 0 && len(manifest.Version) != 0 {
 			return singleErr
 		}
-		list := api.ContainerManifestList{Items: manifests}
-		boundPods := &api.BoundPods{}
-		if err := api.Scheme.Convert(&list, boundPods); err != nil {
-			return err
-		}
-		for i := range boundPods.Items {
-			pod := &boundPods.Items[i]
+		// Assume it parsed.
+		for i := range pods.Items {
+			pod := &pods.Items[i]
 			applyDefaults(pod, s.url)
 		}
-		s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
 	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
 		"single manifest (%v: %+v) or as multiple manifests (%v: %+v).\n",
 		s.url, string(data), singleErr, manifest, multiErr, manifests)
+}
+
+func tryDecodeSingle(data []byte) (parsed bool, manifest v1beta1.ContainerManifest, pod api.BoundPod, err error) {
+	// TODO: should be api.Scheme.Decode
+	// This is awful.  DecodeInto() expects to find an APIObject, which
+	// Manifest is not.  We keep reading manifest for now for compat, but
+	// we will eventually change it to read Pod (at which point this all
+	// becomes nicer).  Until then, we assert that the ContainerManifest
+	// structure on disk is always v1beta1.  Read that, convert it to a
+	// "current" ContainerManifest (should be ~identical), then convert
+	// that to a BoundPod (which is a well-understood conversion).  This
+	// avoids writing a v1beta1.ContainerManifest -> api.BoundPod
+	// conversion which would be identical to the api.ContainerManifest ->
+	// api.BoundPod conversion.
+	if err = yaml.Unmarshal(data, &manifest); err != nil {
+		return false, manifest, pod, err
+	}
+	newManifest := api.ContainerManifest{}
+	if err = api.Scheme.Convert(&manifest, &newManifest); err != nil {
+		return false, manifest, pod, err
+	}
+	if errs := validation.ValidateManifest(&newManifest); len(errs) > 0 {
+		err = fmt.Errorf("invalid manifest: %v", errs)
+		return false, manifest, pod, err
+	}
+	if err = api.Scheme.Convert(&newManifest, &pod); err != nil {
+		return true, manifest, pod, err
+	}
+	// Success.
+	return true, manifest, pod, nil
+}
+
+func tryDecodeList(data []byte) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.BoundPods, err error) {
+	// TODO: should be api.Scheme.Decode
+	// See the comment in tryDecodeSingle().
+	if err = yaml.Unmarshal(data, &manifests); err != nil {
+		return false, manifests, pods, err
+	}
+	newManifests := []api.ContainerManifest{}
+	if err = api.Scheme.Convert(&manifests, &newManifests); err != nil {
+		return false, manifests, pods, err
+	}
+	for i := range newManifests {
+		manifest := &newManifests[i]
+		if errs := validation.ValidateManifest(manifest); len(errs) > 0 {
+			err = fmt.Errorf("invalid manifest: %v", errs)
+			return false, manifests, pods, err
+		}
+	}
+	list := api.ContainerManifestList{Items: newManifests}
+	if err = api.Scheme.Convert(&list, &pods); err != nil {
+		return true, manifests, pods, err
+	}
+	// Success.
+	return true, manifests, pods, nil
 }
 
 func applyDefaults(pod *api.BoundPod, url string) {
@@ -150,6 +187,12 @@ func applyDefaults(pod *api.BoundPod, url string) {
 		util.DeepHashObject(hasher, pod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q for pod %q from URL %s", pod.UID, pod.Name, url)
+	}
+	// This is required for backward compatibility, and should be removed once we
+	// completely deprecate ContainerManifest.
+	if len(pod.Name) == 0 {
+		pod.Name = string(pod.UID)
+		glog.V(5).Infof("Generate Name %q from UID %q from URL %s", pod.Name, pod.UID, url)
 	}
 	if len(pod.Namespace) == 0 {
 		hasher := adler32.New()

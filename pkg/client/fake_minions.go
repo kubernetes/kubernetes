@@ -51,3 +51,8 @@ func (c *FakeNodes) Delete(id string) error {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-minion", Value: id})
 	return nil
 }
+
+func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-minion", Value: minion})
+	return &api.Node{}, nil
+}

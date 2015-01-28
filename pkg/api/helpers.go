@@ -18,10 +18,10 @@ package api
 
 import (
 	"reflect"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -60,27 +60,10 @@ var Semantic = conversion.EqualitiesOrDie(
 		}
 		return a.Amount.Cmp(b.Amount) == 0
 	},
-	pullPoliciesEqual,
 )
 
-// TODO: Address these per #1502
+var standardResources = util.NewStringSet(string(ResourceMemory), string(ResourceCPU))
 
-func IsPullAlways(p PullPolicy) bool {
-	return pullPoliciesEqual(p, PullAlways)
-}
-
-func IsPullNever(p PullPolicy) bool {
-	return pullPoliciesEqual(p, PullNever)
-}
-
-func IsPullIfNotPresent(p PullPolicy) bool {
-	// Default to pull if not present
-	if len(p) == 0 {
-		return true
-	}
-	return pullPoliciesEqual(p, PullIfNotPresent)
-}
-
-func pullPoliciesEqual(p1, p2 PullPolicy) bool {
-	return strings.ToLower(string(p1)) == strings.ToLower(string(p2))
+func IsStandardResourceName(str string) bool {
+	return standardResources.Has(str)
 }

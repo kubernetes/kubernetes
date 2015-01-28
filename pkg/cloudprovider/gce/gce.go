@@ -32,10 +32,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 
-	"code.google.com/p/goauth2/compute/serviceaccount"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	container "code.google.com/p/google-api-go-client/container/v1beta1"
 	"github.com/golang/glog"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -109,10 +110,7 @@ func newGCECloud() (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := serviceaccount.NewClient(&serviceaccount.Options{})
-	if err != nil {
-		return nil, err
-	}
+	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
 	svc, err := compute.New(client)
 	if err != nil {
 		return nil, err

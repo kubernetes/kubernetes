@@ -30,7 +30,7 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewFactory().NewKubectlCommand(out)
+	kubectl := cmd.NewFactory(nil).NewKubectlCommand(out)
 	fmt.Fprintf(out, "## %s\n\n", kubectl.Name())
 	fmt.Fprintf(out, "%s\n\n", kubectl.Short)
 	fmt.Fprintln(out, "### Commands\n")

@@ -37,9 +37,10 @@ import (
 )
 
 var (
-	port         = flag.Int("port", ports.SchedulerPort, "The port that the scheduler's http service runs on")
-	address      = util.IP(net.ParseIP("127.0.0.1"))
-	clientConfig = &client.Config{}
+	port              = flag.Int("port", ports.SchedulerPort, "The port that the scheduler's http service runs on")
+	address           = util.IP(net.ParseIP("127.0.0.1"))
+	clientConfig      = &client.Config{}
+	algorithmProvider = flag.String("algorithm_provider", factory.DefaultProvider, "The scheduling algorithm provider to use")
 )
 
 func init() {
@@ -64,7 +65,7 @@ func main() {
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 
 	configFactory := factory.NewConfigFactory(kubeClient)
-	config, err := configFactory.Create()
+	config, err := createConfig(configFactory)
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}
@@ -72,4 +73,13 @@ func main() {
 	s.Run()
 
 	select {}
+}
+
+func createConfig(configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
+	// check of algorithm provider is registered and fail fast
+	_, err := factory.GetAlgorithmProvider(*algorithmProvider)
+	if err != nil {
+		return nil, err
+	}
+	return configFactory.CreateFromProvider(*algorithmProvider)
 }

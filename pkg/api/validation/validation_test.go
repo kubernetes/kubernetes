@@ -53,7 +53,7 @@ func TestValidateLabels(t *testing.T) {
 		{"1.2.3.4/5678": "bar"},
 	}
 	for i := range successCases {
-		errs := validateLabels(successCases[i], "field")
+		errs := ValidateLabels(successCases[i], "field")
 		if len(errs) != 0 {
 			t.Errorf("case[%d] expected success, got %#v", i, errs)
 		}
@@ -67,7 +67,7 @@ func TestValidateLabels(t *testing.T) {
 		{strings.Repeat("a", 254): "bar"},
 	}
 	for i := range errorCases {
-		errs := validateLabels(errorCases[i], "field")
+		errs := ValidateLabels(errorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		}
@@ -77,11 +77,11 @@ func TestValidateLabels(t *testing.T) {
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
-		{Name: "123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path2"}}},
-		{Name: "abc-123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path3"}}},
-		{Name: "empty", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
-		{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
-		{Name: "gitrepo", Source: &api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
+		{Name: "123", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path2"}}},
+		{Name: "abc-123", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path3"}}},
+		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
+		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -218,6 +218,54 @@ func TestValidateVolumeMounts(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
+}
+
+func TestValidatePullPolicy(t *testing.T) {
+	type T struct {
+		Container      api.Container
+		ExpectedPolicy api.PullPolicy
+	}
+	testCases := map[string]T{
+		"NotPresent1": {
+			api.Container{Name: "abc", Image: "image:latest", ImagePullPolicy: "IfNotPresent"},
+			api.PullIfNotPresent,
+		},
+		"NotPresent2": {
+			api.Container{Name: "abc1", Image: "image", ImagePullPolicy: "IfNotPresent"},
+			api.PullIfNotPresent,
+		},
+		"Always1": {
+			api.Container{Name: "123", Image: "image:latest", ImagePullPolicy: "Always"},
+			api.PullAlways,
+		},
+		"Always2": {
+			api.Container{Name: "1234", Image: "image", ImagePullPolicy: "Always"},
+			api.PullAlways,
+		},
+		"Never1": {
+			api.Container{Name: "abc-123", Image: "image:latest", ImagePullPolicy: "Never"},
+			api.PullNever,
+		},
+		"Never2": {
+			api.Container{Name: "abc-1234", Image: "image", ImagePullPolicy: "Never"},
+			api.PullNever,
+		},
+		"DefaultToNotPresent":  {api.Container{Name: "notPresent", Image: "image"}, api.PullIfNotPresent},
+		"DefaultToNotPresent2": {api.Container{Name: "notPresent1", Image: "image:sometag"}, api.PullIfNotPresent},
+		"DefaultToAlways1":     {api.Container{Name: "always", Image: "image:latest"}, api.PullAlways},
+		"DefaultToAlways2":     {api.Container{Name: "always", Image: "foo.bar.com:5000/my/image:latest"}, api.PullAlways},
+	}
+	for k, v := range testCases {
+		ctr := &v.Container
+		errs := validatePullPolicyWithDefault(ctr)
+		if len(errs) != 0 {
+			t.Errorf("case[%s] expected success, got %#v", k, errs)
+		}
+		if ctr.ImagePullPolicy != v.ExpectedPolicy {
+			t.Errorf("case[%s] expected policy %v, got %v", k, v.ExpectedPolicy, ctr.ImagePullPolicy)
+		}
+	}
+
 }
 
 func TestValidateContainers(t *testing.T) {
@@ -366,8 +414,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/vol1"}}},
-				{Name: "vol2", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/vol2"}}}},
+			Volumes: []api.Volume{{Name: "vol1", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol1"}}},
+				{Name: "vol2", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol2"}}}},
 			Containers: []api.Container{
 				{
 					Name:       "abc",
@@ -519,6 +567,24 @@ func TestValidatePod(t *testing.T) {
 				Containers: []api.Container{{}},
 			},
 		},
+		"bad label": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "ns",
+				Labels: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+		},
+		"bad annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
@@ -564,6 +630,26 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			true,
 			"labels",
+		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Annotations: map[string]string{
+						"bar": "foo",
+					},
+				},
+			},
+			true,
+			"annotations",
 		},
 		{
 			api.Pod{
@@ -867,7 +953,7 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid port in use",
+			name: "external port in use",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
@@ -884,7 +970,7 @@ func TestValidateService(t *testing.T) {
 					},
 				},
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "same port in use, but not external",
@@ -961,6 +1047,22 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "invalid annotation",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "abc123",
+					Namespace: api.NamespaceDefault,
+					Annotations: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Port: 8675,
+				},
+			},
+			numErrs: 1,
+		},
+		{
 			name: "invalid selector",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -1013,7 +1115,7 @@ func TestValidateReplicationController(t *testing.T) {
 	invalidVolumePodTemplate := api.PodTemplate{
 		Spec: api.PodTemplateSpec{
 			Spec: api.PodSpec{
-				Volumes: []api.Volume{{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
+				Volumes: []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
 			},
 		},
 	}
@@ -1086,7 +1188,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Selector: validSelector,
 			},
 		},
-		"read-write presistent disk": {
+		"read-write persistent disk": {
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
@@ -1123,6 +1225,19 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 			Spec: api.ReplicationControllerSpec{
 				Template: &invalidPodTemplate.Spec,
+			},
+		},
+		"invalid_annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+				Annotations: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		"invalid restart policy 1": {
@@ -1179,7 +1294,8 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.replicas" &&
 				field != "spec.template.labels" &&
-				field != "labels" {
+				field != "labels" &&
+				field != "annotations" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1246,6 +1362,12 @@ func TestValidateMinion(t *testing.T) {
 				Labels: invalidSelector,
 			},
 		},
+		"invalid-annotations": {
+			ObjectMeta: api.ObjectMeta{
+				Name:        "abc-123",
+				Annotations: invalidSelector,
+			},
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateMinion(&v)
@@ -1255,7 +1377,8 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if field != "name" &&
-				field != "labels" {
+				field != "labels" &&
+				field != "annotations" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1389,6 +1512,132 @@ func TestValidateMinionUpdate(t *testing.T) {
 		}
 		if !test.valid && len(errs) == 0 {
 			t.Errorf("Unexpected non-error")
+		}
+	}
+}
+
+func TestValidateResourceNames(t *testing.T) {
+	longString := "a"
+	for i := 0; i < 6; i++ {
+		longString += longString
+	}
+	table := []struct {
+		input   string
+		success bool
+	}{
+		{"memory", true},
+		{"cpu", true},
+		{"network", false},
+		{"disk", false},
+		{"", false},
+		{".", false},
+		{"..", false},
+		{"kubernetes.io/cpu", true},
+		{"kubernetes.io/disk", false},
+		{"my.favorite.app.co/12345", true},
+		{"my.favorite.app.co/_12345", false},
+		{"my.favorite.app.co/12345_", false},
+		{"kubernetes.io/..", false},
+		{"kubernetes.io/" + longString, false},
+		{"kubernetes.io//", false},
+		{"kubernetes.io", false},
+		{"kubernetes.io/will/not/work/", false},
+	}
+	for _, item := range table {
+		err := ValidateResourceName(item.input)
+		if len(err) != 0 && item.success {
+			t.Errorf("expected no failure for input %q", item.input)
+		} else if len(err) == 0 && !item.success {
+			t.Errorf("expected failure for input %q", item.input)
+		}
+	}
+}
+
+func TestValidateLimitRange(t *testing.T) {
+	successCases := []api.LimitRange{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePod,
+						Max: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100"),
+							api.ResourceMemory: resource.MustParse("10000"),
+						},
+						Min: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateLimitRange(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.LimitRange{
+		"zero-length Name": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "",
+				Namespace: "foo",
+			},
+			Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePod,
+						Max: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100"),
+							api.ResourceMemory: resource.MustParse("10000"),
+						},
+						Min: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
+		"zero-length-namespace": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc",
+				Namespace: "",
+			},
+			Spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePod,
+						Max: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100"),
+							api.ResourceMemory: resource.MustParse("10000"),
+						},
+						Min: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("0"),
+							api.ResourceMemory: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateLimitRange(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+		for i := range errs {
+			field := errs[i].(*errors.ValidationError).Field
+			if field != "name" &&
+				field != "namespace" {
+				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
 		}
 	}
 }

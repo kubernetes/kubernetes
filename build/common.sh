@@ -51,7 +51,7 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 # KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
 readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
-readonly KUBE_BUILD_GOLANG_VERSION=1.3
+readonly KUBE_BUILD_GOLANG_VERSION=1.4
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
 # Here we map the output directories across both the local and remote _output
@@ -141,7 +141,7 @@ function kube::build::verify_prereqs() {
         echo
         echo "Possible causes:"
         echo "  - On Mac OS X, boot2docker VM isn't installed or started"
-        echo "  - On Mac OS X, docker env variable isn't set approriately. Run:"
+        echo "  - On Mac OS X, docker env variable isn't set appropriately. Run:"
         echo "      \$(boot2docker shellinit)"
         echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
         echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
@@ -261,7 +261,7 @@ function kube::build::build_image_built() {
 }
 
 function kube::build::ensure_golang() {
-  kube::build::docker_image_exists golang 1.3 || {
+  kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
       echo "You don't have a local copy of the golang docker image. This image is 450MB."
       read -p "Download it now? [y/n] " -r
@@ -550,6 +550,14 @@ function kube::release::package_salt_tarball() {
   mkdir -p "${release_stage}"
 
   cp -R "${KUBE_ROOT}/cluster/saltbase" "${release_stage}/"
+
+  # TODO(#3579): This is a temporary hack. It gathers up the yaml,
+  # yaml.in files in cluster/addons (minus any demos) and overlays
+  # them into kube-addons, where we expect them. (This pipeline is a
+  # fancy copy, stripping anything but the files we don't want.)
+  local objects
+  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . -name \*.yaml -or -name \*.yaml.in | grep -v demo)
+  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/saltbase/salt/kube-addons"
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."

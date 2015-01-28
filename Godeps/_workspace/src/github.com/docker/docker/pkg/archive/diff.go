@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/pkg/system"
 )
 
-func UnpackLayer(dest string, layer ArchiveReader) error {
+func UnpackLayer(dest string, layer ArchiveReader) (size int64, err error) {
 	tr := tar.NewReader(layer)
 	trBuf := pools.BufioReader32KPool.Get(tr)
 	defer pools.BufioReader32KPool.Put(trBuf)
@@ -33,8 +33,10 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 			break
 		}
 		if err != nil {
-			return err
+			return 0, err
 		}
+
+		size += hdr.Size
 
 		// Normalize name, for safety and for a simple is-root check
 		hdr.Name = filepath.Clean(hdr.Name)
@@ -48,7 +50,7 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 			if _, err := os.Lstat(parentPath); err != nil && os.IsNotExist(err) {
 				err = os.MkdirAll(parentPath, 0600)
 				if err != nil {
-					return err
+					return 0, err
 				}
 			}
 		}
@@ -63,12 +65,12 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 				aufsHardlinks[basename] = hdr
 				if aufsTempdir == "" {
 					if aufsTempdir, err = ioutil.TempDir("", "dockerplnk"); err != nil {
-						return err
+						return 0, err
 					}
 					defer os.RemoveAll(aufsTempdir)
 				}
 				if err := createTarFile(filepath.Join(aufsTempdir, basename), dest, hdr, tr, true); err != nil {
-					return err
+					return 0, err
 				}
 			}
 			continue
@@ -77,10 +79,10 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 		path := filepath.Join(dest, hdr.Name)
 		rel, err := filepath.Rel(dest, path)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if strings.HasPrefix(rel, "..") {
-			return breakoutError(fmt.Errorf("%q is outside of %q", hdr.Name, dest))
+			return 0, breakoutError(fmt.Errorf("%q is outside of %q", hdr.Name, dest))
 		}
 		base := filepath.Base(path)
 
@@ -88,7 +90,7 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 			originalBase := base[len(".wh."):]
 			originalPath := filepath.Join(filepath.Dir(path), originalBase)
 			if err := os.RemoveAll(originalPath); err != nil {
-				return err
+				return 0, err
 			}
 		} else {
 			// If path exits we almost always just want to remove and replace it.
@@ -98,7 +100,7 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 			if fi, err := os.Lstat(path); err == nil {
 				if !(fi.IsDir() && hdr.Typeflag == tar.TypeDir) {
 					if err := os.RemoveAll(path); err != nil {
-						return err
+						return 0, err
 					}
 				}
 			}
@@ -113,18 +115,18 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 				linkBasename := filepath.Base(hdr.Linkname)
 				srcHdr = aufsHardlinks[linkBasename]
 				if srcHdr == nil {
-					return fmt.Errorf("Invalid aufs hardlink")
+					return 0, fmt.Errorf("Invalid aufs hardlink")
 				}
 				tmpFile, err := os.Open(filepath.Join(aufsTempdir, linkBasename))
 				if err != nil {
-					return err
+					return 0, err
 				}
 				defer tmpFile.Close()
 				srcData = tmpFile
 			}
 
 			if err := createTarFile(path, dest, srcHdr, srcData, true); err != nil {
-				return err
+				return 0, err
 			}
 
 			// Directory mtimes must be handled at the end to avoid further
@@ -139,27 +141,29 @@ func UnpackLayer(dest string, layer ArchiveReader) error {
 		path := filepath.Join(dest, hdr.Name)
 		ts := []syscall.Timespec{timeToTimespec(hdr.AccessTime), timeToTimespec(hdr.ModTime)}
 		if err := syscall.UtimesNano(path, ts); err != nil {
-			return err
+			return 0, err
 		}
 	}
-	return nil
+
+	return size, nil
 }
 
 // ApplyLayer parses a diff in the standard layer format from `layer`, and
-// applies it to the directory `dest`.
-func ApplyLayer(dest string, layer ArchiveReader) error {
+// applies it to the directory `dest`. Returns the size in bytes of the
+// contents of the layer.
+func ApplyLayer(dest string, layer ArchiveReader) (int64, error) {
 	dest = filepath.Clean(dest)
 
 	// We need to be able to set any perms
 	oldmask, err := system.Umask(0)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer system.Umask(oldmask) // ignore err, ErrNotSupportedPlatform
 
 	layer, err = DecompressStream(layer)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	return UnpackLayer(dest, layer)
 }

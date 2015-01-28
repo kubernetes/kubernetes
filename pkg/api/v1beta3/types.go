@@ -164,18 +164,19 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source *VolumeSource `json:"source"`
+	Source VolumeSource `json:"source,omitempty"`
 }
 
 // VolumeSource represents the source location of a valume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
-	// HostDir represents a pre-existing directory on the host machine that is directly
-	// exposed to the container. This is generally used for system agents or other privileged
-	// things that are allowed to see the host machine. Most containers will NOT need this.
+	// HostPath represents a pre-existing file or directory on the host
+	// machine that is directly exposed to the container. This is generally
+	// used for system agents or other privileged things that are allowed
+	// to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
 	// mount host directories as read/write.
-	HostDir *HostDir `json:"hostDir"`
+	HostPath *HostPath `json:"hostPath"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDir `json:"emptyDir"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
@@ -185,8 +186,8 @@ type VolumeSource struct {
 	GitRepo *GitRepo `json:"gitRepo"`
 }
 
-// HostDir represents bare host directory volume.
-type HostDir struct {
+// HostPath represents bare host directory volume.
+type HostPath struct {
 	Path string `json:"path"`
 }
 
@@ -308,11 +309,11 @@ type PullPolicy string
 
 const (
 	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
-	PullAlways PullPolicy = "PullAlways"
+	PullAlways PullPolicy = "Always"
 	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
-	PullNever PullPolicy = "PullNever"
+	PullNever PullPolicy = "Never"
 	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
-	PullIfNotPresent PullPolicy = "PullIfNotPresent"
+	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
 // Container represents a single container that is expected to be run on the host.
@@ -435,13 +436,6 @@ type ContainerStatus struct {
 // PodInfo contains one entry for every container with available info.
 type PodInfo map[string]ContainerStatus
 
-// PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
-type PodContainerInfo struct {
-	TypeMeta      `json:",inline"`
-	ObjectMeta    `json:"metadata,omitempty"`
-	ContainerInfo PodInfo `json:"containerInfo" description:"information about each container in this pod"`
-}
-
 type RestartPolicyAlways struct{}
 
 // TODO(dchen1107): Define what kinds of failures should restart.
@@ -509,6 +503,15 @@ type PodStatus struct {
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
 	Info PodInfo `json:"info,omitempty"`
+}
+
+// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+type PodStatusResult struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+	// Status represents the current information about a pod. This data may not be up
+	// to date.
+	Status PodStatus `json:"status,omitempty"`
 }
 
 // Pod is a collection of containers that can run on a host. This resource is created
@@ -782,6 +785,8 @@ type NodeCondition struct {
 type ResourceName string
 
 const (
+	// The default compute resource namespace for all standard resource types.
+	DefaultResourceNamespace = "kubernetes.io"
 	// CPU, in cores. (500m = .5 cores)
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
@@ -1048,4 +1053,48 @@ type List struct {
 	ListMeta `json:"metadata,omitempty"`
 
 	Items []runtime.RawExtension `json:"items" description:"list of objects"`
+}
+
+// A type of object that is limited
+type LimitType string
+
+const (
+	// Limit that applies to all pods in a namespace
+	LimitTypePod LimitType = "Pod"
+	// Limit that applies to all containers in a namespace
+	LimitTypeContainer LimitType = "Container"
+)
+
+// LimitRangeItem defines a min/max usage limit for any resource that matches on kind
+type LimitRangeItem struct {
+	// Type of resource that this limit applies to
+	Type LimitType `json:"type,omitempty"`
+	// Max usage constraints on this kind by resource name
+	Max ResourceList `json:"max,omitempty"`
+	// Min usage constraints on this kind by resource name
+	Min ResourceList `json:"min,omitempty"`
+}
+
+// LimitRangeSpec defines a min/max usage limit for resources that match on kind
+type LimitRangeSpec struct {
+	// Limits is the list of LimitRangeItem objects that are enforced
+	Limits []LimitRangeItem `json:"limits"`
+}
+
+// LimitRange sets resource usage limits for each kind of resource in a Namespace
+type LimitRange struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the limits enforced
+	Spec LimitRangeSpec `json:"spec,omitempty"`
+}
+
+// LimitRangeList is a list of LimitRange items.
+type LimitRangeList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of LimitRange objects
+	Items []LimitRange `json:"items"`
 }

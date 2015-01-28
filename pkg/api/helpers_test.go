@@ -59,13 +59,29 @@ func TestSemantic(t *testing.T) {
 			true,
 		},
 		{resource.MustParse("2m"), resource.MustParse("1m"), false},
-		{PullPolicy("NEVER"), PullPolicy("neveR"), true},
-		{PullPolicy("NEVER"), PullPolicy("neveRi"), false},
 	}
 
 	for index, item := range table {
 		if e, a := item.shouldEqual, Semantic.DeepEqual(item.a, item.b); e != a {
 			t.Errorf("expected %v, got %v.", index, e, a)
+		}
+	}
+}
+
+func TestIsStandardResource(t *testing.T) {
+	testCases := []struct {
+		input  string
+		output bool
+	}{
+		{"cpu", true},
+		{"memory", true},
+		{"disk", false},
+		{"blah", false},
+		{"x.y.z", false},
+	}
+	for i, tc := range testCases {
+		if IsStandardResourceName(tc.input) != tc.output {
+			t.Errorf("case[%d], expected: %t, got: %t", i, tc.output, !tc.output)
 		}
 	}
 }

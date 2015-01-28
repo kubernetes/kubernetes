@@ -25,9 +25,9 @@ var Scheme = runtime.NewScheme()
 
 func init() {
 	Scheme.AddKnownTypes("",
-		&PodContainerInfo{},
-		&PodList{},
 		&Pod{},
+		&PodList{},
+		&PodStatusResult{},
 		&ReplicationControllerList{},
 		&ReplicationController{},
 		&ServiceList{},
@@ -47,6 +47,8 @@ func init() {
 		&BoundPod{},
 		&BoundPods{},
 		&List{},
+		&LimitRange{},
+		&LimitRangeList{},
 	)
 	// Legacy names are supported
 	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
@@ -55,9 +57,9 @@ func init() {
 	Scheme.AddKnownTypeWithName("", "ServerOpList", &OperationList{})
 }
 
-func (*PodContainerInfo) IsAnAPIObject()          {}
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
+func (*PodStatusResult) IsAnAPIObject()           {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}
@@ -77,3 +79,5 @@ func (*ContainerManifestList) IsAnAPIObject()     {}
 func (*BoundPod) IsAnAPIObject()                  {}
 func (*BoundPods) IsAnAPIObject()                 {}
 func (*List) IsAnAPIObject()                      {}
+func (*LimitRange) IsAnAPIObject()                {}
+func (*LimitRangeList) IsAnAPIObject()            {}

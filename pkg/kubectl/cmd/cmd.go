@@ -64,16 +64,27 @@ type Factory struct {
 	Printer func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
 	// Returns a Resizer for changing the size of the specified RESTMapping type or an error
 	Resizer func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Resizer, error)
+	// Returns a Reaper for gracefully shutting down resources.
+	Reaper func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Reaper, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(*cobra.Command) (validation.Schema, error)
+	// Returns the default namespace to use in cases where no other namespace is specified
+	DefaultNamespace func(cmd *cobra.Command) (string, error)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
-func NewFactory() *Factory {
+// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
+// if optionalClientConfig is not nil, then this factory will make use of it.
+func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	clientConfig := DefaultClientConfig(flags)
+
+	clientConfig := optionalClientConfig
+	if optionalClientConfig == nil {
+		clientConfig = DefaultClientConfig(flags)
+	}
+
 	clients := &clientCache{
 		clients: make(map[string]*client.Client),
 		loader:  clientConfig,
@@ -84,8 +95,11 @@ func NewFactory() *Factory {
 		flags:   flags,
 
 		Object: func(cmd *cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
-			version := GetFlagString(cmd, "api-version")
-			return kubectl.OutputVersionMapper{mapper, version}, api.Scheme
+			cfg, err := clientConfig.ClientConfig()
+			checkErr(err)
+			cmdApiVersion := cfg.Version
+
+			return kubectl.OutputVersionMapper{mapper, cmdApiVersion}, api.Scheme
 		},
 		Client: func(cmd *cobra.Command) (*client.Client, error) {
 			return clients.ClientForVersion("")
@@ -119,11 +133,14 @@ func NewFactory() *Factory {
 			if err != nil {
 				return nil, err
 			}
-			resizer, ok := kubectl.ResizerFor(mapping.Kind, client)
-			if !ok {
-				return nil, fmt.Errorf("no resizer has been implemented for %q", mapping.Kind)
+			return kubectl.ResizerFor(mapping.Kind, client)
+		},
+		Reaper: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Reaper, error) {
+			client, err := clients.ClientForVersion(mapping.APIVersion)
+			if err != nil {
+				return nil, err
 			}
-			return resizer, nil
+			return kubectl.ReaperFor(mapping.Kind, client)
 		},
 		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
 			if GetFlagBool(cmd, "validate") {
@@ -134,6 +151,9 @@ func NewFactory() *Factory {
 				return &clientSwaggerSchema{client, api.Scheme}, nil
 			}
 			return validation.NullSchema{}, nil
+		},
+		DefaultNamespace: func(cmd *cobra.Command) (string, error) {
+			return clientConfig.Namespace()
 		},
 	}
 }
@@ -158,8 +178,6 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
-	flags.String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
-	flags.StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
 	flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
 }
 
@@ -193,6 +211,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdResize(out))
 
 	cmds.AddCommand(f.NewCmdRunContainer(out))
+	cmds.AddCommand(f.NewCmdStop(out))
 
 	return cmds
 }
@@ -235,7 +254,12 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	flags.StringVar(&loadingRules.CommandLinePath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &clientcmd.ConfigOverrides{}
-	clientcmd.BindOverrideFlags(overrides, flags, clientcmd.RecommendedConfigOverrideFlags(""))
+	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
+	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
+	flagNames.AuthOverrideFlags.AuthPathShort = "a"
+	flagNames.ClusterOverrideFlags.APIServerShort = "s"
+
+	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
@@ -262,38 +286,6 @@ func usageError(cmd *cobra.Command, format string, args ...interface{}) {
 
 func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
-}
-
-// GetKubeNamespace returns the value of the namespace a
-// user provided on the command line or use the default
-// namespace.
-func GetKubeNamespace(cmd *cobra.Command) string {
-	result := api.NamespaceDefault
-	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
-		result = ns
-		glog.V(2).Infof("Using namespace from -ns flag")
-	} else {
-		nsPath := GetFlagString(cmd, "ns-path")
-		nsInfo, err := kubectl.LoadNamespaceInfo(nsPath)
-		if err != nil {
-			glog.Fatalf("Error loading current namespace: %v", err)
-		}
-		result = nsInfo.Namespace
-	}
-	glog.V(2).Infof("Using namespace %s", result)
-	return result
-}
-
-// GetExplicitKubeNamespace returns the value of the namespace a
-// user explicitly provided on the command line, or false if no
-// such namespace was specified.
-func GetExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
-	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
-		return ns, true
-	}
-	// TODO: determine when --ns-path is set but equal to the default
-	// value and return its value and true.
-	return "", false
 }
 
 type clientSwaggerSchema struct {

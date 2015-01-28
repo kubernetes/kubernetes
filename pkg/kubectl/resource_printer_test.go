@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -338,7 +339,7 @@ func TestTemplateStrings(t *testing.T) {
 		"netExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"net": api.ContainerStatus{}},
+					Info: api.PodInfo{"POD": api.ContainerStatus{}},
 				},
 			},
 			"false",
@@ -348,7 +349,7 @@ func TestTemplateStrings(t *testing.T) {
 				Status: api.PodStatus{
 					Info: api.PodInfo{
 						"update-demo": api.ContainerStatus{},
-						"net":         api.ContainerStatus{},
+						"POD":         api.ContainerStatus{},
 					},
 				},
 			},
@@ -359,7 +360,7 @@ func TestTemplateStrings(t *testing.T) {
 				Status: api.PodStatus{
 					Info: api.PodInfo{
 						"update-demo": api.ContainerStatus{},
-						"net": api.ContainerStatus{
+						"POD": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -382,7 +383,7 @@ func TestTemplateStrings(t *testing.T) {
 								},
 							},
 						},
-						"net": api.ContainerStatus{
+						"POD": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -399,7 +400,7 @@ func TestTemplateStrings(t *testing.T) {
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
 	tmpl :=
-		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "net" "state" "running")}}`
+		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "POD" "state" "running")}}`
 	useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}
@@ -505,4 +506,79 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	}
 	out := buffer.String()
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "  " /* columnDelimiter */, t)
+}
+
+func TestPrintMinionStatus(t *testing.T) {
+	printer := NewHumanReadablePrinter(false)
+	table := []struct {
+		minion api.Node
+		status string
+	}{
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+			},
+			status: "Ready",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Kind: api.NodeReady, Status: api.ConditionFull},
+					{Kind: api.NodeReachable, Status: api.ConditionFull}}},
+			},
+			status: "Ready,Reachable",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo3"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Kind: api.NodeReady, Status: api.ConditionFull},
+					{Kind: api.NodeReady, Status: api.ConditionFull}}},
+			},
+			status: "Ready",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo4"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionNone}}},
+			},
+			status: "NotReady",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo5"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: "InvalidValue", Status: api.ConditionFull}}},
+			},
+			status: "Unknown",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo6"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+			},
+			status: "Unknown",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.minion, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Minion: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.status) {
+			t.Fatalf("Expect printing minion %s with status %#v, got: %#v", test.minion.Name, test.status, buffer.String())
+		}
+	}
+}
+
+func contains(fields []string, field string) bool {
+	for _, v := range fields {
+		if v == field {
+			return true
+		}
+	}
+	return false
 }

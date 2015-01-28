@@ -34,7 +34,7 @@ import (
 // For more details on the remote API, check http://goo.gl/G3plxW.
 type DockerServer struct {
 	containers     []*docker.Container
-	execs          []*docker.Exec
+	execs          []*docker.ExecInspect
 	cMut           sync.RWMutex
 	images         []docker.Image
 	iMut           sync.RWMutex
@@ -99,7 +99,9 @@ func (s *DockerServer) buildMuxer() {
 	s.mux.Path("/containers/{id:.*}/attach").Methods("POST").HandlerFunc(s.handlerWrapper(s.attachContainer))
 	s.mux.Path("/containers/{id:.*}").Methods("DELETE").HandlerFunc(s.handlerWrapper(s.removeContainer))
 	s.mux.Path("/containers/{id:.*}/exec").Methods("POST").HandlerFunc(s.handlerWrapper(s.createExecContainer))
+	s.mux.Path("/exec/{id:.*}/resize").Methods("POST").HandlerFunc(s.handlerWrapper(s.resizeExecContainer))
 	s.mux.Path("/exec/{id:.*}/start").Methods("POST").HandlerFunc(s.handlerWrapper(s.startExecContainer))
+	s.mux.Path("/exec/{id:.*}/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.inspectExecContainer))
 	s.mux.Path("/images/create").Methods("POST").HandlerFunc(s.handlerWrapper(s.pullImage))
 	s.mux.Path("/build").Methods("POST").HandlerFunc(s.handlerWrapper(s.buildImage))
 	s.mux.Path("/images/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.listImages))
@@ -724,10 +726,31 @@ func (s *DockerServer) getImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	container, _, err := s.findContainer(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	exec := docker.ExecInspect{
+		ID:        "id-exec-created-by-test",
+		Container: *container,
+	}
+	var params docker.CreateExecOptions
+	err = json.NewDecoder(r.Body).Decode(&params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(params.Cmd) > 0 {
+		exec.ProcessConfig.EntryPoint = params.Cmd[0]
+		if len(params.Cmd) > 1 {
+			exec.ProcessConfig.Arguments = params.Cmd[1:]
+		}
+	}
+	s.execs = append(s.execs, &exec)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	exec := docker.Exec{ID: "id-exec-created-by-test"}
-	s.execs = append(s.execs, &exec)
 	json.NewEncoder(w).Encode(map[string]string{"Id": exec.ID})
 
 }
@@ -737,6 +760,30 @@ func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request
 	for _, exec := range s.execs {
 		if exec.ID == id {
 			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNotFound)
+}
+
+func (s *DockerServer) resizeExecContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	for _, exec := range s.execs {
+		if exec.ID == id {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNotFound)
+}
+
+func (s *DockerServer) inspectExecContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	for _, exec := range s.execs {
+		if exec.ID == id {
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(exec)
 			return
 		}
 	}

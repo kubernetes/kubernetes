@@ -15,7 +15,7 @@ All users of the cluster will have access to any private registry in the `.docke
 ## Preloading Images
 
 Be default, the kubelet will try to pull each image from the specified registry.
-However, if the `imagePullPolicy` property of the container is set to `PullIfNotPresent` or `PullNever`,
+However, if the `imagePullPolicy` property of the container is set to `IfNotPresent` or `Never`,
 then a local image is used (preferentially or exclusively, respectively).
 
 This can be used to preload certain images for speed or as an alternative to authenticating to a private registry.

@@ -20,7 +20,7 @@ for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | gr
 done
 
 # Check sh files for boilerplate
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v "third_party"); do
+for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"); do
   # Check for files without the required boilerplate.
   boilerplate=$("${KUBE_HOOKS_DIR}/boilerplate.sh" "${file}")
   if [[ "$boilerplate" -eq "0" ]]; then

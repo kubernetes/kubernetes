@@ -17,13 +17,16 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
@@ -63,15 +66,15 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 		},
 	}
 	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.Spec); err != nil {
-		glog.Errorf("Unable to convert pod template: %v", err)
+		util.HandleError(fmt.Errorf("unable to convert pod template: %v", err))
 		return
 	}
 	if labels.Set(pod.Labels).AsSelector().Empty() {
-		glog.Errorf("Unable to create pod replica, no labels")
+		util.HandleError(fmt.Errorf("unable to create pod replica, no labels"))
 		return
 	}
 	if _, err := r.kubeClient.Pods(namespace).Create(pod); err != nil {
-		glog.Errorf("Unable to create pod replica: %v", err)
+		util.HandleError(fmt.Errorf("unable to create pod replica: %v", err))
 	}
 }
 
@@ -106,7 +109,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 		*resourceVersion,
 	)
 	if err != nil {
-		glog.Errorf("Unexpected failure to watch: %v", err)
+		util.HandleError(fmt.Errorf("unable to watch: %v", err))
 		time.Sleep(5 * time.Second)
 		return
 	}
@@ -122,10 +125,14 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 				// that called us call us again.
 				return
 			}
+			if event.Type == watch.Error {
+				util.HandleError(fmt.Errorf("error from watch during sync: %v", errors.FromObject(event.Object)))
+				continue
+			}
 			glog.V(4).Infof("Got watch: %#v", event)
 			rc, ok := event.Object.(*api.ReplicationController)
 			if !ok {
-				glog.Errorf("unexpected object: %#v", event.Object)
+				util.HandleError(fmt.Errorf("unexpected object: %#v", event.Object))
 				continue
 			}
 			// If we get disconnected, start where we left off.
@@ -134,7 +141,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 			// it in the desired state.
 			glog.V(4).Infof("About to sync from watch: %v", rc.Name)
 			if err := rm.syncHandler(*rc); err != nil {
-				glog.Errorf("unexpected sync. error: %v", err)
+				util.HandleError(fmt.Errorf("unexpected sync error: %v", err))
 			}
 		}
 	}
@@ -193,7 +200,7 @@ func (rm *ReplicationManager) synchronize() {
 	var controllers []api.ReplicationController
 	list, err := rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
-		glog.Errorf("Synchronization error: %v (%#v)", err, err)
+		util.HandleError(fmt.Errorf("synchronization error: %v", err))
 		return
 	}
 	controllers = list.Items
@@ -205,7 +212,7 @@ func (rm *ReplicationManager) synchronize() {
 			glog.V(4).Infof("periodic sync of %v", controllers[ix].Name)
 			err := rm.syncHandler(controllers[ix])
 			if err != nil {
-				glog.Errorf("Error synchronizing: %v", err)
+				util.HandleError(fmt.Errorf("error synchronizing: %v", err))
 			}
 		}(ix)
 	}

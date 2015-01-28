@@ -1,0 +1,20 @@
+{
+  "id": "valid-pod",
+  "kind": "Pod",
+  "apiVersion":"v1beta2",
+  "labels": {
+    "name": "valid-pod"
+  },
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "invalid-pod",
+      "containers": [{
+        "name": "kubernetes-serve-hostname",
+        "image": "kubernetes/serve_hostname",        
+        "cpu": 1000,
+        "memory": 1048576,
+      }]
+    }
+  },
+}

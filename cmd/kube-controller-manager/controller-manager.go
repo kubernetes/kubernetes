@@ -49,7 +49,10 @@ var (
 	cloudProvider   = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	cloudConfigFile = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	minionRegexp    = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
-	machineList     util.StringList
+	nodeSyncPeriod  = flag.Duration("node_sync_period", 10*time.Second, ""+
+		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
+		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
+	machineList util.StringList
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	nodeMilliCPU = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
@@ -107,7 +110,7 @@ func main() {
 		},
 	}
 	nodeController := nodeControllerPkg.NewNodeController(cloud, *minionRegexp, machineList, nodeResources, kubeClient)
-	nodeController.Run(10 * time.Second)
+	nodeController.Run(*nodeSyncPeriod)
 
 	select {}
 }

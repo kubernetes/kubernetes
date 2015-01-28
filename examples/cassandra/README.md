@@ -5,7 +5,7 @@ The following document describes the development of a _cloud native_ [Cassandra]
 This document also attempts to describe the core components of Kubernetes, _Pods_, _Services_ and _Replication Controllers_.
 
 ### Prerequisites
-This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` and ```kubecfg``` command line tools somewhere in your path.  Please see the [getting started](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/getting-started-guides) for installation instructions for your platform.
+This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/getting-started-guides) for installation instructions for your platform.
 
 ### A note for the impatient
 This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
@@ -151,7 +151,7 @@ Now this is actually not that interesting, since we haven't actually done anythi
 
 Let's resize our cluster to 2:
 ```sh
-$ kubecfg resize cassandra 2
+$ kubectl resize rc cassandra --replicas=2
 ```
 
 Now if you list the pods in your cluster, you should see two cassandra pods:
@@ -181,7 +181,7 @@ UN  10.244.1.10  41.14 KB   256     100.0%            42617acd-b16e-4ee3-9486-68
 
 Now let's resize our cluster to 4 nodes:
 ```sh
-$ kubecfg resize cassandra 4
+$ kubectl resize rc cassandra --replicas=4
 ```
 
 Examining the status again:
@@ -212,13 +212,13 @@ kubectl create -f cassandra-service.yaml
 kubectl create -f cassandra-controller.yaml
 
 # scale up to 2 nodes
-kubecfg resize cassandra 2
+kubectl resize rc cassandra --replicas=2
 
 # validate the cluster
 docker exec <container-id> nodetool status
 
 # scale up to 4 nodes
-kubecfg resize cassandra 4
+kubectl resize rc cassandra --replicas=4
 ```
 
 ### Seed Provider Source

@@ -762,6 +762,7 @@ func addInterfaceFormatterTests() {
 func addMapFormatterTests() {
 	// Map with string keys and int vals.
 	v := map[string]int{"one": 1, "two": 2}
+	nilMap := map[string]int(nil)
 	nv := (*map[string]int)(nil)
 	pv := &v
 	vAddr := fmt.Sprintf("%p", pv)
@@ -772,21 +773,25 @@ func addMapFormatterTests() {
 	addFormatterTest("%v", v, vs, vs2)
 	addFormatterTest("%v", pv, "<*>"+vs, "<*>"+vs2)
 	addFormatterTest("%v", &pv, "<**>"+vs, "<**>"+vs2)
+	addFormatterTest("%+v", nilMap, "<nil>")
 	addFormatterTest("%+v", nv, "<nil>")
 	addFormatterTest("%+v", v, vs, vs2)
 	addFormatterTest("%+v", pv, "<*>("+vAddr+")"+vs, "<*>("+vAddr+")"+vs2)
 	addFormatterTest("%+v", &pv, "<**>("+pvAddr+"->"+vAddr+")"+vs,
 		"<**>("+pvAddr+"->"+vAddr+")"+vs2)
+	addFormatterTest("%+v", nilMap, "<nil>")
 	addFormatterTest("%+v", nv, "<nil>")
 	addFormatterTest("%#v", v, "("+vt+")"+vs, "("+vt+")"+vs2)
 	addFormatterTest("%#v", pv, "(*"+vt+")"+vs, "(*"+vt+")"+vs2)
 	addFormatterTest("%#v", &pv, "(**"+vt+")"+vs, "(**"+vt+")"+vs2)
+	addFormatterTest("%#v", nilMap, "("+vt+")"+"<nil>")
 	addFormatterTest("%#v", nv, "(*"+vt+")"+"<nil>")
 	addFormatterTest("%#+v", v, "("+vt+")"+vs, "("+vt+")"+vs2)
 	addFormatterTest("%#+v", pv, "(*"+vt+")("+vAddr+")"+vs,
 		"(*"+vt+")("+vAddr+")"+vs2)
 	addFormatterTest("%#+v", &pv, "(**"+vt+")("+pvAddr+"->"+vAddr+")"+vs,
 		"(**"+vt+")("+pvAddr+"->"+vAddr+")"+vs2)
+	addFormatterTest("%#+v", nilMap, "("+vt+")"+"<nil>")
 	addFormatterTest("%#+v", nv, "(*"+vt+")"+"<nil>")
 
 	// Map with custom formatter type on pointer receiver only keys and vals.

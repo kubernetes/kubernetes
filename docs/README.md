@@ -1,7 +1,7 @@
 # Kubernetes Documentation
 
 * [Primary concepts](#primary-concepts)
-* [Additional user guides](#additional-user-guides)
+* [Further reading](#further-reading)
 
 
 Getting started guides are in [getting-started-guides](getting-started-guides).
@@ -43,11 +43,11 @@ Design docs are in [design](design).
 * **Accessing the API** ([accessing_the_api.md](accessing_the_api.md)):
   Ports, IPs, proxies, and firewall rules.
 
-* **Kubernetes Web Interface** ([ux.md](ux.md)): Accessing the Kubernetes
+* **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
   web user interface.
 
-* **Kubecfg Command Line Interface** ([cli.md](cli.md)):
-  The `kubecfg` command line reference.
+* **Kubectl Command Line Interface** ([kubectl.md](kubectl.md)):
+  The `kubectl` command line reference.
 
 * **Roadmap** ([roadmap.md](roadmap.md)): The set of supported use cases, features,
   docs, and patterns that are required before Kubernetes 1.0.

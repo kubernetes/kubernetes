@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -29,8 +30,6 @@ type testSpec struct {
 	test func(c *client.Client) bool
 	// The human readable name of this test
 	name string
-	// The id for this test.  It should be constant for the life of the test.
-	id int
 }
 
 type testInfo struct {
@@ -42,47 +41,61 @@ type testInfo struct {
 // See http://testanything.org/ for more info
 func outputTAPSummary(infoList []testInfo) {
 	glog.Infof("1..%d", len(infoList))
-	for _, info := range infoList {
+	for i, info := range infoList {
 		if info.passed {
-			glog.Infof("ok %d - %s", info.spec.id, info.spec.name)
+			glog.Infof("ok %d - %s", i+1, info.spec.name)
 		} else {
-			glog.Infof("not ok %d - %s", info.spec.id, info.spec.name)
+			glog.Infof("not ok %d - %s", i+1, info.spec.name)
 		}
 	}
 }
 
-func RunE2ETests(authConfig, certDir, host, repoRoot string, testList []string) {
-	testContext = testContextType{authConfig, certDir, host, repoRoot}
+// Fisher-Yates shuffle using the given RNG r
+func shuffleTests(tests []testSpec, r *rand.Rand) {
+	for i := len(tests) - 1; i > 0; i-- {
+		j := r.Intn(i + 1)
+		tests[i], tests[j] = tests[j], tests[i]
+	}
+}
+
+// Run each Go end-to-end-test. This function assumes the
+// creation of a test cluster.
+func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed int64, times int, testList []string) {
+	testContext = testContextType{authConfig, certDir, host, repoRoot, provider}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
 
+	// TODO: Associate a timeout with each test individually.
 	go func() {
 		defer util.FlushLogs()
-		time.Sleep(5 * time.Minute)
+		// TODO: We should modify testSpec to include an estimated running time
+		//       for each test and use that information to estimate a timeout
+		//       value. Until then, as we add more tests (and before we move to
+		//       parallel testing) we need to adjust this value as we add more tests.
+		time.Sleep(15 * time.Minute)
 		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
 	}()
 
-	c := loadClientOrDie()
-
-	// Define the tests.  Important: for a clean test grid, please keep ids for a test constant.
 	tests := []testSpec{
-		{TestKubernetesROService, "TestKubernetesROService", 1},
-		{TestKubeletSendsEvent, "TestKubeletSendsEvent", 2},
-		{TestImportantURLs, "TestImportantURLs", 3},
-		{TestPodUpdate, "TestPodUpdate", 4},
-		{TestNetwork, "TestNetwork", 5},
-		{TestClusterDNS, "TestClusterDNS", 6},
-		{TestPodHasServiceEnvVars, "TestPodHasServiceEnvVars", 7},
-		{TestBasic, "TestBasic", 8},
+		{TestKubernetesROService, "TestKubernetesROService"},
+		{TestKubeletSendsEvent, "TestKubeletSendsEvent"},
+		{TestImportantURLs, "TestImportantURLs"},
+		{TestPodUpdate, "TestPodUpdate"},
+		{TestNetwork, "TestNetwork"},
+		{TestClusterDNS, "TestClusterDNS"},
+		{TestPodHasServiceEnvVars, "TestPodHasServiceEnvVars"},
+		{TestBasic, "TestBasic"},
+		{TestPrivate, "TestPrivate"},
+		{TestLivenessHttp, "TestLivenessHttp"},
+		{TestLivenessExec, "TestLivenessExec"},
 	}
 
+	// Check testList for non-existent tests and populate a StringSet with tests to run.
 	validTestNames := util.NewStringSet()
 	for _, test := range tests {
 		validTestNames.Insert(test.name)
 	}
-
-	// Check testList for non-existent tests and populate a StringSet with tests to run.
 	runTestNames := util.NewStringSet()
 	for _, testName := range testList {
 		if validTestNames.Has(testName) {
@@ -92,17 +105,46 @@ func RunE2ETests(authConfig, certDir, host, repoRoot string, testList []string) 
 		}
 	}
 
+	// if testList was specified, filter down now before we expand and shuffle
+	if len(testList) > 0 {
+		newTests := make([]testSpec, 0)
+		for i, test := range tests {
+			// Check if this test is supposed to run, either if listed explicitly in
+			// a --test flag or if no --test flags were supplied.
+			if !runTestNames.Has(test.name) {
+				glog.Infof("Skipping test %d %s", i+1, test.name)
+				continue
+			}
+			newTests = append(newTests, test)
+		}
+		tests = newTests
+	}
+	if times != 1 {
+		newTests := make([]testSpec, 0, times*len(tests))
+		for i := 0; i < times; i++ {
+			newTests = append(newTests, tests...)
+		}
+		tests = newTests
+	}
+	if orderseed == 0 {
+		// Use low order bits of NanoTime as the default seed. (Using
+		// all the bits makes for a long, very similar looking seed
+		// between runs.)
+		orderseed = time.Now().UnixNano() & (1<<32 - 1)
+	}
+	// TODO(satnam6502): When the tests are run in parallel we will
+	//                   no longer need the shuffle.
+	shuffleTests(tests, rand.New(rand.NewSource(orderseed)))
+	glog.Infof("Tests shuffled with orderseed %#x\n", orderseed)
+
 	info := []testInfo{}
 	passed := true
 	for i, test := range tests {
-		// Check if this test is supposed to run, either if listed explicitly in
-		// a --test flag or if no --test flags were supplied.
-		if len(testList) > 0 && !runTestNames.Has(test.name) {
-			glog.Infof("Skipping test %d %s", i+1, test.name)
-			continue
-		}
 		glog.Infof("Running test %d %s", i+1, test.name)
-		testPassed := test.test(c)
+		// A client is made for each test. This allows us to attribute
+		// issues with rate ACLs etc. to a specific test and supports
+		// parallel testing.
+		testPassed := test.test(loadClientOrDie())
 		if !testPassed {
 			glog.Infof("        test %d failed", i+1)
 			passed = false

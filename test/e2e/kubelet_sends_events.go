@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"os"
 	"strconv"
 	"time"
 
@@ -29,13 +28,10 @@ import (
 
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
 func TestKubeletSendsEvent(c *client.Client) bool {
-	provider := os.Getenv("KUBERNETES_PROVIDER")
+	provider := testContext.provider
 	if len(provider) > 0 && provider != "gce" && provider != "gke" {
 		glog.Infof("skipping TestKubeletSendsEvent on cloud provider %s", provider)
 		return true
-	}
-	if provider == "" {
-		glog.Info("KUBERNETES_PROVIDER is unset; assuming \"gce\"")
 	}
 
 	podClient := c.Pods(api.NamespaceDefault)

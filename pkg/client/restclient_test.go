@@ -102,7 +102,7 @@ func TestSetDefaults(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		if *val != testCase.After {
+		if !reflect.DeepEqual(*val, testCase.After) {
 			t.Errorf("unexpected result object: %#v", val)
 		}
 	}

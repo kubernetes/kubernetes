@@ -25,26 +25,30 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type createContextOptions struct {
 	pathOptions *pathOptions
 	name        string
-	cluster     string
-	authInfo    string
-	namespace   string
+	cluster     util.StringFlag
+	authInfo    util.StringFlag
+	namespace   util.StringFlag
 }
 
 func NewCmdConfigSetContext(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	options := &createContextOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
-		Use:   "set-context name",
+		Use:   fmt.Sprintf("set-context name [--%v=cluster-nickname] [--%v=user-nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		Short: "Sets a context entry in .kubeconfig",
 		Long: `Sets a context entry in .kubeconfig
-
-		Specifying a name that already exists overwrites that context entry.
+	Specifying a name that already exists will merge new fields on top of existing values for those fields.
+	e.g. 
+		kubectl config set-context gce --user=cluster-admin
+		only sets the user field on the gce context entry without touching other values.
 		`,
+
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return
@@ -57,9 +61,9 @@ func NewCmdConfigSetContext(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().StringVar(&options.cluster, clientcmd.FlagClusterName, "", clientcmd.FlagClusterName+" for the context entry in .kubeconfig")
-	cmd.Flags().StringVar(&options.authInfo, clientcmd.FlagAuthInfoName, "", clientcmd.FlagAuthInfoName+" for the context entry in .kubeconfig")
-	cmd.Flags().StringVar(&options.namespace, clientcmd.FlagNamespace, "", clientcmd.FlagNamespace+" for the context entry in .kubeconfig")
+	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in .kubeconfig")
+	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in .kubeconfig")
+	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in .kubeconfig")
 
 	return cmd
 }
@@ -75,7 +79,7 @@ func (o createContextOptions) run() error {
 		return err
 	}
 
-	context := o.context()
+	context := o.modifyContext(config.Contexts[o.name])
 	config.Contexts[o.name] = context
 
 	err = clientcmd.WriteToFile(*config, filename)
@@ -86,14 +90,20 @@ func (o createContextOptions) run() error {
 	return nil
 }
 
-func (o *createContextOptions) context() clientcmdapi.Context {
-	context := clientcmdapi.Context{
-		Cluster:   o.cluster,
-		AuthInfo:  o.authInfo,
-		Namespace: o.namespace,
+func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Context) clientcmdapi.Context {
+	modifiedContext := existingContext
+
+	if o.cluster.Provided() {
+		modifiedContext.Cluster = o.cluster.Value()
+	}
+	if o.authInfo.Provided() {
+		modifiedContext.AuthInfo = o.authInfo.Value()
+	}
+	if o.namespace.Provided() {
+		modifiedContext.Namespace = o.namespace.Value()
 	}
 
-	return context
+	return modifiedContext
 }
 
 func (o *createContextOptions) complete(cmd *cobra.Command) bool {

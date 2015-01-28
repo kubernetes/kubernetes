@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/slice"
 	"github.com/golang/glog"
 )
 
@@ -210,14 +211,14 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	for _, endpoint := range endpoints {
 		existingEndpoints, exists := lb.endpointsMap[endpoint.Name]
 		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
-		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
+		if !exists || !reflect.DeepEqual(slice.SortStrings(slice.CopyStrings(existingEndpoints)), slice.SortStrings(validEndpoints)) {
 			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.Name, endpoint.Endpoints)
 			updateServiceDetailMap(lb, endpoint.Name, validEndpoints)
 			// On update can be called without NewService being called externally.
 			// to be safe we will call it here.  A new service will only be created
 			// if one does not already exist.
 			lb.NewService(endpoint.Name, api.AffinityTypeNone, 0)
-			lb.endpointsMap[endpoint.Name] = validEndpoints
+			lb.endpointsMap[endpoint.Name] = slice.ShuffleStrings(validEndpoints)
 
 			// Reset the round-robin index.
 			lb.rrIndex[endpoint.Name] = 0

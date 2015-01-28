@@ -25,7 +25,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -49,7 +51,7 @@ var (
 	address                 = util.IP(net.ParseIP("127.0.0.1"))
 	port                    = flag.Uint("port", ports.KubeletPort, "The port for the info server to serve on")
 	hostnameOverride        = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
-	networkContainerImage   = flag.String("network_container_image", kubelet.NetworkContainerImage, "The image that network containers in each pod will use.")
+	podInfraContainerImage  = flag.String("pod_infra_container_image", kubelet.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	dockerEndpoint          = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 	etcdServerList          util.StringList
 	etcdConfigFile          = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
@@ -68,6 +70,7 @@ var (
 	clusterDomain           = flag.String("cluster_domain", "", "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	masterServiceNamespace  = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 	clusterDNS              = util.IP(nil)
+	reallyCrashForTesting   = flag.Bool("really_crash_for_testing", false, "If true, crash with panics more often.")
 )
 
 func init() {
@@ -96,6 +99,7 @@ func setupRunOnce() {
 func main() {
 	util.InitFlags()
 	util.InitLogs()
+	util.ReallyCrash = *reallyCrashForTesting
 	defer util.FlushLogs()
 	rand.Seed(time.Now().UTC().UnixNano())
 
@@ -124,6 +128,8 @@ func main() {
 		glog.Warningf("No API client: %v", err)
 	}
 
+	credentialprovider.SetPreferredDockercfgPath(*rootDirectory)
+
 	kcfg := standalone.KubeletConfig{
 		Address:                 address,
 		AllowPrivileged:         *allowPrivileged,
@@ -133,7 +139,7 @@ func main() {
 		ManifestURL:             *manifestURL,
 		FileCheckFrequency:      *fileCheckFrequency,
 		HttpCheckFrequency:      *httpCheckFrequency,
-		NetworkContainerImage:   *networkContainerImage,
+		PodInfraContainerImage:  *podInfraContainerImage,
 		SyncFrequency:           *syncFrequency,
 		RegistryPullQPS:         *registryPullQPS,
 		RegistryBurst:           *registryBurst,
@@ -150,6 +156,7 @@ func main() {
 		KubeClient:              client,
 		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
 		MasterServiceNamespace:  *masterServiceNamespace,
+		VolumePlugins:           app.ProbeVolumePlugins(),
 	}
 
 	standalone.RunKubelet(&kcfg)

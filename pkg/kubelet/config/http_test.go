@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -122,8 +123,9 @@ func TestExtractFromHTTP(t *testing.T) {
 		expected  kubelet.PodUpdate
 	}{
 		{
-			desc:      "Single manifest",
-			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo", UUID: "111"},
+			desc: "Single manifest",
+			manifests: v1beta1.ContainerManifest{Version: "v1beta1", ID: "foo", UUID: "111",
+				Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
 				api.BoundPod{
@@ -135,14 +137,61 @@ func TestExtractFromHTTP(t *testing.T) {
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 						DNSPolicy:     api.DNSClusterFirst,
+						Containers: []api.Container{{
+							Name:  "1",
+							Image: "foo",
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "Always"}},
+					},
+				}),
+		},
+		{
+			desc:      "Single manifest without ID",
+			manifests: api.ContainerManifest{Version: "v1beta1", UUID: "111"},
+			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.HTTPSource,
+				api.BoundPod{
+					ObjectMeta: api.ObjectMeta{
+						UID:       "111",
+						Name:      "111",
+						Namespace: "foobar",
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						DNSPolicy:     api.DNSClusterFirst,
+					},
+				}),
+		},
+		{
+			desc: "Single manifest with v1beta2",
+			manifests: v1beta1.ContainerManifest{Version: "v1beta2", ID: "foo", UUID: "111",
+				Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
+			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.HTTPSource,
+				api.BoundPod{
+					ObjectMeta: api.ObjectMeta{
+						UID:       "111",
+						Name:      "foo",
+						Namespace: "foobar",
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers: []api.Container{{
+							Name:  "1",
+							Image: "foo",
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "Always"}},
 					},
 				}),
 		},
 		{
 			desc: "Multiple manifests",
-			manifests: []api.ContainerManifest{
-				{Version: "v1beta1", ID: "foo", UUID: "111", Containers: []api.Container{{Name: "1", Image: "foo"}}},
-				{Version: "v1beta1", ID: "bar", UUID: "222", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+			manifests: []v1beta1.ContainerManifest{
+				{Version: "v1beta1", ID: "foo", UUID: "111",
+					Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
+				{Version: "v1beta1", ID: "bar", UUID: "222",
+					Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: ""}}},
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
@@ -153,10 +202,13 @@ func TestExtractFromHTTP(t *testing.T) {
 						Namespace: "foobar",
 					},
 					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log"}},
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "Always"}},
 					},
 				},
 				api.BoundPod{
@@ -166,16 +218,19 @@ func TestExtractFromHTTP(t *testing.T) {
 						Namespace: "foobar",
 					},
 					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
 							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log"}},
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				}),
 		},
 		{
 			desc:      "Empty Array",
-			manifests: []api.ContainerManifest{},
+			manifests: []v1beta1.ContainerManifest{},
 			expected:  CreatePodUpdate(kubelet.SET, kubelet.HTTPSource),
 		},
 	}

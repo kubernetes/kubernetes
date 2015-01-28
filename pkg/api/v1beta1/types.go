@@ -79,7 +79,7 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source *VolumeSource `json:"source" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"`
+	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"`
 }
 
 // VolumeSource represents the source location of a valume to mount.
@@ -90,7 +90,7 @@ type VolumeSource struct {
 	// things that are allowed to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and
 	// who can/can not mount host directories as read/write.
-	HostDir *HostDir `json:"hostDir" description:"pre-existing host directory; generally for privileged system daemons or other agents tied to the host"`
+	HostDir *HostPath `json:"hostDir" description:"pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDir `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
@@ -100,8 +100,8 @@ type VolumeSource struct {
 	GitRepo *GitRepo `json:"gitRepo" description:"git repository at a particular revision"`
 }
 
-// HostDir represents bare host directory volume.
-type HostDir struct {
+// HostPath represents bare host directory volume.
+type HostPath struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
@@ -412,6 +412,11 @@ type PodState struct {
 	Info PodInfo `json:"info,omitempty" description:"map of container name to container status"`
 }
 
+type PodStatusResult struct {
+	TypeMeta `json:",inline"`
+	State    PodState `json:"state,omitempty" description:"current state of the pod"`
+}
+
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline"`
@@ -452,6 +457,7 @@ type ReplicationController struct {
 // PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
 }
 
@@ -885,4 +891,46 @@ type BoundPods struct {
 type List struct {
 	TypeMeta `json:",inline"`
 	Items    []runtime.RawExtension `json:"items" description:"list of objects"`
+}
+
+// A type of object that is limited
+type LimitType string
+
+const (
+	// Limit that applies to all pods in a namespace
+	LimitTypePod LimitType = "Pod"
+	// Limit that applies to all containers in a namespace
+	LimitTypeContainer LimitType = "Container"
+)
+
+// LimitRangeItem defines a min/max usage limit for any resource that matches on kind
+type LimitRangeItem struct {
+	// Type of resource that this limit applies to
+	Type LimitType `json:"type,omitempty"`
+	// Max usage constraints on this kind by resource name
+	Max ResourceList `json:"max,omitempty"`
+	// Min usage constraints on this kind by resource name
+	Min ResourceList `json:"min,omitempty"`
+}
+
+// LimitRangeSpec defines a min/max usage limit for resources that match on kind
+type LimitRangeSpec struct {
+	// Limits is the list of LimitRangeItem objects that are enforced
+	Limits []LimitRangeItem `json:"limits"`
+}
+
+// LimitRange sets resource usage limits for each kind of resource in a Namespace
+type LimitRange struct {
+	TypeMeta `json:",inline"`
+
+	// Spec defines the limits enforced
+	Spec LimitRangeSpec `json:"spec,omitempty"`
+}
+
+// LimitRangeList is a list of LimitRange items.
+type LimitRangeList struct {
+	TypeMeta `json:",inline"`
+
+	// Items is a list of LimitRange objects
+	Items []LimitRange `json:"items"`
 }

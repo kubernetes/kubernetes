@@ -31,6 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -48,10 +50,6 @@ type defaultAPIServer struct {
 	http.Handler
 	group *APIGroupVersion
 }
-
-const (
-	StatusUnprocessableEntity = 422
-)
 
 // Handle returns a Handler function that exposes the provided storage interfaces
 // as RESTful resources at prefix, serialized by codec, and also includes the support
@@ -252,14 +250,16 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 		strippedHandler.ServeHTTP(resp.ResponseWriter, req.Request)
 	}
 
+	registrationErrors := make([]error, 0)
+
 	for path, storage := range g.handler.storage {
 		// register legacy patterns where namespace is optional in path
 		if err := registerResourceHandlers(ws, version, path, storage, h, false); err != nil {
-			return err
+			registrationErrors = append(registrationErrors, err)
 		}
 		// register pattern where namespace is required in path
 		if err := registerResourceHandlers(ws, version, path, storage, h, true); err != nil {
-			return err
+			registrationErrors = append(registrationErrors, err)
 		}
 	}
 
@@ -274,7 +274,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 
 	container.Add(ws)
 
-	return nil
+	return errors.NewAggregate(registrationErrors)
 }
 
 // TODO: Convert to go-restful
@@ -370,6 +370,7 @@ func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
 
 // errorJSONFatal renders an error to the response, and if codec fails will render plaintext
 func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) {
+	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
 	output, err := codec.Encode(status)
 	if err != nil {
@@ -384,7 +385,6 @@ func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) {
 
 // writeRawJSON writes a non-API object in JSON.
 func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	// PR #2243: Pretty-print JSON by default.
 	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

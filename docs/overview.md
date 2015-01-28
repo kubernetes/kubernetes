@@ -11,7 +11,7 @@ Kubernetes supports a unique [networking model](networking.md). Kubernetes encou
 
 Each resource has a map of key-value [labels](labels.md). Individual labels are used to specify identifying metadata that can be used to define sets of resources by specifying required labels. 
 
-Each resource also has a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object, called [annotations.md](annotations.md).
+Each resource also has a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object, called [annotations](annotations.md).
 
 Each resource is created within a specific [namespace](namespaces.md), a default one if unspecified.
 
@@ -19,7 +19,7 @@ Other details:
 
 * [API](api-conventions.md)
 * [Client libraries](client-libraries.md)
-* [Command-line interface](cli.md)
+* [Command-line interface](kubectl.md)
 * [UI](ux.md)
 * [Images and registries](images.md)
 * [Container environment](container-environment.md)

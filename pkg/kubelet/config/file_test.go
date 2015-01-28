@@ -26,27 +26,28 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
-	manifest := api.ContainerManifest{
+func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) {
+	manifest := v1beta1.ContainerManifest{
 		ID:   id,
 		UUID: types.UID(id),
-		Containers: []api.Container{
+		Containers: []v1beta1.Container{
 			{
 				Name:  "c" + id,
 				Image: "foo",
 				TerminationMessagePath: "/somepath",
 			},
 		},
-		Volumes: []api.Volume{
+		Volumes: []v1beta1.Volume{
 			{
 				Name: "host-dir",
-				Source: &api.VolumeSource{
-					HostDir: &api.HostDir{"/dir/path"},
+				Source: v1beta1.VolumeSource{
+					HostDir: &v1beta1.HostPath{"/dir/path"},
 				},
 			},
 		},
@@ -67,8 +68,8 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 			Volumes: []api.Volume{
 				{
 					Name: "host-dir",
-					Source: &api.VolumeSource{
-						HostDir: &api.HostDir{"/dir/path"},
+					Source: api.VolumeSource{
+						HostPath: &api.HostPath{"/dir/path"},
 					},
 				},
 			},
@@ -120,7 +121,7 @@ func TestReadFromFile(t *testing.T) {
 			"version": "v1beta1",
 			"uuid": "12345",
 			"id": "test",
-			"containers": [{ "image": "test/image" }]
+			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
 		}`)
 	defer os.Remove(file.Name())
 
@@ -137,7 +138,13 @@ func TestReadFromFile(t *testing.T) {
 				SelfLink:  "",
 			},
 			Spec: api.PodSpec{
-				Containers: []api.Container{{Image: "test/image", TerminationMessagePath: "/dev/termination-log"}},
+				Containers: []api.Container{
+					{
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        api.PullAlways,
+					},
+				},
 			},
 		})
 
@@ -152,6 +159,99 @@ func TestReadFromFile(t *testing.T) {
 		if !strings.HasPrefix(update.Pods[0].ObjectMeta.SelfLink, "/api/") {
 			t.Errorf("Unexpected selflink: %s", update.Pods[0].ObjectMeta.SelfLink)
 		}
+		update.Pods[0].ObjectMeta.SelfLink = ""
+
+		if !api.Semantic.DeepEqual(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadFromFileWithoutID(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta1",
+			"uuid": "12345",
+			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "",
+				UID:       "12345",
+				Namespace: "",
+				SelfLink:  "",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        api.PullAlways,
+					},
+				},
+			},
+		})
+
+		if len(update.Pods[0].ObjectMeta.Name) == 0 {
+			t.Errorf("Name did not get defaulted")
+		}
+		update.Pods[0].ObjectMeta.Name = ""
+		update.Pods[0].ObjectMeta.Namespace = ""
+		update.Pods[0].ObjectMeta.SelfLink = ""
+
+		if !api.Semantic.DeepEqual(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(2 * time.Millisecond):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadV1Beta2FromFile(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta2",
+			"uuid": "12345",
+			"id": "test",
+			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "test",
+				UID:       "12345",
+				Namespace: "",
+				SelfLink:  "",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        api.PullAlways,
+					},
+				},
+			},
+		})
+
+		update.Pods[0].ObjectMeta.Namespace = ""
 		update.Pods[0].ObjectMeta.SelfLink = ""
 
 		if !api.Semantic.DeepEqual(expected, update) {
@@ -224,7 +324,7 @@ func TestExtractFromDir(t *testing.T) {
 	manifest, expectedPod := ExampleManifestAndPod("1")
 	manifest2, expectedPod2 := ExampleManifestAndPod("2")
 
-	manifests := []api.ContainerManifest{manifest, manifest2}
+	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
 	pods := []api.BoundPod{expectedPod, expectedPod2}
 	files := make([]*os.File, len(manifests))
 

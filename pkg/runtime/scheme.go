@@ -360,6 +360,9 @@ func (s *Scheme) Decode(data []byte) (Object, error) {
 // pointer to an api type.
 // If obj's APIVersion doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
+// TODO: allow Decode/DecodeInto to take a default apiVersion and a default kind, to
+// be applied if the provided object does not have either field (integrate external
+// apis into the decoding scheme).
 func (s *Scheme) DecodeInto(data []byte, obj Object) error {
 	return s.raw.DecodeInto(data, obj)
 }

@@ -41,6 +41,7 @@ import (
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
@@ -61,7 +62,7 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodContainerInfo, error) {
+func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
 	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podID)
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
@@ -80,7 +81,7 @@ func (fakeKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodCo
 	default:
 		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
 	}
-	return c.GetPodInfo("localhost", podNamespace, podID)
+	return c.GetPodStatus("localhost", podNamespace, podID)
 }
 
 func (fakeKubeletClient) HealthCheck(host string) (health.Status, error) {
@@ -190,13 +191,13 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// Kubelet (localhost)
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.")
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	standalone.SimpleRunKubelet(cl, nil, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault)
+	standalone.SimpleRunKubelet(cl, nil, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins())
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	standalone.SimpleRunKubelet(cl, nil, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault)
+	standalone.SimpleRunKubelet(cl, nil, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins())
 
 	return apiServer.URL
 }
@@ -221,7 +222,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 			if len(host) == 0 {
 				return false, nil
 			}
-			if _, err := podInfo.GetPodInfo(host, namespace, id); err != nil {
+			if _, err := podInfo.GetPodStatus(host, namespace, id); err != nil {
 				return false, nil
 			}
 		}

@@ -21,16 +21,38 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
 func TestNetwork(c *client.Client) bool {
+	if testContext.provider == "vagrant" {
+		glog.Infof("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
+		return true
+	}
+
 	ns := api.NamespaceDefault
-	svc, err := c.Services(ns).Create(loadObjectOrDie(assetPath(
-		"contrib", "for-tests", "network-tester", "service.json",
-	)).(*api.Service))
+	// TODO(satnam6502): Replace call of randomSuffix with call to NewUUID when service
+	//                   names have the same form as pod and replication controller names.
+	name := "nettest-" + randomSuffix()
+	svc, err := c.Services(ns).Create(&api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: api.ServiceSpec{
+			Port:          8080,
+			ContainerPort: util.NewIntOrStringFromInt(8080),
+			Selector: map[string]string{
+				"name": name,
+			},
+		},
+	})
+	glog.Infof("Creating service with name %s", svc.Name)
 	if err != nil {
-		glog.Errorf("unable to create test service: %v", err)
+		glog.Errorf("unable to create test service %s: %v", svc.Name, err)
 		return false
 	}
 	// Clean up service
@@ -39,10 +61,35 @@ func TestNetwork(c *client.Client) bool {
 			glog.Errorf("unable to delete svc %v: %v", svc.Name, err)
 		}
 	}()
-
-	rc, err := c.ReplicationControllers(ns).Create(loadObjectOrDie(assetPath(
-		"contrib", "for-tests", "network-tester", "rc.json",
-	)).(*api.ReplicationController))
+	rc, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 8,
+			Selector: map[string]string{
+				"name": name,
+			},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": name},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:    "webserver",
+							Image:   "kubernetes/nettest:latest",
+							Command: []string{"-service=" + name},
+							Ports:   []api.Port{{ContainerPort: 8080}},
+						},
+					},
+				},
+			},
+		},
+	})
 	if err != nil {
 		glog.Errorf("unable to create test rc: %v", err)
 		return false
@@ -61,7 +108,7 @@ func TestNetwork(c *client.Client) bool {
 	}()
 	const maxAttempts = 60
 	for i := 0; i < maxAttempts; i++ {
-		time.Sleep(time.Second)
+		time.Sleep(2 * time.Second)
 		body, err := c.Get().Prefix("proxy").Resource("services").Name(svc.Name).Suffix("status").Do().Raw()
 		if err != nil {
 			glog.Infof("Attempt %v/%v: service/pod still starting. (error: '%v')", i, maxAttempts, err)

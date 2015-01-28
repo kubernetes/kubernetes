@@ -24,6 +24,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  echo "WARNING: Skipping services.sh for ${KUBERNETES_PROVIDER}.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/3655"
+  exit 0
+fi
+
 function error() {
   echo "$@" >&2
   exit 1
@@ -50,6 +55,7 @@ function join() {
 svcs_to_clean=()
 function do_teardown() {
   local svc
+  return
   for svc in "${svcs_to_clean[@]:+${svcs_to_clean[@]}}"; do
     stop_service "${svc}"
   done
@@ -206,6 +212,7 @@ function wait_for_service_up() {
         set -e;
         for i in $(seq -s' ' 1 $4); do
           curl -s --connect-timeout 1 http://$2:$3;
+          echo;
         done | sort | uniq
         "))
 
@@ -252,7 +259,8 @@ function verify_from_container() {
             ok=false
             for j in $(seq -s' ' 1 10); do
               if wget -q -T 1 -O - http://$2:$3; then
-		ok=true
+                echo
+                ok=true
                 break
               fi
               sleep 1

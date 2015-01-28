@@ -1,7 +1,7 @@
 all: push
 
 server: server.go
-	CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' ./server.go
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./server.go
 
 container: server
 	docker build -t kubernetes/liveness .

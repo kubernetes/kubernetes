@@ -1,0 +1,162 @@
+syntax = "proto2";
+option go_package = "image";
+
+package appengine;
+
+message ImagesServiceError {
+  enum ErrorCode {
+    UNSPECIFIED_ERROR = 1;
+    BAD_TRANSFORM_DATA = 2;
+    NOT_IMAGE = 3;
+    BAD_IMAGE_DATA = 4;
+    IMAGE_TOO_LARGE = 5;
+    INVALID_BLOB_KEY = 6;
+    ACCESS_DENIED = 7;
+    OBJECT_NOT_FOUND = 8;
+  }
+}
+
+message ImagesServiceTransform {
+  enum Type {
+    RESIZE = 1;
+    ROTATE = 2;
+    HORIZONTAL_FLIP = 3;
+    VERTICAL_FLIP = 4;
+    CROP = 5;
+    IM_FEELING_LUCKY = 6;
+  }
+}
+
+message Transform {
+  optional int32 width = 1;
+  optional int32 height = 2;
+  optional bool crop_to_fit = 11 [default = false];
+  optional float crop_offset_x = 12 [default = 0.5];
+  optional float crop_offset_y = 13 [default = 0.5];
+
+  optional int32 rotate = 3 [default = 0];
+
+  optional bool horizontal_flip = 4 [default = false];
+
+  optional bool vertical_flip = 5 [default = false];
+
+  optional float crop_left_x = 6 [default = 0.0];
+  optional float crop_top_y = 7 [default = 0.0];
+  optional float crop_right_x = 8 [default = 1.0];
+  optional float crop_bottom_y = 9 [default = 1.0];
+
+  optional bool autolevels = 10 [default = false];
+
+  optional bool allow_stretch = 14 [default = false];
+}
+
+message ImageData {
+  required bytes content = 1 [ctype=CORD];
+  optional string blob_key = 2;
+
+  optional int32 width = 3;
+  optional int32 height = 4;
+}
+
+message InputSettings {
+  enum ORIENTATION_CORRECTION_TYPE {
+    UNCHANGED_ORIENTATION = 0;
+    CORRECT_ORIENTATION = 1;
+  }
+  optional ORIENTATION_CORRECTION_TYPE correct_exif_orientation = 1
+      [default=UNCHANGED_ORIENTATION];
+  optional bool parse_metadata = 2 [default=false];
+  optional int32 transparent_substitution_rgb = 3;
+}
+
+message OutputSettings {
+  enum MIME_TYPE {
+    PNG = 0;
+    JPEG = 1;
+    WEBP = 2;
+  }
+
+  optional MIME_TYPE mime_type = 1 [default=PNG];
+  optional int32 quality = 2;
+}
+
+message ImagesTransformRequest {
+  required ImageData image = 1;
+  repeated Transform transform = 2;
+  required OutputSettings output = 3;
+  optional InputSettings input = 4;
+}
+
+message ImagesTransformResponse {
+  required ImageData image = 1;
+  optional string source_metadata = 2;
+}
+
+message CompositeImageOptions {
+  required int32 source_index = 1;
+  required int32 x_offset = 2;
+  required int32 y_offset = 3;
+  required float opacity = 4;
+
+  enum ANCHOR {
+    TOP_LEFT = 0;
+    TOP = 1;
+    TOP_RIGHT = 2;
+    LEFT = 3;
+    CENTER = 4;
+    RIGHT = 5;
+    BOTTOM_LEFT = 6;
+    BOTTOM = 7;
+    BOTTOM_RIGHT = 8;
+  }
+
+  required ANCHOR anchor = 5;
+}
+
+message ImagesCanvas {
+  required int32 width = 1;
+  required int32 height = 2;
+  required OutputSettings output = 3;
+  optional int32 color = 4 [default=-1];
+}
+
+message ImagesCompositeRequest {
+  repeated ImageData image = 1;
+  repeated CompositeImageOptions options = 2;
+  required ImagesCanvas canvas = 3;
+}
+
+message ImagesCompositeResponse {
+  required ImageData image = 1;
+}
+
+message ImagesHistogramRequest {
+  required ImageData image = 1;
+}
+
+message ImagesHistogram {
+  repeated int32 red = 1;
+  repeated int32 green = 2;
+  repeated int32 blue = 3;
+}
+
+message ImagesHistogramResponse {
+  required ImagesHistogram histogram = 1;
+}
+
+message ImagesGetUrlBaseRequest {
+  required string blob_key = 1;
+
+  optional bool create_secure_url = 2 [default = false];
+}
+
+message ImagesGetUrlBaseResponse {
+  required string url = 1;
+}
+
+message ImagesDeleteUrlBaseRequest {
+  required string blob_key = 1;
+}
+
+message ImagesDeleteUrlBaseResponse {
+}

@@ -58,10 +58,13 @@ Examples:
   $ kubectl delete pod 1234-56-7890-234234-456456
   <delete a pod with ID 1234-56-7890-234234-456456>`,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdNamespace, err := f.DefaultNamespace(cmd)
+			checkErr(err)
+
 			mapper, typer := f.Object(cmd)
 			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
 				ContinueOnError().
-				NamespaceParam(GetKubeNamespace(cmd)).DefaultNamespace().
+				NamespaceParam(cmdNamespace).DefaultNamespace().
 				FilenameParam(flags.Filenames...).
 				SelectorParam(GetFlagString(cmd, "selector")).
 				ResourceTypeOrNameArgs(args...).
@@ -69,7 +72,7 @@ Examples:
 				Do()
 
 			found := 0
-			err := r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
+			err = r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
 				found++
 				if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
 					return err

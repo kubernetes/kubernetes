@@ -1,8 +1,6 @@
-# https://github.com/thockin/serve_hostname
-
 FROM scratch
 MAINTAINER Tim Hockin <thockin@google.com>
-ADD serve_hostname serve_hostname
-ADD serve_hostname.go serve_hostname.go
+ADD serve_hostname /serve_hostname
+ADD serve_hostname.go /serve_hostname.go
 EXPOSE 9376
 ENTRYPOINT ["/serve_hostname"]

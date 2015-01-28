@@ -41,10 +41,18 @@ func GetItemsPtr(list Object) (interface{}, error) {
 	if !items.IsValid() {
 		return nil, fmt.Errorf("no Items field in %#v", list)
 	}
-	if items.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("Items field is not a slice")
+	switch items.Kind() {
+	case reflect.Interface, reflect.Ptr:
+		target := reflect.TypeOf(items.Interface()).Elem()
+		if target.Kind() != reflect.Slice {
+			return nil, fmt.Errorf("items: Expected slice, got %s", target.Kind())
+		}
+		return items.Interface(), nil
+	case reflect.Slice:
+		return items.Addr().Interface(), nil
+	default:
+		return nil, fmt.Errorf("items: Expected slice, got %s", items.Kind())
 	}
-	return items.Addr().Interface(), nil
 }
 
 // ExtractList returns obj's Items element as an array of runtime.Objects.
@@ -61,11 +69,16 @@ func ExtractList(obj Object) ([]Object, error) {
 	list := make([]Object, items.Len())
 	for i := range list {
 		raw := items.Index(i)
-		item, ok := raw.Addr().Interface().(Object)
-		if !ok {
-			return nil, fmt.Errorf("item[%v]: Expected object, got %#v", i, raw.Interface())
+		var found bool
+		switch raw.Kind() {
+		case reflect.Interface, reflect.Ptr:
+			list[i], found = raw.Interface().(Object)
+		default:
+			list[i], found = raw.Addr().Interface().(Object)
 		}
-		list[i] = item
+		if !found {
+			return nil, fmt.Errorf("item[%v]: Expected object, got %#v(%s)", i, raw.Interface(), raw.Kind())
+		}
 	}
 	return list, nil
 }

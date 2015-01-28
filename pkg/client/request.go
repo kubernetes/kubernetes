@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"github.com/golang/glog"
 )
 
 // specialParams lists parameters that are handled specially and which users of Request
@@ -443,6 +444,10 @@ func (r *Request) Do() Result {
 		client = http.DefaultClient
 	}
 
+	// Right now we make about ten retry attempts if we get a Retry-After response.
+	// TODO: Change to a timeout based approach.
+	retries := 0
+
 	for {
 		if r.err != nil {
 			return Result{err: &RequestConstructionError{r.err}}
@@ -464,6 +469,20 @@ func (r *Request) Do() Result {
 			continue
 		}
 
+		// Check to see if we got a 429 Too Many Requests response code.
+		if resp.StatusCode == errors.StatusTooManyRequests {
+			if retries < 10 {
+				retries++
+				if waitFor := resp.Header.Get("Retry-After"); waitFor != "" {
+					delay, err := strconv.Atoi(waitFor)
+					if err == nil {
+						glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", waitFor, retries, r.finalURL())
+						time.Sleep(time.Duration(delay) * time.Second)
+						continue
+					}
+				}
+			}
+		}
 		return Result{respBody, created, err, r.codec}
 	}
 }

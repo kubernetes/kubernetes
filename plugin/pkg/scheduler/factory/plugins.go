@@ -37,7 +37,7 @@ var (
 )
 
 const (
-	DefaultProvider = "default"
+	DefaultProvider = "DefaultProvider"
 )
 
 type AlgorithmProviderConfig struct {
@@ -45,49 +45,49 @@ type AlgorithmProviderConfig struct {
 	PriorityFunctionKeys util.StringSet
 }
 
-// RegisterFitPredicate registers a fit predicate with the algorithm registry. Returns the key,
+// RegisterFitPredicate registers a fit predicate with the algorithm registry. Returns the name,
 // with which the predicate was registered.
-func RegisterFitPredicate(key string, predicate algorithm.FitPredicate) string {
+func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	validateAlgorithmNameOrDie(key)
-	fitPredicateMap[key] = predicate
-	return key
+	validateAlgorithmNameOrDie(name)
+	fitPredicateMap[name] = predicate
+	return name
 }
 
 // IsFitPredicateRegistered check is useful for testing providers.
-func IsFitPredicateRegistered(key string) bool {
+func IsFitPredicateRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	_, ok := fitPredicateMap[key]
+	_, ok := fitPredicateMap[name]
 	return ok
 }
 
-// RegisterFitPredicate registers a priority function with the algorithm registry. Returns the key,
+// RegisterFitPredicate registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
-func RegisterPriorityFunction(key string, function algorithm.PriorityFunction, weight int) string {
+func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	validateAlgorithmNameOrDie(key)
-	priorityFunctionMap[key] = algorithm.PriorityConfig{Function: function, Weight: weight}
-	return key
+	validateAlgorithmNameOrDie(name)
+	priorityFunctionMap[name] = algorithm.PriorityConfig{Function: function, Weight: weight}
+	return name
 }
 
 // IsPriorityFunctionRegistered check is useful for testing providers.
-func IsPriorityFunctionRegistered(key string) bool {
+func IsPriorityFunctionRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	_, ok := priorityFunctionMap[key]
+	_, ok := priorityFunctionMap[name]
 	return ok
 }
 
 // SetPriorityFunctionWeight sets the weight of an already registered priority function.
-func SetPriorityFunctionWeight(key string, weight int) {
+func SetPriorityFunctionWeight(name string, weight int) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	config, ok := priorityFunctionMap[key]
+	config, ok := priorityFunctionMap[name]
 	if !ok {
-		glog.Errorf("Invalid priority key %s specified - no corresponding function found", key)
+		glog.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		return
 	}
 	config.Weight = weight
@@ -120,30 +120,30 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(keys util.StringSet) ([]algorithm.FitPredicate, error) {
+func getFitPredicateFunctions(names util.StringSet) ([]algorithm.FitPredicate, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	predicates := []algorithm.FitPredicate{}
-	for _, key := range keys.List() {
-		function, ok := fitPredicateMap[key]
+	for _, name := range names.List() {
+		function, ok := fitPredicateMap[name]
 		if !ok {
-			return nil, fmt.Errorf("Invalid predicate key %q specified - no corresponding function found", key)
+			return nil, fmt.Errorf("Invalid predicate name %q specified - no corresponding function found", name)
 		}
 		predicates = append(predicates, function)
 	}
 	return predicates, nil
 }
 
-func getPriorityFunctionConfigs(keys util.StringSet) ([]algorithm.PriorityConfig, error) {
+func getPriorityFunctionConfigs(names util.StringSet) ([]algorithm.PriorityConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	configs := []algorithm.PriorityConfig{}
-	for _, key := range keys.List() {
-		config, ok := priorityFunctionMap[key]
+	for _, name := range names.List() {
+		config, ok := priorityFunctionMap[name]
 		if !ok {
-			return nil, fmt.Errorf("Invalid priority key %s specified - no corresponding function found", key)
+			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
 		configs = append(configs, config)
 	}
