@@ -32,10 +32,18 @@ type key int
 
 // namespaceKey is the context key for the request namespace.
 const namespaceKey key = 0
+const traceKey key = 1
 
 // NewContext instantiates a base context object for request flows.
 func NewContext() Context {
 	return context.TODO()
+}
+
+func NewTracedContext(trace string) Context {
+	if len(trace) == 0 {
+		panic("all trace contexts must have a value")
+	}
+	return withTrace(context.Background(), trace)
 }
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
@@ -50,6 +58,12 @@ func WithValue(parent Context, key interface{}, val interface{}) Context {
 		panic(stderrs.New("Invalid context type"))
 	}
 	return context.WithValue(internalCtx, key, val)
+}
+
+// TraceFrom returns the value of the trace key on the ctx.
+func TraceFrom(ctx Context) (string, bool) {
+	namespace, ok := ctx.Value(traceKey).(string)
+	return namespace, ok
 }
 
 // WithNamespace returns a copy of parent in which the namespace value is set
@@ -85,4 +99,9 @@ func WithNamespaceDefaultIfNone(parent Context) Context {
 		return WithNamespace(parent, NamespaceDefault)
 	}
 	return parent
+}
+
+// withTrace returns a copy of the parent in which the trace value is set
+func withTrace(parent Context, trace string) Context {
+	return WithValue(parent, traceKey, trace)
 }

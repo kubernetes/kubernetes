@@ -30,6 +30,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/httpcontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -96,6 +97,9 @@ type Request struct {
 	// If true, lowercase resource prior to inserting into a path, if false, leave it as is. Preserving
 	// case is considered legacy behavior.
 	preserveResourceCase bool
+
+	// optional, defines caller context for traceability
+	ctx api.Context
 
 	// generic components accessible via method setters
 	path    string
@@ -315,6 +319,14 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
+func (r *Request) WithContext(ctx api.Context) *Request {
+	if r.err != nil {
+		return r
+	}
+	r.ctx = ctx
+	return r
+}
+
 // NoPoll indicates a server "working" response should be returned as an error
 func (r *Request) NoPoll() *Request {
 	return r.Poller(nil)
@@ -470,6 +482,10 @@ func (r *Request) Do() Result {
 		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
 		if err != nil {
 			return Result{err: &RequestConstructionError{err}}
+		}
+
+		if r.ctx != nil {
+			httpcontext.AddToRequest(req, r.ctx)
 		}
 
 		resp, err := client.Do(req)

@@ -30,6 +30,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/httpcontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
@@ -415,7 +416,7 @@ func (m *Master) init(c *Config) {
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
 
-	m.InsecureHandler = handler
+	m.InsecureHandler = httpcontext.Wrap(handler)
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts)
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
@@ -429,7 +430,7 @@ func (m *Master) init(c *Config) {
 	m.handlerContainer.Add(m.rootWebService)
 
 	// TODO: Make this optional?  Consumers of master depend on this currently.
-	m.Handler = handler
+	m.Handler = httpcontext.Wrap(handler)
 
 	if m.enableSwaggerSupport {
 		m.InstallSwaggerAPI()
