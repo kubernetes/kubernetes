@@ -339,7 +339,7 @@ func TestFillPodStatus(t *testing.T) {
 			HostIP: "ip of machine",
 			PodIP:  expectedIP,
 			Info: api.PodInfo{
-				"net": {
+				"POD": {
 					State: api.ContainerState{
 						Running: &api.ContainerStateRunning{
 							StartedAt: util.NewTime(expectedTime),
@@ -374,7 +374,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 			Host:   "machine",
 			HostIP: "ip of machine",
 			Info: api.PodInfo{
-				"net": {},
+				"POD": {},
 			},
 		},
 		nodes: []api.Node{*makeHealthyNode("machine")},
