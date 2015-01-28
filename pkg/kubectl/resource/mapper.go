@@ -54,6 +54,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	}
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
+	if isNode(kind) {
+		namespace = ""
+	}
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
 	return &Info{
 		Mapping:   mapping,
@@ -84,6 +87,9 @@ func (m *Mapper) InfoForObject(obj runtime.Object) (*Info, error) {
 	}
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
+	if isNode(kind) {
+		namespace = ""
+	}
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
 	return &Info{
 		Mapping:   mapping,

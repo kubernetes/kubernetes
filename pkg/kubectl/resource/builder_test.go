@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -169,6 +170,37 @@ func TestPathBuilder(t *testing.T) {
 
 	info := test.Infos[0]
 	if info.Name != "redis-master" || info.Namespace != "" || info.Object == nil {
+		t.Errorf("unexpected info: %#v", info)
+	}
+}
+
+func TestNodeBuilder(t *testing.T) {
+	node := &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: "node1", Namespace: "should-not-have", ResourceVersion: "10"},
+		Spec: api.NodeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1000m"),
+				api.ResourceMemory: resource.MustParse("1Mi"),
+			},
+		},
+	}
+	r, w := io.Pipe()
+	go func() {
+		defer w.Close()
+		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, node)))
+	}()
+
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").Stream(r, "STDIN")
+
+	test := &testVisitor{}
+
+	err := b.Do().Visit(test.Handle)
+	if err != nil || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+	}
+	info := test.Infos[0]
+	if info.Name != "node1" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
