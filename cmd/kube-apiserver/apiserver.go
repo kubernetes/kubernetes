@@ -60,6 +60,8 @@ var (
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
 		"read-only address. It is assumed that firewall rules are set up such that "+
 		"this port is not reachable from outside of the cluster.")
+	apiRate     = flag.Float32("api_rate", 1.0, "API rate limit as QPS for the read only port")
+	apiBurst    = flag.Int("api_burst", 20, "API burst amount for the read only port")
 	securePort  = flag.Int("secure_port", 8443, "The port from which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS ")
 	tlsCertFile = flag.String("tls_cert_file", "", ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
@@ -216,8 +218,8 @@ func main() {
 	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
 
 	if roLocation != "" {
-		// Allow 1 read-only request per second, allow up to 20 in a burst before enforcing.
-		rl := util.NewTokenBucketRateLimiter(1.0, 20)
+		// Default settings allow 1 read-only request per second, allow up to 20 in a burst before enforcing.
+		rl := util.NewTokenBucketRateLimiter(*apiRate, *apiBurst)
 		readOnlyServer := &http.Server{
 			Addr:           roLocation,
 			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler))),
