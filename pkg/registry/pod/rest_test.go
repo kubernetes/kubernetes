@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -83,11 +84,15 @@ func TestCreatePodRegistryError(t *testing.T) {
 		registry: podRegistry,
 		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
-	pod := &api.Pod{}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+	}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
-		t.Errorf("Expected %#v, Got %#v", nil, err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 }
@@ -99,11 +104,15 @@ func TestCreatePodSetsIds(t *testing.T) {
 		registry: podRegistry,
 		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
-	pod := &api.Pod{}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+	}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
-		t.Errorf("Expected %#v, Got %#v", nil, err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 
@@ -122,11 +131,15 @@ func TestCreatePodSetsUID(t *testing.T) {
 		registry: podRegistry,
 		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
-	pod := &api.Pod{}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+	}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
-		t.Errorf("Expected %#v, Got %#v", nil, err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 
@@ -190,7 +203,7 @@ func TestListEmptyPodList(t *testing.T) {
 	ctx := api.NewContext()
 	pods, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(pods.(*api.PodList).Items) != 0 {
@@ -225,7 +238,7 @@ func TestListPodList(t *testing.T) {
 	podsObj, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	pods := podsObj.(*api.PodList)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(pods.Items) != 2 {
@@ -336,12 +349,12 @@ func TestPodDecode(t *testing.T) {
 	}
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
 	if err := latest.Codec.DecodeInto(body, actual); err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
@@ -363,7 +376,7 @@ func TestGetPod(t *testing.T) {
 	obj, err := storage.Get(ctx, "foo")
 	pod := obj.(*api.Pod)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	expect := *podRegistry.Pod
@@ -386,7 +399,7 @@ func TestGetPodCacheError(t *testing.T) {
 	obj, err := storage.Get(ctx, "foo")
 	pod := obj.(*api.Pod)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	expect := *podRegistry.Pod
@@ -396,6 +409,7 @@ func TestGetPodCacheError(t *testing.T) {
 	}
 }
 
+// TODO: remove, this is covered by RESTTest.TestCreate
 func TestPodStorageValidatesCreate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
@@ -420,6 +434,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	}
 }
 
+// TODO: remove, this is covered by RESTTest.TestCreate
 func TestCreatePod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{
@@ -437,7 +452,7 @@ func TestCreatePod(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	channel, err := storage.Create(ctx, pod)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	select {
 	case <-channel:
@@ -450,6 +465,7 @@ func TestCreatePod(t *testing.T) {
 	}
 }
 
+// TODO: remove, this is covered by RESTTest.TestCreate
 func TestCreatePodWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	pod := &api.Pod{
@@ -463,7 +479,7 @@ func TestCreatePodWithConflictingNamespace(t *testing.T) {
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Pod.Namespace does not match the provided context") == -1 {
+	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
 		t.Errorf("Expected 'Pod.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
@@ -605,7 +621,7 @@ func TestDeletePod(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	channel, err := storage.Delete(ctx, "foo")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	var result apiserver.RESTResult
 	select {
@@ -617,4 +633,30 @@ func TestDeletePod(t *testing.T) {
 	if fakeCache.clearedNamespace != "default" || fakeCache.clearedName != "foo" {
 		t.Errorf("Unexpeceted cache delete: %s %s %#v", fakeCache.clearedName, fakeCache.clearedNamespace, result.Object)
 	}
+}
+
+func TestCreate(t *testing.T) {
+	test := resttest.New(t, &REST{
+		registry: registrytest.NewPodRegistry(nil),
+		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
+	})
+	test.TestCreate(
+		// valid
+		&api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "test1",
+						Image: "foo",
+					},
+				},
+			},
+		},
+		// invalid
+		&api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{},
+			},
+		},
+	)
 }

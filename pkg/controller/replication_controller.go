@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -60,9 +61,17 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 	for k, v := range controller.Spec.Template.Labels {
 		desiredLabels[k] = v
 	}
+
+	// use the dash (if the name isn't too long) to make the pod name a bit prettier
+	prefix := fmt.Sprintf("%s-", controller.Name)
+	if ok, _ := validation.ValidatePodName(prefix, true); !ok {
+		prefix = controller.Name
+	}
+
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Labels: desiredLabels,
+			Labels:       desiredLabels,
+			GenerateName: prefix,
 		},
 	}
 	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.Spec); err != nil {

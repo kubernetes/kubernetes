@@ -66,6 +66,35 @@ func maskTrailingDash(name string) string {
 	return name
 }
 
+// ValidatePodName can be used to check whether the given pod name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidatePodName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateReplicationControllerName can be used to check whether the given replication
+// controller name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateReplicationControllerName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateServiceName can be used to check whether the given service name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateServiceName(name string, prefix bool) (bool, string) {
+	return nameIsDNS952Label(name, prefix)
+}
+
+// ValidateNodeName can be used to check whether the given node name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateNodeName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -510,7 +539,7 @@ func validateDNSPolicy(dnsPolicy *api.DNSPolicy) errs.ValidationErrorList {
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, nameIsDNSSubdomain).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
 
 	return allErrs
@@ -563,7 +592,7 @@ var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClie
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, nameIsDNS952Label).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName).Prefix("metadata")...)
 
 	if !util.IsValidPortNum(service.Spec.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port, ""))
@@ -604,7 +633,7 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, true, nameIsDNSSubdomain).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
 
 	return allErrs
@@ -694,7 +723,7 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 // ValidateMinion tests if required fields in the node are set.
 func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, nameIsDNSSubdomain).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName).Prefix("metadata")...)
 	return allErrs
 }
 

@@ -45,3 +45,26 @@ func (rcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	controller := obj.(*api.ReplicationController)
 	return validation.ValidateReplicationController(controller)
 }
+
+// podStrategy implements behavior for Pods
+// TODO: move to a pod specific package.
+type podStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+// Pods is the default logic that applies when creating and updating Pod
+// objects.
+var Pods RESTCreateStrategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
+	pod := obj.(*api.Pod)
+	pod.Status = api.PodStatus{}
+}
+
+// Validate validates a new pod.
+func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	pod := obj.(*api.Pod)
+	return validation.ValidatePod(pod)
+}

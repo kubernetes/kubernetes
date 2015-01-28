@@ -229,7 +229,8 @@ func TestCreateReplica(t *testing.T) {
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Labels: controllerSpec.Spec.Template.Labels,
+			Labels:       controllerSpec.Spec.Template.Labels,
+			GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}

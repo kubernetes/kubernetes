@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type Tester struct {
@@ -51,6 +52,28 @@ func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.TestCreateGeneratesName(copyOrDie(valid))
 	t.TestCreateRejectsMismatchedNamespace(copyOrDie(valid))
 	t.TestCreateInvokesValidation(invalid...)
+}
+
+func (t *Tester) TestCreateResetsUserData(valid runtime.Object) {
+	objectMeta, err := api.ObjectMetaFor(valid)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, valid)
+	}
+
+	now := util.Now()
+	objectMeta.UID = "bad-uid"
+	objectMeta.CreationTimestamp = now
+
+	channel, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if obj := <-channel; obj.Object == nil {
+		t.Fatalf("Unexpected object from channel: %#v", obj)
+	}
+	if objectMeta.UID == "bad-uid" || objectMeta.CreationTimestamp == now {
+		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
+	}
 }
 
 func (t *Tester) TestCreateHasMetadata(valid runtime.Object) {

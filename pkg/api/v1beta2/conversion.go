@@ -79,6 +79,7 @@ func init() {
 		func(in *newer.ObjectMeta, out *TypeMeta, s conversion.Scope) error {
 			out.Namespace = in.Namespace
 			out.ID = in.Name
+			out.GenerateName = in.GenerateName
 			out.UID = in.UID
 			out.CreationTimestamp = in.CreationTimestamp
 			out.SelfLink = in.SelfLink
@@ -94,6 +95,7 @@ func init() {
 		func(in *TypeMeta, out *newer.ObjectMeta, s conversion.Scope) error {
 			out.Namespace = in.Namespace
 			out.Name = in.ID
+			out.GenerateName = in.GenerateName
 			out.UID = in.UID
 			out.CreationTimestamp = in.CreationTimestamp
 			out.SelfLink = in.SelfLink
