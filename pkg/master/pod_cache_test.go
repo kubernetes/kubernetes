@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -339,7 +340,7 @@ func TestFillPodStatus(t *testing.T) {
 			HostIP: "ip of machine",
 			PodIP:  expectedIP,
 			Info: api.PodInfo{
-				"POD": {
+				leaky.PodInfraContainerName: {
 					State: api.ContainerState{
 						Running: &api.ContainerStateRunning{
 							StartedAt: util.NewTime(expectedTime),
@@ -374,7 +375,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 			Host:   "machine",
 			HostIP: "ip of machine",
 			Info: api.PodInfo{
-				"POD": {},
+				leaky.PodInfraContainerName: {},
 			},
 		},
 		nodes: []api.Node{*makeHealthyNode("machine")},
