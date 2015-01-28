@@ -40,7 +40,7 @@ function validate() {
     sleep 2
 
     local pod_id_list
-    pod_id_list=($($KUBECFG -template='{{range.items}}{{.id}} {{end}}' -l name="${CONTROLLER_NAME}" list pods))
+    pod_id_list=($($KUBECTL get pods -o template --template='{{range.items}}{{.id}} {{end}}' -l name="${CONTROLLER_NAME}"))
 
     echo "  ${#pod_id_list[@]} out of ${num_replicas} created"
 
@@ -56,19 +56,19 @@ function validate() {
       # NB: kubectl & kubecfg add the "exists" function to the standard template functions.
       # This lets us check to see if the "running" entry exists for each of the containers
       # we care about. Exists will never return an error and it's safe to check a chain of
-      # things, any one of which may not exist. In the below template, all of info, 
+      # things, any one of which may not exist. In the below template, all of info,
       # containername, and running might be nil, so the normal index function isn't very
       # helpful.
       # This template is unit-tested in kubec{tl|fg}, so if you change it, update the unit test.
       #
       # You can read about the syntax here: http://golang.org/pkg/text/template/
-      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"POD\" \"state\" \"running\")}}"
-      current_status=$($KUBECFG -template="${template_string}" get "pods/$id") || {
+      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"net\" \"state\" \"running\")}}"
+      current_status=$($KUBECTL get pods "$id" -o template --template="${template_string}") || {
         if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
           echo "  $id no longer exists"
           continue
         else
-          echo "  kubecfg failed with error:"
+          echo "  kubectl failed with error:"
           echo $current_status
           exit -1
         fi
@@ -81,14 +81,14 @@ function validate() {
       echo "  $id is created and both POD and update-demo containers are running: $current_status"
 
       template_string="{{(index .currentState.info \"${CONTROLLER_NAME}\").image}}"
-      current_image=$($KUBECFG -template="${template_string}" get "pods/$id") || true
+      current_image=$($KUBECTL get pods "$id" -o template --template="${template_string}") || true
       if [[ "$current_image" != "${DOCKER_HUB_USER}/update-demo:${container_image_version}" ]]; then
         echo "  ${id} is created but running wrong image"
         continue
       fi
 
 
-      host_ip=$($KUBECFG -template='{{.currentState.hostIP}}' get pods/$id)
+      host_ip=$($KUBECTL get pods "$id" -o template --template='{{.currentState.hostIP}}')
       curl -s --max-time 5 --fail http://${host_ip}:8080/data.json \
           | grep -q ${container_image_version} || {
         echo "  ${id} is running the right image but curl to contents failed or returned wrong info"
@@ -104,7 +104,7 @@ function validate() {
   return 0
 }
 
-export DOCKER_HUB_USER=davidopp
+export DOCKER_HUB_USER=jlowdermilk
 
 # Launch a container
 ${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh

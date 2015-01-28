@@ -24,6 +24,9 @@ echo
 echo "    http://localhost:8001/static/"
 echo
 
+export KUBE_ROOT=$(dirname $0)/../..
+export KUBECTL=${KUBE_REPO_ROOT}/cluster/kubectl.sh
+
 set -x
 
-../../cluster/kubecfg.sh -proxy -www local/
+$KUBECTL proxy --www=local/

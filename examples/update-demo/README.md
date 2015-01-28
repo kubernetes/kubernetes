@@ -61,8 +61,8 @@ separate terminal or run it in the background.
 
     http://localhost:8001/static/
 
-+ ../../cluster/kubecfg.sh -proxy -www local/
-I0922 11:43:54.886018 15659 kubecfg.go:209] Starting to serve on localhost:8001
++ ../../cluster/kubectl.sh proxy --www=local/
+I0115 16:50:15.959551   19790 proxy.go:34] Starting to serve on localhost:8001
 ```
 
 Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
@@ -92,12 +92,12 @@ We will now update the docker image to serve a different image by doing a rollin
 ```bash
 $ ./4-rolling-update.sh
 ```
-The rollingUpdate command in kubecfg will do 2 things:
+The rollingUpdate command in kubectl will do 2 things:
 
-1. Update the template in the replication controller to the new image (`$DOCKER_HUB_USER/update-demo:kitten`)
-2. Kill each of the pods one by one.  It'll let the replication controller create new pods to replace those that were killed.
+1. Create a new replication controller with a pod template that uses the new image (`$DOCKER_HUB_USER/update-demo:kitten`)
+2. Resize the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
 
-Watch the UX, it will update one pod every 10 seconds until all of the pods have the new image.
+Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
 
 ### Step Five: Bring down the pods
 

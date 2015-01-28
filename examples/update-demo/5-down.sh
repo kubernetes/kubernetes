@@ -18,10 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+export KUBE_ROOT=$(dirname $0)/../..
+export KUBECTL=${KUBE_ROOT}/cluster/kubectl.sh
 
 set -x
 
-$KUBECFG stop update-demo
-$KUBECFG rm update-demo
+rc="update-demo-kitten"
+
+$KUBECTL stop rc ${rc}

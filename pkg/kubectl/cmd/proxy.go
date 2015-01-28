@@ -36,9 +36,9 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 			clientConfig, err := f.ClientConfig(cmd)
 			checkErr(err)
 
-			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), clientConfig, port)
+			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), clientConfig)
 			checkErr(err)
-			glog.Fatal(server.Serve())
+			glog.Fatal(server.Serve(port))
 		},
 	}
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the prefix /static")

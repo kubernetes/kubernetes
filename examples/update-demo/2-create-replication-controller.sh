@@ -23,9 +23,11 @@ if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
   exit 1
 fi
 
-export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+export KUBE_ROOT=$(dirname $0)/../..
+export KUBECTL=${KUBE_REPO_ROOT}/cluster/kubectl.sh
 
 set -x
 
-$KUBECFG -p 8080:80 run $DOCKER_HUB_USER/update-demo:nautilus 2 update-demo
+SCHEMA=${KUBE_REPO_ROOT}/examples/update-demo/nautilus-rc.yaml
+
+cat ${SCHEMA} | sed "s/DOCKER_HUB_USER/${DOCKER_HUB_USER}/" | ${KUBECTL} create -f -
