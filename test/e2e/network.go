@@ -36,10 +36,12 @@ func TestNetwork(c *client.Client) bool {
 	//                   names have the same form as pod and replication controller names.
 	name := "nettest-" + randomSuffix()
 	svc, err := c.Services(ns).Create(&api.Service{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"name": name,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": name,
+				},
 			},
 		},
 		Spec: api.ServiceSpec{
@@ -62,10 +64,12 @@ func TestNetwork(c *client.Client) bool {
 		}
 	}()
 	rc, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"name": name,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": name,
+				},
 			},
 		},
 		Spec: api.ReplicationControllerSpec{
@@ -74,8 +78,10 @@ func TestNetwork(c *client.Client) bool {
 				"name": name,
 			},
 			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{"name": name},
+				NSObjectMeta: api.NSObjectMeta{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{"name": name},
+					},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{

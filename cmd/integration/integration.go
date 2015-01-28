@@ -295,10 +295,12 @@ func runSelfLinkTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Resource("services").Body(
 		&api.Service{
-			ObjectMeta: api.ObjectMeta{
-				Name: "selflinktest",
-				Labels: map[string]string{
-					"name": "selflinktest",
+			NSObjectMeta: api.NSObjectMeta{
+				ObjectMeta: api.ObjectMeta{
+					Name: "selflinktest",
+					Labels: map[string]string{
+						"name": "selflinktest",
+					},
 				},
 			},
 			Spec: api.ServiceSpec{
@@ -357,10 +359,12 @@ func runAtomicPutTest(c *client.Client) {
 			TypeMeta: api.TypeMeta{
 				APIVersion: latest.Version,
 			},
-			ObjectMeta: api.ObjectMeta{
-				Name: "atomicservice",
-				Labels: map[string]string{
-					"name": "atomicService",
+			NSObjectMeta: api.NSObjectMeta{
+				ObjectMeta: api.ObjectMeta{
+					Name: "atomicservice",
+					Labels: map[string]string{
+						"name": "atomicService",
+					},
 				},
 			},
 			Spec: api.ServiceSpec{
@@ -495,10 +499,12 @@ func runMasterServiceTest(client *client.Client) {
 
 func runServiceTest(client *client.Client) {
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: "foo",
-			Labels: map[string]string{
-				"name": "thisisalonglabel",
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+				Labels: map[string]string{
+					"name": "thisisalonglabel",
+				},
 			},
 		},
 		Spec: api.PodSpec{
@@ -524,7 +530,9 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	svc1 := api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service1"},
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{Name: "service1"},
+		},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{
 				"name": "thisisalonglabel",
@@ -541,7 +549,9 @@ func runServiceTest(client *client.Client) {
 	}
 	// A second service with the same port.
 	svc2 := api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service2"},
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{Name: "service2"},
+		},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{
 				"name": "thisisalonglabel",

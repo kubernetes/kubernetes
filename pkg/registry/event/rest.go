@@ -48,7 +48,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("invalid object type")
 	}
 	if api.Namespace(ctx) != "" {
-		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
+		if !api.ValidNamespace(ctx, &event.NSObjectMeta) {
 			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
 		}
 	}

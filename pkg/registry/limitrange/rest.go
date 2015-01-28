@@ -50,7 +50,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("invalid object type")
 	}
 
-	if !api.ValidNamespace(ctx, &limitRange.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &limitRange.NSObjectMeta) {
 		return nil, errors.NewConflict("limitRange", limitRange.Namespace, fmt.Errorf("LimitRange.Namespace does not match the provided context"))
 	}
 
@@ -79,7 +79,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("invalid object type")
 	}
 
-	if !api.ValidNamespace(ctx, &limitRange.ObjectMeta) {
+	if !api.ValidNamespace(ctx, &limitRange.NSObjectMeta) {
 		return nil, errors.NewConflict("limitRange", limitRange.Namespace, fmt.Errorf("LimitRange.Namespace does not match the provided context"))
 	}
 

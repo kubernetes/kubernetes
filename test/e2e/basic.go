@@ -44,8 +44,8 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 	// in contrib/for-demos/serve_hostname
 	glog.Infof("Creating replication controller %s", name)
 	controller, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{Name: name},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
@@ -53,8 +53,10 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 				"name": name,
 			},
 			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{"name": name},
+				NSObjectMeta: api.NSObjectMeta{
+					ObjectMeta: api.ObjectMeta{
+						Labels: map[string]string{"name": name},
+					},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{

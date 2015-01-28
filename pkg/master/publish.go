@@ -82,10 +82,12 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 		return nil
 	}
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{
-			Name:      serviceName,
+		NSObjectMeta: api.NSObjectMeta{
 			Namespace: api.NamespaceDefault,
-			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
+			ObjectMeta: api.ObjectMeta{
+				Name:   serviceName,
+				Labels: map[string]string{"provider": "kubernetes", "component": "apiserver"},
+			},
 		},
 		Spec: api.ServiceSpec{
 			Port: port,
@@ -116,9 +118,11 @@ func (m *Master) ensureEndpointsContain(serviceName string, endpoint string) err
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
 		e = &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
-				Name:      serviceName,
+			NSObjectMeta: api.NSObjectMeta{
 				Namespace: api.NamespaceDefault,
+				ObjectMeta: api.ObjectMeta{
+					Name: serviceName,
+				},
 			},
 		}
 	}

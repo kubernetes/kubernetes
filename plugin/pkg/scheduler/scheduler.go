@@ -77,9 +77,9 @@ func (s *Scheduler) scheduleOne() {
 		return
 	}
 	b := &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace},
-		PodID:      pod.Name,
-		Host:       dest,
+		NSObjectMeta: api.NSObjectMeta{Namespace: pod.Namespace},
+		PodID:        pod.Name,
+		Host:         dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		glog.V(1).Infof("Failed to bind pod: %v", err)

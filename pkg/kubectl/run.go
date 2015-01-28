@@ -52,16 +52,20 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 		return nil, err
 	}
 	controller := api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name:   params["name"],
-			Labels: labels,
+		NSObjectMeta: api.NSObjectMeta{
+			ObjectMeta: api.ObjectMeta{
+				Name:   params["name"],
+				Labels: labels,
+			},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: count,
 			Selector: labels,
 			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: labels,
+				NSObjectMeta: api.NSObjectMeta{
+					ObjectMeta: api.ObjectMeta{
+						Labels: labels,
+					},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
