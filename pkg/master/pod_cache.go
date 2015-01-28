@@ -169,7 +169,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	} else {
 		newStatus.Info = result.Status.Info
 		newStatus.Phase = getPhase(&pod.Spec, newStatus.Info)
-		if netContainerInfo, ok := newStatus.Info["net"]; ok {
+		if netContainerInfo, ok := newStatus.Info["POD"]; ok {
 			if netContainerInfo.PodIP != "" {
 				newStatus.PodIP = netContainerInfo.PodIP
 			}
