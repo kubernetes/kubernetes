@@ -23,6 +23,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func TestNetwork(c *client.Client) bool {
@@ -138,3 +141,11 @@ func TestNetwork(c *client.Client) bool {
 
 	return false
 }
+
+var _ = Describe("TestNetwork", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestNetwork(loadClientOrDie())).To(BeTrue())
+	})
+})

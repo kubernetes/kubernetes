@@ -24,6 +24,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // TestClusterDNS checks that cluster DNS works.
@@ -150,3 +153,11 @@ func TestClusterDNS(c *client.Client) bool {
 	glog.Infof("DNS probes using %s succeeded", pod.Name)
 	return true
 }
+
+var _ = Describe("TestClusterDNS", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestClusterDNS(loadClientOrDie())).To(BeTrue())
+	})
+})

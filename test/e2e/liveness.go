@@ -26,6 +26,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func runLivenessTest(c *client.Client, yamlFileName string) bool {
@@ -92,3 +95,19 @@ func TestLivenessHttp(c *client.Client) bool {
 func TestLivenessExec(c *client.Client) bool {
 	return runLivenessTest(c, "exec-liveness.yaml")
 }
+
+var _ = Describe("TestLivenessHttp", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestLivenessHttp(loadClientOrDie())).To(BeTrue())
+	})
+})
+
+var _ = Describe("TestLivenessExec", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestLivenessExec(loadClientOrDie())).To(BeTrue())
+	})
+})

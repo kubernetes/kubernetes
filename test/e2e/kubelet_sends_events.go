@@ -24,6 +24,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // TestKubeletSendsEvent checks that kubelets and scheduler send events about pods scheduling and running.
@@ -101,3 +104,11 @@ func TestKubeletSendsEvent(c *client.Client) bool {
 	glog.Info("Saw kubelet event for our pod.")
 	return true
 }
+
+var _ = Describe("TestKubeletSendsEvent", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestKubeletSendsEvent(loadClientOrDie())).To(BeTrue())
+	})
+})

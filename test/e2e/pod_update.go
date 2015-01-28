@@ -24,6 +24,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func TestPodUpdate(c *client.Client) bool {
@@ -69,3 +72,11 @@ func TestPodUpdate(c *client.Client) bool {
 	glog.Infof("pod update OK")
 	return true
 }
+
+var _ = Describe("TestPodUpdate", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestPodUpdate(loadClientOrDie())).To(BeTrue())
+	})
+})

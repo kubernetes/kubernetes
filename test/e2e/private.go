@@ -19,6 +19,9 @@ package e2e
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // A basic test to check the deployment of the
@@ -33,3 +36,11 @@ func TestPrivate(c *client.Client) bool {
 	glog.Info("Calling out to TestBasic")
 	return TestBasicImage(c, "private", "gcr.io/_b_k8s_test/serve_hostname:1.0")
 }
+
+var _ = Describe("TestPrivate", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestPrivate(loadClientOrDie())).To(BeTrue())
+	})
+})

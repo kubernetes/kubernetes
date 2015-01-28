@@ -20,6 +20,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func TestKubernetesROService(c *client.Client) bool {
@@ -53,3 +56,11 @@ func TestKubernetesROService(c *client.Client) bool {
 	}
 	return true
 }
+
+var _ = Describe("TestKubernetesROService", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestKubernetesROService(loadClientOrDie())).To(BeTrue())
+	})
+})
