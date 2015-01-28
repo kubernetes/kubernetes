@@ -33,7 +33,9 @@ function validate() {
 
   # Container turn up on a clean cluster can take a while for the docker image pull.
   local num_running=0
-  while [[ $num_running -ne $num_replicas ]]; do
+  local i=0
+  while [[ ${num_running} -ne ${num_replicas} && ${i} -ne 100]]; do
+    ((i++)) || true
     echo "Waiting for all containers in pod to come up. Currently: ${num_running}/${num_replicas}"
     sleep 2
 
