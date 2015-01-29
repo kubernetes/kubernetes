@@ -22,7 +22,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -61,7 +60,6 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string
 func newApiClient(addr string, port int) *client.Client {
 	apiServerURL := fmt.Sprintf("http://%s:%d", addr, port)
 	cl := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
-	cl.PollPeriod = time.Second * 1
 	return cl
 }
 

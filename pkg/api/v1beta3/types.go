@@ -832,12 +832,12 @@ type Status struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
 
-	// One of: "Success", "Failure", "Working" (for operations not yet completed)
+	// One of: "Success" or "Failure"
 	Status string `json:"status,omitempty"`
 	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty"`
 	// A machine-readable description of why this operation is in the
-	// "Failure" or "Working" status. If this value is empty there
+	// "Failure" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
 	Reason StatusReason `json:"reason,omitempty"`
@@ -872,7 +872,6 @@ type StatusDetails struct {
 const (
 	StatusSuccess = "Success"
 	StatusFailure = "Failure"
-	StatusWorking = "Working"
 )
 
 // StatusReason is an enumeration of possible failure causes.  Each StatusReason
@@ -948,7 +947,7 @@ type StatusCause struct {
 
 // CauseType is a machine readable value providing more detail about what
 // occured in a status response. An operation may have multiple causes for a
-// status (whether Failure, Success, or Working).
+// status (whether Failure or Success).
 type CauseType string
 
 const (

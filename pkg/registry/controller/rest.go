@@ -18,7 +18,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -38,17 +37,15 @@ type PodLister interface {
 
 // REST implements apiserver.RESTStorage for the replication controller service.
 type REST struct {
-	registry   Registry
-	podLister  PodLister
-	pollPeriod time.Duration
+	registry  Registry
+	podLister PodLister
 }
 
 // NewREST returns a new apiserver.RESTStorage for the given registry and PodLister.
 func NewREST(registry Registry, podLister PodLister) *REST {
 	return &REST{
-		registry:   registry,
-		podLister:  podLister,
-		pollPeriod: time.Second * 10,
+		registry:  registry,
+		podLister: podLister,
 	}
 }
 

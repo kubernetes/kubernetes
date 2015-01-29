@@ -636,15 +636,15 @@ type Binding struct {
 // import both.
 type Status struct {
 	TypeMeta `json:",inline"`
-	// One of: "Success", "Failure", "Working" (for operations not yet completed)
-	Status string `json:"status,omitempty" description:"status of the operation; either Working (not yet completed), Success, or Failure"`
+	// One of: "Success" or "Failure".
+	Status string `json:"status,omitempty" description:"status of the operation; either Success, or Failure"`
 	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty" description:"human-readable description of the status of this operation"`
 	// A machine-readable description of why this operation is in the
-	// "Failure" or "Working" status. If this value is empty there
+	// "Failure" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
-	Reason StatusReason `json:"reason,omitempty" description:"machine-readable description of why this operation is in the 'Failure' or 'Working' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"`
+	Reason StatusReason `json:"reason,omitempty" description:"machine-readable description of why this operation is in the 'Failure' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"`
 	// Extended data associated with the reason.  Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by
@@ -676,7 +676,6 @@ type StatusDetails struct {
 const (
 	StatusSuccess = "Success"
 	StatusFailure = "Failure"
-	StatusWorking = "Working"
 )
 
 // StatusReason is an enumeration of possible failure causes.  Each StatusReason
@@ -739,7 +738,7 @@ type StatusCause struct {
 
 // CauseType is a machine readable value providing more detail about what
 // occured in a status response. An operation may have multiple causes for a
-// status (whether Failure, Success, or Working).
+// status (whether Failure or Success).
 type CauseType string
 
 const (
