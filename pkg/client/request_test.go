@@ -44,10 +44,6 @@ import (
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
 
-func skipPolling(name string) (*Request, bool) {
-	return nil, false
-}
-
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{err: errors.New("test")}
 	r := original
@@ -61,9 +57,7 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 		Namespace("new").
 		Resource("foos").
 		Name("bars").
-		NoPoll().
 		Body("foo").
-		Poller(skipPolling).
 		Timeout(time.Millisecond)
 	if changed != &r {
 		t.Errorf("returned request should point to the same object")
@@ -765,90 +759,6 @@ func TestBody(t *testing.T) {
 		if body != data {
 			t.Errorf("%d: r.body = %q; want %q", i, body, data)
 		}
-	}
-}
-
-func TestSetPoller(t *testing.T) {
-	c := NewOrDie(&Config{})
-	r := c.Get()
-	if c.PollPeriod == 0 {
-		t.Errorf("polling should be on by default")
-	}
-	if r.poller == nil {
-		t.Errorf("polling should be on by default")
-	}
-	r.NoPoll()
-	if r.poller != nil {
-		t.Errorf("'NoPoll' doesn't work")
-	}
-}
-
-func TestPolling(t *testing.T) {
-	objects := []runtime.Object{
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusSuccess},
-	}
-
-	callNumber := 0
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if callNumber == 0 {
-			if r.URL.Path != "/api/v1beta1/" {
-				t.Fatalf("unexpected request URL path %s", r.URL.Path)
-			}
-		} else {
-			if r.URL.Path != "/api/v1beta1/operations/1234" {
-				t.Fatalf("unexpected request URL path %s", r.URL.Path)
-			}
-		}
-		t.Logf("About to write %d", callNumber)
-		data, err := v1beta1.Codec.Encode(objects[callNumber])
-		if err != nil {
-			t.Errorf("Unexpected encode error")
-		}
-		callNumber++
-		w.Write(data)
-	}))
-
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
-	c.PollPeriod = 1 * time.Millisecond
-	trials := []func(){
-		func() {
-			// Check that we do indeed poll when asked to.
-			obj, err := c.Get().Do().Get()
-			if err != nil {
-				t.Errorf("Unexpected error: %v %#v", err, err)
-				return
-			}
-			if s, ok := obj.(*api.Status); !ok || s.Status != api.StatusSuccess {
-				t.Errorf("Unexpected return object: %#v", obj)
-				return
-			}
-			if callNumber != len(objects) {
-				t.Errorf("Unexpected number of calls: %v", callNumber)
-			}
-		},
-		func() {
-			// Check that we don't poll when asked not to.
-			obj, err := c.Get().NoPoll().Do().Get()
-			if err == nil {
-				t.Errorf("Unexpected non error: %v", obj)
-				return
-			}
-			if se, ok := err.(APIStatus); !ok || se.Status().Status != api.StatusWorking {
-				t.Errorf("Unexpected kind of error: %#v", err)
-				return
-			}
-			if callNumber != 1 {
-				t.Errorf("Unexpected number of calls: %v", callNumber)
-			}
-		},
-	}
-	for _, f := range trials {
-		callNumber = 0
-		f()
 	}
 }
 

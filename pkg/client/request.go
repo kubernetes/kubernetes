@@ -42,12 +42,6 @@ import (
 // are therefore not allowed to set manually.
 var specialParams = util.NewStringSet("timeout")
 
-// PollFunc is called when a server operation returns 202 accepted. The name of the
-// operation is extracted from the response and passed to this function. Return a
-// request to retrieve the result of the operation, or false for the second argument
-// if polling should end.
-type PollFunc func(name string) (*Request, bool)
-
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -85,10 +79,6 @@ type Request struct {
 	verb    string
 	baseURL *url.URL
 	codec   runtime.Codec
-
-	// optional, will be invoked if the server returns a 202 to decide
-	// whether to poll.
-	poller PollFunc
 
 	// If true, add "?namespace=<namespace>" as a query parameter, if false put ns/<namespace> in path
 	// Query parameter is considered legacy behavior
@@ -305,22 +295,6 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// NoPoll indicates a server "working" response should be returned as an error
-func (r *Request) NoPoll() *Request {
-	return r.Poller(nil)
-}
-
-// Poller indicates this request should use the specified poll function to determine whether
-// a server "working" response should be retried. The poller is responsible for waiting or
-// outputting messages to the client.
-func (r *Request) Poller(poller PollFunc) *Request {
-	if r.err != nil {
-		return r
-	}
-	r.poller = poller
-	return r
-}
-
 func (r *Request) finalURL() string {
 	p := r.path
 	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
@@ -430,7 +404,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 }
 
 // Do formats and executes the request. Returns a Result object for easy response
-// processing. Handles polling the server in the event a continuation was sent.
+// processing.
 //
 // Error type:
 //  * If the request can't be constructed, or an error happened earlier while building its
@@ -464,10 +438,6 @@ func (r *Request) Do() Result {
 		}
 
 		respBody, created, err := r.transformResponse(resp, req)
-		if poll, ok := r.shouldPoll(err); ok {
-			r = poll
-			continue
-		}
 
 		// Check to see if we got a 429 Too Many Requests response code.
 		if resp.StatusCode == errors.StatusTooManyRequests {
@@ -485,27 +455,6 @@ func (r *Request) Do() Result {
 		}
 		return Result{respBody, created, err, r.codec}
 	}
-}
-
-// shouldPoll checks the server error for an incomplete operation
-// and if found returns a request that would check the response.
-// If no polling is necessary or possible, it will return false.
-func (r *Request) shouldPoll(err error) (*Request, bool) {
-	if err == nil || r.poller == nil {
-		return nil, false
-	}
-	apistatus, ok := err.(APIStatus)
-	if !ok {
-		return nil, false
-	}
-	status := apistatus.Status()
-	if status.Status != api.StatusWorking {
-		return nil, false
-	}
-	if status.Details == nil || len(status.Details.ID) == 0 {
-		return nil, false
-	}
-	return r.poller(status.Details.ID)
 }
 
 // transformResponse converts an API response into a structured API object.
