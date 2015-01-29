@@ -34,7 +34,7 @@ function validate() {
   # Container turn up on a clean cluster can take a while for the docker image pull.
   local num_running=0
   local i=0
-  while [[ ${num_running} -ne ${num_replicas} && ${i} -ne 100]]; do
+  while [[ ${num_running} -ne ${num_replicas} && ${i} -ne 100 ]]; do
     ((i++)) || true
     echo "Waiting for all containers in pod to come up. Currently: ${num_running}/${num_replicas}"
     sleep 2
@@ -62,7 +62,7 @@ function validate() {
       # This template is unit-tested in kubec{tl|fg}, so if you change it, update the unit test.
       #
       # You can read about the syntax here: http://golang.org/pkg/text/template/
-      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"net\" \"state\" \"running\")}}"
+      template_string="{{and (exists . \"currentState\" \"info\" \"${CONTROLLER_NAME}\" \"state\" \"running\") (exists . \"currentState\" \"info\" \"POD\" \"state\" \"running\")}}"
       current_status=$($KUBECTL get pods "$id" -o template --template="${template_string}") || {
         if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
           echo "  $id no longer exists"
@@ -106,15 +106,15 @@ function validate() {
 
 export DOCKER_HUB_USER=jlowdermilk
 
-# Launch a container
-${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh
-
 function teardown() {
   echo "Cleaning up test artifacts"
   ${KUBE_ROOT}/examples/update-demo/5-down.sh
 }
 
 trap "teardown" EXIT
+
+# Launch a container
+${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh
 
 validate 2 nautilus
 

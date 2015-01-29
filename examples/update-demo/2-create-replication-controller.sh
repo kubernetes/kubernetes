@@ -23,7 +23,7 @@ if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
   exit 1
 fi
 
-export KUBE_ROOT=$(dirname $0)/../..
+export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
 export KUBECTL=${KUBE_REPO_ROOT}/cluster/kubectl.sh
 
 set -x
