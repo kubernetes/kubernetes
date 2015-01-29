@@ -21,149 +21,25 @@ import (
 
 	"math/rand"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	docker "github.com/fsouza/go-dockerclient"
-	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
-	"speter.net/go/exp/math/dec/inf"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 20, "How many fuzzing iterations to do.")
 
-// fuzzerFor can randomly populate api objects that are destined for version.
-func fuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
-	f := fuzz.New().NilChance(.5).NumElements(1, 1)
-	if src != nil {
-		f.RandSource(src)
-	}
-	f.Funcs(
-		func(j *runtime.PluginBase, c fuzz.Continue) {
-			// Do nothing; this struct has only a Kind field and it must stay blank in memory.
-		},
-		func(j *runtime.TypeMeta, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
-			j.Kind = ""
-		},
-		func(j *api.TypeMeta, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
-			j.Kind = ""
-		},
-		func(j *api.ObjectMeta, c fuzz.Continue) {
-			j.Name = c.RandString()
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
-
-			var sec, nsec int64
-			c.Fuzz(&sec)
-			c.Fuzz(&nsec)
-			j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
-		},
-		func(j *api.ListMeta, c fuzz.Continue) {
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
-		},
-		func(j *api.PodPhase, c fuzz.Continue) {
-			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
-			*j = statuses[c.Rand.Intn(len(statuses))]
-		},
-		func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
-			// TemplateRef must be nil for round trip
-			c.Fuzz(&j.Template)
-			if j.Template == nil {
-				// TODO: v1beta1/2 can't round trip a nil template correctly, fix by having v1beta1/2
-				// conversion compare converted object to nil via DeepEqual
-				j.Template = &api.PodTemplateSpec{}
-			}
-			j.Template.ObjectMeta = api.ObjectMeta{Labels: j.Template.ObjectMeta.Labels}
-			c.Fuzz(&j.Selector)
-			j.Replicas = int(c.RandUint64())
-		},
-		func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
-			// only replicas round trips
-			j.Replicas = int(c.RandUint64())
-		},
-		func(j *api.List, c fuzz.Continue) {
-			c.Fuzz(&j.ListMeta)
-			c.Fuzz(&j.Items)
-			if j.Items == nil {
-				j.Items = []runtime.Object{}
-			}
-		},
-		func(j *runtime.Object, c fuzz.Continue) {
-			if c.RandBool() {
-				*j = &runtime.Unknown{
-					TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown"},
-					RawJSON:  []byte(`{"apiVersion":"unknown","kind":"Something","someKey":"someValue"}`),
-				}
-			} else {
-				types := []runtime.Object{&api.Pod{}, &api.ReplicationController{}}
-				t := types[c.Rand.Intn(len(types))]
-				c.Fuzz(t)
-				*j = t
-			}
-		},
-		func(intstr *util.IntOrString, c fuzz.Continue) {
-			// util.IntOrString will panic if its kind is set wrong.
-			if c.RandBool() {
-				intstr.Kind = util.IntstrInt
-				intstr.IntVal = int(c.RandUint64())
-				intstr.StrVal = ""
-			} else {
-				intstr.Kind = util.IntstrString
-				intstr.IntVal = 0
-				intstr.StrVal = c.RandString()
-			}
-		},
-		func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
-			// This is necessary because keys with nil values get omitted.
-			// TODO: Is this a bug?
-			pb[docker.Port(c.RandString())] = []docker.PortBinding{
-				{c.RandString(), c.RandString()},
-				{c.RandString(), c.RandString()},
-			}
-		},
-		func(pm map[string]docker.PortMapping, c fuzz.Continue) {
-			// This is necessary because keys with nil values get omitted.
-			// TODO: Is this a bug?
-			pm[c.RandString()] = docker.PortMapping{
-				c.RandString(): c.RandString(),
-			}
-		},
-		func(q *resource.Quantity, c fuzz.Continue) {
-			// Real Quantity fuzz testing is done elsewhere;
-			// this limited subset of functionality survives
-			// round-tripping to v1beta1/2.
-			q.Amount = &inf.Dec{}
-			q.Format = resource.DecimalExponent
-			//q.Amount.SetScale(inf.Scale(-c.Intn(12)))
-			q.Amount.SetUnscaled(c.Int63n(1000))
-		},
-		func(p *api.PullPolicy, c fuzz.Continue) {
-			policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
-			*p = policies[c.Rand.Intn(len(policies))]
-		},
-	)
-	return f
-}
-
 func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, seed int64) runtime.Object {
-	fuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
+	apitesting.FuzzerFor(t, forVersion, rand.NewSource(seed)).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -316,7 +192,7 @@ const benchmarkSeed = 100
 
 func BenchmarkEncode(b *testing.B) {
 	pod := api.Pod{}
-	apiObjectFuzzer := fuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	for i := 0; i < b.N; i++ {
 		latest.Codec.Encode(&pod)
@@ -326,7 +202,7 @@ func BenchmarkEncode(b *testing.B) {
 // BenchmarkEncodeJSON provides a baseline for regular JSON encode performance
 func BenchmarkEncodeJSON(b *testing.B) {
 	pod := api.Pod{}
-	apiObjectFuzzer := fuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	for i := 0; i < b.N; i++ {
 		json.Marshal(&pod)
@@ -335,7 +211,7 @@ func BenchmarkEncodeJSON(b *testing.B) {
 
 func BenchmarkDecode(b *testing.B) {
 	pod := api.Pod{}
-	apiObjectFuzzer := fuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	data, _ := latest.Codec.Encode(&pod)
 	for i := 0; i < b.N; i++ {
@@ -345,7 +221,7 @@ func BenchmarkDecode(b *testing.B) {
 
 func BenchmarkDecodeInto(b *testing.B) {
 	pod := api.Pod{}
-	apiObjectFuzzer := fuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	data, _ := latest.Codec.Encode(&pod)
 	for i := 0; i < b.N; i++ {
@@ -357,7 +233,7 @@ func BenchmarkDecodeInto(b *testing.B) {
 // BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
 func BenchmarkDecodeJSON(b *testing.B) {
 	pod := api.Pod{}
-	apiObjectFuzzer := fuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(benchmarkSeed))
 	apiObjectFuzzer.Fuzz(&pod)
 	data, _ := latest.Codec.Encode(&pod)
 	for i := 0; i < b.N; i++ {
