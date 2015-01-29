@@ -93,7 +93,7 @@ func main() {
 	}
 	imageID := hex.EncodeToString(imageIDBytes)
 	repo := map[string]map[string]string{
-		*image: map[string]string{
+		*image: {
 			"latest": imageID,
 		},
 	}
