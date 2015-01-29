@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"path"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -57,7 +59,17 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
 	}()
 
-	// TODO: Make -t TestName work again.
+	if len(testList) != 0 {
+		if config.GinkgoConfig.FocusString != "" || config.GinkgoConfig.SkipString != "" {
+			glog.Fatal("Either specify --test/-t or --ginkgo.focus/--ginkgo.skip but not both.")
+		}
+		var testRegexps []string
+		for _, t := range testList {
+			testRegexps = append(testRegexps, regexp.QuoteMeta(t))
+		}
+		config.GinkgoConfig.FocusString = `\b(` + strings.Join(testRegexps, "|") + `)\b`
+	}
+
 	// TODO: Make "times" work again.
 	// TODO: Make orderseed work again.
 
