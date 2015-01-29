@@ -213,6 +213,24 @@ EOF
   chmod 0600 "$file"
 }
 
+# Adds a tag to an AWS resource
+# usage: add-tag <resource-id> <tag-name> <tag-value>
+function add-tag {
+  echo "Adding tag to ${1}: ${2}=${3}"
+
+  # We need to retry in case the resource isn't yet fully created
+  sleep 3
+  n=0
+  until [ $n -ge 5 ]; do
+    $AWS_CMD create-tags --resources ${1} --tags Key=${2},Value=${3} > $LOG && return
+    n=$[$n+1]
+    sleep 15
+  done
+
+  echo "Unable to add tag to AWS resource"
+  exit 1
+}
+
 function kube-up {
   find-release-tars
   upload-server-tars
@@ -243,8 +261,7 @@ function kube-up {
 	  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  $AWS_CMD create-tags --resources $VPC_ID --tags Key=Name,Value=kubernetes-vpc > $LOG
-
+	  add-tag $VPC_ID Name kubernetes-vpc
   fi
 
   echo "Using VPC $VPC_ID"
@@ -322,10 +339,8 @@ function kube-up {
     --security-group-ids $SEC_GROUP_ID \
     --associate-public-ip-address \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
-  sleep 3
-  $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=$MASTER_NAME > $LOG
-  sleep 3
-  $AWS_CMD create-tags --resources $master_id --tags Key=Role,Value=$MASTER_TAG > $LOG
+  add-tag $master_id Name $MASTER_NAME
+  add-tag $master_id Role $MASTER_TAG
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Starting Minion (${MINION_NAMES[$i]})"
@@ -346,21 +361,9 @@ function kube-up {
       --security-group-ids $SEC_GROUP_ID \
       --associate-public-ip-address \
       --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
-    sleep 3
-    n=0
-    until [ $n -ge 5 ]; do
-      $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=${MINION_NAMES[$i]} > $LOG && break
-      n=$[$n+1]
-      sleep 15
-    done
 
-    sleep 3
-    n=0
-    until [ $n -ge 5 ]; do
-      $AWS_CMD create-tags --resources $minion_id --tags Key=Role,Value=$MINION_TAG > $LOG && break
-      n=$[$n+1]
-      sleep 15
-    done
+    add-tag $minion_id Name ${MINION_NAMES[$i]}
+    add-tag $minion_id Role $MINION_TAG
 
     sleep 3
     $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
