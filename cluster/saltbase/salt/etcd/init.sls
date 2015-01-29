@@ -10,10 +10,10 @@
 #    shasum <tar>
 # 6. Update this file with new tar version and new hash
 
-{% set etcd_version="v0.4.6" %}
+{% set etcd_version="v2.0.0" %}
 {% set etcd_tar_url="https://storage.googleapis.com/kubernetes-release/etcd/etcd-%s-linux-amd64.tar.gz"
   | format(etcd_version)  %}
-{% set etcd_tar_hash="sha1=5db514e30b9f340eda00671230d5136855ae14d7" %}
+{% set etcd_tar_hash="sha1=b3cd41d1748bf882a58a98c9585fd5849b943811" %}
 
 etcd-tar:
   archive:
