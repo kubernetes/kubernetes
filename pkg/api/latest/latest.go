@@ -103,25 +103,6 @@ func init() {
 			return interfaces, true
 		},
 	)
-	// scopes that are used to qualify resources in the API
-	namespaceAsQueryParam := meta.RESTScope{
-		Name:             "namespace",
-		ParamName:        "namespace",
-		ParamPath:        false,
-		ParamDescription: "object name and auth scope, such as for teams and projects",
-	}
-	namespaceAsPathParam := meta.RESTScope{
-		Name:             "namespace",
-		ParamName:        "ns",
-		ParamPath:        true,
-		ParamDescription: "object name and auth scope, such as for teams and projects",
-	}
-	rootScope := meta.RESTScope{
-		Name:      "root",
-		ParamName: "",
-		ParamPath: true,
-	}
-
 	// list of versions we support on the server
 	versions := []string{"v1beta1", "v1beta2", "v1beta3"}
 
@@ -133,9 +114,9 @@ func init() {
 
 	// backwards compatibility, prior to v1beta3, we identified the namespace as a query parameter
 	versionToNamespaceScope := map[string]meta.RESTScope{
-		"v1beta1": namespaceAsQueryParam,
-		"v1beta2": namespaceAsQueryParam,
-		"v1beta3": namespaceAsPathParam,
+		"v1beta1": meta.RESTScopeNamespaceLegacy,
+		"v1beta2": meta.RESTScopeNamespaceLegacy,
+		"v1beta3": meta.RESTScopeNamespace,
 	}
 
 	// the list of kinds that are scoped at the root of the api hierarchy
@@ -155,7 +136,7 @@ func init() {
 			scope := versionToNamespaceScope[version]
 			_, found = kindToRootScope[kind]
 			if found {
-				scope = rootScope
+				scope = meta.RESTScopeRoot
 			}
 			mapper.Add(scope, kind, version, mixedCase)
 		}

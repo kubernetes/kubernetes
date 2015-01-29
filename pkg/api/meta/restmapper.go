@@ -21,6 +21,45 @@ import (
 	"strings"
 )
 
+// Implements RESTScope interface
+type restScope struct {
+	name             RESTScopeName
+	paramName        string
+	paramPath        bool
+	paramDescription string
+}
+
+func (r *restScope) Name() RESTScopeName {
+	return r.name
+}
+func (r *restScope) ParamName() string {
+	return r.paramName
+}
+func (r *restScope) ParamPath() bool {
+	return r.paramPath
+}
+func (r *restScope) ParamDescription() string {
+	return r.paramDescription
+}
+
+var RESTScopeNamespaceLegacy = &restScope{
+	name:             RESTScopeNameNamespace,
+	paramName:        "namespace",
+	paramPath:        false,
+	paramDescription: "object name and auth scope, such as for teams and projects",
+}
+
+var RESTScopeNamespace = &restScope{
+	name:             RESTScopeNameNamespace,
+	paramName:        "namespace",
+	paramPath:        true,
+	paramDescription: "object name and auth scope, such as for teams and projects",
+}
+
+var RESTScopeRoot = &restScope{
+	name: RESTScopeNameRoot,
+}
+
 // typeMeta is used as a key for lookup in the mapping between REST path and
 // API object.
 type typeMeta struct {
@@ -89,6 +128,9 @@ func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mi
 
 // kindToResource converts Kind to a resource name.
 func kindToResource(kind string, mixedCase bool) (plural, singular string) {
+	if len(kind) == 0 {
+		return
+	}
 	if mixedCase {
 		// Legacy support for mixed case names
 		singular = strings.ToLower(kind[:1]) + kind[1:]

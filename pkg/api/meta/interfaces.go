@@ -94,19 +94,26 @@ type MetadataAccessor interface {
 	runtime.ResourceVersioner
 }
 
-// RESTScope contains the information needed to deal with REST Resources that are in a resource hierarchy
-type RESTScope struct {
-	// Name of the scope (e.g. "cluster", "namespace", etc.)
-	Name string
+type RESTScopeName string
+
+const (
+	RESTScopeNameNamespace RESTScopeName = "namespace"
+	RESTScopeNameRoot      RESTScopeName = "root"
+)
+
+// RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
+type RESTScope interface {
+	// Name of the scope
+	Name() RESTScopeName
 	// ParamName is the optional name of the parameter that should be inserted in the resource url
 	// If empty, no param will be inserted
-	ParamName string
+	ParamName() string
 	// ParamPath is a boolean that controls how the parameter is manifested in resource paths
 	// If true, this parameter is encoded in path (i.e. /{paramName}/{paramValue})
 	// If false, this parameter is encoded in query (i.e. ?{paramName}={paramValue})
-	ParamPath bool
+	ParamPath() bool
 	// ParamDescription is the optional description to use to document the parameter in api documentation
-	ParamDescription string
+	ParamDescription() string
 }
 
 // RESTMapping contains the information needed to deal with objects of a specific

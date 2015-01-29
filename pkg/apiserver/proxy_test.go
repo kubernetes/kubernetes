@@ -230,7 +230,7 @@ func TestProxy(t *testing.T) {
 		}
 		handler := Handle(map[string]RESTStorage{
 			"foo": simpleStorage,
-		}, codec, "/prefix", "version", selfLinker, admissionControl)
+		}, codec, "/prefix", "version", selfLinker, admissionControl, mapper)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 

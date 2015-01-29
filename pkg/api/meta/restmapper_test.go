@@ -75,10 +75,7 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		mapper := NewDefaultRESTMapper([]string{"test"}, fakeInterfaces)
-		scheme := runtime.NewScheme()
-		scheme.AddKnownTypes("test", &InternalObject{})
-		mapper.Add(scheme, testCase.MixedCase, "test")
-
+		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, testCase.MixedCase)
 		v, k, err := mapper.VersionAndKindForResource(testCase.Resource)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -150,10 +147,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
-		scheme := runtime.NewScheme()
-		scheme.AddKnownTypes("test", &InternalObject{})
-		mapper.Add(scheme, testCase.MixedCase, "test")
-
+		mapper.Add(RESTScopeNamespace, "InternalObject", "test", testCase.MixedCase)
 		mapping, err := mapper.RESTMapping(testCase.Kind, testCase.APIVersions...)
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -180,11 +174,8 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 
 func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	mapper := NewDefaultRESTMapper([]string{"test1", "test2"}, fakeInterfaces)
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypes("test1", &InternalObject{})
-	scheme.AddKnownTypeWithName("test2", "OtherObject", &InternalObject{})
-	scheme.AddKnownTypeWithName("test3", "OtherObject", &InternalObject{})
-	mapper.Add(scheme, false, "test1", "test2")
+	mapper.Add(RESTScopeNamespace, "InternalObject", "test1", false)
+	mapper.Add(RESTScopeNamespace, "OtherObject", "test2", false)
 
 	// pick default matching object kind based on search order
 	mapping, err := mapper.RESTMapping("OtherObject")
@@ -236,10 +227,7 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 
 func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 	mapper := NewDefaultRESTMapper([]string{"test1", "test2"}, unmatchedVersionInterfaces)
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypes("test1", &InternalObject{})
-	mapper.Add(scheme, false, "test1")
-
+	mapper.Add(RESTScopeNamespace, "InternalObject", "test1", false)
 	_, err := mapper.RESTMapping("InternalObject", "test1")
 	if err == nil {
 		t.Errorf("unexpected non-error")

@@ -29,7 +29,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -56,9 +56,9 @@ type defaultAPIServer struct {
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
 // Note: This method is used only in tests.
-func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, selfLinker runtime.SelfLinker, admissionControl admission.Interface) http.Handler {
+func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) http.Handler {
 	prefix := root + "/" + version
-	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker, admissionControl)
+	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker, admissionControl, mapper)
 	container := restful.NewContainer()
 	mux := container.ServeMux
 	group.InstallREST(container, mux, root, version)
@@ -77,6 +77,7 @@ func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, ve
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIGroupVersion struct {
 	handler RESTHandler
+	mapper  meta.RESTMapper
 }
 
 // NewAPIGroupVersion returns an object that will serve a set of REST resources and their
@@ -84,15 +85,18 @@ type APIGroupVersion struct {
 // This is a helper method for registering multiple sets of REST handlers under different
 // prefixes onto a server.
 // TODO: add multitype codec serialization
-func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, canonicalPrefix string, selfLinker runtime.SelfLinker, admissionControl admission.Interface) *APIGroupVersion {
-	return &APIGroupVersion{RESTHandler{
-		storage:          storage,
-		codec:            codec,
-		canonicalPrefix:  canonicalPrefix,
-		selfLinker:       selfLinker,
-		ops:              NewOperations(),
-		admissionControl: admissionControl,
-	}}
+func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, canonicalPrefix string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) *APIGroupVersion {
+	return &APIGroupVersion{
+		handler: RESTHandler{
+			storage:          storage,
+			codec:            codec,
+			canonicalPrefix:  canonicalPrefix,
+			selfLinker:       selfLinker,
+			ops:              NewOperations(),
+			admissionControl: admissionControl,
+		},
+		mapper: mapper,
+	}
 }
 
 // This magic incantation returns *ptrToObject for an arbitrary pointer
@@ -100,7 +104,7 @@ func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, h restful.RouteFunction) error {
+func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, h restful.RouteFunction, mapper meta.RESTMapper) error {
 	object := storage.New()
 	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 	if err != nil {
@@ -112,7 +116,6 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	mapper := latest.RESTMapper
 	mapping, err := mapper.RESTMapping(kind, version)
 	if err != nil {
 		glog.V(1).Infof("OH NOES kind %s version %s err: %v", kind, version, err)
@@ -124,9 +127,9 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	// check if this
 	scope := mapping.Scope
 	var scopeParam *restful.Parameter
-	if len(scope.ParamName) > 0 && scope.ParamPath {
-		path = scope.ParamName + "/{" + scope.ParamName + "}/" + path
-		scopeParam = ws.PathParameter(scope.ParamName, scope.ParamDescription).DataType("string")
+	if len(scope.ParamName()) > 0 && scope.ParamPath() {
+		path = scope.ParamName() + "/{" + scope.ParamName() + "}/" + path
+		scopeParam = ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
 	}
 
 	glog.V(5).Infof("Installing version=/%s, kind=/%s, path=/%s", version, kind, path)
@@ -263,7 +266,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 	registrationErrors := make([]error, 0)
 
 	for path, storage := range g.handler.storage {
-		if err := registerResourceHandlers(ws, version, path, storage, h); err != nil {
+		if err := registerResourceHandlers(ws, version, path, storage, h, g.mapper); err != nil {
 			registrationErrors = append(registrationErrors, err)
 		}
 	}
