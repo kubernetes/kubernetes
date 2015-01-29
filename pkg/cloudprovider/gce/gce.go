@@ -37,6 +37,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/cloud/compute/metadata"
 )
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -72,8 +73,7 @@ func getMetadata(url string) (string, error) {
 }
 
 func getProjectAndZone() (string, string, error) {
-	url := "http://metadata/computeMetadata/v1/instance/zone"
-	result, err := getMetadata(url)
+	result, err := metadata.Get("instance/zone")
 	if err != nil {
 		return "", "", err
 	}
@@ -85,8 +85,7 @@ func getProjectAndZone() (string, string, error) {
 }
 
 func getInstanceID() (string, error) {
-	url := "http://metadata/computeMetadata/v1/instance/hostname"
-	result, err := getMetadata(url)
+	result, err := metadata.Get("instance/hostname")
 	if err != nil {
 		return "", err
 	}
