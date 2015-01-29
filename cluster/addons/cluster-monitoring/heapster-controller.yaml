@@ -1,5 +1,5 @@
 apiVersion: "v1beta1"
-id: "monitoring-heapsterController"
+id: "monitoring-heapster-controller"
 kind: "ReplicationController"
 desiredState: 
   replicas: 1
@@ -9,7 +9,7 @@ desiredState:
     desiredState:
       manifest:
         version: "v1beta1"
-        id: "monitoring-heapsterController"
+        id: "monitoring-heapster-controller"
         containers:
           - name: "heapster"
             image: "kubernetes/heapster:v0.6"

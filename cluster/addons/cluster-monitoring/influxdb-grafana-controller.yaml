@@ -1,6 +1,6 @@
 apiVersion: "v1beta1"
 kind: "ReplicationController"
-id: "monitoring-influxGrafanaController"
+id: "monitoring-influx-grafana-controller"
 desiredState: 
   replicas: 1
   replicaSelector:
@@ -11,7 +11,7 @@ desiredState:
     desiredState:
       manifest:
         version: "v1beta1"
-        id: "monitoring-influxGrafanaController"
+        id: "monitoring-influx-grafana-controller"
         containers: 
           - name: "influxdb"
             image: "kubernetes/heapster_influxdb:v0.3"
