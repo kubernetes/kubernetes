@@ -30,6 +30,12 @@ import (
 
 type testResult bool
 
+func init() {
+	// Turn off colors by default to make it easier to collect console output in Jenkins
+	// Override colors off with --ginkgo.noColor=false in the command-line
+	config.DefaultReporterConfig.NoColor = true
+}
+
 func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
@@ -57,8 +63,6 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 
 	var passed testResult = true
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	// Turn of colors for now to make it easier to collect console output in Jenkins
-	config.DefaultReporterConfig.NoColor = true
 	var r []ginkgo.Reporter
 	if reportDir != "" {
 		// TODO: When we start using parallel tests we need to change this to "junit_%d.xml",
