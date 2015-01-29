@@ -60,8 +60,8 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.CreateMinion(ctx, minion)
-		if err != nil {
+		if err := rs.registry.CreateMinion(ctx, minion); err != nil {
+			err = rest.CheckGeneratedNameError(rest.Nodes, err, minion)
 			return nil, err
 		}
 		return minion, nil

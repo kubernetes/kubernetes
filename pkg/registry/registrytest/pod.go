@@ -40,6 +40,12 @@ func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	}
 }
 
+func (r *PodRegistry) SetError(err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Err = err
+}
+
 func (r *PodRegistry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool) (*api.PodList, error) {
 	r.Lock()
 	defer r.Unlock()

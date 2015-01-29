@@ -64,6 +64,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := rs.registry.CreatePod(ctx, pod); err != nil {
+			err = rest.CheckGeneratedNameError(rest.Pods, err, pod)
 			return nil, err
 		}
 		return rs.registry.GetPod(ctx, pod.Name)

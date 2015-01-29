@@ -45,13 +45,9 @@ type RESTCreateStrategy interface {
 // errors that can be converted to api.Status. It invokes ResetBeforeCreate, then GenerateName, then Validate.
 // It returns nil if the object should be created.
 func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Object) error {
-	_, kind, err := strategy.ObjectVersionAndKind(obj)
-	if err != nil {
-		return errors.NewInternalError(err)
-	}
-	objectMeta, err := api.ObjectMetaFor(obj)
-	if err != nil {
-		return errors.NewInternalError(err)
+	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
+	if kerr != nil {
+		return kerr
 	}
 
 	if strategy.NamespaceScoped() {
@@ -69,4 +65,36 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 		return errors.NewInvalid(kind, objectMeta.Name, errs)
 	}
 	return nil
+}
+
+// CheckGeneratedNameError checks whether an error that occured creating a resource is due
+// to generation being unable to pick a valid name.
+func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime.Object) error {
+	if !errors.IsAlreadyExists(err) {
+		return err
+	}
+
+	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
+	if kerr != nil {
+		return kerr
+	}
+
+	if len(objectMeta.GenerateName) == 0 {
+		return err
+	}
+
+	return errors.NewTryAgainLater(kind, "POST")
+}
+
+// objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
+func objectMetaAndKind(strategy RESTCreateStrategy, obj runtime.Object) (*api.ObjectMeta, string, error) {
+	objectMeta, err := api.ObjectMetaFor(obj)
+	if err != nil {
+		return nil, "", errors.NewInternalError(err)
+	}
+	_, kind, err := strategy.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, "", errors.NewInternalError(err)
+	}
+	return objectMeta, kind, nil
 }

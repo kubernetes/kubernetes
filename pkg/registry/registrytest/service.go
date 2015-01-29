@@ -41,6 +41,12 @@ type ServiceRegistry struct {
 	UpdatedID string
 }
 
+func (r *ServiceRegistry) SetError(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.Err = err
+}
+
 func (r *ServiceRegistry) ListServices(ctx api.Context) (*api.ServiceList, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

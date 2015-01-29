@@ -52,6 +52,12 @@ func NewMinionRegistry(minions []string, nodeResources api.NodeResources) *Minio
 	}
 }
 
+func (r *MinionRegistry) SetError(err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Err = err
+}
+
 func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.NodeList, error) {
 	r.Lock()
 	defer r.Unlock()

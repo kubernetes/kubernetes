@@ -154,7 +154,8 @@ func contains(nodes *api.NodeList, nodeID string) bool {
 }
 
 func TestCreate(t *testing.T) {
-	test := resttest.New(t, NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))).ClusterScope()
+	registry := registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{})
+	test := resttest.New(t, NewREST(registry), registry.SetError).ClusterScope()
 	test.TestCreate(
 		// valid
 		&api.Node{

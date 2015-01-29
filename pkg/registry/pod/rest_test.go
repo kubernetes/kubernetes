@@ -636,10 +636,11 @@ func TestDeletePod(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+	registry := registrytest.NewPodRegistry(nil)
 	test := resttest.New(t, &REST{
-		registry: registrytest.NewPodRegistry(nil),
+		registry: registry,
 		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
-	})
+	}, registry.SetError)
 	test.TestCreate(
 		// valid
 		&api.Pod{

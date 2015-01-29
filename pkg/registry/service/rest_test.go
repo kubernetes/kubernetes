@@ -666,7 +666,7 @@ func TestCreate(t *testing.T) {
 	rest := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	rest.portalMgr.randomAttempts = 0
 
-	test := resttest.New(t, rest)
+	test := resttest.New(t, rest, registry.SetError)
 	test.TestCreate(
 		// valid
 		&api.Service{

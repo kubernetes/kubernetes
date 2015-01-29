@@ -152,6 +152,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		}
 
 		if err := rs.registry.CreateService(ctx, service); err != nil {
+			err = rest.CheckGeneratedNameError(rest.Services, err, service)
 			return nil, err
 		}
 		return rs.registry.GetService(ctx, service.Name)

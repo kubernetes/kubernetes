@@ -62,6 +62,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := rs.registry.CreateController(ctx, controller); err != nil {
+			err = rest.CheckGeneratedNameError(rest.ReplicationControllers, err, controller)
 			return apiserver.RESTResult{}, err
 		}
 		return rs.registry.GetController(ctx, controller.Name)

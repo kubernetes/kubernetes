@@ -952,6 +952,17 @@ const (
 	// Status code 422
 	StatusReasonInvalid StatusReason = "Invalid"
 
+	// StatusReasonTryAgainLater means the server can be reached and understood the request,
+	// but cannot complete the action in a reasonable time. The client should retry the request.
+	// This is may be due to temporary server load or a transient communication issue with
+	// another server. Status code 500 is used because the HTTP spec provides no suitable
+	// server-requested client retry and the 5xx class represents actionable errors.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the resource being acted on.
+	//   "id"   string - the operation that is being attempted.
+	// Status code 500
+	StatusReasonTryAgainLater StatusReason = "TryAgainLater"
+
 	// StatusReasonTimeout means that the request could not be completed within the given time.
 	// Clients can get this response only when they specified a timeout param in the request.
 	// The request might succeed with an increased value of timeout param.

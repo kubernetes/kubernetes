@@ -51,7 +51,9 @@ func TestListControllersError(t *testing.T) {
 }
 
 func TestListEmptyControllerList(t *testing.T) {
-	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{ListMeta: api.ListMeta{ResourceVersion: "1"}}}
+	mockRegistry := registrytest.ControllerRegistry{
+		Controllers: &api.ReplicationControllerList{ListMeta: api.ListMeta{ResourceVersion: "1"}},
+	}
 	storage := REST{
 		registry: &mockRegistry,
 	}
@@ -444,7 +446,8 @@ func TestUpdateControllerWithConflictingNamespace(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	test := resttest.New(t, NewREST(&registrytest.ControllerRegistry{}, nil))
+	registry := &registrytest.ControllerRegistry{}
+	test := resttest.New(t, NewREST(registry, nil), registry.SetError)
 	test.TestCreate(
 		// valid
 		&api.ReplicationController{
