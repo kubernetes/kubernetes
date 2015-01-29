@@ -98,7 +98,7 @@ type Config struct {
 	// Defaults to 443 if not set.
 	ReadWritePort int
 
-	// If empty, the first result from net.InterfaceAddrs will be used.
+	// If empty, Defaults to 0.0.0.0.
 	PublicAddress string
 }
 
@@ -178,34 +178,9 @@ func setDefaults(c *Config) {
 		c.ReadWritePort = 443
 	}
 	for c.PublicAddress == "" {
-		// Find and use the first non-loopback address.
-		// TODO: potentially it'd be useful to skip the docker interface if it
-		// somehow is first in the list.
-		addrs, err := net.InterfaceAddrs()
-		if err != nil {
-			glog.Fatalf("Unable to get network interfaces: error='%v'", err)
-		}
-		found := false
-		for i := range addrs {
-			ip, _, err := net.ParseCIDR(addrs[i].String())
-			if err != nil {
-				glog.Errorf("Error parsing '%v': %v", addrs[i], err)
-				continue
-			}
-			if ip.IsLoopback() {
-				glog.Infof("'%v' (%v) is a loopback address, ignoring.", ip, addrs[i])
-				continue
-			}
-			found = true
-			c.PublicAddress = ip.String()
-			glog.Infof("Will report %v as public IP address.", ip)
-			break
-		}
-		if !found {
-			glog.Errorf("Unable to find suitable network address in list: '%v'\n"+
-				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", addrs)
-			time.Sleep(5 * time.Second)
-		}
+		defaultPublicAddress := "0.0.0.0"
+		glog.Infof("Public Address unspecified. Defaulting to %v.", defaultPublicAddress)
+		c.PublicAddress = defaultPublicAddress
 	}
 }
 

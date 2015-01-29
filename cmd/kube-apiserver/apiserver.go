@@ -54,7 +54,7 @@ var (
 	publicAddressOverride = flag.String("public_address_override", "", ""+
 		"Public serving address. Read only port will be opened on this address, "+
 		"and it is assumed that port 443 at this address will be proxied/redirected "+
-		"to '-address':'-port'. If blank, the address in the first listed interface "+
+		"to '-address':'-port'. If blank, Default value 0.0.0.0 "+
 		"will be used.")
 	readOnlyPort = flag.Int("read_only_port", 7080, ""+
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
