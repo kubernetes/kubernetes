@@ -402,6 +402,7 @@ func (b *Builder) Do() *Result {
 	if b.requireNamespace {
 		helpers = append(helpers, RequireNamespace(b.namespace))
 	}
+	helpers = append(helpers, FilterNamespace())
 	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	return r
 }
