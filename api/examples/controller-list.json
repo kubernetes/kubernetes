@@ -3,11 +3,11 @@
     "apiVersion": "v1beta1",
     "items": [
         {
-            "id": "testRun",
+            "id": "test-run",
             "desiredState": {
                 "replicas": 2,
                 "replicaSelector": {
-                    "name": "testRun"
+                    "name": "test-run"
                 },
                 "podTemplate": {
                     "desiredState": {
@@ -23,12 +23,12 @@
                         }
                     },
                     "labels": {
-                        "name": "testRun"
+                        "name": "test-run"
                     }
                 }
             },
             "labels": {
-                "name": "testRun"
+                "name": "test-run"
             }
         }
     ]

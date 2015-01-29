@@ -60,8 +60,8 @@
     }
   },
   {
-    "id": "frontendController",
-    "name": "frontendController",
+    "id": "frontend-controller",
+    "name": "frontend-controller",
     "kind": "ReplicationController",
     "apiVersion": "v1beta1",
     "desiredState": {
@@ -97,8 +97,8 @@
       "labels": {"name": "frontend"}
   },
   {
-    "id": "redisSlaveController",
-    "name": "redisSlaveController",
+    "id": "redis-slave-controller",
+    "name": "redis-slave-controller",
     "kind": "ReplicationController",
     "apiVersion": "v1beta1",
     "desiredState": {

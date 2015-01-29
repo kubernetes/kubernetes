@@ -168,8 +168,8 @@ __EOF__
   kubectl get replicationcontrollers "${kube_flags[@]}"
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   kubectl get replicationcontrollers "${kube_flags[@]}"
-  kubectl describe replicationcontroller frontendController "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
-  kubectl delete rc frontendController "${kube_flags[@]}"
+  kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
+  kubectl delete rc frontend-controller "${kube_flags[@]}"
 
   kube::log::status "Testing kubectl(${version}:nodes)"
   kubectl get nodes "${kube_flags[@]}"

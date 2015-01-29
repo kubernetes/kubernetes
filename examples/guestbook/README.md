@@ -121,7 +121,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`:
 
 ```js
 {
-  "id": "redisSlaveController",
+  "id": "redis-slave-controller",
   "kind": "ReplicationController",
   "apiVersion": "v1beta1",
   "desiredState": {
@@ -131,7 +131,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`:
       "desiredState": {
          "manifest": {
            "version": "v1beta1",
-           "id": "redisSlaveController",
+           "id": "redis-slave-controller",
            "containers": [{
              "name": "slave",
              "image": "brendanburns/redis-slave",
@@ -153,11 +153,11 @@ to create the replication controller by running:
 
 ```shell
 $ cluster/kubectl.sh create -f examples/guestbook/redis-slave-controller.json
-redisSlaveController
+redis-slave-controller
 
 # cluster/kubectl.sh get replicationcontrollers
-NAME                   IMAGE(S)                   SELECTOR            REPLICAS
-redisSlaveController   brendanburns/redis-slave   name=redisslave     2
+NAME                    IMAGE(S)                   SELECTOR            REPLICAS
+redis-slave-controller  brendanburns/redis-slave   name=redisslave     2
 ```
 
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment. In particular, the redis slave is started with the following command:
@@ -225,7 +225,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
 
 ```js
 {
-  "id": "frontendController",
+  "id": "frontend-controller",
   "kind": "ReplicationController",
   "apiVersion": "v1beta1",
   "desiredState": {
@@ -235,7 +235,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
       "desiredState": {
          "manifest": {
            "version": "v1beta1",
-           "id": "frontendController",
+           "id": "frontend-controller",
            "containers": [{
              "name": "php-redis",
              "image": "kubernetes/example-guestbook-php-redis",
@@ -258,12 +258,12 @@ Using this file, you can turn up your frontend with:
 
 ```shell
 $ cluster/kubectl.sh create -f examples/guestbook/frontend-controller.json
-frontendController
+frontend-controller
 
 $ cluster/kubectl.sh get replicationcontrollers
-NAME                   IMAGE(S)                                   SELECTOR            REPLICAS
-redisSlaveController   brendanburns/redis-slave                   name=redisslave     2
-frontendController     kubernetes/example-guestbook-php-redis     name=frontend       3
+NAME                    IMAGE(S)                                   SELECTOR            REPLICAS
+redis-slave-controller  brendanburns/redis-slave                   name=redisslave     2
+frontend-controller     kubernetes/example-guestbook-php-redis     name=frontend       3
 ```
 
 Once that's up (it may take ten to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
