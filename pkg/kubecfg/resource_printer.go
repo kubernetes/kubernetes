@@ -170,7 +170,7 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 		return err
 	}
 	var lines []string
-	for _ = range columnNames {
+	for range columnNames {
 		lines = append(lines, "----------")
 	}
 	_, err := fmt.Fprintf(w, "%s\n", strings.Join(lines, "\t"))
