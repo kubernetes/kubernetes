@@ -49,8 +49,8 @@ function setup {
 }
 
 function cleanup {
-  "${KUBECFG}" resize monitoring-influxGrafanaController 0 &> /dev/null || true
-  "${KUBECFG}" resize monitoring-heapsterController 0 &> /dev/null || true
+  "${KUBECFG}" resize monitoring-influx-grafana-controller 0 &> /dev/null || true
+  "${KUBECFG}" resize monitoring-heapster-controller 0 &> /dev/null || true
   while "${KUBECTL}" get pods -l "name=influxGrafana" -o template -t {{range.items}}{{.id}}:{{end}} | grep -c . &> /dev/null \
     || "${KUBECTL}" get pods -l "name=heapster" -o template -t {{range.items}}{{.id}}:{{end}} | grep -c . &> /dev/null; do
     sleep 2

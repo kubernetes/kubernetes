@@ -29,9 +29,90 @@ import (
 	"github.com/golang/glog"
 )
 
-// ServiceLister is an abstract interface for testing.
-type ServiceLister interface {
-	ListServices(api.Context) (*api.ServiceList, error)
+// ValidateNameFunc validates that the provided name is valid for a given resource type.
+// Not all resources have the same validation rules for names.
+type ValidateNameFunc func(name string) (bool, string)
+
+// nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
+func nameIsDNSSubdomain(name string) (bool, string) {
+	if util.IsDNSSubdomain(name) {
+		return true, ""
+	}
+	return false, "name must be lowercase letters and numbers, with inline dashes or periods"
+}
+
+// nameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
+func nameIsDNS952Label(name string) (bool, string) {
+	if util.IsDNS952Label(name) {
+		return true, ""
+	}
+	return false, "name must be lowercase letters, numbers, and dashes"
+}
+
+// ValidateObjectMeta validates an object's metadata.
+func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(meta.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", meta.Name))
+	} else {
+		if ok, qualifier := nameFn(meta.Name); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, qualifier))
+		}
+	}
+	if requiresNamespace {
+		if len(meta.Namespace) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired("namespace", meta.Namespace))
+		} else if !util.IsDNSSubdomain(meta.Namespace) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, ""))
+		}
+	} else {
+		if len(meta.Namespace) != 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, "namespace is not allowed on this type"))
+		}
+	}
+	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(meta.Annotations, "annotations")...)
+
+	// Clear self link internally
+	// TODO: move to its own area
+	meta.SelfLink = ""
+
+	return allErrs
+}
+
+// ValidateObjectMetaUpdate validates an object's metadata when updated
+func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	// in the event it is left empty, set it, to allow clients more flexibility
+	if len(meta.UID) == 0 {
+		meta.UID = old.UID
+	}
+	if meta.CreationTimestamp.IsZero() {
+		meta.CreationTimestamp = old.CreationTimestamp
+	}
+
+	if old.Name != meta.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, "field is immutable"))
+	}
+	if old.Namespace != meta.Namespace {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, "field is immutable"))
+	}
+	if old.UID != meta.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("uid", meta.UID, "field is immutable"))
+	}
+	if old.CreationTimestamp != meta.CreationTimestamp {
+		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", meta.CreationTimestamp, "field is immutable"))
+	}
+
+	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateLabels(meta.Annotations, "annotations")...)
+
+	// Clear self link internally
+	// TODO: move to its own area
+	meta.SelfLink = ""
+
+	return allErrs
 }
 
 func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationErrorList) {
@@ -387,19 +468,9 @@ func validateDNSPolicy(dnsPolicy *api.DNSPolicy) errs.ValidationErrorList {
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(pod.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
-	} else if !util.IsDNSSubdomain(pod.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, ""))
-	}
-	if len(pod.Namespace) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("namespace", pod.Namespace))
-	} else if !util.IsDNSSubdomain(pod.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace, ""))
-	}
+	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, nameIsDNSSubdomain).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, ValidateLabels(pod.Labels, "labels")...)
-	allErrs = append(allErrs, ValidateLabels(pod.Annotations, "annotations")...)
+
 	return allErrs
 }
 
@@ -434,9 +505,7 @@ func ValidateLabels(labels map[string]string, field string) errs.ValidationError
 func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if newPod.Name != oldPod.Name {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", newPod.Name, "field is immutable"))
-	}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPod.ObjectMeta, &newPod.ObjectMeta).Prefix("metadata")...)
 
 	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers, "may not add or remove containers"))
@@ -454,22 +523,17 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		// TODO: a better error would include all immutable fields explicitly.
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers, "some fields are immutable"))
 	}
+
 	return allErrs
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClientIP), string(api.AffinityTypeNone))
 
 // ValidateService tests if required fields in the service are set.
-func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context) errs.ValidationErrorList {
+func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(service.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", service.Name))
-	} else if !util.IsDNS952Label(service.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", service.Name, ""))
-	}
-	if !util.IsDNSSubdomain(service.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace, ""))
-	}
+	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, nameIsDNS952Label).Prefix("metadata")...)
+
 	if !util.IsValidPortNum(service.Spec.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port, ""))
 	}
@@ -482,8 +546,6 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	if service.Spec.Selector != nil {
 		allErrs = append(allErrs, ValidateLabels(service.Spec.Selector, "spec.selector")...)
 	}
-	allErrs = append(allErrs, ValidateLabels(service.Labels, "labels")...)
-	allErrs = append(allErrs, ValidateLabels(service.Annotations, "annotations")...)
 
 	if service.Spec.SessionAffinity == "" {
 		service.Spec.SessionAffinity = api.AffinityTypeNone
@@ -494,18 +556,35 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	return allErrs
 }
 
+// ValidateServiceUpdate tests if required fields in the service are set during an update
+func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldService.ObjectMeta, &service.ObjectMeta).Prefix("metadata")...)
+
+	// TODO: PortalIP should be a Status field, since the system can set a value != to the user's value
+	// PortalIP can only be set, not unset.
+	if oldService.Spec.PortalIP != "" && service.Spec.PortalIP != oldService.Spec.PortalIP {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable"))
+	}
+
+	return allErrs
+}
+
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(controller.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", controller.Name))
-	}
-	if !util.IsDNSSubdomain(controller.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace, ""))
-	}
+	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, true, nameIsDNSSubdomain).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, ValidateLabels(controller.Labels, "labels")...)
-	allErrs = append(allErrs, ValidateLabels(controller.Annotations, "annotations")...)
+
+	return allErrs
+}
+
+// ValidateReplicationControllerUpdate tests if required fields in the replication controller are set.
+func ValidateReplicationControllerUpdate(oldController, controller *api.ReplicationController) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldController.ObjectMeta, &controller.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
+
 	return allErrs
 }
 
@@ -563,12 +642,15 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 }
 
 // ValidateBoundPod tests if required fields on a bound pod are set.
+// TODO: to be removed.
 func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(pod.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
-	} else if !util.IsDNSSubdomain(pod.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, ""))
+	} else {
+		if ok, qualifier := nameIsDNSSubdomain(pod.Name); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, qualifier))
+		}
 	}
 	if len(pod.Namespace) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("namespace", pod.Namespace))
@@ -579,30 +661,26 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 	return allErrs
 }
 
-// ValidateMinion tests if required fields in the minion are set.
-func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
+// ValidateMinion tests if required fields in the node are set.
+func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(minion.Namespace) != 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace, ""))
-	}
-	if len(minion.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", minion.Name))
-	}
-	allErrs = append(allErrs, ValidateLabels(minion.Labels, "labels")...)
-	allErrs = append(allErrs, ValidateLabels(minion.Annotations, "annotations")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, nameIsDNSSubdomain).Prefix("metadata")...)
 	return allErrs
 }
 
 // ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
 func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldMinion.ObjectMeta, &minion.ObjectMeta).Prefix("metadata")...)
 
 	if !api.Semantic.DeepEqual(minion.Status, api.NodeStatus{}) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("status", minion.Status, "status must be empty"))
 	}
 
-	// Allow users to update labels and capacity
-	oldMinion.Labels = minion.Labels
+	// TODO: move reset function to its own location
+	// Ignore metadata changes now that they have been tested
+	oldMinion.ObjectMeta = minion.ObjectMeta
+	// Allow users to update capacity
 	oldMinion.Spec.Capacity = minion.Spec.Capacity
 	// Clear status
 	oldMinion.Status = minion.Status
@@ -611,6 +689,8 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldMinion, minion)
 		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or capacity changes"))
 	}
+
+	// TODO: validate Spec.Capacity
 	return allErrs
 }
 

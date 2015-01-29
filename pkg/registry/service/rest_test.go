@@ -118,7 +118,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Port:     6502,
 			Selector: map[string]string{"bar": "baz1"},
@@ -132,11 +132,11 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			Selector: map[string]string{"bar": "baz2"},
 		},
 	})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
 	if c == nil {
 		t.Errorf("Expected non-nil channel")
-	}
-	if err != nil {
-		t.Errorf("Expected no error")
 	}
 	updated_svc := <-c
 	updated_service := updated_svc.Object.(*api.Service)
@@ -531,11 +531,9 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update.Spec.Port = 6503
 	update.Spec.PortalIP = "1.2.3.76" // error
 
-	c, _ = rest.Update(ctx, update)
-	result := <-c
-	st := result.Object.(*api.Status)
-	if st.Reason != api.StatusReasonInvalid {
-		t.Errorf("Expected to get an invalid error, got %v", st)
+	_, err := rest.Update(ctx, update)
+	if err == nil || !errors.IsInvalid(err) {
+		t.Error("Unexpected error type: %v", err)
 	}
 }
 

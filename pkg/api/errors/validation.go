@@ -84,14 +84,21 @@ type ValidationError struct {
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
-	s := spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
-	if v.Detail != "" {
+	var s string
+	switch v.Type {
+	case ValidationErrorTypeRequired:
+		s = spew.Sprintf("%s: %s", v.Field, v.Type)
+	default:
+		s = spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
+	}
+	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
 	}
 	return s
 }
 
 // NewFieldRequired returns a *ValidationError indicating "value required"
+// TODO: remove "value"
 func NewFieldRequired(field string, value interface{}) *ValidationError {
 	return &ValidationError{ValidationErrorTypeRequired, field, value, ""}
 }

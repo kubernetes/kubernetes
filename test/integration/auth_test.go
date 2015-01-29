@@ -106,6 +106,7 @@ var aService string = `
   "apiVersion": "v1beta1",
   "id": "a",
   "port": 8000,
+  "portalIP": "10.0.0.1",
   "labels": { "name": "a" },
   "selector": { "name": "a" }
 }

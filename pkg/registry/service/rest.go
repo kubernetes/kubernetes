@@ -84,7 +84,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
-	if errs := validation.ValidateService(service, rs.registry, ctx); len(errs) > 0 {
+	if errs := validation.ValidateService(service); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", service.Name, errs)
 	}
 
@@ -226,20 +226,21 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
-	if errs := validation.ValidateService(service, rs.registry, ctx); len(errs) > 0 {
+
+	oldService, err := rs.registry.GetService(ctx, service.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Copy over non-user fields
+	// TODO: this should be a Status field, since the end user does not set it.
+	// TODO: make this a merge function
+	service.Spec.ProxyPort = oldService.Spec.ProxyPort
+
+	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", service.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		cur, err := rs.registry.GetService(ctx, service.Name)
-		if err != nil {
-			return nil, err
-		}
-		if service.Spec.PortalIP != "" && service.Spec.PortalIP != cur.Spec.PortalIP {
-			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable")}
-			return nil, errors.NewInvalid("service", service.Name, el)
-		}
-		// Copy over non-user fields.
-		service.Spec.ProxyPort = cur.Spec.ProxyPort
 		// TODO: check to see if external load balancer status changed
 		err = rs.registry.UpdateService(ctx, service)
 		if err != nil {

@@ -1081,7 +1081,7 @@ func TestValidateService(t *testing.T) {
 	for _, tc := range testCases {
 		registry := registrytest.NewServiceRegistry()
 		registry.List = tc.existing
-		errs := ValidateService(&tc.svc, registry, api.NewDefaultContext())
+		errs := ValidateService(&tc.svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, utilerrors.NewAggregate(errs))
 		}
@@ -1094,7 +1094,7 @@ func TestValidateService(t *testing.T) {
 			Selector: map[string]string{"foo": "bar"},
 		},
 	}
-	errs := ValidateService(&svc, registrytest.NewServiceRegistry(), api.NewDefaultContext())
+	errs := ValidateService(&svc)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
@@ -1287,15 +1287,15 @@ func TestValidateReplicationController(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "name" &&
-				field != "namespace" &&
+				field != "metadata.name" &&
+				field != "metadata.namespace" &&
 				field != "spec.selector" &&
 				field != "spec.template" &&
 				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "spec.replicas" &&
 				field != "spec.template.labels" &&
-				field != "labels" &&
-				field != "annotations" {
+				field != "metadata.annotations" &&
+				field != "metadata.labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1376,9 +1376,10 @@ func TestValidateMinion(t *testing.T) {
 		}
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
-			if field != "name" &&
-				field != "labels" &&
-				field != "annotations" {
+			if field != "metadata.name" &&
+				field != "metadata.labels" &&
+				field != "metadata.annotations" &&
+				field != "metadata.namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -1504,14 +1505,170 @@ func TestValidateMinionUpdate(t *testing.T) {
 			},
 		}, true},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
 		if test.valid && len(errs) > 0 {
-			t.Errorf("Unexpected error: %v", errs)
+			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldMinion.ObjectMeta, test.minion.ObjectMeta)
 		}
 		if !test.valid && len(errs) == 0 {
-			t.Errorf("Unexpected non-error")
+			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
+
+func TestValidateServiceUpdate(t *testing.T) {
+	tests := []struct {
+		oldService api.Service
+		service    api.Service
+		valid      bool
+	}{
+		{ // 0
+			api.Service{},
+			api.Service{},
+			true},
+		{ // 1
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo"}},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "bar"},
+			}, false},
+		{ // 2
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar"},
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "baz"},
+				},
+			}, true},
+		{ // 3
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "baz"},
+				},
+			}, true},
+		{ // 4
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "foo"},
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "baz"},
+				},
+			}, true},
+		{ // 5
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:        "foo",
+					Annotations: map[string]string{"bar": "foo"},
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:        "foo",
+					Annotations: map[string]string{"foo": "baz"},
+				},
+			}, true},
+		{ // 6
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"foo": "baz"},
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"foo": "baz"},
+				},
+			}, true},
+		{ // 7
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "foo"},
+				},
+				Spec: api.ServiceSpec{
+					PortalIP: "127.0.0.1",
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "fooobaz"},
+				},
+				Spec: api.ServiceSpec{
+					PortalIP: "new",
+				},
+			}, false},
+		{ // 8
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "foo"},
+				},
+				Spec: api.ServiceSpec{
+					PortalIP: "127.0.0.1",
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "fooobaz"},
+				},
+				Spec: api.ServiceSpec{
+					PortalIP: "",
+				},
+			}, false},
+		{ // 9
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "foo"},
+				},
+				Spec: api.ServiceSpec{
+					PortalIP: "127.0.0.1",
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"bar": "fooobaz"},
+				},
+				Spec: api.ServiceSpec{
+					PortalIP: "127.0.0.2",
+				},
+			}, false},
+	}
+	for i, test := range tests {
+		errs := ValidateServiceUpdate(&test.oldService, &test.service)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+			t.Logf("%#v vs %#v", test.oldService.ObjectMeta, test.service.ObjectMeta)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
 		}
 	}
 }

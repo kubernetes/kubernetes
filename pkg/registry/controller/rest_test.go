@@ -143,7 +143,7 @@ func TestControllerDecode(t *testing.T) {
 func TestControllerParsing(t *testing.T) {
 	expectedController := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name: "nginxController",
+			Name: "nginx-controller",
 			Labels: map[string]string{
 				"name": "nginx",
 			},

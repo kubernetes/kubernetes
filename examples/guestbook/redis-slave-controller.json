@@ -1,5 +1,5 @@
 {
-  "id": "redisSlaveController",
+  "id": "redis-slave-controller",
   "kind": "ReplicationController",
   "apiVersion": "v1beta1",
   "desiredState": {
@@ -9,7 +9,7 @@
       "desiredState": {
          "manifest": {
            "version": "v1beta1",
-           "id": "redisSlaveController",
+           "id": "redis-slave-controller",
            "containers": [{
              "name": "slave",
              "image": "brendanburns/redis-slave",
