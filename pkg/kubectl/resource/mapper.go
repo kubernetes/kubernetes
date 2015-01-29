@@ -54,6 +54,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	}
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
+	if mapping.Scope.Name != "namespace" {
+		namespace = ""
+	}
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
 	return &Info{
 		Mapping:   mapping,

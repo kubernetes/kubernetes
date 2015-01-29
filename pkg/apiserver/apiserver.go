@@ -29,6 +29,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -99,7 +100,7 @@ func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, h restful.RouteFunction, namespaceScope bool) error {
+func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, h restful.RouteFunction) error {
 	object := storage.New()
 	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 	if err != nil {
@@ -111,21 +112,31 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
+	mapper := latest.RESTMapper
+	mapping, err := mapper.RESTMapping(kind, version)
+	if err != nil {
+		glog.V(1).Infof("OH NOES kind %s version %s err: %v", kind, version, err)
+		return err
+	}
+
 	// See github.com/emicklei/go-restful/blob/master/jsr311.go for routing logic
 	// and status-code behavior
-	if namespaceScope {
-		path = "ns/{namespace}/" + path
+	// check if this
+	scope := mapping.Scope
+	var scopeParam *restful.Parameter
+	if len(scope.ParamName) > 0 && scope.ParamPath {
+		path = scope.ParamName + "/{" + scope.ParamName + "}/" + path
+		scopeParam = ws.PathParameter(scope.ParamName, scope.ParamDescription).DataType("string")
 	}
 
 	glog.V(5).Infof("Installing version=/%s, kind=/%s, path=/%s", version, kind, path)
 
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
-	namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
 
 	createRoute := ws.POST(path).To(h).
 		Doc("create a " + kind).
 		Operation("create" + kind)
-	addParamIf(createRoute, namespaceParam, namespaceScope)
+	addParamIf(createRoute, scopeParam, scopeParam != nil)
 	if _, ok := storage.(RESTCreater); ok {
 		ws.Route(createRoute.Reads(versionedObject)) // from the request
 	} else {
@@ -135,7 +146,7 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	listRoute := ws.GET(path).To(h).
 		Doc("list objects of kind " + kind).
 		Operation("list" + kind)
-	addParamIf(listRoute, namespaceParam, namespaceScope)
+	addParamIf(listRoute, scopeParam, scopeParam != nil)
 	if lister, ok := storage.(RESTLister); ok {
 		list := lister.NewList()
 		_, listKind, err := api.Scheme.ObjectVersionAndKind(list)
@@ -154,7 +165,7 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 		Doc("read the specified " + kind).
 		Operation("read" + kind).
 		Param(nameParam)
-	addParamIf(getRoute, namespaceParam, namespaceScope)
+	addParamIf(getRoute, scopeParam, scopeParam != nil)
 	if _, ok := storage.(RESTGetter); ok {
 		ws.Route(getRoute.Writes(versionedObject)) // on the response
 	} else {
@@ -165,7 +176,7 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 		Doc("update the specified " + kind).
 		Operation("update" + kind).
 		Param(nameParam)
-	addParamIf(updateRoute, namespaceParam, namespaceScope)
+	addParamIf(updateRoute, scopeParam, scopeParam != nil)
 	if _, ok := storage.(RESTUpdater); ok {
 		ws.Route(updateRoute.Reads(versionedObject)) // from the request
 	} else {
@@ -177,7 +188,7 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 		Doc("delete the specified " + kind).
 		Operation("delete" + kind).
 		Param(nameParam)
-	addParamIf(deleteRoute, namespaceParam, namespaceScope)
+	addParamIf(deleteRoute, scopeParam, scopeParam != nil)
 	if _, ok := storage.(RESTDeleter); ok {
 		ws.Route(deleteRoute)
 	} else {
@@ -252,12 +263,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, roo
 	registrationErrors := make([]error, 0)
 
 	for path, storage := range g.handler.storage {
-		// register legacy patterns where namespace is optional in path
-		if err := registerResourceHandlers(ws, version, path, storage, h, false); err != nil {
-			registrationErrors = append(registrationErrors, err)
-		}
-		// register pattern where namespace is required in path
-		if err := registerResourceHandlers(ws, version, path, storage, h, true); err != nil {
+		if err := registerResourceHandlers(ws, version, path, storage, h); err != nil {
 			registrationErrors = append(registrationErrors, err)
 		}
 	}
