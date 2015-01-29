@@ -54,6 +54,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
 
+	// This is hacky, but minions don't really have a namespace, but kubectl currently automatically
+	// stuffs one in there.  Fix it here temporarily until we fix kubectl
+	if minion.Namespace == api.NamespaceDefault {
+		minion.Namespace = api.NamespaceNone
+	}
+
 	if errs := validation.ValidateMinion(minion); len(errs) > 0 {
 		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
 	}
