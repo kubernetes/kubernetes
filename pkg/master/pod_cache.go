@@ -69,14 +69,38 @@ func NewPodCache(ipCache IPGetter, info client.PodInfoGetter, nodes client.NodeI
 
 // GetPodStatus gets the stored pod status.
 func (p *PodCache) GetPodStatus(namespace, name string) (*api.PodStatus, error) {
+	status := p.getPodStatusInternal(namespace, name)
+	if status != nil {
+		return status, nil
+	}
+	return p.updateCacheAndReturn(namespace, name)
+}
+
+func (p *PodCache) updateCacheAndReturn(namespace, name string) (*api.PodStatus, error) {
+	pod, err := p.pods.GetPod(api.WithNamespace(api.NewContext(), namespace), name)
+	if err != nil {
+		return nil, err
+	}
+	if err := p.updatePodStatus(pod); err != nil {
+		return nil, err
+	}
+	status := p.getPodStatusInternal(namespace, name)
+	if status == nil {
+		glog.Warningf("nil status after successful update.  that's odd... (%s %s)", namespace, name)
+		return nil, client.ErrPodInfoNotAvailable
+	}
+	return status, nil
+}
+
+func (p *PodCache) getPodStatusInternal(namespace, name string) *api.PodStatus {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	value, ok := p.podStatus[objKey{namespace, name}]
 	if !ok {
-		return nil, client.ErrPodInfoNotAvailable
+		return nil
 	}
 	// Make a copy
-	return &value, nil
+	return &value
 }
 
 func (p *PodCache) ClearPodStatus(namespace, name string) {
@@ -178,10 +202,23 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	return newStatus, err
 }
 
-func (p *PodCache) resetNodeStatusCache() {
+func (p *PodCache) GarbageCollectPodStatus() {
+	pods, err := p.pods.ListPods(api.NewContext(), labels.Everything())
+	if err != nil {
+		glog.Errorf("Error getting pod list: %v", err)
+	}
+	keys := map[objKey]bool{}
+	for _, pod := range pods.Items {
+		keys[objKey{pod.Namespace, pod.Name}] = true
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.currentNodes = map[objKey]api.NodeStatus{}
+	for key := range p.podStatus {
+		if _, found := keys[key]; !found {
+			glog.Infof("Deleting orphaned cache entry: %v", key)
+			delete(p.podStatus, key)
+		}
+	}
 }
 
 // UpdateAllContainers updates information about all containers.
@@ -189,8 +226,6 @@ func (p *PodCache) resetNodeStatusCache() {
 // calling again, or risk having new info getting clobbered by delayed
 // old info.
 func (p *PodCache) UpdateAllContainers() {
-	p.resetNodeStatusCache()
-
 	ctx := api.NewContext()
 	pods, err := p.pods.ListPods(ctx, labels.Everything())
 	if err != nil {

@@ -126,7 +126,10 @@ func TestPodCacheGet(t *testing.T) {
 }
 
 func TestPodCacheDelete(t *testing.T) {
-	cache := NewPodCache(nil, nil, nil, nil)
+	config := podCacheTestConfig{
+		err: client.ErrPodInfoNotAvailable,
+	}
+	cache := config.Construct()
 
 	expected := api.PodStatus{
 		Info: api.PodInfo{
@@ -156,14 +159,38 @@ func TestPodCacheDelete(t *testing.T) {
 }
 
 func TestPodCacheGetMissing(t *testing.T) {
-	cache := NewPodCache(nil, nil, nil, nil)
+	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
+	config := podCacheTestConfig{
+		ipFunc: func(host string) string {
+			if host == "machine" {
+				return "1.2.3.5"
+			}
+			return ""
+		},
+		kubeletContainerInfo: api.PodStatus{
+			Info: api.PodInfo{"bar": api.ContainerStatus{}}},
+		nodes: []api.Node{*makeHealthyNode("machine")},
+		pod:   pod1,
+	}
+	cache := config.Construct()
 
 	status, err := cache.GetPodStatus(api.NamespaceDefault, "foo")
-	if err == nil {
-		t.Errorf("Unexpected non-error: %+v", err)
+	if err != nil {
+		t.Errorf("Unexpected error: %+v", err)
 	}
-	if status != nil {
-		t.Errorf("Unexpected status: %+v", status)
+	if status == nil {
+		t.Errorf("Unexpected non-status.")
+	}
+	expected := &api.PodStatus{
+		Phase:  "Pending",
+		Host:   "machine",
+		HostIP: "1.2.3.5",
+		Info: api.PodInfo{
+			"bar": api.ContainerStatus{},
+		},
+	}
+	if !reflect.DeepEqual(status, expected) {
+		t.Errorf("expected:\n%#v\ngot:\n%#v\n", expected, status)
 	}
 }
 
@@ -177,6 +204,8 @@ type podCacheTestConfig struct {
 	ipFunc               func(string) string // Construct will set a default if nil
 	nodes                []api.Node
 	pods                 []api.Pod
+	pod                  *api.Pod
+	err                  error
 	kubeletContainerInfo api.PodStatus
 
 	// Construct will fill in these fields
@@ -202,6 +231,8 @@ func (c *podCacheTestConfig) Construct() *PodCache {
 		},
 	}
 	c.fakePods = registrytest.NewPodRegistry(&api.PodList{Items: c.pods})
+	c.fakePods.Pod = c.pod
+	c.fakePods.Err = c.err
 	return NewPodCache(
 		fakeIPCache(c.ipFunc),
 		c.fakePodInfo,
@@ -827,5 +858,28 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
+	}
+}
+
+func TestGarbageCollection(t *testing.T) {
+	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
+	pod2 := makePod(api.NamespaceDefault, "baz", "machine", "qux")
+	config := podCacheTestConfig{
+		pods: []api.Pod{*pod1, *pod2},
+	}
+	cache := config.Construct()
+
+	expected := api.PodStatus{
+		Info: api.PodInfo{
+			"extra": api.ContainerStatus{},
+		},
+	}
+	cache.podStatus[objKey{api.NamespaceDefault, "extra"}] = expected
+
+	cache.GarbageCollectPodStatus()
+
+	status, found := cache.podStatus[objKey{api.NamespaceDefault, "extra"}]
+	if found {
+		t.Errorf("unexpectedly found: %v for key %v", status, objKey{api.NamespaceDefault, "extra"})
 	}
 }
