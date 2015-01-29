@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -171,4 +172,28 @@ func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 
 func stringBody(body string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+}
+
+// Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
+func TestClientVersions(t *testing.T) {
+	f := NewFactory(nil)
+
+	versions := []string{
+		"v1beta1",
+		"v1beta2",
+		"v1beta3",
+	}
+	for _, version := range versions {
+		mapping := &meta.RESTMapping{
+			APIVersion: version,
+		}
+		c, err := f.RESTClient(nil, mapping)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		client := c.(*client.RESTClient)
+		if client.APIVersion() != version {
+			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
+		}
+	}
 }

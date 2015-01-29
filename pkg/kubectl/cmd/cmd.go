@@ -329,17 +329,19 @@ func (c *clientCache) ClientConfigForVersion(version string) (*client.Config, er
 			return nil, err
 		}
 		c.defaultConfig = config
-
 		if c.matchVersion {
 			if err := client.MatchesServerVersion(config); err != nil {
 				return nil, err
 			}
 		}
 	}
-
 	// TODO: have a better config copy method
 	config := *c.defaultConfig
+	if len(version) != 0 {
+		config.Version = version
+	}
 	client.SetKubernetesDefaults(&config)
+
 	return &config, nil
 }
 
