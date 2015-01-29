@@ -68,3 +68,28 @@ func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	pod := obj.(*api.Pod)
 	return validation.ValidatePod(pod)
 }
+
+// svcStrategy implements behavior for Services
+// TODO: move to a service specific package.
+type svcStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+// Services is the default logic that applies when creating and updating Service
+// objects.
+var Services RESTCreateStrategy = svcStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
+	service := obj.(*api.Service)
+	// TODO: Get rid of ProxyPort.
+	service.Spec.ProxyPort = 0
+	service.Status = api.ServiceStatus{}
+}
+
+// Validate validates a new pod.
+func (svcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	service := obj.(*api.Service)
+	return validation.ValidateService(service)
+}

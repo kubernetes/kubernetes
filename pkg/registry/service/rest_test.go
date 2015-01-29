@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -621,6 +622,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	}
 }
 
+// TODO: remove, covered by TestCreate
 func TestCreateServiceWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	service := &api.Service{
@@ -634,7 +636,7 @@ func TestCreateServiceWithConflictingNamespace(t *testing.T) {
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
+	} else if strings.Contains(err.Error(), "Service.Namespace does not match the provided context") {
 		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
 }
@@ -655,4 +657,27 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
 		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
+}
+
+func TestCreate(t *testing.T) {
+	registry := registrytest.NewServiceRegistry()
+	fakeCloud := &cloud.FakeCloud{}
+	machines := []string{"foo", "bar", "baz"}
+	rest := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest.portalMgr.randomAttempts = 0
+
+	test := resttest.New(t, rest)
+	test.TestCreate(
+		// valid
+		&api.Service{
+			Spec: api.ServiceSpec{
+				Selector: map[string]string{"bar": "baz"},
+				Port:     6502,
+			},
+		},
+		// invalid
+		&api.Service{
+			Spec: api.ServiceSpec{},
+		},
+	)
 }
