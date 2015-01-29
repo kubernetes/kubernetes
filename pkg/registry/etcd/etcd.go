@@ -347,7 +347,17 @@ func (r *Registry) WatchControllers(ctx api.Context, label, field labels.Selecto
 		}
 		match := label.Matches(labels.Set(controller.Labels))
 		if match {
-			pods, _ := r.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
+			pods, err := r.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
+			if err != nil {
+				glog.Warningf("Error listing pods: %v", err)
+				// No object that's useable so drop it on the floor
+				return false
+			}
+			if pods == nil {
+				glog.Warningf("Pods list is nil.  This should never happen...")
+				// No object that's useable so drop it on the floor
+				return false
+			}
 			controller.Status.Replicas = len(pods.Items)
 		}
 		return match
