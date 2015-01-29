@@ -596,9 +596,6 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 // ValidateMinion tests if required fields in the minion are set.
 func ValidateMinion(minion *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(minion.Namespace) != 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", minion.Namespace, ""))
-	}
 	if len(minion.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", minion.Name))
 	}
