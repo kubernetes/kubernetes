@@ -10,7 +10,7 @@ readonly port is not currently subject to authorization, but is planned to be
 removed soon.)
 
 The authorization check for any request compares attributes of the context of
-the request, (such as user, resource kind, and namespace) with access
+the request, (such as user, resource, and namespace) with access
 policies.  An API call must be allowed by some policy in order to proceed.
 
 The following implementations are available, and are selected by flag:
@@ -28,10 +28,10 @@ The following implementations are available, and are selected by flag:
 A request has 4 attributes that can be considered for authorization:
   - user (the user-string which a user was authenticated as).
   - whether the request is readonly (GETs are readonly)
-  - what kind of object is being accessed 
+  - what resource is being accessed 
     - applies only to the API endpoints, such as 
         `/api/v1beta1/pods`.  For miscelaneous endpoints, like `/version`, the
-        kind is the empty string.
+        resource is the empty string.
   - the namespace of the object being access, or the empty string if the
         endpoint does not support namespaced objects.
 
@@ -49,7 +49,7 @@ Each line is a "policy object".  A policy object is a map with the following pro
     - `user`, type string; the user-string from `--token_auth_file`
     - `readonly`, type boolean, when true, means that the policy only applies to GET
       operations.
-    - `kind`, type string; a kind of object, from an URL, such as `pods`.
+    - `resource`, type string; a resource from an URL, such as `pods`.
     - `namespace`, type string; a namespace string.
 
 An unset property is the same as a property set to the zero value for its type (e.g. empty string, 0, false).
@@ -76,9 +76,9 @@ To permit an action Policy with an unset namespace applies regardless of namespa
 
 ### Examples
  1. Alice can do anything: `{"user":"alice"}`
- 2. Kubelet can read any pods: `{"user":"kubelet", "kind": "pods", "readonly": true}`
- 3. Kubelet can read and write events: `{"user":"kubelet", "kind": "events"}`
- 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "kind": "pods", "readonly": true, "ns": "projectCaribou"}`
+ 2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
+ 3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
+ 4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
 
 [Complete file example](../pkg/auth/authorizer/abac/example_policy_file.jsonl)
 

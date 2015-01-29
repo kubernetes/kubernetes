@@ -52,7 +52,7 @@ type policy struct {
 
 	// TODO: make this a proper REST object with its own registry.
 	Readonly  bool   `json:"readonly,omitempty"`
-	Kind      string `json:"kind,omitempty"`
+	Resource  string `json:"resource,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 
 	// TODO: "expires" string in RFC3339 format.
@@ -100,7 +100,7 @@ func NewFromFile(path string) (policyList, error) {
 func (p policy) matches(a authorizer.Attributes) bool {
 	if p.subjectMatches(a) {
 		if p.Readonly == false || (p.Readonly == a.IsReadOnly()) {
-			if p.Kind == "" || (p.Kind == a.GetKind()) {
+			if p.Resource == "" || (p.Resource == a.GetResource()) {
 				if p.Namespace == "" || (p.Namespace == a.GetNamespace()) {
 					return true
 				}

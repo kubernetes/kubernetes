@@ -176,8 +176,8 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 
 	// If a path follows the conventions of the REST object store, then
-	// we can extract the object Kind.  Otherwise, not.
-	attribs.Kind = apiRequestInfo.Resource
+	// we can extract the resource.  Otherwise, not.
+	attribs.Resource = apiRequestInfo.Resource
 
 	// If the request specifies a namespace, then the namespace is filled in.
 	// Assumes there is no empty string namespace.  Unspecified results
