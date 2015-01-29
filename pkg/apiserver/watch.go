@@ -36,10 +36,11 @@ import (
 )
 
 type WatchHandler struct {
-	storage         map[string]RESTStorage
-	codec           runtime.Codec
-	canonicalPrefix string
-	selfLinker      runtime.SelfLinker
+	storage                map[string]RESTStorage
+	codec                  runtime.Codec
+	canonicalPrefix        string
+	selfLinker             runtime.SelfLinker
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 // setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
@@ -87,21 +88,21 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	namespace, kind, _, err := KindAndNamespace(req)
+	requestInfo, err := h.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
 		return
 	}
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := api.WithNamespace(api.NewContext(), requestInfo.Namespace)
 
-	storage := h.storage[kind]
+	storage := h.storage[requestInfo.Resource]
 	if storage == nil {
 		notFound(w, req)
 		return
 	}
 	watcher, ok := storage.(ResourceWatcher)
 	if !ok {
-		errorJSON(errors.NewMethodNotSupported(kind, "watch"), h.codec, w)
+		errorJSON(errors.NewMethodNotSupported(requestInfo.Resource, "watch"), h.codec, w)
 		return
 	}
 

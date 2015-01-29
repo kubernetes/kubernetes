@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	authhandlers "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
@@ -153,12 +154,13 @@ type RequestAttributeGetter interface {
 }
 
 type requestAttributeGetter struct {
-	userContexts authhandlers.RequestContext
+	userContexts           authhandlers.RequestContext
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(userContexts authhandlers.RequestContext) RequestAttributeGetter {
-	return &requestAttributeGetter{userContexts}
+func NewRequestAttributeGetter(userContexts authhandlers.RequestContext, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
+	return &requestAttributeGetter{userContexts, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
@@ -171,16 +173,16 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 
 	attribs.ReadOnly = IsReadOnlyReq(*req)
 
-	namespace, kind, _, _ := KindAndNamespace(req)
+	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 
 	// If a path follows the conventions of the REST object store, then
 	// we can extract the object Kind.  Otherwise, not.
-	attribs.Kind = kind
+	attribs.Kind = apiRequestInfo.Resource
 
 	// If the request specifies a namespace, then the namespace is filled in.
 	// Assumes there is no empty string namespace.  Unspecified results
 	// in empty (does not understand defaulting rules.)
-	attribs.Namespace = namespace
+	attribs.Namespace = apiRequestInfo.Namespace
 
 	return &attribs
 }
@@ -197,78 +199,136 @@ func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGet
 	})
 }
 
-// KindAndNamespace returns the kind, namespace, and path parts for the request relative to /{kind}/{name}
+// APIRequestInfo holds information parsed from the http.Request
+type APIRequestInfo struct {
+	// Verb is the kube verb associated with the request, not the http verb.  This includes things like list and watch.
+	Verb       string
+	APIVersion string
+	Namespace  string
+	// Resource is the name of the resource being requested.  This is not the kind.  For example: pods
+	Resource string
+	// Kind is the type of object being manipulated.  For example: Pod
+	Kind string
+	// Name is empty for some verbs, but if the request directly indicates a name (not in body content) then this field is filled in.
+	Name string
+	// Parts are the path parts for the request relative to /{resource}/{name}
+	Parts []string
+}
+
+type APIRequestInfoResolver struct {
+	apiPrefixes util.StringSet
+	restMapper  meta.RESTMapper
+}
+
+// GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
 // Valid Inputs:
 // Storage paths
-// /ns/{namespace}/{kind}
-// /ns/{namespace}/{kind}/{resourceName}
-// /{kind}
-// /{kind}/{resourceName}
-// /{kind}/{resourceName}?namespace={namespace}
-// /{kind}?namespace={namespace}
+// /ns/{namespace}/{resource}
+// /ns/{namespace}/{resource}/{resourceName}
+// /{resource}
+// /{resource}/{resourceName}
+// /{resource}/{resourceName}?namespace={namespace}
+// /{resource}?namespace={namespace}
 //
 // Special verbs:
-// /proxy/{kind}/{resourceName}
-// /proxy/ns/{namespace}/{kind}/{resourceName}
-// /redirect/ns/{namespace}/{kind}/{resourceName}
-// /redirect/{kind}/{resourceName}
-// /watch/{kind}
-// /watch/ns/{namespace}/{kind}
+// /proxy/{resource}/{resourceName}
+// /proxy/ns/{namespace}/{resource}/{resourceName}
+// /redirect/ns/{namespace}/{resource}/{resourceName}
+// /redirect/{resource}/{resourceName}
+// /watch/{resource}
+// /watch/ns/{namespace}/{resource}
 //
 // Fully qualified paths for above:
 // /api/{version}/*
 // /api/{version}/*
-func KindAndNamespace(req *http.Request) (namespace, kind string, parts []string, err error) {
-	parts = splitPath(req.URL.Path)
-	if len(parts) < 1 {
-		err = fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
-		return
+func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIRequestInfo, error) {
+	requestInfo := APIRequestInfo{}
+
+	currentParts := splitPath(req.URL.Path)
+	if len(currentParts) < 1 {
+		return requestInfo, fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
 	}
 
-	// handle input of form /api/{version}/* by adjusting special paths
-	if parts[0] == "api" {
-		if len(parts) > 2 {
-			parts = parts[2:]
-		} else {
-			err = fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
-			return
+	for _, currPrefix := range r.apiPrefixes.List() {
+		// handle input of form /api/{version}/* by adjusting special paths
+		if currentParts[0] == currPrefix {
+			if len(currentParts) > 1 {
+				requestInfo.APIVersion = currentParts[1]
+			}
+
+			if len(currentParts) > 2 {
+				currentParts = currentParts[2:]
+			} else {
+				return requestInfo, fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+			}
 		}
 	}
 
 	// handle input of form /{specialVerb}/*
-	if _, ok := specialVerbs[parts[0]]; ok {
-		if len(parts) > 1 {
-			parts = parts[1:]
+	if _, ok := specialVerbs[currentParts[0]]; ok {
+		requestInfo.Verb = currentParts[0]
+
+		if len(currentParts) > 1 {
+			currentParts = currentParts[1:]
 		} else {
-			err = fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
-			return
+			return requestInfo, fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+		}
+	} else {
+		switch req.Method {
+		case "POST":
+			requestInfo.Verb = "create"
+		case "GET":
+			requestInfo.Verb = "get"
+		case "PUT":
+			requestInfo.Verb = "update"
+		case "DELETE":
+			requestInfo.Verb = "delete"
+		}
+
+	}
+
+	// URL forms: /ns/{namespace}/{resource}/*, where parts are adjusted to be relative to kind
+	if currentParts[0] == "ns" {
+		if len(currentParts) < 3 {
+			return requestInfo, fmt.Errorf("ResourceTypeAndNamespace expects a path of form /ns/{namespace}/*")
+		}
+		requestInfo.Resource = currentParts[2]
+		requestInfo.Namespace = currentParts[1]
+		currentParts = currentParts[2:]
+
+	} else {
+		// URL forms: /{resource}/*
+		// URL forms: POST /{resource} is a legacy API convention to create in "default" namespace
+		// URL forms: /{resource}/{resourceName} use the "default" namespace if omitted from query param
+		// URL forms: /{resource} assume cross-namespace operation if omitted from query param
+		requestInfo.Resource = currentParts[0]
+		requestInfo.Namespace = req.URL.Query().Get("namespace")
+		if len(requestInfo.Namespace) == 0 {
+			if len(currentParts) > 1 || req.Method == "POST" {
+				requestInfo.Namespace = api.NamespaceDefault
+			} else {
+				requestInfo.Namespace = api.NamespaceAll
+			}
 		}
 	}
 
-	// URL forms: /ns/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
-	if parts[0] == "ns" {
-		if len(parts) < 3 {
-			err = fmt.Errorf("ResourceTypeAndNamespace expects a path of form /ns/{namespace}/*")
-			return
-		}
-		namespace = parts[1]
-		kind = parts[2]
-		parts = parts[2:]
-		return
+	// parsing successful, so we now know the proper value for .Parts
+	requestInfo.Parts = currentParts
+
+	// if there's another part remaining after the kind, then that's the resource name
+	if len(requestInfo.Parts) >= 2 {
+		requestInfo.Name = requestInfo.Parts[1]
 	}
 
-	// URL forms: /{kind}/*
-	// URL forms: POST /{kind} is a legacy API convention to create in "default" namespace
-	// URL forms: /{kind}/{resourceName} use the "default" namespace if omitted from query param
-	// URL forms: /{kind} assume cross-namespace operation if omitted from query param
-	kind = parts[0]
-	namespace = req.URL.Query().Get("namespace")
-	if len(namespace) == 0 {
-		if len(parts) > 1 || req.Method == "POST" {
-			namespace = api.NamespaceDefault
-		} else {
-			namespace = api.NamespaceAll
-		}
+	// if there's no name on the request and we thought it was a get before, then the actual verb is a list
+	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
+		requestInfo.Verb = "list"
 	}
-	return
+
+	// if we have a resource, we have a good shot at being able to determine kind
+	if len(requestInfo.Resource) > 0 {
+		_, requestInfo.Kind, _ = r.restMapper.VersionAndKindForResource(requestInfo.Resource)
+	}
+
+	return requestInfo, nil
 }

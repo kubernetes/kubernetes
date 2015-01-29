@@ -454,7 +454,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts)
+	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts, latest.RESTMapper, "api")
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -531,25 +531,25 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 }
 
 // api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
+func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta1.Codec, "/api/v1beta1", latest.SelfLinker, m.admissionControl, latest.RESTMapper
+	return storage, v1beta1.Codec, "api", "/api/v1beta1", latest.SelfLinker, m.admissionControl, latest.RESTMapper
 }
 
 // api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
+func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker, m.admissionControl, latest.RESTMapper
+	return storage, v1beta2.Codec, "api", "/api/v1beta2", latest.SelfLinker, m.admissionControl, latest.RESTMapper
 }
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
+func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, meta.RESTMapper) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		if k == "minions" {
@@ -557,5 +557,5 @@ func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec,
 		}
 		storage[strings.ToLower(k)] = v
 	}
-	return storage, v1beta3.Codec, "/api/v1beta3", latest.SelfLinker, m.admissionControl, latest.RESTMapper
+	return storage, v1beta3.Codec, "api", "/api/v1beta3", latest.SelfLinker, m.admissionControl, latest.RESTMapper
 }

@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -57,7 +58,7 @@ type defaultAPIServer struct {
 // Note: This method is used only in tests.
 func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) http.Handler {
 	prefix := root + "/" + version
-	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker, admissionControl, mapper)
+	group := NewAPIGroupVersion(storage, codec, root, prefix, selfLinker, admissionControl, mapper)
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -85,15 +86,16 @@ type APIGroupVersion struct {
 // This is a helper method for registering multiple sets of REST handlers under different
 // prefixes onto a server.
 // TODO: add multitype codec serialization
-func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, canonicalPrefix string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) *APIGroupVersion {
+func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, apiRoot, canonicalPrefix string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) *APIGroupVersion {
 	return &APIGroupVersion{
 		handler: RESTHandler{
-			storage:          storage,
-			codec:            codec,
-			canonicalPrefix:  canonicalPrefix,
-			selfLinker:       selfLinker,
-			ops:              NewOperations(),
-			admissionControl: admissionControl,
+			storage:                storage,
+			codec:                  codec,
+			canonicalPrefix:        canonicalPrefix,
+			selfLinker:             selfLinker,
+			ops:                    NewOperations(),
+			admissionControl:       admissionControl,
+			apiRequestInfoResolver: &APIRequestInfoResolver{util.NewStringSet(apiRoot), latest.RESTMapper},
 		},
 		mapper: mapper,
 	}
