@@ -279,7 +279,7 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 }
 
 func Test() (results ResultsByTest) {
-	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
+	defer runBashUntil("watchEvents", "while true; do $KUBECTL --watch-only get events; done")()
 
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
