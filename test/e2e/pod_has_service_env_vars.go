@@ -23,6 +23,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // TestPodHasServiceEnvVars checks that kubelets and scheduler send events about pods scheduling and running.
@@ -159,3 +162,11 @@ func TestPodHasServiceEnvVars(c *client.Client) bool {
 	// We could try a wget the service from the client pod.  But services.sh e2e test covers that pretty well.
 	return success
 }
+
+var _ = Describe("TestPodHasServiceEnvVars", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestPodHasServiceEnvVars(loadClientOrDie())).To(BeTrue())
+	})
+})

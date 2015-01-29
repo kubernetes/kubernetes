@@ -77,6 +77,9 @@ if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
     export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
 fi
 
+# Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
+export E2E_REPORT_DIR=${WORKSPACE}
+
 go run ./hack/e2e.go ${E2E_OPT} -v --down
 go run ./hack/e2e.go ${E2E_OPT} -v --up
 go run ./hack/e2e.go -v --ctl="version --match-server-version=false"

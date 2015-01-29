@@ -27,6 +27,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // A basic test to check the deployment of an image using
@@ -189,3 +192,11 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 func TestBasic(c *client.Client) bool {
 	return TestBasicImage(c, "basic", "kubernetes/serve_hostname:1.1")
 }
+
+var _ = Describe("TestBasic", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestBasic(loadClientOrDie())).To(BeTrue())
+	})
+})

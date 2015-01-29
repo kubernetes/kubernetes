@@ -26,6 +26,9 @@ Session.vim
 *.test
 /hack/.test-cmd-auth
 
+# JUnit test output from ginkgo e2e tests
+/junit*.xml
+
 # Mercurial files
 **/.hg
 **/.hg*

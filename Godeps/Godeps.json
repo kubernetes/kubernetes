@@ -144,6 +144,16 @@
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
 		{
+			"ImportPath": "github.com/onsi/ginkgo",
+			"Comment": "v1.1.0-33-g17ea479729ee",
+			"Rev": "17ea479729ee427265ac1e913443018350946ddf"
+		},
+		{
+			"ImportPath": "github.com/onsi/gomega",
+			"Comment": "v1.0-28-g8adf9e1730c5",
+			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
+		},
+		{
 			"ImportPath": "github.com/racker/perigee",
 			"Comment": "v0.0.0-18-g0c00cb0",
 			"Rev": "0c00cb0a026b71034ebc8205263c77dad3577db5"

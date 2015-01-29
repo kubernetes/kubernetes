@@ -1,0 +1,12 @@
+language: go
+go:
+  - 1.4
+
+install:
+  - go get -v ./...
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/onsi/gomega
+  - go install github.com/onsi/ginkgo/ginkgo
+  - export PATH=$PATH:$HOME/gopath/bin
+
+script: $HOME/gopath/bin/ginkgo -r --randomizeAllSpecs --failOnPending --randomizeSuites --race

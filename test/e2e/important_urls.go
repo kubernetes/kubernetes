@@ -19,6 +19,9 @@ package e2e
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // TestImportantURLs validates that URLs that people depend on haven't moved.
@@ -46,3 +49,11 @@ func TestImportantURLs(c *client.Client) bool {
 	}
 	return ok
 }
+
+var _ = Describe("TestImportantURLs", func() {
+	It("should pass", func() {
+		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
+		// In general tests should Fail() instead of glog.Fatalf().
+		Expect(TestImportantURLs(loadClientOrDie())).To(BeTrue())
+	})
+})
