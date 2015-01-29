@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -59,7 +60,7 @@ func InitHealthChecking(k *Kubelet) {
 }
 
 // TODO: move this into a pkg/tools/etcd_tools
-func EtcdClientOrDie(etcdServerList util.StringList, etcdConfigFile string) *etcd.Client {
+func EtcdClientOrDie(etcdServerList util.StringList, etcdConfigFile string) tools.EtcdClient {
 	if len(etcdServerList) > 0 {
 		return etcd.NewClient(etcdServerList)
 	} else if etcdConfigFile != "" {
