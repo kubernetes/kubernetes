@@ -59,41 +59,25 @@ type HTTPKubeletClient struct {
 	EnableHttps bool
 }
 
+// TODO: this structure is questionable, it should be using client.Config and overriding defaults.
 func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	transport := http.DefaultTransport
-	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
-	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
-	if hasCert {
-		var (
-			certData, keyData, caData []byte
-			err                       error
-		)
-		if certData, err = dataFromSliceOrFile(config.CertData, config.CertFile); err != nil {
-			return nil, err
-		}
-		if keyData, err = dataFromSliceOrFile(config.KeyData, config.KeyFile); err != nil {
-			return nil, err
-		}
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
-			return nil, err
-		}
-	} else if hasCA {
-		var (
-			caData []byte
-			err    error
-		)
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewTLSTransport(caData); err != nil {
-			return nil, err
+
+	tlsConfig, err := TLSConfigFor(&Config{
+		TLSClientConfig: config.TLSClientConfig,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if tlsConfig != nil {
+		transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
 		}
 	}
 
-	c := &http.Client{Transport: transport}
+	c := &http.Client{
+		Transport: transport,
+	}
 	return &HTTPKubeletClient{
 		Client:      c,
 		Port:        config.Port,

@@ -23,9 +23,9 @@ import (
 )
 
 func TestUnsecuredTLSTransport(t *testing.T) {
-	transport := NewUnsafeTLSTransport()
-	if !transport.TLSClientConfig.InsecureSkipVerify {
-		t.Errorf("expected transport to be insecure")
+	cfg := NewUnsafeTLSConfig()
+	if !cfg.InsecureSkipVerify {
+		t.Errorf("expected config to be insecure")
 	}
 }
 

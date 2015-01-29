@@ -61,22 +61,8 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
-	// Server requires TLS client certificate authentication
-	CertFile string
-	// Server requires TLS client certificate authentication
-	KeyFile string
-	// Trusted root certificates for server
-	CAFile string
-
-	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
-	// CertData takes precedence over CertFile
-	CertData []byte
-	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
-	// KeyData takes precedence over KeyFile
-	KeyData []byte
-	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
-	// CAData takes precedence over CAFile
-	CAData []byte
+	// TLSClientConfig contains settings to enable transport layer security
+	TLSClientConfig
 
 	// Server should be accessed without verifying the TLS
 	// certificate. For testing only.
@@ -92,11 +78,17 @@ type KubeletConfig struct {
 	Port        uint
 	EnableHttps bool
 
-	// TLS Configuration, only applies if EnableHttps is true.
+	// TLSClientConfig contains settings to enable transport layer security
+	TLSClientConfig
+}
+
+// TLSClientConfig contains settings to enable transport layer security
+type TLSClientConfig struct {
+	// Server requires TLS client certificate authentication
 	CertFile string
-	// TLS Configuration, only applies if EnableHttps is true.
+	// Server requires TLS client certificate authentication
 	KeyFile string
-	// TLS Configuration, only applies if EnableHttps is true.
+	// Trusted root certificates for server
 	CAFile string
 
 	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
@@ -215,47 +207,40 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	if config.Transport != nil && (hasCA || hasCert || config.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
 	}
-	if hasCA && config.Insecure {
-		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
-	}
-	var transport http.RoundTripper
-	switch {
-	case config.Transport != nil:
-		transport = config.Transport
-	case hasCert:
-		var (
-			certData, keyData, caData []byte
-			err                       error
-		)
-		if certData, err = dataFromSliceOrFile(config.CertData, config.CertFile); err != nil {
-			return nil, err
-		}
-		if keyData, err = dataFromSliceOrFile(config.KeyData, config.KeyFile); err != nil {
-			return nil, err
-		}
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
-			return nil, err
-		}
-	case hasCA:
-		var (
-			caData []byte
-			err    error
-		)
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewTLSTransport(caData); err != nil {
-			return nil, err
-		}
-	case config.Insecure:
-		transport = NewUnsafeTLSTransport()
-	default:
-		transport = http.DefaultTransport
+
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		return nil, err
 	}
 
+	var transport http.RoundTripper
+	if config.Transport != nil {
+		transport = config.Transport
+	} else {
+		if tlsConfig != nil {
+			transport = &http.Transport{
+				TLSClientConfig: tlsConfig,
+			}
+		} else {
+			transport = http.DefaultTransport
+		}
+	}
+
+	transport, err = HTTPWrappersForConfig(config, transport)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: use the config context to wrap a transport
+
+	return transport, nil
+}
+
+// HTTPWrappersForConfig wraps a round tripper with any relevant layered behavior from the
+// config. Exposed to allow more clients that need HTTP-like behavior but then must hijack
+// the underlying connection (like WebSocket or HTTP2 clients). Pure HTTP clients should use
+// the higher level TransportFor or RESTClientFor methods.
+func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTripper, error) {
 	// Set authentication wrappers
 	hasBasicAuth := config.Username != "" || config.Password != ""
 	if hasBasicAuth && config.BearerToken != "" {
@@ -263,14 +248,11 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	}
 	switch {
 	case config.BearerToken != "":
-		transport = NewBearerAuthRoundTripper(config.BearerToken, transport)
+		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
 	case hasBasicAuth:
-		transport = NewBasicAuthRoundTripper(config.Username, config.Password, transport)
+		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
 	}
-
-	// TODO: use the config context to wrap a transport
-
-	return transport, nil
+	return rt, nil
 }
 
 // dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,

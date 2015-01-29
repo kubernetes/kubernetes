@@ -54,44 +54,84 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	return rt.rt.RoundTrip(req)
 }
 
-func NewClientCertTLSTransport(certData, keyData, caData []byte) (*http.Transport, error) {
+// TLSConfigFor returns a tls.Config that will provide the transport level security defined
+// by the provided Config. Will return nil if no transport level security is requested.
+func TLSConfigFor(config *Config) (*tls.Config, error) {
+	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
+	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
+
+	if hasCA && config.Insecure {
+		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
+	}
+	var tlsConfig *tls.Config
+	switch {
+	case hasCert:
+		certData, err := dataFromSliceOrFile(config.CertData, config.CertFile)
+		if err != nil {
+			return nil, err
+		}
+		keyData, err := dataFromSliceOrFile(config.KeyData, config.KeyFile)
+		if err != nil {
+			return nil, err
+		}
+		caData, err := dataFromSliceOrFile(config.CAData, config.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		cfg, err := NewClientCertTLSConfig(certData, keyData, caData)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig = cfg
+	case hasCA:
+		caData, err := dataFromSliceOrFile(config.CAData, config.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		cfg, err := NewTLSConfig(caData)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig = cfg
+	case config.Insecure:
+		tlsConfig = NewUnsafeTLSConfig()
+	}
+
+	return tlsConfig, nil
+}
+
+func NewClientCertTLSConfig(certData, keyData, caData []byte) (*tls.Config, error) {
 	cert, err := tls.X509KeyPair(certData, keyData)
 	if err != nil {
 		return nil, err
 	}
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caData)
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{
-			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
-			MinVersion: tls.VersionTLS10,
-			Certificates: []tls.Certificate{
-				cert,
-			},
-			RootCAs:    certPool,
-			ClientCAs:  certPool,
-			ClientAuth: tls.RequireAndVerifyClientCert,
+	return &tls.Config{
+		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
+		MinVersion: tls.VersionTLS10,
+		Certificates: []tls.Certificate{
+			cert,
 		},
+		RootCAs:    certPool,
+		ClientCAs:  certPool,
+		ClientAuth: tls.RequireAndVerifyClientCert,
 	}, nil
 }
 
-func NewTLSTransport(caData []byte) (*http.Transport, error) {
+func NewTLSConfig(caData []byte) (*tls.Config, error) {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caData)
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{
-			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
-			MinVersion: tls.VersionTLS10,
-			RootCAs:    certPool,
-		},
+	return &tls.Config{
+		// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
+		MinVersion: tls.VersionTLS10,
+		RootCAs:    certPool,
 	}, nil
 }
 
-func NewUnsafeTLSTransport() *http.Transport {
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+func NewUnsafeTLSConfig() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: true,
 	}
 }
 
