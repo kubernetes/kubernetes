@@ -29,7 +29,8 @@ import (
 
 type Tester struct {
 	*testing.T
-	storage apiserver.RESTStorage
+	storage      apiserver.RESTStorage
+	clusterScope bool
 }
 
 func New(t *testing.T, storage apiserver.RESTStorage) *Tester {
@@ -37,6 +38,11 @@ func New(t *testing.T, storage apiserver.RESTStorage) *Tester {
 		T:       t,
 		storage: storage,
 	}
+}
+
+func (t *Tester) ClusterScope() *Tester {
+	t.clusterScope = true
+	return t
 }
 
 func copyOrDie(obj runtime.Object) runtime.Object {
@@ -50,7 +56,11 @@ func copyOrDie(obj runtime.Object) runtime.Object {
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.TestCreateHasMetadata(copyOrDie(valid))
 	t.TestCreateGeneratesName(copyOrDie(valid))
-	t.TestCreateRejectsMismatchedNamespace(copyOrDie(valid))
+	if t.clusterScope {
+		t.TestCreateRejectsNamespace(copyOrDie(valid))
+	} else {
+		t.TestCreateRejectsMismatchedNamespace(copyOrDie(valid))
+	}
 	t.TestCreateInvokesValidation(invalid...)
 }
 
@@ -84,8 +94,13 @@ func (t *Tester) TestCreateHasMetadata(valid runtime.Object) {
 
 	objectMeta.Name = "test"
 	objectMeta.Namespace = api.NamespaceDefault
+	context := api.NewDefaultContext()
+	if t.clusterScope {
+		objectMeta.Namespace = api.NamespaceNone
+		context = api.NewContext()
+	}
 
-	channel, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
+	channel, err := t.storage.(apiserver.RESTCreater).Create(context, valid)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -125,6 +140,22 @@ func (t *Tester) TestCreateInvokesValidation(invalid ...runtime.Object) {
 }
 
 func (t *Tester) TestCreateRejectsMismatchedNamespace(valid runtime.Object) {
+	objectMeta, err := api.ObjectMetaFor(valid)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, valid)
+	}
+
+	objectMeta.Namespace = "not-default"
+
+	_, err = t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+	}
+}
+
+func (t *Tester) TestCreateRejectsNamespace(valid runtime.Object) {
 	objectMeta, err := api.ObjectMetaFor(valid)
 	if err != nil {
 		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, valid)

@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -54,11 +55,9 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
 
-	if errs := validation.ValidateMinion(minion); len(errs) > 0 {
-		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
+	if err := rest.BeforeCreate(rest.Nodes, ctx, obj); err != nil {
+		return nil, err
 	}
-
-	api.FillObjectMetaSystemFields(ctx, &minion.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.CreateMinion(ctx, minion)

@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -107,11 +108,14 @@ func TestMinionRegistryValidUpdate(t *testing.T) {
 	}
 }
 
+var (
+	validSelector   = map[string]string{"a": "b"}
+	invalidSelector = map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+)
+
 func TestMinionRegistryValidatesCreate(t *testing.T) {
 	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
-	validSelector := map[string]string{"a": "b"}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	failureCases := map[string]api.Node{
 		"zero-length Name": {
 			ObjectMeta: api.ObjectMeta{
@@ -147,4 +151,21 @@ func contains(nodes *api.NodeList, nodeID string) bool {
 		}
 	}
 	return false
+}
+
+func TestCreate(t *testing.T) {
+	test := resttest.New(t, NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))).ClusterScope()
+	test.TestCreate(
+		// valid
+		&api.Node{
+			Status: api.NodeStatus{
+				HostIP: "something",
+			},
+		},
+		// invalid
+		&api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Labels: invalidSelector,
+			},
+		})
 }

@@ -31,6 +31,8 @@ type RESTCreateStrategy interface {
 	// The NameGenerator will be invoked prior to validation.
 	api.NameGenerator
 
+	// NamespaceScoped returns true if the object must be within a namespace.
+	NamespaceScoped() bool
 	// ResetBeforeCreate is invoked on create before validation to remove any fields
 	// that may not be persisted.
 	ResetBeforeCreate(obj runtime.Object)
@@ -52,8 +54,12 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 		return errors.NewInternalError(err)
 	}
 
-	if !api.ValidNamespace(ctx, objectMeta) {
-		return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
+	if strategy.NamespaceScoped() {
+		if !api.ValidNamespace(ctx, objectMeta) {
+			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
+		}
+	} else {
+		objectMeta.Namespace = api.NamespaceNone
 	}
 	strategy.ResetBeforeCreate(obj)
 	api.FillObjectMetaSystemFields(ctx, objectMeta)

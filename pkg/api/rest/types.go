@@ -34,6 +34,11 @@ type rcStrategy struct {
 // objects.
 var ReplicationControllers RESTCreateStrategy = rcStrategy{api.Scheme, api.SimpleNameGenerator}
 
+// NamespaceScoped is true for replication controllers.
+func (rcStrategy) NamespaceScoped() bool {
+	return true
+}
+
 // ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
 func (rcStrategy) ResetBeforeCreate(obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
@@ -56,6 +61,11 @@ type podStrategy struct {
 // Pods is the default logic that applies when creating and updating Pod
 // objects.
 var Pods RESTCreateStrategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for pods.
+func (podStrategy) NamespaceScoped() bool {
+	return true
+}
 
 // ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
@@ -80,6 +90,11 @@ type svcStrategy struct {
 // objects.
 var Services RESTCreateStrategy = svcStrategy{api.Scheme, api.SimpleNameGenerator}
 
+// NamespaceScoped is true for services.
+func (svcStrategy) NamespaceScoped() bool {
+	return true
+}
+
 // ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
 func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
 	service := obj.(*api.Service)
@@ -88,8 +103,36 @@ func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
 	service.Status = api.ServiceStatus{}
 }
 
-// Validate validates a new pod.
+// Validate validates a new service.
 func (svcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
+}
+
+// nodeStrategy implements behavior for nodes
+// TODO: move to a node specific package.
+type nodeStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+// Nodes is the default logic that applies when creating and updating Node
+// objects.
+var Nodes RESTCreateStrategy = nodeStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is false for services.
+func (nodeStrategy) NamespaceScoped() bool {
+	return false
+}
+
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (nodeStrategy) ResetBeforeCreate(obj runtime.Object) {
+	_ = obj.(*api.Node)
+	// Nodes allow *all* fields, including status, to be set.
+}
+
+// Validate validates a new node.
+func (nodeStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	node := obj.(*api.Node)
+	return validation.ValidateMinion(node)
 }
