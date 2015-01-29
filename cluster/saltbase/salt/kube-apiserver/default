@@ -27,6 +27,10 @@
 {% if grains.cloud == 'gce' -%}
   {% set cloud_provider = "--cloud_provider=gce" -%}
 {% endif -%}
+{% if grains.cloud == 'aws' -%}
+  {% set cloud_provider = "--cloud_provider=aws" -%}
+  {% set cloud_config = "--cloud_config=/etc/aws.conf" -%}
+{% endif -%}
 {% endif -%}
 
 {% if pillar['portal_net'] is defined -%}
@@ -51,4 +55,4 @@
  {% set admission_control = "--admission_control=" + grains.admission_control -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} {{admission_control}} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}} {{cert_file}} {{key_file}} {{secure_port}} {{token_auth_file}} {{publicAddressOverride}} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} {{ cloud_config }} {{admission_control}} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}} {{cert_file}} {{key_file}} {{secure_port}} {{token_auth_file}} {{publicAddressOverride}} {{pillar['log_level']}}"
