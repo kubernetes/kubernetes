@@ -107,6 +107,15 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
 }
 
+func (i *Info) IsNode() bool {
+	kind := i.Mapping.Kind
+	return isNode(kind)
+}
+
+func isNode(kind string) bool {
+	return kind == "Node" || kind == "Minion"
+}
+
 // VisitorList implements Visit for the sub visitors it contains. The first error
 // returned from a child Visitor will terminate iteration.
 type VisitorList []Visitor
@@ -388,7 +397,9 @@ func UpdateObjectNamespace(info *Info) error {
 // set. If info.Object is set, it will be mutated as well.
 func SetNamespace(namespace string) VisitorFunc {
 	return func(info *Info) error {
-		if len(info.Namespace) == 0 {
+		if info.IsNode() {
+			info.Namespace = ""
+		} else if len(info.Namespace) == 0 {
 			info.Namespace = namespace
 			UpdateObjectNamespace(info)
 		}
@@ -402,7 +413,10 @@ func SetNamespace(namespace string) VisitorFunc {
 // accidentally operating on resources outside their namespace.
 func RequireNamespace(namespace string) VisitorFunc {
 	return func(info *Info) error {
-		if len(info.Namespace) == 0 {
+		if info.IsNode() {
+			info.Namespace = ""
+			return nil
+		} else if len(info.Namespace) == 0 {
 			info.Namespace = namespace
 			UpdateObjectNamespace(info)
 			return nil
