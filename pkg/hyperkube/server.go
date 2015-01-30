@@ -38,7 +38,7 @@ type Server struct {
 	hk    *HyperKube
 }
 
-// FullUsage returns the full usage string including all of the flags.
+// Usage returns the full usage string including all of the flags.
 func (s *Server) Usage() error {
 	tt := `{{if .Long}}{{.Long | trim | wrap ""}}
 {{end}}Usage:

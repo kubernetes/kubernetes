@@ -14,27 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// apiserver is the main api server and master for the cluster.
-// it is responsible for serving the cluster management API.
+// A binary that can morph into all of the other kubernetes binaries. You can
+// also soft-link to it busybox style.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+	"os"
 
-	"github.com/spf13/pflag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
+	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
 )
 
 func main() {
-	s := server.NewAPIServer()
-	s.AddFlags(pflag.CommandLine)
+	hk := hyperkube.HyperKube{
+		Name: "hyperkube",
+		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
+	}
 
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	hk.AddServer(apiserver.NewHyperkubeServer())
 
-	verflag.PrintAndExitIfRequested()
-
-	s.Run(pflag.CommandLine.Args())
+	hk.RunToExit(os.Args)
 }

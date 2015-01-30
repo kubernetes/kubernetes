@@ -38,9 +38,6 @@ The the kube-apiserver several options.
 **--etcd_servers**=[]
 	List of etcd servers to watch (http://ip:port), comma separated
 
-**--health_check_minions**=
-	If true, health check minions and filter unhealthy ones. Default true.
-
 **--log_backtrace_at=**:0
 	when logging hits line file:N, emit a stack trace
 
