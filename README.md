@@ -1,5 +1,7 @@
 # Kubernetes
 
+[![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes) [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes)
+
 Kubernetes is an open source system for managing containerized applications across multiple hosts,
 providing basic mechanisms for deployment, maintenance, and scaling of applications.
 
