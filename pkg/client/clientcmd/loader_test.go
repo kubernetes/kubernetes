@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"testing"
 
 	"github.com/ghodss/yaml"
 
@@ -70,6 +73,107 @@ var (
 		CurrentContext: "federal-context",
 	}
 )
+
+func TestResolveRelativePaths(t *testing.T) {
+	pathResolutionConfig1 := clientcmdapi.Config{
+		AuthInfos: map[string]clientcmdapi.AuthInfo{
+			"relative-user-1": {ClientCertificate: "relative/client/cert", ClientKey: "../relative/client/key", AuthPath: "../../relative/auth/path"},
+			"absolute-user-1": {ClientCertificate: "/absolute/client/cert", ClientKey: "/absolute/client/key", AuthPath: "/absolute/auth/path"},
+		},
+		Clusters: map[string]clientcmdapi.Cluster{
+			"relative-server-1": {CertificateAuthority: "../relative/ca"},
+			"absolute-server-1": {CertificateAuthority: "/absolute/ca"},
+		},
+	}
+	pathResolutionConfig2 := clientcmdapi.Config{
+		AuthInfos: map[string]clientcmdapi.AuthInfo{
+			"relative-user-2": {ClientCertificate: "relative/client/cert2", ClientKey: "../relative/client/key2", AuthPath: "../../relative/auth/path2"},
+			"absolute-user-2": {ClientCertificate: "/absolute/client/cert2", ClientKey: "/absolute/client/key2", AuthPath: "/absolute/auth/path2"},
+		},
+		Clusters: map[string]clientcmdapi.Cluster{
+			"relative-server-2": {CertificateAuthority: "../relative/ca2"},
+			"absolute-server-2": {CertificateAuthority: "/absolute/ca2"},
+		},
+	}
+
+	configDir1, _ := ioutil.TempDir("", "")
+	configFile1 := path.Join(configDir1, ".kubeconfig")
+	configDir1, _ = filepath.Abs(configDir1)
+	defer os.Remove(configFile1)
+	configDir2, _ := ioutil.TempDir("", "")
+	configDir2, _ = ioutil.TempDir(configDir2, "")
+	configFile2 := path.Join(configDir2, ".kubeconfig")
+	configDir2, _ = filepath.Abs(configDir2)
+	defer os.Remove(configFile2)
+
+	WriteToFile(pathResolutionConfig1, configFile1)
+	WriteToFile(pathResolutionConfig2, configFile2)
+
+	loadingRules := ClientConfigLoadingRules{
+		CommandLinePath: configFile1,
+		EnvVarPath:      configFile2,
+	}
+
+	mergedConfig, err := loadingRules.Load()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	foundClusterCount := 0
+	for key, cluster := range mergedConfig.Clusters {
+		if key == "relative-server-1" {
+			foundClusterCount++
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.Clusters["relative-server-1"].CertificateAuthority), cluster.CertificateAuthority, t)
+		}
+		if key == "relative-server-2" {
+			foundClusterCount++
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.Clusters["relative-server-2"].CertificateAuthority), cluster.CertificateAuthority, t)
+		}
+		if key == "absolute-server-1" {
+			foundClusterCount++
+			matchStringArg(pathResolutionConfig1.Clusters["absolute-server-1"].CertificateAuthority, cluster.CertificateAuthority, t)
+		}
+		if key == "absolute-server-2" {
+			foundClusterCount++
+			matchStringArg(pathResolutionConfig2.Clusters["absolute-server-2"].CertificateAuthority, cluster.CertificateAuthority, t)
+		}
+	}
+	if foundClusterCount != 4 {
+		t.Errorf("Expected 4 clusters, found %v: %v", foundClusterCount, mergedConfig.Clusters)
+	}
+
+	foundAuthInfoCount := 0
+	for key, authInfo := range mergedConfig.AuthInfos {
+		if key == "relative-user-1" {
+			foundAuthInfoCount++
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientCertificate), authInfo.ClientCertificate, t)
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientKey), authInfo.ClientKey, t)
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].AuthPath), authInfo.AuthPath, t)
+		}
+		if key == "relative-user-2" {
+			foundAuthInfoCount++
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientCertificate), authInfo.ClientCertificate, t)
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientKey), authInfo.ClientKey, t)
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].AuthPath), authInfo.AuthPath, t)
+		}
+		if key == "absolute-user-1" {
+			foundAuthInfoCount++
+			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].ClientCertificate, authInfo.ClientCertificate, t)
+			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].ClientKey, authInfo.ClientKey, t)
+			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].AuthPath, authInfo.AuthPath, t)
+		}
+		if key == "absolute-user-2" {
+			foundAuthInfoCount++
+			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientCertificate, authInfo.ClientCertificate, t)
+			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientKey, authInfo.ClientKey, t)
+			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].AuthPath, authInfo.AuthPath, t)
+		}
+	}
+	if foundAuthInfoCount != 4 {
+		t.Errorf("Expected 4 users, found %v: %v", foundAuthInfoCount, mergedConfig.AuthInfos)
+	}
+
+}
 
 func ExampleMergingSomeWithConflict() {
 	commandLineFile, _ := ioutil.TempFile("", "")

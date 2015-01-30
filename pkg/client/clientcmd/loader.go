@@ -19,6 +19,7 @@ package clientcmd
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
@@ -59,13 +60,22 @@ func NewClientConfigLoadingRules() *ClientConfigLoadingRules {
 // This means that the first file to set CurrentContext will have its context preserved.  It also means
 // that if two files specify a "red-user", only values from the first file's red-user are used.  Even
 // non-conflicting entries from the second file's "red-user" are discarded.
+// Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
+// and only absolute file paths are returned.
 func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	config := clientcmdapi.NewConfig()
 
 	mergeConfigWithFile(config, rules.CommandLinePath)
+	resolveLocalPaths(rules.CommandLinePath, config)
+
 	mergeConfigWithFile(config, rules.EnvVarPath)
+	resolveLocalPaths(rules.EnvVarPath, config)
+
 	mergeConfigWithFile(config, rules.CurrentDirectoryPath)
+	resolveLocalPaths(rules.CurrentDirectoryPath, config)
+
 	mergeConfigWithFile(config, rules.HomeDirectoryPath)
+	resolveLocalPaths(rules.HomeDirectoryPath, config)
 
 	return config, nil
 }
@@ -84,6 +94,50 @@ func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) e
 	mergo.Merge(startingConfig, config)
 
 	return nil
+}
+
+// resolveLocalPaths resolves all relative paths in the config object with respect to the parent directory of the filename
+// this cannot be done directly inside of LoadFromFile because doing so there would make it impossible to load a file without
+// modification of its contents.
+func resolveLocalPaths(filename string, config *clientcmdapi.Config) error {
+	if len(filename) == 0 {
+		return nil
+	}
+
+	configDir, err := filepath.Abs(filepath.Dir(filename))
+	if err != nil {
+		return err
+	}
+
+	resolvedClusters := make(map[string]clientcmdapi.Cluster)
+	for key, cluster := range config.Clusters {
+		cluster.CertificateAuthority = resolveLocalPath(configDir, cluster.CertificateAuthority)
+		resolvedClusters[key] = cluster
+	}
+	config.Clusters = resolvedClusters
+
+	resolvedAuthInfos := make(map[string]clientcmdapi.AuthInfo)
+	for key, authInfo := range config.AuthInfos {
+		authInfo.AuthPath = resolveLocalPath(configDir, authInfo.AuthPath)
+		authInfo.ClientCertificate = resolveLocalPath(configDir, authInfo.ClientCertificate)
+		authInfo.ClientKey = resolveLocalPath(configDir, authInfo.ClientKey)
+		resolvedAuthInfos[key] = authInfo
+	}
+	config.AuthInfos = resolvedAuthInfos
+
+	return nil
+}
+
+// resolveLocalPath makes the path absolute with respect to the startingDir
+func resolveLocalPath(startingDir, path string) string {
+	if len(path) == 0 {
+		return path
+	}
+	if filepath.IsAbs(path) {
+		return path
+	}
+
+	return filepath.Join(startingDir, path)
 }
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
