@@ -306,21 +306,27 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 	return &Simple{}
 }
 
-func TestMethodNotAllowed(t *testing.T) {
+// TestUnimplementedRESTStorage ensures that if a RESTStorage does not implement a given
+// method, that it is literally not registered with the server.  In the past,
+// we registered everything, and returned method not supported if it didn't support
+// a verb.  Now we literally do not register a storage if it does not implement anything.
+// TODO: in future, we should update proxy/redirect
+func TestUnimplementedRESTStorage(t *testing.T) {
 	type T struct {
-		Method string
-		Path   string
+		Method  string
+		Path    string
+		ErrCode int
 	}
 	cases := map[string]T{
-		"GET object":    {"GET", "/prefix/version/foo/bar"},
-		"GET list":      {"GET", "/prefix/version/foo"},
-		"POST list":     {"POST", "/prefix/version/foo"},
-		"PUT object":    {"PUT", "/prefix/version/foo/bar"},
-		"DELETE object": {"DELETE", "/prefix/version/foo/bar"},
+		"GET object":    {"GET", "/prefix/version/foo/bar", http.StatusNotFound},
+		"GET list":      {"GET", "/prefix/version/foo", http.StatusNotFound},
+		"POST list":     {"POST", "/prefix/version/foo", http.StatusNotFound},
+		"PUT object":    {"PUT", "/prefix/version/foo/bar", http.StatusNotFound},
+		"DELETE object": {"DELETE", "/prefix/version/foo/bar", http.StatusNotFound},
 		//"watch list":      {"GET", "/prefix/version/watch/foo"},
 		//"watch object":    {"GET", "/prefix/version/watch/foo/bar"},
-		"proxy object":    {"GET", "/prefix/version/proxy/foo/bar"},
-		"redirect object": {"GET", "/prefix/version/redirect/foo/bar"},
+		"proxy object":    {"GET", "/prefix/version/proxy/foo/bar", http.StatusMethodNotAllowed},
+		"redirect object": {"GET", "/prefix/version/redirect/foo/bar", http.StatusMethodNotAllowed},
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": UnimplementedRESTStorage{},
@@ -342,22 +348,9 @@ func TestMethodNotAllowed(t *testing.T) {
 		defer response.Body.Close()
 		data, _ := ioutil.ReadAll(response.Body)
 		t.Logf("resp: %s", string(data))
-		if response.StatusCode != http.StatusMethodNotAllowed {
-			t.Errorf("%s: expected %d for %s, Got %s", k, http.StatusMethodNotAllowed, v.Method, string(data))
+		if response.StatusCode != v.ErrCode {
+			t.Errorf("%s: expected %d for %s, Got %s", k, http.StatusNotFound, v.Method, string(data))
 			continue
-		}
-		obj, err := codec.Decode(data)
-		if err != nil {
-			t.Errorf("%s: unexpected decode error: %v", k, err)
-			continue
-		}
-		status, ok := obj.(*api.Status)
-		if !ok {
-			t.Errorf("%s: unexpected object: %#v", k, obj)
-			continue
-		}
-		if status.Reason != api.StatusReasonMethodNotAllowed {
-			t.Errorf("%s: unexpected status: %#v", k, status)
 		}
 	}
 }
