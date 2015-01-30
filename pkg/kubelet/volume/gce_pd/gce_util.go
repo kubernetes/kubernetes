@@ -87,7 +87,7 @@ func (util *GCEDiskUtil) AttachDisk(pd *gcePersistentDisk) error {
 	if !mountpoint {
 		err = pd.mounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
 		if err != nil {
-			os.RemoveAll(globalPDPath)
+			os.Remove(globalPDPath)
 			return err
 		}
 	}
@@ -127,7 +127,7 @@ func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk, devicePath string) er
 	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(globalPDPath); err != nil {
+	if err := os.Remove(globalPDPath); err != nil {
 		return err
 	}
 	gce, err := cloudprovider.GetCloudProvider("gce", nil)
