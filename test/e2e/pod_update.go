@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
@@ -32,10 +33,35 @@ import (
 func TestPodUpdate(c *client.Client) bool {
 	podClient := c.Pods(api.NamespaceDefault)
 
-	pod := loadPodOrDie(assetPath("api", "examples", "pod.json"))
+	name := "pod-update-" + string(util.NewUUID())
 	value := strconv.Itoa(time.Now().Nanosecond())
-	pod.Labels["time"] = value
-
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": "foo",
+				"time": value,
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "nginx",
+					Image: "dockerfile/nginx",
+					Ports: []api.Port{{ContainerPort: 80, HostPort: 8080}},
+					LivenessProbe: &api.Probe{
+						Handler: api.Handler{
+							HTTPGet: &api.HTTPGetAction{
+								Path: "/index.html",
+								Port: util.NewIntOrStringFromInt(8080),
+							},
+						},
+						InitialDelaySeconds: 30,
+					},
+				},
+			},
+		},
+	}
 	_, err := podClient.Create(pod)
 	if err != nil {
 		glog.Errorf("Failed to create pod: %v", err)
