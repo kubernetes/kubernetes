@@ -55,7 +55,7 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 		//       for each test and use that information to estimate a timeout
 		//       value. Until then, as we add more tests (and before we move to
 		//       parallel testing) we need to adjust this value as we add more tests.
-		time.Sleep(15 * time.Minute)
+		time.Sleep(40 * time.Minute)
 		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
 	}()
 
