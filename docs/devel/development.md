@@ -136,7 +136,7 @@ godep go tool cover -html=target/c.out
 
 ## Integration tests
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
 ```
 cd kubernetes
 hack/test-integration.sh
@@ -243,4 +243,3 @@ git rebase upstream/master
 ```
 hack/run-gendocs.sh
 ```
-
