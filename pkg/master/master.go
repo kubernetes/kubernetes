@@ -341,7 +341,7 @@ func (m *Master) init(c *Config) {
 		RESTStorageToNodes(nodeRESTStorage).Nodes(),
 		m.podRegistry,
 	)
-	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
+	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*5)
 	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
 
 	// TODO: Factor out the core API registration
