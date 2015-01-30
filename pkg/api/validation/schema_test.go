@@ -18,16 +18,13 @@ package validation
 
 import (
 	"io/ioutil"
-	"strconv"
+	"math/rand"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-
-	docker "github.com/fsouza/go-dockerclient"
-	fuzz "github.com/google/gofuzz"
 )
 
 func LoadSchemaForTest(file string) (Schema, error) {
@@ -37,92 +34,6 @@ func LoadSchemaForTest(file string) (Schema, error) {
 	}
 	return NewSwaggerSchemaFromBytes(data)
 }
-
-// TODO: this is cloned from serialization_test.go, refactor to somewhere common like util
-// apiObjectFuzzer can randomly populate api objects.
-var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
-	func(j *runtime.PluginBase, c fuzz.Continue) {
-		// Do nothing; this struct has only a Kind field and it must stay blank in memory.
-	},
-	func(j *runtime.TypeMeta, c fuzz.Continue) {
-		// We have to customize the randomization of TypeMetas because their
-		// APIVersion and Kind must remain blank in memory.
-		j.APIVersion = ""
-		j.Kind = ""
-	},
-	func(j *api.TypeMeta, c fuzz.Continue) {
-		// We have to customize the randomization of TypeMetas because their
-		// APIVersion and Kind must remain blank in memory.
-		j.APIVersion = ""
-		j.Kind = ""
-	},
-	func(j *api.ObjectMeta, c fuzz.Continue) {
-		j.Name = c.RandString()
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-		j.SelfLink = c.RandString()
-
-		var sec, nsec int64
-		c.Fuzz(&sec)
-		c.Fuzz(&nsec)
-		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
-	},
-	func(j *api.ListMeta, c fuzz.Continue) {
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-		j.SelfLink = c.RandString()
-	},
-	func(j *api.PodPhase, c fuzz.Continue) {
-		statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
-		*j = statuses[c.Rand.Intn(len(statuses))]
-	},
-	func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
-		// TemplateRef must be nil for round trip
-		c.Fuzz(&j.Template)
-		if j.Template == nil {
-			// TODO: v1beta1/2 can't round trip a nil template correctly, fix by having v1beta1/2
-			// conversion compare converted object to nil via DeepEqual
-			j.Template = &api.PodTemplateSpec{}
-		}
-		j.Template.ObjectMeta = api.ObjectMeta{Labels: j.Template.ObjectMeta.Labels}
-		j.Template.Spec.NodeSelector = nil
-		c.Fuzz(&j.Selector)
-		j.Replicas = int(c.RandUint64())
-	},
-	func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
-		// only replicas round trips
-		j.Replicas = int(c.RandUint64())
-	},
-	func(intstr *util.IntOrString, c fuzz.Continue) {
-		// util.IntOrString will panic if its kind is set wrong.
-		if c.RandBool() {
-			intstr.Kind = util.IntstrInt
-			intstr.IntVal = int(c.RandUint64())
-			intstr.StrVal = ""
-		} else {
-			intstr.Kind = util.IntstrString
-			intstr.IntVal = 0
-			intstr.StrVal = c.RandString()
-		}
-	},
-	func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
-		// This is necessary because keys with nil values get omitted.
-		// TODO: Is this a bug?
-		pb[docker.Port(c.RandString())] = []docker.PortBinding{
-			{c.RandString(), c.RandString()},
-			{c.RandString(), c.RandString()},
-		}
-	},
-	func(pm map[string]docker.PortMapping, c fuzz.Continue) {
-		// This is necessary because keys with nil values get omitted.
-		// TODO: Is this a bug?
-		pm[c.RandString()] = docker.PortMapping{
-			c.RandString(): c.RandString(),
-		}
-	},
-	func(p *api.PullPolicy, c fuzz.Continue) {
-		policies := []api.PullPolicy{api.PullAlways, api.PullNever, api.PullIfNotPresent}
-		*p = policies[c.Rand.Intn(len(policies))]
-	},
-)
 
 func TestLoad(t *testing.T) {
 	_, err := LoadSchemaForTest("v1beta1-swagger.json")
@@ -145,6 +56,8 @@ func TestValidateOk(t *testing.T) {
 		{obj: &api.ReplicationController{}},
 	}
 
+	seed := rand.Int63()
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, "", rand.NewSource(seed))
 	for i := 0; i < 5; i++ {
 		for _, test := range tests {
 			testObj := test.obj
