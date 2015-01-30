@@ -245,10 +245,10 @@ func getTestRequests() []struct {
 		{"GET", "/api/v1beta1/bindings", "", code405},              // Bindings are write-only
 		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code200}, // Need a pod to bind or you get a 404
 		{"POST", "/api/v1beta1/bindings" + timeoutFlag, aBinding, code200},
-		{"PUT", "/api/v1beta1/bindings/a" + timeoutFlag, aBinding, code405},
+		{"PUT", "/api/v1beta1/bindings/a" + timeoutFlag, aBinding, code404},
 		{"GET", "/api/v1beta1/bindings", "", code405},
-		{"GET", "/api/v1beta1/bindings/a", "", code405}, // No bindings instances
-		{"DELETE", "/api/v1beta1/bindings/a" + timeoutFlag, "", code405},
+		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
+		{"DELETE", "/api/v1beta1/bindings/a" + timeoutFlag, "", code404},
 
 		// Non-existent object type.
 		{"GET", "/api/v1beta1/foo", "", code404},
