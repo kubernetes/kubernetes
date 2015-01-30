@@ -87,7 +87,7 @@ function start_service() {
                           "containers": [
                               {
                                   "name": "$1",
-                                  "image": "kubernetes/serve_hostname",
+                                  "image": "kubernetes/serve_hostname:1.1",
                                   "ports": [
                                       {
                                           "containerPort": 9376,
@@ -145,12 +145,12 @@ function stop_service() {
 #   $2: expected pod count
 function query_pods() {
   # This fails very occasionally, so retry a bit.
-  pods_unsorted=()
+  local pods_unsorted=()
   local i
   for i in $(seq 1 10); do
-    pods_unsorted=($(${KUBECFG} \
-        '-template={{range.items}}{{.id}} {{end}}' \
-        -l name="$1" list pods))
+    pods_unsorted=($(${KUBECTL} get pods -o template \
+        '--template={{range.items}}{{.id}} {{end}}' \
+        -l name="$1"))
     found="${#pods_unsorted[*]}"
     if [[ "${found}" == "$2" ]]; then
       break
@@ -183,7 +183,7 @@ function wait_for_pods() {
     echo "Waiting for ${pods_needed} pods to become 'running'"
     pods_needed="$2"
     for id in ${pods_sorted}; do
-      status=$(${KUBECFG} -template '{{.currentState.status}}' get "pods/${id}")
+      status=$(${KUBECTL} get pods "${id}" -o template --template='{{.currentState.status}}')
       if [[ "${status}" == "Running" ]]; then
         pods_needed=$((pods_needed-1))
       fi
@@ -289,13 +289,13 @@ test_node="${MINION_NAMES[0]}"
 master="${MASTER_NAME}"
 
 # Launch some pods and services.
-svc1_name="service1"
+svc1_name="service-${RANDOM}"
 svc1_port=80
 svc1_count=3
 svc1_publics="192.168.1.1 192.168.1.2"
 start_service "${svc1_name}" "${svc1_port}" "${svc1_count}" "${svc1_publics}"
 
-svc2_name="service2"
+svc2_name="service-${RANDOM}"
 svc2_port=80
 svc2_count=3
 start_service "${svc2_name}" "${svc2_port}" "${svc2_count}"
