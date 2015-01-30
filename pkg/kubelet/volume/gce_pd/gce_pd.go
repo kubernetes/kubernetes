@@ -234,15 +234,15 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return err
 	}
 	refCount--
-	if err := os.RemoveAll(pd.GetPath()); err != nil {
-		return err
-	}
 	// If refCount is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
 	if refCount == 1 {
 		if err := pd.manager.DetachDisk(pd, devicePath); err != nil {
 			return err
 		}
+	}
+	if err := os.RemoveAll(pd.GetPath()); err != nil {
+		return err
 	}
 	return nil
 }
