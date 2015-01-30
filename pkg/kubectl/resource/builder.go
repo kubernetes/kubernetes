@@ -318,7 +318,11 @@ func (b *Builder) visitorResult() *Result {
 			if err != nil {
 				return &Result{err: err}
 			}
-			visitors = append(visitors, NewSelector(client, mapping, b.namespace, b.selector))
+			selectorNamespace := b.namespace
+			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+				selectorNamespace = ""
+			}
+			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector))
 		}
 		if b.continueOnError {
 			return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -337,14 +341,19 @@ func (b *Builder) visitorResult() *Result {
 		if len(b.resources) > 1 {
 			return &Result{singular: true, err: fmt.Errorf("you must specify only one resource")}
 		}
-		if len(b.namespace) == 0 {
-			return &Result{singular: true, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
-		}
 		mappings, err := b.resourceMappings()
 		if err != nil {
 			return &Result{singular: true, err: err}
 		}
-		client, err := b.mapper.ClientForMapping(mappings[0])
+		mapping := mappings[0]
+		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			b.namespace = ""
+		} else {
+			if len(b.namespace) == 0 {
+				return &Result{singular: true, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+			}
+		}
+		client, err := b.mapper.ClientForMapping(mapping)
 		if err != nil {
 			return &Result{singular: true, err: err}
 		}
