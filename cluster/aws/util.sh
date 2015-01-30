@@ -342,6 +342,11 @@ function kube-up {
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
 
+  echo "Waiting 1 minute for master to be ready"
+  # TODO(justinsb): Actually poll for the master being ready
+  #  (we at least need the salt-master to be up before the minions come up)
+  sleep 60
+
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Starting Minion (${MINION_NAMES[$i]})"
     (
@@ -400,7 +405,8 @@ function kube-up {
 
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
-  echo "Waiting for cluster to settle"
+  # TODO: Can we poll here?
+  echo "Waiting 3 minutes for cluster to settle"
   local i
   for (( i=0; i < 6*3; i++)); do
     printf "."
