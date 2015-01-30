@@ -83,7 +83,7 @@ func main() {
 		log.Fatalf("failed to create temp directory: %v", err)
 	}
 	aout := filepath.Join(tmpDir, basename)
-	command := append([]string{"go", "build", "-o", aout, "-a", "-tags", "netgo", "-ldflags", "'-w'"}, args...)
+	command := append([]string{"go", "build", "-o", aout, "-a", "-tags", "netgo", "-installsuffix", "netgo"}, args...)
 	if _, err := exec.Command(command[0], command[1:]...).Output(); err != nil {
 		log.Fatalf("failed to run command %q: %v", strings.Join(command, " "), err)
 	}
