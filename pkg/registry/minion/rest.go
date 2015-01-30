@@ -122,12 +122,18 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	// Clear out the self link, if specified, since it's not in the registry either.
 	minion.SelfLink = ""
 
-	// TODO: GetMinion will health check the minion, but we shouldn't require the minion to be
-	// running for updating labels.
 	oldMinion, err := rs.registry.GetMinion(ctx, minion.Name)
 	if err != nil {
 		return nil, err
 	}
+
+	// This is hacky, but minion HostIP has been moved from spec to status since v1beta2. When updating
+	// minion from older client, HostIP will be lost.  Fix it here temporarily until we strip out status
+	// info from user input.
+	if minion.Status.HostIP == "" {
+		minion.Status.HostIP = oldMinion.Status.HostIP
+	}
+
 	if errs := validation.ValidateMinionUpdate(oldMinion, minion); len(errs) > 0 {
 		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
 	}
