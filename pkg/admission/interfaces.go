@@ -24,7 +24,7 @@ import (
 // that is used to make an admission decision.
 type Attributes interface {
 	GetNamespace() string
-	GetKind() string
+	GetResource() string
 	GetOperation() string
 	GetObject() runtime.Object
 }

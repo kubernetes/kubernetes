@@ -36,7 +36,7 @@ func init() {
 type alwaysDeny struct{}
 
 func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return apierrors.NewForbidden(a.GetKind(), "", errors.New("Admission control is denying all modifications"))
+	return apierrors.NewForbidden(a.GetResource(), "", errors.New("Admission control is denying all modifications"))
 }
 
 func NewAlwaysDeny() admission.Interface {

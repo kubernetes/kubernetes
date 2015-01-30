@@ -58,7 +58,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	// ensure it meets each prescribed min/max
 	for i := range items.Items {
 		limitRange := &items.Items[i]
-		err = l.limitFunc(limitRange, a.GetKind(), a.GetObject())
+		err = l.limitFunc(limitRange, a.GetResource(), a.GetObject())
 		if err != nil {
 			return err
 		}
@@ -86,8 +86,8 @@ func Max(a int64, b int64) int64 {
 }
 
 // PodLimitFunc enforces that a pod spec does not exceed any limits specified on the supplied limit range
-func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) error {
-	if kind != "pods" {
+func PodLimitFunc(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
+	if resourceName != "pods" {
 		return nil
 	}
 
@@ -161,11 +161,11 @@ func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) e
 				switch minOrMax {
 				case "Min":
 					if observed < enforced {
-						return apierrors.NewForbidden(kind, pod.Name, err)
+						return apierrors.NewForbidden(resourceName, pod.Name, err)
 					}
 				case "Max":
 					if observed > enforced {
-						return apierrors.NewForbidden(kind, pod.Name, err)
+						return apierrors.NewForbidden(resourceName, pod.Name, err)
 					}
 				}
 			}
