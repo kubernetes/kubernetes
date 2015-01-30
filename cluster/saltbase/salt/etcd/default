@@ -1,2 +1,6 @@
-{% set hostname = grains.host %}
-DAEMON_ARGS="-peer-addr {{hostname}}:7001 -name {{hostname}}"
+{% set etcd_servers = "127.0.0.1" -%}
+{% if grains.etcd_servers is defined -%}
+  {% set etcd_servers = grains.etcd_servers -%}
+{% endif -%}
+
+DAEMON_ARGS="-addr {{etcd_servers}}:4001 -bind-addr {{etcd_servers}}:4001 -data-dir /var/etcd"
