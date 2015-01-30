@@ -1,3 +1,5 @@
+{% if grains['os_family'] != 'RedHat' %}
+
 monit:
   pkg:
     - installed
@@ -17,3 +19,5 @@ monit-service:
     - watch:
       - pkg: monit 
       - file: /etc/monit/conf.d/etcd
+
+{% endif %}
