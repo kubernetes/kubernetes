@@ -102,6 +102,8 @@ const (
 )
 
 // RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
+// TODO After we deprecate v1beta1 and v1beta2, we can look a supporting removing the flexibility of supporting
+// either a query or path param, and instead just support path param
 type RESTScope interface {
 	// Name of the scope
 	Name() RESTScopeName
