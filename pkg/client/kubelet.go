@@ -135,6 +135,9 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	if response.StatusCode == http.StatusNotFound {
 		return status, ErrPodInfoNotAvailable
 	}
+	if response.StatusCode >= 300 || response.StatusCode < 200 {
+		return status, fmt.Errorf("kubelet %q server responded with HTTP error code %d for pod %s/%s", host, response.StatusCode, podNamespace, podID)
+	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return status, err
