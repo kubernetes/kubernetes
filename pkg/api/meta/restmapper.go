@@ -51,7 +51,7 @@ var RESTScopeNamespaceLegacy = &restScope{
 
 var RESTScopeNamespace = &restScope{
 	name:             RESTScopeNameNamespace,
-	paramName:        "namespace",
+	paramName:        "ns",
 	paramPath:        true,
 	paramDescription: "object name and auth scope, such as for teams and projects",
 }
