@@ -78,6 +78,7 @@ function create-provision-scripts {
     echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
+    echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 

@@ -76,6 +76,7 @@ grains:
   roles:
     - kubernetes-master
   admission_control: AlwaysAdmit
+  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
 
 mkdir -p /srv/salt-overlay/pillar
