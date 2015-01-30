@@ -39,6 +39,42 @@ var _ = Describe("Pods", func() {
 		c = loadClientOrDie()
 	})
 
+	It("should be submitted and removed", func() {
+		podClient := c.Pods(api.NamespaceDefault)
+
+		By("loading the pod json")
+		pod := loadPodOrDie(assetPath("api", "examples", "pod.json"))
+		value := strconv.Itoa(time.Now().Nanosecond())
+		pod.Name = pod.Name + "-" + randomSuffix()
+		pod.Labels["time"] = value
+		pod.Spec.Containers[0].Ports[0].HostPort = 0
+
+		By("submitting the pod to kubernetes")
+		_, err := podClient.Create(pod)
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+		}
+		defer func() {
+			// We call defer here in case there is a problem with
+			// the test so we can ensure that we clean up after
+			// ourselves
+			defer GinkgoRecover()
+			podClient.Delete(pod.Name)
+		}()
+
+		By("verifying the pod is in kubernetes")
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+		}
+		Expect(len(pods.Items)).To(Equal(1))
+
+		By("deleting the pod")
+		podClient.Delete(pod.Name)
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		Expect(len(pods.Items)).To(Equal(0))
+	})
+
 	It("should be updated", func() {
 		podClient := c.Pods(api.NamespaceDefault)
 
