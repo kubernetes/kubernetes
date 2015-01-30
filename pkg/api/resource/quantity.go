@@ -411,6 +411,12 @@ func (qf qFlag) Type() string {
 // Will panic if defaultValue is not a valid quantity.
 func QuantityFlag(flagName, defaultValue, description string) *Quantity {
 	q := MustParse(defaultValue)
-	flag.Var(qFlag{&q}, flagName, description)
+	flag.Var(NewQuantityFlagValue(&q), flagName, description)
 	return &q
+}
+
+// NewQuantityFlagValue returns an object that can be used to back a flag,
+// pointing at the given Quantity variable.
+func NewQuantityFlagValue(q *Quantity) flag.Value {
+	return qFlag{q}
 }

@@ -21,6 +21,7 @@ package main
 import (
 	"os"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
 )
@@ -32,6 +33,7 @@ func main() {
 	}
 
 	hk.AddServer(apiserver.NewHyperkubeServer())
+	hk.AddServer(controllermanager.NewHyperkubeServer())
 
 	hk.RunToExit(os.Args)
 }
