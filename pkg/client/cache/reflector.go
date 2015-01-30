@@ -18,7 +18,6 @@ package cache
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"time"
@@ -97,8 +96,7 @@ func (r *Reflector) listAndWatch() {
 		glog.Errorf("Unable to understand list result %#v (%v)", list, err)
 		return
 	}
-	err = r.syncWith(items)
-	if err != nil {
+	if err := r.syncWith(items); err != nil {
 		glog.Errorf("Unable to sync list result: %v", err)
 		return
 	}
@@ -125,17 +123,12 @@ func (r *Reflector) listAndWatch() {
 
 // syncWith replaces the store's items with the given list.
 func (r *Reflector) syncWith(items []runtime.Object) error {
-	found := map[string]interface{}{}
+	found := make([]interface{}, 0, len(items))
 	for _, item := range items {
-		meta, err := meta.Accessor(item)
-		if err != nil {
-			return fmt.Errorf("unexpected item in list: %v", err)
-		}
-		found[meta.Name()] = item
+		found = append(found, item)
 	}
 
-	r.store.Replace(found)
-	return nil
+	return r.store.Replace(found)
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
@@ -161,14 +154,14 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) err
 		}
 		switch event.Type {
 		case watch.Added:
-			r.store.Add(meta.Name(), event.Object)
+			r.store.Add(event.Object)
 		case watch.Modified:
-			r.store.Update(meta.Name(), event.Object)
+			r.store.Update(event.Object)
 		case watch.Deleted:
 			// TODO: Will any consumers need access to the "last known
 			// state", which is passed in event.Object? If so, may need
 			// to change this.
-			r.store.Delete(meta.Name())
+			r.store.Delete(event.Object)
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}

@@ -17,53 +17,89 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 )
 
 // Store is a generic object storage interface. Reflector knows how to watch a server
 // and update a store. A generic store is provided, which allows Reflector to be used
 // as a local caching system, and an LRU store, which allows Reflector to work like a
 // queue of items yet to be processed.
+//
+// Store makes no assumptions about stored object identity; it is the responsibility
+// of a Store implementation to provide a mechanism to correctly key objects and to
+// define the contract for obtaining objects by some arbitrary key type.
 type Store interface {
-	Add(id string, obj interface{})
-	Update(id string, obj interface{})
-	Delete(id string)
+	Add(obj interface{}) error
+	Update(obj interface{}) error
+	Delete(obj interface{}) error
 	List() []interface{}
-	ContainedIDs() util.StringSet
-	Get(id string) (item interface{}, exists bool)
+	Get(obj interface{}) (item interface{}, exists bool, err error)
 
 	// Replace will delete the contents of the store, using instead the
-	// given map. Store takes ownership of the map, you should not reference
+	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
-	Replace(idToObj map[string]interface{})
+	Replace([]interface{}) error
+}
+
+// KeyFunc knows how to make a key from an object. Implementations should be deterministic.
+type KeyFunc func(obj interface{}) (string, error)
+
+// MetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
+// keys for API objects which implement meta.Interface.
+// The key uses the format: <namespace>/<name>
+func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("object has no meta: %v", err)
+	}
+	return meta.Namespace() + "/" + meta.Name(), nil
 }
 
 type cache struct {
 	lock  sync.RWMutex
 	items map[string]interface{}
+	// keyFunc is used to make the key for objects stored in and retrieved from items, and
+	// should be deterministic.
+	keyFunc KeyFunc
 }
 
 // Add inserts an item into the cache.
-func (c *cache) Add(id string, obj interface{}) {
+func (c *cache) Add(obj interface{}) error {
+	id, err := c.keyFunc(obj)
+	if err != nil {
+		return fmt.Errorf("couldn't create key for object: %v", err)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items[id] = obj
+	return nil
 }
 
 // Update sets an item in the cache to its updated state.
-func (c *cache) Update(id string, obj interface{}) {
+func (c *cache) Update(obj interface{}) error {
+	id, err := c.keyFunc(obj)
+	if err != nil {
+		return fmt.Errorf("couldn't create key for object: %v", err)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items[id] = obj
+	return nil
 }
 
 // Delete removes an item from the cache.
-func (c *cache) Delete(id string) {
+func (c *cache) Delete(obj interface{}) error {
+	id, err := c.keyFunc(obj)
+	if err != nil {
+		return fmt.Errorf("couldn't create key for object: %v", err)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.items, id)
+	return nil
 }
 
 // List returns a list of all the items.
@@ -78,38 +114,39 @@ func (c *cache) List() []interface{} {
 	return list
 }
 
-// ContainedIDs returns a util.StringSet containing all IDs of the stored items.
-// This is a snapshot of a moment in time, and one should keep in mind that
-// other go routines can add or remove items after you call this.
-func (c *cache) ContainedIDs() util.StringSet {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	set := util.StringSet{}
-	for id := range c.items {
-		set.Insert(id)
-	}
-	return set
-}
-
 // Get returns the requested item, or sets exists=false.
 // Get is completely threadsafe as long as you treat all items as immutable.
-func (c *cache) Get(id string) (item interface{}, exists bool) {
+func (c *cache) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	id, _ := c.keyFunc(obj)
+	if err != nil {
+		return nil, false, fmt.Errorf("couldn't create key for object: %v", err)
+	}
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	item, exists = c.items[id]
-	return item, exists
+	return item, exists, nil
 }
 
-// Replace will delete the contents of 'c', using instead the given map.
-// 'c' takes ownership of the map, you should not reference the map again
+// Replace will delete the contents of 'c', using instead the given list.
+// 'c' takes ownership of the list, you should not reference the list again
 // after calling this function.
-func (c *cache) Replace(idToObj map[string]interface{}) {
+func (c *cache) Replace(list []interface{}) error {
+	items := map[string]interface{}{}
+	for _, item := range list {
+		key, err := c.keyFunc(item)
+		if err != nil {
+			return fmt.Errorf("couldn't create key for object: %v", err)
+		}
+		items[key] = item
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.items = idToObj
+	c.items = items
+	return nil
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.
-func NewStore() Store {
-	return &cache{items: map[string]interface{}{}}
+func NewStore(keyFunc KeyFunc) Store {
+	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc}
 }

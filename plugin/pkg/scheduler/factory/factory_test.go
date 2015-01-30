@@ -208,7 +208,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
-	queue := cache.NewFIFO()
+	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[string]*backoffEntry{},
 		clock:           &fakeClock{},
@@ -223,7 +223,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		// whole error handling system in the future. The test will time
 		// out if something doesn't work.
 		time.Sleep(10 * time.Millisecond)
-		got, exists := queue.Get("foo")
+		got, exists, _ := queue.Get(testPod)
 		if !exists {
 			continue
 		}
@@ -249,8 +249,8 @@ func TestMinionEnumerator(t *testing.T) {
 		t.Fatalf("expected %v, got %v", e, a)
 	}
 	for i := range testList.Items {
-		gotID, gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotID; e != a {
+		gotObj := me.Get(i)
+		if e, a := testList.Items[i].Name, gotObj.(*api.Node).Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {

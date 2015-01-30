@@ -69,10 +69,17 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 // rather than a method of StoreToNodeLister.
 // GetNodeInfo returns cached data for the minion 'id'.
 func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
-	if minion, ok := s.Get(id); ok {
-		return minion.(*api.Node), nil
+	minion, exists, err := s.Get(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving minion '%v' from cache: %v", id, err)
 	}
-	return nil, fmt.Errorf("minion '%v' is not in cache", id)
+
+	if !exists {
+		return nil, fmt.Errorf("minion '%v' is not in cache", id)
+	}
+
+	return minion.(*api.Node), nil
 }
 
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
