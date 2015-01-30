@@ -727,7 +727,11 @@ function test-teardown {
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
-  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
+  for try in $(seq 1 5); do
+    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"; then
+      break
+    fi
+  done
 }
 
 # Restart the kube-proxy on a node ($1)
