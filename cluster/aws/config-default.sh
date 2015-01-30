@@ -18,7 +18,7 @@
 ZONE=us-west-2
 MASTER_SIZE=t2.micro
 MINION_SIZE=t2.micro
-NUM_MINIONS=4
+NUM_MINIONS=${NUM_MINIONS:-4}
 
 # This is the ubuntu 14.04 image for us-west-2 + ebs
 # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images

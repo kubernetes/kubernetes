@@ -24,7 +24,9 @@ etcd-tar:
     - source_hash: {{ etcd_tar_hash }}
     - archive_format: tar
     - if_missing: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
+{% if grains['saltversioninfo'] <= (2014, 7, 0, 0) %}
     - tar_options: xz
+{% endif %}
   file.directory:
     - name: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
     - user: root
