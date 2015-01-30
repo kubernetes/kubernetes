@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 
@@ -193,7 +194,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	} else {
 		newStatus.Info = result.Status.Info
 		newStatus.Phase = getPhase(&pod.Spec, newStatus.Info)
-		if netContainerInfo, ok := newStatus.Info["POD"]; ok {
+		if netContainerInfo, ok := newStatus.Info[leaky.PodInfraContainerName]; ok {
 			if netContainerInfo.PodIP != "" {
 				newStatus.PodIP = netContainerInfo.PodIP
 			}

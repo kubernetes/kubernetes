@@ -305,7 +305,7 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 }
 
 func TestTemplatePanic(t *testing.T) {
-	tmpl := `{{and ((index .currentState.info "update-demo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
+	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
 	printer, err := NewTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
@@ -328,18 +328,18 @@ func TestTemplateStrings(t *testing.T) {
 	}{
 		"nilInfo":   {api.Pod{}, "false"},
 		"emptyInfo": {api.Pod{Status: api.PodStatus{Info: api.PodInfo{}}}, "false"},
-		"containerExists": {
+		"fooExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"update-demo": api.ContainerStatus{}},
+					Info: api.PodInfo{"foo": api.ContainerStatus{}},
 				},
 			},
 			"false",
 		},
-		"netExists": {
+		"barExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"POD": api.ContainerStatus{}},
+					Info: api.PodInfo{"bar": api.ContainerStatus{}},
 				},
 			},
 			"false",
@@ -348,8 +348,8 @@ func TestTemplateStrings(t *testing.T) {
 			api.Pod{
 				Status: api.PodStatus{
 					Info: api.PodInfo{
-						"update-demo": api.ContainerStatus{},
-						"POD":         api.ContainerStatus{},
+						"foo": api.ContainerStatus{},
+						"bar": api.ContainerStatus{},
 					},
 				},
 			},
@@ -359,8 +359,8 @@ func TestTemplateStrings(t *testing.T) {
 			api.Pod{
 				Status: api.PodStatus{
 					Info: api.PodInfo{
-						"update-demo": api.ContainerStatus{},
-						"POD": api.ContainerStatus{
+						"foo": api.ContainerStatus{},
+						"bar": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -376,14 +376,14 @@ func TestTemplateStrings(t *testing.T) {
 			api.Pod{
 				Status: api.PodStatus{
 					Info: api.PodInfo{
-						"update-demo": api.ContainerStatus{
+						"foo": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
 								},
 							},
 						},
-						"POD": api.ContainerStatus{
+						"bar": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -400,14 +400,14 @@ func TestTemplateStrings(t *testing.T) {
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
 	tmpl :=
-		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "POD" "state" "running")}}`
+		`{{and (exists . "currentState" "info" "foo" "state" "running") (exists . "currentState" "info" "bar" "state" "running")}}`
 	useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}
-c: {{exists . "currentState" "info" "update-demo"}}
-d: {{exists . "currentState" "info" "update-demo" "state"}}
-e: {{exists . "currentState" "info" "update-demo" "state" "running"}}
-f: {{exists . "currentState" "info" "update-demo" "state" "running" "startedAt"}}`
+c: {{exists . "currentState" "info" "foo"}}
+d: {{exists . "currentState" "info" "foo" "state"}}
+e: {{exists . "currentState" "info" "foo" "state" "running"}}
+f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
 	_ = useThisToDebug // don't complain about unused var
 
 	p, err := NewTemplatePrinter([]byte(tmpl))

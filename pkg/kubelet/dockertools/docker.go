@@ -31,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -38,7 +39,7 @@ import (
 )
 
 const (
-	PodInfraContainerName = "POD" // This should match the constant defined in kubelet
+	PodInfraContainerName = leaky.PodInfraContainerName
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
