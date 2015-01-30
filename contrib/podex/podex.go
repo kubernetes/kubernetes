@@ -32,22 +32,29 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/ghodss/yaml"
+	goyaml "gopkg.in/v2/yaml"
 )
 
-const usage = "usage: podex [-json|-yaml] [-id PODNAME] IMAGES"
+const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES..."
 
-var generateJSON = flag.Bool("json", false, "generate json manifest")
-var generateYAML = flag.Bool("yaml", false, "generate yaml manifest")
-var podName = flag.String("id", "", "set pod name")
+var manifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
+var manifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
+var manifestName = flag.String("name", "", "manifest name, default to image base name")
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s\n", usage)
+		flag.PrintDefaults()
+	}
+}
 
 type image struct {
 	Host      string
@@ -60,28 +67,25 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() < 1 {
-		log.Fatal(usage)
+		flag.Usage()
+		log.Fatal("pod: missing image argument")
 	}
-	if *podName == "" {
+	if *manifestName == "" {
 		if flag.NArg() > 1 {
-			log.Print(usage)
+			flag.Usage()
 			log.Fatal("podex: -id arg is required when passing more than one image")
 		}
-		_, _, *podName, _ = splitDockerImageName(flag.Arg(0))
+		_, _, *manifestName, _ = splitDockerImageName(flag.Arg(0))
 	}
 
-	if (!*generateJSON && !*generateYAML) || (*generateJSON && *generateYAML) {
-		log.Fatal(usage)
-	}
-
-	podContainers := []v1beta1.Container{}
+	podContainers := []goyaml.MapSlice{}
 
 	for _, imageName := range flag.Args() {
 		host, namespace, repo, tag := splitDockerImageName(imageName)
 
-		container := v1beta1.Container{
-			Name:  repo,
-			Image: imageName,
+		container := goyaml.MapSlice{
+			{Key: "name", Value: repo},
+			{Key: "image", Value: imageName},
 		}
 
 		img, err := getImageMetadata(host, namespace, repo, tag)
@@ -89,43 +93,79 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to get image metadata %q: %v", imageName, err)
 		}
+		portSlice := []goyaml.MapSlice{}
 		for p := range img.ContainerConfig.ExposedPorts {
 			port, err := strconv.Atoi(p.Port())
 			if err != nil {
 				log.Fatalf("failed to parse port %q: %v", p.Port(), err)
 			}
-			container.Ports = append(container.Ports, v1beta1.Port{
-				Name:          strings.Join([]string{repo, p.Proto(), p.Port()}, "-"),
-				ContainerPort: port,
-				Protocol:      v1beta1.Protocol(strings.ToUpper(p.Proto())),
-			})
+			portEntry := goyaml.MapSlice{{
+				Key:   "name",
+				Value: strings.Join([]string{repo, p.Proto(), p.Port()}, "-"),
+			}, {
+				Key:   "containerPort",
+				Value: port,
+			}}
+			portSlice = append(portSlice, portEntry)
+			if p.Proto() != "tcp" {
+				portEntry = append(portEntry, goyaml.MapItem{Key: "protocol", Value: strings.ToUpper(p.Proto())})
+			}
+		}
+		if len(img.ContainerConfig.ExposedPorts) > 0 {
+			container = append(container, goyaml.MapItem{Key: "ports", Value: portSlice})
 		}
 		podContainers = append(podContainers, container)
 	}
 
 	// TODO(proppy): add flag to handle multiple version
-	manifest := v1beta1.ContainerManifest{
-		Version:    "v1beta1",
-		ID:         *podName + "-pod",
-		Containers: podContainers,
-		RestartPolicy: v1beta1.RestartPolicy{
-			Always: &v1beta1.RestartPolicyAlways{},
-		},
+	containerManifest := goyaml.MapSlice{
+		{Key: "version", Value: "v1beta2"},
+		{Key: "containers", Value: podContainers},
 	}
 
-	if *generateJSON {
-		bs, err := json.MarshalIndent(manifest, "", "  ")
-		if err != nil {
-			log.Fatalf("failed to render JSON container manifest: %v", err)
+	var data interface{}
+
+	switch *manifestType {
+	case "container":
+		containerManifest = append(goyaml.MapSlice{
+			{Key: "id", Value: *manifestName},
+		}, containerManifest...)
+		data = containerManifest
+	case "pod":
+		data = goyaml.MapSlice{
+			{Key: "id", Value: *manifestName},
+			{Key: "kind", Value: "Pod"},
+			{Key: "apiVersion", Value: "v1beta1"},
+			{Key: "desiredState", Value: goyaml.MapSlice{
+				{Key: "manifest", Value: containerManifest},
+			}},
 		}
-		os.Stdout.Write(bs)
+	default:
+		flag.Usage()
+		log.Fatalf("unsupported manifest type %q", *manifestType)
 	}
-	if *generateYAML {
-		bs, err := yaml.Marshal(manifest)
+
+	yamlBytes, err := goyaml.Marshal(data)
+	if err != nil {
+		log.Fatalf("failed to marshal container manifest: %v", err)
+	}
+
+	switch *manifestFormat {
+	case "yaml":
+		os.Stdout.Write(yamlBytes)
+	case "json":
+		jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 		if err != nil {
-			log.Fatalf("failed to render YAML container manifest: %v", err)
+			log.Fatalf("failed to marshal container manifest into JSON: %v", err)
 		}
-		os.Stdout.Write(bs)
+		var jsonPretty bytes.Buffer
+		if err := json.Indent(&jsonPretty, jsonBytes, "", "  "); err != nil {
+			log.Fatalf("failed to indent json %q: %v", string(jsonBytes), err)
+		}
+		io.Copy(os.Stdout, &jsonPretty)
+	default:
+		flag.Usage()
+		log.Fatalf("unsupported manifest format %q", *manifestFormat)
 	}
 }
 
@@ -215,11 +255,8 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	if err != nil {
 		return nil, fmt.Errorf("error getting json for image %q: %v", imageID, err)
 	}
-	data, _ := ioutil.ReadAll(resp.Body)
-	buf := bytes.NewBuffer(data)
-	log.Print(string(data))
 	var image imageMetadata
-	if err := json.NewDecoder(buf).Decode(&image); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&image); err != nil {
 		return nil, fmt.Errorf("error decoding image %q metadata: %v", imageID, err)
 	}
 	return &image, nil
