@@ -68,7 +68,6 @@ type Config struct {
 	Client                 *client.Client
 	Cloud                  cloudprovider.Interface
 	EtcdHelper             tools.EtcdHelper
-	HealthCheckMinions     bool
 	EventTTL               time.Duration
 	MinionRegexp           string
 	KubeletClient          client.KubeletClient
@@ -235,7 +234,7 @@ func setDefaults(c *Config) {
 //   any unhandled paths to "Handler".
 func New(c *Config) *Master {
 	setDefaults(c)
-	minionRegistry := makeMinionRegistry(c)
+	minionRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
 	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
 	boundPodFactory := &pod.BasicBoundPodFactory{
 		ServiceRegistry:        serviceRegistry,
@@ -328,15 +327,6 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
 	}
 	glog.Errorln(buffer.String())
-}
-
-func makeMinionRegistry(c *Config) minion.Registry {
-	var minionRegistry minion.Registry = etcd.NewRegistry(c.EtcdHelper, nil)
-	// TODO: plumb in nodeIPCache here
-	if c.HealthCheckMinions {
-		minionRegistry = minion.NewHealthyRegistry(minionRegistry, c.KubeletClient, util.RealClock{}, 20*time.Second)
-	}
-	return minionRegistry
 }
 
 // init initializes master.

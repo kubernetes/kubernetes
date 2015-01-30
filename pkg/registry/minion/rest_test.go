@@ -18,13 +18,11 @@ package minion
 
 import (
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestMinionRegistryREST(t *testing.T) {
@@ -89,57 +87,6 @@ func TestMinionRegistryREST(t *testing.T) {
 	}
 }
 
-func TestMinionRegistryHealthCheck(t *testing.T) {
-	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
-	minionHealthRegistry := NewHealthyRegistry(
-		minionRegistry,
-		&notMinion{minion: "m1"},
-		&util.FakeClock{},
-		60*time.Second,
-	)
-
-	ms := NewREST(minionHealthRegistry)
-	ctx := api.NewContext()
-
-	c, err := ms.Create(ctx, &api.Node{ObjectMeta: api.ObjectMeta{Name: "m1"}})
-	if err != nil {
-		t.Fatalf("insert failed: %v", err)
-	}
-	result := <-c
-	if m, ok := result.Object.(*api.Node); !ok || m.Name != "m1" {
-		t.Errorf("insert return value was weird: %#v", result)
-	}
-	if _, err := ms.Get(ctx, "m1"); err != nil {
-		t.Errorf("node is unhealthy, expect no error: %v", err)
-	}
-}
-
-func contains(nodes *api.NodeList, nodeID string) bool {
-	for _, node := range nodes.Items {
-		if node.Name == nodeID {
-			return true
-		}
-	}
-	return false
-}
-
-func TestMinionRegistryInvalidUpdate(t *testing.T) {
-	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
-	ctx := api.NewContext()
-	obj, err := storage.Get(ctx, "foo")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	minion, ok := obj.(*api.Node)
-	if !ok {
-		t.Fatalf("Object is not a minion: %#v", obj)
-	}
-	minion.Status.HostIP = "1.2.3.4"
-	if _, err = storage.Update(ctx, minion); err == nil {
-		t.Error("Unexpected non-error.")
-	}
-}
-
 func TestMinionRegistryValidUpdate(t *testing.T) {
 	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
@@ -191,4 +138,13 @@ func TestMinionRegistryValidatesCreate(t *testing.T) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
 	}
+}
+
+func contains(nodes *api.NodeList, nodeID string) bool {
+	for _, node := range nodes.Items {
+		if node.Name == nodeID {
+			return true
+		}
+	}
+	return false
 }
