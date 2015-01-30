@@ -14,18 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package server
 
 // This file exists to force the desired plugin implementations to be linked.
 // This should probably be part of some configuration fed into the build for a
 // given binary target.
 import (
+	// Cloud providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
 
+	// Admission policies
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/deny"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/limitranger"

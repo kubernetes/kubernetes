@@ -26,6 +26,7 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
 )
@@ -128,6 +129,9 @@ func (hk *HyperKube) Run(args []string) error {
 			hk.Usage()
 			return err
 		}
+
+		verflag.PrintAndExitIfRequested()
+
 		args = baseFlags.Args()
 		if len(args) > 0 && len(args[0]) > 0 {
 			serverName = args[0]
@@ -135,7 +139,7 @@ func (hk *HyperKube) Run(args []string) error {
 			args = args[1:]
 		} else {
 			err = errors.New("No server specified")
-			hk.Println("Error", err)
+			hk.Printf("Error: %v\n\n", err)
 			hk.Usage()
 			return err
 		}
@@ -143,7 +147,7 @@ func (hk *HyperKube) Run(args []string) error {
 
 	s, err := hk.FindServer(serverName)
 	if err != nil {
-		hk.Println("Error:", err)
+		hk.Printf("Error: %v\n\n", err)
 		hk.Usage()
 		return err
 	}
@@ -152,19 +156,32 @@ func (hk *HyperKube) Run(args []string) error {
 	err = s.Flags().Parse(args)
 	if err != nil || hk.helpFlagVal {
 		if err != nil {
-			hk.Println("Error:", err)
+			hk.Printf("Error: %v\n\n", err)
 		}
 		s.Usage()
 		return err
 	}
 
+	verflag.PrintAndExitIfRequested()
+
 	util.InitLogs()
+	defer util.FlushLogs()
+
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {
 		hk.Println("Error:", err)
 	}
 
 	return err
+}
+
+// RunToExit will run the hyperkube and then call os.Exit with an appropriate exit code.
+func (hk *HyperKube) RunToExit(args []string) {
+	err := hk.Run(args)
+	if err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
 
 // Usage will write out a summary for all servers that this binary supports.
