@@ -25,22 +25,37 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 )
 
-var flRepo = flag.String("repo", env("GIT_SYNC_REPO", ""), "git repo url")
-var flBranch = flag.String("branch", env("GIT_SYNC_BRANCH", "master"), "git branch")
-var flRev = flag.String("rev", env("GIT_SYNC_BRANCH", "HEAD"), "git rev")
-var flDest = flag.String("dest", env("GIT_SYNC_DEST", ""), "destination path")
+var flRepo = flag.String("repo", envString("GIT_SYNC_REPO", ""), "git repo url")
+var flBranch = flag.String("branch", envString("GIT_SYNC_BRANCH", "master"), "git branch")
+var flRev = flag.String("rev", envString("GIT_SYNC_BRANCH", "HEAD"), "git rev")
+var flDest = flag.String("dest", envString("GIT_SYNC_DEST", ""), "destination path")
+var flWait = flag.Int("wait", envInt("GIT_SYNC_WAIT", 0), "number of seconds to wait before exit")
 
-func env(key, def string) string {
+func envString(key, def string) string {
 	if env := os.Getenv(key); env != "" {
 		return env
 	}
 	return def
 }
 
-const usage = "usage: GIT_SYNC_REPO= GIT_SYNC_DEST= [GIT_SYNC_BRANCH=] git-sync -repo GIT_REPO_URL -dest PATH [-branch]"
+func envInt(key string, def int) int {
+	if env := os.Getenv(key); env != "" {
+		val, err := strconv.Atoi(env)
+		if err != nil {
+			log.Println("invalid value for %q: using default: %q", key, def)
+			return def
+		}
+		return val
+	}
+	return def
+}
+
+const usage = "usage: GIT_SYNC_REPO= GIT_SYNC_DEST= [GIT_SYNC_BRANCH= GIT_SYNC_WAIT=] git-sync -repo GIT_REPO_URL -dest PATH [-branch -wait]"
 
 func main() {
 	flag.Parse()
@@ -54,6 +69,9 @@ func main() {
 	if err := syncRepo(*flRepo, *flDest, *flBranch, *flRev); err != nil {
 		log.Fatalf("error syncing repo: %v", err)
 	}
+	log.Printf("wait %d seconds", *flWait)
+	time.Sleep(time.Duration(*flWait) * time.Second)
+	log.Println("done")
 }
 
 // syncRepo syncs the branch of a given repository to the destination at the given rev.
