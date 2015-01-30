@@ -34,16 +34,15 @@ export PATH=$PATH:/usr/local/go/bin
 export KUBE_RELEASE_RUN_TESTS=n
 export KUBE_SKIP_CONFIRMATIONS=y
 
-# Clean stuff out.
-#
-# TODO: Look at git clean plugin again for hermeticism, but may not
-# play nicely with dockerized stuff and permissions. (We may just need
-# to force the build/make-clean.sh at the end of the build regardless
-# of status and be delicate with the exit status.) (Low priority
-# unless there's a hermetic issue.)
+# Clean stuff out. Assume the worst - the last build may have left the
+# tree in an odd state. There's a Jenkins git clean plugin, but we
+# have the docker images to worry about as well, so be really pedantic
+# about cleaning.
 rm -rf ~/.kube*
-./build/make-clean.sh
+make clean
 git clean -fdx
+docker ps -aq | xargs -r docker rm
+docker images -q | xargs -r docker rmi
 
 # Build
 go run ./hack/e2e.go -v --build
