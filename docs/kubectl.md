@@ -930,7 +930,6 @@ Usage:
       --output-version="": Output the formatted object with the given version (default api-version)
       --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.
       --port=-1: The port that this container exposes.
-      --public-ip="": A public IP address to use for this service.
   -r, --replicas=1: Number of replicas to create for this container. Default 1
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr

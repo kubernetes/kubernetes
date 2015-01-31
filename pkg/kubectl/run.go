@@ -73,8 +73,12 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 			},
 		},
 	}
-	port, err := strconv.Atoi(params["port"])
-	if err != nil {
+
+	if len(params["port"]) > 0 {
+		port, err := strconv.Atoi(params["port"])
+		if err != nil {
+			return nil, err
+		}
 		controller.Spec.Template.Spec.Containers[0].Ports = []api.Port{
 			{
 				ContainerPort: port,
