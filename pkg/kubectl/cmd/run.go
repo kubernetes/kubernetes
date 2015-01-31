@@ -74,7 +74,8 @@ Examples:
 
 			inline := util.GetFlagString(cmd, "overrides")
 			if len(inline) > 0 {
-				util.Merge(controller, inline, "ReplicationController")
+				controller, err = util.Merge(controller, inline, "ReplicationController")
+				checkErr(err)
 			}
 
 			// TODO: extract this flag to a central location, when such a location exists.

@@ -116,12 +116,13 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string
 	obj, err := helper.Get(namespace, name)
 	checkErr(err)
 
-	cmdutil.Merge(obj, patch, mapping.Kind)
-
-	data, err := helper.Codec.Encode(obj)
+	patchedObj, err := cmdutil.Merge(obj, patch, mapping.Kind)
 	checkErr(err)
 
-	obj, err = helper.Update(namespace, name, true, data)
+	data, err := helper.Codec.Encode(patchedObj)
+	checkErr(err)
+
+	_, err = helper.Update(namespace, name, true, data)
 	checkErr(err)
 	return name
 }
