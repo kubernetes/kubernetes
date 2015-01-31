@@ -129,6 +129,20 @@ Reliability Goals:
 
 ## Work Items
 
+* Issue [#3118](https://github.com/GoogleCloudPlatform/kubernetes/issues/3118) Build/find a dashboard to record performance metrics. The dashboard should have graphs of metrics over time and be queriable.
+* Issue [#3119](https://github.com/GoogleCloudPlatform/kubernetes/issues/3119) Decide how to archive information.
+* Issue [#3120](https://github.com/GoogleCloudPlatform/kubernetes/issues/3120) Configure and automated hourly build and record the time it takes to build kubernetes from source. Export information into the dashboard.
+* Issue [#3121](https://github.com/GoogleCloudPlatform/kubernetes/issues/3121) Configure the automated e2e test runner (jenkins) to export the time for each test to complete into the dashboard.
+* Issue [#3122](https://github.com/GoogleCloudPlatform/kubernetes/issues/3122) When e2e tests run on multiple cloud providers, break out the test performance by provider so that regressions can be tracked on each cloud provider individually.  
+* Issue [#3123](https://github.com/GoogleCloudPlatform/kubernetes/issues/3123) Measure the time for each Go test in the e2e test suite individually rather than in aggregate.
+* Issue [#3124](https://github.com/GoogleCloudPlatform/kubernetes/issues/3124) Develop synthetic workload tests to measure basic Kubernetes API performance. Since tests will run on shared resources (e.g. GCE) individual tests should be run N times to weed out any statistical outliers from the performance results. 
+* Issue [#3125](https://github.com/GoogleCloudPlatform/kubernetes/issues/3125) Curate a small number of “applications” that can be used to measure performance at a higher level (QPS for high level requests).
+* Work out how to specify performance regression tests (e.g. decide on thresholds).
+* Issue [#3126](https://github.com/GoogleCloudPlatform/kubernetes/issues/3126) Measure the time taken to create and tear down clusters of various sizes
+* Issue [#3127](https://github.com/GoogleCloudPlatform/kubernetes/issues/3127) Create a network performance test.
+* Issue [#3128](https://github.com/GoogleCloudPlatform/kubernetes/issues/3128) Measure memory consumption of kubernetes master components
+* What happens if I have LIST queries that return 1000s of results per request from apiserver with go heap
+* How efficient is serialization / deserialization of large lists of items
 * Issue [#3130](https://github.com/GoogleCloudPlatform/kubernetes/issues/3130) Rewrite the remaining e2e bash tests in Go. Whilst doing so, reduce/remove the cases where the tests were incorrectly passing.
 * Issue [#3131](https://github.com/GoogleCloudPlatform/kubernetes/issues/3131) Refactor the Go e2e tests to use a test framework (ideally just http://golang.org/pkg/testing/ with some extra bits to make sure the cluster is in the right state at the start of the tests). Try to consolidate on a test framework that works the same for integration and e2e tests.
 * Issue [#3132](https://github.com/GoogleCloudPlatform/kubernetes/issues/3132) Refactor the e2e tests to allow multiple concurrent runs (assuming it is supported by the cloud provider).
@@ -140,7 +154,7 @@ Allow the client to be authenticated to multiple clusters (https://github.com/Go
 * Should have separate projects/flows for testing against different vendors.
 * Shared configuration with other GCE projects for vendor specific tests (GKE will need this).
 * Issue [#3134](https://github.com/GoogleCloudPlatform/kubernetes/issues/3134) Jenkis should produce build artifacts and push to gcs ~hourly. Ideally we can use this to build and push a ‘continuous’ or ‘latest-dev’ bucket to the official gcs kubernetes-release bucket.
-* Issue [#2953]((https://github.com/GoogleCloudPlatform/kubernetes/issues/2953) [zml] Capability bits: I proposed this last week, I still need to write up an issue on it. The idea is that along with the API version (and server version?), the server communicates a bucket of tags that says "I support these capabilities". Then tests like pd.sh can stop being conditionalized on provider and can instead be conditionalized on server capability. Want to get this filed/done before v1beta3, and has testing impact. (Zach edit: The I’s here are me.)
+* Issue [#2953](https://github.com/GoogleCloudPlatform/kubernetes/issues/2953) [zml] Capability bits: I proposed this last week, I still need to write up an issue on it. The idea is that along with the API version (and server version?), the server communicates a bucket of tags that says "I support these capabilities". Then tests like pd.sh can stop being conditionalized on provider and can instead be conditionalized on server capability. Want to get this filed/done before v1beta3, and has testing impact. (Zach edit: The I’s here are me.)
 * Stress testing as a Jenkins job using a large-ish number of VMs.
 * Issue [#3135](https://github.com/GoogleCloudPlatform/kubernetes/issues/3135) [zml] Upgrade testing: Related to the previous, but you could write an entire doc on upgrade testing alone. I think we're going to need a story here, and it's actually a long one. We need to get a pretty good handle on upgrade/release policy, versions we're going to keep around (OSS-wise, GKE-wise, etc), versions we're going to allow upgrade between, etc. (I volunteer to help pin people down here - I think the release process is getting driven elsewhere but this is a crossbar item between that group and us that's pretty important). (Zach edit: The I’s here are me.)
 * Issue [#3136](https://github.com/GoogleCloudPlatform/kubernetes/issues/3136) Create a compatibility test matrix. Verify that an old client works with a new server, different api versions, etc.
@@ -181,22 +195,3 @@ Things we could measure:
  2. How much of the performance testing will/should be cloud provider specific?
  3. Are there any any open source tools / frameworks we can use use?
  4. Storage performance?
-
-## Work Items
-
-* Issue [#3118](https://github.com/GoogleCloudPlatform/kubernetes/issues/3118) Build/find a dashboard to record performance metrics. The dashboard should have graphs of metrics over time and be queriable.
-* Issue [#3119](https://github.com/GoogleCloudPlatform/kubernetes/issues/3119) Decide how to archive information.
-* Issue [#3120](https://github.com/GoogleCloudPlatform/kubernetes/issues/3120) Configure and automated hourly build and record the time it takes to build kubernetes from source. Export information into the dashboard.
-* Issue [#3121](https://github.com/GoogleCloudPlatform/kubernetes/issues/3121) Configure the automated e2e test runner (jenkins) to export the time for each test to complete into the dashboard.
-* Issue [#3122](https://github.com/GoogleCloudPlatform/kubernetes/issues/3122) When e2e tests run on multiple cloud providers, break out the test performance by provider so that regressions can be tracked on each cloud provider individually.  
-* Issue [#3123](https://github.com/GoogleCloudPlatform/kubernetes/issues/3123) Measure the time for each Go test in the e2e test suite individually rather than in aggregate.
-* Issue [#3124](https://github.com/GoogleCloudPlatform/kubernetes/issues/3124) Develop synthetic workload tests to measure basic Kubernetes API performance. Since tests will run on shared resources (e.g. GCE) individual tests should be run N times to weed out any statistical outliers from the performance results. 
-Issue [#3125](https://github.com/GoogleCloudPlatform/kubernetes/issues/3125) Curate a small number of “applications” that can be used to measure performance at a higher level (QPS for high level requests).
-Work out how to specify performance regression tests (e.g. decide on thresholds).
-Issue [#3126](https://github.com/GoogleCloudPlatform/kubernetes/issues/3126) Measure the time taken to create and tear down clusters of various sizes
-Issue [#3127](https://github.com/GoogleCloudPlatform/kubernetes/issues/3127) Create a network performance test.
-Issue [#3128](https://github.com/GoogleCloudPlatform/kubernetes/issues/3128) Measure memory consumption of kubernetes master components
-* What happens if I have LIST queries that return 1000s of results per request from apiserver with go heap
-* How efficient is serialization / deserialization of large lists of items
-
-
