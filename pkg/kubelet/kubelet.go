@@ -177,6 +177,8 @@ type Kubelet struct {
 	// Optional, maximum burst QPS from the docker registry, must be positive if QPS is > 0.0
 	pullBurst int
 
+	// Optional, executes probes
+	prober *probeHolder
 	// Optional, no statistics will be available if omitted
 	cadvisorClient cadvisorInterface
 	cadvisorLock   sync.RWMutex
@@ -1424,6 +1426,9 @@ func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status ap
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
 		return probe.Success, nil
+	}
+	if kl.prober == nil {
+		kl.prober = newProbeHolder()
 	}
 	return kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
 }
