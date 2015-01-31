@@ -32,29 +32,23 @@ import (
 	"github.com/golang/glog"
 )
 
-var (
-	execprober = execprobe.New()
-	httprober  = httprobe.New()
-	tcprober   = tcprobe.New()
-)
-
 func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
 	if p.Exec != nil {
-		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
+		return kl.prober.exec.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
 	if p.HTTPGet != nil {
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return httprober.Probe(extractGetParams(p.HTTPGet, status, port))
+		return kl.prober.http.Probe(extractGetParams(p.HTTPGet, status, port))
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return tcprober.Probe(status.PodIP, port)
+		return kl.prober.tcp.Probe(status.PodIP, port)
 	}
 	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)
 	return probe.Unknown, nil
@@ -122,4 +116,18 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 
 func (eic execInContainer) SetDir(dir string) {
 	//unimplemented
+}
+
+type probeHolder struct {
+	http httprobe.HTTPProber
+	tcp  tcprobe.TCPProber
+	exec execprobe.ExecProber
+}
+
+func newProbeHolder() *probeHolder {
+	return &probeHolder{
+		exec: execprobe.New(),
+		http: httprobe.New(),
+		tcp:  tcprobe.New(),
+	}
 }
