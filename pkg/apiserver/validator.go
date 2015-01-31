@@ -46,7 +46,7 @@ type validator struct {
 }
 
 // TODO: can this use pkg/probe/http
-func (s *Server) check(client httpGet) (probe.Status, string, error) {
+func (s *Server) check(client httpGet) (probe.Result, string, error) {
 	resp, err := client.Get("http://" + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
 	if err != nil {
 		return probe.Unknown, "", err
@@ -66,7 +66,7 @@ func (s *Server) check(client httpGet) (probe.Status, string, error) {
 type ServerStatus struct {
 	Component  string       `json:"component,omitempty"`
 	Health     string       `json:"health,omitempty"`
-	HealthCode probe.Status `json:"healthCode,omitempty"`
+	HealthCode probe.Result `json:"healthCode,omitempty"`
 	Msg        string       `json:"msg,omitempty"`
 	Err        string       `json:"err,omitempty"`
 }

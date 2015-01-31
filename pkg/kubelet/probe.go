@@ -39,7 +39,7 @@ var (
 	tcprober   = tcprobe.New()
 )
 
-func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
+func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
 	var timeout time.Duration
 	secs := container.LivenessProbe.TimeoutSeconds
 	if secs > 0 {
@@ -47,7 +47,6 @@ func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types
 	} else {
 		timeout = 1 * time.Second
 	}
-
 	if p.Exec != nil {
 		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}

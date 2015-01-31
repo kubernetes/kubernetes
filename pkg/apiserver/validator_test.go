@@ -54,7 +54,7 @@ func TestValidate(t *testing.T) {
 	tests := []struct {
 		err            error
 		data           string
-		expectedStatus probe.Status
+		expectedStatus probe.Result
 		code           int
 		expectErr      bool
 	}{

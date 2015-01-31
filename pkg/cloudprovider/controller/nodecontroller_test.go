@@ -102,7 +102,7 @@ func (m *FakeNodeHandler) Update(node *api.Node) (*api.Node, error) {
 
 // FakeKubeletClient is a fake implementation of KubeletClient.
 type FakeKubeletClient struct {
-	Status probe.Status
+	Status probe.Result
 	Err    error
 }
 
@@ -110,7 +110,7 @@ func (c *FakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	return api.PodStatusResult{}, errors.New("Not Implemented")
 }
 
-func (c *FakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
+func (c *FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return c.Status, c.Err
 }
 

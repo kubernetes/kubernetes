@@ -41,7 +41,7 @@ type KubeletClient interface {
 
 // KubeletHealthchecker is an interface for healthchecking kubelets
 type KubeletHealthChecker interface {
-	HealthCheck(host string) (probe.Status, error)
+	HealthCheck(host string) (probe.Result, error)
 }
 
 // PodInfoGetter is an interface for things that can get information about a pod's containers.
@@ -134,7 +134,7 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	return status, nil
 }
 
-func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Status, error) {
+func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return httprobe.DoHTTPProbe(fmt.Sprintf("%s/healthz", c.url(host)), c.Client)
 }
 
@@ -148,6 +148,6 @@ func (c FakeKubeletClient) GetPodStatus(host, podNamespace string, podID string)
 	return api.PodStatusResult{}, errors.New("Not Implemented")
 }
 
-func (c FakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
+func (c FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return probe.Unknown, errors.New("Not Implemented")
 }

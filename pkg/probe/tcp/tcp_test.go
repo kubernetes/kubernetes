@@ -31,7 +31,7 @@ import (
 func TestTcpHealthChecker(t *testing.T) {
 	prober := New()
 	tests := []struct {
-		expectedStatus probe.Status
+		expectedStatus probe.Result
 		usePort        bool
 		expectError    bool
 	}{
