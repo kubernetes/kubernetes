@@ -90,7 +90,5 @@ if [[ ! -x "$gendocs" || ! -x "$genman" ]]; then
   exit 1
 fi
 
-
-KUBECTL_DOC="docs/kubectl.md"
-${gendocs} > ${KUBECTL_DOC}
-${genman} "${KUBE_ROOT}/docs/man/man1"
+${gendocs} "${KUBE_ROOT}/docs/"
+${genman} "${KUBE_ROOT}/docs/man/man1/"

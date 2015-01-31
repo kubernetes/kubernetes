@@ -1,16 +1,44 @@
-## kubectl
+## kubectl delete
 
-kubectl controls the Kubernetes cluster manager
+Delete a resource by filename, stdin, or resource and ID.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Delete a resource by filename, stdin, resource and ID, or by resources and label selector.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+JSON and YAML formats are accepted.
 
-kubectl
+If both a filename and command line arguments are passed, the command line
+arguments are used and the filename is ignored.
+
+Note that the delete command does NOT do resource version checks, so if someone
+submits an update to a resource right when you submit a delete, their update
+will be lost along with the rest of the resource.
+
+Examples:
+
+    $ kubectl delete -f pod.json
+    // Delete a pod using the type and ID specified in pod.json.
+
+    $ cat pod.json | kubectl delete -f -
+    // Delete a pod based on the type and ID in the JSON passed into stdin.
+
+    $ kubectl delete pods,services -l name=myLabel
+    // Delete pods and services with label name=myLabel.
+
+    $ kubectl delete pod 1234-56-7890-234234-456456
+    // Delete a pod with ID 1234-56-7890-234234-456456.
+
+kubectl delete ([-f filename] | (<resource> [(<id> | -l <label>)]
 
 ### Options
+
+```
+  -f, --filename=[]: Filename, directory, or URL to a file containing the resource to delete
+  -l, --selector="": Selector (label query) to filter on
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +68,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

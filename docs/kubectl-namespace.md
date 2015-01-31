@@ -1,16 +1,17 @@
-## kubectl
+## kubectl namespace
 
-kubectl controls the Kubernetes cluster manager
+SUPERCEDED: Set and view the current Kubernetes namespace
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
 
-kubectl
 
-### Options
+kubectl namespace [<namespace>]
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +41,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

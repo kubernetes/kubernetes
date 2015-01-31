@@ -1,16 +1,22 @@
-## kubectl
+## kubectl config
 
-kubectl controls the Kubernetes cluster manager
+config modifies .kubeconfig files
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+config modifies .kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
-
-kubectl
+kubectl config <subcommand>
 
 ### Options
+
+```
+      --envvar=false: use the .kubeconfig from $KUBECONFIG
+      --global=false: use the .kubeconfig from /home/username
+      --local=false: use the .kubeconfig in the current directory
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +46,12 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
+* [kubectl-config-view](kubectl-config-view.md)
+* [kubectl-config-set-cluster](kubectl-config-set-cluster.md)
+* [kubectl-config-set-credentials](kubectl-config-set-credentials.md)
+* [kubectl-config-set-context](kubectl-config-set-context.md)
+* [kubectl-config-set](kubectl-config-set.md)
+* [kubectl-config-unset](kubectl-config-unset.md)
+* [kubectl-config-use-context](kubectl-config-use-context.md)
 

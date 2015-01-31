@@ -1,16 +1,30 @@
-## kubectl
+## kubectl create
 
-kubectl controls the Kubernetes cluster manager
+Create a resource by filename or stdin
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Create a resource by filename or stdin.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+JSON and YAML formats are accepted.
 
-kubectl
+Examples:
+
+    $ kubectl create -f pod.json
+    // Create a pod using the data in pod.json.
+
+    $ cat pod.json | kubectl create -f -
+    // Create a pod based on the JSON passed into stdin.
+
+kubectl create -f filename
 
 ### Options
+
+```
+  -f, --filename=[]: Filename, directory, or URL to file to use to create the resource
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +54,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

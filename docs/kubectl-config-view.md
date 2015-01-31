@@ -1,16 +1,30 @@
-## kubectl
+## kubectl config view
 
-kubectl controls the Kubernetes cluster manager
+displays merged .kubeconfig settings or a specified .kubeconfig file.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+displays merged .kubeconfig settings or a specified .kubeconfig file.
+Examples:
+  // Show merged .kubeconfig settings.
+  $ kubectl config view
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+  // Show only local ./.kubeconfig settings
+  $ kubectl config view --local
 
-kubectl
+kubectl config view
 
 ### Options
+
+```
+      --merge=true: merge together the full hierarchy of .kubeconfig files
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -21,9 +35,12 @@ kubectl
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -h, --help=false: help for kubectl
+      --envvar=false: use the .kubeconfig from $KUBECONFIG
+      --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+      --kubeconfig="": use a particular .kubeconfig file
+      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -40,20 +57,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
 * [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
 

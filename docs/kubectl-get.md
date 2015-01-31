@@ -1,16 +1,49 @@
-## kubectl
+## kubectl get
 
-kubectl controls the Kubernetes cluster manager
+Display one or many resources
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Display one or many resources.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+Possible resources include pods (po), replication controllers (rc), services
+(se), minions (mi), or events (ev).
 
-kubectl
+By specifying the output as 'template' and providing a Go template as the value
+of the --template flag, you can filter the attributes of the fetched resource(s).
+
+Examples:
+
+    $ kubectl get pods
+    // List all pods in ps output format.
+
+    $ kubectl get replicationController 1234-56-7890-234234-456456
+    // List a single replication controller with specified ID in ps output format.
+
+    $ kubectl get -o json pod 1234-56-7890-234234-456456
+    // List a single pod in JSON output format.
+
+    $ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
+    // Return only the status value of the specified pod.
+
+    $ kubectl get rc,services
+    // List all replication controllers and services together in ps output format.
+
+kubectl get [(-o|--output=)json|yaml|template|...] <resource> [<id>]
 
 ### Options
+
+```
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+  -l, --selector="": Selector (label query) to filter on
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -w, --watch=false: After listing/getting the requested object, watch for changes.
+      --watch-only=false: Watch for changes to the requested object(s), without listing/getting first.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +73,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

@@ -1,16 +1,41 @@
-## kubectl
+## kubectl label
 
-kubectl controls the Kubernetes cluster manager
+Update the labels on a resource
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Update the labels on a resource.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
+If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-kubectl
+Examples:
+  $ kubectl label pods foo unhealthy=true
+  <update a pod with the label 'unhealthy' and the value 'true'>
+
+  $ kubectl label --overwrite pods foo status=unhealthy
+  <update a pod with the label 'status' and the value 'unhealthy' overwritting an existing value>
+  
+  $ kubectl label pods foo status=unhealthy --resource-version=1
+  <update a pod with the label 'status' and the value 'unhealthy' if the resource is unchanged from version 1>
+  
+  $ kubectl label pods foo bar-
+  <update a pod by removing a label named 'bar' if it exists. Does not require the --overwrite flag.>
+
+kubectl label [--overwrite] <resource> <name> <key-1>=<val-1> ... <key-n>=<val-n> [--resource-version=<version>]
 
 ### Options
+
+```
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+      --overwrite=false: If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
+      --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +65,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

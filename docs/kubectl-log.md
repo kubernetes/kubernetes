@@ -1,16 +1,28 @@
-## kubectl
+## kubectl log
 
-kubectl controls the Kubernetes cluster manager
+Print the logs for a container in a pod.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+Examples:
 
-kubectl
+    $ kubectl log 123456-7890 ruby-container
+    // Returns snapshot of ruby-container logs from pod 123456-7890.
+
+    $ kubectl log -f 123456-7890 ruby-container
+    // Starts streaming of ruby-container logs from pod 123456-7890.
+
+kubectl log [-f] <pod> [<container>]
 
 ### Options
+
+```
+  -f, --follow=false: Specify if the logs should be streamed.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +52,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

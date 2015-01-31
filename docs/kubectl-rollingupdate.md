@@ -1,16 +1,35 @@
-## kubectl
+## kubectl rollingupdate
 
-kubectl controls the Kubernetes cluster manager
+Perform a rolling update of the given ReplicationController.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Perform a rolling update of the given ReplicationController.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+Replaces the specified controller with new controller, updating one pod at a time to use the
+new PodTemplate. The new-controller.json must specify the same namespace as the
+existing controller and overwrite at least one (common) label in its replicaSelector.
 
-kubectl
+Examples:
+
+    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
+    // Update pods of frontend-v1 using new controller data in frontend-v2.json.
+
+    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
+    // Update pods of frontend-v1 using JSON data passed into stdin.
+
+kubectl rollingupdate <old-controller-name> -f <new-controller.json>
 
 ### Options
+
+```
+  -f, --filename="": Filename or URL to file to use to create the new controller.
+      --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+      --timeout="5m0s": Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+      --update-period="1m0s": Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +59,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

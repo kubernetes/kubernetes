@@ -1,16 +1,34 @@
-## kubectl
+## kubectl update
 
-kubectl controls the Kubernetes cluster manager
+Update a resource by filename or stdin.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Update a resource by filename or stdin.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+JSON and YAML formats are accepted.
 
-kubectl
+Examples:
+
+    $ kubectl update -f pod.json
+    // Update a pod using the data in pod.json.
+
+    $ cat pod.json | kubectl update -f -
+    // Update a pod based on the JSON passed into stdin.
+
+    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
+    // Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
+
+kubectl update -f filename
 
 ### Options
+
+```
+  -f, --filename=[]: Filename, directory, or URL to file to use to update the resource.
+      --patch="": A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +58,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

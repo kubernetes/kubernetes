@@ -91,19 +91,12 @@ if [[ ! -x "$gendocs" || ! -x "$genman" ]]; then
   exit 1
 fi
 
-KUBECTL_DOC="docs/kubectl.md"
-
-echo "diffing ${KUBECTL_DOC} against generated output from ${gendocs}"
-"${gendocs}" | diff "${KUBE_ROOT}/${KUBECTL_DOC}" - && echo "${KUBECTL_DOC} up to date." || {
-  echo "${KUBECTL_DOC} is out of date. Please run hack/run-gendocs.sh"
-  exit 1
-}
-
 DOCROOT="${KUBE_ROOT}/docs/"
 TMP_DOCROOT="${KUBE_ROOT}/docs_tmp/"
 cp -a "${DOCROOT}" "${TMP_DOCROOT}"
 echo "diffing ${DOCROOT} against generated output from ${genman}"
 ${genman} "${TMP_DOCROOT}/man/man1/"
+${gendocs} "${TMP_DOCROOT}"
 set +e
 diff -Naupr "${DOCROOT}" "${TMP_DOCROOT}"
 ret=$?

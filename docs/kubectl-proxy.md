@@ -1,16 +1,23 @@
-## kubectl
+## kubectl proxy
 
-kubectl controls the Kubernetes cluster manager
+Run a proxy to the Kubernetes API server
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Run a proxy to the Kubernetes API server.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
-
-kubectl
+kubectl proxy
 
 ### Options
+
+```
+      --api-prefix="/api/": Prefix to serve the proxied API under.
+  -p, --port=8001: The port on which to run the proxy.
+  -w, --www="": Also serve static files from the given directory under the specified prefix.
+  -P, --www-prefix="/static/": Prefix to serve static files under, if static file directory is specified.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +47,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

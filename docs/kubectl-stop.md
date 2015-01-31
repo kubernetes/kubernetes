@@ -1,16 +1,23 @@
-## kubectl
+## kubectl stop
 
-kubectl controls the Kubernetes cluster manager
+Gracefully shut down a resource.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Gracefully shut down a resource.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+Attempts to shut down and delete a resource that supports graceful termination.
+If the resource is resizable it will be resized to 0 before deletion.
 
-kubectl
+Examples:
 
-### Options
+    $ kubectl stop replicationcontroller foo
+    // Shut down foo.
+
+
+kubectl stop <resource> <id>
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +47,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 

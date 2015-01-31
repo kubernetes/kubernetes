@@ -1,16 +1,35 @@
-## kubectl
+## kubectl resize
 
-kubectl controls the Kubernetes cluster manager
+Set a new size for a Replication Controller.
 
 ### Synopsis
 
-kubectl controls the Kubernetes cluster manager.
+Set a new size for a Replication Controller.
 
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+Resize also allows users to specify one or more preconditions for the resize action.
+If --current-replicas or --resource-version is specified, it is validated before the
+resize is attempted, and it is guaranteed that the precondition holds true when the
+resize is sent to the server.
 
-kubectl
+Examples:
+
+    $ kubectl resize --replicas=3 replicationcontrollers foo
+    // Resize replication controller named 'foo' to 3.
+
+    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
+    // If the replication controller named foo's current size is 2, resize foo to 3.
+
+kubectl resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>
 
 ### Options
+
+```
+      --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.
+      --replicas=-1: The new desired number of replicas. Required.
+      --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize.
+```
+
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -40,20 +59,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 
