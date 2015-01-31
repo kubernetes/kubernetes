@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
-	"reflect"
 	"strings"
 	"time"
 
@@ -60,8 +59,9 @@ func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, ve
 	prefix := root + "/" + version
 	group := NewAPIGroupVersion(storage, codec, prefix, selfLinker, admissionControl, mapper)
 	container := restful.NewContainer()
+	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
-	group.InstallREST(container, mux, root, version)
+	group.InstallREST(container, root, version)
 	ws := new(restful.WebService)
 	InstallSupport(mux, ws)
 	container.Add(ws)
@@ -99,267 +99,13 @@ func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, can
 	}
 }
 
-// This magic incantation returns *ptrToObject for an arbitrary pointer
-func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
-	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
-}
-
-func registerResourceHandlers(ws *restful.WebService, version string, path string, storage RESTStorage, h restful.RouteFunction, mapper meta.RESTMapper) error {
-	object := storage.New()
-	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
-	if err != nil {
-		return err
-	}
-	versionedPtr, err := api.Scheme.New(version, kind)
-	if err != nil {
-		return err
-	}
-	versionedObject := indirectArbitraryPointer(versionedPtr)
-
-	var versionedList interface{}
-	if lister, ok := storage.(RESTLister); ok {
-		list := lister.NewList()
-		_, listKind, err := api.Scheme.ObjectVersionAndKind(list)
-		versionedListPtr, err := api.Scheme.New(version, listKind)
-		if err != nil {
-			return err
-		}
-		versionedList = indirectArbitraryPointer(versionedListPtr)
-	}
-
-	mapping, err := mapper.RESTMapping(kind, version)
-	if err != nil {
-		return err
-	}
-
-	// names are always in path
-	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
-
-	// what verbs are supported by the storage, used to know what verbs we support per path
-	storageVerbs := map[string]bool{}
-	if _, ok := storage.(RESTCreater); ok {
-		storageVerbs["RESTCreater"] = true
-	}
-	if _, ok := storage.(RESTLister); ok {
-		storageVerbs["RESTLister"] = true
-	}
-	if _, ok := storage.(RESTGetter); ok {
-		storageVerbs["RESTGetter"] = true
-	}
-	if _, ok := storage.(RESTDeleter); ok {
-		storageVerbs["RESTDeleter"] = true
-	}
-	if _, ok := storage.(RESTUpdater); ok {
-		storageVerbs["RESTUpdater"] = true
-	}
-
-	// path to verbs takes a path, and set of http verbs we should claim to support on this path
-	// given current url formats, this is scope specific
-	// for example, in v1beta3 url styles we would support the following:
-	// /ns/{namespace}/{resource} = []{POST, GET}  // list resources in this namespace scope
-	// /ns/{namespace}/{resource}/{name} = []{GET, PUT, DELETE} // handle an individual resource
-	// /{resource} = []{GET} // list resources across all namespaces
-	pathToVerbs := map[string][]string{}
-	// similar to the above, it maps the ordered set of parameters that need to be documented
-	pathToParam := map[string][]*restful.Parameter{}
-	// pathToStorageVerb lets us distinguish between RESTLister and RESTGetter on verb=GET
-	pathToStorageVerb := map[string]string{}
-	scope := mapping.Scope
-	if scope.Name() != meta.RESTScopeNameNamespace {
-		// non-namespaced resources support a smaller set of resource paths
-		resourcesPath := path
-		resourcesPathVerbs := []string{}
-		resourcesPathVerbs = appendStringIf(resourcesPathVerbs, "POST", storageVerbs["RESTCreater"])
-		resourcesPathVerbs = appendStringIf(resourcesPathVerbs, "GET", storageVerbs["RESTLister"])
-		pathToVerbs[resourcesPath] = resourcesPathVerbs
-		pathToParam[resourcesPath] = []*restful.Parameter{}
-		pathToStorageVerb[resourcesPath] = "RESTLister"
-
-		itemPath := resourcesPath + "/{name}"
-		itemPathVerbs := []string{}
-		itemPathVerbs = appendStringIf(itemPathVerbs, "GET", storageVerbs["RESTGetter"])
-		itemPathVerbs = appendStringIf(itemPathVerbs, "PUT", storageVerbs["RESTUpdater"])
-		itemPathVerbs = appendStringIf(itemPathVerbs, "DELETE", storageVerbs["RESTDeleter"])
-		pathToVerbs[itemPath] = itemPathVerbs
-		pathToParam[itemPath] = []*restful.Parameter{nameParam}
-		pathToStorageVerb[itemPath] = "RESTGetter"
-
-	} else {
-		// v1beta3 format with namespace in path
-		if scope.ParamPath() {
-			namespaceParam := ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
-
-			resourceByNamespace := scope.ParamName() + "/{" + scope.ParamName() + "}/" + path
-			resourceByNamespaceVerbs := []string{}
-			resourceByNamespaceVerbs = appendStringIf(resourceByNamespaceVerbs, "POST", storageVerbs["RESTCreater"])
-			resourceByNamespaceVerbs = appendStringIf(resourceByNamespaceVerbs, "GET", storageVerbs["RESTLister"])
-			pathToVerbs[resourceByNamespace] = resourceByNamespaceVerbs
-			pathToParam[resourceByNamespace] = []*restful.Parameter{namespaceParam}
-			pathToStorageVerb[resourceByNamespace] = "RESTLister"
-
-			itemPath := resourceByNamespace + "/{name}"
-			itemPathVerbs := []string{}
-			itemPathVerbs = appendStringIf(itemPathVerbs, "GET", storageVerbs["RESTGetter"])
-			itemPathVerbs = appendStringIf(itemPathVerbs, "PUT", storageVerbs["RESTUpdater"])
-			itemPathVerbs = appendStringIf(itemPathVerbs, "DELETE", storageVerbs["RESTDeleter"])
-			pathToVerbs[itemPath] = itemPathVerbs
-			pathToParam[itemPath] = []*restful.Parameter{namespaceParam, nameParam}
-			pathToStorageVerb[itemPath] = "RESTGetter"
-
-			listAcrossNamespace := path
-			listAcrossNamespaceVerbs := []string{}
-			listAcrossNamespaceVerbs = appendStringIf(listAcrossNamespaceVerbs, "GET", storageVerbs["RESTLister"])
-			pathToVerbs[listAcrossNamespace] = listAcrossNamespaceVerbs
-			pathToParam[listAcrossNamespace] = []*restful.Parameter{}
-			pathToStorageVerb[listAcrossNamespace] = "RESTLister"
-
-		} else {
-			// v1beta1/v1beta2 format where namespace was a query parameter
-			namespaceParam := ws.QueryParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
-
-			resourcesPath := path
-			resourcesPathVerbs := []string{}
-			resourcesPathVerbs = appendStringIf(resourcesPathVerbs, "POST", storageVerbs["RESTCreater"])
-			resourcesPathVerbs = appendStringIf(resourcesPathVerbs, "GET", storageVerbs["RESTLister"])
-			pathToVerbs[resourcesPath] = resourcesPathVerbs
-			pathToParam[resourcesPath] = []*restful.Parameter{namespaceParam}
-			pathToStorageVerb[resourcesPath] = "RESTLister"
-
-			itemPath := resourcesPath + "/{name}"
-			itemPathVerbs := []string{}
-			itemPathVerbs = appendStringIf(itemPathVerbs, "GET", storageVerbs["RESTGetter"])
-			itemPathVerbs = appendStringIf(itemPathVerbs, "PUT", storageVerbs["RESTUpdater"])
-			itemPathVerbs = appendStringIf(itemPathVerbs, "DELETE", storageVerbs["RESTDeleter"])
-			pathToVerbs[itemPath] = itemPathVerbs
-			pathToParam[itemPath] = []*restful.Parameter{namespaceParam, nameParam}
-			pathToStorageVerb[itemPath] = "RESTGetter"
-		}
-	}
-
-	// See github.com/emicklei/go-restful/blob/master/jsr311.go for routing logic
-	// and status-code behavior
-	for path, verbs := range pathToVerbs {
-
-		params := pathToParam[path]
-		for _, verb := range verbs {
-			var route *restful.RouteBuilder
-			switch verb {
-			case "POST":
-				route = ws.POST(path).To(h).
-					Doc("create a " + kind).
-					Operation("create" + kind).Reads(versionedObject)
-			case "PUT":
-				route = ws.PUT(path).To(h).
-					Doc("update the specified " + kind).
-					Operation("update" + kind).Reads(versionedObject)
-			case "DELETE":
-				route = ws.DELETE(path).To(h).
-					Doc("delete the specified " + kind).
-					Operation("delete" + kind)
-			case "GET":
-				doc := "read the specified " + kind
-				op := "read" + kind
-				if pathToStorageVerb[path] == "RESTLister" {
-					doc = "list objects of kind " + kind
-					op = "list" + kind
-				}
-				route = ws.GET(path).To(h).
-					Doc(doc).
-					Operation(op)
-				if pathToStorageVerb[path] == "RESTLister" {
-					route = route.Returns(http.StatusOK, "OK", versionedList)
-				} else {
-					route = route.Writes(versionedObject)
-				}
-			}
-			for paramIndex := range params {
-				route.Param(params[paramIndex])
-			}
-			ws.Route(route)
-		}
-	}
-	return nil
-}
-
-// appendStringIf appends the value to the slice if shouldAdd is true
-func appendStringIf(slice []string, value string, shouldAdd bool) []string {
-	if shouldAdd {
-		return append(slice, value)
-	}
-	return slice
-}
-
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *restful.Container, mux Mux, root string, version string) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) error {
 	prefix := path.Join(root, version)
-	restHandler := &g.handler
-	strippedHandler := http.StripPrefix(prefix, restHandler)
-	watchHandler := &WatchHandler{
-		storage:         g.handler.storage,
-		codec:           g.handler.codec,
-		canonicalPrefix: g.handler.canonicalPrefix,
-		selfLinker:      g.handler.selfLinker,
-	}
-	proxyHandler := &ProxyHandler{prefix + "/proxy/", g.handler.storage, g.handler.codec}
-	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
-
-	// Create a new WebService for this APIGroupVersion at the specified path prefix
-	// TODO: Pass in more descriptive documentation
-	ws := new(restful.WebService)
-	ws.Path(prefix)
-	ws.Doc("API at " + root + ", version " + version)
-	// TODO: change to restful.MIME_JSON when we convert YAML->JSON and set content type in client
-	ws.Consumes("*/*")
-	ws.Produces(restful.MIME_JSON)
-	// TODO: require json on input
-	//ws.Consumes(restful.MIME_JSON)
-	ws.ApiVersion(version)
-
-	// TODO: add scheme to APIGroupVersion rather than using api.Scheme
-
-	// TODO: #2057: Return API resources on "/".
-
-	// TODO: Add status documentation using Returns()
-	// Errors (see api/errors/errors.go as well as go-restful router):
-	// http.StatusNotFound, http.StatusMethodNotAllowed,
-	// http.StatusUnsupportedMediaType, http.StatusNotAcceptable,
-	// http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
-	// http.StatusRequestTimeout, http.StatusConflict, http.StatusPreconditionFailed,
-	// 422 (StatusUnprocessableEntity), http.StatusInternalServerError,
-	// http.StatusServiceUnavailable
-	// and api error codes
-	// Note that if we specify a versioned Status object here, we may need to
-	// create one for the tests, also
-	// Success:
-	// http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent
-	//
-	// test/integration/auth_test.go is currently the most comprehensive status code test
-
-	// TODO: eliminate all the restful wrappers
-	// TODO: create a separate handler per verb
-	h := func(req *restful.Request, resp *restful.Response) {
-		strippedHandler.ServeHTTP(resp.ResponseWriter, req.Request)
-	}
-
-	registrationErrors := make([]error, 0)
-
-	for path, storage := range g.handler.storage {
-		if err := registerResourceHandlers(ws, version, path, storage, h, g.mapper); err != nil {
-			registrationErrors = append(registrationErrors, err)
-		}
-	}
-
-	// TODO: port the rest of these. Sadly, if we don't, we'll have inconsistent
-	// API behavior, as well as lack of documentation
-	// Note: update GetAttribs() when adding a handler.
-	mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
-	mux.Handle(prefix+"/proxy/", http.StripPrefix(prefix+"/proxy/", proxyHandler))
-	mux.Handle(prefix+"/redirect/", http.StripPrefix(prefix+"/redirect/", redirectHandler))
-
+	ws, registrationErrors := (&APIInstaller{prefix, version, &g.handler, g.mapper}).Install()
 	container.Add(ws)
-
 	return errors.NewAggregate(registrationErrors)
 }
 

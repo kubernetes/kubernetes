@@ -317,6 +317,8 @@ func New(c *Config) *Master {
 		m.mux = mux
 		m.handlerContainer = NewHandlerContainer(mux)
 	}
+	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
+	m.handlerContainer.Router(restful.CurlyRouter{})
 	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
 
 	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
@@ -401,14 +403,14 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta1"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta1: %v", err)
 	}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta2"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
 	if c.EnableV1Beta3 {
-		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta3"); err != nil {
+		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}

@@ -236,18 +236,30 @@ func TestProxy(t *testing.T) {
 			resourceLocation:          proxyServer.URL,
 			expectedResourceNamespace: item.reqNamespace,
 		}
-		handler := Handle(map[string]RESTStorage{
+
+		namespaceHandler := Handle(map[string]RESTStorage{
 			"foo": simpleStorage,
-		}, codec, "/prefix", "version", selfLinker, admissionControl, mapper)
-		server := httptest.NewServer(handler)
-		defer server.Close()
+		}, codec, "/prefix", "version", selfLinker, admissionControl, namespaceMapper)
+		namespaceServer := httptest.NewServer(namespaceHandler)
+		defer namespaceServer.Close()
+		legacyNamespaceHandler := Handle(map[string]RESTStorage{
+			"foo": simpleStorage,
+		}, codec, "/prefix", "version", selfLinker, admissionControl, legacyNamespaceMapper)
+		legacyNamespaceServer := httptest.NewServer(legacyNamespaceHandler)
+		defer legacyNamespaceServer.Close()
 
 		// test each supported URL pattern for finding the redirection resource in the proxy in a particular namespace
-		proxyTestPatterns := []string{
-			"/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace,
-			"/prefix/version/proxy/ns/" + item.reqNamespace + "/foo/id" + item.path,
+		serverPatterns := []struct {
+			server           *httptest.Server
+			proxyTestPattern string
+		}{
+			{namespaceServer, "/prefix/version/proxy/ns/" + item.reqNamespace + "/foo/id" + item.path},
+			{legacyNamespaceServer, "/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
-		for _, proxyTestPattern := range proxyTestPatterns {
+
+		for _, serverPattern := range serverPatterns {
+			server := serverPattern.server
+			proxyTestPattern := serverPattern.proxyTestPattern
 			req, err := http.NewRequest(
 				item.method,
 				server.URL+proxyTestPattern,
@@ -268,7 +280,7 @@ func TestProxy(t *testing.T) {
 			}
 			resp.Body.Close()
 			if e, a := item.respBody, string(gotResp); e != a {
-				t.Errorf("%v - expected %v, got %v", item.method, e, a)
+				t.Errorf("%v - expected %v, got %v. url: %#v", item.method, e, a, req.URL)
 			}
 		}
 	}

@@ -84,7 +84,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionControl, mapper)
+	}, codec, "/prefix", "version", selfLinker, admissionControl, namespaceMapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
