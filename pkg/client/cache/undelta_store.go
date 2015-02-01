@@ -69,6 +69,9 @@ func (u *UndeltaStore) List() []interface{} {
 func (u *UndeltaStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
 	return u.ActualStore.Get(obj)
 }
+func (u *UndeltaStore) GetByKey(key string) (item interface{}, exists bool, err error) {
+	return u.ActualStore.GetByKey(key)
+}
 func (u *UndeltaStore) Replace(list []interface{}) error {
 	if err := u.ActualStore.Replace(list); err != nil {
 		return err

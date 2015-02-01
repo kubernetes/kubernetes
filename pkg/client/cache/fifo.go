@@ -86,13 +86,18 @@ func (f *FIFO) List() []interface{} {
 
 // Get returns the requested item, or sets exists=false.
 func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	id, err := f.keyFunc(obj)
+	key, err := f.keyFunc(obj)
 	if err != nil {
 		return nil, false, fmt.Errorf("couldn't create key for object: %v", err)
 	}
+	return f.GetByKey(key)
+}
+
+// GetByKey returns the requested item, or sets exists=false.
+func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	item, exists = f.items[id]
+	item, exists = f.items[key]
 	return item, exists, nil
 }
 

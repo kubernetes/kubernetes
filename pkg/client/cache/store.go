@@ -37,6 +37,7 @@ type Store interface {
 	Delete(obj interface{}) error
 	List() []interface{}
 	Get(obj interface{}) (item interface{}, exists bool, err error)
+	GetByKey(key string) (item interface{}, exists bool, err error)
 
 	// Replace will delete the contents of the store, using instead the
 	// given list. Store takes ownership of the list, you should not reference
@@ -68,37 +69,37 @@ type cache struct {
 
 // Add inserts an item into the cache.
 func (c *cache) Add(obj interface{}) error {
-	id, err := c.keyFunc(obj)
+	key, err := c.keyFunc(obj)
 	if err != nil {
 		return fmt.Errorf("couldn't create key for object: %v", err)
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.items[id] = obj
+	c.items[key] = obj
 	return nil
 }
 
 // Update sets an item in the cache to its updated state.
 func (c *cache) Update(obj interface{}) error {
-	id, err := c.keyFunc(obj)
+	key, err := c.keyFunc(obj)
 	if err != nil {
 		return fmt.Errorf("couldn't create key for object: %v", err)
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.items[id] = obj
+	c.items[key] = obj
 	return nil
 }
 
 // Delete removes an item from the cache.
 func (c *cache) Delete(obj interface{}) error {
-	id, err := c.keyFunc(obj)
+	key, err := c.keyFunc(obj)
 	if err != nil {
 		return fmt.Errorf("couldn't create key for object: %v", err)
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	delete(c.items, id)
+	delete(c.items, key)
 	return nil
 }
 
@@ -117,13 +118,19 @@ func (c *cache) List() []interface{} {
 // Get returns the requested item, or sets exists=false.
 // Get is completely threadsafe as long as you treat all items as immutable.
 func (c *cache) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	id, _ := c.keyFunc(obj)
+	key, _ := c.keyFunc(obj)
 	if err != nil {
 		return nil, false, fmt.Errorf("couldn't create key for object: %v", err)
 	}
+	return c.GetByKey(key)
+}
+
+// GetByKey returns the request item, or exists=false.
+// GetByKey is completely threadsafe as long as you treat all items as immutable.
+func (c *cache) GetByKey(key string) (item interface{}, exists bool, err error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	item, exists = c.items[id]
+	item, exists = c.items[key]
 	return item, exists, nil
 }
 
