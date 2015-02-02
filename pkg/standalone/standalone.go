@@ -63,7 +63,11 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client.Client, error) {
 	authInfo, err := clientauth.LoadFromFile(authPath)
 	if err != nil {
-		return nil, err
+		glog.Warningf("Could not load kubernetes auth path: %v. Continuing with defaults.", err)
+	}
+	if authInfo == nil {
+		// authInfo didn't load correctly - continue with defaults.
+		authInfo = &clientauth.Info{}
 	}
 	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
 	if err != nil {
