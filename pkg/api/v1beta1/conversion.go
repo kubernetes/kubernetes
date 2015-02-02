@@ -418,6 +418,9 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.ObjectMeta.Annotations, &out.Annotations, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *PodTemplate, out *newer.PodTemplateSpec, s conversion.Scope) error {
@@ -429,6 +432,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Annotations, &out.ObjectMeta.Annotations, 0); err != nil {
 				return err
 			}
 			return nil
