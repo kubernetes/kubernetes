@@ -19,6 +19,8 @@ package kubelet
 import (
 	"fmt"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -30,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 
+	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -39,13 +42,47 @@ var (
 	tcprober   = tcprobe.New()
 )
 
-func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
+const (
+	defaultProbeTimeout = 1 * time.Second
+	maxProbeRetries     = 3
+)
+
+// probeContainer executes the given probe on a container and returns the result.
+// If the probe is nil this returns Success. If the probe's initial delay has not passed
+// since the creation of the container, this returns the defaultResult. It will then attempt
+// to execute the probe repeatedly up to maxProbeRetries times, and return on the first
+// successful result, else returning the last unsucessful result and error.
+func (kl *Kubelet) probeContainer(p *api.Probe,
+	podFullName string,
+	podUID types.UID,
+	status api.PodStatus,
+	container api.Container,
+	dockerContainer *docker.APIContainers,
+	defaultResult probe.Result) (probe.Result, error) {
+	var err error
+	result := probe.Unknown
+	if p == nil {
+		return probe.Success, nil
+	}
+	if time.Now().Unix()-dockerContainer.Created < p.InitialDelaySeconds {
+		return defaultResult, nil
+	}
+	for i := 0; i < maxProbeRetries; i++ {
+		result, err = kl.runProbe(p, podFullName, podUID, status, container)
+		if result == probe.Success {
+			return result, err
+		}
+	}
+	return result, err
+}
+
+func (kl *Kubelet) runProbe(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
 	var timeout time.Duration
-	secs := container.LivenessProbe.TimeoutSeconds
+	secs := p.TimeoutSeconds
 	if secs > 0 {
 		timeout = time.Duration(secs) * time.Second
 	} else {
-		timeout = 1 * time.Second
+		timeout = defaultProbeTimeout
 	}
 	if p.Exec != nil {
 		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
@@ -131,4 +168,42 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 
 func (eic execInContainer) SetDir(dir string) {
 	//unimplemented
+}
+
+// This will eventually maintain info about probe results over time
+// to allow for implementation of health thresholds
+func newReadinessStates() *readinessStates {
+	return &readinessStates{states: make(map[string]bool)}
+}
+
+type readinessStates struct {
+	sync.Mutex
+	states map[string]bool
+}
+
+func (r *readinessStates) IsReady(c api.ContainerStatus) bool {
+	if c.State.Running == nil {
+		return false
+	}
+	return r.get(strings.TrimPrefix(c.ContainerID, "docker://"))
+
+}
+
+func (r *readinessStates) get(key string) bool {
+	r.Lock()
+	defer r.Unlock()
+	state, found := r.states[key]
+	return state && found
+}
+
+func (r *readinessStates) set(key string, value bool) {
+	r.Lock()
+	defer r.Unlock()
+	r.states[key] = value
+}
+
+func (r *readinessStates) remove(key string) {
+	r.Lock()
+	defer r.Unlock()
+	delete(r.states, key)
 }

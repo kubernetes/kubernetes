@@ -162,6 +162,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	if pod.Status.Host == "" {
 		// Not assigned.
 		newStatus.Phase = api.PodPending
+		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 		return newStatus, nil
 	}
 
@@ -171,6 +172,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	if err != nil || len(nodeStatus.Conditions) == 0 {
 		glog.V(5).Infof("node doesn't exist: %v %v, setting pod status to unknown", err, nodeStatus)
 		newStatus.Phase = api.PodUnknown
+		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 		return newStatus, nil
 	}
 
@@ -179,6 +181,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		if (condition.Kind == api.NodeReady || condition.Kind == api.NodeReachable) && condition.Status == api.ConditionNone {
 			glog.V(5).Infof("node status: %v, setting pod status to unknown", condition)
 			newStatus.Phase = api.PodUnknown
+			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 			return newStatus, nil
 		}
 	}
@@ -189,6 +192,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	if err != nil {
 		glog.Errorf("error getting pod status: %v, setting status to unknown", err)
 		newStatus.Phase = api.PodUnknown
+		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 	} else {
 		newStatus.Info = result.Status.Info
 		newStatus.PodIP = result.Status.PodIP
@@ -197,8 +201,10 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 			// propulated the status yet. This should go away once
 			// we removed boundPods
 			newStatus.Phase = api.PodPending
+			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 		} else {
 			newStatus.Phase = result.Status.Phase
+			newStatus.Conditions = result.Status.Conditions
 		}
 	}
 	return newStatus, err
