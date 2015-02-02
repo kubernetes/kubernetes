@@ -84,6 +84,15 @@ etcd:
       - user: etcd
       - group: etcd
 
+/var/etcd/data:
+  file.directory:
+    - user: etcd
+    - group: etcd
+    - dir_mode: 700
+    - require:
+      - user: etcd
+      - group: etcd
+
 {% if grains['os_family'] == 'RedHat' %}
 
 /etc/default/etcd:
@@ -125,6 +134,7 @@ etcd-service:
       - file: etcd-symlink
     - require:
       - file: /var/etcd
+      - file: /var/etcd/data
       - user: etcd
       - group: etcd
 
