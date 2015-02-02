@@ -18,7 +18,6 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"reflect"
 	"sort"
@@ -59,7 +58,7 @@ func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 		m.CreatedNodes = append(m.CreatedNodes, &nodeCopy)
 		return node, nil
 	} else {
-		return nil, fmt.Errorf("Create error.")
+		return nil, errors.New("Create error.")
 	}
 }
 
@@ -255,7 +254,6 @@ func TestCreateCloudNodes(t *testing.T) {
 		{
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines:      []string{"node0"},
-				IP:            net.ParseIP("1.2.3.4"),
 				NodeResources: &api.NodeResources{Capacity: resourceList},
 			},
 			expectedNodes: &api.NodeList{
@@ -263,7 +261,6 @@ func TestCreateCloudNodes(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
 						Spec:       api.NodeSpec{Capacity: resourceList},
-						Status:     api.NodeStatus{HostIP: "1.2.3.4"},
 					},
 				},
 			},
@@ -404,10 +401,45 @@ func TestHealthCheckNode(t *testing.T) {
 	}
 }
 
+func TestPopulateNodeIPs(t *testing.T) {
+	table := []struct {
+		nodes        *api.NodeList
+		fakeCloud    *fake_cloud.FakeCloud
+		expectedFail bool
+		expectedIP   string
+	}{
+		{
+			nodes:      &api.NodeList{Items: []api.Node{*newNode("node0"), *newNode("node1")}},
+			fakeCloud:  &fake_cloud.FakeCloud{IP: net.ParseIP("1.2.3.4")},
+			expectedIP: "1.2.3.4",
+		},
+		{
+			nodes:      &api.NodeList{Items: []api.Node{*newNode("node0"), *newNode("node1")}},
+			fakeCloud:  &fake_cloud.FakeCloud{Err: ErrQueryIPAddress},
+			expectedIP: "",
+		},
+	}
+
+	for _, item := range table {
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil)
+		result, err := nodeController.PopulateIPs(item.nodes)
+		// In case of IP querying error, we should continue.
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		for _, node := range result.Items {
+			if node.Status.HostIP != item.expectedIP {
+				t.Errorf("expect HostIP %s, got %s", item.expectedIP, node.Status.HostIP)
+			}
+		}
+	}
+}
+
 func TestSyncNodeStatus(t *testing.T) {
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
 		fakeKubeletClient    *FakeKubeletClient
+		fakeCloud            *fake_cloud.FakeCloud
 		expectedNodes        []*api.Node
 		expectedRequestCount int
 	}{
@@ -419,14 +451,23 @@ func TestSyncNodeStatus(t *testing.T) {
 				Status: probe.Success,
 				Err:    nil,
 			},
+			fakeCloud: &fake_cloud.FakeCloud{
+				IP: net.ParseIP("1.2.3.4"),
+			},
 			expectedNodes: []*api.Node{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "node0"},
-					Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}},
+						HostIP:     "1.2.3.4",
+					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "node1"},
-					Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}},
+						HostIP:     "1.2.3.4",
+					},
 				},
 			},
 			expectedRequestCount: 3, // List + 2xUpdate
@@ -434,7 +475,7 @@ func TestSyncNodeStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient)
 		if err := nodeController.SyncNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -442,7 +483,7 @@ func TestSyncNodeStatus(t *testing.T) {
 			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
 		}
 		if !reflect.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
-			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes, item.fakeNodeHandler.UpdatedNodes)
+			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0])
 		}
 		item.fakeNodeHandler.RequestCount = 0
 		if err := nodeController.SyncNodeStatus(); err != nil {
