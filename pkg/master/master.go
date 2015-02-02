@@ -49,6 +49,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolumeclaim"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
@@ -60,7 +62,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 )
@@ -379,6 +381,8 @@ func (m *Master) init(c *Config) {
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
 	resourceQuotaRegistry := resourcequota.NewEtcdRegistry(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
+	persistentVolumeRegistry := persistentvolume.NewEtcdRegistry(c.EtcdHelper)
+	persistentVolumeClaimRegistry := persistentvolumeclaim.NewEtcdRegistry(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewEtcdRegistry(c.EtcdHelper)
 
 	// TODO: split me up into distinct storage registries
@@ -421,6 +425,8 @@ func (m *Master) init(c *Config) {
 		"resourceQuotaUsages": resourcequotausage.NewREST(resourceQuotaRegistry),
 		"namespaces":          namespace.NewREST(m.namespaceRegistry),
 		"secrets":             secret.NewREST(secretRegistry),
+		"persistentVolumes": persistentvolume.NewREST(persistentVolumeRegistry),
+		"persistentVolumeClaims": persistentvolumeclaim.NewREST(persistentVolumeClaimRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

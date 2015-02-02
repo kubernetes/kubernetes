@@ -105,6 +105,19 @@ func (r *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
 
 // Create creates a pod based on a specification.
 func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+
+	//
+	// A user will specify which PVClaim they want to use in their volume, but Kubelet needs
+	// to query for the claim in a namespace.  Set it here to avoid having to require the user to specify it.
+	// I'm sure this bit has a better home somewhere ...
+	//
+	mypod := obj.(*api.Pod)
+	for _,v := range mypod.Spec.Volumes {
+		if v.Source.PersistentVolumeClaimAttachment != nil {
+			v.Source.PersistentVolumeClaimAttachment.PersistentVolumeClaimReference.Namespace = mypod.Namespace
+		}
+	}
+
 	return r.store.Create(ctx, obj)
 }
 

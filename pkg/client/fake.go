@@ -47,6 +47,8 @@ type Fake struct {
 	NamespacesList     api.NamespaceList
 	SecretList         api.SecretList
 	Secret             api.Secret
+	PersistentVolumesList       api.PersistentVolumeList
+	PersistentVolumeClaimList api.PersistentVolumeClaimList
 	Err                error
 	Watch              watch.Interface
 }
@@ -81,6 +83,14 @@ func (c *Fake) Endpoints(namespace string) EndpointsInterface {
 
 func (c *Fake) Pods(namespace string) PodInterface {
 	return &FakePods{Fake: c, Namespace: namespace}
+}
+
+func (c *Fake) PersistentVolumes() PersistentVolumeInterface {
+	return &FakePersistentVolumes{Fake: c}
+}
+
+func (c *Fake) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
+	return &FakePersistentVolumeClaims{Fake: c, Namespace: namespace}
 }
 
 func (c *Fake) Services(namespace string) ServiceInterface {

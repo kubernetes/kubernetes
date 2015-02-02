@@ -54,6 +54,10 @@ func init() {
 		&NamespaceList{},
 		&Secret{},
 		&SecretList{},
+		&PersistentVolume{},
+		&PersistentVolumeList{},
+		&PersistentVolumeClaim{},
+		&PersistentVolumeClaimList{},
 	)
 	// Legacy names are supported
 	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
@@ -89,3 +93,7 @@ func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
+func (*PersistentVolume) IsAnAPIObject()          {}
+func (*PersistentVolumeList) IsAnAPIObject()      {}
+func (*PersistentVolumeClaim) IsAnAPIObject()     {}
+func (*PersistentVolumeClaimList) IsAnAPIObject() {}

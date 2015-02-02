@@ -1,0 +1,9 @@
+kind: PersistentVolumeClaim
+apiVersion: v1beta3
+metadata:
+  name: myclaim-1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    size: 3

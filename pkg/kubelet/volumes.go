@@ -53,7 +53,7 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *api.Volume, podUID types.UID) volume.Builder {
+func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *api.Volume, ns string, podUID types.UID) volume.Builder {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		glog.Warningf("Can't use volume plugins for %s: %v", spew.Sprintf("%#v", *spec), err)
@@ -63,9 +63,12 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *api.Volume, podUID types.UI
 		glog.Errorf("No error, but nil volume plugin for %s", spew.Sprintf("%#v", *spec))
 		return nil
 	}
+
+	glog.V(5).Infof("Making builder for spec %s\n", spec)
+
 	builder, err := plugin.NewBuilder(spec, podUID)
 	if err != nil {
-		glog.Warningf("Error instantiating volume plugin for %s: %v", spew.Sprintf("%#v", *spec), err)
+		glog.V(3).Infof("Error instantiating volume plugin for %s: %v", spew.Sprintf("%#v", *spec), err)
 		return nil
 	}
 	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spew.Sprintf("%#v", *spec))
@@ -78,7 +81,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.BoundPod) (volumeMap, error) {
 		volSpec := &pod.Spec.Volumes[i]
 
 		// Try to use a plugin for this volume.
-		builder := kl.newVolumeBuilderFromPlugins(volSpec, pod.UID)
+		builder := kl.newVolumeBuilderFromPlugins(volSpec, pod.Namespace, pod.UID)
 		if builder == nil {
 			return nil, errUnsupportedVolumeType
 		}
