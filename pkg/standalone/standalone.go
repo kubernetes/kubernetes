@@ -107,6 +107,7 @@ func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, p
 		},
 		EnableLogsSupport:    false,
 		EnableSwaggerSupport: true,
+		EnableIndex:          true,
 		APIPrefix:            "/api",
 		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
 

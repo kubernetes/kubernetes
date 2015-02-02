@@ -66,17 +66,21 @@ import (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Client                 *client.Client
-	Cloud                  cloudprovider.Interface
-	EtcdHelper             tools.EtcdHelper
-	EventTTL               time.Duration
-	MinionRegexp           string
-	KubeletClient          client.KubeletClient
-	PortalNet              *net.IPNet
-	EnableLogsSupport      bool
-	EnableUISupport        bool
-	EnableSwaggerSupport   bool
-	EnableV1Beta3          bool
+	Client            *client.Client
+	Cloud             cloudprovider.Interface
+	EtcdHelper        tools.EtcdHelper
+	EventTTL          time.Duration
+	MinionRegexp      string
+	KubeletClient     client.KubeletClient
+	PortalNet         *net.IPNet
+	EnableLogsSupport bool
+	EnableUISupport   bool
+	// allow downstream consumers to disable swagger
+	EnableSwaggerSupport bool
+	// allow v1beta3 to be conditionally enabled
+	EnableV1Beta3 bool
+	// allow downstream consumers to disable the index route
+	EnableIndex            bool
 	APIPrefix              string
 	CorsAllowedOriginList  util.StringList
 	Authenticator          authenticator.Request
@@ -418,7 +422,10 @@ func (m *Master) init(c *Config) {
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
+	// Allow master to be embedded in contexts which already have something registered at the root
+	if c.EnableIndex {
+		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
+	}
 
 	// TODO: use go-restful
 	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })

@@ -247,6 +247,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableLogsSupport:      s.EnableLogsSupport,
 		EnableUISupport:        true,
 		EnableSwaggerSupport:   true,
+		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadOnlyPort:           s.ReadOnlyPort,
