@@ -954,6 +954,10 @@ const (
 	// can only be created. API calls that return MethodNotAllowed can never succeed.
 	StatusReasonMethodNotAllowed StatusReason = "MethodNotAllowed"
 
+	// StatusReasonPreconditionNotMet means that the action the client attempted to perform on the
+	// resource was not allowed because one or more preconditions were not met
+	StatusReasonPreconditionNotMet StatusReason = "PreconditionNotMet"
+
 	// StatusReasonInternalError indicates that an internal error occurred, it is unexpected
 	// and the outcome of the call is unknown.
 	// Details (optional):

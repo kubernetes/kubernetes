@@ -50,6 +50,8 @@ const (
 	// values which would be accepted by some api instances, but which would invoke behavior
 	// not permitted by this api instance (such as due to stricter security policy).
 	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
+
+	ValidationErrorTypePreconditionNotMet ValidationErrorType = "PreconditionNotMet"
 )
 
 // String converts a ValidationErrorType into its corresponding error message.
@@ -67,6 +69,8 @@ func (t ValidationErrorType) String() string {
 		return "unsupported value"
 	case ValidationErrorTypeForbidden:
 		return "forbidden"
+	case ValidationErrorTypePreconditionNotMet:
+		return "precondition not met"
 	default:
 		glog.Errorf("unrecognized validation type: %#v", t)
 		return ""
@@ -126,6 +130,12 @@ func NewFieldDuplicate(field string, value interface{}) *ValidationError {
 // NewFieldNotFound returns a *ValidationError indicating "value not found"
 func NewFieldNotFound(field string, value interface{}) *ValidationError {
 	return &ValidationError{ValidationErrorTypeNotFound, field, value, ""}
+}
+
+// TODO: doesn't feel quite right to fit precondition errors (which could be expressed
+// in annotations instead of first-class fields) into this model; discuss alternatives
+func NewPreconditionNotMet(field string, value interface{}) *ValidationError {
+	return &ValidationError{ValidationErrorTypePreconditionNotMet, field, value, ""}
 }
 
 type ValidationErrorList []error
