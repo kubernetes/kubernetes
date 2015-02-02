@@ -253,7 +253,7 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -f, --filename="": Filename or URL to file to use to update the resource
+  -f, --filename=[]: Filename, directory, or URL to file to use to update the resource
   -h, --help=false: help for update
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
