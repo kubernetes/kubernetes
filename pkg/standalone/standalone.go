@@ -89,7 +89,7 @@ func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client
 }
 
 // RunApiServer starts an API server in a go routine.
-func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, port int, masterServiceNamespace string) {
+func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
 	helper, err := master.NewEtcdHelper(etcdClient, "")

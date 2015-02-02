@@ -98,8 +98,8 @@ type Config struct {
 	// Defaults to 443 if not set.
 	ReadWritePort int
 
-	// If empty, the first result from net.InterfaceAddrs will be used.
-	PublicAddress string
+	// If nil, the first result from net.InterfaceAddrs will be used.
+	PublicAddress net.IP
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -134,9 +134,14 @@ type Master struct {
 	v1beta3               bool
 	nodeIPCache           IPGetter
 
-	readOnlyServer  string
-	readWriteServer string
-	masterServices  *util.Runner
+	publicIP             net.IP
+	publicReadOnlyPort   int
+	publicReadWritePort  int
+	serviceReadOnlyIP    net.IP
+	serviceReadOnlyPort  int
+	serviceReadWriteIP   net.IP
+	serviceReadWritePort int
+	masterServices       *util.Runner
 
 	// "Outputs"
 	Handler         http.Handler
@@ -177,7 +182,7 @@ func setDefaults(c *Config) {
 	if c.ReadWritePort == 0 {
 		c.ReadWritePort = 443
 	}
-	for c.PublicAddress == "" {
+	for c.PublicAddress == nil {
 		// Find and use the first non-loopback address.
 		// TODO: potentially it'd be useful to skip the docker interface if it
 		// somehow is first in the list.
@@ -197,7 +202,7 @@ func setDefaults(c *Config) {
 				continue
 			}
 			found = true
-			c.PublicAddress = ip.String()
+			c.PublicAddress = ip
 			glog.Infof("Will report %v as public IP address.", ip)
 			break
 		}
@@ -245,6 +250,17 @@ func New(c *Config) *Master {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
 
+	// Select the first two valid IPs from portalNet to use as the master service portalIPs
+	serviceReadOnlyIP, err := service.GetIndexedIP(c.PortalNet, 1)
+	if err != nil {
+		glog.Fatalf("Failed to generate service read-only IP for master service: %v", err)
+	}
+	serviceReadWriteIP, err := service.GetIndexedIP(c.PortalNet, 2)
+	if err != nil {
+		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
+	}
+	glog.Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
+
 	m := &Master{
 		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
@@ -269,9 +285,16 @@ func New(c *Config) *Master {
 		v1beta3:               c.EnableV1Beta3,
 		nodeIPCache:           NewIPCache(c.Cloud, util.RealClock{}, 30*time.Second),
 
-		masterCount:     c.MasterCount,
-		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
-		readWriteServer: net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
+		masterCount:         c.MasterCount,
+		publicIP:            c.PublicAddress,
+		publicReadOnlyPort:  c.ReadOnlyPort,
+		publicReadWritePort: c.ReadWritePort,
+		serviceReadOnlyIP:   serviceReadOnlyIP,
+		// TODO: serviceReadOnlyPort should be passed in as an argument, it may not always be 80
+		serviceReadOnlyPort: 80,
+		serviceReadWriteIP:  serviceReadWriteIP,
+		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
+		serviceReadWritePort: 443,
 	}
 
 	if c.RestfulContainer != nil {
@@ -444,7 +467,7 @@ func (m *Master) init(c *Config) {
 func (m *Master) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
-		WebServicesUrl: m.readWriteServer,
+		WebServicesUrl: net.JoinHostPort(m.publicIP.String(), strconv.Itoa(int(m.publicReadWritePort))),
 		WebServices:    m.handlerContainer.RegisteredWebServices(),
 		// TODO: Parameterize the path?
 		ApiPath:         "/swaggerapi/",

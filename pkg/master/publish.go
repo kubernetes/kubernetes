@@ -18,6 +18,8 @@ package master
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -32,12 +34,11 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
 		// TODO: add endpoints of all replicas, not just the elected master.
-		if m.readWriteServer != "" {
-			// TODO: the public port should be part of the argument here, port will not always be 443
-			if err := m.createMasterServiceIfNeeded("kubernetes", 443); err != nil {
+		if m.serviceReadWriteIP != nil {
+			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
-			if err := m.ensureEndpointsContain("kubernetes", m.readWriteServer); err != nil {
+			if err := m.ensureEndpointsContain("kubernetes", net.JoinHostPort(m.publicIP.String(), strconv.Itoa(int(m.publicReadWritePort)))); err != nil {
 				glog.Errorf("Can't create rw endpoints: %v", err)
 			}
 		}
@@ -55,12 +56,11 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 		// Update service & endpoint records.
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
-		if m.readOnlyServer != "" {
-			// TODO: the public port should be part of the argument here, port will not always be 80
-			if err := m.createMasterServiceIfNeeded("kubernetes-ro", 80); err != nil {
+		if m.serviceReadOnlyIP != nil {
+			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
-			if err := m.ensureEndpointsContain("kubernetes-ro", m.readOnlyServer); err != nil {
+			if err := m.ensureEndpointsContain("kubernetes-ro", net.JoinHostPort(m.publicIP.String(), strconv.Itoa(int(m.publicReadOnlyPort)))); err != nil {
 				glog.Errorf("Can't create ro endpoints: %v", err)
 			}
 		}
@@ -75,7 +75,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 
 // createMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error {
+func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort int) error {
 	ctx := api.NewDefaultContext()
 	if _, err := m.serviceRegistry.GetService(ctx, serviceName); err == nil {
 		// The service already exists.
@@ -88,9 +88,10 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
-			Port: port,
+			Port: servicePort,
 			// maintained by this code, not by the pod selector
 			Selector: nil,
+			PortalIP: serviceIP.String(),
 		},
 	}
 	// Kids, don't do this at home: this is a hack. There's no good way to call the business
