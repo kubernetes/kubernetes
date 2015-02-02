@@ -194,7 +194,28 @@ func (pd *gcePersistentDisk) SetUp() error {
 	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
 	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
 	if err != nil {
-		os.RemoveAll(pd.GetPath())
+		mountpoint, mntErr := isMountPoint(pd.GetPath())
+		if mntErr != nil {
+			glog.Errorf("isMountpoint check failed: %v", mntErr)
+			return err
+		}
+		if mountpoint {
+			if mntErr = pd.mounter.Unmount(pd.GetPath(), 0); mntErr != nil {
+				glog.Errorf("Failed to unmount: %v", mntErr)
+				return err
+			}
+			mountpoint, mntErr := isMountPoint(pd.GetPath())
+			if mntErr != nil {
+				glog.Errorf("isMountpoint check failed: %v", mntErr)
+				return err
+			}
+			if mountpoint {
+				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", pd.GetPath())
+				return err
+			}
+		}
+		os.Remove(pd.GetPath())
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(pd)
 		return err
@@ -223,7 +244,7 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return err
 	}
 	if !mountpoint {
-		return os.RemoveAll(pd.GetPath())
+		return os.Remove(pd.GetPath())
 	}
 
 	devicePath, refCount, err := getMountRefCount(pd.mounter, pd.GetPath())
@@ -241,8 +262,15 @@ func (pd *gcePersistentDisk) TearDown() error {
 			return err
 		}
 	}
-	if err := os.RemoveAll(pd.GetPath()); err != nil {
+	mountpoint, mntErr := isMountPoint(pd.GetPath())
+	if mntErr != nil {
+		glog.Errorf("isMountpoint check failed: %v", mntErr)
 		return err
+	}
+	if !mountpoint {
+		if err := os.Remove(pd.GetPath()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
