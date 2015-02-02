@@ -49,7 +49,7 @@ func NewCmdConfigSet(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 		Short: "Sets an individual value in a .kubeconfig file",
 		Long: `Sets an individual value in a .kubeconfig file
 
-		property-name is a dot delimitted name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
+		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 		property-value is the new value you wish to set.
 
 		`,
