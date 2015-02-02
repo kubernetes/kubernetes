@@ -61,6 +61,10 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 	for k, v := range controller.Spec.Template.Labels {
 		desiredLabels[k] = v
 	}
+	desiredAnnotations := make(labels.Set)
+	for k, v := range controller.Spec.Template.Annotations {
+		desiredAnnotations[k] = v
+	}
 
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controller.Name)
@@ -71,6 +75,7 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels:       desiredLabels,
+			Annotations:  desiredAnnotations,
 			GenerateName: prefix,
 		},
 	}
