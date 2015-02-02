@@ -3,4 +3,4 @@
   {% set etcd_servers = grains.etcd_servers -%}
 {% endif -%}
 
-DAEMON_ARGS="-addr {{etcd_servers}}:4001 -bind-addr {{etcd_servers}}:4001 -data-dir /var/etcd"
+DAEMON_ARGS="-addr {{etcd_servers}}:4001 -bind-addr {{etcd_servers}}:4001 -data-dir /var/etcd/data"
