@@ -30,8 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	kubeletServer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/standalone"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
@@ -123,14 +123,14 @@ func main() {
 		glog.Info(err)
 	}
 
-	client, err := standalone.GetAPIServerClient(*authPath, apiServerList)
+	client, err := kubeletServer.GetAPIServerClient(*authPath, apiServerList)
 	if err != nil && len(apiServerList) > 0 {
 		glog.Warningf("No API client: %v", err)
 	}
 
 	credentialprovider.SetPreferredDockercfgPath(*rootDirectory)
 
-	kcfg := standalone.KubeletConfig{
+	kcfg := kubeletServer.KubeletConfig{
 		Address:                 address,
 		AllowPrivileged:         *allowPrivileged,
 		HostnameOverride:        *hostnameOverride,
@@ -159,7 +159,7 @@ func main() {
 		VolumePlugins:           app.ProbeVolumePlugins(),
 	}
 
-	standalone.RunKubelet(&kcfg)
+	kubeletServer.RunKubelet(&kcfg)
 	// runs forever
 	select {}
 }

@@ -14,50 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package standalone
+// package server makes it easy to create a kubelet server for various contexts.
+package server
 
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
 )
-
-type delegateHandler struct {
-	delegate http.Handler
-}
-
-func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if h.delegate != nil {
-		h.delegate.ServeHTTP(w, req)
-		return
-	}
-	w.WriteHeader(http.StatusNotFound)
-}
 
 // TODO: replace this with clientcmd
 func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client.Client, error) {
@@ -86,69 +62,6 @@ func GetAPIServerClient(authPath string, apiServerList util.StringList) (*client
 		return nil, err
 	}
 	return c, nil
-}
-
-// RunApiServer starts an API server in a go routine.
-func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
-	handler := delegateHandler{}
-
-	helper, err := master.NewEtcdHelper(etcdClient, "")
-	if err != nil {
-		glog.Fatalf("Unable to get etcd helper: %v", err)
-	}
-
-	// Create a master and install handlers into mux.
-	m := master.New(&master.Config{
-		Client:     cl,
-		EtcdHelper: helper,
-		KubeletClient: &client.HTTPKubeletClient{
-			Client: http.DefaultClient,
-			Port:   10250,
-		},
-		EnableLogsSupport:    false,
-		EnableSwaggerSupport: true,
-		EnableIndex:          true,
-		APIPrefix:            "/api",
-		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
-
-		ReadWritePort:          port,
-		ReadOnlyPort:           port,
-		PublicAddress:          addr,
-		MasterServiceNamespace: masterServiceNamespace,
-	})
-	handler.delegate = m.InsecureHandler
-
-	go http.ListenAndServe(fmt.Sprintf("%s:%d", addr, port), &handler)
-}
-
-// RunScheduler starts up a scheduler in it's own goroutine
-func RunScheduler(cl *client.Client) {
-	// Scheduler
-	schedulerConfigFactory := factory.NewConfigFactory(cl)
-	schedulerConfig, err := schedulerConfigFactory.Create()
-	if err != nil {
-		glog.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-	scheduler.New(schedulerConfig).Run()
-}
-
-// RunControllerManager starts a controller
-func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int64) {
-	nodeResources := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(nodeMilliCPU, resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
-		},
-	}
-	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, kubeClient)
-	nodeController.Run(10*time.Second, 10)
-
-	endpoints := service.NewEndpointController(cl)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
-
-	controllerManager := controller.NewReplicationManager(cl)
-	controllerManager.Run(10 * time.Second)
 }
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an etcdClient.
