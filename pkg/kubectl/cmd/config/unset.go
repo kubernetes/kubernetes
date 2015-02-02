@@ -41,7 +41,7 @@ func NewCmdConfigUnset(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 		Short: "Unsets an individual value in a .kubeconfig file",
 		Long: `Unsets an individual value in a .kubeconfig file
 
-		property-name is a dot delimitted name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
+		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 		`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
