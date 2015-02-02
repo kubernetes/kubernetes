@@ -43,6 +43,12 @@ func TestErrorNew(t *testing.T) {
 	if IsBadRequest(err) {
 		t.Errorf("expected to not be %s", api.StatusReasonBadRequest)
 	}
+	if IsForbidden(err) {
+		t.Errorf("expected to not be %s", api.StatusReasonForbidden)
+	}
+	if IsTryAgainLater(err) {
+		t.Errorf("expected to not be %s", api.StatusReasonTryAgainLater)
+	}
 	if IsMethodNotSupported(err) {
 		t.Errorf("expected to not be %s", api.StatusReasonMethodNotAllowed)
 	}
@@ -58,6 +64,12 @@ func TestErrorNew(t *testing.T) {
 	}
 	if !IsBadRequest(NewBadRequest("reason")) {
 		t.Errorf("expected to be %s", api.StatusReasonBadRequest)
+	}
+	if !IsForbidden(NewForbidden("test", "2", errors.New("reason"))) {
+		t.Errorf("expected to be %s", api.StatusReasonForbidden)
+	}
+	if !IsTryAgainLater(NewTryAgainLater("test", "reason")) {
+		t.Errorf("expected to be %s", api.StatusReasonTryAgainLater)
 	}
 	if !IsMethodNotSupported(NewMethodNotSupported("foo", "delete")) {
 		t.Errorf("expected to be %s", api.StatusReasonMethodNotAllowed)

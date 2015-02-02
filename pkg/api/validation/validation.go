@@ -53,11 +53,53 @@ func ValidateAnnotations(annotations map[string]string, field string) errs.Valid
 }
 
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names.
-type ValidateNameFunc func(name string) (bool, string)
+// Not all resources have the same validation rules for names. Prefix is true if the
+// name will have a value appended to it.
+type ValidateNameFunc func(name string, prefix bool) (bool, string)
+
+// maskTrailingDash replaces the final character of a string with a subdomain safe
+// value if is a dash.
+func maskTrailingDash(name string) string {
+	if strings.HasSuffix(name, "-") {
+		return name[:len(name)-2] + "a"
+	}
+	return name
+}
+
+// ValidatePodName can be used to check whether the given pod name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidatePodName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateReplicationControllerName can be used to check whether the given replication
+// controller name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateReplicationControllerName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateServiceName can be used to check whether the given service name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateServiceName(name string, prefix bool) (bool, string) {
+	return nameIsDNS952Label(name, prefix)
+}
+
+// ValidateNodeName can be used to check whether the given node name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateNodeName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
 
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func nameIsDNSSubdomain(name string) (bool, string) {
+func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
 	if util.IsDNSSubdomain(name) {
 		return true, ""
 	}
@@ -65,23 +107,36 @@ func nameIsDNSSubdomain(name string) (bool, string) {
 }
 
 // nameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func nameIsDNS952Label(name string) (bool, string) {
+func nameIsDNS952Label(name string, prefix bool) (bool, string) {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
 	if util.IsDNS952Label(name) {
 		return true, ""
 	}
 	return false, "name must be lowercase letters, numbers, and dashes"
 }
 
-// ValidateObjectMeta validates an object's metadata.
+// ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
+// been performed.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
+
+	if len(meta.GenerateName) != 0 {
+		if ok, qualifier := nameFn(meta.GenerateName, true); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("generateName", meta.GenerateName, qualifier))
+		}
+	}
+	// if the generated name validates, but the calculated value does not, it's a problem with generation, and we
+	// report it here. This may confuse users, but indicates a programming bug and still must be validated.
 	if len(meta.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", meta.Name))
 	} else {
-		if ok, qualifier := nameFn(meta.Name); !ok {
+		if ok, qualifier := nameFn(meta.Name, false); !ok {
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, qualifier))
 		}
 	}
+
 	if requiresNamespace {
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, errs.NewFieldRequired("namespace", meta.Namespace))
@@ -95,10 +150,6 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	}
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, "annotations")...)
-
-	// Clear self link internally
-	// TODO: move to its own area
-	meta.SelfLink = ""
 
 	return allErrs
 }
@@ -130,10 +181,6 @@ func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorLis
 
 	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, "annotations")...)
-
-	// Clear self link internally
-	// TODO: move to its own area
-	meta.SelfLink = ""
 
 	return allErrs
 }
@@ -492,7 +539,7 @@ func validateDNSPolicy(dnsPolicy *api.DNSPolicy) errs.ValidationErrorList {
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, nameIsDNSSubdomain).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
 
 	return allErrs
@@ -545,7 +592,7 @@ var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClie
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, nameIsDNS952Label).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName).Prefix("metadata")...)
 
 	if !util.IsValidPortNum(service.Spec.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port, ""))
@@ -586,7 +633,7 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, true, nameIsDNSSubdomain).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
 
 	return allErrs
@@ -660,7 +707,7 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 	if len(pod.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
 	} else {
-		if ok, qualifier := nameIsDNSSubdomain(pod.Name); !ok {
+		if ok, qualifier := nameIsDNSSubdomain(pod.Name, false); !ok {
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, qualifier))
 		}
 	}
@@ -676,7 +723,7 @@ func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
 // ValidateMinion tests if required fields in the node are set.
 func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, nameIsDNSSubdomain).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName).Prefix("metadata")...)
 	return allErrs
 }
 

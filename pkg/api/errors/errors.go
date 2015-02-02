@@ -174,6 +174,21 @@ func NewMethodNotSupported(kind, action string) error {
 	}}
 }
 
+// NewTryAgainLater returns an error indicating the requested action could not be completed due to a
+// transient error, and the client should try again.
+func NewTryAgainLater(kind, operation string) error {
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusInternalServerError,
+		Reason: api.StatusReasonTryAgainLater,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   operation,
+		},
+		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, kind),
+	}}
+}
+
 // NewInternalError returns an error indicating the item is invalid and cannot be processed.
 func NewInternalError(err error) error {
 	return &StatusError{api.Status{
@@ -216,6 +231,18 @@ func IsMethodNotSupported(err error) bool {
 // IsBadRequest determines if err is an error which indicates that the request is invalid.
 func IsBadRequest(err error) bool {
 	return reasonForError(err) == api.StatusReasonBadRequest
+}
+
+// IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
+// be completed as requested.
+func IsForbidden(err error) bool {
+	return reasonForError(err) == api.StatusReasonForbidden
+}
+
+// IsTryAgainLater determines if err is an error which indicates that the request needs to be retried
+// by the client.
+func IsTryAgainLater(err error) bool {
+	return reasonForError(err) == api.StatusReasonTryAgainLater
 }
 
 func reasonForError(err error) api.StatusReason {

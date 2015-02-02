@@ -100,6 +100,10 @@ type Config struct {
 
 	// If nil, the first result from net.InterfaceAddrs will be used.
 	PublicAddress net.IP
+
+	// Control the interval that pod, node IP, and node heath status caches
+	// expire.
+	CacheTimeout time.Duration
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -117,6 +121,7 @@ type Master struct {
 	storage               map[string]apiserver.RESTStorage
 	client                *client.Client
 	portalNet             *net.IPNet
+	cacheTimeout          time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -178,6 +183,9 @@ func setDefaults(c *Config) {
 	}
 	if c.ReadOnlyPort == 0 {
 		c.ReadOnlyPort = 7080
+	}
+	if c.CacheTimeout == 0 {
+		c.CacheTimeout = 5 * time.Second
 	}
 	if c.ReadWritePort == 0 {
 		c.ReadWritePort = 443
@@ -283,7 +291,9 @@ func New(c *Config) *Master {
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
 		v1beta3:               c.EnableV1Beta3,
-		nodeIPCache:           NewIPCache(c.Cloud, util.RealClock{}, 30*time.Second),
+		nodeIPCache:           NewIPCache(c.Cloud, util.RealClock{}, c.CacheTimeout),
+
+		cacheTimeout: c.CacheTimeout,
 
 		masterCount:         c.MasterCount,
 		publicIP:            c.PublicAddress,
@@ -365,7 +375,7 @@ func (m *Master) init(c *Config) {
 		RESTStorageToNodes(nodeRESTStorage).Nodes(),
 		m.podRegistry,
 	)
-	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*5)
+	go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
 	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
 
 	// TODO: Factor out the core API registration

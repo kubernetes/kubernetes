@@ -87,6 +87,9 @@ func TestClient(t *testing.T) {
 
 		// get a validation error
 		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: "test",
+			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{

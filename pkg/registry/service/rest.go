@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -81,35 +82,29 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	service := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
-		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
-	}
-	if errs := validation.ValidateService(service); len(errs) > 0 {
-		return nil, errors.NewInvalid("service", service.Name, errs)
+
+	if err := rest.BeforeCreate(rest.Services, ctx, obj); err != nil {
+		return nil, err
 	}
 
-	api.FillObjectMetaSystemFields(ctx, &service.ObjectMeta)
-
-	if service.Spec.PortalIP == "" {
+	if len(service.Spec.PortalIP) == 0 {
 		// Allocate next available.
-		if ip, err := rs.portalMgr.AllocateNext(); err != nil {
+		ip, err := rs.portalMgr.AllocateNext()
+		if err != nil {
 			return nil, err
-		} else {
-			service.Spec.PortalIP = ip.String()
 		}
+		service.Spec.PortalIP = ip.String()
 	} else {
 		// Try to respect the requested IP.
 		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
 			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
-			return nil, errors.NewInvalid("service", service.Name, el)
+			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 	}
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
+		// TODO: Move this to post-creation rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
-		// TODO: Get rid of ProxyPort.
-		service.Spec.ProxyPort = 0
 		if service.Spec.CreateExternalLoadBalancer {
 			if rs.cloud == nil {
 				return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
@@ -155,8 +150,9 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 				service.Spec.PublicIPs = []string{ip.String()}
 			}
 		}
-		err := rs.registry.CreateService(ctx, service)
-		if err != nil {
+
+		if err := rs.registry.CreateService(ctx, service); err != nil {
+			err = rest.CheckGeneratedNameError(rest.Services, err, service)
 			return nil, err
 		}
 		return rs.registry.GetService(ctx, service.Name)

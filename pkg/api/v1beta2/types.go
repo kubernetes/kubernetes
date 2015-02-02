@@ -290,6 +290,19 @@ type TypeMeta struct {
 	APIVersion        string    `json:"apiVersion,omitempty" description:"version of the schema the object should have"`
 	Namespace         string    `json:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"`
 
+	// GenerateName indicates that the name should be made unique by the server prior to persisting
+	// it. A non-empty value for the field indicates the name will be made unique (and the name
+	// returned to the client will be different than the name passed). The value of this field will
+	// be combined with a unique suffix on the server if the Name field has not been provided.
+	// The provided value must be valid within the rules for Name, and may be truncated by the length
+	// of the suffix required to make the value unique on the server.
+	//
+	// If this field is specified, and Name is not present, the server will NOT return a 409 if the
+	// generated name exists - instead, it will either return 201 Created or 500 with Reason
+	// TryAgainLater indicating a unique name could not be found in the time allotted, and the client
+	// should retry (optionally after the time indicated in the Retry-After header).
+	GenerateName string `json:"generateName,omitempty" description:"an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"`
+
 	// Annotations are unstructured key value data stored with a resource that may be set by
 	// external tooling. They are not queryable and should be preserved when modifying
 	// objects.
@@ -706,6 +719,17 @@ const (
 	//                   field attributes will be set.
 	// Status code 422
 	StatusReasonInvalid StatusReason = "Invalid"
+
+	// StatusReasonTryAgainLater means the server can be reached and understood the request,
+	// but cannot complete the action in a reasonable time. The client should retry the request.
+	// This is may be due to temporary server load or a transient communication issue with
+	// another server. Status code 500 is used because the HTTP spec provides no suitable
+	// server-requested client retry and the 5xx class represents actionable errors.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the resource being acted on.
+	//   "id"   string - the operation that is being attempted.
+	// Status code 500
+	StatusReasonTryAgainLater StatusReason = "TryAgainLater"
 )
 
 // StatusCause provides more information about an api.Status failure, including

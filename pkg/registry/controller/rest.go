@@ -21,12 +21,12 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	rc "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -55,23 +55,15 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
-		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
-	}
 
-	if len(controller.Name) == 0 {
-		controller.Name = string(util.NewUUID())
+	if err := rest.BeforeCreate(rest.ReplicationControllers, ctx, obj); err != nil {
+		return nil, err
 	}
-	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
-	}
-
-	api.FillObjectMetaSystemFields(ctx, &controller.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.CreateController(ctx, controller)
-		if err != nil {
-			return nil, err
+		if err := rs.registry.CreateController(ctx, controller); err != nil {
+			err = rest.CheckGeneratedNameError(rest.ReplicationControllers, err, controller)
+			return apiserver.RESTResult{}, err
 		}
 		return rs.registry.GetController(ctx, controller.Name)
 	}), nil
