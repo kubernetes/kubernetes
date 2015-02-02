@@ -103,8 +103,8 @@ func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) e
 
 	for i := range pod.Spec.Containers {
 		container := pod.Spec.Containers[i]
-		containerCPU := container.CPU.MilliValue()
-		containerMem := container.Memory.Value()
+		containerCPU := container.Resources.Limits.Cpu().MilliValue()
+		containerMem := container.Resources.Limits.Memory().Value()
 
 		if i == 0 {
 			minContainerCPU = containerCPU
@@ -113,8 +113,8 @@ func PodLimitFunc(limitRange *api.LimitRange, kind string, obj runtime.Object) e
 			maxContainerMem = containerMem
 		}
 
-		podCPU = podCPU + container.CPU.MilliValue()
-		podMem = podMem + container.Memory.Value()
+		podCPU = podCPU + container.Resources.Limits.Cpu().MilliValue()
+		podMem = podMem + container.Resources.Limits.Memory().Value()
 
 		minContainerCPU = Min(containerCPU, minContainerCPU)
 		minContainerMem = Min(containerMem, minContainerMem)

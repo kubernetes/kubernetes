@@ -41,11 +41,13 @@ func TestAdmission(t *testing.T) {
 	}
 
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Memory.String() != "512Mi" {
-			t.Errorf("Unexpected memory value %s", pod.Spec.Containers[i].Memory.String())
+		memory := pod.Spec.Containers[i].Resources.Limits.Memory().String()
+		cpu := pod.Spec.Containers[i].Resources.Limits.Cpu().String()
+		if memory != "512Mi" {
+			t.Errorf("Unexpected memory value %s", memory)
 		}
-		if pod.Spec.Containers[i].CPU.String() != "1" {
-			t.Errorf("Unexpected cpu value %s", pod.Spec.Containers[i].CPU.String())
+		if cpu != "1" {
+			t.Errorf("Unexpected cpu value %s", cpu)
 		}
 	}
 }

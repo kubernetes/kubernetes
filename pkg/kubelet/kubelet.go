@@ -649,8 +649,8 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			ExposedPorts: exposedPorts,
 			Hostname:     pod.Name,
 			Image:        container.Image,
-			Memory:       container.Memory.Value(),
-			CPUShares:    milliCPUToShares(container.CPU.MilliValue()),
+			Memory:       container.Resources.Limits.Memory().Value(),
+			CPUShares:    milliCPUToShares(container.Resources.Limits.Cpu().MilliValue()),
 			WorkingDir:   container.WorkingDir,
 		},
 	}

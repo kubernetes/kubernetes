@@ -30,8 +30,8 @@ func makeMinion(node string, milliCPU, memory int64) api.Node {
 		ObjectMeta: api.ObjectMeta{Name: node},
 		Spec: api.NodeSpec{
 			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
+				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				"memory": *resource.NewQuantity(memory, resource.BinarySI),
 			},
 		},
 	}
@@ -57,14 +57,40 @@ func TestLeastRequested(t *testing.T) {
 	}
 	cpuOnly := api.PodSpec{
 		Containers: []api.Container{
-			{CPU: resource.MustParse("1000m")},
-			{CPU: resource.MustParse("2000m")},
+			{
+				Resources: api.ResourceRequirementSpec{
+					Limits: api.ResourceList{
+						"cpu": resource.MustParse("1000m"),
+					},
+				},
+			},
+			{
+				Resources: api.ResourceRequirementSpec{
+					Limits: api.ResourceList{
+						"cpu": resource.MustParse("2000m"),
+					},
+				},
+			},
 		},
 	}
 	cpuAndMemory := api.PodSpec{
 		Containers: []api.Container{
-			{CPU: resource.MustParse("1000m"), Memory: resource.MustParse("2000")},
-			{CPU: resource.MustParse("2000m"), Memory: resource.MustParse("3000")},
+			{
+				Resources: api.ResourceRequirementSpec{
+					Limits: api.ResourceList{
+						"cpu":    resource.MustParse("1000m"),
+						"memory": resource.MustParse("2000"),
+					},
+				},
+			},
+			{
+				Resources: api.ResourceRequirementSpec{
+					Limits: api.ResourceList{
+						"cpu":    resource.MustParse("2000m"),
+						"memory": resource.MustParse("3000"),
+					},
+				},
+			},
 		},
 	}
 	tests := []struct {

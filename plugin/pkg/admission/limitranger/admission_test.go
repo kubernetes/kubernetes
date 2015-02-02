@@ -23,6 +23,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
+func getResourceRequirements(cpu, memory string) api.ResourceRequirementSpec {
+	res := api.ResourceRequirementSpec{}
+	res.Limits = api.ResourceList{}
+	if cpu != "" {
+		res.Limits[api.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res.Limits[api.ResourceMemory] = resource.MustParse(memory)
+	}
+
+	return res
+}
+
 func TestPodLimitFunc(t *testing.T) {
 	limitRange := &api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
@@ -32,25 +45,13 @@ func TestPodLimitFunc(t *testing.T) {
 			Limits: []api.LimitRangeItem{
 				{
 					Type: api.LimitTypePod,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("200m"),
-						api.ResourceMemory: resource.MustParse("4Gi"),
-					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("50m"),
-						api.ResourceMemory: resource.MustParse("2Mi"),
-					},
+					Max:  getResourceRequirements("200m", "4Gi").Limits,
+					Min:  getResourceRequirements("50m", "2Mi").Limits,
 				},
 				{
 					Type: api.LimitTypeContainer,
-					Max: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("100m"),
-						api.ResourceMemory: resource.MustParse("2Gi"),
-					},
-					Min: api.ResourceList{
-						api.ResourceCPU:    resource.MustParse("25m"),
-						api.ResourceMemory: resource.MustParse("1Mi"),
-					},
+					Max:  getResourceRequirements("100m", "2Gi").Limits,
+					Min:  getResourceRequirements("25m", "1Mi").Limits,
 				},
 			},
 		},
@@ -62,14 +63,12 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "foo:V1",
-						CPU:    resource.MustParse("100m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "foo:V1",
+						Resources: getResourceRequirements("100m", "2Gi"),
 					},
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("100m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("100m", "2Gi"),
 					},
 				},
 			},
@@ -79,9 +78,8 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("100m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("100m", "2Gi"),
 					},
 				},
 			},
@@ -94,9 +92,8 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("25m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("25m", "2Gi"),
 					},
 				},
 			},
@@ -106,9 +103,8 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("110m"),
-						Memory: resource.MustParse("1Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("110m", "1Gi"),
 					},
 				},
 			},
@@ -118,9 +114,8 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("30m"),
-						Memory: resource.MustParse("0"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("30m", "0"),
 					},
 				},
 			},
@@ -130,9 +125,8 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("30m"),
-						Memory: resource.MustParse("3Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("30m", "3Gi"),
 					},
 				},
 			},
@@ -142,9 +136,8 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("40m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("40m", "2Gi"),
 					},
 				},
 			},
@@ -154,24 +147,20 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("1Mi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("60m", "1Mi"),
 					},
 					{
-						Image:  "boo:V2",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("1Mi"),
+						Image:     "boo:V2",
+						Resources: getResourceRequirements("60m", "1Mi"),
 					},
 					{
-						Image:  "boo:V3",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("1Mi"),
+						Image:     "boo:V3",
+						Resources: getResourceRequirements("60m", "1Mi"),
 					},
 					{
-						Image:  "boo:V4",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("1Mi"),
+						Image:     "boo:V4",
+						Resources: getResourceRequirements("60m", "1Mi"),
 					},
 				},
 			},
@@ -181,19 +170,16 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("60m", "2Gi"),
 					},
 					{
-						Image:  "boo:V2",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V2",
+						Resources: getResourceRequirements("60m", "2Gi"),
 					},
 					{
-						Image:  "boo:V3",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("2Gi"),
+						Image:     "boo:V3",
+						Resources: getResourceRequirements("60m", "2Gi"),
 					},
 				},
 			},
@@ -203,19 +189,16 @@ func TestPodLimitFunc(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Image:  "boo:V1",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("0"),
+						Image:     "boo:V1",
+						Resources: getResourceRequirements("60m", "0"),
 					},
 					{
-						Image:  "boo:V2",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("0"),
+						Image:     "boo:V2",
+						Resources: getResourceRequirements("60m", "0"),
 					},
 					{
-						Image:  "boo:V3",
-						CPU:    resource.MustParse("60m"),
-						Memory: resource.MustParse("0"),
+						Image:     "boo:V3",
+						Resources: getResourceRequirements("60m", "0"),
 					},
 				},
 			},

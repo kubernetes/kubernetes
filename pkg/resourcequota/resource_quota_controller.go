@@ -179,7 +179,7 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 func PodCPU(pod *api.Pod) *resource.Quantity {
 	val := int64(0)
 	for j := range pod.Spec.Containers {
-		val = val + pod.Spec.Containers[j].CPU.MilliValue()
+		val = val + pod.Spec.Containers[j].Resources.Limits.Cpu().MilliValue()
 	}
 	return resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 }
@@ -188,7 +188,7 @@ func PodCPU(pod *api.Pod) *resource.Quantity {
 func PodMemory(pod *api.Pod) *resource.Quantity {
 	val := int64(0)
 	for j := range pod.Spec.Containers {
-		val = val + pod.Spec.Containers[j].Memory.Value()
+		val = val + pod.Spec.Containers[j].Resources.Limits.Memory().Value()
 	}
 	return resource.NewQuantity(int64(val), resource.DecimalSI)
 }
