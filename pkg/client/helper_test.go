@@ -104,54 +104,68 @@ func TestTransportFor(t *testing.T) {
 		"ca transport": {
 			TLS: true,
 			Config: &Config{
-				CAData: []byte(rootCACert),
+				TLSClientConfig: TLSClientConfig{
+					CAData: []byte(rootCACert),
+				},
 			},
 		},
 		"bad ca file transport": {
 			Err: true,
 			Config: &Config{
-				CAFile: "invalid file",
+				TLSClientConfig: TLSClientConfig{
+					CAFile: "invalid file",
+				},
 			},
 		},
 		"ca data overriding bad ca file transport": {
 			TLS: true,
 			Config: &Config{
-				CAData: []byte(rootCACert),
-				CAFile: "invalid file",
+				TLSClientConfig: TLSClientConfig{
+					CAData: []byte(rootCACert),
+					CAFile: "invalid file",
+				},
 			},
 		},
 
 		"cert transport": {
 			TLS: true,
 			Config: &Config{
-				CertData: []byte(certData),
-				KeyData:  []byte(keyData),
-				CAData:   []byte(rootCACert),
+				TLSClientConfig: TLSClientConfig{
+					CertData: []byte(certData),
+					KeyData:  []byte(keyData),
+					CAData:   []byte(rootCACert),
+				},
 			},
 		},
 		"bad cert data transport": {
 			Err: true,
 			Config: &Config{
-				CertData: []byte(certData),
-				KeyData:  []byte("bad key data"),
-				CAData:   []byte(rootCACert),
+				TLSClientConfig: TLSClientConfig{
+					CertData: []byte(certData),
+					KeyData:  []byte("bad key data"),
+					CAData:   []byte(rootCACert),
+				},
 			},
 		},
 		"bad file cert transport": {
 			Err: true,
 			Config: &Config{
-				CertData: []byte(certData),
-				KeyFile:  "invalid file",
-				CAData:   []byte(rootCACert),
+				TLSClientConfig: TLSClientConfig{
+					CertData: []byte(certData),
+					KeyFile:  "invalid file",
+					CAData:   []byte(rootCACert),
+				},
 			},
 		},
 		"key data overriding bad file cert transport": {
 			TLS: true,
 			Config: &Config{
-				CertData: []byte(certData),
-				KeyData:  []byte(keyData),
-				KeyFile:  "invalid file",
-				CAData:   []byte(rootCACert),
+				TLSClientConfig: TLSClientConfig{
+					CertData: []byte(certData),
+					KeyData:  []byte(keyData),
+					KeyFile:  "invalid file",
+					CAData:   []byte(rootCACert),
+				},
 			},
 		},
 	}
@@ -206,15 +220,19 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		},
 		{
 			Config: &Config{
-				Host:     "localhost",
-				CertFile: "foo",
+				Host: "localhost",
+				TLSClientConfig: TLSClientConfig{
+					CertFile: "foo",
+				},
 			},
 			TransportTLS: true,
 		},
 		{
 			Config: &Config{
-				Host:     "///:://localhost",
-				CertFile: "foo",
+				Host: "///:://localhost",
+				TLSClientConfig: TLSClientConfig{
+					CertFile: "foo",
+				},
 			},
 			TransportTLS: false,
 		},
