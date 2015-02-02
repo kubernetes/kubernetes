@@ -7,7 +7,8 @@ Vagrant        | Ansible      | Fedora | [docs](../../docs/getting-started-guide
 GKE            |              |        | [docs](https://cloud.google.com/container-engine)      | Commercial                   | Uses K8s version 0.9.2
 AWS            | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community                    | Uses K8s version 0.9.1
 GCE            | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) | Uses K8s version 0.9.1
-Vagrant        | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@pires)           | Uses K8s version 0.9.1 
+Vagrant        | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@pires)           | Uses K8s version 0.9.1
+CloudStack     | Ansible      | CoreOS | [docs](../../docs/getting-started-guides/cloudstack.md)| Community (@sebgoa)          | Uses K8s version 0.9.1
 Vmware         |              | Debian | [docs](../../docs/getting-started-guides/vsphere.md)   | Community (@pietern)         | Uses K8s version 0.9.1
 AWS            | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guides/aws.md)       | Community (@justinsb)        | Uses K8s version 0.5.0 
 Vmware         | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) |
