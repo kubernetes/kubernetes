@@ -19,9 +19,46 @@ package meta
 import (
 	"fmt"
 	"strings"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
+
+// Implements RESTScope interface
+type restScope struct {
+	name             RESTScopeName
+	paramName        string
+	paramPath        bool
+	paramDescription string
+}
+
+func (r *restScope) Name() RESTScopeName {
+	return r.name
+}
+func (r *restScope) ParamName() string {
+	return r.paramName
+}
+func (r *restScope) ParamPath() bool {
+	return r.paramPath
+}
+func (r *restScope) ParamDescription() string {
+	return r.paramDescription
+}
+
+var RESTScopeNamespaceLegacy = &restScope{
+	name:             RESTScopeNameNamespace,
+	paramName:        "namespace",
+	paramPath:        false,
+	paramDescription: "object name and auth scope, such as for teams and projects",
+}
+
+var RESTScopeNamespace = &restScope{
+	name:             RESTScopeNameNamespace,
+	paramName:        "ns",
+	paramPath:        true,
+	paramDescription: "object name and auth scope, such as for teams and projects",
+}
+
+var RESTScopeRoot = &restScope{
+	name: RESTScopeNameRoot,
+}
 
 // typeMeta is used as a key for lookup in the mapping between REST path and
 // API object.
@@ -45,6 +82,7 @@ type typeMeta struct {
 type DefaultRESTMapper struct {
 	mapping        map[string]typeMeta
 	reverse        map[typeMeta]string
+	scopes         map[typeMeta]RESTScope
 	versions       []string
 	interfacesFunc VersionInterfacesFunc
 }
@@ -61,40 +99,38 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, bool)
 func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRESTMapper {
 	mapping := make(map[string]typeMeta)
 	reverse := make(map[typeMeta]string)
+	scopes := make(map[typeMeta]RESTScope)
 	// TODO: verify name mappings work correctly when versions differ
 
 	return &DefaultRESTMapper{
-		mapping: mapping,
-		reverse: reverse,
-
+		mapping:        mapping,
+		reverse:        reverse,
+		scopes:         scopes,
 		versions:       versions,
 		interfacesFunc: f,
 	}
 }
 
-// Add adds objects from a runtime.Scheme and its named versions to this map.
-// If mixedCase is true, the legacy v1beta1/v1beta2 Kubernetes resource naming convention
-// will be applied (camelCase vs lowercase).
-func (m *DefaultRESTMapper) Add(scheme *runtime.Scheme, mixedCase bool, versions ...string) {
-	for _, version := range versions {
-		for kind := range scheme.KnownTypes(version) {
-			plural, singular := kindToResource(kind, mixedCase)
-			meta := typeMeta{APIVersion: version, Kind: kind}
-			if _, ok := m.mapping[plural]; !ok {
-				m.mapping[plural] = meta
-				m.mapping[singular] = meta
-				if strings.ToLower(plural) != plural {
-					m.mapping[strings.ToLower(plural)] = meta
-					m.mapping[strings.ToLower(singular)] = meta
-				}
-			}
-			m.reverse[meta] = plural
+func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
+	plural, singular := kindToResource(kind, mixedCase)
+	meta := typeMeta{APIVersion: version, Kind: kind}
+	if _, ok := m.mapping[plural]; !ok {
+		m.mapping[plural] = meta
+		m.mapping[singular] = meta
+		if strings.ToLower(plural) != plural {
+			m.mapping[strings.ToLower(plural)] = meta
+			m.mapping[strings.ToLower(singular)] = meta
 		}
 	}
+	m.reverse[meta] = plural
+	m.scopes[meta] = scope
 }
 
 // kindToResource converts Kind to a resource name.
 func kindToResource(kind string, mixedCase bool) (plural, singular string) {
+	if len(kind) == 0 {
+		return
+	}
 	if mixedCase {
 		// Legacy support for mixed case names
 		singular = strings.ToLower(kind[:1]) + kind[1:]
@@ -167,6 +203,12 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", version, kind)
 	}
 
+	// Ensure we have a REST scope
+	scope, ok := m.scopes[typeMeta{APIVersion: version, Kind: kind}]
+	if !ok {
+		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", version, kind)
+	}
+
 	interfaces, ok := m.interfacesFunc(version)
 	if !ok {
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", version)
@@ -176,6 +218,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		Resource:   resource,
 		APIVersion: version,
 		Kind:       kind,
+		Scope:      scope,
 
 		Codec:            interfaces.Codec,
 		ObjectConvertor:  interfaces.ObjectConvertor,

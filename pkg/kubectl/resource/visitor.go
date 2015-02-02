@@ -384,6 +384,17 @@ func UpdateObjectNamespace(info *Info) error {
 	return nil
 }
 
+// FilterNamespace omits the namespace if the object is not namespace scoped
+func FilterNamespace() VisitorFunc {
+	return func(info *Info) error {
+		if info.Mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			info.Namespace = ""
+			UpdateObjectNamespace(info)
+		}
+		return nil
+	}
+}
+
 // SetNamespace ensures that every Info object visited will have a namespace
 // set. If info.Object is set, it will be mutated as well.
 func SetNamespace(namespace string) VisitorFunc {

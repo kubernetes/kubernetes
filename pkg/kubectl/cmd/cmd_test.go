@@ -66,7 +66,13 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 			MetadataAccessor: meta.NewAccessor(),
 		}, (version == "unlikelyversion")
 	})
-	mapper.Add(scheme, false, "unlikelyversion")
+	for _, version := range []string{"unlikelyversion"} {
+		for kind := range scheme.KnownTypes(version) {
+			mixedCase := false
+			scope := meta.RESTScopeNamespace
+			mapper.Add(scope, kind, version, mixedCase)
+		}
+	}
 
 	return scheme, mapper, codec
 }
