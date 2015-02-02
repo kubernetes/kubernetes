@@ -74,7 +74,7 @@ func (f *FakePodInfoGetter) GetPodStatus(host, namespace, name string) (api.PodS
 }
 
 func TestPodCacheGetDifferentNamespace(t *testing.T) {
-	cache := NewPodCache(nil, nil, nil, nil)
+	cache := NewPodCache(nil, nil, nil)
 
 	expectedDefault := api.PodStatus{
 		Info: api.PodInfo{
@@ -108,7 +108,7 @@ func TestPodCacheGetDifferentNamespace(t *testing.T) {
 }
 
 func TestPodCacheGet(t *testing.T) {
-	cache := NewPodCache(nil, nil, nil, nil)
+	cache := NewPodCache(nil, nil, nil)
 
 	expected := api.PodStatus{
 		Info: api.PodInfo{
@@ -156,21 +156,14 @@ func TestPodCacheDelete(t *testing.T) {
 	if err != client.ErrPodInfoNotAvailable {
 		t.Errorf("Unexpected error: %v, expecting: %v", err, client.ErrPodInfoNotAvailable)
 	}
-
 }
 
 func TestPodCacheGetMissing(t *testing.T) {
 	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
 	config := podCacheTestConfig{
-		ipFunc: func(host string) string {
-			if host == "machine" {
-				return "1.2.3.5"
-			}
-			return ""
-		},
 		kubeletContainerInfo: api.PodStatus{
 			Info: api.PodInfo{"bar": api.ContainerStatus{}}},
-		nodes: []api.Node{*makeHealthyNode("machine")},
+		nodes: []api.Node{*makeHealthyNode("machine", "1.2.3.5")},
 		pod:   pod1,
 	}
 	cache := config.Construct()
@@ -195,14 +188,7 @@ func TestPodCacheGetMissing(t *testing.T) {
 	}
 }
 
-type fakeIPCache func(string) string
-
-func (f fakeIPCache) GetInstanceIP(host string) (ip string) {
-	return f(host)
-}
-
 type podCacheTestConfig struct {
-	ipFunc               func(string) string // Construct will set a default if nil
 	nodes                []api.Node
 	pods                 []api.Pod
 	pod                  *api.Pod
@@ -216,11 +202,6 @@ type podCacheTestConfig struct {
 }
 
 func (c *podCacheTestConfig) Construct() *PodCache {
-	if c.ipFunc == nil {
-		c.ipFunc = func(host string) string {
-			return "ip of " + host
-		}
-	}
 	c.fakePodInfo = &FakePodInfoGetter{
 		data: api.PodStatusResult{
 			Status: c.kubeletContainerInfo,
@@ -235,7 +216,6 @@ func (c *podCacheTestConfig) Construct() *PodCache {
 	c.fakePods.Pod = c.pod
 	c.fakePods.Err = c.err
 	return NewPodCache(
-		fakeIPCache(c.ipFunc),
 		c.fakePodInfo,
 		c.fakeNodes.Nodes(),
 		c.fakePods,
@@ -253,12 +233,15 @@ func makePod(namespace, name, host string, containers ...string) *api.Pod {
 	return pod
 }
 
-func makeHealthyNode(name string) *api.Node {
+func makeHealthyNode(name string, ip string) *api.Node {
 	return &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: name},
-		Status: api.NodeStatus{Conditions: []api.NodeCondition{
-			{Kind: api.NodeReady, Status: api.ConditionFull},
-		}},
+		Status: api.NodeStatus{
+			HostIP: ip,
+			Conditions: []api.NodeCondition{
+				{Kind: api.NodeReady, Status: api.ConditionFull},
+			},
+		},
 	}
 }
 
@@ -275,15 +258,9 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
 	pod2 := makePod(api.NamespaceDefault, "baz", "machine", "qux")
 	config := podCacheTestConfig{
-		ipFunc: func(host string) string {
-			if host == "machine" {
-				return "1.2.3.5"
-			}
-			return ""
-		},
 		kubeletContainerInfo: api.PodStatus{
 			Info: api.PodInfo{"bar": api.ContainerStatus{}}},
-		nodes: []api.Node{*makeHealthyNode("machine")},
+		nodes: []api.Node{*makeHealthyNode("machine", "1.2.3.5")},
 		pods:  []api.Pod{*pod1, *pod2},
 	}
 	cache := config.Construct()
@@ -326,7 +303,7 @@ func TestFillPodStatusNoHost(t *testing.T) {
 	pod := makePod(api.NamespaceDefault, "foo", "", "bar")
 	config := podCacheTestConfig{
 		kubeletContainerInfo: api.PodStatus{},
-		nodes:                []api.Node{*makeHealthyNode("machine")},
+		nodes:                []api.Node{*makeHealthyNode("machine", "")},
 		pods:                 []api.Pod{*pod},
 	}
 	cache := config.Construct()
@@ -382,7 +359,7 @@ func TestFillPodStatus(t *testing.T) {
 				},
 			},
 		},
-		nodes: []api.Node{*makeHealthyNode("machine")},
+		nodes: []api.Node{*makeHealthyNode("machine", "ip of machine")},
 		pods:  []api.Pod{*pod},
 	}
 	cache := config.Construct()
@@ -409,7 +386,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 				leaky.PodInfraContainerName: {},
 			},
 		},
-		nodes: []api.Node{*makeHealthyNode("machine")},
+		nodes: []api.Node{*makeHealthyNode("machine", "ip of machine")},
 		pods:  []api.Pod{*pod},
 	}
 	cache := config.Construct()
