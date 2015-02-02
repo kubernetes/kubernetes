@@ -74,6 +74,43 @@ func TestValidateLabels(t *testing.T) {
 	}
 }
 
+func TestValidateAnnotations(t *testing.T) {
+	successCases := []map[string]string{
+		{"simple": "bar"},
+		{"now-with-dashes": "bar"},
+		{"1-starts-with-num": "bar"},
+		{"1234": "bar"},
+		{"simple/simple": "bar"},
+		{"now-with-dashes/simple": "bar"},
+		{"now-with-dashes/now-with-dashes": "bar"},
+		{"now.with.dots/simple": "bar"},
+		{"now-with.dashes-and.dots/simple": "bar"},
+		{"1-num.2-num/3-num": "bar"},
+		{"1234/5678": "bar"},
+		{"1.2.3.4/5678": "bar"},
+		{"UpperCase123": "bar"},
+	}
+	for i := range successCases {
+		errs := ValidateAnnotations(successCases[i], "field")
+		if len(errs) != 0 {
+			t.Errorf("case[%d] expected success, got %#v", i, errs)
+		}
+	}
+
+	errorCases := []map[string]string{
+		{"nospecialchars^=@": "bar"},
+		{"cantendwithadash-": "bar"},
+		{"only/one/slash": "bar"},
+		{strings.Repeat("a", 254): "bar"},
+	}
+	for i := range errorCases {
+		errs := ValidateAnnotations(errorCases[i], "field")
+		if len(errs) != 1 {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
