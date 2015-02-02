@@ -216,16 +216,26 @@ func (t *proxyTransport) updateURLs(n *html.Node, sourceURL *url.URL) {
 		if err != nil {
 			continue
 		}
-		// Is this URL relative?
-		if url.Host == "" {
+
+		// Is this URL referring to the same host as sourceURL?
+		if url.Host == "" || url.Host == sourceURL.Host {
 			url.Scheme = t.proxyScheme
 			url.Host = t.proxyHost
-			url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path, "/")
-			n.Attr[i].Val = url.String()
-		} else if url.Host == sourceURL.Host {
-			url.Scheme = t.proxyScheme
-			url.Host = t.proxyHost
-			url.Path = path.Join(t.proxyPathPrepend, url.Path)
+			origPath := url.Path
+
+			if strings.HasPrefix(url.Path, "/") {
+				// The path is rooted at the host. Just add proxy prepend.
+				url.Path = path.Join(t.proxyPathPrepend, url.Path)
+			} else {
+				// The path is relative to sourceURL.
+				url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path)
+			}
+
+			if strings.HasSuffix(origPath, "/") {
+				// Add back the trailing slash, which was stripped by path.Join().
+				url.Path += "/"
+			}
+
 			n.Attr[i].Val = url.String()
 		}
 	}
