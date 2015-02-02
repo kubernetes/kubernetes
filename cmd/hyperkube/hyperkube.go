@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
+	kubelet "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
 	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
 	sched "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
 )
@@ -36,6 +37,7 @@ func main() {
 	hk.AddServer(apiserver.NewHyperkubeServer())
 	hk.AddServer(controllermanager.NewHyperkubeServer())
 	hk.AddServer(sched.NewHyperkubeServer())
+	hk.AddServer(kubelet.NewHyperkubeServer())
 
 	hk.RunToExit(os.Args)
 }
