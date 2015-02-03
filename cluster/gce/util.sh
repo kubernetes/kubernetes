@@ -203,16 +203,6 @@ function get-password {
   fi
   KUBE_USER=admin
   KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Remove this code, since in all use cases I can see, we are overwriting this
-  # at cluster creation time.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 # Generate authentication token for admin user. Will
@@ -505,30 +495,44 @@ function kube-up {
 
   echo "Kubernetes cluster created."
 
-  local kube_cert=".kubecfg.crt"
-  local kube_key=".kubecfg.key"
-  local ca_cert=".kubernetes.ca.crt"
+  local kube_cert="kubecfg.crt"
+  local kube_key="kubecfg.key"
+  local ca_cert="kubernetes.ca.crt"
+  # TODO use token instead of kube_auth
+  local kube_auth="kubernetes_auth"
+
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local context="${INSTANCE_PREFIX}"
+  local user="${INSTANCE_PREFIX}-admin"
+  local config_dir="${HOME}/.kube/${context}"
 
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
-  (umask 077
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${HOME}/${kube_cert}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${HOME}/${kube_key}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${HOME}/${ca_cert}" 2>/dev/null
+  (
+   mkdir -p "${config_dir}"
+   umask 077
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${config_dir}/${kube_cert}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${config_dir}/${kube_key}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${config_dir}/${ca_cert}" 2>/dev/null
 
-   cat << EOF > ~/.kubernetes_auth
+   "${kubectl}" config set-cluster "${context}" --server="https://${KUBE_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
+   "${kubectl}" config set-credentials "${user}" --auth-path="${config_dir}/${kube_auth}" --global
+   "${kubectl}" config set-context "${context}" --cluster="${context}" --user="${user}" --global
+   "${kubectl}" config use-context "${context}" --global
+
+   cat << EOF > "${config_dir}/${kube_auth}"
 {
   "User": "$KUBE_USER",
   "Password": "$KUBE_PASSWORD",
-  "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
+  "CAFile": "${config_dir}/${ca_cert}",
+  "CertFile": "${config_dir}/${kube_cert}",
+  "KeyFile": "${config_dir}/${kube_key}"
 }
 EOF
 
-   chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-     "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
-   echo Wrote ~/.kubernetes_auth
+   chmod 0600 "${config_dir}/${kube_auth}" "${config_dir}/$kube_cert" \
+     "${config_dir}/${kube_key}" "${config_dir}/${ca_cert}"
+   echo "Wrote ${config_dir}/${kube_auth}"
   )
 
   echo "Sanity checking cluster..."
@@ -576,7 +580,7 @@ EOF
   echo
   echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ~/.kubernetes_auth.${color_norm}"
+  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}.${color_norm}"
   echo
 
 }
