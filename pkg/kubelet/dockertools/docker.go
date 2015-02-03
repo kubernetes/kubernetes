@@ -601,6 +601,23 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	return
 }
 
+func GetRunningContainers(client DockerInterface, ids []string) ([]*docker.Container, error) {
+	result := []*docker.Container{}
+	if client == nil {
+		return nil, fmt.Errorf("unexpected nil docker client.")
+	}
+	for ix := range ids {
+		status, err := client.InspectContainer(ids[ix])
+		if err != nil {
+			return nil, err
+		}
+		if status != nil && status.State.Running {
+			result = append(result, status)
+		}
+	}
+	return result, nil
+}
+
 // Parses image name including a tag and returns image name and tag.
 // TODO: Future Docker versions can parse the tag on daemon side, see
 // https://github.com/dotcloud/docker/issues/6876
