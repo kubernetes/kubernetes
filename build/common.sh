@@ -473,9 +473,11 @@ function kube::release::package_tarballs() {
   mkdir -p "${RELEASE_DIR}"
   
   # Clean out cruft
-  find _output/release-stage/ -name '*~' -exec rm {} \;
-  find _output/release-stage/ -name '#*#' -exec rm {} \;
-  find _output/release-stage/ -name '.DS*' -exec rm {} \;
+  if [ -d "_output/release-stage/" ]; then
+    find _output/release-stage/ -name '*~' -exec rm {} \;
+    find _output/release-stage/ -name '#*#' -exec rm {} \;
+    find _output/release-stage/ -name '.DS*' -exec rm {} \;
+  fi
 
   kube::release::package_client_tarballs
   kube::release::package_server_tarballs
