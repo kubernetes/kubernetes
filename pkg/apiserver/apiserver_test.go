@@ -55,7 +55,7 @@ var codec = runtime.CodecFor(api.Scheme, testVersion)
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
 var selfLinker runtime.SelfLinker = accessor
-var mapper meta.RESTMapper
+var mapper, namespaceMapper, legacyNamespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
 
 func interfacesFor(version string) (*meta.VersionInterfaces, error) {
@@ -71,6 +71,19 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	}
 }
 
+func newMapper() *meta.DefaultRESTMapper {
+	return meta.NewDefaultRESTMapper(
+		versions,
+		func(version string) (*meta.VersionInterfaces, bool) {
+			interfaces, err := interfacesFor(version)
+			if err != nil {
+				return nil, false
+			}
+			return interfaces, true
+		},
+	)
+}
+
 func init() {
 	// Certain API objects are returned regardless of the contents of storage:
 	// api.Status is returned in errors
@@ -83,26 +96,20 @@ func init() {
 	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{},
 		&api.Status{})
 
-	defMapper := meta.NewDefaultRESTMapper(
-		versions,
-		func(version string) (*meta.VersionInterfaces, bool) {
-			interfaces, err := interfacesFor(version)
-			if err != nil {
-				return nil, false
-			}
-			return interfaces, true
-		},
-	)
+	nsMapper := newMapper()
+	legacyNsMapper := newMapper()
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
 			mixedCase := true
-			scope := meta.RESTScopeNamespaceLegacy
-			defMapper.Add(scope, kind, version, mixedCase)
+			legacyNsMapper.Add(meta.RESTScopeNamespaceLegacy, kind, version, mixedCase)
+			nsMapper.Add(meta.RESTScopeNamespace, kind, version, mixedCase)
 		}
 	}
 
-	mapper = defMapper
+	mapper = legacyNsMapper
+	legacyNamespaceMapper = legacyNsMapper
+	namespaceMapper = nsMapper
 	admissionControl = admit.NewAlwaysAdmit()
 }
 
@@ -274,7 +281,7 @@ func TestNotFound(t *testing.T) {
 		"PUT without extra segment":    {"PUT", "/prefix/version/foo", http.StatusMethodNotAllowed},
 		"PUT with extra segment":       {"PUT", "/prefix/version/foo/bar/baz", http.StatusNotFound},
 		"watch missing storage":        {"GET", "/prefix/version/watch/", http.StatusNotFound},
-		"watch with bad method":        {"POST", "/prefix/version/watch/foo/bar", http.StatusNotFound},
+		"watch with bad method":        {"POST", "/prefix/version/watch/foo/bar", http.StatusMethodNotAllowed},
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &SimpleRESTStorage{},
@@ -318,15 +325,15 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
-		"GET object":    {"GET", "/prefix/version/foo/bar", http.StatusNotFound},
-		"GET list":      {"GET", "/prefix/version/foo", http.StatusNotFound},
-		"POST list":     {"POST", "/prefix/version/foo", http.StatusNotFound},
-		"PUT object":    {"PUT", "/prefix/version/foo/bar", http.StatusNotFound},
-		"DELETE object": {"DELETE", "/prefix/version/foo/bar", http.StatusNotFound},
-		//"watch list":      {"GET", "/prefix/version/watch/foo"},
-		//"watch object":    {"GET", "/prefix/version/watch/foo/bar"},
-		"proxy object":    {"GET", "/prefix/version/proxy/foo/bar", http.StatusMethodNotAllowed},
-		"redirect object": {"GET", "/prefix/version/redirect/foo/bar", http.StatusMethodNotAllowed},
+		"GET object":      {"GET", "/prefix/version/foo/bar", http.StatusNotFound},
+		"GET list":        {"GET", "/prefix/version/foo", http.StatusNotFound},
+		"POST list":       {"POST", "/prefix/version/foo", http.StatusNotFound},
+		"PUT object":      {"PUT", "/prefix/version/foo/bar", http.StatusNotFound},
+		"DELETE object":   {"DELETE", "/prefix/version/foo/bar", http.StatusNotFound},
+		"watch list":      {"GET", "/prefix/version/watch/foo", http.StatusNotFound},
+		"watch object":    {"GET", "/prefix/version/watch/foo/bar", http.StatusNotFound},
+		"proxy object":    {"GET", "/prefix/version/proxy/foo/bar", http.StatusNotFound},
+		"redirect object": {"GET", "/prefix/version/redirect/foo/bar", http.StatusNotFound},
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": UnimplementedRESTStorage{},
@@ -347,9 +354,8 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		}
 		defer response.Body.Close()
 		data, _ := ioutil.ReadAll(response.Body)
-		t.Logf("resp: %s", string(data))
 		if response.StatusCode != v.ErrCode {
-			t.Errorf("%s: expected %d for %s, Got %s", k, http.StatusNotFound, v.Method, string(data))
+			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
 			continue
 		}
 	}

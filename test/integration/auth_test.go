@@ -259,7 +259,6 @@ func getTestRequests() []struct {
 		{"DELETE", "/api/v1beta1/foo" + timeoutFlag, "", code404},
 
 		// Special verbs on nodes
-		// TODO: Will become 405 once these are converted to go-restful
 		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},
 		{"GET", "/api/v1beta1/redirect/minions/a", "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
