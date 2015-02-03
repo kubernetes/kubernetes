@@ -1,6 +1,6 @@
 # Labels
 
-_Labels_ are key/value pairs identifying client/user-defined attributes (and non-primitive system-generated attributes) of API objects, which are stored and returned as part of the [metadata of those objects](api-conventions.md). Labels can be used to organize and to select subsets of objects according to these attributes.
+_Labels_ are key/value pairs identifying client/user-defined attributes (and non-primitive system-generated attributes) of API objects, which are stored and returned as part of the [metadata of those objects](/docs/api-conventions.md). Labels can be used to organize and to select subsets of objects according to these attributes.
 
 Each object can have a set of key/value labels set on it, with at most one label with a particular key. 
 ```
@@ -10,13 +10,13 @@ Each object can have a set of key/value labels set on it, with at most one label
 }
 ```
 
-Unlike [names and UIDs](identifiers.md), labels do not provide uniqueness. In general, we expect many objects to carry the same label(s). 
+Unlike [names and UIDs](/docs/identifiers.md), labels do not provide uniqueness. In general, we expect many objects to carry the same label(s). 
 
 Via a _label selector_, the client/user can identify a set of objects. The label selector is the core grouping primitive in Kubernetes. 
 
 Label selectors may also be used to associate policies with sets of objects.
 
-We also [plan](https://github.com/GoogleCloudPlatform/kubernetes/issues/560) to make labels available inside pods and [lifecycle hooks](container-environment.md).
+We also [plan](https://github.com/GoogleCloudPlatform/kubernetes/issues/560) to make labels available inside pods and [lifecycle hooks](/docs/container-environment.md).
 
 Valid label keys are comprised of two segments - prefix and name - separated
 by a slash (`/`).  The name segment is required and must be a DNS label: 63
@@ -50,8 +50,8 @@ key1 exists
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter: `?labels=key1%3Dvalue1,key2%3Dvalue2,...`. We may extend such filtering to DELETE operations in the future.
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
-- `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
-- `replicationController`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
+- `service`: A [service](/docs/services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
+- `replicationController`: A [replication controller](/docs/replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
 
 The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. 
 
@@ -73,4 +73,4 @@ Since labels can be set at pod creation time, no separate set add/remove operati
 
 ## Labels vs. annotations
 
-We'll eventually index and reverse-index labels for efficient queries and watches, use them to sort and group in UIs and CLIs, etc. We don't want to pollute labels with non-identifying, especially large and/or structured, data. Non-identifying information should be recorded using [annotations](annotations.md).
+We'll eventually index and reverse-index labels for efficient queries and watches, use them to sort and group in UIs and CLIs, etc. We don't want to pollute labels with non-identifying, especially large and/or structured, data. Non-identifying information should be recorded using [annotations](/docs/annotations.md).
