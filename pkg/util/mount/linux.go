@@ -34,23 +34,23 @@ import (
 const FlagBind = syscall.MS_BIND
 const FlagReadOnly = syscall.MS_RDONLY
 
-type mounter struct{}
+type Mounter struct{}
 
 // Wraps syscall.Mount()
-func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (mounter *Mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
 	glog.V(5).Infof("Mounting %s %s %s %d %s", source, target, fstype, flags, data)
 	return syscall.Mount(source, target, fstype, flags, data)
 }
 
 // Wraps syscall.Unmount()
-func (mounter *mounter) Unmount(target string, flags int) error {
+func (mounter *Mounter) Unmount(target string, flags int) error {
 	return syscall.Unmount(target, flags)
 }
 
 // How many times to retry for a consistent read of /proc/mounts.
 const maxListTries = 3
 
-func (mounter *mounter) List() ([]MountPoint, error) {
+func (*Mounter) List() ([]MountPoint, error) {
 	hash1, err := readProcMounts(nil)
 	if err != nil {
 		return nil, err

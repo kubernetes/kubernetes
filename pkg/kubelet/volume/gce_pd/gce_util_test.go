@@ -17,7 +17,10 @@ limitations under the License.
 package gce_pd
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
 func TestGetDeviceName(t *testing.T) {
@@ -50,6 +53,66 @@ func TestGetDeviceName(t *testing.T) {
 		}
 		if name != test.expectedName {
 			t.Errorf("expected: %s, got %s", test.expectedName, name)
+		}
+	}
+}
+
+func TestSafeFormatAndMount(t *testing.T) {
+	tests := []struct {
+		fstype       string
+		expectedArgs []string
+		err          error
+	}{
+		{
+			fstype:       "ext4",
+			expectedArgs: []string{"/dev/foo", "/mnt/bar"},
+		},
+		{
+			fstype:       "vfat",
+			expectedArgs: []string{"-m", "mkfs.vfat", "/dev/foo", "/mnt/bar"},
+		},
+		{
+			err: fmt.Errorf("test error"),
+		},
+	}
+	for _, test := range tests {
+
+		var cmdOut string
+		var argsOut []string
+		fake := exec.FakeExec{
+			CommandScript: []exec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd {
+					cmdOut = cmd
+					argsOut = args
+					fake := exec.FakeCmd{
+						CombinedOutputScript: []exec.FakeCombinedOutputAction{
+							func() ([]byte, error) { return []byte{}, test.err },
+						},
+					}
+					return exec.InitFakeCmd(&fake, cmd, args...)
+				},
+			},
+		}
+
+		mounter := gceSafeFormatAndMount{
+			runner: &fake,
+		}
+
+		err := mounter.Mount("/dev/foo", "/mnt/bar", test.fstype, 0, "")
+		if test.err == nil && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.err != nil {
+			if err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			return
+		}
+		if cmdOut != "/usr/share/google/safe_format_and_mount" {
+			t.Errorf("unexpected command: %s", cmdOut)
+		}
+		if len(argsOut) != len(test.expectedArgs) {
+			t.Errorf("unexpected args: %v, expected: %v", argsOut, test.expectedArgs)
 		}
 	}
 }
