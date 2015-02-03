@@ -19,6 +19,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -82,7 +83,7 @@ func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, string, error) 
 	switch {
 	case o.merge:
 		loadingRules := clientcmd.NewClientConfigLoadingRules()
-		loadingRules.EnvVarPath = ""
+		loadingRules.EnvVarPath = os.Getenv("KUBECONFIG")
 		loadingRules.CommandLinePath = o.pathOptions.specifiedFile
 
 		overrides := &clientcmd.ConfigOverrides{}
