@@ -471,6 +471,11 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
+  
+  # Clean out cruft
+  find _output/release-stage/ -name '*~' -exec rm {} \;
+  find _output/release-stage/ -name '#*#' -exec rm {} \;
+  find _output/release-stage/ -name '.DS*' -exec rm {} \;
 
   kube::release::package_client_tarballs
   kube::release::package_server_tarballs
@@ -629,6 +634,11 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
+
+  # Clean out cruft
+  find ${release_stage} -name '*~' -exec rm {} \;
+  find ${release_stage} -name '#*#' -exec rm {} \;
+  find ${release_stage} -name '.DS*' -exec rm {} \;
 
   local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
