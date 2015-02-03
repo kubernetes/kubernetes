@@ -56,6 +56,11 @@ Kubernetes documentation is organized into several categories.
     - for people who want to contribute code to kubernetes
     - covers development conventions
     - explains current architecture and project plans
+  - ** Service Documentation***
+    - [Service FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
+    - for people who are interested in how Services work
+    - details of ```kube-proxy``` iptables
+    - how to wire services to external internet
   - **Design Documentation**
     - in [docs/design](docs/design)
     - for people who want to understand the design choices made
