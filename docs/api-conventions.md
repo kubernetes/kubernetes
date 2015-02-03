@@ -98,11 +98,7 @@ Kubernetes MAY return two resources from any API endpoint in special circumstanc
 
 A "Status" object SHOULD be returned by an API when an operation is not successful (when the server would return a non 2xx HTTP status code). The status object contains fields for humans and machine consumers of the API to determine failures. The information in the status object supplements, but does not override, the HTTP status code's meaning.
 
-An "Operation" object MAY be returned by any non-GET API if the operation may take a significant amount of time. The name of the Operation may be used to retrieve the final result of an operation at a later time.
-
 TODO: More details (refer to another doc for details)
-
-TODO: Use SelfLink to retrieve operation instead.
 
 
 Synthetic Resources
@@ -127,10 +123,9 @@ Kubernetes by convention exposes additional verbs as new endpoints with singular
 * GET /watch/&lt;resourceNamePlural&gt; - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
 * GET /watch/&lt;resourceNamePlural&gt;/&lt;name&gt; - Receive a stream of JSON objects corresponding to changes made to the named resource of the given kind over time.
 * GET /redirect/&lt;resourceNamePlural&gt;/&lt;name&gt; - If the named resource can be described by a URL, return an HTTP redirect to that URL instead of a JSON response. For example, a service exposes a port and IP address and a client could invoke the redirect verb to receive an HTTP 307 redirection to that port and IP.
+* GET /proxy/&lt;resourceNamePlural&gt;/&lt;name&gt;/{subpath:*} - Proxy GET request to the named resource of the given kind. Can be used for example, to access log files on pods.
 
 Support of additional verbs is not required for all object types.
-
-TODO: document proxy
 
 TODO: more documentation of Watch
 
@@ -229,3 +224,10 @@ Events
 ------
 
 TODO: Document events (refer to another doc for details)
+
+
+API Documentation
+-----------------
+
+API documentation can be found at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+
