@@ -1,0 +1,6 @@
+#!/bin/bash
+set -ex
+if [ ! -d ${SRC}/themes ]; then
+    ln -s /themes ${SRC}/themes
+fi
+hugo $(eval echo $*) # force default CMD env expansion
