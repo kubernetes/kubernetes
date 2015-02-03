@@ -155,28 +155,22 @@ var _ = Describe("Pods", func() {
 	It("should contain environment variables for services", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
-		serverPod := parsePodOrDie(`{
-		  "kind": "Pod",
-		  "apiVersion": "v1beta1",
-		  "id": "srv",
-		  "desiredState": {
-			"manifest": {
-			  "version": "v1beta1",
-			  "id": "srv",
-			  "containers": [{
-				"name": "srv",
-				"image": "kubernetes/serve_hostname",
-				"ports": [{
-				  "containerPort": 9376,
-				  "hostPort": 8080
-				}]
-			  }]
-			}
-		  },
-		  "labels": {
-			"name": "srv"
-		  }
-		}`)
+		serverName := "server-envvars-" + string(util.NewUUID())
+		serverPod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   serverName,
+				Labels: map[string]string{"name": serverName},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "srv",
+						Image: "kubernetes/serve_hostname",
+						Ports: []api.Port{{ContainerPort: 9376, HostPort: 8080}},
+					},
+				},
+			},
+		}
 		_, err := c.Pods(api.NamespaceDefault).Create(serverPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
@@ -187,19 +181,28 @@ var _ = Describe("Pods", func() {
 		}()
 		waitForPodRunning(c, serverPod.Name)
 
-		// This service exposes pod p's port 8080 as a service on port 8765
-		svc := parseServiceOrDie(`{
-		  "id": "fooservice",
-		  "kind": "Service",
-		  "apiVersion": "v1beta1",
-		  "port": 8765,
-		  "containerPort": 8080,
-		  "selector": {
-			"name": "p"
-		  }
-		}`)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to delete service: %v", err))
+		// This service exposes port 8080 of the test pod as a service on port 8765
+		// TODO(filbranden): We would like to use a unique service name such as:
+		//   svcName := "svc-envvars-" + randomSuffix()
+		// However, that affects the name of the environment variables which are the capitalized
+		// service name, so that breaks this test.  One possibility is to tweak the variable names
+		// to match the service.  Another is to rethink environment variable names and possibly
+		// allow overriding the prefix in the service manifest.
+		svcName := "fooservice"
+		svc := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: svcName,
+				Labels: map[string]string{
+					"name": svcName,
+				},
+			},
+			Spec: api.ServiceSpec{
+				Port:          8765,
+				ContainerPort: util.NewIntOrStringFromInt(8080),
+				Selector: map[string]string{
+					"name": serverName,
+				},
+			},
 		}
 		time.Sleep(2)
 		_, err = c.Services(api.NamespaceDefault).Create(svc)
@@ -214,24 +217,25 @@ var _ = Describe("Pods", func() {
 		// TODO: we don't have a way to wait for a service to be "running".  // If this proves flaky, then we will need to retry the clientPod or insert a sleep.
 
 		// Make a client pod that verifies that it has the service environment variables.
-		clientPod := parsePodOrDie(`{
-		  "apiVersion": "v1beta1",
-		  "kind": "Pod",
-		  "id": "env3",
-		  "desiredState": {
-			"manifest": {
-			  "version": "v1beta1",
-			  "id": "env3",
-			  "restartPolicy": { "never": {} },
-			  "containers": [{
-				"name": "env3cont",
-				"image": "busybox",
-				"command": ["sh", "-c", "env"]
-			  }]
-			}
-		  },
-		  "labels": { "name": "env3" }
-		}`)
+		clientName := "client-envvars-" + string(util.NewUUID())
+		clientPod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   clientName,
+				Labels: map[string]string{"name": clientName},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "env3cont",
+						Image:   "busybox",
+						Command: []string{"sh", "-c", "env"},
+					},
+				},
+				RestartPolicy: api.RestartPolicy{
+					Never: &api.RestartPolicyNever{},
+				},
+			},
+		}
 		_, err = c.Pods(api.NamespaceDefault).Create(clientPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
