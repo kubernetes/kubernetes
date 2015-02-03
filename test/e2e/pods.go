@@ -42,12 +42,36 @@ var _ = Describe("Pods", func() {
 	It("should be submitted and removed", func() {
 		podClient := c.Pods(api.NamespaceDefault)
 
-		By("loading the pod json")
-		pod := loadPodOrDie(assetPath("api", "examples", "pod.json"))
+		By("creating the pod")
+		name := "pod-update-" + string(util.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
-		pod.Name = pod.Name + "-" + randomSuffix()
-		pod.Labels["time"] = value
-		pod.Spec.Containers[0].Ports[0].HostPort = 0
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": "foo",
+					"time": value,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "dockerfile/nginx",
+						Ports: []api.Port{{ContainerPort: 80}},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/index.html",
+									Port: util.NewIntOrStringFromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 30,
+						},
+					},
+				},
+			},
+		}
 
 		By("submitting the pod to kubernetes")
 		_, err := podClient.Create(pod)
