@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -32,6 +33,17 @@ func TestNetwork(c *client.Client) bool {
 	if testContext.provider == "vagrant" {
 		glog.Infof("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 		return true
+	}
+
+	// Test basic external connectivity.
+	resp, err := http.Get("http://google.com/")
+	if err != nil {
+		glog.Errorf("unable to talk to the external internet: %v", err)
+		return false
+	}
+	if resp.StatusCode != http.StatusOK {
+		glog.Errorf("unexpected error code. expected 200, got: %v (%v)", resp.StatusCode, resp)
+		return false
 	}
 
 	ns := api.NamespaceDefault
