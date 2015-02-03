@@ -23,14 +23,25 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/http"
+	"time"
 
-	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/standalone"
+	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	kubeletServer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -47,15 +58,89 @@ var (
 	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 )
 
+type delegateHandler struct {
+	delegate http.Handler
+}
+
+func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if h.delegate != nil {
+		h.delegate.ServeHTTP(w, req)
+		return
+	}
+	w.WriteHeader(http.StatusNotFound)
+}
+
+// RunApiServer starts an API server in a go routine.
+func runApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
+	handler := delegateHandler{}
+
+	helper, err := master.NewEtcdHelper(etcdClient, "")
+	if err != nil {
+		glog.Fatalf("Unable to get etcd helper: %v", err)
+	}
+
+	// Create a master and install handlers into mux.
+	m := master.New(&master.Config{
+		Client:     cl,
+		EtcdHelper: helper,
+		KubeletClient: &client.HTTPKubeletClient{
+			Client: http.DefaultClient,
+			Port:   10250,
+		},
+		EnableLogsSupport:    false,
+		EnableSwaggerSupport: true,
+		APIPrefix:            "/api",
+		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
+
+		ReadWritePort:          port,
+		ReadOnlyPort:           port,
+		PublicAddress:          addr,
+		MasterServiceNamespace: masterServiceNamespace,
+	})
+	handler.delegate = m.InsecureHandler
+
+	go http.ListenAndServe(fmt.Sprintf("%s:%d", addr, port), &handler)
+}
+
+// RunScheduler starts up a scheduler in it's own goroutine
+func runScheduler(cl *client.Client) {
+	// Scheduler
+	schedulerConfigFactory := factory.NewConfigFactory(cl)
+	schedulerConfig, err := schedulerConfigFactory.Create()
+	if err != nil {
+		glog.Fatalf("Couldn't create scheduler config: %v", err)
+	}
+	scheduler.New(schedulerConfig).Run()
+}
+
+// RunControllerManager starts a controller
+func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int64) {
+	nodeResources := &api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(nodeMilliCPU, resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
+		},
+	}
+	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, kubeClient)
+	nodeController.Run(10*time.Second, 10)
+
+	endpoints := service.NewEndpointController(cl)
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+
+	controllerManager := controller.NewReplicationManager(cl)
+	controllerManager.Run(10 * time.Second)
+}
+
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
 	machineList := []string{"localhost"}
 
-	standalone.RunApiServer(cl, etcdClient, addr, port, *masterServiceNamespace)
-	standalone.RunScheduler(cl)
-	standalone.RunControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
+	runApiServer(cl, etcdClient, addr, port, *masterServiceNamespace)
+	runScheduler(cl)
+	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
 	dockerClient := util.ConnectToDockerOrDie(*dockerEndpoint)
-	standalone.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins())
+	kubeletServer.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletServer.ProbeVolumePlugins())
 }
 
 func newApiClient(addr net.IP, port int) *client.Client {

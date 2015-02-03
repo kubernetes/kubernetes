@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package server
 
 // This file exists to force the desired plugin implementations to be linked.
 import (
@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
 )
 
+// ProbeVolumePlugins collects all volume plugins into an easy to use list.
 func ProbeVolumePlugins() []volume.Plugin {
 	allPlugins := []volume.Plugin{}
 
