@@ -57,7 +57,6 @@ var (
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
 
-	cfgCmd = flag.String("cfg", "", "If nonempty, pass this as an argument, and call kubecfg. Implies -v.")
 	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
 )
 
@@ -164,8 +163,6 @@ func main() {
 
 	failure := false
 	switch {
-	case *cfgCmd != "":
-		failure = !runBash("'kubecfg "+*cfgCmd+"'", "$KUBECFG "+*cfgCmd)
 	case *ctlCmd != "":
 		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
 	case *tests != "":
@@ -537,15 +534,6 @@ func printPrefixedLines(prefix, s string) {
 }
 
 // returns either "", or a list of args intended for appending with the
-// kubecfg or kubectl commands (begining with a space).
-func kubecfgArgs() string {
-	if *checkVersionSkew {
-		return " -expect_version_match"
-	}
-	return ""
-}
-
-// returns either "", or a list of args intended for appending with the
 // kubectl command (begining with a space).
 func kubectlArgs() string {
 	if *checkVersionSkew {
@@ -564,7 +552,6 @@ export KUBE_CONFIG_FILE="config-test.sh"
 
 # TODO(jbeda): This will break on usage if there is a space in
 # ${KUBE_ROOT}.  Convert to an array?  Or an exported function?
-export KUBECFG="` + versionRoot + `/cluster/kubecfg.sh` + kubecfgArgs() + `"
 export KUBECTL="` + versionRoot + `/cluster/kubectl.sh` + kubectlArgs() + `"
 
 source "` + *root + `/cluster/kube-env.sh"

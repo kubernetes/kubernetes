@@ -29,23 +29,21 @@ source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
 # Launch the guestbook example
-$KUBECFG -c "${GUESTBOOK}/redis-master.json" create /pods
-$KUBECFG -c "${GUESTBOOK}/redis-master-service.json" create /services
-$KUBECFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
+${KUBECTL} create -f  "${GUESTBOOK}"
 
-sleep 5
+sleep 15
 
-POD_LIST_1=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
+POD_LIST_1=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
 echo "Pods running: ${POD_LIST_1}"
 
-$KUBECFG stop redis-slave-controller
-# Needed until issue #103 gets fixed
-sleep 25
-$KUBECFG rm redis-slave-controller
-$KUBECFG delete services/redis-master
-$KUBECFG delete pods/redis-master
+# TODO make this an actual test. Open up a firewall and use curl to post and
+# read a message via the frontend
 
-POD_LIST_2=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
+${KUBECTL} stop rc redis-slave-controller
+${KUBECTL} delete services redis-master
+${KUBECTL} delete pods redis-master
+
+POD_LIST_2=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
 echo "Pods running after shutdown: ${POD_LIST_2}"
 
 exit 0

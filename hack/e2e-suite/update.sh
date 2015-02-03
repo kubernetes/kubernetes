@@ -53,7 +53,7 @@ function validate() {
     for id in "${pod_id_list[@]+${pod_id_list[@]}}"; do
       local template_string current_status current_image host_ip
 
-      # NB: kubectl & kubecfg add the "exists" function to the standard template functions.
+      # NB: kubectl adds the "exists" function to the standard template functions.
       # This lets us check to see if the "running" entry exists for each of the containers
       # we care about. Exists will never return an error and it's safe to check a chain of
       # things, any one of which may not exist. In the below template, all of info,

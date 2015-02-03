@@ -37,12 +37,12 @@ fi
 function teardown() {
   echo "Cleaning up test artifacts"
   for test in ${liveness_tests}; do
-    ${KUBECFG} delete pods/liveness-${test}
+    ${KUBECTL} delete pods liveness-${test}
   done
 }
 
 function waitForNotPending() {
-  pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=liveness list pods)
+  pod_id_list=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}' -l test=liveness)
   # Pod turn up on a clean cluster can take a while for the docker image pull.
   all_running=0
   for i in $(seq 1 24); do
@@ -50,7 +50,7 @@ function waitForNotPending() {
     sleep 5
     all_running=1
     for id in $pod_id_list; do
-      current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+      current_status=$(${KUBECTL} get pods $id -o template '--template={{.currentState.status}}') || true
       if [[ "$current_status" == "Pending" ]]; then
         all_running=0
         break
@@ -70,18 +70,18 @@ trap "teardown" EXIT
 
 for test in ${liveness_tests}; do
   echo "Liveness test: ${test}"
-  ${KUBECFG} -c ${KUBE_ROOT}/examples/liveness/${test}-liveness.yaml create pods
+  ${KUBECTL} create -f ${KUBE_ROOT}/examples/liveness/${test}-liveness.yaml
   waitForNotPending
 
-  before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+  before=$(${KUBECTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
   while [[ "${before}" == "<no value>" ]]; do
-    before=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+    before=$(${KUBECTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
   done
-  
+
   echo "Waiting for restarts."
   for i in $(seq 1 24); do
-    sleep 10 
-    after=$(${KUBECFG} '-template={{.currentState.info.liveness.restartCount}}' get pods/liveness-${test})
+    sleep 10
+    after=$(${KUBECTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
     echo "Restarts: ${after} > ${before}"
     if [[ "${after}" == "<no value>" ]]; then
       continue

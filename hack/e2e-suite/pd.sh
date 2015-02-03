@@ -35,13 +35,13 @@ config="/tmp/${disk_name}.yaml"
 
 function delete_pd_pod() {
   # Delete the pod this should unmount the PD
-  ${KUBECFG} delete pods/testpd
+  ${KUBECTL} delete pods testpd
   for i in $(seq 1 30); do
     echo "Waiting for pod to be deleted."
     sleep 5
     all_running=0
     for id in $pod_id_list; do
-      current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+      current_status=$(${KUBECTL} get pods $id -o template '--template={{.currentState.status}}') || true
       if [[ "$current_status" == "Running" ]]; then
         all_running=1
         break
@@ -99,17 +99,17 @@ perl -p -e "s/%.*%/${disk_name}/g" ${KUBE_ROOT}/examples/gce-pd/testpd.yaml > ${
 # Create and format the disk.
 "${GCLOUD}" compute disks create --zone="${ZONE}" --size=10GB "${disk_name}"
 "${GCLOUD}" compute instances attach-disk --zone="${ZONE}" --disk="${disk_name}" \
-  --device-name temp-data "${MASTER_NAME}"
+  --device-name tempdata "${MASTER_NAME}"
 "${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo rm -rf /mnt/tmp"
 "${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo mkdir -p /mnt/tmp"
-"${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
+"${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-tempdata /mnt/tmp"
 "${GCLOUD}" compute ssh --zone="${ZONE}" "${MASTER_NAME}" --command "sudo umount /mnt/tmp"
 "${GCLOUD}" compute instances detach-disk --zone="${ZONE}" --disk "${disk_name}" "${MASTER_NAME}"
 
 # Create a pod that uses the PD
-${KUBECFG} -c ${config} create pods
+${KUBECTL} create -f ${config}
 
-pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=testpd list pods)
+pod_id_list=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}' -l test=testpd)
 # Pod turn up on a clean cluster can take a while for the docker image
 # pull, and even longer if the PD mount takes a bit.
 all_running=0
@@ -118,7 +118,7 @@ for i in $(seq 1 30); do
   sleep 5
   all_running=1
   for id in $pod_id_list; do
-    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+    current_status=$(${KUBECTL} get pods $id -o template '--template={{.currentState.status}}') || true
     if [[ "$current_status" != "Running" ]]; then
       all_running=0
       break
@@ -141,9 +141,9 @@ sleep 20
 
 
 # Recreate the pod, this should re-mount the PD
-${KUBECFG} -c ${config} create pods
+${KUBECTL} create -f ${config}
 
-pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l test=testpd list pods)
+pod_id_list=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}' -l test=testpd)
 # Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
 for i in $(seq 1 30); do
@@ -151,7 +151,7 @@ for i in $(seq 1 30); do
   sleep 5
   all_running=1
   for id in $pod_id_list; do
-    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
+    current_status=$(${KUBECTL} get pods $id -o template '--template={{.currentState.status}}') || true
     if [[ "$current_status" != "Running" ]]; then
       all_running=0
       break

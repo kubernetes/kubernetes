@@ -28,7 +28,6 @@ source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 MONITORING="${KUBE_ROOT}/cluster/addons/cluster-monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-KUBECFG="${KUBE_ROOT}/cluster/kubecfg.sh"
 BIGRAND=$(printf "%x\n" $(( $RANDOM << 16 | $RANDOM ))) # random 2^32 in hex
 MONITORING_FIREWALL_RULE="monitoring-test-${BIGRAND}"
 
@@ -49,13 +48,9 @@ function setup {
 }
 
 function cleanup {
-  "${KUBECFG}" resize monitoring-influx-grafana-controller 0 &> /dev/null || true
-  "${KUBECFG}" resize monitoring-heapster-controller 0 &> /dev/null || true
-  while "${KUBECTL}" get pods -l "name=influxGrafana" -o template -t {{range.items}}{{.id}}:{{end}} | grep -c . &> /dev/null \
-    || "${KUBECTL}" get pods -l "name=heapster" -o template -t {{range.items}}{{.id}}:{{end}} | grep -c . &> /dev/null; do
-    sleep 2
-  done
-  "${KUBECTL}" delete -f "${MONITORING}/" &> /dev/null || true
+  "${KUBECTL}" stop rc monitoring-influx-grafana-controller &> /dev/null || true
+  "${KUBECTL}" stop rc monitoring-heapster-controller &> /dev/null || true
+r "${KUBECTL}" delete -f "${MONITORING}/" &> /dev/null || true
 
   # This only has work to do on gce and gke
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then

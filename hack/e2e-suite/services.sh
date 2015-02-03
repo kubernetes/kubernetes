@@ -135,9 +135,8 @@ __EOF__
 #   $1: service name
 function stop_service() {
   echo "Stopping service '$1'"
-  ${KUBECFG} stop "$1" || true
-  ${KUBECFG} delete "/replicationControllers/$1" || true
-  ${KUBECFG} delete "/services/$1" || true
+  ${KUBECTL} stop rc "$1" || true
+  ${KUBECTL} delete services "$1" || true
 }
 
 # Args:
@@ -309,9 +308,9 @@ svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
 # Get the portal IPs.
-svc1_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc1_name}")
+svc1_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc1_name}")
 test -n "${svc1_ip}" || error "Service1 IP is blank"
-svc2_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc2_name}")
+svc2_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc2_name}")
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
   error "Portal IPs conflict: ${svc1_ip}"
@@ -381,7 +380,7 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
 # Get the portal IP.
-svc3_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc3_name}")
+svc3_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc3_name}")
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 
 echo "Verifying the portals from the host"
@@ -437,7 +436,7 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
 # Get the portal IP.
-svc4_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc4_name}")
+svc4_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc4_name}")
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
   error "Portal IPs conflict: ${svc4_ip}"
