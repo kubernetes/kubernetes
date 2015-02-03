@@ -89,17 +89,18 @@ If you specify a Go template, you can use any fields defined for the API version
 you are connecting to the server with.
 
 Examples:
-  $ kubectl get pods
-  <list all pods in ps output format>
 
-  $ kubectl get replicationController 1234-56-7890-234234-456456
-  <list single replication controller in ps output format>
+    # list all pods in ps output format
+    $ kubectl get pods
 
-  $ kubectl get -o json pod 1234-56-7890-234234-456456
-  <list single pod in json output format>
+    # list single replication controller in ps output format
+    $ kubectl get replicationController 1234-56-7890-234234-456456
 
-  $ kubectl get rc,services
-  <list replication controllers and services together in ps output format>
+    # list single pod in json output format
+    $ kubectl get -o json pod 1234-56-7890-234234-456456
+
+    # list replication controllers and services together in ps output format
+    $ kubectl get rc,services
 
 Usage:
 ```
@@ -185,11 +186,12 @@ Create a resource by filename or stdin.
 JSON and YAML formats are accepted.
 
 Examples:
-  $ kubectl create -f pod.json
-  <create a pod using the data in pod.json>
 
-  $ cat pod.json | kubectl create -f -
-  <create a pod based on the json passed into stdin>
+    # create a pod using the data in pod.json
+    $ kubectl create -f pod.json
+
+    # create a pod based on the json passed into stdin
+    $ cat pod.json | kubectl create -f -
 
 Usage:
 ```
@@ -231,14 +233,15 @@ Update a resource by filename or stdin.
 JSON and YAML formats are accepted.
 
 Examples:
-  $ kubectl update -f pod.json
-  <update a pod using the data in pod.json>
 
-  $ cat pod.json | kubectl update -f -
-  <update a pod based on the json passed into stdin>
-  
-  $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
-  <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>
+    # update a pod using the data in pod.json
+    $ kubectl update -f pod.json
+
+    # update a pod based on the json passed into stdin
+    $ cat pod.json | kubectl update -f -
+
+    # update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified  
+    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
 
 Usage:
 ```
@@ -288,17 +291,18 @@ submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.
 
 Examples:
-  $ kubectl delete -f pod.json
-  <delete a pod using the type and id pod.json>
 
-  $ cat pod.json | kubectl delete -f -
-  <delete a pod based on the type and id in the json passed into stdin>
+    # delete a pod using the type and id pod.json
+    $ kubectl delete -f pod.json
 
-  $ kubectl delete pods,services -l name=myLabel
-  <delete pods and services with label name=myLabel>
+    # delete a pod based on the type and id in the json passed into stdin
+    $ cat pod.json | kubectl delete -f -
 
-  $ kubectl delete pod 1234-56-7890-234234-456456
-  <delete a pod with ID 1234-56-7890-234234-456456>
+    # delete pods and services with label name=myLabel
+    $ kubectl delete pods,services -l name=myLabel
+
+    # delete a pod with ID 1234-56-7890-234234-456456
+    $ kubectl delete pod 1234-56-7890-234234-456456
 
 Usage:
 ```
@@ -336,7 +340,7 @@ Usage:
 ```
 
 #### config
-config modifies .kubeconfig files using subcommands like "kubectl config set current-context my-context"
+config modifies .kubeconfig files using subcommands like `kubectl config set current-context my-context`
 
 Usage:
 ```
@@ -439,12 +443,12 @@ Usage:
 ```
 
 #### config set-cluster
-Sets a cluster entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
-		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/.kubernetes.ca.cert
-		only sets the certificate-authority field on the e2e cluster entry without touching other values.
-		
+Sets a cluster entry in .kubeconfig. Specifying a name that already exists will merge new fields on top of existing values for those fields.
+
+Example:
+
+    # only sets the certificate-authority field on the e2e cluster entry without touching other values
+  	$ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/.kubernetes.ca.cert
 
 Usage:
 ```
@@ -482,12 +486,12 @@ Usage:
 ```
 
 #### config set-credentials
-Sets a user entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
-		kubectl config set-credentials cluster-admin --client-key=~/.kube/cluster-admin/.kubecfg.key
-		only sets the client-key field on the cluster-admin user entry without touching other values.
-		
+Sets a user entry in .kubeconfig. Specifying a name that already exists will merge new fields on top of existing values for those fields.
+
+Example:
+
+    # only sets the client-key field on the cluster-admin user entry without touching other values
+  	$ kubectl config set-credentials cluster-admin --client-key=~/.kube/cluster-admin/.kubecfg.key
 
 Usage:
 ```
@@ -525,12 +529,12 @@ Usage:
 ```
 
 #### config set-context
-Sets a context entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
-		kubectl config set-context gce --user=cluster-admin
-		only sets the user field on the gce context entry without touching other values.
-		
+Sets a context entry in .kubeconfig. Specifying a name that already exists will merge new fields on top of existing values for those fields.
+
+Example:
+  
+    # only sets the user field on the gce context entry without touching other values
+  	$ kubectl config set-context gce --user=cluster-admin
 
 Usage:
 ```
@@ -568,12 +572,7 @@ Usage:
 ```
 
 #### config set
-Sets an individual value in a .kubeconfig file
-
-		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-		property-value is the new value you wish to set.
-
-		
+Sets an individual value in a .kubeconfig file. `property-name` is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots. `property-value` is the new value you wish to set.	
 
 Usage:
 ```
@@ -611,10 +610,7 @@ Usage:
 ```
 
 #### config unset
-Unsets an individual value in a .kubeconfig file
-
-		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-		
+Unsets an individual value in a .kubeconfig file. `property-name` is a dot delimited name where each token represents either a attribute name or a map key. Map keys may not contain dots.
 
 Usage:
 ```
@@ -690,16 +686,15 @@ Usage:
 ```
 
 #### namespace
-Set and view the current Kubernetes namespace scope for command line requests.
-
-A Kubernetes namespace subdivides the cluster into groups of logically related pods, services, and replication controllers.
+Set and view the current Kubernetes namespace scope for command line requests. A Kubernetes namespace subdivides the cluster into groups of logically related pods, services, and replication controllers.
 
 Examples:
-  $ kubectl namespace 
-  Using namespace default
 
-  $ kubectl namespace other
-  Set current namespace to other
+    # Using namespace default
+    $ kubectl namespace 
+
+    # Set current namespace to other
+    $ kubectl namespace other
 
 Usage:
 ```
@@ -734,13 +729,15 @@ Usage:
 ```
 
 #### log
-Print the logs for a container in a pod. If the pod has only one container, the container name is optional
-Examples:
-  $ kubectl log 123456-7890 ruby-container
-  <returns snapshot of ruby-container logs from pod 123456-7890>
+Print the logs for a container in a pod. If the pod has only one container, the container name will be optional.
 
-  $ kubectl log -f 123456-7890 ruby-container
-  <starts streaming of ruby-container logs from pod 123456-7890>
+Examples:
+
+    # returns snapshot of ruby-container logs from pod 123456-7890
+    $ kubectl log 123456-7890 ruby-container
+
+    # starts streaming of ruby-container logs from pod 123456-7890
+    $ kubectl log -f 123456-7890 ruby-container
 
 Usage:
 ```
@@ -784,11 +781,12 @@ new PodTemplate. The new-controller.json must specify the same namespace as the
 existing controller and overwrite at least one (common) label in its replicaSelector.
 
 Examples:
-$ kubectl rollingupdate frontend-v1 -f frontend-v2.json
-  <update pods of frontend-v1 using new controller data in frontend-v2.json>
 
-$ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
-  <update pods of frontend-v1 using json data passed into stdin>
+    # update pods of frontend-v1 using new controller data in frontend-v2.json
+    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
+
+    # update pods of frontend-v1 using json data passed into stdin    
+    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 
 Usage:
 ```
@@ -837,12 +835,12 @@ If a precondition is specified, it is validated before the resize is attempted, 
 guaranteed that the precondition holds true when the resize is sent to the server.
 
 Examples:
-  $ kubectl resize --replicas=3 replicationcontrollers foo
-  resized
 
-  # will only execute if the current size is 2
-  $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
+    # resized
+    $ kubectl resize --replicas=3 replicationcontrollers foo
 
+    # will only execute if the current size is 2
+    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 
 Usage:
 ```
@@ -885,17 +883,18 @@ Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s)
 
 Examples:
-  $ kubectl run-container nginx --image=dockerfile/nginx
-  <starts a single instance of nginx>
 
-  $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
-  <starts a replicated instance of nginx>
+    # starts a single instance of nginx
+    $ kubectl run-container nginx --image=dockerfile/nginx
 
-  $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
-  <just print the corresponding API objects, don't actually send them to the apiserver>
-  
-  $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
-  <start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON
+    # starts a replicated instance of nginx
+    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
+
+    # just print the corresponding API objects, don't actually send them to the apiserver
+    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
+    
+    # start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON
+    $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
 
 Usage:
 ```
@@ -947,9 +946,9 @@ Attempts to shutdown and delete a resource that supports graceful termination.
 If the resource is resizable it will be resized to 0 before deletion.
 
 Examples:
-  $ kubectl stop replicationcontroller foo
-  foo stopped
-
+  
+    # foo stopped
+    $ kubectl stop replicationcontroller foo
 
 Usage:
 ```
@@ -982,4 +981,3 @@ Usage:
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
 
 ```
-
