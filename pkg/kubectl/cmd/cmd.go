@@ -212,6 +212,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 
 	cmds.AddCommand(f.NewCmdRunContainer(out))
 	cmds.AddCommand(f.NewCmdStop(out))
+	cmds.AddCommand(f.NewCmdExposeService(out))
 
 	return cmds
 }

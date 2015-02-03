@@ -395,6 +395,7 @@ Additional help topics:
   kubectl resize        Set a new size for a resizable resource (currently only Replication Controllers)
   kubectl run-container Run a particular image on the cluster.
   kubectl stop          Gracefully shutdown a resource
+  kubectl expose        Take a replicated application and expose it as Kubernetes Service
 
 Use "kubectl help [command]" for more information about that command.
 ```
@@ -899,7 +900,7 @@ Examples:
 
 Usage:
 ```
-  kubectl run-container <name> --image=<image> [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>] [flags]
+  kubectl run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>] [flags]
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -911,12 +912,12 @@ Usage:
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
       --dry-run=false: If true, only print the object that would be sent, don't actually do anything
-      --generator="run-container/v1": The name of the api generator that you want to use.  Default 'run-container-controller-v1'
+      --generator="run-container/v1": The name of the api generator that you want to use.  Default 'run-container-controller/v1'
   -h, --help=false: help for run-container
       --image="": The image for the container you wish to run.
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
-  -l, --labels="": Labels to apply to the pod(s) created by this call to run.
+  -l, --labels="": Labels to apply to the pod(s) created by this call to run-container.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -928,6 +929,7 @@ Usage:
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
       --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.
+      --port=-1: The port that this container exposes.
   -r, --replicas=1: Number of replicas to create for this container. Default 1
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -975,6 +977,67 @@ Usage:
       --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
+      --token="": Bearer token for authentication to the API server.
+      --user="": The name of the kubeconfig user to use
+      --v=0: log level for V logs
+      --validate=false: If true, use a schema to validate the input before sending it
+      --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
+
+```
+
+#### expose
+Take a replicated application and expose it as Kubernetes Service.
+		
+Looks up a ReplicationController named <name>, and uses the selector for that replication controller
+as the selector for a new Service which services on <port>
+
+Examples:
+$ kubectl expose nginx --port=80 --container-port=8000
+<creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000>
+
+$ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
+<create a service for a replicated streaming application on port 4100 balancing UDP traffic and is named 'video-stream'>
+
+
+Usage:
+```
+  kubectl expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer] [flags]
+
+ Available Flags:
+      --alsologtostderr=false: log to standard error as well as files
+      --api-version="": The API version to use when talking to the server
+  -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
+      --certificate-authority="": Path to a cert. file for the certificate authority.
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
+      --cluster="": The name of the kubeconfig cluster to use
+      --container-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
+      --context="": The name of the kubeconfig context to use
+      --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default false
+      --dry-run=false: If true, only print the object that would be sent, don't actually do anything
+      --generator="service/v1": The name of the api generator that you want to use.  Default 'service/v1'
+  -h, --help=false: help for expose
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
+      --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
+      --log_dir=: If non-empty, write log files in this directory
+      --log_flush_frequency=5s: Maximum number of seconds between log flushes
+      --logtostderr=true: log to standard error instead of files
+      --match-server-version=false: Require server version to match client version
+      --namespace="": If present, the namespace scope for this CLI request.
+      --no-headers=false: When using the default output, don't print headers
+      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
+  -o, --output="": Output format: json|yaml|template|templatefile
+      --output-version="": Output the formatted object with the given version (default api-version)
+      --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.
+      --port=-1: The port that the service should serve on. Required.
+      --protocol="TCP": The network protocol for the service you want to be created. Default 'tcp'
+      --public-ip="": Name of a public ip address to set for the service.  The service will be assigned this IP in addition to its generated service IP.
+      --selector="": A label selector to use for this service.  If empty (the default) infer the selector from the replication controller
+  -s, --server="": The address of the Kubernetes API server
+      --service-name="": The name for the newly created service.
+      --stderrthreshold=2: logs at or above this threshold go to stderr
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
