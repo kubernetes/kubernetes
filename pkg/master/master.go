@@ -141,7 +141,6 @@ type Master struct {
 	admissionControl      admission.Interface
 	masterCount           int
 	v1beta3               bool
-	nodeIPCache           IPGetter
 
 	publicIP             net.IP
 	publicReadOnlyPort   int
@@ -295,7 +294,6 @@ func New(c *Config) *Master {
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
 		v1beta3:               c.EnableV1Beta3,
-		nodeIPCache:           NewIPCache(c.Cloud, util.RealClock{}, c.CacheTimeout),
 
 		cacheTimeout: c.CacheTimeout,
 
@@ -374,7 +372,6 @@ func (m *Master) init(c *Config) {
 
 	nodeRESTStorage := minion.NewREST(m.minionRegistry)
 	podCache := NewPodCache(
-		m.nodeIPCache,
 		c.KubeletClient,
 		RESTStorageToNodes(nodeRESTStorage).Nodes(),
 		m.podRegistry,
