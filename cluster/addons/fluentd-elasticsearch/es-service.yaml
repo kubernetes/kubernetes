@@ -3,6 +3,8 @@ kind: Service
 id: elasticsearch-logging
 containerPort: es-port
 port: 9200
+labels:
+  name: elasticsearch-logging
 selector:
   name: elasticsearch-logging
 createExternalLoadBalancer: true
