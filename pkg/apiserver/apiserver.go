@@ -129,7 +129,6 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 
 	mapping, err := mapper.RESTMapping(kind, version)
 	if err != nil {
-		glog.V(1).Infof("OH NOES kind %s version %s err: %v", kind, version, err)
 		return err
 	}
 
@@ -240,7 +239,6 @@ func registerResourceHandlers(ws *restful.WebService, version string, path strin
 	// See github.com/emicklei/go-restful/blob/master/jsr311.go for routing logic
 	// and status-code behavior
 	for path, verbs := range pathToVerbs {
-		glog.V(5).Infof("Installing version=/%s, kind=/%s, path=/%s", version, kind, path)
 
 		params := pathToParam[path]
 		for _, verb := range verbs {
