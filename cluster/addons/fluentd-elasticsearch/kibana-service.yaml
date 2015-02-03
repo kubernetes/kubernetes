@@ -3,7 +3,8 @@ kind: Service
 id: kibana-logging
 containerPort: kibana-port
 port: 5601
+labels:
+  name: kibana-logging
 selector:
   name: kibana-logging
 createExternalLoadBalancer: true
- 
