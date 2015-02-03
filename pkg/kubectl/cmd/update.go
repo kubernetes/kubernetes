@@ -85,6 +85,7 @@ Examples:
 				})
 				checkErr(err)
 			} else {
+				// TODO: Make patching work with -f, updating with patched JSON input files
 				name := updateWithPatch(cmd, args, f, patch)
 				fmt.Fprintf(out, "%s\n", name)
 			}
