@@ -185,6 +185,10 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, nil
 	}
 
+	if redirect := resp.Header.Get("Location"); redirect != "" {
+		resp.Header.Set("Location", t.rewriteURL(redirect, req.URL))
+	}
+
 	cType := resp.Header.Get("Content-Type")
 	cType = strings.TrimSpace(strings.SplitN(cType, ";", 2)[0])
 	if cType != "text/html" {
@@ -193,6 +197,38 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	return t.fixLinks(req, resp)
+}
+
+// rewriteURL rewrites a single URL to go through the proxy, if the URL refers
+// to the same host as sourceURL, which is the page on which the target URL
+// occurred. If any error occurs (e.g. parsing), it returns targetURL.
+func (t *proxyTransport) rewriteURL(targetURL string, sourceURL *url.URL) string {
+	url, err := url.Parse(targetURL)
+	if err != nil {
+		return targetURL
+	}
+	if url.Host != "" && url.Host != sourceURL.Host {
+		return targetURL
+	}
+
+	url.Scheme = t.proxyScheme
+	url.Host = t.proxyHost
+	origPath := url.Path
+
+	if strings.HasPrefix(url.Path, "/") {
+		// The path is rooted at the host. Just add proxy prepend.
+		url.Path = path.Join(t.proxyPathPrepend, url.Path)
+	} else {
+		// The path is relative to sourceURL.
+		url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path)
+	}
+
+	if strings.HasSuffix(origPath, "/") {
+		// Add back the trailing slash, which was stripped by path.Join().
+		url.Path += "/"
+	}
+
+	return url.String()
 }
 
 // updateURLs checks and updates any of n's attributes that are listed in tagsToAttrs.
@@ -212,32 +248,7 @@ func (t *proxyTransport) updateURLs(n *html.Node, sourceURL *url.URL) {
 		if !attrs.Has(attr.Key) {
 			continue
 		}
-		url, err := url.Parse(attr.Val)
-		if err != nil {
-			continue
-		}
-
-		// Is this URL referring to the same host as sourceURL?
-		if url.Host == "" || url.Host == sourceURL.Host {
-			url.Scheme = t.proxyScheme
-			url.Host = t.proxyHost
-			origPath := url.Path
-
-			if strings.HasPrefix(url.Path, "/") {
-				// The path is rooted at the host. Just add proxy prepend.
-				url.Path = path.Join(t.proxyPathPrepend, url.Path)
-			} else {
-				// The path is relative to sourceURL.
-				url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path)
-			}
-
-			if strings.HasSuffix(origPath, "/") {
-				// Add back the trailing slash, which was stripped by path.Join().
-				url.Path += "/"
-			}
-
-			n.Attr[i].Val = url.String()
-		}
+		n.Attr[i].Val = t.rewriteURL(attr.Val, sourceURL)
 	}
 }
 
