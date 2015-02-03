@@ -27,15 +27,16 @@ import (
 func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop <resource> <id>",
-		Short: "Gracefully shutdown a resource",
-		Long: `Gracefully shutdown a resource
+		Short: "Gracefully shut down a resource.",
+		Long: `Gracefully shut down a resource.
 
-Attempts to shutdown and delete a resource that supports graceful termination.
+Attempts to shut down and delete a resource that supports graceful termination.
 If the resource is resizable it will be resized to 0 before deletion.
 
 Examples:
-  $ kubectl stop replicationcontroller foo
-  foo stopped
+
+    $ kubectl stop replicationcontroller foo
+    // Shut down foo.
 `,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 2 {

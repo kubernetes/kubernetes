@@ -34,8 +34,8 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 	}{}
 	cmd := &cobra.Command{
 		Use:   "delete ([-f filename] | (<resource> [(<id> | -l <label>)]",
-		Short: "Delete a resource by filename, stdin or resource and id",
-		Long: `Delete a resource by filename, stdin, resource and id or by resources and label selector.
+		Short: "Delete a resource by filename, stdin, or resource and ID.",
+		Long: `Delete a resource by filename, stdin, resource and ID, or by resources and label selector.
 
 JSON and YAML formats are accepted.
 
@@ -47,17 +47,18 @@ submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.
 
 Examples:
-  $ kubectl delete -f pod.json
-  <delete a pod using the type and id pod.json>
 
-  $ cat pod.json | kubectl delete -f -
-  <delete a pod based on the type and id in the json passed into stdin>
+    $ kubectl delete -f pod.json
+    // Delete a pod using the type and ID specified in pod.json.
 
-  $ kubectl delete pods,services -l name=myLabel
-  <delete pods and services with label name=myLabel>
+    $ cat pod.json | kubectl delete -f -
+    // Delete a pod based on the type and ID in the JSON passed into stdin.
 
-  $ kubectl delete pod 1234-56-7890-234234-456456
-  <delete a pod with ID 1234-56-7890-234234-456456>`,
+    $ kubectl delete pods,services -l name=myLabel
+    // Delete pods and services with label name=myLabel.
+
+    $ kubectl delete pod 1234-56-7890-234234-456456
+    // Delete a pod with ID 1234-56-7890-234234-456456.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			checkErr(err)

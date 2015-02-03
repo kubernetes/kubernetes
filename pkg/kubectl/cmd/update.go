@@ -32,20 +32,21 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 	}{}
 	cmd := &cobra.Command{
 		Use:   "update -f filename",
-		Short: "Update a resource by filename or stdin",
+		Short: "Update a resource by filename or stdin.",
 		Long: `Update a resource by filename or stdin.
 
 JSON and YAML formats are accepted.
 
 Examples:
-  $ kubectl update -f pod.json
-  <update a pod using the data in pod.json>
 
-  $ cat pod.json | kubectl update -f -
-  <update a pod based on the json passed into stdin>
+    $ kubectl update -f pod.json
+    // Update a pod using the data in pod.json.
 
-  $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
-  <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>`,
+    $ cat pod.json | kubectl update -f -
+    // Update a pod based on the JSON passed into stdin.
+
+    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
+    // Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
 			checkErr(err)
@@ -97,8 +98,8 @@ Examples:
 
 		},
 	}
-	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file to use to update the resource")
-	cmd.Flags().String("patch", "", "A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the updated")
+	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file to use to update the resource.")
+	cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
 	return cmd
 }
 

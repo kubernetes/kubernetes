@@ -38,11 +38,12 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 JSON and YAML formats are accepted.
 
 Examples:
-  $ kubectl create -f pod.json
-  <create a pod using the data in pod.json>
 
-  $ cat pod.json | kubectl create -f -
-  <create a pod based on the json passed into stdin>`,
+    $ kubectl create -f pod.json
+    // Create a pod using the data in pod.json.
+
+    $ cat pod.json | kubectl create -f -
+    // Create a pod based on the JSON passed into stdin.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
 			checkErr(err)
