@@ -57,7 +57,7 @@ firstapp:
 techdetails:
     api: 
         label: API Documentation
-        url: http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html
+        url: http://kubernetes.io/third_party/swagger-ui/
     kubecfg:
         label: Kubectl Command Tool
         url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md
