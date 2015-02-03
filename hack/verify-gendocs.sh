@@ -89,6 +89,6 @@ KUBECTL_DOC="docs/kubectl.md"
 
 echo "diffing ${KUBECTL_DOC} against generated output from ${gendocs}"
 "${gendocs}" | diff "${KUBE_ROOT}/${KUBECTL_DOC}" - && echo "${KUBECTL_DOC} up to date." || {
-  echo "${KUBECTL_DOC} is out of date. Please run ${gendocs} > ${KUBECTL_DOC}"
+  echo "${KUBECTL_DOC} is out of date. Please run hack/run-gendocs.sh"
   exit 1
 }
