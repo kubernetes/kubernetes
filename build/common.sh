@@ -467,18 +467,18 @@ function kube::build::copy_output() {
 
 # ---------------------------------------------------------------------------
 # Build final release artifacts
+function kube::release::clean_cruft() {
+  # Clean out cruft
+  find ${RELEASE_STAGE} -name '*~' -exec rm {} \;
+  find ${RELEASE_STAGE} -name '#*#' -exec rm {} \;
+  find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
+}
+
 function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
   
-  # Clean out cruft
-  if [ -d "_output/release-stage/" ]; then
-    find _output/release-stage/ -name '*~' -exec rm {} \;
-    find _output/release-stage/ -name '#*#' -exec rm {} \;
-    find _output/release-stage/ -name '.DS*' -exec rm {} \;
-  fi
-
   kube::release::package_client_tarballs
   kube::release::package_server_tarballs
   kube::release::package_salt_tarball
@@ -511,6 +511,7 @@ function kube::release::package_client_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/client/bin/"
 
+    kube::release::clean_cruft
 
     local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
@@ -542,6 +543,8 @@ function kube::release::package_server_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
+    kube::release::clean_cruft
+
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
@@ -565,6 +568,8 @@ function kube::release::package_salt_tarball() {
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . -name \*.yaml -or -name \*.yaml.in | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/saltbase/salt/kube-addons"
+
+  kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
@@ -590,6 +595,8 @@ function kube::release::package_test_tarball() {
   done
 
   tar c ${KUBE_TEST_PORTABLE[@]} | tar x -C ${release_stage}
+
+  kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes-test.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
@@ -637,10 +644,7 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
 
-  # Clean out cruft
-  find ${release_stage} -name '*~' -exec rm {} \;
-  find ${release_stage} -name '#*#' -exec rm {} \;
-  find ${release_stage} -name '.DS*' -exec rm {} \;
+  kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
