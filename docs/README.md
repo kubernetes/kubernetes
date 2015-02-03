@@ -12,6 +12,8 @@ If you're developing Kubernetes, docs are in the [devel](devel) folder.
 
 Design docs are in [design](design).
 
+API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+
 ## Primary concepts
 
 * **Overview** ([overview.md](overview.md)): A brief overview
