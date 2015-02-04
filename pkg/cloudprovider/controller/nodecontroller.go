@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +113,7 @@ func (s *NodeController) Run(period time.Duration, retryCount int) {
 // RegisterNodes registers the given list of nodes, it keeps retrying for `retryCount` times.
 func (s *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, retryInterval time.Duration) error {
 	registered := util.NewStringSet()
+	nodes = s.canonicalizeName(nodes)
 	for i := 0; i < retryCount; i++ {
 		for _, node := range nodes.Items {
 			if registered.Has(node.Name) {
@@ -329,4 +331,12 @@ func (s *NodeController) CloudNodes() (*api.NodeList, error) {
 // isRunningCloudProvider checks if cluster is running with cloud provider.
 func (s *NodeController) isRunningCloudProvider() bool {
 	return s.cloud != nil && len(s.matchRE) > 0
+}
+
+// canonicalizeName takes a node list and lowercases all nodes' name.
+func (s *NodeController) canonicalizeName(nodes *api.NodeList) *api.NodeList {
+	for i := range nodes.Items {
+		nodes.Items[i].Name = strings.ToLower(nodes.Items[i].Name)
+	}
+	return nodes
 }

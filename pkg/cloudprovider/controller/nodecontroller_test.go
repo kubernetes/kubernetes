@@ -135,6 +135,22 @@ func TestRegisterNodes(t *testing.T) {
 			expectedFail:         false,
 		},
 		{
+			// Canonicalize node names.
+			machines: []string{"NODE0", "node1"},
+			fakeNodeHandler: &FakeNodeHandler{
+				CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool {
+					if node.Name == "NODE0" {
+						return false
+					}
+					return true
+				},
+			},
+			retryCount:           1,
+			expectedRequestCount: 2,
+			expectedCreateCount:  2,
+			expectedFail:         false,
+		},
+		{
 			// No machine to register.
 			machines: []string{},
 			fakeNodeHandler: &FakeNodeHandler{
