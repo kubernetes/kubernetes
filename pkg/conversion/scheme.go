@@ -63,7 +63,7 @@ func NewScheme() *Scheme {
 		InternalVersion: "",
 		MetaFactory:     DefaultMetaFactory,
 	}
-	s.converter.NameFunc = s.nameFunc
+	s.converter.nameFunc = s.nameFunc
 	return s
 }
 
@@ -194,7 +194,7 @@ func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
 // add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
-		if err := s.converter.Register(f); err != nil {
+		if err := s.converter.RegisterConversionFunc(f); err != nil {
 			return err
 		}
 	}
@@ -207,6 +207,29 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 // Call as many times as needed, even on the same fields.
 func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
 	return s.converter.SetStructFieldCopy(srcFieldType, srcFieldName, destFieldType, destFieldName)
+}
+
+// AddDefaultingFuncs adds functions to the list of default-value functions.
+// Each of the given functions is responsible for applying default values
+// when converting an instance of a versioned API object into an internal
+// API object.  These functions do not need to handle sub-objects. We deduce
+// how to call these functions from the types of their two parameters.
+//
+// s.AddDefaultingFuncs(
+//	func(obj *v1beta1.Pod) {
+//		if obj.OptionalField == "" {
+//			obj.OptionalField = "DefaultValue"
+//		}
+//	},
+// )
+func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
+	for _, f := range defaultingFuncs {
+		err := s.converter.RegisterDefaultingFunc(f)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Convert will attempt to convert in into out. Both must be pointers. For easy

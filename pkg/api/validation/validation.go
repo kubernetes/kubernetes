@@ -189,8 +189,7 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationError
 	allErrs := errs.ValidationErrorList{}
 
 	allNames := util.StringSet{}
-	for i := range volumes {
-		vol := &volumes[i] // so we can set default values
+	for i, vol := range volumes {
 		el := validateSource(&vol.Source).Prefix("source")
 		if len(vol.Name) == 0 {
 			el = append(el, errs.NewFieldRequired("name", vol.Name))
@@ -227,10 +226,7 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
-	if numVolumes == 0 {
-		// TODO: Enforce that a source is set once we deprecate the implied form.
-		source.EmptyDir = &api.EmptyDir{}
-	} else if numVolumes != 1 {
+	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
 	return allErrs
@@ -272,9 +268,8 @@ func validatePorts(ports []api.Port) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	allNames := util.StringSet{}
-	for i := range ports {
+	for i, port := range ports {
 		pErrs := errs.ValidationErrorList{}
-		port := &ports[i] // so we can set default values
 		if len(port.Name) > 0 {
 			if len(port.Name) > 63 || !util.IsDNSLabel(port.Name) {
 				pErrs = append(pErrs, errs.NewFieldInvalid("name", port.Name, ""))
@@ -293,7 +288,7 @@ func validatePorts(ports []api.Port) errs.ValidationErrorList {
 			pErrs = append(pErrs, errs.NewFieldInvalid("hostPort", port.HostPort, ""))
 		}
 		if len(port.Protocol) == 0 {
-			port.Protocol = "TCP"
+			pErrs = append(pErrs, errs.NewFieldRequired("protocol", port.Protocol))
 		} else if !supportedPortProtocols.Has(strings.ToUpper(string(port.Protocol))) {
 			pErrs = append(pErrs, errs.NewFieldNotSupported("protocol", port.Protocol))
 		}
@@ -305,9 +300,8 @@ func validatePorts(ports []api.Port) errs.ValidationErrorList {
 func validateEnv(vars []api.EnvVar) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	for i := range vars {
+	for i, ev := range vars {
 		vErrs := errs.ValidationErrorList{}
-		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 {
 			vErrs = append(vErrs, errs.NewFieldRequired("name", ev.Name))
 		}
@@ -322,9 +316,8 @@ func validateEnv(vars []api.EnvVar) errs.ValidationErrorList {
 func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	for i := range mounts {
+	for i, mnt := range mounts {
 		mErrs := errs.ValidationErrorList{}
-		mnt := &mounts[i] // so we can set default values
 		if len(mnt.Name) == 0 {
 			mErrs = append(mErrs, errs.NewFieldRequired("name", mnt.Name))
 		} else if !volumes.Has(mnt.Name) {
@@ -343,9 +336,8 @@ func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs
 func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool, extract func(*api.Port) int) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	for ci := range containers {
+	for ci, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
-		ctr := &containers[ci]
 		for pi := range ctr.Ports {
 			port := extract(&ctr.Ports[pi])
 			if port == 0 {
@@ -413,22 +405,14 @@ func validateLifecycle(lifecycle *api.Lifecycle) errs.ValidationErrorList {
 	return allErrs
 }
 
-// TODO(dchen1107): Move this along with other defaulting values
-func validatePullPolicyWithDefault(ctr *api.Container) errs.ValidationErrorList {
+func validatePullPolicy(ctr *api.Container) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
 
 	switch ctr.ImagePullPolicy {
-	case "":
-		// TODO(dchen1107): Move ParseImageName code to pkg/util
-		parts := strings.Split(ctr.Image, ":")
-		// Check image tag
-		if parts[len(parts)-1] == "latest" {
-			ctr.ImagePullPolicy = api.PullAlways
-		} else {
-			ctr.ImagePullPolicy = api.PullIfNotPresent
-		}
 	case api.PullAlways, api.PullIfNotPresent, api.PullNever:
 		break
+	case "":
+		allErrors = append(allErrors, errs.NewFieldRequired("", ctr.ImagePullPolicy))
 	default:
 		allErrors = append(allErrors, errs.NewFieldNotSupported("", ctr.ImagePullPolicy))
 	}
@@ -440,9 +424,8 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	allErrs := errs.ValidationErrorList{}
 
 	allNames := util.StringSet{}
-	for i := range containers {
+	for i, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
-		ctr := &containers[i] // so we can set default values
 		capabilities := capabilities.Get()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name", ctr.Name))
@@ -464,8 +447,8 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
 		cErrs = append(cErrs, validateVolumeMounts(ctr.VolumeMounts, volumes).Prefix("volumeMounts")...)
-		cErrs = append(cErrs, validatePullPolicyWithDefault(ctr).Prefix("pullPolicy")...)
-		cErrs = append(cErrs, validateResourceRequirements(ctr).Prefix("resources")...)
+		cErrs = append(cErrs, validatePullPolicy(&ctr).Prefix("pullPolicy")...)
+		cErrs = append(cErrs, validateResourceRequirements(&ctr).Prefix("resources")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
@@ -513,10 +496,7 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ValidationErro
 	if restartPolicy.Never != nil {
 		numPolicies++
 	}
-	if numPolicies == 0 {
-		restartPolicy.Always = &api.RestartPolicyAlways{}
-	}
-	if numPolicies > 1 {
+	if numPolicies != 1 {
 		allErrors = append(allErrors, errs.NewFieldInvalid("", restartPolicy, "only 1 policy is allowed"))
 	}
 	return allErrors
@@ -525,11 +505,10 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ValidationErro
 func validateDNSPolicy(dnsPolicy *api.DNSPolicy) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
 	switch *dnsPolicy {
-	case "":
-		// TODO: move this out to standard defaulting logic, when that is ready.
-		*dnsPolicy = api.DNSClusterFirst // Default value.
 	case api.DNSClusterFirst, api.DNSDefault:
 		break
+	case "":
+		allErrors = append(allErrors, errs.NewFieldRequired("", *dnsPolicy))
 	default:
 		allErrors = append(allErrors, errs.NewFieldNotSupported("", dnsPolicy))
 	}
@@ -598,7 +577,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port, ""))
 	}
 	if len(service.Spec.Protocol) == 0 {
-		service.Spec.Protocol = "TCP"
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.protocol", service.Spec.Protocol))
 	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
 	}
@@ -608,7 +587,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 
 	if service.Spec.SessionAffinity == "" {
-		service.Spec.SessionAffinity = api.AffinityTypeNone
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.sessionAffinity", service.Spec.SessionAffinity))
 	} else if !supportedSessionAffinityType.Has(string(service.Spec.SessionAffinity)) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity))
 	}

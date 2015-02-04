@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -441,6 +440,10 @@ func TestEtcdUpdatePodNotScheduled(t *testing.T) {
 				"foo": "bar",
 			},
 		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	err := registry.UpdatePod(ctx, &podIn)
 	if err != nil {
@@ -515,9 +518,13 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Image: "foo:v2",
+					Image:                  "foo:v2",
+					ImagePullPolicy:        api.PullIfNotPresent,
+					TerminationMessagePath: api.TerminationMessagePathDefault,
 				},
 			},
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 		Status: api.PodStatus{
 			Host: "machine",
@@ -1338,6 +1345,8 @@ func TestEtcdUpdateService(t *testing.T) {
 			Selector: map[string]string{
 				"baz": "bar",
 			},
+			Protocol:        "TCP",
+			SessionAffinity: "None",
 		},
 	}
 	err := registry.UpdateService(ctx, &testService)
@@ -1352,7 +1361,7 @@ func TestEtcdUpdateService(t *testing.T) {
 	// Clear modified indices before the equality test.
 	svc.ResourceVersion = ""
 	testService.ResourceVersion = ""
-	if !reflect.DeepEqual(*svc, testService) {
+	if !api.Semantic.DeepEqual(*svc, testService) {
 		t.Errorf("Unexpected service: got\n %#v\n, wanted\n %#v", svc, testService)
 	}
 }
@@ -1404,7 +1413,7 @@ func TestEtcdGetEndpoints(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if e, a := endpoints, got; !reflect.DeepEqual(e, a) {
+	if e, a := endpoints, got; !api.Semantic.DeepEqual(e, a) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", e, a)
 	}
 }
@@ -1433,7 +1442,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	}
 	var endpointsOut api.Endpoints
 	err = latest.Codec.DecodeInto([]byte(response.Node.Value), &endpointsOut)
-	if !reflect.DeepEqual(endpoints, endpointsOut) {
+	if !api.Semantic.DeepEqual(endpoints, endpointsOut) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", endpointsOut, endpoints)
 	}
 }

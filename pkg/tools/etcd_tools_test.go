@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -47,6 +48,12 @@ func init() {
 	scheme.AddKnownTypes("", &TestResource{})
 	scheme.AddKnownTypes("v1beta1", &TestResource{})
 	codec = runtime.CodecFor(scheme, "v1beta1")
+	scheme.AddConversionFuncs(
+		func(in *TestResource, out *TestResource, s conversion.Scope) error {
+			*out = *in
+			return nil
+		},
+	)
 }
 
 func TestIsEtcdNotFound(t *testing.T) {
@@ -94,10 +101,27 @@ func TestExtractToList(t *testing.T) {
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			// We expect items to be sorted by its name.
-			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
-			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
-			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
 		},
 	}
 
@@ -160,9 +184,27 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			// We expect list to be sorted by directory (e.g. namespace) first, then by name.
-			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
 		},
 	}
 
@@ -212,9 +254,27 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
-			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
-			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
 		},
 	}
 
@@ -231,7 +291,13 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 
 func TestExtractObj(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	expect := api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	expect := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+	}
 	fakeClient.Set("/some/key", runtime.EncodeOrDie(testapi.Codec(), &expect), 0)
 	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	var got api.Pod

@@ -49,8 +49,10 @@ func TestServiceRegistryCreate(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Port:     6502,
-			Selector: map[string]string{"bar": "baz"},
+			Port:            6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -88,14 +90,18 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
-				Port:     6502,
-				Selector: map[string]string{"bar": "baz"},
+				Port:            6502,
+				Selector:        map[string]string{"bar": "baz"},
+				Protocol:        api.ProtocolTCP,
+				SessionAffinity: api.AffinityTypeNone,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Selector: map[string]string{"bar": "baz"},
+				Selector:        map[string]string{"bar": "baz"},
+				Protocol:        api.ProtocolTCP,
+				SessionAffinity: api.AffinityTypeNone,
 			},
 		},
 	}
@@ -126,8 +132,10 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	c, err := storage.Update(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Port:     6502,
-			Selector: map[string]string{"bar": "baz2"},
+			Port:            6502,
+			Selector:        map[string]string{"bar": "baz2"},
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	})
 	if err != nil {
@@ -161,15 +169,19 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
-				Port:     6502,
-				Selector: map[string]string{"bar": "baz"},
+				Port:            6502,
+				Selector:        map[string]string{"bar": "baz"},
+				Protocol:        api.ProtocolTCP,
+				SessionAffinity: api.AffinityTypeNone,
 			},
 		},
 		"invalid selector": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Port:     6502,
-				Selector: map[string]string{"ThisSelectorFailsValidation": "ok"},
+				Port:            6502,
+				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
+				Protocol:        api.ProtocolTCP,
+				SessionAffinity: api.AffinityTypeNone,
 			},
 		},
 	}
@@ -196,6 +208,8 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
+			Protocol:                   api.ProtocolTCP,
+			SessionAffinity:            api.AffinityTypeNone,
 		},
 	}
 	c, _ := storage.Create(ctx, svc)
@@ -225,6 +239,8 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
+			Protocol:                   api.ProtocolTCP,
+			SessionAffinity:            api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -247,7 +263,9 @@ func TestServiceRegistryDelete(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
+			Selector:        map[string]string{"bar": "baz"},
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	registry.CreateService(ctx, svc)
@@ -272,6 +290,8 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
+			Protocol:                   api.ProtocolTCP,
+			SessionAffinity:            api.AffinityTypeNone,
 		},
 	}
 	registry.CreateService(ctx, svc)
@@ -386,8 +406,10 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -404,8 +426,10 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		}}
 	ctx = api.NewDefaultContext()
 	c2, _ := rest.Create(ctx, svc2)
@@ -421,9 +445,11 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	svc3 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "quux"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			PortalIP: "1.2.3.93",
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			PortalIP:        "1.2.3.93",
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx = api.NewDefaultContext()
@@ -445,8 +471,10 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -466,8 +494,10 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx = api.NewDefaultContext()
@@ -492,8 +522,10 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -541,6 +573,8 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 			Selector: map[string]string{"bar": "baz"},
 			Port:     6502,
 			CreateExternalLoadBalancer: true,
+			Protocol:                   api.ProtocolTCP,
+			SessionAffinity:            api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -573,8 +607,10 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -583,8 +619,10 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	svc = &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	c, _ = rest1.Create(ctx, svc)
@@ -597,8 +635,10 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	svc = &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:        map[string]string{"bar": "baz"},
+			Port:            6502,
+			Protocol:        api.ProtocolTCP,
+			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
 	c, _ = rest2.Create(ctx, svc)
@@ -658,8 +698,10 @@ func TestCreate(t *testing.T) {
 		// valid
 		&api.Service{
 			Spec: api.ServiceSpec{
-				Selector: map[string]string{"bar": "baz"},
-				Port:     6502,
+				Selector:        map[string]string{"bar": "baz"},
+				Port:            6502,
+				Protocol:        "TCP",
+				SessionAffinity: "None",
 			},
 		},
 		// invalid

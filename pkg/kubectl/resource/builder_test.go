@@ -88,9 +88,17 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 		},
 	}
@@ -376,7 +384,7 @@ func TestSelector(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 
@@ -419,7 +427,7 @@ func TestStream(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -436,7 +444,7 @@ func TestYAMLStream(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -458,7 +466,7 @@ func TestMultipleObject(t *testing.T) {
 			&svc.Items[0],
 		},
 	}
-	if !reflect.DeepEqual(expected, obj) {
+	if !api.Semantic.DeepDerivative(expected, obj) {
 		t.Errorf("unexpected visited objects: %#v", obj)
 	}
 }
@@ -612,7 +620,7 @@ func TestLatest(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -646,7 +654,7 @@ func TestIgnoreStreamErrors(t *testing.T) {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
 
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &svc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &svc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }

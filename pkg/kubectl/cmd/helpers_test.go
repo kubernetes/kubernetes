@@ -42,6 +42,12 @@ func TestMerge(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{
+						Always: &api.RestartPolicyAlways{},
+					},
+					DNSPolicy: api.DNSClusterFirst,
+				},
 			},
 		},
 		{
@@ -57,6 +63,10 @@ func TestMerge(t *testing.T) {
 				},
 				Spec: api.PodSpec{
 					Host: "bar",
+					RestartPolicy: api.RestartPolicy{
+						Always: &api.RestartPolicyAlways{},
+					},
+					DNSPolicy: api.DNSClusterFirst,
 				},
 			},
 		},
@@ -74,12 +84,18 @@ func TestMerge(t *testing.T) {
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{
 						{
-							Name: "v1",
+							Name:   "v1",
+							Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}},
 						},
 						{
-							Name: "v2",
+							Name:   "v2",
+							Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}},
 						},
 					},
+					RestartPolicy: api.RestartPolicy{
+						Always: &api.RestartPolicyAlways{},
+					},
+					DNSPolicy: api.DNSClusterFirst,
 				},
 			},
 		},
@@ -91,13 +107,13 @@ func TestMerge(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		err := Merge(test.obj, test.fragment, "Pod")
 		if !test.expectErr {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			} else if !reflect.DeepEqual(test.obj, test.expected) {
-				t.Errorf("\nexpected:\n%v\nsaw:\n%v", test.expected, test.obj)
+				t.Errorf("\n\ntestcase[%d]\nexpected:\n%v\nsaw:\n%v", i, test.expected, test.obj)
 			}
 		}
 		if test.expectErr && err == nil {

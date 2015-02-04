@@ -19,7 +19,6 @@ package etcd
 import (
 	"fmt"
 	"path"
-	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -146,7 +145,7 @@ func TestEtcdList(t *testing.T) {
 			continue
 		}
 
-		if e, a := item.out, list; !reflect.DeepEqual(e, a) {
+		if e, a := item.out, list; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
 		}
 	}
@@ -209,7 +208,7 @@ func TestEtcdCreate(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
+		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
@@ -284,7 +283,7 @@ func TestEtcdUpdate(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
+		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
@@ -340,7 +339,7 @@ func TestEtcdGet(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, got; !reflect.DeepEqual(e, a) {
+		if e, a := item.expect, got; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
@@ -396,7 +395,7 @@ func TestEtcdDelete(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
-		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
+		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
@@ -432,7 +431,7 @@ func TestEtcdWatch(t *testing.T) {
 		t.Fatalf("unexpected channel close")
 	}
 
-	if e, a := podA, got.Object; !reflect.DeepEqual(e, a) {
+	if e, a := podA, got.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("difference: %s", util.ObjectDiff(e, a))
 	}
 }

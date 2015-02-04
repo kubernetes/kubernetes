@@ -42,9 +42,17 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 		},
 	}
@@ -55,6 +63,10 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					Protocol:        "TCP",
+					SessionAffinity: "None",
+				},
 			},
 		},
 	}
@@ -296,6 +308,10 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				Namespace:       "test",
 				ResourceVersion: "10",
 			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				DNSPolicy:     api.DNSClusterFirst,
+			},
 		},
 	}
 	events := []watch.Event{
@@ -307,6 +323,10 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "11",
 				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 		},
 		{
@@ -316,6 +336,10 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "12",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},

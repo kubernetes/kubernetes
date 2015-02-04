@@ -71,6 +71,11 @@ type ContainerManifestList struct {
 	Items    []ContainerManifest `json:"items" description:"list of pod container manifests"`
 }
 
+const (
+	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
+	TerminationMessagePathDefault string = "/dev/termination-log"
+)
+
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have

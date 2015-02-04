@@ -126,6 +126,10 @@ func TestControllerDecode(t *testing.T) {
 						"name": "nginx",
 					},
 				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 		},
 	}
@@ -225,10 +229,13 @@ var validPodTemplate = api.PodTemplate{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  "test",
-					Image: "test_image",
+					Name:            "test",
+					Image:           "test_image",
+					ImagePullPolicy: api.PullIfNotPresent,
 				},
 			},
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	},
 }

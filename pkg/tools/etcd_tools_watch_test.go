@@ -18,7 +18,6 @@ package tools
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -123,7 +122,7 @@ func TestWatchInterpretations(t *testing.T) {
 				if e, a := item.expectType, event.Type; e != a {
 					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
 				}
-				if e, a := item.expectObject, event.Object; !reflect.DeepEqual(e, a) {
+				if e, a := item.expectObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
 					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
 				}
 			}
@@ -250,7 +249,7 @@ func TestWatch(t *testing.T) {
 	if e, a := watch.Added, event.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 
@@ -381,7 +380,7 @@ func TestWatchEtcdState(t *testing.T) {
 				t.Errorf("%s: expected type %v, got %v", k, e, a)
 				break
 			}
-			if e, a := testCase.Expected[i].Endpoints, event.Object.(*api.Endpoints).Endpoints; !reflect.DeepEqual(e, a) {
+			if e, a := testCase.Expected[i].Endpoints, event.Object.(*api.Endpoints).Endpoints; !api.Semantic.DeepDerivative(e, a) {
 				t.Errorf("%s: expected type %v, got %v", k, e, a)
 				break
 			}
@@ -456,7 +455,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			t.Errorf("%s: expected pod with resource version %v, Got %#v", k, testCase.ExpectedVersion, actualPod)
 		}
 		pod.ResourceVersion = testCase.ExpectedVersion
-		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+		if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%s: expected %v, got %v", k, e, a)
 		}
 		watching.Stop()
@@ -515,7 +514,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
 		}
 		pod.ResourceVersion = "1"
-		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+		if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}

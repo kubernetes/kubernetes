@@ -88,6 +88,10 @@ func TestCreatePodRegistryError(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
@@ -107,6 +111,10 @@ func TestCreatePodSetsIds(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -134,6 +142,10 @@ func TestCreatePodSetsUID(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -346,6 +358,10 @@ func TestPodDecode(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
@@ -447,7 +463,12 @@ func TestCreatePod(t *testing.T) {
 		registry: podRegistry,
 		podCache: &fakeCache{statusToReturn: &api.PodStatus{}},
 	}
-	pod := &api.Pod{}
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+	}
 	pod.Name = "foo"
 	ctx := api.NewDefaultContext()
 	channel, err := storage.Create(ctx, pod)
@@ -470,6 +491,10 @@ func TestCreatePodWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 
 	ctx := api.NewDefaultContext()
@@ -488,6 +513,10 @@ func TestUpdatePodWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 
 	ctx := api.NewDefaultContext()
@@ -647,10 +676,13 @@ func TestCreate(t *testing.T) {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Name:  "test1",
-						Image: "foo",
+						Name:            "test1",
+						Image:           "foo",
+						ImagePullPolicy: api.PullIfNotPresent,
 					},
 				},
+				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		// invalid
