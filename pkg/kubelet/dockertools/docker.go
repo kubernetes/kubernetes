@@ -104,7 +104,7 @@ type dockerContainerCommandRunner struct {
 var dockerAPIVersionWithExec = []uint{1, 15}
 
 // Returns the major and minor version numbers of docker server.
-func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) {
+func (d *dockerContainerCommandRunner) GetDockerServerVersion() ([]uint, error) {
 	env, err := d.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get docker server version - %v", err)
@@ -127,7 +127,7 @@ func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) 
 }
 
 func (d *dockerContainerCommandRunner) nativeExecSupportExists() (bool, error) {
-	version, err := d.getDockerServerVersion()
+	version, err := d.GetDockerServerVersion()
 	if err != nil {
 		return false, err
 	}
@@ -626,4 +626,5 @@ func parseImageName(image string) (string, string) {
 
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
+	GetDockerServerVersion() ([]uint, error)
 }

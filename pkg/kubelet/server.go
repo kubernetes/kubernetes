@@ -63,7 +63,7 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	GetDockerVersion() (string, error)
+	GetDockerVersion() ([]uint, error)
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetBoundPods() ([]api.BoundPod, error)
 	GetPodByName(namespace, name string) (*api.BoundPod, bool)
@@ -109,16 +109,33 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
 }
 
+func isValidDockerVersion(ver []uint) (bool, string) {
+	minAllowedVersion := []uint{1, 3, 0}
+	for i := 0; i < len(ver) && i < len(minAllowedVersion); i++ {
+		if ver[i] != minAllowedVersion[i] {
+			if ver[i] < minAllowedVersion[i] {
+				versions := make([]string, len(ver))
+				for i, v := range(ver) {
+					versions[i] = fmt.Sprint(v)
+				}
+				return false, strings.Join(versions, ".")
+			}
+			return true, ""
+		}
+	}
+	return true, ""
+}
+
 // handleHealthz handles /healthz request and checks Docker version
 func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
-	version, err := s.host.GetDockerVersion()
+	versions, err := s.host.GetDockerVersion()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("unknown Docker version"))
 		return
 	}
-	const minDockerVersion = "1.3.0"
-	if version < minDockerVersion {
+	valid, version := isValidDockerVersion(versions)
+	if !valid {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := "Docker version is too old (" + version + ")"
 		w.Write([]byte(msg))

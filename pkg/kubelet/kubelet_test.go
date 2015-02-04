@@ -1367,6 +1367,10 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 	return []byte{}, f.E
 }
 
+func (f *fakeContainerCommandRunner) GetDockerServerVersion() ([]uint, error) {
+	return nil, nil
+}
+
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet, fakeDocker := newTestKubelet(t)

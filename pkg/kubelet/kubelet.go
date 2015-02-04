@@ -1362,20 +1362,12 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 }
 
 // Returns Docker version for this Kubelet.
-func (kl *Kubelet) GetDockerVersion() (string, error) {
+func (kl *Kubelet) GetDockerVersion() ([]uint, error) {
 	if kl.dockerClient == nil {
-		return "", fmt.Errorf("No Docker client")
+		return nil, fmt.Errorf("no Docker client")
 	}
-	env, err := kl.dockerClient.Version()
-	if err != nil {
-		return "", err
-	}
-	for _, entry := range *env {
-		if strings.HasPrefix(entry, "Version=") {
-			return strings.Split(entry, "=")[1], nil
-		}
-	}
-	return "", fmt.Errorf("Docker version unknown")
+	dockerRunner := dockertools.NewDockerContainerCommandRunner(kl.dockerClient)
+	return dockerRunner.GetDockerServerVersion()
 }
 
 // GetKubeletContainerLogs returns logs from the container
