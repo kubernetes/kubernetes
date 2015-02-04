@@ -157,6 +157,31 @@ func TestInstances(t *testing.T) {
 	t.Logf("Found GetNodeResources(%s) = %s\n", srvs[0], rsrcs)
 }
 
+func TestTCPLoadBalancer(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	os, err := newRackspace(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate Rackspace: %s", err)
+	}
+
+	lb, ok := os.TCPLoadBalancer()
+	if !ok {
+		t.Fatalf("TCPLoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+	}
+
+	exists, err := lb.TCPLoadBalancerExists("noexist", "region")
+	if err != nil {
+		t.Fatalf("TCPLoadBalancerExists(\"noexist\") returned error: %s", err)
+	}
+	if exists {
+		t.Fatalf("TCPLoadBalancerExists(\"noexist\") returned true")
+	}
+}
+
 func TestZones(t *testing.T) {
 	os := Rackspace{
 		provider: &gophercloud.ProviderClient{

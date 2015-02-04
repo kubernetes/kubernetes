@@ -31,6 +31,9 @@ import (
 	"github.com/rackspace/gophercloud/rackspace"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/flavors"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
+	"github.com/rackspace/gophercloud/rackspace/lb/v1/lbs"
+	"github.com/rackspace/gophercloud/rackspace/lb/v1/nodes"
+	"github.com/rackspace/gophercloud/rackspace/lb/v1/vips"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
@@ -393,8 +396,206 @@ func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
+type LoadBalancer struct {
+	network *gophercloud.ServiceClient
+	compute *gophercloud.ServiceClient
+	opts    LoadBalancerOpts
+}
+
 func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
-	return nil, false
+	// TODO: Search for and support Rackspace loadbalancer API, and others.
+	network, err := rackspace.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find neutron endpoint: %v", err)
+		return nil, false
+	}
+
+	compute, err := rackspace.NewComputeV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
+		return nil, false
+	}
+
+	glog.V(1).Info("Claiming to support TCPLoadBalancer")
+
+	return &LoadBalancer{network, compute, os.lbOpts}, true
+}
+
+func getVipByName(client *gophercloud.ServiceClient, name string) (*lbs.LoadBalancer, error) {
+	pager := lbs.List(client, nil)
+
+	vipList := make([]lbs.LoadBalancer, 0)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		list, err := lbs.ExtractLBs(page)
+		if err != nil {
+			return false, err
+		}
+		for _, v := range list {
+			if v.Name == name {
+				vipList = append(vipList, v)
+			}
+		}
+
+		if len(vipList) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(vipList) == 0 {
+		return nil, ErrNotFound
+	} else if len(vipList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &vipList[0], nil
+}
+
+func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error) {
+	vip, err := getVipByName(lb.network, name)
+	if err == ErrNotFound {
+		return false, nil
+	}
+	return vip != nil, err
+}
+
+// TODO: This code currently ignores 'region' and always creates a
+// loadbalancer in only the current Rackspace region.  We should take
+// a list of regions (from config) and query/create loadbalancers in
+// each region.
+
+func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (net.IP, error) {
+	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, port, hosts)
+	if affinity != api.AffinityTypeNone {
+		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
+	}
+
+	vipList := []vips.VIP{
+		{
+			Type:    vips.PUBLIC,
+			Version: vips.IPV4,
+		},
+	}
+
+	pool, err := lbs.Create(lb.network, lbs.CreateOpts{
+		Name:     name,
+		Protocol: "TCP",
+		VIPs:     vipList,
+	}).Extract()
+	if err != nil {
+		return nil, err
+	}
+
+	nodeList := make(nodes.CreateOpts, 0, 1)
+	for _, host := range hosts {
+		addr, err := getAddressByName(lb.compute, host)
+		if err != nil {
+			return nil, err
+		}
+
+		nodeList = append(nodeList, nodes.CreateOpt{
+			Port:    port,
+			Address: addr,
+		})
+	}
+
+	_, err = nodes.Create(lb.network, pool.ID, nodeList).ExtractNodes()
+	if err != nil {
+		lbs.Delete(lb.network, pool.ID)
+		return nil, err
+	}
+
+	return net.ParseIP(pool.VIPs[0].Address), nil
+}
+
+func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+	glog.V(2).Infof("UpdateTCPLoadBalancer(%v, %v, %v)", name, region, hosts)
+
+	vip, err := getVipByName(lb.network, name)
+	if err != nil {
+		return err
+	}
+
+	// Set of member (addresses) that _should_ exist
+	addrs := map[string]bool{}
+	for _, host := range hosts {
+		addr, err := getAddressByName(lb.compute, host)
+		if err != nil {
+			return err
+		}
+
+		addrs[addr] = true
+	}
+
+	// Iterate over members that _do_ exist
+	pager := nodes.List(lb.network, vip.ID, nil)
+	err = pager.EachPage(func(page pagination.Page) (bool, error) {
+		memList, err := nodes.ExtractNodes(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, member := range memList {
+			if _, found := addrs[member.Address]; found {
+				// Member already exists
+				delete(addrs, member.Address)
+			} else {
+				// Member needs to be deleted
+				err = nodes.Delete(lb.network, vip.ID, member.ID).ExtractErr()
+				if err != nil {
+					return false, err
+				}
+			}
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Anything left in addrs is a new member that needs to be added
+	nodeList := make(nodes.CreateOpts, 0, 1)
+	for addr := range addrs {
+		nodeList = append(nodeList, nodes.CreateOpt{
+			Address: addr,
+			Port:    vip.Port,
+		})
+	}
+	_, err = nodes.Create(lb.network, vip.ID, nodeList).ExtractNodes()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
+	glog.V(2).Infof("DeleteTCPLoadBalancer(%v, %v)", name, region)
+
+	vip, err := getVipByName(lb.network, name)
+	if err != nil {
+		return err
+	}
+
+	pool, err := lbs.Get(lb.network, vip.ID).Extract()
+	if err != nil {
+		return err
+	}
+
+	// Ignore errors for everything following here
+
+	lbs.Delete(lb.network, pool.ID)
+
+	return nil
 }
 
 func (os *Rackspace) Zones() (cloudprovider.Zones, bool) {
