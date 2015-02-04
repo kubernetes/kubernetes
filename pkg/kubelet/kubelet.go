@@ -1274,14 +1274,14 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		}
 	}
 
-	// Remove any orphaned pods.
-	err = kl.cleanupOrphanedPods(pods)
+	// Remove any orphaned volumes.
+	err = kl.cleanupOrphanedVolumes(pods)
 	if err != nil {
 		return err
 	}
 
-	// Remove any orphaned volumes.
-	err = kl.cleanupOrphanedVolumes(pods)
+	// Remove any orphaned pods.
+	err = kl.cleanupOrphanedPods(pods)
 	if err != nil {
 		return err
 	}
