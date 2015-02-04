@@ -86,8 +86,45 @@ func doTestStore(t *testing.T, store Store) {
 	}
 }
 
+// Test public interface
+func doTestIndex(t *testing.T, index Index) {
+	mkObj := func(id string, val string) testStoreObject {
+		return testStoreObject{id: id, val: val}
+	}
+
+	// Test Index
+	expected := map[string]util.StringSet{}
+	expected["b"] = util.NewStringSet("a", "c")
+	expected["f"] = util.NewStringSet("e")
+	expected["h"] = util.NewStringSet("g")
+	index.Add(mkObj("a", "b"))
+	index.Add(mkObj("c", "b"))
+	index.Add(mkObj("e", "f"))
+	index.Add(mkObj("g", "h"))
+	{
+		for k, v := range expected {
+			found := util.StringSet{}
+			indexResults, err := index.Index(mkObj("", k))
+			if err != nil {
+				t.Errorf("Unexpected error %v", err)
+			}
+			for _, item := range indexResults {
+				found.Insert(item.(testStoreObject).id)
+			}
+			items := v.List()
+			if !found.HasAll(items...) {
+				t.Errorf("missing items, index %s, expected %v but found %v", k, items, found.List())
+			}
+		}
+	}
+}
+
 func testStoreKeyFunc(obj interface{}) (string, error) {
 	return obj.(testStoreObject).id, nil
+}
+
+func testStoreIndexFunc(obj interface{}) (string, error) {
+	return obj.(testStoreObject).val, nil
 }
 
 type testStoreObject struct {
@@ -106,4 +143,8 @@ func TestFIFOCache(t *testing.T) {
 func TestUndeltaStore(t *testing.T) {
 	nop := func([]interface{}) {}
 	doTestStore(t, NewUndeltaStore(nop, testStoreKeyFunc))
+}
+
+func TestIndex(t *testing.T) {
+	doTestIndex(t, NewIndex(testStoreKeyFunc, testStoreIndexFunc))
 }
