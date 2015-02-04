@@ -31,15 +31,6 @@ import (
 
 // TestClusterDNS checks that cluster DNS works.
 func TestClusterDNS(c *client.Client) bool {
-	// TODO:
-	// https://github.com/GoogleCloudPlatform/kubernetes/issues/3305
-	// (but even if it's fixed, this will need a version check for
-	// skewed version tests)
-	if testContext.provider == "gke" {
-		glog.Infof("skipping TestClusterDNS on gke")
-		return true
-	}
-
 	if testContext.provider == "vagrant" {
 		glog.Infof("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 		return true
