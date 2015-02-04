@@ -16,6 +16,7 @@ https://github.com/swagger-api/swagger-ui#how-to-use-it
 - Updated the url to "../../swaggerapi" as per instructions at:
 https://github.com/swagger-api/swagger-ui#how-to-use-it
 - Modified swagger-ui.js to list resources and operations in sorted order.
+- Set supportedSubmitMethods: [] in index.html to remove "Try it out" buttons.
 
 LICENSE file has been created for compliance purposes.
 Not included in original distribution.

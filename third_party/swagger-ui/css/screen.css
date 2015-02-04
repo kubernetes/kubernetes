@@ -294,7 +294,13 @@
 .swagger-section .swagger-ui-wrap .message-fail {
   color: #cc0000;
 }
-.swagger-section .swagger-ui-wrap .info_contact {
+.swagger-section .swagger-ui-wrap .info_url {
+  padding-bottom: 5px;
+}
+.swagger-section .swagger-ui-wrap .info_email {
+  padding-bottom: 5px;
+}
+.swagger-section .swagger-ui-wrap .info_name {
   padding-bottom: 5px;
 }
 .swagger-section .swagger-ui-wrap .info_description {
@@ -390,6 +396,32 @@
 .swagger-section .swagger-ui-wrap .model-signature .description .stronger {
   font-weight: bold;
   color: #000;
+}
+.swagger-section .swagger-ui-wrap .model-signature .description .propWrap .optionsWrapper {
+  border-spacing: 0;
+  position: absolute;
+  background-color: #ffffff;
+  border: 1px solid #bbbbbb;
+  display: none;
+  font-size: 11px;
+  max-width: 400px;
+  line-height: 30px;
+  color: black;
+  padding: 5px;
+  margin-left: 10px;
+}
+.swagger-section .swagger-ui-wrap .model-signature .description .propWrap .optionsWrapper th {
+  text-align: center;
+  background-color: #eeeeee;
+  border: 1px solid #bbbbbb;
+  font-size: 11px;
+  color: #666666;
+  font-weight: bold;
+  padding: 5px;
+  line-height: 15px;
+}
+.swagger-section .swagger-ui-wrap .model-signature .description .propWrap .optionsWrapper .optionName {
+  font-weight: bold;
 }
 .swagger-section .swagger-ui-wrap .model-signature .propName {
   font-weight: bold;
