@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// EndpointController manages service endpoints.
+// EndpointController manages selector-based service endpoints.
 type EndpointController struct {
 	client *client.Client
 }
@@ -42,7 +42,7 @@ func NewEndpointController(client *client.Client) *EndpointController {
 	}
 }
 
-// SyncServiceEndpoints syncs service endpoints.
+// SyncServiceEndpoints syncs endpoints for services with selectors.
 func (e *EndpointController) SyncServiceEndpoints() error {
 	services, err := e.client.Services(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
@@ -52,7 +52,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	var resultErr error
 	for _, service := range services.Items {
 		if service.Spec.Selector == nil {
-			// services without a selector receive no endpoints.  The last endpoint will be used.
+			// services without a selector receive no endpoints from this controller;
+			// these services will receive the endpoints that are created out-of-band via the REST API.
 			continue
 		}
 

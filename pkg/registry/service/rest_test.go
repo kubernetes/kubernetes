@@ -92,7 +92,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 				Selector: map[string]string{"bar": "baz"},
 			},
 		},
-		"empty selector": {
+		"empty port": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector: map[string]string{"bar": "baz"},
