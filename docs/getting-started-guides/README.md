@@ -1,6 +1,6 @@
-IaaS Provider  | Config. Mgmt | OS     | Docs                                                   | Support Level                | Notes 
--------------- | ------------ | ------ | ----------------------------------------------------   | ---------------------------- | -----  
-GCE            | Saltstack    | Debian | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.9.2 by @satnam6502 
+IaaS Provider  | Config. Mgmt | OS     | Docs                                                   | Support Level                | Notes
+-------------- | ------------ | ------ | ----------------------------------------------------   | ---------------------------- | -----
+GCE            | Saltstack    | Debian | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.9.2 by @satnam6502
 Vagrant        | Saltstack    | Fedora | [docs](../../docs/getting-started-guides/vagrant.md)   | Project                      |
 Vagrant        |              | Fedora | [docs](../../docs/getting-started-guides/fedora/fedora_manual_config.md) | Project    | Uses K8s v0.5-8
 Vagrant        | Ansible      | Fedora | [docs](../../docs/getting-started-guides/fedora/fedora_ansible.md)       | Project    | Uses K8s v0.5-8
@@ -10,12 +10,12 @@ GCE            | CoreOS       | CoreOS | [docs](../../docs/getting-started-guide
 Vagrant        | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@pires)           | Uses K8s version 0.9.1
 CloudStack     | Ansible      | CoreOS | [docs](../../docs/getting-started-guides/cloudstack.md)| Community (@sebgoa)          | Uses K8s version 0.9.1
 Vmware         |              | Debian | [docs](../../docs/getting-started-guides/vsphere.md)   | Community (@pietern)         | Uses K8s version 0.9.1
-AWS            | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guides/aws.md)       | Community (@justinsb)        | Uses K8s version 0.5.0 
+AWS            | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guides/aws.md)       | Community (@justinsb)        | Uses K8s version 0.5.0
 Vmware         | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) |
-Azure          | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     | 
-Local          |              |        | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     | 
+Azure          | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     |
+Local          |              |        | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     |
 Ovirt          |              |        | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
-Rackspace      | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     | 
+Rackspace      | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
 
 Definition of columns:
   - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
@@ -24,9 +24,7 @@ Definition of columns:
     nodes.
   - Support Levels
     - **Project**:  Kubernetes Committers regularly use this configuration, so it usually works with the latest release
-      of Kubernetes.  
+      of Kubernetes.
     - **Commercial**: A commercial offering with its own support arrangements.
     - **Community**: Actively supported by community contributions. May not work with more recent releases of kubernetes.
     - **Inactive**: No active maintainer.  Not recommended for first-time K8s users, and may be deleted soon.
- 
-
