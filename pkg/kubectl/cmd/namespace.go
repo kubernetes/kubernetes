@@ -18,43 +18,24 @@ package cmd
 
 import (
 	"io"
+	"os"
 
-	"fmt"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
+// TODO remove once people have been given enough time to notice
 func NewCmdNamespace(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "namespace [<namespace>]",
-		Short: "Set and view the current Kubernetes namespace",
-		Long: `Set and view the current Kubernetes namespace scope for command line requests.
+		Short: "SUPERCEDED: Set and view the current Kubernetes namespace",
+		Long: `SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
-A Kubernetes namespace subdivides the cluster into groups of logically related pods, services, and replication controllers.
-
-Examples:
-  $ kubectl namespace 
-  Using namespace default
-
-  $ kubectl namespace other
-  Set current namespace to other`,
+namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
+`,
 		Run: func(cmd *cobra.Command, args []string) {
-			nsPath := GetFlagString(cmd, "ns-path")
-			var err error
-			var ns *kubectl.NamespaceInfo
-			switch len(args) {
-			case 0:
-				ns, err = kubectl.LoadNamespaceInfo(nsPath)
-				fmt.Printf("Using namespace %s\n", ns.Namespace)
-			case 1:
-				ns = &kubectl.NamespaceInfo{Namespace: args[0]}
-				err = kubectl.SaveNamespaceInfo(nsPath, ns)
-				fmt.Printf("Set current namespace to %s\n", ns.Namespace)
-			default:
-				usageError(cmd, "kubectl namespace [<namespace>]")
-			}
-			checkErr(err)
+			glog.Errorln("namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.")
+			os.Exit(1)
 		},
 	}
 	return cmd

@@ -22,10 +22,10 @@ import (
 
 	"github.com/imdario/mergo"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
@@ -241,25 +241,10 @@ func (config DirectClientConfig) Namespace() (string, error) {
 
 	configContext := config.getContext()
 
-	if len(configContext.Namespace) != 0 {
-		return configContext.Namespace, nil
+	if len(configContext.Namespace) == 0 {
+		return api.NamespaceDefault, nil
 	}
-
-	if len(configContext.NamespacePath) != 0 {
-		nsInfo, err := kubectl.LoadNamespaceInfo(configContext.NamespacePath)
-		if err != nil {
-			return "", err
-		}
-
-		return nsInfo.Namespace, nil
-	}
-
-	// if nothing was specified, try the default file
-	nsInfo, err := kubectl.LoadNamespaceInfo(os.Getenv("HOME") + "/.kubernetes_ns")
-	if err != nil {
-		return "", err
-	}
-	return nsInfo.Namespace, nil
+	return configContext.Namespace, nil
 }
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,

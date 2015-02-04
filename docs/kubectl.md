@@ -30,7 +30,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -66,7 +65,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -p, --port=8001: The port on which to run the proxy
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -124,7 +122,6 @@ Usage:
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --no-headers=false: When using the default output, don't print headers
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
   -l, --selector="": Selector (label query) to filter on
@@ -168,7 +165,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -214,7 +210,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -263,7 +258,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --patch="": A JSON document to override the existing resource.  The resource is downloaded, then patched with the JSON, the updated
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -323,7 +317,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -l, --selector="": Selector (label query) to filter on
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -372,7 +365,6 @@ Available Commands:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -390,7 +382,7 @@ Additional help topics:
   kubectl update        Update a resource by filename or stdin
   kubectl delete        Delete a resource by filename, stdin or resource and id
   kubectl config        config modifies .kubeconfig files
-  kubectl namespace     Set and view the current Kubernetes namespace
+  kubectl namespace     SUPERCEDED: Set and view the current Kubernetes namespace
   kubectl log           Print the logs for a container in a pod.
   kubectl rollingupdate Perform a rolling update of the given ReplicationController
   kubectl resize        Set a new size for a resizable resource (currently only Replication Controllers)
@@ -430,7 +422,6 @@ Usage:
       --match-server-version=false: Require server version to match client version
       --merge=false: merge together the full hierarchy of .kubeconfig files
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -474,7 +465,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --server=: server for the cluster entry in .kubeconfig
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -518,7 +508,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token=: token for the user entry in .kubeconfig
@@ -562,7 +551,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace=: namespace for the context entry in .kubeconfig
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -606,7 +594,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -648,7 +635,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -687,7 +673,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -699,16 +684,10 @@ Usage:
 ```
 
 #### namespace
-Set and view the current Kubernetes namespace scope for command line requests.
+SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
-A Kubernetes namespace subdivides the cluster into groups of logically related pods, services, and replication controllers.
+namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
 
-Examples:
-  $ kubectl namespace 
-  Using namespace default
-
-  $ kubectl namespace other
-  Set current namespace to other
 
 Usage:
 ```
@@ -731,7 +710,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -774,7 +752,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -822,7 +799,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
@@ -876,7 +852,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
       --replicas=-1: The new number desired number of replicas.  Required.
       --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize
   -s, --server="": The address of the Kubernetes API server
@@ -933,7 +908,6 @@ Usage:
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --no-headers=false: When using the default output, don't print headers
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
       --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.
@@ -982,7 +956,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -1034,7 +1007,6 @@ Usage:
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
       --no-headers=false: When using the default output, don't print headers
-      --ns-path="": Path to the namespace info file that holds the namespace context to use for CLI requests.
   -o, --output="": Output format: json|yaml|template|templatefile
       --output-version="": Output the formatted object with the given version (default api-version)
       --overrides="": An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.

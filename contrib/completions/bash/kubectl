@@ -72,9 +72,7 @@ __kubectl_pre_command()
             --client-key=
             --insecure-skip-tls-verify=
             --match-server-version=
-            -n
             --namespace=
-            --ns-path=
             -s
             --server=
     )
@@ -85,7 +83,7 @@ __kubectl_pre_command()
             COMPREPLY=( $(compgen -W "${api_versions[*]}" -- "$cur") )
             return 0
             ;;
-        -a | --auth-path | --certificate-authority | --client-certificate | --client-key | --ns-path)
+        -a | --auth-path | --certificate-authority | --client-certificate | --client-key)
             _filedir
             return 0
             ;;
