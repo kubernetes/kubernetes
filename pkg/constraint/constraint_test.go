@@ -41,8 +41,8 @@ func podWithContainers(containers ...api.Container) api.BoundPod {
 
 func TestAllowed(t *testing.T) {
 	table := []struct {
-		err	error
-		pods    []api.BoundPod
+		err  error
+		pods []api.BoundPod
 	}{
 		{
 			err: nil,

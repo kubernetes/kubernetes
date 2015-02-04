@@ -25,8 +25,8 @@ import (
 // Allowed returns true if pods is a collection of bound pods
 // which can run without conflict on a single minion.
 func Allowed(pods []api.BoundPod) error {
-	if (PortsConflict(pods)) {
-		return fmt.Errorf("conflicting ports");
+	if PortsConflict(pods) {
+		return fmt.Errorf("conflicting ports")
 	}
-	return nil;
+	return nil
 }
