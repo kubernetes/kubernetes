@@ -18,6 +18,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
 	"strings"
@@ -262,26 +263,43 @@ func (s *NodeController) DoChecks(nodes *api.NodeList) *api.NodeList {
 // DoCheck performs health checking for given node.
 func (s *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	var conditions []api.NodeCondition
+
+	// Check Condition: NodeReady. TODO: More node conditions.
+	oldReadyCondition := s.getCondition(node, api.NodeReady)
+	newReadyCondition := s.checkNodeReady(node)
+	if oldReadyCondition != nil && oldReadyCondition.Status == newReadyCondition.Status {
+		newReadyCondition.LastTransitionTime = oldReadyCondition.LastTransitionTime
+	} else {
+		newReadyCondition.LastTransitionTime = util.Now()
+	}
+	conditions = append(conditions, *newReadyCondition)
+
+	return conditions
+}
+
+// checkNodeReady checks raw node ready condition, without timestamp set.
+func (s *NodeController) checkNodeReady(node *api.Node) *api.NodeCondition {
 	switch status, err := s.kubeletClient.HealthCheck(node.Name); {
 	case err != nil:
 		glog.V(2).Infof("NodeController: node %s health check error: %v", node.Name, err)
-		conditions = append(conditions, api.NodeCondition{
+		return &api.NodeCondition{
 			Kind:   api.NodeReady,
 			Status: api.ConditionUnknown,
-		})
+			Reason: fmt.Sprintf("Node health check error: %v", err),
+		}
 	case status == probe.Failure:
-		conditions = append(conditions, api.NodeCondition{
+		return &api.NodeCondition{
 			Kind:   api.NodeReady,
 			Status: api.ConditionNone,
-		})
+			Reason: fmt.Sprintf("Node health check failed: kubelet /healthz endpoint returns not ok"),
+		}
 	default:
-		conditions = append(conditions, api.NodeCondition{
+		return &api.NodeCondition{
 			Kind:   api.NodeReady,
 			Status: api.ConditionFull,
-		})
+			Reason: fmt.Sprintf("Node health check succeeded: kubelet /healthz endpoint returns ok"),
+		}
 	}
-	glog.V(5).Infof("NodeController: node %q status was %+v", node.Name, conditions)
-	return conditions
 }
 
 // StaticNodes constructs and returns api.NodeList for static nodes. If error
@@ -339,4 +357,15 @@ func (s *NodeController) canonicalizeName(nodes *api.NodeList) *api.NodeList {
 		nodes.Items[i].Name = strings.ToLower(nodes.Items[i].Name)
 	}
 	return nodes
+}
+
+// getCondition returns a condition object for the specific condition
+// kind, nil if the condition is not set.
+func (s *NodeController) getCondition(node *api.Node, kind api.NodeConditionKind) *api.NodeCondition {
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Kind == kind {
+			return &node.Status.Conditions[i]
+		}
+	}
+	return nil
 }
