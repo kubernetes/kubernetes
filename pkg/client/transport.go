@@ -23,6 +23,24 @@ import (
 	"net/http"
 )
 
+type userAgentRoundTripper struct {
+	agent string
+	rt    http.RoundTripper
+}
+
+func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
+	return &userAgentRoundTripper{agent, rt}
+}
+
+func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("User-Agent")) != 0 {
+		return rt.rt.RoundTrip(req)
+	}
+	req = cloneRequest(req)
+	req.Header.Set("User-Agent", rt.agent)
+	return rt.rt.RoundTrip(req)
+}
+
 type basicAuthRoundTripper struct {
 	username string
 	password string
