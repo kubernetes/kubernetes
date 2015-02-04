@@ -50,6 +50,7 @@ while true; do
   fi
 done
 echo "Found ${found} nodes."
+cat "${MINIONS_FILE}"
 
 # On vSphere, use minion IPs as their names
 if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]]; then
