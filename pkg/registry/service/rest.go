@@ -229,10 +229,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 
 	// Copy over non-user fields
-	// TODO: this should be a Status field, since the end user does not set it.
 	// TODO: make this a merge function
-	service.Spec.ProxyPort = oldService.Spec.ProxyPort
-
 	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", service.Name, errs)
 	}

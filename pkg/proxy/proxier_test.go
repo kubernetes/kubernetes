@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -384,8 +383,12 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", ProxyPort: svcInfo.proxyPort}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP"}, Status: api.ServiceStatus{}},
 	})
+	svcInfo, exists := p.getServiceInfo("echo")
+	if !exists {
+		t.Fatalf("can't find serviceInfo")
+	}
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 }
@@ -419,8 +422,12 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "UDP", ProxyPort: svcInfo.proxyPort}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "UDP"}, Status: api.ServiceStatus{}},
 	})
+	svcInfo, exists := p.getServiceInfo("echo")
+	if !exists {
+		t.Fatalf("can't find serviceInfo")
+	}
 	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 }
@@ -444,36 +451,21 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 
-	// add a new dummy listener in order to get a port that is free
-	l, _ := net.Listen("tcp", ":0")
-	_, newPortStr, _ := net.SplitHostPort(l.Addr().String())
-	newPort, _ := strconv.Atoi(newPortStr)
-	l.Close()
-
-	// Wait for the socket to actually get free.
-	if err := waitForClosedPortTCP(p, newPort); err != nil {
-		t.Fatalf(err.Error())
-	}
-	if svcInfo.proxyPort == newPort {
-		t.Errorf("expected difference, got %d %d", newPort, svcInfo.proxyPort)
-	}
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPort, Protocol: "TCP", ProxyPort: newPort}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: 99, Protocol: "TCP"}, Status: api.ServiceStatus{}},
 	})
+	// Wait for the socket to actually get free.
 	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
-	testEchoTCP(t, "127.0.0.1", newPort)
+	svcInfo, exists := p.getServiceInfo("echo")
+	if !exists {
+		t.Fatalf("can't find serviceInfo")
+	}
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	// This is a bit async, but this should be sufficient.
 	time.Sleep(500 * time.Millisecond)
 	waitForNumProxyLoops(t, p, 1)
-
-	// Ensure the old port is released and re-usable.
-	l, err = net.Listen("tcp", joinHostPort("", svcInfo.proxyPort))
-	if err != nil {
-		t.Fatalf("can't claim released port: %s", err)
-	}
-	l.Close()
 }
 
 func TestUDPProxyUpdatePort(t *testing.T) {
@@ -494,34 +486,19 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 1)
 
-	// add a new dummy listener in order to get a port that is free
-	pc, _ := net.ListenPacket("udp", ":0")
-	_, newPortStr, _ := net.SplitHostPort(pc.LocalAddr().String())
-	newPort, _ := strconv.Atoi(newPortStr)
-	pc.Close()
-
-	// Wait for the socket to actually get free.
-	if err := waitForClosedPortUDP(p, newPort); err != nil {
-		t.Fatalf(err.Error())
-	}
-	if svcInfo.proxyPort == newPort {
-		t.Errorf("expected difference, got %d %d", newPort, svcInfo.proxyPort)
-	}
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPort, Protocol: "UDP", ProxyPort: newPort}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: 99, Protocol: "UDP"}, Status: api.ServiceStatus{}},
 	})
+	// Wait for the socket to actually get free.
 	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
-	testEchoUDP(t, "127.0.0.1", newPort)
-	waitForNumProxyLoops(t, p, 1)
-
-	// Ensure the old port is released and re-usable.
-	pc, err = net.ListenPacket("udp", joinHostPort("", svcInfo.proxyPort))
-	if err != nil {
-		t.Fatalf("can't claim released port: %s", err)
+	svcInfo, exists := p.getServiceInfo("echo")
+	if !exists {
+		t.Fatalf("can't find serviceInfo")
 	}
-	pc.Close()
+	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
+	waitForNumProxyLoops(t, p, 1)
 }
 
 // TODO: Test UDP timeouts.

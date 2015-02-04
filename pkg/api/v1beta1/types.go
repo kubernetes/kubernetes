@@ -544,7 +544,7 @@ type Service struct {
 	// not be changed by updates.
 	PortalIP string `json:"portalIP,omitempty" description:"IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated"`
 
-	// ProxyPort is assigned by the master.  If specified by the user it will be ignored.
+	// DEPRECATED: has no implementation.
 	ProxyPort int `json:"proxyPort,omitempty" description:"if non-zero, a pre-allocated host port used for this service by the proxy on each node; assigned by the master and ignored on input"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.

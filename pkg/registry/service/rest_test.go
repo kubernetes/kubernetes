@@ -69,9 +69,6 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
-	if created_service.Spec.ProxyPort != 0 {
-		t.Errorf("Unexpected ProxyPort: %d", created_service.Spec.ProxyPort)
-	}
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -509,23 +506,16 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
-	if created_service.Spec.ProxyPort != 0 {
-		t.Errorf("Unexpected ProxyPort: %d", created_service.Spec.ProxyPort)
-	}
 
 	update := new(api.Service)
 	*update = *created_service
 	update.Spec.Port = 6503
-	update.Spec.ProxyPort = 309 // should be ignored
 
 	c, _ = rest.Update(ctx, update)
 	updated_svc := <-c
 	updated_service := updated_svc.Object.(*api.Service)
 	if updated_service.Spec.Port != 6503 {
 		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Port)
-	}
-	if updated_service.Spec.ProxyPort != 0 { // unchanged, despite trying
-		t.Errorf("Unexpected ProxyPort: %d", updated_service.Spec.ProxyPort)
 	}
 
 	*update = *created_service
@@ -562,9 +552,6 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	}
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
-	}
-	if created_service.Spec.ProxyPort != 0 {
-		t.Errorf("Unexpected ProxyPort: %d", created_service.Spec.ProxyPort)
 	}
 
 	update := new(api.Service)
