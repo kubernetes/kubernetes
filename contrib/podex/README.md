@@ -19,8 +19,8 @@ $ podex [-format json|yaml] [-type=pod|container] [-name PODNAME] IMAGES...
 
 ### Examples
 ```
-$ podex google/nodejs-hello > pod-manifest.yaml
-$ podex -format json -type container -name nodejs-nginx google/nodejs-hello nginx > container-manifest.json
+$ podex google/nodejs-hello > pod.yaml
+$ podex -format json -type container -name nodejs-nginx google/nodejs-hello nginx > container.json
 ```
 
 ## TODOs
