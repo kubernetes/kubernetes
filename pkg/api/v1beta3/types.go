@@ -691,9 +691,6 @@ type ServiceSpec struct {
 	// not be changed by updates.
 	PortalIP string `json:"portalIP,omitempty"`
 
-	// ProxyPort is assigned by the master.  If 0, the proxy will choose an ephemeral port.
-	ProxyPort int `json:"proxyPort,omitempty"`
-
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
 	// PublicIPs are used by external load balancers.

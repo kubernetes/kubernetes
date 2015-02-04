@@ -481,8 +481,8 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 				glog.Errorf("Failed to stop service %q: %v", service.Name, err)
 			}
 		}
-		glog.V(1).Infof("Adding new service %q at %s:%d/%s (local :%d)", service.Name, serviceIP, service.Spec.Port, service.Spec.Protocol, service.Spec.ProxyPort)
-		info, err := proxier.addServiceOnPort(service.Name, service.Spec.Protocol, service.Spec.ProxyPort, udpIdleTimeout)
+		glog.V(1).Infof("Adding new service %q at %s:%d/%s", service.Name, serviceIP, service.Spec.Port, service.Spec.Protocol)
+		info, err := proxier.addServiceOnPort(service.Name, service.Spec.Protocol, 0, udpIdleTimeout)
 		if err != nil {
 			glog.Errorf("Failed to start proxy for %q: %v", service.Name, err)
 			continue

@@ -98,8 +98,6 @@ func (svcStrategy) NamespaceScoped() bool {
 // ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
 func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
 	service := obj.(*api.Service)
-	// TODO: Get rid of ProxyPort.
-	service.Spec.ProxyPort = 0
 	service.Status = api.ServiceStatus{}
 }
 

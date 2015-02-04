@@ -554,7 +554,6 @@ func init() {
 			out.PublicIPs = in.Spec.PublicIPs
 			out.ContainerPort = in.Spec.ContainerPort
 			out.PortalIP = in.Spec.PortalIP
-			out.ProxyPort = in.Spec.ProxyPort
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
 			}
@@ -581,7 +580,6 @@ func init() {
 			out.Spec.PublicIPs = in.PublicIPs
 			out.Spec.ContainerPort = in.ContainerPort
 			out.Spec.PortalIP = in.PortalIP
-			out.Spec.ProxyPort = in.ProxyPort
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
 				return err
 			}
