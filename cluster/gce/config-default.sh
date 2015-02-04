@@ -49,9 +49,9 @@ function increment_ipv4 {
     ip_dec=$((ip_dec<<8))
     ip_dec=$((ip_dec + $comp))
   done
- 
+
   ip_dec=$((ip_dec + $incr_amount))
- 
+
   ip_components=()
   local i
   for ((i=0; i < 4; i++)); do
@@ -61,13 +61,13 @@ function increment_ipv4 {
   done
   echo "${ip_components[3]}.${ip_components[2]}.${ip_components[1]}.${ip_components[0]}"
 }
- 
+
 node_count="${NUM_MINIONS}"
 next_node="10.244.0.0"
 node_subnet_size=24
 node_subnet_count=$((2 ** (32-$node_subnet_size)))
 subnets=()
- 
+
 for ((node_num=0; node_num<node_count; node_num++)); do
   subnets+=("$next_node"/"${node_subnet_size}")
   next_node=$(increment_ipv4 $next_node $node_subnet_count)
@@ -81,21 +81,21 @@ MINION_SCOPES=("storage-ro" "compute-rw")
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
-
-# Optional: When set to true, heapster will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING=true
-
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
 
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
+
+# Optional: When set to true, heapster will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING=true
-LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
+LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING=true
+ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Don't require https for registries in our local RFC1918 network
