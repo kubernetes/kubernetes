@@ -691,7 +691,7 @@ func TestKindAuthorization(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	a := newAuthorizerWithContents(t, `{"kind": "services"}
+	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
 
 	var m *master.Master

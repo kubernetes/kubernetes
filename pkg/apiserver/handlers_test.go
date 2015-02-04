@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type fakeRL bool
@@ -63,59 +65,78 @@ func TestReadOnly(t *testing.T) {
 	}
 }
 
-func TestKindAndNamespace(t *testing.T) {
+func TestGetAPIRequestInfo(t *testing.T) {
 	successCases := []struct {
-		method            string
-		url               string
-		expectedNamespace string
-		expectedKind      string
-		expectedParts     []string
+		method             string
+		url                string
+		expectedVerb       string
+		expectedAPIVersion string
+		expectedNamespace  string
+		expectedResource   string
+		expectedKind       string
+		expectedName       string
+		expectedParts      []string
 	}{
 		// resource paths
-		{"GET", "/ns/other/pods", "other", "pods", []string{"pods"}},
-		{"GET", "/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"GET", "/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"POST", "/pods", api.NamespaceDefault, "pods", []string{"pods"}},
-		{"GET", "/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"GET", "/pods/foo?namespace=other", "other", "pods", []string{"pods", "foo"}},
-		{"GET", "/pods?namespace=other", "other", "pods", []string{"pods"}},
+		{"GET", "/ns/other/pods", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/ns/other/pods/foo", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
+		{"POST", "/pods", "create", "", api.NamespaceDefault, "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/pods/foo", "get", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/pods/foo?namespace=other", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/pods?namespace=other", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
 
 		// special verbs
-		{"GET", "/proxy/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"GET", "/proxy/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"GET", "/redirect/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"GET", "/redirect/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"GET", "/watch/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"GET", "/watch/ns/other/pods", "other", "pods", []string{"pods"}},
+		{"GET", "/proxy/ns/other/pods/foo", "proxy", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/proxy/pods/foo", "proxy", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/redirect/ns/other/pods/foo", "redirect", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/redirect/pods/foo", "redirect", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/watch/ns/other/pods", "watch", "", "other", "pods", "Pod", "", []string{"pods"}},
 
 		// fully-qualified paths
-		{"GET", "/api/v1beta1/ns/other/pods", "other", "pods", []string{"pods"}},
-		{"GET", "/api/v1beta1/ns/other/pods/foo", "other", "pods", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"POST", "/api/v1beta1/pods", api.NamespaceDefault, "pods", []string{"pods"}},
-		{"GET", "/api/v1beta1/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods/foo?namespace=other", "other", "pods", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods?namespace=other", "other", "pods", []string{"pods"}},
-		{"GET", "/api/v1beta1/proxy/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/redirect/pods/foo", api.NamespaceDefault, "pods", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/watch/pods", api.NamespaceAll, "pods", []string{"pods"}},
-		{"GET", "/api/v1beta1/watch/ns/other/pods", "other", "pods", []string{"pods"}},
+		{"GET", "/api/v1beta1/ns/other/pods", "list", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/ns/other/pods/foo", "get", "v1beta1", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods", "list", "v1beta1", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
+		{"POST", "/api/v1beta1/pods", "create", "v1beta1", api.NamespaceDefault, "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/pods/foo", "get", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods/foo?namespace=other", "get", "v1beta1", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods?namespace=other", "list", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/proxy/pods/foo", "proxy", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/redirect/pods/foo", "redirect", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/watch/pods", "watch", "v1beta1", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/watch/ns/other/pods", "watch", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
 	}
+
+	apiRequestInfoResolver := &APIRequestInfoResolver{util.NewStringSet("api"), latest.RESTMapper}
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
-		namespace, kind, parts, err := KindAndNamespace(req)
+
+		apiRequestInfo, err := apiRequestInfoResolver.GetAPIRequestInfo(req)
 		if err != nil {
-			t.Errorf("Unexpected error for url: %s", successCase.url)
+			t.Errorf("Unexpected error for url: %s %v", successCase.url, err)
 		}
-		if successCase.expectedNamespace != namespace {
-			t.Errorf("Unexpected namespace for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedNamespace, namespace)
+		if successCase.expectedVerb != apiRequestInfo.Verb {
+			t.Errorf("Unexpected verb for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedVerb, apiRequestInfo.Verb)
 		}
-		if successCase.expectedKind != kind {
-			t.Errorf("Unexpected resourceType for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedKind, kind)
+		if successCase.expectedAPIVersion != apiRequestInfo.APIVersion {
+			t.Errorf("Unexpected apiVersion for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedAPIVersion, apiRequestInfo.APIVersion)
 		}
-		if !reflect.DeepEqual(successCase.expectedParts, parts) {
-			t.Errorf("Unexpected parts for url: %s, expected: %v, actual: %v", successCase.url, successCase.expectedParts, parts)
+		if successCase.expectedNamespace != apiRequestInfo.Namespace {
+			t.Errorf("Unexpected namespace for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedNamespace, apiRequestInfo.Namespace)
+		}
+		if successCase.expectedKind != apiRequestInfo.Kind {
+			t.Errorf("Unexpected kind for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedKind, apiRequestInfo.Kind)
+		}
+		if successCase.expectedResource != apiRequestInfo.Resource {
+			t.Errorf("Unexpected resource for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedResource, apiRequestInfo.Resource)
+		}
+		if successCase.expectedName != apiRequestInfo.Name {
+			t.Errorf("Unexpected name for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedName, apiRequestInfo.Name)
+		}
+		if !reflect.DeepEqual(successCase.expectedParts, apiRequestInfo.Parts) {
+			t.Errorf("Unexpected parts for url: %s, expected: %v, actual: %v", successCase.url, successCase.expectedParts, apiRequestInfo.Parts)
 		}
 	}
 
@@ -131,7 +152,7 @@ func TestKindAndNamespace(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		_, _, _, err = KindAndNamespace(req)
+		_, err = apiRequestInfoResolver.GetAPIRequestInfo(req)
 		if err == nil {
 			t.Errorf("Expected error for key: %s", k)
 		}

@@ -32,28 +32,29 @@ import (
 
 // RESTHandler implements HTTP verbs on a set of RESTful resources identified by name.
 type RESTHandler struct {
-	storage          map[string]RESTStorage
-	codec            runtime.Codec
-	canonicalPrefix  string
-	selfLinker       runtime.SelfLinker
-	ops              *Operations
-	admissionControl admission.Interface
+	storage                map[string]RESTStorage
+	codec                  runtime.Codec
+	canonicalPrefix        string
+	selfLinker             runtime.SelfLinker
+	ops                    *Operations
+	admissionControl       admission.Interface
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 // ServeHTTP handles requests to all RESTStorage objects.
 func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	namespace, kind, parts, err := KindAndNamespace(req)
+	requestInfo, err := h.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
 		return
 	}
-	storage, ok := h.storage[kind]
+	storage, ok := h.storage[requestInfo.Resource]
 	if !ok {
 		notFound(w, req)
 		return
 	}
 
-	h.handleRESTStorage(parts, req, w, storage, namespace, kind)
+	h.handleRESTStorage(requestInfo.Parts, req, w, storage, requestInfo.Namespace, requestInfo.Resource)
 }
 
 // Sets the SelfLink field of the object.

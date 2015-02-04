@@ -47,7 +47,7 @@ func (resourceDefaults) Admit(a admission.Attributes) (err error) {
 	}
 
 	// we only care about pods
-	if a.GetKind() != "pods" {
+	if a.GetResource() != "pods" {
 		return nil
 	}
 

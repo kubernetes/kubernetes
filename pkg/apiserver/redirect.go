@@ -26,35 +26,37 @@ import (
 )
 
 type RedirectHandler struct {
-	storage map[string]RESTStorage
-	codec   runtime.Codec
+	storage                map[string]RESTStorage
+	codec                  runtime.Codec
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	namespace, kind, parts, err := KindAndNamespace(req)
+	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
 		return
 	}
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	resource, parts := requestInfo.Resource, requestInfo.Parts
+	ctx := api.WithNamespace(api.NewContext(), requestInfo.Namespace)
 
-	// redirection requires /kind/resourceName path parts
+	// redirection requires /resource/resourceName path parts
 	if len(parts) != 2 || req.Method != "GET" {
 		notFound(w, req)
 		return
 	}
 	id := parts[1]
-	storage, ok := r.storage[kind]
+	storage, ok := r.storage[resource]
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' has no storage object", kind)
+		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
 		notFound(w, req)
 		return
 	}
 
 	redirector, ok := storage.(Redirector)
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' is not a redirector", kind)
-		errorJSON(errors.NewMethodNotSupported(kind, "redirect"), r.codec, w)
+		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
+		errorJSON(errors.NewMethodNotSupported(resource, "redirect"), r.codec, w)
 		return
 	}
 
