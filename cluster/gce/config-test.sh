@@ -44,16 +44,19 @@ PORTAL_NET="10.0.0.0/16"
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
 
-ENABLE_NODE_MONITORING=true
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
-ENABLE_NODE_LOGGING=true
-LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+# Optional: When set to true, heapster will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-false}"
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
+LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING=false
+ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-false}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
-
-ENABLE_CLUSTER_MONITORING=false
 
 # Don't require https for registries in our local RFC1918 network
 EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
