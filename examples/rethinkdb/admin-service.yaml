@@ -1,0 +1,11 @@
+apiVersion: v1beta1
+namespace: rethinkdb
+kind: Service
+id: rethinkdb-admin
+containerPort: admin-port
+port: 8080
+labels:
+  db: influxdb
+selector:
+  db: rethinkdb
+  role: admin
