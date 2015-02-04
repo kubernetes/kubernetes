@@ -21,8 +21,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"reflect"
+	gruntime "runtime"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -67,6 +69,9 @@ type Config struct {
 	// Server should be accessed without verifying the TLS
 	// certificate. For testing only.
 	Insecure bool
+
+	// UserAgent is an optional field that specifies the caller of this request.
+	UserAgent string
 
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options.
@@ -150,6 +155,9 @@ func NewOrDie(c *Config) *Client {
 func SetKubernetesDefaults(config *Config) error {
 	if config.Prefix == "" {
 		config.Prefix = "/api"
+	}
+	if len(config.UserAgent) == 0 {
+		config.UserAgent = DefaultKubernetesUserAgent()
 	}
 	if len(config.Version) == 0 {
 		config.Version = defaultVersionFor(config)
@@ -252,6 +260,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	case hasBasicAuth:
 		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
 	}
+	if len(config.UserAgent) > 0 {
+		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
+	}
 	return rt, nil
 }
 
@@ -352,4 +363,19 @@ func defaultVersionFor(config *Config) string {
 		version = latest.Version
 	}
 	return version
+}
+
+// DefaultKubernetesUserAgent returns the default user agent that clients can use.
+func DefaultKubernetesUserAgent() string {
+	commit := version.Get().GitCommit
+	if len(commit) > 7 {
+		commit = commit[:7]
+	}
+	if len(commit) == 0 {
+		commit = "unknown"
+	}
+	version := version.Get().GitVersion
+	seg := strings.SplitN(version, "-", 2)
+	version = seg[0]
+	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
 }

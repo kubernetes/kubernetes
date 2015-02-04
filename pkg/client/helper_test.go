@@ -18,7 +18,11 @@ package client
 
 import (
 	"net/http"
+	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 )
 
 const (
@@ -253,5 +257,59 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		if testCase.TransportTLS != useTLS {
 			t.Errorf("expected %v for %#v", testCase.TransportTLS, testCase.Config)
 		}
+	}
+}
+
+func TestSetKubernetesDefaults(t *testing.T) {
+	testCases := []struct {
+		Config Config
+		After  Config
+		Err    bool
+	}{
+		{
+			Config{},
+			Config{
+				Prefix:         "/api",
+				Version:        latest.Version,
+				Codec:          latest.Codec,
+				LegacyBehavior: (latest.Version == "v1beta1" || latest.Version == "v1beta2"),
+			},
+			false,
+		},
+		{
+			Config{
+				Version: "not_an_api",
+			},
+			Config{},
+			true,
+		},
+	}
+	for _, testCase := range testCases {
+		val := &testCase.Config
+		err := SetKubernetesDefaults(val)
+		val.UserAgent = ""
+		switch {
+		case err == nil && testCase.Err:
+			t.Errorf("expected error but was nil")
+			continue
+		case err != nil && !testCase.Err:
+			t.Errorf("unexpected error %v", err)
+			continue
+		case err != nil:
+			continue
+		}
+		if !reflect.DeepEqual(*val, testCase.After) {
+			t.Errorf("unexpected result object: %#v", val)
+		}
+	}
+}
+
+func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
+	config := &Config{}
+	if err := SetKubernetesDefaults(config); err != nil {
+		t.Errorf("unexpected error: %v")
+	}
+	if !strings.Contains(config.UserAgent, "kubernetes/") {
+		t.Errorf("no user agent set: %#v", config)
 	}
 }
