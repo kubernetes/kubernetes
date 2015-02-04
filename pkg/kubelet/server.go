@@ -31,7 +31,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -64,6 +63,7 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetDockerVersion() (string, error)
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetBoundPods() ([]api.BoundPod, error)
 	GetPodByName(namespace, name string) (*api.BoundPod, bool)
@@ -88,7 +88,7 @@ func NewServer(host HostInterface, enableDebuggingHandlers bool) Server {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
-	healthz.InstallHandler(s.mux)
+	s.mux.HandleFunc("/healthz", s.handleHealthz)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
 	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
@@ -107,6 +107,25 @@ func (s *Server) InstallDebuggingHandlers() {
 // error serializes an error object into an HTTP response.
 func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
+}
+
+// handleHealthz handles /healthz request and checks Docker version
+func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
+	version, err := s.host.GetDockerVersion()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("unknown Docker version"))
+		return
+	}
+	const minDockerVersion = "1.3.0"
+	if version < minDockerVersion {
+		w.WriteHeader(http.StatusInternalServerError)
+		msg := "Docker version is too old (" + version + ")"
+		w.Write([]byte(msg))
+		return;
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
 }
 
 // handleContainerLogs handles containerLogs request against the Kubelet

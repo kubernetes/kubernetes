@@ -1361,6 +1361,23 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
+// Returns Docker version for this Kubelet.
+func (kl *Kubelet) GetDockerVersion() (string, error) {
+	if kl.dockerClient == nil {
+		return "", fmt.Errorf("No Docker client")
+	}
+	env, err := kl.dockerClient.Version()
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range *env {
+		if strings.HasPrefix(entry, "Version=") {
+			return strings.Split(entry, "=")[1], nil
+		}
+	}
+	return "", fmt.Errorf("Docker version unknown")
+}
+
 // GetKubeletContainerLogs returns logs from the container
 // The second parameter of GetPodStatus and FindPodContainer methods represents pod UUID, which is allowed to be blank
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
