@@ -49,7 +49,11 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	if !found {
 		return nil, fmt.Errorf("'name' is a required parameter.")
 	}
-	port, err := strconv.Atoi(params["port"])
+	portString, found := params["port"]
+	if !found {
+		return nil, fmt.Errorf("'port' is a required parameter.")
+	}
+	port, err := strconv.Atoi(portString)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +69,10 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	}
 	containerPort, found := params["container-port"]
 	if found && len(containerPort) > 0 {
-		cPort, err := strconv.Atoi(containerPort)
-		if err != nil {
-			service.Spec.ContainerPort = util.NewIntOrStringFromInt(cPort)
-		} else {
+		if cPort, err := strconv.Atoi(containerPort); err != nil {
 			service.Spec.ContainerPort = util.NewIntOrStringFromString(containerPort)
+		} else {
+			service.Spec.ContainerPort = util.NewIntOrStringFromInt(cPort)
 		}
 	} else {
 		service.Spec.ContainerPort = util.NewIntOrStringFromInt(port)
@@ -77,7 +80,7 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.CreateExternalLoadBalancer = true
 	}
-	if len(params["public-ip"]) == 0 {
+	if len(params["public-ip"]) != 0 {
 		service.Spec.PublicIPs = []string{params["public-ip"]}
 	}
 	return &service, nil

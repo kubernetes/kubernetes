@@ -51,9 +51,6 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 			client, err := f.Client(cmd)
 			checkErr(err)
 
-			rc, err := client.ReplicationControllers(namespace).Get(args[0])
-			checkErr(err)
-
 			generatorName := GetFlagString(cmd, "generator")
 			generator, found := kubectl.Generators[generatorName]
 			if !found {
@@ -70,6 +67,8 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 				params["name"] = GetFlagString(cmd, "service-name")
 			}
 			if _, found := params["selector"]; !found {
+				rc, err := client.ReplicationControllers(namespace).Get(args[0])
+				checkErr(err)
 				params["selector"] = kubectl.MakeLabels(rc.Spec.Selector)
 			}
 			if GetFlagBool(cmd, "create-external-load-balancer") {
