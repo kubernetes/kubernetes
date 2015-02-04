@@ -876,6 +876,26 @@ func TestValidatePodUpdate(t *testing.T) {
 			false,
 			"port change",
 		},
+		{
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"Bar": "foo",
+					},
+				},
+			},
+			true,
+			"bad label change",
+		},
 	}
 
 	for _, test := range tests {
@@ -1640,6 +1660,17 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"Foo": "baz"},
+			},
+		}, false},
 	}
 	for i, test := range tests {
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
@@ -1794,6 +1825,19 @@ func TestValidateServiceUpdate(t *testing.T) {
 				},
 				Spec: api.ServiceSpec{
 					PortalIP: "127.0.0.2",
+				},
+			}, false},
+		{ // 10
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "baz"},
+				},
+			},
+			api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"Foo": "baz"},
 				},
 			}, false},
 	}
