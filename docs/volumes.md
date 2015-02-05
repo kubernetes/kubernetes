@@ -49,9 +49,10 @@ A Volume with a GCEPersistentDisk property allows access to files on a Google Co
 There are some restrictions when using a GCEPersistentDisk:
   - the nodes (what the kubelet runs on) need to be GCE VMs
   - those VMs need to be in the same GCE project and zone as the PD
-  - avoid creating multiple pods that use the same Volume
-    - if multiple pods refer to the same Volume and both are scheduled on the same machine, regardless of whether they are read-only or read-write, then the second pod scheduled will fail.
-    - Replication controllers can only be created for pods that use read-only mounts.
+  - avoid creating multiple pods that use the same Volume if any mount it read/write.
+    - if a pod P already mounts a volume read/write, and a second pod Q attempts to use the volume, regardless of if it tries to use it read-only or read/write, Q will fail.
+    - if a pod P already mounts a volume read-only, and a second pod Q attempts to use the volume read/write, Q will fail.
+    - replication controllers with replicas > 1 can only be created for pods that use read-only mounts.
 
 #### Creating a PD
 Before you can use a GCE PD with a pod, you need to create it and format it.
