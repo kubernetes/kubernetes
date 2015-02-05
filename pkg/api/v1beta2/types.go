@@ -782,17 +782,6 @@ const (
 	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
 )
 
-// ServerOp is an operation delivered to API clients.
-type ServerOp struct {
-	TypeMeta `json:",inline"`
-}
-
-// ServerOpList is a list of operations, as delivered to API clients.
-type ServerOpList struct {
-	TypeMeta `json:",inline"`
-	Items    []ServerOp `json:"items" description:"list of operations"`
-}
-
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	Kind            string    `json:"kind,omitempty" description:"kind of the referent"`
