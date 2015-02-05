@@ -60,35 +60,16 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	return meta.Namespace() + "/" + meta.Name(), nil
 }
 
-// Index is a generic object storage interface that lets you list objects by their Index
-type Index interface {
-	Store
-	Index(obj interface{}) ([]interface{}, error)
-}
-
-// IndexFunc knows how to provide an indexed value for an object.
-type IndexFunc func(obj interface{}) (string, error)
-
-// MetaNamespaceIndexFunc is a convenient default IndexFun which knows how to index
-// an object by its namespace.
-func MetaNamespaceIndexFunc(obj interface{}) (string, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return "", fmt.Errorf("object has no meta: %v", err)
-	}
-	return meta.Namespace(), nil
-}
-
 type cache struct {
 	lock  sync.RWMutex
 	items map[string]interface{}
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	keyFunc KeyFunc
-	// indexFunc is used to make the index value for objects stored in an retrieved from index
-	indexFunc IndexFunc
-	// maps the indexFunc value for an object to a set whose keys are keys in items
-	index map[string]util.StringSet
+	// indexers maps a name to an IndexFunc
+	indexers Indexers
+	// indices maps a name to an Index
+	indices Indices
 }
 
 // Add inserts an item into the cache.
@@ -100,53 +81,57 @@ func (c *cache) Add(obj interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items[key] = obj
-	c.updateIndex(obj)
+	c.updateIndices(obj)
 	return nil
 }
 
-// updateIndex adds or modifies an object in the index
-// it is intended to be called from a function that already has a lock on the cache
-func (c *cache) updateIndex(obj interface{}) error {
-	if c.indexFunc == nil {
-		return nil
-	}
+// updateIndices modifies the objects location in the managed indexes
+// updateIndices must be called from a function that already has a lock on the cache
+func (c *cache) updateIndices(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return err
 	}
-	indexValue, err := c.indexFunc(obj)
-	if err != nil {
-		return err
+	for name, indexFunc := range c.indexers {
+		indexValue, err := indexFunc(obj)
+		if err != nil {
+			return err
+		}
+		index := c.indices[name]
+		if index == nil {
+			index = Index{}
+			c.indices[name] = index
+		}
+		set := index[indexValue]
+		if set == nil {
+			set = util.StringSet{}
+			index[indexValue] = set
+		}
+		set.Insert(key)
 	}
-	set := c.index[indexValue]
-	if set == nil {
-		set = util.StringSet{}
-		c.index[indexValue] = set
-	}
-	set.Insert(key)
 	return nil
 }
 
-// deleteFromIndex removes an entry from the index
+// deleteFromIndices removes the object from each of the managed indexes
 // it is intended to be called from a function that already has a lock on the cache
-func (c *cache) deleteFromIndex(obj interface{}) error {
-	if c.indexFunc == nil {
-		return nil
-	}
+func (c *cache) deleteFromIndices(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return err
 	}
-	indexValue, err := c.indexFunc(obj)
-	if err != nil {
-		return err
+	for name, indexFunc := range c.indexers {
+		indexValue, err := indexFunc(obj)
+		if err != nil {
+			return err
+		}
+		index := c.indices[name]
+		if index != nil {
+			set := index[indexValue]
+			if set != nil {
+				set.Delete(key)
+			}
+		}
 	}
-	set := c.index[indexValue]
-	if set == nil {
-		set = util.StringSet{}
-		c.index[indexValue] = set
-	}
-	set.Delete(key)
 	return nil
 }
 
@@ -159,7 +144,7 @@ func (c *cache) Update(obj interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items[key] = obj
-	c.updateIndex(obj)
+	c.updateIndices(obj)
 	return nil
 }
 
@@ -172,7 +157,7 @@ func (c *cache) Delete(obj interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.items, key)
-	c.deleteFromIndex(obj)
+	c.deleteFromIndices(obj)
 	return nil
 }
 
@@ -190,15 +175,21 @@ func (c *cache) List() []interface{} {
 
 // Index returns a list of items that match on the index function
 // Index is thread-safe so long as you treat all items as immutable
-func (c *cache) Index(obj interface{}) ([]interface{}, error) {
+func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	indexKey, err := c.indexFunc(obj)
+	indexFunc := c.indexers[indexName]
+	if indexFunc == nil {
+		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	indexKey, err := indexFunc(obj)
 	if err != nil {
 		return nil, err
 	}
-	set := c.index[indexKey]
+	index := c.indices[indexName]
+	set := index[indexKey]
 	list := make([]interface{}, 0, set.Len())
 	for _, key := range set.List() {
 		list = append(list, c.items[key])
@@ -243,9 +234,9 @@ func (c *cache) Replace(list []interface{}) error {
 	c.items = items
 
 	// rebuild any index
-	c.index = map[string]util.StringSet{}
+	c.indices = Indices{}
 	for _, item := range c.items {
-		c.updateIndex(item)
+		c.updateIndices(item)
 	}
 
 	return nil
@@ -253,10 +244,10 @@ func (c *cache) Replace(list []interface{}) error {
 
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc) Store {
-	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc}
+	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, indexers: Indexers{}, indices: Indices{}}
 }
 
-// NewIndex returns an Index implemented simply with a map and a lock.
-func NewIndex(keyFunc KeyFunc, indexFunc IndexFunc) Index {
-	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, indexFunc: indexFunc, index: map[string]util.StringSet{}}
+// NewIndexer returns an Indexer implemented simply with a map and a lock.
+func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
+	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, indexers: indexers, indices: Indices{}}
 }

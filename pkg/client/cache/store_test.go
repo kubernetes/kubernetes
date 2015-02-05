@@ -87,7 +87,7 @@ func doTestStore(t *testing.T, store Store) {
 }
 
 // Test public interface
-func doTestIndex(t *testing.T, index Index) {
+func doTestIndex(t *testing.T, indexer Indexer) {
 	mkObj := func(id string, val string) testStoreObject {
 		return testStoreObject{id: id, val: val}
 	}
@@ -97,14 +97,14 @@ func doTestIndex(t *testing.T, index Index) {
 	expected["b"] = util.NewStringSet("a", "c")
 	expected["f"] = util.NewStringSet("e")
 	expected["h"] = util.NewStringSet("g")
-	index.Add(mkObj("a", "b"))
-	index.Add(mkObj("c", "b"))
-	index.Add(mkObj("e", "f"))
-	index.Add(mkObj("g", "h"))
+	indexer.Add(mkObj("a", "b"))
+	indexer.Add(mkObj("c", "b"))
+	indexer.Add(mkObj("e", "f"))
+	indexer.Add(mkObj("g", "h"))
 	{
 		for k, v := range expected {
 			found := util.StringSet{}
-			indexResults, err := index.Index(mkObj("", k))
+			indexResults, err := indexer.Index("by_val", mkObj("", k))
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
@@ -127,6 +127,12 @@ func testStoreIndexFunc(obj interface{}) (string, error) {
 	return obj.(testStoreObject).val, nil
 }
 
+func testStoreIndexers() Indexers {
+	indexers := Indexers{}
+	indexers["by_val"] = testStoreIndexFunc
+	return indexers
+}
+
 type testStoreObject struct {
 	id  string
 	val string
@@ -146,5 +152,5 @@ func TestUndeltaStore(t *testing.T) {
 }
 
 func TestIndex(t *testing.T) {
-	doTestIndex(t, NewIndex(testStoreKeyFunc, testStoreIndexFunc))
+	doTestIndex(t, NewIndexer(testStoreKeyFunc, testStoreIndexers()))
 }
