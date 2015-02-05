@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -51,27 +52,28 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 			client, err := f.Client(cmd)
 			checkErr(err)
 
-			generatorName := GetFlagString(cmd, "generator")
+			generatorName := util.GetFlagString(cmd, "generator")
+
 			generator, found := kubectl.Generators[generatorName]
 			if !found {
 				usageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
 			}
-			if GetFlagInt(cmd, "port") < 1 {
+			if util.GetFlagInt(cmd, "port") < 1 {
 				usageError(cmd, "--port is required and must be a positive integer.")
 			}
 			names := generator.ParamNames()
 			params := kubectl.MakeParams(cmd, names)
-			if len(GetFlagString(cmd, "service-name")) == 0 {
+			if len(util.GetFlagString(cmd, "service-name")) == 0 {
 				params["name"] = args[0]
 			} else {
-				params["name"] = GetFlagString(cmd, "service-name")
+				params["name"] = util.GetFlagString(cmd, "service-name")
 			}
 			if _, found := params["selector"]; !found {
 				rc, err := client.ReplicationControllers(namespace).Get(args[0])
 				checkErr(err)
 				params["selector"] = kubectl.MakeLabels(rc.Spec.Selector)
 			}
-			if GetFlagBool(cmd, "create-external-load-balancer") {
+			if util.GetFlagBool(cmd, "create-external-load-balancer") {
 				params["create-external-load-balancer"] = "true"
 			}
 
@@ -81,22 +83,22 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 			service, err := generator.Generate(params)
 			checkErr(err)
 
-			inline := GetFlagString(cmd, "overrides")
+			inline := util.GetFlagString(cmd, "overrides")
 			if len(inline) > 0 {
-				Merge(service, inline, "Service")
+				util.Merge(service, inline, "Service")
 			}
 
 			// TODO: extract this flag to a central location, when such a location exists.
-			if !GetFlagBool(cmd, "dry-run") {
+			if !util.GetFlagBool(cmd, "dry-run") {
 				service, err = client.Services(namespace).Create(service.(*api.Service))
 				checkErr(err)
 			}
 
-			err = PrintObject(cmd, service, f, out)
+			err = f.PrintObject(cmd, service, out)
 			checkErr(err)
 		},
 	}
-	AddPrinterFlags(cmd)
+	util.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "service/v1", "The name of the api generator that you want to use.  Default 'service/v1'")
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service you want to be created. Default 'tcp'")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")

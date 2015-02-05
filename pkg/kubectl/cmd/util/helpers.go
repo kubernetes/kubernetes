@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package util
 
 import (
 	"encoding/json"
@@ -33,6 +33,18 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
 )
+
+func checkErr(err error) {
+	if err != nil {
+		glog.FatalDepth(1, err)
+	}
+}
+
+func usageError(cmd *cobra.Command, format string, args ...interface{}) {
+	glog.Errorf(format, args...)
+	glog.Errorf("See '%s -h' for help.", cmd.CommandPath())
+	os.Exit(1)
+}
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	f := cmd.Flags().Lookup(flag)
