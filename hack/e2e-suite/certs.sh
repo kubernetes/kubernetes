@@ -22,8 +22,17 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+
+: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBE_CONFIG_FILE:="config-test.sh"}
+
+export KUBECTL KUBE_CONFIG_FILE
+
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+prepare-e2e
 
 if [[ "${KUBERNETES_PROVIDER}" != "gce" ]] && [[ "${KUBERNETES_PROVIDER}" != "gke" ]]; then
   echo "WARNING: Skipping certs.sh for cloud provider: ${KUBERNETES_PROVIDER}."

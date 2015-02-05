@@ -137,8 +137,11 @@ func main() {
 			log.Fatalf("Error preparing a binary of version %s: %s. Aborting.", *version, err)
 		} else {
 			versionRoot = newVersionRoot
+			os.Setenv("KUBE_VERSION_ROOT", newVersionRoot)
 		}
 	}
+
+	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
 
 	if *pushup {
 		if IsUp() {
