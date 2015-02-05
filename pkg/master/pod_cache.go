@@ -188,8 +188,9 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		newStatus.Info = result.Status.Info
 		newStatus.PodIP = result.Status.PodIP
 		if newStatus.Info == nil {
-			// There is a small race window, kubelet just has PodSpec, but
-			// couldn't retrieve any ContainerStatus.
+			// There is a small race window that kubelet couldn't
+			// propulated the status yet. This should go away once
+			// we removed boundPods
 			newStatus.Phase = api.PodPending
 		} else {
 			newStatus.Phase = result.Status.Phase
