@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
@@ -46,20 +47,25 @@ func TestFormatURL(t *testing.T) {
 }
 
 func TestHTTPProbeChecker(t *testing.T) {
+	handleReq := func(s int) func(w http.ResponseWriter) {
+		return func(w http.ResponseWriter) { w.WriteHeader(s) }
+	}
+
 	prober := New()
 	testCases := []struct {
-		status int
-		health probe.Status
+		handler func(w http.ResponseWriter)
+		health  probe.Status
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
-		{http.StatusOK, probe.Success},
-		{-1, probe.Failure},
+		{handleReq(http.StatusOK), probe.Success},
+		{handleReq(-1), probe.Failure},
+		{func(w http.ResponseWriter) { time.Sleep(3 * time.Second) }, probe.Failure},
 	}
 	for _, test := range testCases {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(test.status)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			test.handler(w)
 		}))
-		u, err := url.Parse(ts.URL)
+		u, err := url.Parse(server.URL)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -71,7 +77,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		health, err := prober.Probe(host, p, "")
+		health, err := prober.Probe(host, p, "", 1*time.Second)
 		if test.health == probe.Unknown && err == nil {
 			t.Errorf("Expected error")
 		}

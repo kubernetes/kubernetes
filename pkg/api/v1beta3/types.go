@@ -310,6 +310,8 @@ type Probe struct {
 	Handler `json:",inline"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+	// Length of time before health checking times out.  In seconds.
+	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

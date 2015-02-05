@@ -19,6 +19,7 @@ package tcp
 import (
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 
@@ -31,16 +32,16 @@ func New() TCPProber {
 
 type TCPProber struct{}
 
-func (pr TCPProber) Probe(host string, port int) (probe.Status, error) {
-	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)))
+func (pr TCPProber) Probe(host string, port int, timeout time.Duration) (probe.Status, error) {
+	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
 
 // DoTCPProbe checks that a TCP socket to the address can be opened.
 // If the socket can be opened, it returns Success
 // If the socket fails to open, it returns Failure.
 // This is exported because some other packages may want to do direct TCP probes.
-func DoTCPProbe(addr string) (probe.Status, error) {
-	conn, err := net.Dial("tcp", addr)
+func DoTCPProbe(addr string, timeout time.Duration) (probe.Status, error) {
+	conn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
 		return probe.Failure, nil
 	}

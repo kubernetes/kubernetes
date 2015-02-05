@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
@@ -59,7 +60,7 @@ func TestTcpHealthChecker(t *testing.T) {
 		if !test.usePort {
 			p = -1
 		}
-		status, err := prober.Probe(host, p)
+		status, err := prober.Probe(host, p, 1*time.Second)
 		if status != test.expectedStatus {
 			t.Errorf("expected: %v, got: %v", test.expectedStatus, status)
 		}

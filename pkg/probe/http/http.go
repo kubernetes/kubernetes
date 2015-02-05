@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 
@@ -28,16 +29,17 @@ import (
 )
 
 func New() HTTPProber {
-	return HTTPProber{&http.Client{}}
+	transport := &http.Transport{}
+	return HTTPProber{transport}
 }
 
 type HTTPProber struct {
-	client HTTPGetInterface
+	transport *http.Transport
 }
 
 // Probe returns a ProbeRunner capable of running an http check.
-func (pr *HTTPProber) Probe(host string, port int, path string) (probe.Status, error) {
-	return DoHTTPProbe(formatURL(host, port, path), pr.client)
+func (pr *HTTPProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Status, error) {
+	return DoHTTPProbe(formatURL(host, port, path), &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
 type HTTPGetInterface interface {

@@ -191,6 +191,8 @@ type LivenessProbe struct {
 	Exec *ExecAction `json:"exec,omitempty" description:"parameters for exec-based liveness probe"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty" description:"number of seconds after the container has started before liveness probes are initiated"`
+	// Length of time before health checking times out.  In seconds.
+	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty" description:"number of seconds after which liveness probes timeout; defaults to 1 second"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
