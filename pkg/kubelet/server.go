@@ -115,7 +115,7 @@ func isValidDockerVersion(ver []uint) (bool, string) {
 		if ver[i] != minAllowedVersion[i] {
 			if ver[i] < minAllowedVersion[i] {
 				versions := make([]string, len(ver))
-				for i, v := range(ver) {
+				for i, v := range ver {
 					versions[i] = fmt.Sprint(v)
 				}
 				return false, strings.Join(versions, ".")
@@ -139,7 +139,7 @@ func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := "Docker version is too old (" + version + ")"
 		w.Write([]byte(msg))
-		return;
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))

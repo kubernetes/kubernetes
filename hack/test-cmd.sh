@@ -55,6 +55,7 @@ kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
+  --docker_endpoint="fake://" \
   --address="127.0.0.1" \
   --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
@@ -65,6 +66,7 @@ kube::log::status "Starting kubelet in masterful mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
+  --docker_endpoint="fake://" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \

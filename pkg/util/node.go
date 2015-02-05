@@ -17,11 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -37,27 +35,4 @@ func GetHostname(hostnameOverride string) string {
 		hostname = fqdn
 	}
 	return strings.TrimSpace(string(hostname))
-}
-
-// Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
-func GetDockerEndpoint(dockerEndpoint string) string {
-	var endpoint string
-	if len(dockerEndpoint) > 0 {
-		endpoint = dockerEndpoint
-	} else if len(os.Getenv("DOCKER_HOST")) > 0 {
-		endpoint = os.Getenv("DOCKER_HOST")
-	} else {
-		endpoint = "unix:///var/run/docker.sock"
-	}
-	glog.Infof("Connecting to docker on %s", endpoint)
-
-	return endpoint
-}
-
-func ConnectToDockerOrDie(dockerEndpoint string) *docker.Client {
-	client, err := docker.NewClient(GetDockerEndpoint(dockerEndpoint))
-	if err != nil {
-		glog.Fatal("Couldn't connect to docker.")
-	}
-	return client
 }

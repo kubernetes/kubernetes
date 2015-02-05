@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -622,6 +623,34 @@ func parseImageName(image string) (string, string) {
 		image = fmt.Sprintf("%s/%s", repo, image)
 	}
 	return image, tag
+}
+
+// Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
+func getDockerEndpoint(dockerEndpoint string) string {
+	var endpoint string
+	if len(dockerEndpoint) > 0 {
+		endpoint = dockerEndpoint
+	} else if len(os.Getenv("DOCKER_HOST")) > 0 {
+		endpoint = os.Getenv("DOCKER_HOST")
+	} else {
+		endpoint = "unix:///var/run/docker.sock"
+	}
+	glog.Infof("Connecting to docker on %s", endpoint)
+
+	return endpoint
+}
+
+func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
+	if dockerEndpoint == "fake://" {
+		return &FakeDockerClient{
+			VersionInfo: []string{"apiVersion=1.16"},
+		}
+	}
+	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))
+	if err != nil {
+		glog.Fatal("Couldn't connect to docker.")
+	}
+	return client
 }
 
 type ContainerCommandRunner interface {
