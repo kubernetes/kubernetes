@@ -504,9 +504,10 @@ const (
 
 // PodSpec is a description of a pod
 type PodSpec struct {
-	Volumes       []Volume      `json:"volumes"`
-	Containers    []Container   `json:"containers"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
+	Volumes       []Volume               `json:"volumes"`
+	Containers    []Container            `json:"containers"`
+	Preconditions []PodPreconditionProbe `json:"preconditions,omitempty"`
+	RestartPolicy RestartPolicy          `json:"restartPolicy,omitempty"`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -516,6 +517,12 @@ type PodSpec struct {
 	// the the scheduler simply schedules this pod onto that host, assuming that it fits
 	// other requirements.
 	Host string `json:"host,omitempty" description:"host requested for this pod"`
+}
+
+// Precondition probe expresses a condition that must be satisfied before a pod can
+// be started.
+type PodPreconditionProbe struct {
+	ObjectExists *ObjectReference `json:"objectExists,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

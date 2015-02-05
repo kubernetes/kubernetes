@@ -983,6 +983,29 @@ func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers docke
 
 type empty struct{}
 
+func (kl *Kubelet) checkPodPreconditions(pod *api.BoundPod) errors.Aggregate {
+	errList := []error{}
+
+	for _, condition := range pod.Spec.Preconditions {
+		if condition.ObjectExists != nil {
+			// check existence of object
+			_, err := kl.kubeClient.
+				Get().
+				Namespace(condition.ObjectExists.Namespace).
+				Resource(condition.ObjectExists.Kind).
+				Name(condition.ObjectExists.Name).
+				Do().
+				Get()
+
+			if err != nil {
+				errList = append(errList, err)
+			}
+		}
+	}
+
+	return errors.NewAggregate(errList)
+}
+
 func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.DockerContainers) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
@@ -1011,6 +1034,24 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		if err != nil {
 			return err
 		}
+
+		//
+		// TODO: call site here is probably not ideal, but this seems like a good place
+		// in this first iteration to determine whether preconditions are satisfied.
+		//
+		// I considered making the precondition an attribute of a container, but I don't
+		// like the consequences of that factoring, as it would be possible for:
+		//
+		// 1.  Pods to be incompletely started
+		// 2.  Resources (ex, network container; host volumes) to be consumed by pods that
+		//     are not ready to start
+		//
+		err = kl.checkPodPreconditions(pod)
+		if err != nil {
+			glog.Errorf("Pod has failed preconditions: %v; Skipping pod %q", err, podFullName)
+			return err
+		}
+
 		podInfraContainerID, err = kl.createPodInfraContainer(pod)
 		if err != nil {
 			glog.Errorf("Failed to introspect pod infra container: %v; Skipping pod %q", err, podFullName)
