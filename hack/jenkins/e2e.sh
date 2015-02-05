@@ -78,8 +78,8 @@ if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
 fi
 
 export KUBE_CONFIG_FILE="config-test.sh"
-cluster/kube-down.sh
-cluster/kube-up.sh
-cluster/kubectl.sh version
-hack/ginkgo-e2e.sh --report_dir=${WORKSPACE}
-cluster/kube-down.sh
+cluster/kube-down.sh || true
+cluster/kube-up.sh || { echo "-- kube-up failed --"; exit 1; }
+cluster/kubectl.sh version || { echo "-- kubectl failed --"; exit 1; }
+hack/ginkgo-e2e.sh --report_dir=${WORKSPACE} || { echo "-- tests failed --"; exit 1; }
+cluster/kube-down.sh || { echo "-- kube-down failed --"; exit 1; }

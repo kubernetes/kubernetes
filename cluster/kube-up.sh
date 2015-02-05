@@ -46,3 +46,5 @@ echo "... calling setup-logging-firewall" >&2
 setup-logging-firewall
 
 echo "Done" >&2
+
+exit 0
