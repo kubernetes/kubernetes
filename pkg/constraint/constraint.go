@@ -24,9 +24,10 @@ import (
 
 // Allowed returns true if pods is a collection of bound pods
 // which can run without conflict on a single minion.
-func Allowed(pods []api.BoundPod) error {
-	if PortsConflict(pods) {
-		return fmt.Errorf("conflicting ports")
+func Allowed(pods []api.BoundPod) []error {
+	errors := []error{}
+	for _, port := range hostPortsConflict(pods) {
+		errors = append(errors, fmt.Errorf("host port %v is already in use", port))
 	}
-	return nil
+	return errors
 }
