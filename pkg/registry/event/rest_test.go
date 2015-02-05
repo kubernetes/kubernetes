@@ -97,6 +97,37 @@ func TestRESTCreate(t *testing.T) {
 	}
 }
 
+func TestRESTUpdate(t *testing.T) {
+	_, rest := NewTestREST()
+	eventA := testEvent("foo")
+	c, err := rest.Create(api.NewDefaultContext(), eventA)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	<-c
+	got, err := rest.Get(api.NewDefaultContext(), eventA.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := eventA, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
+	}
+	eventB := testEvent("bar")
+	u, err := rest.Update(api.NewDefaultContext(), eventB)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	<-u
+	got2, err := rest.Get(api.NewDefaultContext(), eventB.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := eventB, got2; !reflect.DeepEqual(e, a) {
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
+	}
+
+}
+
 func TestRESTDelete(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := testEvent("foo")

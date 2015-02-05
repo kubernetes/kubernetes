@@ -41,6 +41,17 @@ func (r registry) Create(ctx api.Context, id string, obj runtime.Object) error {
 	return etcderr.InterpretCreateError(err, r.Etcd.EndpointName, id)
 }
 
+// Update replaces an existing instance of the object, and sets a ttl so that the event
+// doesn't stay in the system forever.
+func (r registry) Update(ctx api.Context, id string, obj runtime.Object) error {
+	key, err := r.Etcd.KeyFunc(ctx, id)
+	if err != nil {
+		return err
+	}
+	err = r.Etcd.Helper.SetObj(key, obj, r.ttl)
+	return etcderr.InterpretUpdateError(err, r.Etcd.EndpointName, id)
+}
+
 // NewEtcdRegistry returns a registry which will store Events in the given
 // EtcdHelper. ttl is the time that Events will be retained by the system.
 func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {

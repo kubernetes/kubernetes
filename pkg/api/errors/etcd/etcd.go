@@ -43,7 +43,7 @@ func InterpretCreateError(err error, kind, name string) error {
 	}
 }
 
-// InterpretUpdateError converts a generic etcd error on a create
+// InterpretUpdateError converts a generic etcd error on a update
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, kind, name string) error {
 	switch {
@@ -54,7 +54,7 @@ func InterpretUpdateError(err error, kind, name string) error {
 	}
 }
 
-// InterpretDeleteError converts a generic etcd error on a create
+// InterpretDeleteError converts a generic etcd error on a delete
 // operation into the appropriate API error.
 func InterpretDeleteError(err error, kind, name string) error {
 	switch {
