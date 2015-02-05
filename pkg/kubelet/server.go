@@ -110,7 +110,7 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 }
 
 func isValidDockerVersion(ver []uint) (bool, string) {
-	minAllowedVersion := []uint{1, 3, 0}
+	minAllowedVersion := []uint{1, 15}
 	for i := 0; i < len(ver) && i < len(minAllowedVersion); i++ {
 		if ver[i] != minAllowedVersion[i] {
 			if ver[i] < minAllowedVersion[i] {
