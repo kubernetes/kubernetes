@@ -6,7 +6,7 @@ The example combines a web frontend, a redis master for storage and a replicated
 
 ### Step Zero: Prerequisites
 
-This example assumes that have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
+This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
 
 ```shell
 $ cd kubernetes
