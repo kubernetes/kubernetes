@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -62,11 +63,11 @@ Examples:
 			checkErr(err)
 
 			mapper, typer := f.Object(cmd)
-			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
 				NamespaceParam(cmdNamespace).DefaultNamespace().
 				FilenameParam(flags.Filenames...).
-				SelectorParam(GetFlagString(cmd, "selector")).
+				SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 				ResourceTypeOrNameArgs(args...).
 				Flatten().
 				Do()

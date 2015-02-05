@@ -338,7 +338,7 @@ Usage:
   kubectl config [command]
 
 Available Commands: 
-  view                                                                                                                                                              displays the specified .kubeconfig file or a merged result
+  view                                                                                                                                                              displays merged .kubeconfig settings or a specified .kubeconfig file.
   set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]            Sets a cluster entry in .kubeconfig
   set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] Sets a user entry in .kubeconfig
   set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]                                                                      Sets a context entry in .kubeconfig
@@ -395,7 +395,13 @@ Use "kubectl help [command]" for more information about that command.
 ```
 
 #### config view
-displays the specified .kubeconfig file or a merged result
+displays merged .kubeconfig settings or a specified .kubeconfig file.
+Examples:
+  // Show merged .kubeconfig settings.
+  $ kubectl config view
+
+  // Show only local ./.kubeconfig settings
+  $ kubectl config view --local
 
 Usage:
 ```
@@ -421,10 +427,14 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-      --merge=false: merge together the full hierarchy of .kubeconfig files
+      --merge=true: merge together the full hierarchy of .kubeconfig files
       --namespace="": If present, the namespace scope for this CLI request.
+      --no-headers=false: When using the default output, don't print headers
+  -o, --output="": Output format: json|yaml|template|templatefile
+      --output-version="": Output the formatted object with the given version (default api-version)
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -31,17 +32,17 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 		Short: "Run a proxy to the Kubernetes API server",
 		Long:  `Run a proxy to the Kubernetes API server.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			port := GetFlagInt(cmd, "port")
+			port := util.GetFlagInt(cmd, "port")
 			glog.Infof("Starting to serve on localhost:%d", port)
 
 			clientConfig, err := f.ClientConfig(cmd)
 			checkErr(err)
 
-			staticPrefix := GetFlagString(cmd, "www-prefix")
+			staticPrefix := util.GetFlagString(cmd, "www-prefix")
 			if !strings.HasSuffix(staticPrefix, "/") {
 				staticPrefix += "/"
 			}
-			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), staticPrefix, clientConfig)
+			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), staticPrefix, clientConfig)
 			checkErr(err)
 			glog.Fatal(server.Serve(port))
 		},

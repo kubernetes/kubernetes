@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func (f *Factory) NewCmdVersion(out io.Writer) *cobra.Command {
@@ -29,7 +30,7 @@ func (f *Factory) NewCmdVersion(out io.Writer) *cobra.Command {
 		Use:   "version",
 		Short: "Print version of client and server",
 		Run: func(cmd *cobra.Command, args []string) {
-			if GetFlagBool(cmd, "client") {
+			if util.GetFlagBool(cmd, "client") {
 				kubectl.GetClientVersion(out)
 				return
 			}

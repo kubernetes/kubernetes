@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,7 @@ Examples:
   $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			count := GetFlagInt(cmd, "replicas")
+			count := util.GetFlagInt(cmd, "replicas")
 			if len(args) != 2 || count < 0 {
 				usageError(cmd, "--replicas=<count> <resource> <id>")
 			}
@@ -53,13 +54,13 @@ Examples:
 			checkErr(err)
 
 			mapper, _ := f.Object(cmd)
-			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			resizer, err := f.Resizer(cmd, mapping)
 			checkErr(err)
 
-			resourceVersion := GetFlagString(cmd, "resource-version")
-			currentSize := GetFlagInt(cmd, "current-replicas")
+			resourceVersion := util.GetFlagString(cmd, "resource-version")
+			currentSize := util.GetFlagInt(cmd, "current-replicas")
 			s, err := resizer.Resize(namespace, name, &kubectl.ResizePrecondition{currentSize, resourceVersion}, uint(count))
 			checkErr(err)
 			fmt.Fprintf(out, "%s\n", s)

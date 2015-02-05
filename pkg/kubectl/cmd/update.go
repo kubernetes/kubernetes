@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
@@ -53,14 +54,14 @@ Examples:
 			checkErr(err)
 
 			mapper, typer := f.Object(cmd)
-			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
 				NamespaceParam(cmdNamespace).RequireNamespace().
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
 
-			patch := GetFlagString(cmd, "patch")
+			patch := cmdutil.GetFlagString(cmd, "patch")
 			if len(flags.Filenames) == 0 && len(patch) == 0 {
 				usageError(cmd, "Must specify --filename or --patch to update")
 			}
@@ -102,7 +103,7 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string
 	checkErr(err)
 
 	mapper, _ := f.Object(cmd)
-	mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	mapping, namespace, name := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	client, err := f.RESTClient(cmd, mapping)
 	checkErr(err)
 
@@ -110,7 +111,7 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string
 	obj, err := helper.Get(namespace, name)
 	checkErr(err)
 
-	Merge(obj, patch, mapping.Kind)
+	cmdutil.Merge(obj, patch, mapping.Kind)
 
 	data, err := helper.Codec.Encode(obj)
 	checkErr(err)

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -202,4 +203,44 @@ func TestClientVersions(t *testing.T) {
 			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
 		}
 	}
+}
+
+func ExamplePrintReplicationController() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false)
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := f.NewCmdRunContainer(os.Stdout)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:   "foo",
+			Labels: map[string]string{"foo": "bar"},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// CONTROLLER          CONTAINER(S)        IMAGE(S)            SELECTOR            REPLICAS
+	// foo                 foo                 someimage           foo=bar             1
 }

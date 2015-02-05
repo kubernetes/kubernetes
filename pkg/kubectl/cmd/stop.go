@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,7 @@ Examples:
 			}
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			mapper, _ := f.Object(cmd)
-			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			reaper, err := f.Reaper(cmd, mapping)
 			checkErr(err)
