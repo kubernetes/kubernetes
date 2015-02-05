@@ -123,7 +123,7 @@ elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   )
 fi
 
-detect-master &> /dev/null
+detect-master > /dev/null
 if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
