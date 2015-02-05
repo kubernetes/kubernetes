@@ -214,8 +214,8 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 	err = r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
 		boundPodList := in.(*api.BoundPods)
 		boundPodList.Items = append(boundPodList.Items, *boundPod)
-		if !constraint.Allowed(boundPodList.Items) {
-			return nil, fmt.Errorf("the assignment would cause a constraint violation")
+		if errors := constraint.Allowed(boundPodList.Items); len(errors) > 0 {
+			return nil, fmt.Errorf("the assignment would cause the following constraints violation: %v", errors)
 		}
 		return boundPodList, nil
 	})
