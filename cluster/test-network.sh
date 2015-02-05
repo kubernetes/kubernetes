@@ -19,7 +19,5 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-${KUBE_ROOT}/hack/e2e-suite/goe2e.sh -tTestNetwork
+exec "${KUBE_ROOT}/hack/e2e-suite/goe2e.sh" -t TestNetwork
