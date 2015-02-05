@@ -370,6 +370,7 @@ type ContainerStatus struct {
 	PodIP string `json:"podIP,omitempty" description:"pod's IP address"`
 	// TODO(dchen1107): Need to decide how to reprensent this in v1beta3
 	Image       string `json:"image" description:"image of the container"`
+	ImageID     string `json:"imageID" description:"ID of the container's image"`
 	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
 }
 
