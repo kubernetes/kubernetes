@@ -154,4 +154,27 @@ var _ = Describe("Services", func() {
 			fmt.Printf("DNS probes using %s succeeded\n", pod.Name)
 		}
 	})
+
+	It("should provide RW and RO services", func() {
+		svc := api.ServiceList{}
+		err := c.Get().
+			Namespace("default").
+			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
+			Do().
+			Into(&svc)
+		if err != nil {
+			Fail(fmt.Sprintf("unexpected error listing services using ro service: %v", err))
+		}
+		var foundRW, foundRO bool
+		for i := range svc.Items {
+			if svc.Items[i].Name == "kubernetes" {
+				foundRW = true
+			}
+			if svc.Items[i].Name == "kubernetes-ro" {
+				foundRO = true
+			}
+		}
+		Expect(foundRW).To(Equal(true))
+		Expect(foundRO).To(Equal(true))
+	})
 })
