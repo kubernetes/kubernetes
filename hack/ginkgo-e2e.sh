@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
 : ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
