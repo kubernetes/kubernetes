@@ -45,11 +45,11 @@ func TestCreateObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "redis-master\n" {
+	if buf.String() != "test-pod\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -77,11 +77,11 @@ func TestCreateMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "redis-master\nfrontend\n" {
+	if buf.String() != "test-pod\ntest-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -111,10 +111,10 @@ func TestCreateDirectory(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("filename", "../../../test/api-resources")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend-controller\nfrontend\nredis-master\nredis-master\nredis-slave-controller\nredisslave\n" {
+	if buf.String() != "test-controller\ntest-pod\ntest-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

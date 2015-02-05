@@ -35,7 +35,7 @@ func TestDeleteObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "DELETE":
+			case p == "/ns/test/pods/test-pod" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -47,11 +47,11 @@ func TestDeleteObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "redis-master\n" {
+	if buf.String() != "test-pod\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -63,7 +63,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "DELETE":
+			case p == "/ns/test/pods/test-pod" && m == "DELETE":
 				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -75,7 +75,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "" {
@@ -123,9 +123,9 @@ func TestDeleteMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "DELETE":
+			case p == "/ns/test/pods/test-pod" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/services/frontend" && m == "DELETE":
+			case p == "/ns/test/services/test-service" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -137,11 +137,11 @@ func TestDeleteMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "redis-master\nfrontend\n" {
+	if buf.String() != "test-pod\ntest-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -155,9 +155,9 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "DELETE":
+			case p == "/ns/test/pods/test-pod" && m == "DELETE":
 				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
-			case p == "/ns/test/services/frontend" && m == "DELETE":
+			case p == "/ns/test/services/test-service" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -169,11 +169,11 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend\n" {
+	if buf.String() != "test-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -203,10 +203,10 @@ func TestDeleteDirectory(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdDelete(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("filename", "../../../test/api-resources")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend-controller\nfrontend\nredis-master\nredis-master\nredis-slave-controller\nredisslave\n" {
+	if buf.String() != "test-controller\ntest-pod\ntest-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

@@ -1,0 +1,13 @@
+{
+  "id": "test-service",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "port": 8000,
+  "containerPort": 7000,
+  "labels": {
+    "name": "test-service"
+  },
+  "selector": {
+    "name": "test-label"
+  }
+}

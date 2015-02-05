@@ -49,9 +49,9 @@ func TestUpdateObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "GET":
+			case p == "/ns/test/pods/test-pod" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/pods/redis-master" && m == "PUT":
+			case p == "/ns/test/pods/test-pod" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -63,11 +63,11 @@ func TestUpdateObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdUpdate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "redis-master\n" {
+	if buf.String() != "test-pod\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -81,14 +81,14 @@ func TestUpdateMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "GET":
+			case p == "/ns/test/pods/test-pod" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/pods/redis-master" && m == "PUT":
+			case p == "/ns/test/pods/test-pod" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 
-			case p == "/ns/test/services/frontend" && m == "GET":
+			case p == "/ns/test/services/test-service" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/ns/test/services/frontend" && m == "PUT":
+			case p == "/ns/test/services/test-service" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -100,11 +100,11 @@ func TestUpdateMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdUpdate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-pod.json")
+	cmd.Flags().Set("filename", "../../../test/api-resources/test-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "redis-master\nfrontend\n" {
+	if buf.String() != "test-pod\ntest-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -135,11 +135,11 @@ func TestUpdateDirectory(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdUpdate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("filename", "../../../test/api-resources")
 	cmd.Flags().Set("namespace", "test")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend-controller\nfrontend\nredis-master\nredis-master\nredis-slave-controller\nredisslave\n" {
+	if buf.String() != "test-controller\ntest-pod\ntest-service\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

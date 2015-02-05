@@ -1,0 +1,20 @@
+{
+  "id": "test-pod",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "test-pod",
+      "containers": [{
+        "name": "test-redis",
+        "image": "dockerfile/redis",
+        "cpu": 100,
+        "ports": [{"containerPort": 6379}]
+      }]
+    }
+  },
+  "labels": {
+    "name": "test-pod"
+  }
+}
