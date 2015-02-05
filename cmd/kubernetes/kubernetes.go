@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	kubeletServer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -139,7 +140,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP
 	runScheduler(cl)
 	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
-	dockerClient := util.ConnectToDockerOrDie(*dockerEndpoint)
+	dockerClient := dockertools.ConnectToDockerOrDie(*dockerEndpoint)
 	kubeletServer.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletServer.ProbeVolumePlugins())
 }
 
