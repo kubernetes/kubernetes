@@ -21,11 +21,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 )
 
 type viewOptions struct {
@@ -38,40 +39,45 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "view",
-		Short: "displays the specified .kubeconfig file or a merged result",
-		Long:  `displays the specified .kubeconfig file or a merged result`,
+		Short: "displays merged .kubeconfig settings or a specified .kubeconfig file.",
+		Long: `displays merged .kubeconfig settings or a specified .kubeconfig file.
+Examples:
+  // Show merged .kubeconfig settings.
+  $ kubectl config view
+
+  // Show only local ./.kubeconfig settings
+  $ kubectl config view --local`,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := options.run()
+			printer, _, err := util.PrinterForCommand(cmd)
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				glog.FatalDepth(1, err)
+			}
+			config, err := options.loadConfig()
+			if err != nil {
+				glog.FatalDepth(1, err)
+			}
+			err = printer.PrintObj(config, out)
+			if err != nil {
+				glog.FatalDepth(1, err)
 			}
 		},
 	}
 
-	cmd.Flags().BoolVar(&options.merge, "merge", false, "merge together the full hierarchy of .kubeconfig files")
-
+	util.AddPrinterFlags(cmd)
+	// Default to yaml
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().BoolVar(&options.merge, "merge", true, "merge together the full hierarchy of .kubeconfig files")
 	return cmd
 }
 
-func (o viewOptions) run() error {
+func (o viewOptions) loadConfig() (*clientcmdapi.Config, error) {
 	err := o.validate()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	config, _, err := o.getStartingConfig()
-	if err != nil {
-		return err
-	}
-
-	content, err := yaml.Marshal(config)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%v", string(content))
-
-	return nil
+	return config, err
 }
 
 func (o viewOptions) validate() error {
