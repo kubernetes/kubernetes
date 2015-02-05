@@ -247,7 +247,7 @@
           "        ExecStart=/opt/bin/kube-apiserver \\\n",
           "        --address=0.0.0.0 \\\n",
           "        --port=8080 \\\n",
-          "        --portal_net 10.244.0.0/16 \\\n",
+          "        --portal_net=10.244.0.0/16 \\\n",
           "        --etcd_servers=http://127.0.0.1:4001 \\\n",
           "        --public_address_override=$private_ipv4 \\\n",
           "        --logtostderr=true\n",
