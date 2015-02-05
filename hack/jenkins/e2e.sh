@@ -80,6 +80,9 @@ fi
 export KUBE_CONFIG_FILE="config-test.sh"
 cluster/kube-down.sh || true
 cluster/kube-up.sh || { echo "-- kube-up failed --"; exit 1; }
+echo
+echo "-- cluster created at $(date -Is) --"
+echo
 cluster/kubectl.sh version || { echo "-- kubectl failed --"; exit 1; }
 hack/ginkgo-e2e.sh --report_dir=${WORKSPACE} || { echo "-- tests failed --"; exit 1; }
 cluster/kube-down.sh || { echo "-- kube-down failed --"; exit 1; }
