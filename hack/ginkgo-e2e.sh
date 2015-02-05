@@ -102,5 +102,6 @@ fi
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
+  --ginkgo.v \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@}"
