@@ -254,6 +254,35 @@ func makeUnhealthyNode(name string) *api.Node {
 	}
 }
 
+func TestPodUpdateAllContainersClearsNodeStatus(t *testing.T) {
+	node := makeHealthyNode("machine", "1.2.3.5")
+	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
+	pod2 := makePod(api.NamespaceDefault, "baz", "machine", "qux")
+	config := podCacheTestConfig{
+		kubeletContainerInfo: api.PodStatus{
+			Info: api.PodInfo{"bar": api.ContainerStatus{}}},
+		nodes: []api.Node{*node},
+		pods:  []api.Pod{*pod1, *pod2},
+	}
+	cache := config.Construct()
+
+	if len(cache.currentNodes) != 0 {
+		t.Errorf("unexpected node cache: %v", cache.currentNodes)
+	}
+	key := objKey{"", "machine"}
+	cache.currentNodes[key] = makeUnhealthyNode("machine").Status
+
+	cache.UpdateAllContainers()
+
+	if len(cache.currentNodes) != 1 {
+		t.Errorf("unexpected empty node cache: %v", cache.currentNodes)
+	}
+
+	if !reflect.DeepEqual(cache.currentNodes[key], node.Status) {
+		t.Errorf("unexpected status:\n%#v\nexpected:\n%#v\n", cache.currentNodes[key], node.Status)
+	}
+}
+
 func TestPodUpdateAllContainers(t *testing.T) {
 	pod1 := makePod(api.NamespaceDefault, "foo", "machine", "bar")
 	pod2 := makePod(api.NamespaceDefault, "baz", "machine", "qux")

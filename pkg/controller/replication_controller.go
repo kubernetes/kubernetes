@@ -179,7 +179,8 @@ func FilterActivePods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
 		if api.PodSucceeded != value.Status.Phase &&
-			api.PodFailed != value.Status.Phase {
+			api.PodFailed != value.Status.Phase &&
+			api.PodUnknown != value.Status.Phase {
 			result = append(result, value)
 		}
 	}
