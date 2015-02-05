@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
@@ -53,6 +54,11 @@ func (c *FakeNodeHandler) Nodes() client.NodeInterface {
 
 func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 	defer func() { m.RequestCount++ }()
+	for _, n := range m.Existing {
+		if n.Name == node.Name {
+			return nil, apierrors.NewAlreadyExists("Minion", node.Name)
+		}
+	}
 	if m.CreateHook == nil || m.CreateHook(m, node) {
 		nodeCopy := *node
 		m.CreatedNodes = append(m.CreatedNodes, &nodeCopy)
@@ -175,6 +181,23 @@ func TestRegisterNodes(t *testing.T) {
 			retryCount:           10,
 			expectedRequestCount: 4,
 			expectedCreateCount:  2,
+			expectedFail:         false,
+		},
+		{
+			// One node already exists
+			machines: []string{"node0", "node1"},
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node1",
+						},
+					},
+				},
+			},
+			retryCount:           10,
+			expectedRequestCount: 2,
+			expectedCreateCount:  1,
 			expectedFail:         false,
 		},
 		{
