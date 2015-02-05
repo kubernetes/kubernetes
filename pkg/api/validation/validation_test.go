@@ -94,6 +94,11 @@ func TestValidateLabels(t *testing.T) {
 		errs := ValidateLabels(errorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
+		} else {
+			detail := errs[0].(*errors.ValidationError).Detail
+			if detail != qualifiedNameErrorMsg {
+				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
+			}
 		}
 	}
 }
@@ -131,6 +136,11 @@ func TestValidateAnnotations(t *testing.T) {
 		errs := ValidateAnnotations(errorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
+		} else {
+			detail := errs[0].(*errors.ValidationError).Detail
+			if detail != qualifiedNameErrorMsg {
+				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
+			}
 		}
 	}
 }
@@ -175,6 +185,10 @@ func TestValidateVolumes(t *testing.T) {
 			if errs[i].(*errors.ValidationError).Field != v.F {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
+			detail := errs[i].(*errors.ValidationError).Detail
+			if detail != "" && detail != dnsLabelErrorMsg {
+				t.Errorf("%s: expected error detail either empty or %s, got %s", k, dnsLabelErrorMsg, detail)
+			}
 		}
 	}
 }
@@ -203,18 +217,19 @@ func TestValidatePorts(t *testing.T) {
 		P []api.Port
 		T errors.ValidationErrorType
 		F string
+		D string
 	}{
-		"name > 63 characters": {[]api.Port{{Name: strings.Repeat("a", 64), ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not a DNS label": {[]api.Port{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name > 63 characters": {[]api.Port{{Name: strings.Repeat("a", 64), ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
+		"name not a DNS label": {[]api.Port{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
 		"name not unique": {[]api.Port{
 			{Name: "abc", ContainerPort: 80, Protocol: "TCP"},
 			{Name: "abc", ContainerPort: 81, Protocol: "TCP"},
-		}, errors.ValidationErrorTypeDuplicate, "[1].name"},
-		"zero container port":    {[]api.Port{{ContainerPort: 0, Protocol: "TCP"}}, errors.ValidationErrorTypeRequired, "[0].containerPort"},
-		"invalid container port": {[]api.Port{{ContainerPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort"},
-		"invalid host port":      {[]api.Port{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].hostPort"},
-		"invalid protocol":       {[]api.Port{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol"},
-		"protocol required":      {[]api.Port{{Name: "abc", ContainerPort: 80}}, errors.ValidationErrorTypeRequired, "[0].protocol"},
+		}, errors.ValidationErrorTypeDuplicate, "[1].name", ""},
+		"zero container port":    {[]api.Port{{ContainerPort: 0, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
+		"invalid container port": {[]api.Port{{ContainerPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
+		"invalid host port":      {[]api.Port{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].hostPort", portRangeErrorMsg},
+		"invalid protocol":       {[]api.Port{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", ""},
+		"protocol required":      {[]api.Port{{Name: "abc", ContainerPort: 80}}, errors.ValidationErrorTypeRequired, "[0].protocol", ""},
 	}
 	for k, v := range errorCases {
 		errs := validatePorts(v.P)
@@ -227,6 +242,10 @@ func TestValidatePorts(t *testing.T) {
 			}
 			if errs[i].(*errors.ValidationError).Field != v.F {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
+			}
+			detail := errs[i].(*errors.ValidationError).Detail
+			if detail != v.D {
+				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
 			}
 		}
 	}
@@ -250,6 +269,13 @@ func TestValidateEnv(t *testing.T) {
 	for k, v := range errorCases {
 		if errs := validateEnv(v); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
+		} else {
+			for i := range errs {
+				detail := errs[i].(*errors.ValidationError).Detail
+				if detail != "" && detail != cIdentifierErrorMsg {
+					t.Errorf("%s: expected error detail either empty or %s, got %s", k, cIdentifierErrorMsg, detail)
+				}
+			}
 		}
 	}
 }
@@ -1076,7 +1102,7 @@ func TestValidateService(t *testing.T) {
 					Protocol: "TCP",
 				},
 			},
-			// Should fail because protocol is missing.
+			// Should fail because the session affinity is missing.
 			numErrs: 1,
 		},
 		{
@@ -1397,6 +1423,9 @@ func TestValidateService(t *testing.T) {
 	errs := ValidateService(&svc)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
+		for i := range errs {
+			t.Errorf("Found error: %s", errs[i].Error())
+		}
 	}
 }
 
@@ -2168,38 +2197,46 @@ func TestValidateResourceNames(t *testing.T) {
 		{"kubernetes.io", false},
 		{"kubernetes.io/will/not/work/", false},
 	}
-	for _, item := range table {
-		err := validateResourceName(item.input)
+	for k, item := range table {
+		err := validateResourceName(item.input, "sth")
 		if len(err) != 0 && item.success {
 			t.Errorf("expected no failure for input %q", item.input)
 		} else if len(err) == 0 && !item.success {
 			t.Errorf("expected failure for input %q", item.input)
+			for i := range err {
+				detail := err[i].(*errors.ValidationError).Detail
+				if detail != "" && detail != qualifiedNameErrorMsg {
+					t.Errorf("%s: expected error detail either empty or %s, got %s", k, qualifiedNameErrorMsg, detail)
+				}
+			}
 		}
 	}
 }
 
 func TestValidateLimitRange(t *testing.T) {
+	spec := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100"),
+					api.ResourceMemory: resource.MustParse("10000"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("0"),
+					api.ResourceMemory: resource.MustParse("100"),
+				},
+			},
+		},
+	}
+
 	successCases := []api.LimitRange{
 		{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
-			Spec: api.LimitRangeSpec{
-				Limits: []api.LimitRangeItem{
-					{
-						Type: api.LimitTypePod,
-						Max: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100"),
-							api.ResourceMemory: resource.MustParse("10000"),
-						},
-						Min: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("0"),
-							api.ResourceMemory: resource.MustParse("100"),
-						},
-					},
-				},
-			},
+			Spec: spec,
 		},
 	}
 
@@ -2209,82 +2246,65 @@ func TestValidateLimitRange(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]api.LimitRange{
+	errorCases := map[string]struct {
+		R api.LimitRange
+		D string
+	}{
 		"zero-length Name": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "",
-				Namespace: "foo",
-			},
-			Spec: api.LimitRangeSpec{
-				Limits: []api.LimitRangeItem{
-					{
-						Type: api.LimitTypePod,
-						Max: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100"),
-							api.ResourceMemory: resource.MustParse("10000"),
-						},
-						Min: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("0"),
-							api.ResourceMemory: resource.MustParse("100"),
-						},
-					},
-				},
-			},
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
+			"",
 		},
 		"zero-length-namespace": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc",
-				Namespace: "",
-			},
-			Spec: api.LimitRangeSpec{
-				Limits: []api.LimitRangeItem{
-					{
-						Type: api.LimitTypePod,
-						Max: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100"),
-							api.ResourceMemory: resource.MustParse("10000"),
-						},
-						Min: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("0"),
-							api.ResourceMemory: resource.MustParse("100"),
-						},
-					},
-				},
-			},
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
+			"",
+		},
+		"invalid Name": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
+			dnsSubdomainErrorMsg,
+		},
+		"invalid Namespace": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
+			dnsSubdomainErrorMsg,
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateLimitRange(&v)
+		errs := ValidateLimitRange(&v.R)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
+			detail := errs[i].(*errors.ValidationError).Detail
 			if field != "name" &&
 				field != "namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
+			if detail != v.D {
+				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
 			}
 		}
 	}
 }
 
 func TestValidateResourceQuota(t *testing.T) {
+	spec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU:                    resource.MustParse("100"),
+			api.ResourceMemory:                 resource.MustParse("10000"),
+			api.ResourcePods:                   resource.MustParse("10"),
+			api.ResourceServices:               resource.MustParse("10"),
+			api.ResourceReplicationControllers: resource.MustParse("10"),
+			api.ResourceQuotas:                 resource.MustParse("10"),
+		},
+	}
+
 	successCases := []api.ResourceQuota{
 		{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
-			Spec: api.ResourceQuotaSpec{
-				Hard: api.ResourceList{
-					api.ResourceCPU:                    resource.MustParse("100"),
-					api.ResourceMemory:                 resource.MustParse("10000"),
-					api.ResourcePods:                   resource.MustParse("10"),
-					api.ResourceServices:               resource.MustParse("10"),
-					api.ResourceReplicationControllers: resource.MustParse("10"),
-					api.ResourceQuotas:                 resource.MustParse("10"),
-				},
-			},
+			Spec: spec,
 		},
 	}
 
@@ -2294,50 +2314,41 @@ func TestValidateResourceQuota(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]api.ResourceQuota{
+	errorCases := map[string]struct {
+		R api.ResourceQuota
+		D string
+	}{
 		"zero-length Name": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "",
-				Namespace: "foo",
-			},
-			Spec: api.ResourceQuotaSpec{
-				Hard: api.ResourceList{
-					api.ResourceCPU:                    resource.MustParse("100"),
-					api.ResourceMemory:                 resource.MustParse("10000"),
-					api.ResourcePods:                   resource.MustParse("10"),
-					api.ResourceServices:               resource.MustParse("10"),
-					api.ResourceReplicationControllers: resource.MustParse("10"),
-					api.ResourceQuotas:                 resource.MustParse("10"),
-				},
-			},
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
+			"",
 		},
-		"zero-length-namespace": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc",
-				Namespace: "",
-			},
-			Spec: api.ResourceQuotaSpec{
-				Hard: api.ResourceList{
-					api.ResourceCPU:                    resource.MustParse("100"),
-					api.ResourceMemory:                 resource.MustParse("10000"),
-					api.ResourcePods:                   resource.MustParse("10"),
-					api.ResourceServices:               resource.MustParse("10"),
-					api.ResourceReplicationControllers: resource.MustParse("10"),
-					api.ResourceQuotas:                 resource.MustParse("10"),
-				},
-			},
+		"zero-length Namespace": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
+			"",
+		},
+		"invalid Name": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
+			dnsSubdomainErrorMsg,
+		},
+		"invalid Namespace": {
+			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
+			dnsSubdomainErrorMsg,
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateResourceQuota(&v)
+		errs := ValidateResourceQuota(&v.R)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
+			detail := errs[i].(*errors.ValidationError).Detail
 			if field != "name" &&
 				field != "namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
+			if detail != v.D {
+				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
 			}
 		}
 	}
