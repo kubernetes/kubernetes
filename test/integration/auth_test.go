@@ -24,12 +24,14 @@ package integration
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -73,7 +75,7 @@ var aPod string = `
       "id": "a",
       "containers": [{ "name": "foo", "image": "bar/foo", }]
     }
-  },
+  }%s
 }
 `
 var aRC string = `
@@ -97,7 +99,7 @@ var aRC string = `
        },
        "labels": {"name": "a"}
       }},
-  "labels": {"name": "a"}
+  "labels": {"name": "a"}%s
 }
 `
 var aService string = `
@@ -108,7 +110,7 @@ var aService string = `
   "port": 8000,
   "portalIP": "10.0.0.100",
   "labels": { "name": "a" },
-  "selector": { "name": "a" }
+  "selector": { "name": "a" }%s
 }
 `
 var aMinion string = `
@@ -116,7 +118,7 @@ var aMinion string = `
   "kind": "Minion",
   "apiVersion": "v1beta1",
   "id": "a",
-  "hostIP": "10.10.10.10",
+  "hostIP": "10.10.10.10"%s
 }
 `
 
@@ -131,7 +133,7 @@ var aEvent string = `
     "name": "a",
     "namespace": "default",
     "apiVersion": "v1beta1",
-  }
+  }%s
 }
 `
 
@@ -141,7 +143,7 @@ var aBinding string = `
   "apiVersion": "v1beta1",
   "id": "a",
   "host": "10.10.10.10",
-  "podID": "a"
+  "podID": "a"%s
 }
 `
 
@@ -150,7 +152,7 @@ var aEndpoints string = `
   "kind": "Endpoints",
   "apiVersion": "v1beta1",
   "id": "a",
-  "endpoints": ["10.10.1.1:1909"],
+  "endpoints": ["10.10.1.1:1909"]%s
 }
 `
 
@@ -183,7 +185,7 @@ func getTestRequests() []struct {
 		// Normal methods on pods
 		{"GET", "/api/v1beta1/pods", "", code200},
 		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code200},
-		{"PUT", "/api/v1beta1/pods/a" + timeoutFlag, aPod, code500}, // See #2114 about why 500
+		{"PUT", "/api/v1beta1/pods/a" + timeoutFlag, aPod, code200},
 		{"GET", "/api/v1beta1/pods", "", code200},
 		{"GET", "/api/v1beta1/pods/a", "", code200},
 		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", code200},
@@ -203,7 +205,7 @@ func getTestRequests() []struct {
 		// Normal methods on services
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code200},
-		{"PUT", "/api/v1beta1/services/a" + timeoutFlag, aService, code409}, // See #2115 about why 409
+		{"PUT", "/api/v1beta1/services/a" + timeoutFlag, aService, code200},
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"GET", "/api/v1beta1/services/a", "", code200},
 		{"DELETE", "/api/v1beta1/services/a" + timeoutFlag, "", code200},
@@ -211,7 +213,7 @@ func getTestRequests() []struct {
 		// Normal methods on replicationControllers
 		{"GET", "/api/v1beta1/replicationControllers", "", code200},
 		{"POST", "/api/v1beta1/replicationControllers" + timeoutFlag, aRC, code200},
-		{"PUT", "/api/v1beta1/replicationControllers/a" + timeoutFlag, aRC, code409}, // See #2115 about why 409
+		{"PUT", "/api/v1beta1/replicationControllers/a" + timeoutFlag, aRC, code200},
 		{"GET", "/api/v1beta1/replicationControllers", "", code200},
 		{"GET", "/api/v1beta1/replicationControllers/a", "", code200},
 		{"DELETE", "/api/v1beta1/replicationControllers/a" + timeoutFlag, "", code200},
@@ -235,7 +237,7 @@ func getTestRequests() []struct {
 		// Normal methods on events
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"POST", "/api/v1beta1/events" + timeoutFlag, aEvent, code200},
-		{"PUT", "/api/v1beta1/events/a" + timeoutFlag, aEvent, code405},
+		{"PUT", "/api/v1beta1/events/a" + timeoutFlag, aEvent, code200},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events/a", "", code200},
@@ -308,10 +310,22 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	})
 
 	transport := http.DefaultTransport
+	previousResourceVersion := make(map[string]float64)
 
 	for _, r := range getTestRequests() {
 		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			bodyStr = fmt.Sprintf(r.body, "")
+			if r.verb == "PUT" && r.body != "" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+				}
+			}
+		}
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -322,13 +336,48 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
 		}()
 	}
+}
+
+func parseResourceVersion(response []byte) (string, float64, error) {
+	var resultBodyMap map[string]interface{}
+	err := json.Unmarshal(response, &resultBodyMap)
+	if err != nil {
+		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %v", err)
+	}
+	id, ok := resultBodyMap["id"].(string)
+	if !ok {
+		return "", 0, fmt.Errorf("unexpected error, id not found in JSON response: %v", string(response))
+	}
+	resourceVersion, ok := resultBodyMap["resourceVersion"].(float64)
+	if !ok {
+		return "", 0, fmt.Errorf("unexpected error, resourceVersion not found in JSON response: %v", string(response))
+	}
+	return id, resourceVersion, nil
+}
+
+func getPreviousResourceVersionKey(url, id string) string {
+	baseUrl := strings.Split(url, "?")[0]
+	key := baseUrl
+	if id != "" {
+		key = fmt.Sprintf("%s/%v", baseUrl, id)
+	}
+	return key
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
@@ -426,12 +475,24 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
+	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
 		token := AliceToken
 		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			bodyStr = fmt.Sprintf(r.body, "")
+			if r.verb == "PUT" && r.body != "" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+				}
+			}
+		}
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -444,11 +505,21 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
+
 		}()
 	}
 }
@@ -628,6 +699,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
+	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -656,7 +728,18 @@ func TestNamespaceAuthorization(t *testing.T) {
 	for _, r := range requests {
 		token := BobToken
 		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			bodyStr = fmt.Sprintf(r.body, "")
+			if r.verb == "PUT" && r.body != "" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+				}
+			}
+		}
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -668,11 +751,21 @@ func TestNamespaceAuthorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
+
 		}()
 	}
 }
@@ -713,6 +806,7 @@ func TestKindAuthorization(t *testing.T) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
+	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -735,7 +829,18 @@ func TestKindAuthorization(t *testing.T) {
 	for _, r := range requests {
 		token := BobToken
 		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			bodyStr = fmt.Sprintf(r.body, "")
+			if r.verb == "PUT" && r.body != "" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+				}
+			}
+		}
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -747,11 +852,21 @@ func TestKindAuthorization(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
+
 		}
 	}
 }

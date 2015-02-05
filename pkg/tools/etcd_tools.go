@@ -281,22 +281,22 @@ func (h *EtcdHelper) Delete(key string, recursive bool) error {
 	return err
 }
 
-// SetObj marshals obj via json, and stores under key. Will do an
-// atomic update if obj's ResourceVersion field is set.
-func (h *EtcdHelper) SetObj(key string, obj runtime.Object) error {
+// SetObj marshals obj via json, and stores under key. Will do an atomic update if obj's ResourceVersion
+// field is set. 'ttl' is time-to-live in seconds, and 0 means forever.
+func (h *EtcdHelper) SetObj(key string, obj runtime.Object, ttl uint64) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
 	}
 	if h.ResourceVersioner != nil {
 		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
-			_, err = h.Client.CompareAndSwap(key, string(data), 0, "", version)
+			_, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
 			return err // err is shadowed!
 		}
 	}
 
 	// Create will fail if a key already exists.
-	_, err = h.Client.Create(key, string(data), 0)
+	_, err = h.Client.Create(key, string(data), ttl)
 	return err
 }
 

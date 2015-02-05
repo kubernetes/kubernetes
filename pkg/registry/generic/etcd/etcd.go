@@ -103,7 +103,7 @@ func (e *Etcd) Update(ctx api.Context, id string, obj runtime.Object) error {
 		return err
 	}
 	// TODO: verify that SetObj checks ResourceVersion before succeeding.
-	err = e.Helper.SetObj(key, obj)
+	err = e.Helper.SetObj(key, obj, 0 /* ttl */)
 	return etcderr.InterpretUpdateError(err, e.EndpointName, id)
 }
 

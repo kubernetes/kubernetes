@@ -66,6 +66,31 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}), nil
 }
 
+// Update replaces an existing Event instance in storage.registry, with the given instance.
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+	event, ok := obj.(*api.Event)
+	if !ok {
+		return nil, fmt.Errorf("not an event object: %#v", obj)
+	}
+	if api.Namespace(ctx) != "" {
+		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
+			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
+		}
+	}
+	if errs := validation.ValidateEvent(event); len(errs) > 0 {
+		return nil, errors.NewInvalid("event", event.Name, errs)
+	}
+	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
+
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		err := rs.registry.Update(ctx, event.Name, event)
+		if err != nil {
+			return nil, err
+		}
+		return rs.registry.Get(ctx, event.Name)
+	}), nil
+}
+
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	obj, err := rs.registry.Get(ctx, id)
 	if err != nil {

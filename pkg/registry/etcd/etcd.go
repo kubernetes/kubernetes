@@ -251,7 +251,7 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	}
 	// There's no race with the scheduler, because either this write will fail because the host
 	// has been updated, or the host update will fail because this pod has been updated.
-	err = r.EtcdHelper.SetObj(podKey, pod)
+	err = r.EtcdHelper.SetObj(podKey, pod, 0 /* ttl */)
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (r *Registry) UpdateController(ctx api.Context, controller *api.Replication
 	if err != nil {
 		return err
 	}
-	err = r.SetObj(key, controller)
+	err = r.SetObj(key, controller, 0 /* ttl */)
 	return etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
 }
 
@@ -512,7 +512,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) error {
 	if err != nil {
 		return err
 	}
-	err = r.SetObj(key, svc)
+	err = r.SetObj(key, svc, 0 /* ttl */)
 	return etcderr.InterpretUpdateError(err, "service", svc.Name)
 }
 
@@ -605,7 +605,7 @@ func (r *Registry) CreateMinion(ctx api.Context, minion *api.Node) error {
 
 func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.SetObj(makeNodeKey(minion.Name), minion)
+	err := r.SetObj(makeNodeKey(minion.Name), minion, 0 /* ttl */)
 	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
 }
 
