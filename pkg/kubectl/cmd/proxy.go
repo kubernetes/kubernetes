@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"io"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/golang/glog"
@@ -36,12 +37,17 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 			clientConfig, err := f.ClientConfig(cmd)
 			checkErr(err)
 
-			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), clientConfig)
+			staticPrefix := GetFlagString(cmd, "www-prefix")
+			if !strings.HasSuffix(staticPrefix, "/") {
+				staticPrefix += "/"
+			}
+			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), staticPrefix, clientConfig)
 			checkErr(err)
 			glog.Fatal(server.Serve(port))
 		},
 	}
-	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the prefix /static")
+	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix")
+	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file dir is specified")
 	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy")
 	return cmd
 }

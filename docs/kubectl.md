@@ -73,7 +73,8 @@ Usage:
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
-  -w, --www="": Also serve static files from the given directory under the prefix /static
+  -w, --www="": Also serve static files from the given directory under the specified prefix
+  -P, --www-prefix="/static/": Prefix to serve static files under, if static file dir is specified
 
 ```
 
