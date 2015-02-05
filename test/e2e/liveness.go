@@ -32,27 +32,28 @@ import (
 )
 
 func runLivenessTest(c *client.Client, podDescr *api.Pod) bool {
-	glog.Infof("Creating pod %s", podDescr.Name)
-	_, err := c.Pods(api.NamespaceDefault).Create(podDescr)
+	ns := "e2e-test-" + string(util.NewUUID())
+	glog.Infof("Creating pod %s in namespace %s", podDescr.Name, ns)
+	_, err := c.Pods(ns).Create(podDescr)
 	if err != nil {
 		glog.Infof("Failed to create pod %s: %v", podDescr.Name, err)
 		return false
 	}
 	// At the end of the test, clean up by removing the pod.
-	defer c.Pods(api.NamespaceDefault).Delete(podDescr.Name)
+	defer c.Pods(ns).Delete(podDescr.Name)
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	if !waitForPodNotPending(c, podDescr.Name) {
-		glog.Infof("Failed to start pod %s", podDescr.Name)
+	if !waitForPodNotPending(c, ns, podDescr.Name) {
+		glog.Infof("Failed to start pod %s in namespace %s", podDescr.Name, ns)
 		return false
 	}
-	glog.Infof("Started pod %s", podDescr.Name)
+	glog.Infof("Started pod %s in namespace %s", podDescr.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
-	pod, err := c.Pods(api.NamespaceDefault).Get(podDescr.Name)
+	pod, err := c.Pods(ns).Get(podDescr.Name)
 	if err != nil {
-		glog.Errorf("Get pod %s failed: %v", podDescr.Name, err)
+		glog.Errorf("Get pod %s in namespace %s failed: %v", podDescr.Name, ns, err)
 		return false
 	}
 	initialRestartCount := pod.Status.Info["liveness"].RestartCount
@@ -62,29 +63,28 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) bool {
 	for i := 0; i < 48; i++ {
 		// Wait until restartCount is incremented.
 		time.Sleep(5 * time.Second)
-		pod, err = c.Pods(api.NamespaceDefault).Get(podDescr.Name)
+		pod, err = c.Pods(ns).Get(podDescr.Name)
 		if err != nil {
 			glog.Errorf("Get pod %s failed: %v", podDescr.Name, err)
 			return false
 		}
 		restartCount := pod.Status.Info["liveness"].RestartCount
-		glog.Infof("Restart count of pod %s is now %d", podDescr.Name, restartCount)
+		glog.Infof("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount)
 		if restartCount > initialRestartCount {
-			glog.Infof("Restart count of pod %s increased from %d to %d during the test", podDescr.Name, initialRestartCount, restartCount)
+			glog.Infof("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount)
 			return true
 		}
 	}
 
-	glog.Errorf("Did not see the restart count of pod %s increase from %d during the test", podDescr.Name, initialRestartCount)
+	glog.Errorf("Did not see the restart count of pod %s in namespace %s increase from %d during the test", podDescr.Name, ns, initialRestartCount)
 	return false
 }
 
 // TestLivenessHttp tests restarts with a /healthz http liveness probe.
 func TestLivenessHttp(c *client.Client) bool {
-	name := "liveness-http-" + string(util.NewUUID())
 	return runLivenessTest(c, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:   name,
+			Name:   "liveness-http",
 			Labels: map[string]string{"test": "liveness"},
 		},
 		Spec: api.PodSpec{
@@ -110,10 +110,9 @@ func TestLivenessHttp(c *client.Client) bool {
 
 // TestLivenessExec tests restarts with a docker exec "cat /tmp/health" liveness probe.
 func TestLivenessExec(c *client.Client) bool {
-	name := "liveness-exec-" + string(util.NewUUID())
 	return runLivenessTest(c, &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:   name,
+			Name:   "liveness-exec",
 			Labels: map[string]string{"test": "liveness"},
 		},
 		Spec: api.PodSpec{
