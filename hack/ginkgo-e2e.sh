@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
 : ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
@@ -102,5 +102,6 @@ fi
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
+  --ginkgo.v \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@}"
