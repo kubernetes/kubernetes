@@ -77,12 +77,11 @@ if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
     export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
 fi
 
-export KUBE_CONFIG_FILE="config-test.sh"
-cluster/kube-down.sh || true
-cluster/kube-up.sh || { echo "-- kube-up failed --"; exit 1; }
-echo
-echo "-- cluster created at $(date -Is) --"
-echo
-cluster/kubectl.sh version || { echo "-- kubectl failed --"; exit 1; }
-hack/ginkgo-e2e.sh --report_dir=${WORKSPACE} || { echo "-- tests failed --"; exit 1; }
-cluster/kube-down.sh || { echo "-- kube-down failed --"; exit 1; }
+# Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
+export E2E_REPORT_DIR=${WORKSPACE}
+
+go run ./hack/e2e.go ${E2E_OPT} -v --down
+go run ./hack/e2e.go ${E2E_OPT} -v --up
+go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
+go run ./hack/e2e.go ${E2E_OPT} -v --test
+go run ./hack/e2e.go ${E2E_OPT} -v --down
