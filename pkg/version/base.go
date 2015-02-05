@@ -36,8 +36,8 @@ package version
 var (
 	// TODO: Deprecate gitMajor and gitMinor, use only gitVersion instead.
 	gitMajor     string = "0"              // major version, always numeric
-	gitMinor     string = "10.0+"          // minor version, numeric possibly followed by "+"
-	gitVersion   string = "v0.10.0-dev"    // version from git, output of $(git describe)
+	gitMinor     string = "10.1"           // minor version, numeric possibly followed by "+"
+	gitVersion   string = "v0.10.1"        // version from git, output of $(git describe)
 	gitCommit    string = ""               // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = "not a git tree" // state of git tree, either "clean" or "dirty"
 )
