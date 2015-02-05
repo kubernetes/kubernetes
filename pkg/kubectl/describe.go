@@ -249,6 +249,11 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
+	endpoints, err := d.Endpoints(namespace).Get(name)
+	if err != nil {
+		endpoints = &api.Endpoints{}
+	}
+
 	events, _ := d.Events(namespace).Search(service)
 
 	return tabbedString(func(out io.Writer) error {
@@ -256,6 +261,7 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
+		fmt.Fprintf(out, "Endpoints:\t%s\n", stringList(endpoints.Endpoints))
 		if events != nil {
 			describeEvents(events, out)
 		}
