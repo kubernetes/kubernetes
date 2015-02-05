@@ -17,50 +17,42 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func TestKubernetesROService(c *client.Client) bool {
-	svc := api.ServiceList{}
-	err := c.Get().
-		Namespace("default").
-		AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
-		Do().
-		Into(&svc)
-	if err != nil {
-		glog.Errorf("unexpected error listing services using ro service: %v", err)
-		return false
-	}
-	var foundRW, foundRO bool
-	for i := range svc.Items {
-		if svc.Items[i].Name == "kubernetes" {
-			foundRW = true
-		}
-		if svc.Items[i].Name == "kubernetes-ro" {
-			foundRO = true
-		}
-	}
-	if !foundRW {
-		glog.Error("no RW service found")
-	}
-	if !foundRO {
-		glog.Error("no RO service found")
-	}
-	if !foundRW || !foundRO {
-		return false
-	}
-	return true
-}
-
 var _ = Describe("TestKubernetesROService", func() {
+	var c *client.Client
+
+	BeforeEach(func() {
+		c = loadClientOrDie()
+	})
+
 	It("should pass", func() {
-		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
-		// In general tests should Fail() instead of glog.Fatalf().
-		Expect(TestKubernetesROService(loadClientOrDie())).To(BeTrue())
+		svc := api.ServiceList{}
+		err := c.Get().
+			Namespace("default").
+			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
+			Do().
+			Into(&svc)
+		if err != nil {
+			Fail(fmt.Sprintf("unexpected error listing services using ro service: %v", err))
+		}
+		var foundRW, foundRO bool
+		for i := range svc.Items {
+			if svc.Items[i].Name == "kubernetes" {
+				foundRW = true
+			}
+			if svc.Items[i].Name == "kubernetes-ro" {
+				foundRO = true
+			}
+		}
+		Expect(foundRW).To(Equal(true))
+		Expect(foundRO).To(Equal(true))
 	})
 })
