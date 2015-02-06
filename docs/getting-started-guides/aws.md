@@ -9,11 +9,10 @@
 ### Cluster turnup
 
 #### Download Kubernetes
-##### a) Preferred Option: Install from [0.5 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.5)
-1. ```wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.5/kubernetes.tar.gz```
+##### a) Preferred Option: Install from [0.10.0 release](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.10.0)
+1. ```wget https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.10.0/kubernetes.tar.gz```
 2. ```tar -xzf kubernetes.tar.gz; cd kubernetes```
 3. ```export PATH=$PATH:$PWD/platforms/<os>/<platform>```
-4. __Temporary for v0.5__ : Edit the ```cluster/aws/config-default.sh``` so that ```IMAGE=ami-39501209``` 
 
 ##### b) Alternate Option: Install from source at head
 1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
@@ -28,7 +27,9 @@ cluster/kube-up.sh
 
 The script above relies on AWS S3 to deploy the software to instances running in EC2.
 
-Once the cluster is up, it will print the ip address of your cluster.
+NOTE: The script will provision a new VPC and a 5 node k8s cluster in us-west-2 (Oregon). It'll also try to create a keypair called "kubernetes" as well as create or reuse an IAM role also called "kubernetes" so make sure one doesn't already exist prior to running the script in order to elminate a potential conflict.
+
+Once the cluster is up, it will print the ip address of your cluster, this process takes ~5 minutes.
 
 ```
 export KUBERNETES_MASTER=https://<ip-address>
@@ -36,7 +37,7 @@ export KUBERNETES_MASTER=https://<ip-address>
 
 Also setup your path to point to the released binaries:
 ```
-
+export PATH=$PATH:$PWD:/cluster
 ```
 
 ### Running examples
