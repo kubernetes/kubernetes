@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
 func TestAdmission(t *testing.T) {
@@ -50,4 +51,48 @@ func TestAdmission(t *testing.T) {
 			t.Errorf("Unexpected cpu value %s", cpu)
 		}
 	}
+}
+
+func TestIgnoreAdmission(t *testing.T) {
+	namespace := "default"
+
+	handler := NewResourceDefaults()
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{
+				{
+					Name:  "ctr",
+					Image: "image",
+					Resources: api.ResourceRequirementSpec{
+						Limits: getResourceLimits("2", "750Mi"),
+					},
+				},
+			},
+		},
+	}
+
+	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+
+	for i := range pod.Spec.Containers {
+		memory := pod.Spec.Containers[i].Resources.Limits.Memory().String()
+		cpu := pod.Spec.Containers[i].Resources.Limits.Cpu().String()
+		if memory != "750Mi" {
+			t.Errorf("Unexpected memory value %s", memory)
+		}
+		if cpu != "2" {
+			t.Errorf("Unexpected cpu value %s", cpu)
+		}
+	}
+}
+
+func getResourceLimits(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
+	res[api.ResourceCPU] = resource.MustParse(cpu)
+	res[api.ResourceMemory] = resource.MustParse(memory)
+	return res
 }
