@@ -93,6 +93,7 @@ func TestEventf(t *testing.T) {
 				Reason:  "Started",
 				Message: "some verbose message: 1",
 				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
 			},
 			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
 		},
@@ -116,6 +117,7 @@ func TestEventf(t *testing.T) {
 				Reason:  "Started",
 				Message: "some verbose message: 1",
 				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
 			},
 			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:""}): reason: 'Started' some verbose message: 1`,
 		},
@@ -127,10 +129,11 @@ func TestEventf(t *testing.T) {
 			OnEvent: func(event *api.Event) (*api.Event, error) {
 				a := *event
 				// Just check that the timestamp was set.
-				if a.Timestamp.IsZero() {
+				if a.FirstTimestamp.IsZero() || a.LastTimestamp.IsZero() {
 					t.Errorf("timestamp wasn't set")
 				}
-				a.Timestamp = item.expect.Timestamp
+				a.FirstTimestamp = item.expect.FirstTimestamp
+				a.LastTimestamp = item.expect.LastTimestamp
 				// Check that name has the right prefix.
 				if n, en := a.Name, item.expect.Name; !strings.HasPrefix(n, en) {
 					t.Errorf("Name '%v' does not contain prefix '%v'", n, en)

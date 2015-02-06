@@ -170,7 +170,9 @@ func Event(object runtime.Object, reason, message string) {
 		InvolvedObject: *ref,
 		Reason:         reason,
 		Message:        message,
-		Timestamp:      t,
+		FirstTimestamp: t,
+		LastTimestamp:  t,
+		Count:          1,
 	}
 
 	events.Action(watch.Added, e)

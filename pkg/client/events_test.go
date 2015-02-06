@@ -64,7 +64,9 @@ func TestEventCreate(t *testing.T) {
 	event := &api.Event{
 		//namespace: namespace{"default"},
 		InvolvedObject: *objReference,
-		Timestamp:      timeStamp,
+		FirstTimestamp: timeStamp,
+		LastTimestamp:  timeStamp,
+		Count:          1,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -98,7 +100,9 @@ func TestEventGet(t *testing.T) {
 	timeStamp := util.Now()
 	event := &api.Event{
 		InvolvedObject: *objReference,
-		Timestamp:      timeStamp,
+		FirstTimestamp: timeStamp,
+		LastTimestamp:  timeStamp,
+		Count:          1,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -135,7 +139,9 @@ func TestEventList(t *testing.T) {
 		Items: []api.Event{
 			{
 				InvolvedObject: *objReference,
-				Timestamp:      timeStamp,
+				FirstTimestamp: timeStamp,
+				LastTimestamp:  timeStamp,
+				Count:          1,
 			},
 		},
 	}

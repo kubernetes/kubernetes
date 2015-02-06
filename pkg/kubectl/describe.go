@@ -301,7 +301,7 @@ func describeEvents(el *api.EventList, w io.Writer) {
 	fmt.Fprint(w, "Events:\nTime\tFrom\tSubobjectPath\tReason\tMessage\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%v\n",
-			e.Timestamp.Time.Format(time.RFC1123Z),
+			e.FirstTimestamp.Time.Format(time.RFC1123Z),
 			e.Source,
 			e.InvolvedObject.FieldPath,
 			e.Reason,
