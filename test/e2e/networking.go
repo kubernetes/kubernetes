@@ -169,4 +169,24 @@ var _ = Describe("Networking", func() {
 		}
 		Expect(string(body)).To(Equal("pass"))
 	})
+
+	It("should provide unchanging URLs", func() {
+		tests := []struct {
+			path string
+		}{
+			{path: "/validate"},
+			{path: "/healthz"},
+			// TODO: test proxy links here
+		}
+		for _, test := range tests {
+			By(fmt.Sprintf("testing: %s", test.path))
+			data, err := c.RESTClient.Get().
+				AbsPath(test.path).
+				Do().
+				Raw()
+			if err != nil {
+				Fail(fmt.Sprintf("Failed: %v\nBody: %s", err, string(data)))
+			}
+		}
+	})
 })
