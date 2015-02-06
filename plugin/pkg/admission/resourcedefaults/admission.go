@@ -55,7 +55,9 @@ func (resourceDefaults) Admit(a admission.Attributes) (err error) {
 	obj := a.GetObject()
 	pod := obj.(*api.Pod)
 	for index := range pod.Spec.Containers {
-		pod.Spec.Containers[index].Resources.Limits = api.ResourceList{}
+		if pod.Spec.Containers[index].Resources.Limits == nil {
+			pod.Spec.Containers[index].Resources.Limits = api.ResourceList{}
+		}
 		if pod.Spec.Containers[index].Resources.Limits.Memory().Value() == 0 {
 			pod.Spec.Containers[index].Resources.Limits[api.ResourceMemory] = resource.MustParse(defaultMemory)
 		}
