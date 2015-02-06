@@ -623,7 +623,6 @@ func ValidateReplicationControllerUpdate(oldController, controller *api.Replicat
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldController.ObjectMeta, &controller.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
-
 	return allErrs
 }
 
@@ -646,7 +645,7 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
 		}
-		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template, spec.Replicas).Prefix("template")...)
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if spec.Template.Spec.RestartPolicy.Always == nil {
 			// TODO: should probably be Unsupported
@@ -658,12 +657,14 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 }
 
 // ValidatePodTemplateSpec validates the spec of a pod template
-func ValidatePodTemplateSpec(spec *api.PodTemplateSpec) errs.ValidationErrorList {
+func ValidatePodTemplateSpec(spec *api.PodTemplateSpec, replicas int) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateLabels(spec.Labels, "labels")...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, "annotations")...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(spec.Spec.Volumes).Prefix("spec.volumes")...)
+	if replicas > 1 {
+		allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(spec.Spec.Volumes).Prefix("spec.volumes")...)
+	}
 	return allErrs
 }
 
@@ -672,7 +673,7 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 	for _, vol := range volumes {
 		if vol.Source.GCEPersistentDisk != nil {
 			if vol.Source.GCEPersistentDisk.ReadOnly == false {
-				allErrs = append(allErrs, errs.NewFieldInvalid("GCEPersistentDisk.ReadOnly", false, "must be true"))
+				allErrs = append(allErrs, errs.NewFieldInvalid("GCEPersistentDisk.ReadOnly", false, "ReadOnly must be true for replicated pods > 1, as GCE PD can only be mounted on multiple machines if it is read-only."))
 			}
 		}
 	}
