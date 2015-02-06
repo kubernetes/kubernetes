@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
@@ -72,7 +71,7 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
 
 func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podUID, &GCEDiskUtil{}, &gceSafeFormatAndMount{mount.New(), exec.New()})
+	return plugin.newBuilderInternal(spec, podUID, &GCEDiskUtil{}, mount.New())
 }
 
 func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {

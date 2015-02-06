@@ -147,7 +147,7 @@ func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk, devicePath string) er
 // This eliminates the necesisty to format a PD before it is used with a Pod on GCE.
 // TODO: port this script into Go and use it for all Linux platforms
 type gceSafeFormatAndMount struct {
-	mount.Interface
+	mount.Mounter
 	runner exec.Interface
 }
 
