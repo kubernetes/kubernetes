@@ -407,7 +407,7 @@ func printStatus(status *api.Status, w io.Writer) error {
 func printEvent(event *api.Event, w io.Writer) error {
 	_, err := fmt.Fprintf(
 		w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		event.Timestamp.Time.Format(time.RFC1123Z),
+		event.FirstTimestamp.Time.Format(time.RFC1123Z),
 		event.InvolvedObject.Name,
 		event.InvolvedObject.Kind,
 		event.InvolvedObject.FieldPath,

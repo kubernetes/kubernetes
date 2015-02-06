@@ -898,7 +898,11 @@ func init() {
 			out.Message = in.Message
 			out.Source = in.Source.Component
 			out.Host = in.Source.Host
-			out.Timestamp = in.Timestamp
+			out.Timestamp = in.FirstTimestamp
+			out.FirstTimestamp = in.FirstTimestamp
+			out.LastTimestamp = in.LastTimestamp
+			out.Count = in.Count
+
 			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
 		},
 		func(in *Event, out *newer.Event, s conversion.Scope) error {
@@ -912,7 +916,16 @@ func init() {
 			out.Message = in.Message
 			out.Source.Component = in.Source
 			out.Source.Host = in.Host
-			out.Timestamp = in.Timestamp
+			if in.FirstTimestamp.IsZero() {
+				// Assume this is an old event that does not specify FirstTimestamp/LastTimestamp/Count
+				out.FirstTimestamp = in.Timestamp
+				out.LastTimestamp = in.Timestamp
+				out.Count = 1
+			} else {
+				out.FirstTimestamp = in.FirstTimestamp
+				out.LastTimestamp = in.LastTimestamp
+				out.Count = in.Count
+			}
 			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
 		},
 

@@ -1058,8 +1058,14 @@ type Event struct {
 	// Optional. The component reporting this event. Should be a short machine understandable string.
 	Source EventSource `json:"source,omitempty"`
 
-	// The time at which the client recorded the event. (Time of server receipt is in TypeMeta.)
-	Timestamp util.Time `json:"timestamp,omitempty"`
+	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
+	FirstTimestamp util.Time `json:"firstTimestamp,omitempty"`
+
+	// The time at which the most recent occurance of this event was recorded.
+	LastTimestamp util.Time `json:"lastTimestamp,omitempty"`
+
+	// The number of times this event has occurred.
+	Count int `json:"count,omitempty"`
 }
 
 // EventList is a list of events.

@@ -211,6 +211,22 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.Fuzz(&ct.Privileged)
 			c.Fuzz(&ct.Capabilities)
 		},
+		func(e *api.Event, c fuzz.Continue) {
+			// Fix event count to 1, otherwise, if a v1beta1 or v1beta2 event has a count set arbitrarily, it's count is ignored
+			c.Fuzz(&e.TypeMeta)
+			c.Fuzz(&e.ObjectMeta)
+			c.Fuzz(&e.InvolvedObject)
+			c.Fuzz(&e.Reason)
+			c.Fuzz(&e.Message)
+			c.Fuzz(&e.Source)
+			c.Fuzz(&e.FirstTimestamp)
+			c.Fuzz(&e.LastTimestamp)
+			if e.FirstTimestamp.IsZero() {
+				e.Count = 1
+			} else {
+				c.Fuzz(&e.Count)
+			}
+		},
 	)
 	return f
 }

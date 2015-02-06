@@ -865,7 +865,18 @@ type Event struct {
 	Host string `json:"host,omitempty" description:"host name on which this event was generated"`
 
 	// The time at which the client recorded the event. (Time of server receipt is in TypeMeta.)
+	// Deprecated: Use InitialTimeStamp/LastSeenTimestamp/Count instead.
+	// For backwards compatability, this will map to IntialTimestamp.
 	Timestamp util.Time `json:"timestamp,omitempty" description:"time at which the client recorded the event"`
+
+	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
+	FirstTimestamp util.Time `json:"firstTimestamp,omitempty" description:"the time at which the event was first recorded"`
+
+	// The time at which the most recent occurance of this event was recorded.
+	LastTimestamp util.Time `json:"lastTimestamp,omitempty" description:"the time at which the most recent occurance of this event was recorded"`
+
+	// The number of times this event has occurred.
+	Count int `json:"count,omitempty" description:"the number of times this event has occurred"`
 }
 
 // EventList is a list of events.
