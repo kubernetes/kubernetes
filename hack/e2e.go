@@ -150,6 +150,7 @@ func main() {
 	switch {
 	case *ctlCmd != "":
 		ctlArgs := strings.Fields(*ctlCmd)
+		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
 		failure = !finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
 	case *test:
 		failure = Test()
