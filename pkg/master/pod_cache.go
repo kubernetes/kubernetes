@@ -169,17 +169,15 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	// Assigned to non-existing node.
 	if err != nil || len(nodeStatus.Conditions) == 0 {
+		glog.V(5).Infof("node doesn't exist: %v %v, setting pod status to unknown", err, nodeStatus)
 		newStatus.Phase = api.PodUnknown
 		return newStatus, nil
 	}
 
 	// Assigned to an unhealthy node.
 	for _, condition := range nodeStatus.Conditions {
-		if condition.Kind == api.NodeReady && condition.Status == api.ConditionNone {
-			newStatus.Phase = api.PodUnknown
-			return newStatus, nil
-		}
-		if condition.Kind == api.NodeReachable && condition.Status == api.ConditionNone {
+		if (condition.Kind == api.NodeReady || condition.Kind == api.NodeReachable) && condition.Status == api.ConditionNone {
+			glog.V(5).Infof("node status: %v, setting pod status to unknown", condition)
 			newStatus.Phase = api.PodUnknown
 			return newStatus, nil
 		}
@@ -189,6 +187,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	newStatus.HostIP = nodeStatus.HostIP
 
 	if err != nil {
+		glog.Errorf("error getting pod status: %v, setting status to unknown", err)
 		newStatus.Phase = api.PodUnknown
 	} else {
 		newStatus.Info = result.Status.Info
