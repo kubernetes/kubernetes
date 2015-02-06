@@ -24,12 +24,12 @@ kube::util::wait_for_url() {
   local wait=${3:-0.2}
   local times=${4:-10}
 
-  local i
-
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
     exit 1
   }
+
+  local i
 
   for i in $(seq 1 $times); do
     local out
