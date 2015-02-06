@@ -198,17 +198,9 @@ function detect-master () {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  local get_auth_path='''
-import yaml, sys
-cfg = yaml.load(sys.stdin)
-try:
-  current = cfg["current-context"]
-  user = cfg["contexts"][current]["user"]
-  print cfg["users"][user]["auth-path"]
-except KeyError:
-  pass
-'''
-  local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view --global | python -c "${get_auth_path}")
+  # go template to extract the auth-path of the current-context user
+  local template='{{$ctx := index . "current-context"}}{{$user := index . "contexts" $ctx "user"}}{{index . "users" $user "auth-path"}}'
+  local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
   if [[ -r "$file" ]]; then
     KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
     KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
