@@ -1,0 +1,43 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl stop \- Gracefully shut down a resource.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl stop\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Gracefully shut down a resource.
+
+.PP
+Attempts to shut down and delete a resource that supports graceful termination.
+If the resource is resizable it will be resized to 0 before deletion.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+$ kubectl stop replicationcontroller foo
+// Shut down foo.
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

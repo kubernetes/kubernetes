@@ -1,0 +1,48 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl config set\-cluster \- Sets a cluster entry in .kubeconfig
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl config set\-cluster\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Sets a cluster entry in .kubeconfig
+    Specifying a name that already exists will merge new fields on top of existing values for those fields.
+    e.g.
+        kubectl config set\-cluster e2e \-\-certificate\-authority=\~/.kube/e2e/.kubernetes.ca.cert
+        only sets the certificate\-authority field on the e2e cluster entry without touching other values.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-api\-version\fP=""
+    api\-version for the cluster entry in .kubeconfig
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    certificate\-authority for the cluster entry in .kubeconfig
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    insecure\-skip\-tls\-verify for the cluster entry in .kubeconfig
+
+.PP
+\fB\-\-server\fP=""
+    server for the cluster entry in .kubeconfig
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl\-config(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

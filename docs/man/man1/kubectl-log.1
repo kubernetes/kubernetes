@@ -1,0 +1,48 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl log \- Print the logs for a container in a pod.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl log\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+$ kubectl log 123456\-7890 ruby\-container
+// Returns snapshot of ruby\-container logs from pod 123456\-7890.
+
+$ kubectl log \-f 123456\-7890 ruby\-container
+// Starts streaming of ruby\-container logs from pod 123456\-7890.
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-follow\fP=false
+    Specify if the logs should be streamed.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

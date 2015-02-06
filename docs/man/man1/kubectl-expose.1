@@ -1,0 +1,104 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl expose \- Take a replicated application and expose it as Kubernetes Service
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl expose\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Take a replicated application and expose it as Kubernetes Service.
+
+.PP
+Looks up a ReplicationController by name, and uses the selector for that replication controller
+as the selector for a new Service on the specified port.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+$ kubectl expose nginx \-\-port=80 \-\-container\-port=8000
+// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+
+$ kubectl expose streamer \-\-port=4100 \-\-protocol=udp \-\-service\-name=video\-stream
+// Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video\-stream'.
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-\-container\-port\fP=""
+    Name or number for the port on the container that the service should direct traffic to. Optional.
+
+.PP
+\fB\-\-create\-external\-load\-balancer\fP=false
+    If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
+
+.PP
+\fB\-\-dry\-run\fP=false
+    If true, only print the object that would be sent, without creating it.
+
+.PP
+\fB\-\-generator\fP="service/v1"
+    The name of the API generator to use.  Default is 'service/v1'.
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-\-overrides\fP=""
+    An inline JSON override for the generated object. If this is non\-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
+
+.PP
+\fB\-\-port\fP=\-1
+    The port that the service should serve on. Required.
+
+.PP
+\fB\-\-protocol\fP="TCP"
+    The network protocol for the service to be created. Default is 'tcp'.
+
+.PP
+\fB\-\-public\-ip\fP=""
+    Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
+
+.PP
+\fB\-\-selector\fP=""
+    A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
+
+.PP
+\fB\-\-service\-name\fP=""
+    The name for the newly created service.
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

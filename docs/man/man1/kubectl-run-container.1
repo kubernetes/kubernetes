@@ -1,0 +1,95 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl run\-container \- Run a particular image on the cluster.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl run\-container\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Create and run a particular image, possibly replicated.
+Creates a replication controller to manage the created container(s).
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx
+// Starts a single instance of nginx.
+
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-replicas=5
+// Starts a replicated instance of nginx.
+
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-dry\-run
+// Dry run. Print the corresponding API objects without creating them.
+
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-overrides='\{ "apiVersion": "v1beta1", "desiredState": \{ ... \} \}'
+// Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-\-dry\-run\fP=false
+    If true, only print the object that would be sent, without sending it.
+
+.PP
+\fB\-\-generator\fP="run\-container/v1"
+    The name of the API generator to use.  Default is 'run\-container\-controller/v1'.
+
+.PP
+\fB\-\-image\fP=""
+    The image for the container to run.
+
+.PP
+\fB\-l\fP, \fB\-\-labels\fP=""
+    Labels to apply to the pod(s) created by this call to run\-container.
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-\-overrides\fP=""
+    An inline JSON override for the generated object. If this is non\-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
+
+.PP
+\fB\-\-port\fP=\-1
+    The port that this container exposes.
+
+.PP
+\fB\-r\fP, \fB\-\-replicas\fP=1
+    Number of replicas to create for this container. Default is 1.
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

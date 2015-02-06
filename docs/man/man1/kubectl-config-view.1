@@ -1,0 +1,55 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl config view \- displays merged .kubeconfig settings or a specified .kubeconfig file.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl config view\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+displays merged .kubeconfig settings or a specified .kubeconfig file.
+Examples:
+  // Show merged .kubeconfig settings.
+  $ kubectl config view
+
+.PP
+// Show only local ./.kubeconfig settings
+  $ kubectl config view \-\-local
+
+
+.SH OPTIONS
+.PP
+\fB\-\-merge\fP=true
+    merge together the full hierarchy of .kubeconfig files
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl\-config(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

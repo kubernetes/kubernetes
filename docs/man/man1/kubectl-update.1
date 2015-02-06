@@ -1,0 +1,58 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl update \- Update a resource by filename or stdin.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl update\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Update a resource by filename or stdin.
+
+.PP
+JSON and YAML formats are accepted.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+$ kubectl update \-f pod.json
+// Update a pod using the data in pod.json.
+
+$ cat pod.json | kubectl update \-f \-
+// Update a pod based on the JSON passed into stdin.
+
+$ kubectl update pods my\-pod \-\-patch='\{ "apiVersion": "v1beta1", "desiredState": \{ "manifest": [\{ "cpu": 100 \}]\}\}'
+// Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to file to use to update the resource.
+
+.PP
+\fB\-\-patch\fP=""
+    A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

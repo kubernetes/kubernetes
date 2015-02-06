@@ -1,0 +1,62 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl resize \- Set a new size for a Replication Controller.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl resize\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Set a new size for a Replication Controller.
+
+.PP
+Resize also allows users to specify one or more preconditions for the resize action.
+If \-\-current\-replicas or \-\-resource\-version is specified, it is validated before the
+resize is attempted, and it is guaranteed that the precondition holds true when the
+resize is sent to the server.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+$ kubectl resize \-\-replicas=3 replicationcontrollers foo
+// Resize replication controller named 'foo' to 3.
+
+$ kubectl resize \-\-current\-replicas=2 \-\-replicas=3 replicationcontrollers foo
+// If the replication controller named foo's current size is 2, resize foo to 3.
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-\-current\-replicas\fP=\-1
+    Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.
+
+.PP
+\fB\-\-replicas\fP=\-1
+    The new desired number of replicas. Required.
+
+.PP
+\fB\-\-resource\-version\fP=""
+    Precondition for resource version. Requires that the current resource version match this value in order to resize.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
