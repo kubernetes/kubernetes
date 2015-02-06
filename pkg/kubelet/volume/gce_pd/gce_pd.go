@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
@@ -89,16 +90,17 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podU
 	readOnly := spec.Source.GCEPersistentDisk.ReadOnly
 
 	return &gcePersistentDisk{
-		podUID:     podUID,
-		volName:    spec.Name,
-		pdName:     pdName,
-		fsType:     fsType,
-		partition:  partition,
-		readOnly:   readOnly,
-		manager:    manager,
-		mounter:    mounter,
-		plugin:     plugin,
-		legacyMode: false,
+		podUID:      podUID,
+		volName:     spec.Name,
+		pdName:      pdName,
+		fsType:      fsType,
+		partition:   partition,
+		readOnly:    readOnly,
+		manager:     manager,
+		mounter:     mounter,
+		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
+		plugin:      plugin,
+		legacyMode:  false,
 	}, nil
 }
 
@@ -113,12 +115,13 @@ func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID
 		legacy = true
 	}
 	return &gcePersistentDisk{
-		podUID:     podUID,
-		volName:    volName,
-		manager:    manager,
-		mounter:    mounter,
-		plugin:     plugin,
-		legacyMode: legacy,
+		podUID:      podUID,
+		volName:     volName,
+		manager:     manager,
+		mounter:     mounter,
+		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
+		plugin:      plugin,
+		legacyMode:  legacy,
 	}, nil
 }
 
@@ -145,10 +148,12 @@ type gcePersistentDisk struct {
 	readOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager pdManager
-	// Mounter interface that provides system calls to mount the disks.
-	mounter    mount.Interface
-	plugin     *gcePersistentDiskPlugin
-	legacyMode bool
+	// Mounter interface that provides system calls to mount the global path to the pod local path.
+	mounter mount.Interface
+	// diskMounter provides the interface that is used to mount the actual block device.
+	diskMounter mount.Interface
+	plugin      *gcePersistentDiskPlugin
+	legacyMode  bool
 }
 
 func detachDiskLogError(pd *gcePersistentDisk) {
