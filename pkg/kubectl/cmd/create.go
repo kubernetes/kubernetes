@@ -67,11 +67,12 @@ Examples:
 				if err := schema.ValidateBytes(data); err != nil {
 					return err
 				}
-				if err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data); err != nil {
+				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data)
+				if err != nil {
 					return err
 				}
 				count++
-				// TODO: if generation of names added to server side, change this to use the server's name
+				info.Refresh(obj, true)
 				fmt.Fprintf(out, "%s\n", info.Name)
 				return nil
 			})

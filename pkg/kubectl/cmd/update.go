@@ -42,7 +42,7 @@ Examples:
 
   $ cat pod.json | kubectl update -f -
   <update a pod based on the json passed into stdin>
-  
+
   $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
   <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -67,28 +67,31 @@ Examples:
 			if len(flags.Filenames) != 0 && len(patch) != 0 {
 				usageError(cmd, "Can not specify both --filename and --patch")
 			}
-			if len(flags.Filenames) > 0 {
-				err := r.Visit(func(info *resource.Info) error {
-					data, err := info.Mapping.Codec.Encode(info.Object)
-					if err != nil {
-						return err
-					}
-					if err := schema.ValidateBytes(data); err != nil {
-						return err
-					}
-					if err := resource.NewHelper(info.Client, info.Mapping).
-						Update(info.Namespace, info.Name, true, data); err != nil {
-						return err
-					}
-					fmt.Fprintf(out, "%s\n", info.Name)
-					return nil
-				})
-				checkErr(err)
-			} else {
-				// TODO: Make patching work with -f, updating with patched JSON input files
+
+			// TODO: Make patching work with -f, updating with patched JSON input files
+			if len(flags.Filenames) == 0 {
 				name := updateWithPatch(cmd, args, f, patch)
 				fmt.Fprintf(out, "%s\n", name)
+				return
 			}
+
+			err = r.Visit(func(info *resource.Info) error {
+				data, err := info.Mapping.Codec.Encode(info.Object)
+				if err != nil {
+					return err
+				}
+				if err := schema.ValidateBytes(data); err != nil {
+					return err
+				}
+				obj, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, true, data)
+				if err != nil {
+					return err
+				}
+				info.Refresh(obj, true)
+				fmt.Fprintf(out, "%s\n", info.Name)
+				return nil
+			})
+			checkErr(err)
 
 		},
 	}
@@ -115,7 +118,7 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string
 	data, err := helper.Codec.Encode(obj)
 	checkErr(err)
 
-	err = helper.Update(namespace, name, true, data)
+	obj, err = helper.Update(namespace, name, true, data)
 	checkErr(err)
 	return name
 }

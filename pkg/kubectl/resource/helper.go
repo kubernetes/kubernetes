@@ -95,7 +95,7 @@ func (m *Helper) Delete(namespace, name string) error {
 		Error()
 }
 
-func (m *Helper) Create(namespace string, modify bool, data []byte) error {
+func (m *Helper) Create(namespace string, modify bool, data []byte) (runtime.Object, error) {
 	if modify {
 		obj, err := m.Codec.Decode(data)
 		if err != nil {
@@ -111,11 +111,11 @@ func (m *Helper) Create(namespace string, modify bool, data []byte) error {
 		}
 		if version != "" {
 			if err := m.Versioner.SetResourceVersion(obj, ""); err != nil {
-				return err
+				return nil, err
 			}
 			newData, err := m.Codec.Encode(obj)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			data = newData
 		}
@@ -124,11 +124,11 @@ func (m *Helper) Create(namespace string, modify bool, data []byte) error {
 	return createResource(m.RESTClient, m.Resource, namespace, data)
 }
 
-func createResource(c RESTClient, resource, namespace string, data []byte) error {
-	return c.Post().Namespace(namespace).Resource(resource).Body(data).Do().Error()
+func createResource(c RESTClient, resource, namespace string, data []byte) (runtime.Object, error) {
+	return c.Post().Namespace(namespace).Resource(resource).Body(data).Do().Get()
 }
 
-func (m *Helper) Update(namespace, name string, overwrite bool, data []byte) error {
+func (m *Helper) Update(namespace, name string, overwrite bool, data []byte) (runtime.Object, error) {
 	c := m.RESTClient
 
 	obj, err := m.Codec.Decode(data)
@@ -152,14 +152,14 @@ func (m *Helper) Update(namespace, name string, overwrite bool, data []byte) err
 		}
 		serverVersion, err := m.Versioner.ResourceVersion(serverObj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := m.Versioner.SetResourceVersion(obj, serverVersion); err != nil {
-			return err
+			return nil, err
 		}
 		newData, err := m.Codec.Encode(obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		data = newData
 	}
@@ -167,6 +167,6 @@ func (m *Helper) Update(namespace, name string, overwrite bool, data []byte) err
 	return updateResource(c, m.Resource, namespace, name, data)
 }
 
-func updateResource(c RESTClient, resource, namespace, name string, data []byte) error {
-	return c.Put().Namespace(namespace).Resource(resource).Name(name).Body(data).Do().Error()
+func updateResource(c RESTClient, resource, namespace, name string, data []byte) (runtime.Object, error) {
+	return c.Put().Namespace(namespace).Resource(resource).Name(name).Body(data).Do().Get()
 }

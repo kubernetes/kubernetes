@@ -26,6 +26,7 @@ import (
 
 func TestCreateObject(t *testing.T) {
 	pods, _ := testData()
+	pods.Items[0].Name = "redis-master"
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -81,13 +82,15 @@ func TestCreateMultipleObject(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "redis-master\nfrontend\n" {
+	// Names should come from the REST response, NOT the files
+	if buf.String() != "foo\nbaz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
 func TestCreateDirectory(t *testing.T) {
 	pods, svc := testData()
+	pods.Items[0].Name = "redis-master"
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -114,7 +117,7 @@ func TestCreateDirectory(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend-controller\nfrontend\nredis-master\nredis-master\nredis-slave-controller\nredisslave\n" {
+	if buf.String() != "baz\nbaz\nbaz\nredis-master\nbaz\nbaz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
