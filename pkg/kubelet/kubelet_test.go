@@ -681,7 +681,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	if err := kubelet.SyncPods([]api.BoundPod{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -740,7 +740,7 @@ func TestSyncPodsDeletesWhenContainerSourceReady(t *testing.T) {
 	if err := kubelet.SyncPods([]api.BoundPod{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
 
 	// Validate container for testSource are killed because testSource is reported as seen, but
 	// containers for otherSource are not killed because otherSource has not.
@@ -780,7 +780,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.

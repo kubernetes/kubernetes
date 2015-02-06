@@ -135,6 +135,12 @@ func (p *PodCache) getNodeStatus(name string) (*api.NodeStatus, error) {
 	return &node.Status, nil
 }
 
+func (p *PodCache) clearNodeStatus() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.currentNodes = map[objKey]api.NodeStatus{}
+}
+
 // TODO: once Host gets moved to spec, this can take a podSpec + metadata instead of an
 // entire pod?
 func (p *PodCache) updatePodStatus(pod *api.Pod) error {
@@ -221,6 +227,10 @@ func (p *PodCache) GarbageCollectPodStatus() {
 // calling again, or risk having new info getting clobbered by delayed
 // old info.
 func (p *PodCache) UpdateAllContainers() {
+	// TODO: this is silly, we should pro-actively update the pod status when
+	// the API server makes changes.
+	p.clearNodeStatus()
+
 	ctx := api.NewContext()
 	pods, err := p.pods.ListPods(ctx, labels.Everything())
 	if err != nil {

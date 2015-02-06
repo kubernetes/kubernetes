@@ -1197,11 +1197,21 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker.Container) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
+	runningSet := util.StringSet{}
+	for ix := range running {
+		_, uid, _, _ := dockertools.ParseDockerName(running[ix].Name)
+		runningSet.Insert(string(uid))
+	}
 	for name, vol := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
+			parts := strings.Split(name, "/")
+			if runningSet.Has(parts[0]) {
+				glog.Infof("volume %s, still has a container running %s, skipping teardown", name, parts[0])
+				continue
+			}
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
 			//to be deleted and volumes that are leftover after a crash.
 			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
@@ -1250,9 +1260,10 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		})
 	}
 	// Kill any containers we don't need.
-	for _, container := range dockerContainers {
+	killed := []string{}
+	for ix := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
-		podFullName, uid, containerName, _ := dockertools.ParseDockerName(container.Names[0])
+		podFullName, uid, containerName, _ := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
 		if _, found := desiredPods[uid]; found {
 			// syncPod() will handle this one.
 			continue
@@ -1267,21 +1278,29 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		pc := podContainer{podFullName, uid, containerName}
 		if _, ok := desiredContainers[pc]; !ok {
 			glog.V(1).Infof("Killing unwanted container %+v", pc)
-			err = kl.killContainer(container)
+			err = kl.killContainer(dockerContainers[ix])
 			if err != nil {
 				glog.Errorf("Error killing container %+v: %v", pc, err)
+			} else {
+				killed = append(killed, dockerContainers[ix].ID)
 			}
 		}
 	}
 
-	// Remove any orphaned pods.
-	err = kl.cleanupOrphanedPods(pods)
+	running, err := dockertools.GetRunningContainers(kl.dockerClient, killed)
 	if err != nil {
+		glog.Errorf("Failed to poll container state: %v", err)
 		return err
 	}
 
 	// Remove any orphaned volumes.
-	err = kl.cleanupOrphanedVolumes(pods)
+	err = kl.cleanupOrphanedVolumes(pods, running)
+	if err != nil {
+		return err
+	}
+
+	// Remove any orphaned pods.
+	err = kl.cleanupOrphanedPods(pods)
 	if err != nil {
 		return err
 	}

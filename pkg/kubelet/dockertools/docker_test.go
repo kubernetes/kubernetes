@@ -327,3 +327,106 @@ func TestIsImagePresent(t *testing.T) {
 		t.Errorf("expected inspection of image abc:123, instead inspected image %v", cl.imageName)
 	}
 }
+
+func TestGetRunningContainers(t *testing.T) {
+	fakeDocker := &FakeDockerClient{}
+	tests := []struct {
+		containers  map[string]*docker.Container
+		inputIDs    []string
+		expectedIDs []string
+		err         error
+	}{
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: false,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: true,
+					},
+				},
+			},
+			inputIDs:    []string{"foobar", "baz"},
+			expectedIDs: []string{"baz"},
+		},
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: true,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: true,
+					},
+				},
+			},
+			inputIDs:    []string{"foobar", "baz"},
+			expectedIDs: []string{"foobar", "baz"},
+		},
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: false,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: false,
+					},
+				},
+			},
+			inputIDs:    []string{"foobar", "baz"},
+			expectedIDs: []string{},
+		},
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: false,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: false,
+					},
+				},
+			},
+			inputIDs: []string{"foobar", "baz"},
+			err:      fmt.Errorf("test error"),
+		},
+	}
+	for _, test := range tests {
+		fakeDocker.ContainerMap = test.containers
+		fakeDocker.Err = test.err
+		if results, err := GetRunningContainers(fakeDocker, test.inputIDs); err == nil {
+			resultIDs := []string{}
+			for _, result := range results {
+				resultIDs = append(resultIDs, result.ID)
+			}
+			if !reflect.DeepEqual(resultIDs, test.expectedIDs) {
+				t.Errorf("expected: %v, saw: %v", test.expectedIDs, resultIDs)
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		} else {
+			if err != test.err {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
+	}
+}
