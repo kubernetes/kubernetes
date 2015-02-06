@@ -404,11 +404,11 @@ type LoadBalancer struct {
 
 func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	// TODO: Search for and support Rackspace loadbalancer API, and others.
-	network, err := rackspace.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
+	network, err := rackspace.NewLBV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
 	if err != nil {
-		glog.Warningf("Failed to find neutron endpoint: %v", err)
+		glog.Warningf("Failed to find LB endpoint: %v", err)
 		return nil, false
 	}
 
@@ -489,6 +489,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		Name:     name,
 		Protocol: "TCP",
 		VIPs:     vipList,
+		Port:     port,
 	}).Extract()
 	if err != nil {
 		return nil, err
@@ -502,18 +503,28 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}
 
 		nodeList = append(nodeList, nodes.CreateOpt{
-			Port:    port,
-			Address: addr,
+			Port:      port,
+			Address:   addr,
+			Condition: nodes.ENABLED,
+			Type:      nodes.PRIMARY,
 		})
 	}
 
+	glog.V(2).Infof("Waiting for LB to be ready")
+	poll, _ := lbs.Get(lb.network, pool.ID).Extract()
+	for poll.Status != lbs.ACTIVE {
+		time.Sleep(time.Second * 5)
+		poll, _ = lbs.Get(lb.network, pool.ID).Extract()
+	}
+
+	glog.V(2).Infof("Adding nodes to LB %v with ID %v", name, pool.ID)
 	_, err = nodes.Create(lb.network, pool.ID, nodeList).ExtractNodes()
 	if err != nil {
 		lbs.Delete(lb.network, pool.ID)
 		return nil, err
 	}
 
-	return net.ParseIP(pool.VIPs[0].Address), nil
+	return net.ParseIP(pool.SourceAddrs.IPv4Private), nil
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
