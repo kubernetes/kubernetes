@@ -45,6 +45,11 @@
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
 		},
 		{
+			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
+			"Comment": "v1.0.2-5-g2831f11",
+			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "1aaf839fb07e099361e445273993ccd9adc21b07"
 		},
@@ -205,6 +210,15 @@
 			"ImportPath": "github.com/rackspace/gophercloud",
 			"Comment": "v1.0.0",
 			"Rev": "da56de6a59e53fdd61be1b5d9b87df34c47ac420"
+		},
+		{
+			"ImportPath": "github.com/russross/blackfriday",
+			"Comment": "v1.2-42-g77efab5",
+			"Rev": "77efab57b2f74dd3f9051c79752b2e8995c8b789"
+		},
+		{
+			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
+			"Rev": "9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",

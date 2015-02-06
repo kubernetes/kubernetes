@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs
+"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -74,16 +74,22 @@ locations=(
 )
 gendocs=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-if [[ ! -x "$gendocs" ]]; then
+locations=(
+  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genman"
+  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genman"
+  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genman"
+)
+genman=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+
+if [[ ! -x "$gendocs" || ! -x "$genman" ]]; then
   {
-    echo "It looks as if you don't have a compiled gendocs binary"
+    echo "It looks as if you don't have a compiled gendocs or genman binary"
     echo
     echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/gendocs'."
+    echo "'./hack/build-go.sh cmd/gendocs cmd/genman'."
   } >&2
   exit 1
 fi
-
 
 KUBECTL_DOC="docs/kubectl.md"
 
@@ -92,3 +98,21 @@ echo "diffing ${KUBECTL_DOC} against generated output from ${gendocs}"
   echo "${KUBECTL_DOC} is out of date. Please run hack/run-gendocs.sh"
   exit 1
 }
+
+DOCROOT="${KUBE_ROOT}/docs/"
+TMP_DOCROOT="${KUBE_ROOT}/docs_tmp/"
+cp -a "${DOCROOT}" "${TMP_DOCROOT}"
+echo "diffing ${DOCROOT} against generated output from ${genman}"
+${genman} "${TMP_DOCROOT}/man/man1/"
+set +e
+diff -Naupr "${DOCROOT}" "${TMP_DOCROOT}"
+ret=$?
+set -e
+rm -rf "${TMP_DOCROOT}"
+if [ $ret -eq 0 ]
+then
+	echo "${DOCROOT} up to date."
+else
+	echo "${DOCROOT} is out of date. Please run hack/run-gendocs.sh"
+	exit 1
+fi
