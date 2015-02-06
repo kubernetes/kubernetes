@@ -452,10 +452,11 @@ func TestPrinters(t *testing.T) {
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
 		"emptyPodList":    &api.PodList{},
 		"nonEmptyPodList": &api.PodList{Items: []api.Pod{{}}},
+		"endpoints":       &api.Endpoints{Endpoints: []string{"127.0.0.1", "localhost:8080"}},
 	}
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]util.StringSet{
-		"template2": util.NewStringSet("pod", "emptyPodList"),
+		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {

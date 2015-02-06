@@ -218,6 +218,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
+var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var minionColumns = []string{"NAME", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"TIME", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
@@ -232,6 +233,7 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
+	h.Handler(endpointColumns, printEndpoints)
 	h.Handler(minionColumns, printMinion)
 	h.Handler(minionColumns, printMinionList)
 	h.Handler(statusColumns, printStatus)
@@ -253,6 +255,13 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 		return err
 	}
 	return nil
+}
+
+func stringList(list []string) string {
+	if len(list) == 0 {
+		return "<empty>"
+	}
+	return strings.Join(list, ",")
 }
 
 func podHostString(host, ip string) string {
@@ -350,6 +359,11 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func printEndpoints(endpoint *api.Endpoints, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoint.Name, stringList(endpoint.Endpoints))
+	return err
 }
 
 func printMinion(minion *api.Node, w io.Writer) error {
