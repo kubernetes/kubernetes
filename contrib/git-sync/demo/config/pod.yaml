@@ -8,11 +8,11 @@ desiredState:
     - name: git-sync
       image: proppy/git-sync
       imagePullPolicy: PullAlways
-      env::
-        - name: GIT_SYNC_REPO
-          value: https://github.com/proppy/blog.git
-        - name: GIT_SYNC_DEST
-          value: /git
+      env:
+      - name: GIT_SYNC_REPO
+        value: https://github.com/GoogleCloudPlatform/kubernetes.git
+      - name: GIT_SYNC_DEST
+        value: /git
       volumeMounts:
       - name: markdown
         mountPath: /git
@@ -20,12 +20,12 @@ desiredState:
       image: proppy/hugo
       imagePullPolicy: PullAlways
       env:
-      - name: SRC
-        value: /src
-      - name: BUILD_DRAFT
+      - name: HUGO_SRC
+        value: /src/contrib/git-sync/demo/blog
+      - name: HUGO_BUILD_DRAFT
         value: 'true'
-      - name: BASE_URL
-        value: kube.proppy.sh
+      - name: HUGO_BASE_URL
+        value: example.com
       volumeMounts:
       - name: markdown
         mountPath: /src
