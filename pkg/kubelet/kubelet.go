@@ -1037,10 +1037,6 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info, health checks may be invalid", podFullName, uid)
 	}
-	netInfo, found := podStatus.Info[dockertools.PodInfraContainerName]
-	if found {
-		podStatus.PodIP = netInfo.PodIP
-	}
 
 	for _, container := range pod.Spec.Containers {
 		expectedHash := dockertools.HashContainer(&container)
@@ -1427,20 +1423,90 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
 	return nil, false
 }
 
+// getPhase returns the phase of a pod given its container info.
+func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
+	if info == nil {
+		return api.PodPending
+	}
+
+	running := 0
+	waiting := 0
+	stopped := 0
+	failed := 0
+	succeeded := 0
+	unknown := 0
+	for _, container := range spec.Containers {
+		if containerStatus, ok := info[container.Name]; ok {
+			if containerStatus.State.Running != nil {
+				running++
+			} else if containerStatus.State.Termination != nil {
+				stopped++
+				if containerStatus.State.Termination.ExitCode == 0 {
+					succeeded++
+				} else {
+					failed++
+				}
+			} else if containerStatus.State.Waiting != nil {
+				waiting++
+			} else {
+				unknown++
+			}
+		} else {
+			unknown++
+		}
+	}
+	switch {
+	case waiting > 0:
+		// One or more containers has not been started
+		return api.PodPending
+	case running > 0 && unknown == 0:
+		// All containers have been started, and at least
+		// one container is running
+		return api.PodRunning
+	case running == 0 && stopped > 0 && unknown == 0:
+		// All containers are terminated
+		if spec.RestartPolicy.Always != nil {
+			// All containers are in the process of restarting
+			return api.PodRunning
+		}
+		if stopped == succeeded {
+			// RestartPolicy is not Always, and all
+			// containers are terminated in success
+			return api.PodSucceeded
+		}
+		if spec.RestartPolicy.Never != nil {
+			// RestartPolicy is Never, and all containers are
+			// terminated with at least one in failure
+			return api.PodFailed
+		}
+		// RestartPolicy is OnFailure, and at least one in failure
+		// and in the process of restarting
+		return api.PodRunning
+	default:
+		return api.PodPending
+	}
+}
+
 // GetPodStatus returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
-	var manifest api.PodSpec
+	var spec api.PodSpec
 	for _, pod := range kl.pods {
 		if GetPodFullName(&pod) == podFullName {
-			manifest = pod.Spec
+			spec = pod.Spec
 			break
 		}
 	}
 
-	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uid)
+	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
 
-	// TODO(dchen1107): Determine PodPhase here
 	var podStatus api.PodStatus
+	podStatus.Phase = getPhase(&spec, info)
+	netContainerInfo, found := info[dockertools.PodInfraContainerName]
+	if found {
+		podStatus.PodIP = netContainerInfo.PodIP
+	}
+
+	// TODO(dchen1107): Change Info to list from map
 	podStatus.Info = info
 
 	return podStatus, err

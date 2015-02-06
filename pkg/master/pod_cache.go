@@ -21,7 +21,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 
@@ -193,11 +192,14 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		newStatus.Phase = api.PodUnknown
 	} else {
 		newStatus.Info = result.Status.Info
-		newStatus.Phase = getPhase(&pod.Spec, newStatus.Info)
-		if netContainerInfo, ok := newStatus.Info[leaky.PodInfraContainerName]; ok {
-			if netContainerInfo.PodIP != "" {
-				newStatus.PodIP = netContainerInfo.PodIP
-			}
+		newStatus.PodIP = result.Status.PodIP
+		if newStatus.Info == nil {
+			// There is a small race window that kubelet couldn't
+			// propulated the status yet. This should go away once
+			// we removed boundPods
+			newStatus.Phase = api.PodPending
+		} else {
+			newStatus.Phase = result.Status.Phase
 		}
 	}
 	return newStatus, err
@@ -255,68 +257,4 @@ func (p *PodCache) UpdateAllContainers() {
 		}()
 	}
 	wg.Wait()
-}
-
-// getPhase returns the phase of a pod given its container info.
-// TODO(dchen1107): push this all the way down into kubelet.
-func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
-	if info == nil {
-		return api.PodPending
-	}
-	running := 0
-	waiting := 0
-	stopped := 0
-	failed := 0
-	succeeded := 0
-	unknown := 0
-	for _, container := range spec.Containers {
-		if containerStatus, ok := info[container.Name]; ok {
-			if containerStatus.State.Running != nil {
-				running++
-			} else if containerStatus.State.Termination != nil {
-				stopped++
-				if containerStatus.State.Termination.ExitCode == 0 {
-					succeeded++
-				} else {
-					failed++
-				}
-			} else if containerStatus.State.Waiting != nil {
-				waiting++
-			} else {
-				unknown++
-			}
-		} else {
-			unknown++
-		}
-	}
-	switch {
-	case waiting > 0:
-		// One or more containers has not been started
-		return api.PodPending
-	case running > 0 && unknown == 0:
-		// All containers have been started, and at least
-		// one container is running
-		return api.PodRunning
-	case running == 0 && stopped > 0 && unknown == 0:
-		// All containers are terminated
-		if spec.RestartPolicy.Always != nil {
-			// All containers are in the process of restarting
-			return api.PodRunning
-		}
-		if stopped == succeeded {
-			// RestartPolicy is not Always, and all
-			// containers are terminated in success
-			return api.PodSucceeded
-		}
-		if spec.RestartPolicy.Never != nil {
-			// RestartPolicy is Never, and all containers are
-			// terminated with at least one in failure
-			return api.PodFailed
-		}
-		// RestartPolicy is OnFailure, and at least one in failure
-		// and in the process of restarting
-		return api.PodRunning
-	default:
-		return api.PodPending
-	}
 }

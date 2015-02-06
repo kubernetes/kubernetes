@@ -2240,3 +2240,322 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		}
 	}
 }
+
+func TestPodPhaseWithRestartAlways(t *testing.T) {
+	desiredState := api.PodSpec{
+		Containers: []api.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+	}
+	currentState := api.PodStatus{
+		Host: "machine",
+	}
+	runningState := api.ContainerStatus{
+		State: api.ContainerState{
+			Running: &api.ContainerStateRunning{},
+		},
+	}
+	stoppedState := api.ContainerStatus{
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{},
+		},
+	}
+
+	tests := []struct {
+		pod    *api.Pod
+		status api.PodPhase
+		test   string
+	}{
+		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"all running",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": stoppedState,
+						"containerB": stoppedState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"all stopped with restart always",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": stoppedState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"mixed state #1 with restart always",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodPending,
+			"mixed state #2 with restart always",
+		},
+	}
+	for _, test := range tests {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
+		}
+	}
+}
+
+func TestPodPhaseWithRestartNever(t *testing.T) {
+	desiredState := api.PodSpec{
+		Containers: []api.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: api.RestartPolicy{Never: &api.RestartPolicyNever{}},
+	}
+	currentState := api.PodStatus{
+		Host: "machine",
+	}
+	runningState := api.ContainerStatus{
+		State: api.ContainerState{
+			Running: &api.ContainerStateRunning{},
+		},
+	}
+	succeededState := api.ContainerStatus{
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: 0,
+			},
+		},
+	}
+	failedState := api.ContainerStatus{
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: -1,
+			},
+		},
+	}
+
+	tests := []struct {
+		pod    *api.Pod
+		status api.PodPhase
+		test   string
+	}{
+		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"all running with restart never",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": succeededState,
+						"containerB": succeededState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodSucceeded,
+			"all succeeded with restart never",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": failedState,
+						"containerB": failedState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodFailed,
+			"all failed with restart never",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": succeededState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"mixed state #1 with restart never",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodPending,
+			"mixed state #2 with restart never",
+		},
+	}
+	for _, test := range tests {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
+		}
+	}
+}
+
+func TestPodPhaseWithRestartOnFailure(t *testing.T) {
+	desiredState := api.PodSpec{
+		Containers: []api.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: api.RestartPolicy{OnFailure: &api.RestartPolicyOnFailure{}},
+	}
+	currentState := api.PodStatus{
+		Host: "machine",
+	}
+	runningState := api.ContainerStatus{
+		State: api.ContainerState{
+			Running: &api.ContainerStateRunning{},
+		},
+	}
+	succeededState := api.ContainerStatus{
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: 0,
+			},
+		},
+	}
+	failedState := api.ContainerStatus{
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: -1,
+			},
+		},
+	}
+
+	tests := []struct {
+		pod    *api.Pod
+		status api.PodPhase
+		test   string
+	}{
+		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"all running with restart onfailure",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": succeededState,
+						"containerB": succeededState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodSucceeded,
+			"all succeeded with restart onfailure",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": failedState,
+						"containerB": failedState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"all failed with restart never",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+						"containerB": succeededState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodRunning,
+			"mixed state #1 with restart onfailure",
+		},
+		{
+			&api.Pod{
+				Spec: desiredState,
+				Status: api.PodStatus{
+					Info: map[string]api.ContainerStatus{
+						"containerA": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodPending,
+			"mixed state #2 with restart onfailure",
+		},
+	}
+	for _, test := range tests {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
+		}
+	}
+}
