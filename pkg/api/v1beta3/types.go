@@ -464,7 +464,8 @@ type ContainerStatus struct {
 	PodIP string `json:"podIP,omitempty"`
 	// TODO(dchen1107): Which image the container is running with?
 	// The image the container is running
-	Image string `json:"image"`
+	Image   string `json:"image"`
+	ImageID string `json:"imageID" description:"ID of the container's image"`
 }
 
 // PodInfo contains one entry for every container with available info.

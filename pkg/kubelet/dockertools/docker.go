@@ -41,6 +41,7 @@ import (
 
 const (
 	PodInfraContainerName = leaky.PodInfraContainerName
+	DockerPrefix          = "docker://"
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
@@ -399,7 +400,8 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
 	containerStatus := api.ContainerStatus{
 		Image:       inspectResult.Config.Image,
-		ContainerID: "docker://" + dockerID,
+		ImageID:     DockerPrefix + inspectResult.Image,
+		ContainerID: DockerPrefix + dockerID,
 	}
 
 	waiting := true
