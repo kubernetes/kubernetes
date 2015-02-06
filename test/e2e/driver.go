@@ -35,6 +35,12 @@ func init() {
 	// Turn off colors by default to make it easier to collect console output in Jenkins
 	// Override colors off with --ginkgo.noColor=false in the command-line
 	config.DefaultReporterConfig.NoColor = true
+
+	// Turn on verbose by default to get spec names
+	config.DefaultReporterConfig.Verbose = true
+
+	// Randomize specs as well as suites
+	config.GinkgoConfig.RandomizeAllSpecs = true
 }
 
 func (t *testResult) Fail() { *t = false }
