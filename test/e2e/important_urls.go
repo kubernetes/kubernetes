@@ -17,43 +17,40 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 // TestImportantURLs validates that URLs that people depend on haven't moved.
 // ***IMPORTANT*** Do *not* fix this test just by changing the path.  If you moved a URL
 // you can break upstream dependencies.
-func TestImportantURLs(c *client.Client) bool {
-	tests := []struct {
-		path string
-	}{
-		{path: "/validate"},
-		{path: "/healthz"},
-		// TODO: test proxy links here
-	}
-	ok := true
-	for _, test := range tests {
-		glog.Infof("testing: %s", test.path)
-		data, err := c.RESTClient.Get().
-			AbsPath(test.path).
-			Do().
-			Raw()
-		if err != nil {
-			glog.Errorf("Failed: %v\nBody: %s", err, string(data))
-			ok = false
-		}
-	}
-	return ok
-}
-
 var _ = Describe("TestImportantURLs", func() {
-	It("should pass", func() {
-		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
-		// In general tests should Fail() instead of glog.Fatalf().
-		Expect(TestImportantURLs(loadClientOrDie())).To(BeTrue())
+	var c *client.Client
+
+	BeforeEach(func() {
+		c = loadClientOrDie()
+	})
+
+	It("should provide unchanging URLs", func() {
+		tests := []struct {
+			path string
+		}{
+			{path: "/validate"},
+			{path: "/healthz"},
+			// TODO: test proxy links here
+		}
+		for _, test := range tests {
+			By(fmt.Sprintf("testing: %s", test.path))
+			data, err := c.RESTClient.Get().
+				AbsPath(test.path).
+				Do().
+				Raw()
+			if err != nil {
+				Fail(fmt.Sprintf("Failed: %v\nBody: %s", err, string(data)))
+			}
+		}
 	})
 })
