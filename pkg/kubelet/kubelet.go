@@ -55,6 +55,7 @@ const defaultChanSize = 1024
 const minShares = 2
 const sharesPerCPU = 1024
 const milliCPUToCPU = 1000
+const maxRetries int = 3
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
@@ -1380,6 +1381,15 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
+// Returns Docker version for this Kubelet.
+func (kl *Kubelet) GetDockerVersion() ([]uint, error) {
+	if kl.dockerClient == nil {
+		return nil, fmt.Errorf("no Docker client")
+	}
+	dockerRunner := dockertools.NewDockerContainerCommandRunner(kl.dockerClient)
+	return dockerRunner.GetDockerServerVersion()
+}
+
 // GetKubeletContainerLogs returns logs from the container
 // The second parameter of GetPodStatus and FindPodContainer methods represents pod UUID, which is allowed to be blank
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
@@ -1436,7 +1446,7 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	return podStatus, err
 }
 
-func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Status, error) {
+func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (healthStatus probe.Result, err error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
 		return probe.Success, nil
@@ -1444,7 +1454,13 @@ func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status ap
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
 		return probe.Success, nil
 	}
-	return kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
+	for i := 0; i < maxRetries; i++ {
+		healthStatus, err = kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
+		if healthStatus == probe.Success {
+			return
+		}
+	}
+	return healthStatus, err
 }
 
 // Returns logs of current machine.

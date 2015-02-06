@@ -14,12 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
-
-${KUBE_ROOT}/hack/e2e-suite/goe2e.sh -tTestNetwork
+set -ex
+if [ ! -d ${SRC}/themes ]; then
+    ln -s /themes ${SRC}/themes
+fi
+hugo $(eval echo $*) # force default CMD env expansion

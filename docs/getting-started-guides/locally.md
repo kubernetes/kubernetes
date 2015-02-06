@@ -30,7 +30,7 @@ hack/local-up-cluster.sh
 This will build and start a lightweight local cluster, consisting of a master
 and a single minion. Type Control-C to shut it down.
 
-You can use the cluster/kubecfg.sh script to interact with the local cluster.
+You can use the cluster/kubectl.sh script to interact with the local cluster.
 You must set the KUBERNETES_PROVIDER and KUBERNETES_MASTER environment variables to let other programs
 know how to reach your master.
 
@@ -43,13 +43,13 @@ export KUBERNETES_MASTER=http://localhost:8080
 
 Your cluster is running, and you want to start running containers!
 
-You can now use any of the cluster/kubecfg.sh commands to interact with your local setup.
+You can now use any of the cluster/kubectl.sh commands to interact with your local setup.
 
 ```
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationControllers
-cluster/kubecfg.sh -p 8081:80 run dockerfile/nginx 1 myNginx
+cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 
 
 ## begin wait for provision to complete, you can monitor the docker pull by opening a new terminal

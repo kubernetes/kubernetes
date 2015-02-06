@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -38,7 +39,14 @@ var (
 	tcprober   = tcprobe.New()
 )
 
-func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
+func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
+	var timeout time.Duration
+	secs := container.LivenessProbe.TimeoutSeconds
+	if secs > 0 {
+		timeout = time.Duration(secs) * time.Second
+	} else {
+		timeout = 1 * time.Second
+	}
 	if p.Exec != nil {
 		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
@@ -47,14 +55,15 @@ func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return httprober.Probe(extractGetParams(p.HTTPGet, status, port))
+		host, port, path := extractGetParams(p.HTTPGet, status, port)
+		return httprober.Probe(host, port, path, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return tcprober.Probe(status.PodIP, port)
+		return tcprober.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)
 	return probe.Unknown, nil

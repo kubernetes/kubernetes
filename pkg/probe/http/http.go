@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 
@@ -28,16 +29,17 @@ import (
 )
 
 func New() HTTPProber {
-	return HTTPProber{&http.Client{}}
+	transport := &http.Transport{}
+	return HTTPProber{transport}
 }
 
 type HTTPProber struct {
-	client HTTPGetInterface
+	transport *http.Transport
 }
 
 // Probe returns a ProbeRunner capable of running an http check.
-func (pr *HTTPProber) Probe(host string, port int, path string) (probe.Status, error) {
-	return DoHTTPProbe(formatURL(host, port, path), pr.client)
+func (pr *HTTPProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error) {
+	return DoHTTPProbe(formatURL(host, port, path), &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
 type HTTPGetInterface interface {
@@ -48,7 +50,7 @@ type HTTPGetInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Status, error) {
+func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, error) {
 	res, err := client.Get(url)
 	if err != nil {
 		glog.V(1).Infof("HTTP probe error: %v", err)

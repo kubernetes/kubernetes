@@ -25,7 +25,7 @@ $ sudo ./util.sh
 
 After this the kubernetes and `etcd` services would be up and running. You can use `service start/stop/restart/force-reload` on the services.
 
-Launching and scheduling containers using kubecfg can also be used at this point, as explained mentioned in the [examples](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook)
+Launching and scheduling containers using kubectl can also be used at this point, as explained mentioned in the [examples](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook)
 
 ### 3. Customizing the ubuntu launch
 To customize the defaults you will need to tweak `/etc/default/kube*` files and restart the appropriate services. This is needed if the binaries are copied in a place other than `/opt/bin`. A run could look like

@@ -14,11 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-detect-master > /dev/null
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBE_CONFIG_FILE:="config-test.sh"}
+
+export KUBECTL KUBE_CONFIG_FILE
+
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+prepare-e2e
+
+detect-master >/dev/null
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -89,5 +102,6 @@ fi
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
+  --ginkgo.v \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@}"

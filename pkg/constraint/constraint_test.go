@@ -17,6 +17,7 @@ limitations under the License.
 package constraint
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -40,11 +41,11 @@ func podWithContainers(containers ...api.Container) api.BoundPod {
 
 func TestAllowed(t *testing.T) {
 	table := []struct {
-		allowed bool
-		pods    []api.BoundPod
+		err  string
+		pods []api.BoundPod
 	}{
 		{
-			allowed: true,
+			err: "[]",
 			pods: []api.BoundPod{
 				podWithContainers(
 					containerWithHostPorts(1, 2, 3),
@@ -57,7 +58,7 @@ func TestAllowed(t *testing.T) {
 			},
 		},
 		{
-			allowed: true,
+			err: "[]",
 			pods: []api.BoundPod{
 				podWithContainers(
 					containerWithHostPorts(0, 0),
@@ -70,7 +71,7 @@ func TestAllowed(t *testing.T) {
 			},
 		},
 		{
-			allowed: false,
+			err: "[host port 3 is already in use]",
 			pods: []api.BoundPod{
 				podWithContainers(
 					containerWithHostPorts(3, 3),
@@ -78,7 +79,7 @@ func TestAllowed(t *testing.T) {
 			},
 		},
 		{
-			allowed: false,
+			err: "[host port 6 is already in use]",
 			pods: []api.BoundPod{
 				podWithContainers(
 					containerWithHostPorts(6),
@@ -91,7 +92,7 @@ func TestAllowed(t *testing.T) {
 	}
 
 	for _, item := range table {
-		if e, a := item.allowed, Allowed(item.pods); e != a {
+		if e, a := item.err, Allowed(item.pods); e != fmt.Sprintf("%v", a) {
 			t.Errorf("Expected %v, got %v: \n%v\v", e, a, item.pods)
 		}
 	}

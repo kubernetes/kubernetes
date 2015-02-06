@@ -30,10 +30,8 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
@@ -44,12 +42,8 @@ var (
 	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
-	orderseed        = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
-	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
-	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
-	times            = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
+	test             = flag.Bool("test", false, "Run Ginkgo tests.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
-	tap              = flag.Bool("tap", false, "Enable Test Anything Protocol (TAP) output (disables --verbose, only failure output recorded)")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -95,21 +89,6 @@ func main() {
 	flag.Parse()
 	signal.Notify(signals, os.Interrupt)
 
-	if *tap {
-		fmt.Printf("TAP version 13\n")
-		log.SetPrefix("# ")
-
-		// TODO: this limitation is fixable by moving runBash to
-		// outputing to temp files, which still lets people check on
-		// stuck things interactively. The current stdout/stderr
-		// approach isn't really going to work with TAP, though.
-		*verbose = false
-	}
-
-	if *test {
-		*tests = "*"
-	}
-
 	if *isup {
 		status := 1
 		if IsUp() {
@@ -137,8 +116,11 @@ func main() {
 			log.Fatalf("Error preparing a binary of version %s: %s. Aborting.", *version, err)
 		} else {
 			versionRoot = newVersionRoot
+			os.Setenv("KUBE_VERSION_ROOT", newVersionRoot)
 		}
 	}
+
+	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
 
 	if *pushup {
 		if IsUp() {
@@ -165,8 +147,8 @@ func main() {
 	switch {
 	case *ctlCmd != "":
 		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
-	case *tests != "":
-		failure = PrintResults(Test())
+	case *test:
+		failure = Test()
 	}
 
 	if *down {
@@ -275,7 +257,7 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 	}
 }
 
-func Test() (results ResultsByTest) {
+func Test() bool {
 	defer runBashUntil("watchEvents", "while true; do $KUBECTL --watch-only get events; done")()
 
 	if !IsUp() {
@@ -284,128 +266,7 @@ func Test() (results ResultsByTest) {
 
 	ValidateClusterSize()
 
-	// run tests!
-	dir, err := os.Open(filepath.Join(*root, "hack", "e2e-suite"))
-	if err != nil {
-		log.Fatal("Couldn't open e2e-suite dir")
-	}
-	defer dir.Close()
-	names, err := dir.Readdirnames(0)
-	if err != nil {
-		log.Fatal("Couldn't read names in e2e-suite dir")
-	}
-
-	toRun := make([]string, 0, len(names))
-	for i := range names {
-		name := names[i]
-		if name == "." || name == ".." {
-			continue
-		}
-		if match, err := path.Match(*tests, name); !match && err == nil {
-			continue
-		}
-		if err != nil {
-			log.Fatalf("Bad test pattern: %v", *tests)
-		}
-		toRun = append(toRun, name)
-	}
-
-	if *orderseed == 0 {
-		// Use low order bits of NanoTime as the default seed. (Using
-		// all the bits makes for a long, very similar looking seed
-		// between runs.)
-		*orderseed = time.Now().UnixNano() & (1<<32 - 1)
-	}
-	sort.Strings(toRun)
-	if *times != 1 {
-		if *times <= 0 {
-			log.Fatal("Invalid --times (negative or no testing requested)!")
-		}
-		newToRun := make([]string, 0, *times*len(toRun))
-		for i := 0; i < *times; i++ {
-			newToRun = append(newToRun, toRun...)
-		}
-		toRun = newToRun
-	}
-	shuffleStrings(toRun, rand.New(rand.NewSource(*orderseed)))
-	log.Printf("Running tests matching %v shuffled with seed %#x: %v", *tests, *orderseed, toRun)
-	results = ResultsByTest{}
-	if *tap {
-		fmt.Printf("1..%v\n", len(toRun))
-	}
-	for i, name := range toRun {
-		absName := filepath.Join(*root, "hack", "e2e-suite", name)
-		log.Printf("Starting test [%v/%v]: %v", i+1, len(toRun), name)
-		start := time.Now()
-		testResult := results[name]
-		res, stdout, stderr := runBashWithOutputs(name, absName)
-		// The duration_ms output is an undocumented Jenkins TAP
-		// plugin feature for test duration. One might think _ms means
-		// milliseconds, but Jenkins interprets this field in seconds.
-		duration_secs := time.Now().Sub(start).Seconds()
-		if res {
-			fmt.Printf("ok %v - %v\n", i+1, name)
-			if *tap {
-				fmt.Printf("  ---\n  duration_ms: %.3f\n  ...\n", duration_secs)
-			}
-			testResult.Pass++
-		} else {
-			fmt.Printf("not ok %v - %v\n", i+1, name)
-			if *tap {
-				fmt.Printf("  ---\n  duration_ms: %.3f\n", duration_secs)
-			}
-			printBashOutputs("  ", "    ", stdout, stderr, *tap)
-			if *tap {
-				fmt.Printf("  ...\n")
-			}
-			testResult.Fail++
-		}
-		results[name] = testResult
-	}
-
-	return
-}
-
-func PrintResults(results ResultsByTest) bool {
-	failures := 0
-
-	passed := []string{}
-	flaky := []string{}
-	failed := []string{}
-	for test, result := range results {
-		if result.Pass > 0 && result.Fail == 0 {
-			passed = append(passed, test)
-		} else if result.Pass > 0 && result.Fail > 0 {
-			flaky = append(flaky, test)
-			failures += result.Fail
-		} else {
-			failed = append(failed, test)
-			failures += result.Fail
-		}
-	}
-	sort.Strings(passed)
-	sort.Strings(flaky)
-	sort.Strings(failed)
-	printSubreport("Passed", passed, results)
-	printSubreport("Flaky", flaky, results)
-	printSubreport("Failed", failed, results)
-	if failures > 0 {
-		log.Printf("%v test(s) failed.", failures)
-	} else {
-		log.Printf("Success!")
-	}
-
-	return failures > 0
-}
-
-func printSubreport(title string, tests []string, results ResultsByTest) {
-	report := title + " tests:"
-
-	for _, test := range tests {
-		result := results[test]
-		report += fmt.Sprintf(" %v[%v/%v]", test, result.Pass, result.Pass+result.Fail)
-	}
-	log.Printf(report)
+	return runBash("Ginkgo tests", filepath.Join(*root, "hack", "ginkgo-e2e.sh"))
 }
 
 // All nonsense below is temporary until we have go versions of these things.
@@ -448,10 +309,6 @@ func runBashUntil(stepName, bashFragment string) func() {
 		cmd.Process.Signal(os.Interrupt)
 		headerprefix := stepName + " "
 		lineprefix := "  "
-		if *tap {
-			headerprefix = "# " + headerprefix
-			lineprefix = "# " + lineprefix
-		}
 		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()), false)
 	}
 }

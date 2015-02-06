@@ -20,6 +20,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +67,7 @@ Examples:
 			}
 
 			follow := false
-			if GetFlagBool(cmd, "follow") {
+			if util.GetFlagBool(cmd, "follow") {
 				follow = true
 			}
 

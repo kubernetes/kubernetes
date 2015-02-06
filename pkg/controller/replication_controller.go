@@ -141,11 +141,24 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 			}
 			if event.Type == watch.Error {
 				util.HandleError(fmt.Errorf("error from watch during sync: %v", errors.FromObject(event.Object)))
+				// Clear the resource version, this may cause us to skip some elements on the watch,
+				// but we'll catch them on the synchronize() call, so it works out.
+				*resourceVersion = ""
 				continue
 			}
 			glog.V(4).Infof("Got watch: %#v", event)
 			rc, ok := event.Object.(*api.ReplicationController)
 			if !ok {
+				if status, ok := event.Object.(*api.Status); ok {
+					if status.Status == api.StatusFailure {
+						glog.Errorf("failed to watch: %v", status)
+						// Clear resource version here, as above, this won't hurt consistency, but we
+						// should consider introspecting more carefully here. (or make the apiserver smarter)
+						// "why not both?"
+						*resourceVersion = ""
+						continue
+					}
+				}
 				util.HandleError(fmt.Errorf("unexpected object: %#v", event.Object))
 				continue
 			}
@@ -166,7 +179,8 @@ func FilterActivePods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
 		if api.PodSucceeded != value.Status.Phase &&
-			api.PodFailed != value.Status.Phase {
+			api.PodFailed != value.Status.Phase &&
+			api.PodUnknown != value.Status.Phase {
 			result = append(result, value)
 		}
 	}

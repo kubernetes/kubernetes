@@ -203,7 +203,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		CAdvisorPort:            s.CAdvisorPort,
 		EnableServer:            s.EnableServer,
 		EnableDebuggingHandlers: s.EnableDebuggingHandlers,
-		DockerClient:            util.ConnectToDockerOrDie(s.DockerEndpoint),
+		DockerClient:            dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
 		KubeClient:              client,
 		EtcdClient:              kubelet.EtcdClientOrDie(s.EtcdServerList, s.EtcdConfigFile),
 		MasterServiceNamespace:  s.MasterServiceNamespace,

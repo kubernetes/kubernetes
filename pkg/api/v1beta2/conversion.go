@@ -966,6 +966,7 @@ func init() {
 				return err
 			}
 			out.InitialDelaySeconds = in.InitialDelaySeconds
+			out.TimeoutSeconds = in.TimeoutSeconds
 			return nil
 		},
 		func(in *LivenessProbe, out *newer.Probe, s conversion.Scope) error {
@@ -979,6 +980,7 @@ func init() {
 				return err
 			}
 			out.InitialDelaySeconds = in.InitialDelaySeconds
+			out.TimeoutSeconds = in.TimeoutSeconds
 			return nil
 		},
 	)

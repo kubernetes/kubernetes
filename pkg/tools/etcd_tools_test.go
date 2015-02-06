@@ -375,7 +375,7 @@ func TestSetObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
-	err := helper.SetObj("/some/key", obj)
+	err := helper.SetObj("/some/key", obj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -388,6 +388,10 @@ func TestSetObj(t *testing.T) {
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
 	}
+	if e, a := uint64(5), fakeClient.LastSetTTL; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
+
 }
 
 func TestSetObjWithVersion(t *testing.T) {
@@ -404,7 +408,7 @@ func TestSetObjWithVersion(t *testing.T) {
 	}
 
 	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
-	err := helper.SetObj("/some/key", obj)
+	err := helper.SetObj("/some/key", obj, 7)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -416,6 +420,9 @@ func TestSetObjWithVersion(t *testing.T) {
 	got := fakeClient.Data["/some/key"].R.Node.Value
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+	if e, a := uint64(7), fakeClient.LastSetTTL; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
 	}
 }
 
@@ -423,7 +430,7 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, testapi.Codec(), nil}
-	err := helper.SetObj("/some/key", obj)
+	err := helper.SetObj("/some/key", obj, 3)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -435,6 +442,9 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	got := fakeClient.Data["/some/key"].R.Node.Value
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+	if e, a := uint64(3), fakeClient.LastSetTTL; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
 	}
 }
 

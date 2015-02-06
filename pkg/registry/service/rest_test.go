@@ -96,7 +96,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 				SessionAffinity: api.AffinityTypeNone,
 			},
 		},
-		"empty selector": {
+		"empty port": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},

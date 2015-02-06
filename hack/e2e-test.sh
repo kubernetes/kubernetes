@@ -15,6 +15,6 @@
 # limitations under the License.
 
 # Provided for backwards compatibility
-go run "$(dirname $0)/e2e.go" -v -build -up -tests="*" -down
+go run "$(dirname $0)/e2e.go" -v -build -up -test -down
 
 exit $?

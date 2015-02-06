@@ -55,6 +55,7 @@ readonly KUBE_TEST_PORTABLE=(
   contrib/for-tests/network-tester/service.json
   hack/e2e.go
   hack/e2e-suite
+  hack/ginkgo-e2e.sh
 )
 
 # If we update this we need to also update the set of golang compilers we build

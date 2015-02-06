@@ -17,11 +17,17 @@ limitations under the License.
 package constraint
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // Allowed returns true if pods is a collection of bound pods
 // which can run without conflict on a single minion.
-func Allowed(pods []api.BoundPod) bool {
-	return !PortsConflict(pods)
+func Allowed(pods []api.BoundPod) []error {
+	errors := []error{}
+	for _, port := range hostPortsConflict(pods) {
+		errors = append(errors, fmt.Errorf("host port %v is already in use", port))
+	}
+	return errors
 }

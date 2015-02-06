@@ -51,7 +51,7 @@ Examples:
 			checkErr(err)
 
 			mapper, typer := f.Object(cmd)
-			r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
 				NamespaceParam(cmdNamespace).RequireNamespace().
 				FilenameParam(flags.Filenames...).

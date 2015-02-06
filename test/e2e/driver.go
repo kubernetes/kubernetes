@@ -20,7 +20,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -47,17 +46,6 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
-
-	// TODO: Associate a timeout with each test individually.
-	go func() {
-		defer util.FlushLogs()
-		// TODO: We should modify testSpec to include an estimated running time
-		//       for each test and use that information to estimate a timeout
-		//       value. Until then, as we add more tests (and before we move to
-		//       parallel testing) we need to adjust this value as we add more tests.
-		time.Sleep(40 * time.Minute)
-		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
-	}()
 
 	if len(testList) != 0 {
 		if config.GinkgoConfig.FocusString != "" || config.GinkgoConfig.SkipString != "" {

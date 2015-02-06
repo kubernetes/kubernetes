@@ -292,6 +292,8 @@ type Probe struct {
 	Handler `json:",inline"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `json:"initialDelaySeconds,omitempty"`
+	// Length of time before health checking times out.  In seconds.
+	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
@@ -1027,20 +1029,6 @@ const (
 	// values that can not be handled (e.g. an enumerated string).
 	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
 )
-
-// Operation is an operation delivered to API clients.
-type Operation struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
-}
-
-// OperationList is a list of operations, as delivered to API clients.
-type OperationList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
-
-	Items []Operation `json:"items"`
-}
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {

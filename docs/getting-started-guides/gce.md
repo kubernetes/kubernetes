@@ -50,23 +50,23 @@ field values:
 Once you have your instances up and running, the `hack/build-go.sh` script sets up
 your Go workspace and builds the Go components.
 
-The `kubecfg.sh` line below spins up two containers running
-[Nginx](http://nginx.org/en/) with port 80 mapped to 8080:
+The `kubectl.sh` line below spins up two containers running
+[Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
 
 ```bash
-cluster/kubecfg.sh stop myNginx
+cluster/kubectl.sh stop rc my-nginx
 ```
 
 To delete the containers:
 
 ```bash
-cluster/kubecfg.sh rm myNginx
+cluster/kubectl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)

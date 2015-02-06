@@ -33,7 +33,7 @@ type ProxyServer struct {
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
-func NewProxyServer(filebase string, cfg *client.Config) (*ProxyServer, error) {
+func NewProxyServer(filebase string, staticPrefix string, cfg *client.Config) (*ProxyServer, error) {
 	prefix := cfg.Prefix
 	if prefix == "" {
 		prefix = "/api"
@@ -47,7 +47,7 @@ func NewProxyServer(filebase string, cfg *client.Config) (*ProxyServer, error) {
 		return nil, err
 	}
 	http.Handle("/api/", http.StripPrefix("/api/", proxy))
-	http.Handle("/static/", newFileHandler("/static/", filebase))
+	http.Handle(staticPrefix, newFileHandler(staticPrefix, filebase))
 	return proxy, nil
 }
 

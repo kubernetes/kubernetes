@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +56,7 @@ Examples:
 			client, err := f.Client(cmd)
 			checkErr(err)
 
-			generatorName := GetFlagString(cmd, "generator")
+			generatorName := util.GetFlagString(cmd, "generator")
 			generator, found := kubectl.Generators[generatorName]
 			if !found {
 				usageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
@@ -70,22 +71,22 @@ Examples:
 			controller, err := generator.Generate(params)
 			checkErr(err)
 
-			inline := GetFlagString(cmd, "overrides")
+			inline := util.GetFlagString(cmd, "overrides")
 			if len(inline) > 0 {
-				Merge(controller, inline, "ReplicationController")
+				util.Merge(controller, inline, "ReplicationController")
 			}
 
 			// TODO: extract this flag to a central location, when such a location exists.
-			if !GetFlagBool(cmd, "dry-run") {
+			if !util.GetFlagBool(cmd, "dry-run") {
 				controller, err = client.ReplicationControllers(namespace).Create(controller.(*api.ReplicationController))
 				checkErr(err)
 			}
 
-			err = PrintObject(cmd, controller, f, out)
+			err = f.PrintObject(cmd, controller, out)
 			checkErr(err)
 		},
 	}
-	AddPrinterFlags(cmd)
+	util.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "run-container/v1", "The name of the api generator that you want to use.  Default 'run-container-controller/v1'")
 	cmd.Flags().String("image", "", "The image for the container you wish to run.")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default 1")

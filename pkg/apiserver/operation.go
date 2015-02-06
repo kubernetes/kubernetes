@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -77,23 +76,6 @@ func (ops *Operations) insert(op *Operation) {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 	ops.ops[op.ID] = op
-}
-
-// List lists operations for an API client.
-func (ops *Operations) List() *api.OperationList {
-	ops.lock.Lock()
-	defer ops.lock.Unlock()
-
-	ids := []string{}
-	for id := range ops.ops {
-		ids = append(ids, id)
-	}
-	sort.StringSlice(ids).Sort()
-	ol := &api.OperationList{}
-	for _, id := range ids {
-		ol.Items = append(ol.Items, api.Operation{ObjectMeta: api.ObjectMeta{Name: id}})
-	}
-	return ol
 }
 
 // Get returns the operation with the given ID, or nil.
