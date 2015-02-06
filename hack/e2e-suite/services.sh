@@ -33,11 +33,6 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  echo "WARNING: Skipping services.sh for ${KUBERNETES_PROVIDER}.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/3655"
-  exit 0
-fi
-
 function error() {
   echo "$@" >&2
   exit 1
