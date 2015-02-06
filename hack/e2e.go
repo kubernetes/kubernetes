@@ -45,7 +45,6 @@ var (
 	test             = flag.Bool("test", false, "Run Ginkgo tests.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
-	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
 		"By default, verify that client and server have exact version match. "+
 		"You can explicitly set to false if you're, e.g., testing client changes "+
@@ -101,7 +100,11 @@ func main() {
 	}
 
 	if *build {
-		if !runBash("build-release", `test-build-release`) {
+		// The build-release script needs stdin to ask the user whether
+		// it's OK to download the docker image.
+		cmd := exec.Command(path.Join(*root, "hack/e2e-internal/build-release.sh"))
+		cmd.Stdin = os.Stdin
+		if !finishRunning("build-release", cmd) {
 			log.Fatal("Error building. Aborting.")
 		}
 	}
@@ -138,7 +141,7 @@ func main() {
 			log.Fatal("Error starting e2e cluster. Aborting.")
 		}
 	} else if *push {
-		if !runBash("push", path.Join(versionRoot, "/cluster/kube-push.sh")) {
+		if !finishRunning("push", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-push.sh"))) {
 			log.Fatal("Error pushing e2e cluster. Aborting.")
 		}
 	}
@@ -146,7 +149,8 @@ func main() {
 	failure := false
 	switch {
 	case *ctlCmd != "":
-		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
+		ctlArgs := strings.Fields(*ctlCmd)
+		failure = !finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
 	case *test:
 		failure = Test()
 	}
@@ -161,7 +165,7 @@ func main() {
 }
 
 func TearDown() bool {
-	return runBash("teardown", "test-teardown")
+	return finishRunning("teardown", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-down.sh")))
 }
 
 // Up brings an e2e cluster up, recreating it if one is already running.
@@ -173,15 +177,13 @@ func Up() bool {
 		}
 	}
 
-	return runBash("up", path.Join(versionRoot, "/cluster/kube-up.sh; test-setup;"))
+	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
 	// Check that there are at least 3 minions running
-	res, stdout, _ := runBashWithOutputs(
-		"validate cluster size",
-		"cluster/kubectl.sh get minions --no-headers | wc -l")
+	res, stdout, _ := finishRunningWithOutputs("validate cluster size", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-watch-events.sh")))
 	if !res {
 		log.Fatal("Could not get nodes to validate cluster size")
 	}
@@ -198,7 +200,7 @@ func ValidateClusterSize() {
 
 // Is the e2e cluster up?
 func IsUp() bool {
-	return runBash("get status", `$KUBECTL version`)
+	return finishRunning("get status", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-status.sh")))
 }
 
 // PrepareVersion makes sure that the specified release version is locally
@@ -241,7 +243,7 @@ func PrepareVersion(version string) (string, error) {
 		}
 		out.Close()
 	}
-	if !runRawBash("untarRelease", fmt.Sprintf("tar -C %s -zxf %s --strip-components=1", localReleaseDir, localReleaseTar)) {
+	if !finishRunning("untarRelease", exec.Command("tar", "-C", localReleaseDir, "-zxf", localReleaseTar, "--strip-components=1")) {
 		log.Fatal("Failed to untar release. Aborting.")
 	}
 	// Now that we have the binaries saved locally, use the path to the untarred
@@ -258,7 +260,7 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 }
 
 func Test() bool {
-	defer runBashUntil("watchEvents", "while true; do $KUBECTL --watch-only get events; done")()
+	defer runBashUntil("watchEvents", exec.Command(filepath.Join(*root, "hack/e2e-internal/e2e-watch-events.sh")))()
 
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
@@ -266,38 +268,13 @@ func Test() bool {
 
 	ValidateClusterSize()
 
-	return runBash("Ginkgo tests", filepath.Join(*root, "hack", "ginkgo-e2e.sh"))
+	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh")))
 }
 
 // All nonsense below is temporary until we have go versions of these things.
 
-// Runs the provided bash without wrapping it in any kubernetes-specific gunk.
-func runRawBashWithOutputs(stepName, bash string) (bool, string, string) {
-	cmd := exec.Command("bash", "-s")
-	if *trace_bash {
-		cmd.Args = append(cmd.Args, "-x")
-	}
-	cmd.Stdin = strings.NewReader(bash)
-	return finishRunning(stepName, cmd)
-}
-
-func runRawBash(stepName, bashFragment string) bool {
-	result, _, _ := runRawBashWithOutputs(stepName, bashFragment)
-	return result
-}
-
-func runBashWithOutputs(stepName, bashFragment string) (bool, string, string) {
-	return runRawBashWithOutputs(stepName, bashWrap(bashFragment))
-}
-
-func runBash(stepName, bashFragment string) bool {
-	return runRawBash(stepName, bashWrap(bashFragment))
-}
-
 // call the returned anonymous function to stop.
-func runBashUntil(stepName, bashFragment string) func() {
-	cmd := exec.Command("bash", "-s")
-	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
+func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 	log.Printf("Running in background: %v", stepName)
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
@@ -313,7 +290,7 @@ func runBashUntil(stepName, bashFragment string) func() {
 	}
 }
 
-func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
+func finishRunningWithOutputs(stepName string, cmd *exec.Cmd) (bool, string, string) {
 	log.Printf("Running: %v", stepName)
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 	if *verbose {
@@ -342,6 +319,11 @@ func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
 		return false, string(stdout.Bytes()), string(stderr.Bytes())
 	}
 	return true, string(stdout.Bytes()), string(stderr.Bytes())
+}
+
+func finishRunning(stepName string, cmd *exec.Cmd) bool {
+	result, _, _ := finishRunningWithOutputs(stepName, cmd)
+	return result
 }
 
 func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bool) {
@@ -397,25 +379,4 @@ func kubectlArgs() string {
 		return " --match-server-version"
 	}
 	return ""
-}
-
-func bashWrap(cmd string) string {
-	return `
-set -o errexit
-set -o nounset
-set -o pipefail
-
-export KUBE_CONFIG_FILE="config-test.sh"
-
-# TODO(jbeda): This will break on usage if there is a space in
-# ${KUBE_ROOT}.  Convert to an array?  Or an exported function?
-export KUBECTL="` + versionRoot + `/cluster/kubectl.sh` + kubectlArgs() + `"
-
-source "` + *root + `/cluster/kube-env.sh"
-source "` + versionRoot + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
-
-prepare-e2e
-
-` + cmd + `
-`
 }
