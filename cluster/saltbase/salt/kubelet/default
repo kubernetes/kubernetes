@@ -29,7 +29,7 @@
 
 {% set cluster_dns = "" %}
 {% set cluster_domain = "" %}
-{% if pillar['enable_cluster_dns'] is defined and pillar['enable_cluster_dns'] %}
+{% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
   {% set cluster_dns = "--cluster_dns=" + pillar['dns_server'] %}
   {% set cluster_domain = "--cluster_domain=" + pillar['dns_domain'] %}
 {% endif %}

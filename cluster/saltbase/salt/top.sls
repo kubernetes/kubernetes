@@ -8,10 +8,10 @@ base:
     - docker
     - kubelet
     - kube-proxy
-{% if pillar['enable_node_monitoring'] is defined and pillar['enable_node_monitoring'] %}
+{% if pillar.get('enable_node_monitoring', '').lower() == 'true' %}
     - cadvisor
 {% endif %}
-{% if pillar['enable_node_logging'] is defined and pillar['enable_node_logging'] %}
+{% if pillar.get('enable_node_logging', '').lower() == 'true' %}
   {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
   {% endif %}
