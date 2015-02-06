@@ -35,7 +35,7 @@ func (f *FakeCmd) CombinedOutput() ([]byte, error) {
 func (f *FakeCmd) SetDir(dir string) {}
 
 type healthCheckTest struct {
-	expectedStatus probe.Status
+	expectedStatus probe.Result
 	expectError    bool
 	output         []byte
 	err            error

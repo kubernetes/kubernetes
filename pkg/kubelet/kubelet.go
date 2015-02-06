@@ -1446,7 +1446,7 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	return podStatus, err
 }
 
-func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (healthStatus probe.Status, err error) {
+func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (healthStatus probe.Result, err error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
 		return probe.Success, nil

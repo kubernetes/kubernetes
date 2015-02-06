@@ -33,7 +33,7 @@ func New() ExecProber {
 
 type ExecProber struct{}
 
-func (pr ExecProber) Probe(e uexec.Cmd) (probe.Status, error) {
+func (pr ExecProber) Probe(e uexec.Cmd) (probe.Result, error) {
 	data, err := e.CombinedOutput()
 	glog.V(4).Infof("health check response: %s", string(data))
 	if err != nil {

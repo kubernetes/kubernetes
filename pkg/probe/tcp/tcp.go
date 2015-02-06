@@ -32,7 +32,7 @@ func New() TCPProber {
 
 type TCPProber struct{}
 
-func (pr TCPProber) Probe(host string, port int, timeout time.Duration) (probe.Status, error) {
+func (pr TCPProber) Probe(host string, port int, timeout time.Duration) (probe.Result, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
 
@@ -40,7 +40,7 @@ func (pr TCPProber) Probe(host string, port int, timeout time.Duration) (probe.S
 // If the socket can be opened, it returns Success
 // If the socket fails to open, it returns Failure.
 // This is exported because some other packages may want to do direct TCP probes.
-func DoTCPProbe(addr string, timeout time.Duration) (probe.Status, error) {
+func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, error) {
 	conn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
 		return probe.Failure, nil

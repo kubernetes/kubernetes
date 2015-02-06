@@ -16,16 +16,16 @@ limitations under the License.
 
 package probe
 
-type Status int
+type Result int
 
 // Status values must be one of these constants.
 const (
-	Success Status = iota
+	Success Result = iota
 	Failure
 	Unknown
 )
 
-func (s Status) String() string {
+func (s Result) String() string {
 	switch s {
 	case Success:
 		return "success"

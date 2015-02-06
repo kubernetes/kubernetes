@@ -54,7 +54,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 	prober := New()
 	testCases := []struct {
 		handler func(w http.ResponseWriter)
-		health  probe.Status
+		health  probe.Result
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{handleReq(http.StatusOK), probe.Success},
