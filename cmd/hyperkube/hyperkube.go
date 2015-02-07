@@ -21,7 +21,6 @@ package main
 import (
 	"os"
 
-	kubelet "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
@@ -38,7 +37,7 @@ func main() {
 	hk.AddServer(apiserver.NewHyperkubeServer())
 	hk.AddServer(controllermanager.NewHyperkubeServer())
 	hk.AddServer(sched.NewHyperkubeServer())
-	hk.AddServer(kubelet.NewHyperkubeServer())
+	hk.AddServer(NewKubelet())
 	hk.AddServer(proxy.NewHyperkubeServer())
 
 	hk.RunToExit(os.Args)

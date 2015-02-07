@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -97,26 +96,6 @@ func NewKubeletServer() *KubeletServer {
 		OOMScoreAdj:             -900,
 		MasterServiceNamespace:  api.NamespaceDefault,
 	}
-}
-
-// NewHyperkubeServer creates a new hyperkube Server object that includes the
-// description and flags.
-func NewHyperkubeServer() *hyperkube.Server {
-	s := NewKubeletServer()
-	hks := hyperkube.Server{
-		SimpleUsage: "kubelet",
-		Long: `The kubelet binary is responsible for maintaining a set of containers on a
-particular node. It syncs data from a variety of sources including a
-Kubernetes API server, an etcd cluster, HTTP endpoint or local file. It then
-queries Docker to see what is currently running.  It synchronizes the
-configuration data, with the running set of containers by starting or stopping
-Docker containers.`,
-		Run: func(_ *hyperkube.Server, args []string) error {
-			return s.Run(args)
-		},
-	}
-	s.AddFlags(hks.Flags())
-	return &hks
 }
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
