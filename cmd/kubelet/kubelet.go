@@ -25,7 +25,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
@@ -34,7 +34,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := server.NewKubeletServer()
+	s := app.NewKubeletServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()

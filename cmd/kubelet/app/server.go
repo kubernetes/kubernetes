@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package server makes it easy to create a kubelet server for various contexts.
-package server
+// Package app makes it easy to create a kubelet server for various contexts.
+package app
 
 import (
 	"fmt"
