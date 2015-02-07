@@ -24,7 +24,7 @@ desiredState:
         source:
           # emptyDir: {}
           persistentDisk:
-            # This GCE PD must already exist and be formatted ext4
+            # This GCE PD must already exist.
             pdName: mysql-disk
             fsType: ext4
 labels:
