@@ -815,7 +815,7 @@ function setup-logging-firewall {
     sleep 10
   done
 
-  local -r region="${ZONE::-2}"
+  local -r region="${ZONE:0:${#ZONE}-2}"
   local -r es_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" elasticsearch-logging | grep IPAddress | awk '{print $2}')
   local -r kibana_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" kibana-logging | grep IPAddress | awk '{print $2}')
   echo
