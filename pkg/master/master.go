@@ -99,7 +99,7 @@ type Config struct {
 	// Defaults to 7080 if not set.
 	ReadOnlyPort int
 	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 443 if not set.
+	// Defaults to 6443 if not set.
 	ReadWritePort int
 
 	// If nil, the first result from net.InterfaceAddrs will be used.
@@ -187,11 +187,11 @@ func setDefaults(c *Config) {
 	if c.ReadOnlyPort == 0 {
 		c.ReadOnlyPort = 7080
 	}
+	if c.ReadWritePort == 0 {
+		c.ReadWritePort = 6443
+	}
 	if c.CacheTimeout == 0 {
 		c.CacheTimeout = 5 * time.Second
-	}
-	if c.ReadWritePort == 0 {
-		c.ReadWritePort = 443
 	}
 	for c.PublicAddress == nil {
 		// Find and use the first non-loopback address.
@@ -483,7 +483,7 @@ func (m *Master) init(c *Config) {
 func (m *Master) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
-		WebServicesUrl: net.JoinHostPort(m.publicIP.String(), strconv.Itoa(int(m.publicReadWritePort))),
+		WebServicesUrl: net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadWritePort)),
 		WebServices:    m.handlerContainer.RegisteredWebServices(),
 		// TODO: Parameterize the path?
 		ApiPath:         "/swaggerapi/",
