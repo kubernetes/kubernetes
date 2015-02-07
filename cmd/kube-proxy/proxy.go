@@ -21,7 +21,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/server"
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
@@ -30,7 +30,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := server.NewProxyServer()
+	s := app.NewProxyServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()

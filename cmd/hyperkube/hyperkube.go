@@ -21,10 +21,10 @@ package main
 import (
 	"os"
 
+	proxy "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
-	proxy "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/server"
 	sched "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
 )
 

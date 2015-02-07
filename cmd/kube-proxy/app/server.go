@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package server does all of the work necessary to configure and run a
-// Kubernetes proxy process.
-package server
+// Package app does all of the work necessary to configure and run a
+// Kubernetes app process.
+package app
 
 import (
 	"net"
