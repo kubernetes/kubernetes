@@ -101,14 +101,12 @@ func (hk *HyperKube) Print(i ...interface{}) {
 
 // Println is a convenience method to Println to the defined output
 func (hk *HyperKube) Println(i ...interface{}) {
-	str := fmt.Sprintln(i...)
-	hk.Print(str)
+	fmt.Fprintln(hk.Out(), i...)
 }
 
 // Printf is a convenience method to Printf to the defined output
 func (hk *HyperKube) Printf(format string, i ...interface{}) {
-	str := fmt.Sprintf(format, i...)
-	hk.Print(str)
+	fmt.Fprintf(hk.Out(), format, i...)
 }
 
 // Run the server.  This will pick the appropriate server and run it.
