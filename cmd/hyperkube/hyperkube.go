@@ -21,9 +21,9 @@ package main
 import (
 	"os"
 
+	apiserver "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
-	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
 	sched "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
 )
 
