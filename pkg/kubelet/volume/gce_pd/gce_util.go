@@ -87,7 +87,7 @@ func (util *GCEDiskUtil) AttachDisk(pd *gcePersistentDisk) error {
 		}
 	}
 	if !mountpoint {
-		err = pd.mounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
+		err = pd.diskMounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
 		if err != nil {
 			os.Remove(globalPDPath)
 			return err
