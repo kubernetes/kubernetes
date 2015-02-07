@@ -21,7 +21,6 @@ package main
 import (
 	"os"
 
-	apiserver "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	sched "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
@@ -33,7 +32,7 @@ func main() {
 		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
 	}
 
-	hk.AddServer(apiserver.NewHyperkubeServer())
+	hk.AddServer(NewKubeAPIServer())
 	hk.AddServer(controllermanager.NewHyperkubeServer())
 	hk.AddServer(sched.NewHyperkubeServer())
 	hk.AddServer(NewKubelet())
