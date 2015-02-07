@@ -30,6 +30,11 @@
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
+			"ImportPath": "code.google.com/p/goprotobuf/proto",
+			"Comment": "go.r60-163",
+			"Rev": "9352842ae63ee1d7e74e074ce7bb10370c4b6b9e"
+		},
+		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -128,6 +133,10 @@
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
 		},
 		{
+			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
+			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
+		},
+		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},
@@ -152,6 +161,40 @@
 			"ImportPath": "github.com/onsi/gomega",
 			"Comment": "v1.0-28-g8adf9e1730c5",
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/_vendor/goautoneg",
+			"Comment": "0.1.0-9-g52186fc",
+			"Rev": "52186fc518809dc9a56502348751e353866b2059"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/_vendor/perks/quantile",
+			"Comment": "0.1.0-9-g52186fc",
+			"Rev": "52186fc518809dc9a56502348751e353866b2059"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/model",
+			"Comment": "0.1.0-9-g52186fc",
+			"Rev": "52186fc518809dc9a56502348751e353866b2059"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus",
+			"Comment": "0.1.0-9-g52186fc",
+			"Rev": "52186fc518809dc9a56502348751e353866b2059"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/text",
+			"Comment": "0.1.0-9-g52186fc",
+			"Rev": "52186fc518809dc9a56502348751e353866b2059"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_model/go",
+			"Comment": "model-0.0.2-10-gbc9454c",
+			"Rev": "bc9454ca562dc050e060ea61a1c0e562a189850f"
+		},
+		{
+			"ImportPath": "github.com/prometheus/procfs",
+			"Rev": "92faa308558161acab0ada1db048e9996ecec160"
 		},
 		{
 			"ImportPath": "github.com/racker/perigee",
