@@ -268,6 +268,10 @@ function find-vagrant-name-by-ip {
 # Find the vagrant machien name based on the host name of the minion
 function find-vagrant-name-by-minion-name {
   local ip="$1"
+  if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
+    echo "master"
+    return $?
+  fi
   local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
 
   [[ $ip =~ $ip_pattern ]] || {
@@ -291,12 +295,17 @@ function ssh-to-node {
     return 1
   }
 
-  vagrant ssh "${machine}" -c "${cmd}" | grep -v "Connection to.*closed"
+  vagrant ssh "${machine}" -c "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
 function restart-kube-proxy {
   ssh-to-node "$1" "sudo systemctl restart kube-proxy"
+}
+
+# Restart the apiserver
+function restart-apiserver {
+  ssh-to-node "${master}" "sudo systemctl restart kube-apiserver"
 }
 
 function setup-monitoring-firewall {
