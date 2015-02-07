@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface.
@@ -377,6 +378,7 @@ func TestHealthCheckNode(t *testing.T) {
 				{
 					Kind:   api.NodeReady,
 					Status: api.ConditionFull,
+					Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 				},
 			},
 		},
@@ -390,6 +392,7 @@ func TestHealthCheckNode(t *testing.T) {
 				{
 					Kind:   api.NodeReady,
 					Status: api.ConditionNone,
+					Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 				},
 			},
 		},
@@ -403,6 +406,7 @@ func TestHealthCheckNode(t *testing.T) {
 				{
 					Kind:   api.NodeReady,
 					Status: api.ConditionUnknown,
+					Reason: "Node health check error: Error",
 				},
 			},
 		},
@@ -411,6 +415,12 @@ func TestHealthCheckNode(t *testing.T) {
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient)
 		conditions := nodeController.DoCheck(item.node)
+		for i := range conditions {
+			if conditions[i].LastTransitionTime.IsZero() {
+				t.Errorf("unexpected zero timestamp")
+			}
+			conditions[i].LastTransitionTime = util.Time{}
+		}
 		if !reflect.DeepEqual(item.expectedConditions, conditions) {
 			t.Errorf("expected conditions %+v, got %+v", item.expectedConditions, conditions)
 		}
@@ -451,6 +461,98 @@ func TestPopulateNodeIPs(t *testing.T) {
 	}
 }
 
+func TestNodeStatusTransitionTime(t *testing.T) {
+	table := []struct {
+		fakeNodeHandler      *FakeNodeHandler
+		fakeKubeletClient    *FakeKubeletClient
+		expectedNodes        []*api.Node
+		expectedRequestCount int
+	}{
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Kind:               api.NodeReady,
+									Status:             api.ConditionFull,
+									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+			},
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Success,
+				Err:    nil,
+			},
+			expectedNodes:        []*api.Node{},
+			expectedRequestCount: 1,
+		},
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Kind:               api.NodeReady,
+									Status:             api.ConditionFull,
+									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+			},
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Failure,
+				Err:    nil,
+			},
+			expectedNodes: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "node0"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{
+								Kind:               api.NodeReady,
+								Status:             api.ConditionFull,
+								Reason:             "Node health check failed: kubelet /healthz endpoint returns not ok",
+								LastTransitionTime: util.Now(), // Placeholder expected transition time, due to inability to mock time.
+							},
+						},
+					},
+				},
+			},
+			expectedRequestCount: 2,
+		},
+	}
+
+	for _, item := range table {
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient)
+		if err := nodeController.SyncNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.expectedRequestCount != item.fakeNodeHandler.RequestCount {
+			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+		}
+		for i := range item.fakeNodeHandler.UpdatedNodes {
+			conditions := item.fakeNodeHandler.UpdatedNodes[i].Status.Conditions
+			for j := range conditions {
+				if !conditions[j].LastTransitionTime.After(time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
+					t.Errorf("unexpected timestamp %v", conditions[j].LastTransitionTime)
+				}
+			}
+		}
+	}
+}
+
 func TestSyncNodeStatus(t *testing.T) {
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
@@ -474,15 +576,27 @@ func TestSyncNodeStatus(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "node0"},
 					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}},
-						HostIP:     "1.2.3.4",
+						Conditions: []api.NodeCondition{
+							{
+								Kind:   api.NodeReady,
+								Status: api.ConditionFull,
+								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
+							},
+						},
+						HostIP: "1.2.3.4",
 					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "node1"},
 					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}},
-						HostIP:     "1.2.3.4",
+						Conditions: []api.NodeCondition{
+							{
+								Kind:   api.NodeReady,
+								Status: api.ConditionFull,
+								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
+							},
+						},
+						HostIP: "1.2.3.4",
 					},
 				},
 			},
@@ -497,6 +611,15 @@ func TestSyncNodeStatus(t *testing.T) {
 		}
 		if item.fakeNodeHandler.RequestCount != item.expectedRequestCount {
 			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+		}
+		for i := range item.fakeNodeHandler.UpdatedNodes {
+			conditions := item.fakeNodeHandler.UpdatedNodes[i].Status.Conditions
+			for j := range conditions {
+				if conditions[j].LastTransitionTime.IsZero() {
+					t.Errorf("unexpected zero timestamp")
+				}
+				conditions[j].LastTransitionTime = util.Time{}
+			}
 		}
 		if !reflect.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
 			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0])
