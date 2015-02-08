@@ -36,12 +36,6 @@ import (
 	"github.com/golang/glog"
 )
 
-var (
-	execprober = execprobe.New()
-	httprober  = httprobe.New()
-	tcprober   = tcprobe.New()
-)
-
 const (
 	defaultProbeTimeout = 1 * time.Second
 	maxProbeRetries     = 3
@@ -85,7 +79,7 @@ func (kl *Kubelet) runProbe(p *api.Probe, podFullName string, podUID types.UID, 
 		timeout = defaultProbeTimeout
 	}
 	if p.Exec != nil {
-		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
+		return kl.prober.exec.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
 	if p.HTTPGet != nil {
 		port, err := extractPort(p.HTTPGet.Port, container)
@@ -93,14 +87,14 @@ func (kl *Kubelet) runProbe(p *api.Probe, podFullName string, podUID types.UID, 
 			return probe.Unknown, err
 		}
 		host, port, path := extractGetParams(p.HTTPGet, status, port)
-		return httprober.Probe(host, port, path, timeout)
+		return kl.prober.http.Probe(host, port, path, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return tcprober.Probe(status.PodIP, port, timeout)
+		return kl.prober.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)
 	return probe.Unknown, nil
@@ -206,4 +200,18 @@ func (r *readinessStates) remove(key string) {
 	r.Lock()
 	defer r.Unlock()
 	delete(r.states, key)
+}
+
+func newProbeHolder() probeHolder {
+	return probeHolder{
+		exec: execprobe.New(),
+		http: httprobe.New(),
+		tcp:  tcprobe.New(),
+	}
+}
+
+type probeHolder struct {
+	exec execprobe.ExecProber
+	http httprobe.HTTPProber
+	tcp  tcprobe.TCPProber
 }

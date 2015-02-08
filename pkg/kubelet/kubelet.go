@@ -120,6 +120,7 @@ func NewMainKubelet(
 		clusterDNS:             clusterDNS,
 		serviceLister:          serviceLister,
 		masterServiceNamespace: masterServiceNamespace,
+		prober:                 newProbeHolder(),
 		readiness:              newReadinessStates(),
 	}
 
@@ -198,6 +199,9 @@ type Kubelet struct {
 	// Volume plugins.
 	volumePluginMgr volume.PluginMgr
 
+	// probe runner holder
+	prober probeHolder
+	// container readiness state holder
 	readiness *readinessStates
 }
 
@@ -1055,8 +1059,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
 				// If the initial delay on the readiness probe has not passed the probe will return Failure.
 				ready := probe.Unknown
-				healthy, err := kl.probeContainer(container.LivenessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Success)
-				if healthy == probe.Success {
+				live, err := kl.probeContainer(container.LivenessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Success)
+				if live == probe.Success {
 					ready, _ = kl.probeContainer(container.ReadinessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Failure)
 				}
 				if ready == probe.Success {
@@ -1069,11 +1073,11 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				if healthy == probe.Success {
+				if live == probe.Success {
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, healthy)
+				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
 				glog.V(1).Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
@@ -1098,6 +1102,10 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			glog.Errorf("Error listing recent containers:%s", dockerContainerName)
 			// TODO(dawnchen): error handling here?
 		}
+		// set dead containers to unready state
+		for _, c := range recentContainers {
+			kl.readiness.remove(c.ID)
+		}
 
 		if len(recentContainers) > 0 && pod.Spec.RestartPolicy.Always == nil {
 			if pod.Spec.RestartPolicy.Never != nil {
@@ -1113,6 +1121,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					continue
 				}
 			}
+
 		}
 
 		glog.V(3).Infof("Container with name %s doesn't exist, creating %#v", dockerContainerName)
@@ -1547,12 +1556,7 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 
 	var podStatus api.PodStatus
 	podStatus.Phase = getPhase(&spec, info)
-	if isPodReady(&spec, info) {
-		podStatus.Conditions = append(podStatus.Conditions, api.PodCondition{
-			Kind:   api.PodReady,
-			Status: api.ConditionFull,
-		})
-	}
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(&spec, info)...)
 	netContainerInfo, found := info[dockertools.PodInfraContainerName]
 	if found {
 		podStatus.PodIP = netContainerInfo.PodIP
