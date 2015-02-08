@@ -17,10 +17,17 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 func TestFindPortByName(t *testing.T) {
@@ -125,6 +132,113 @@ func TestGetTCPAddrParts(t *testing.T) {
 			if host != test.host || port != test.port {
 				t.Errorf("Expected %s:%d, got %s:%d", test.host, test.port, host, port)
 			}
+		}
+	}
+}
+
+type fakeExecProber struct {
+	result probe.Result
+	err    error
+}
+
+func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, error) {
+	return p.result, p.err
+}
+
+func makeTestKubelet(result probe.Result, err error) *Kubelet {
+	return &Kubelet{
+		prober: probeHolder{
+			exec: fakeExecProber{
+				result: result,
+				err:    err,
+			},
+		},
+	}
+}
+
+func TestProbeContainer(t *testing.T) {
+	dc := &docker.APIContainers{Created: time.Now().Unix()}
+	tests := []struct {
+		p              *api.Probe
+		defaultResult  probe.Result
+		expectError    bool
+		expectedResult probe.Result
+	}{
+		{
+			defaultResult:  probe.Success,
+			expectedResult: probe.Success,
+		},
+		{
+			defaultResult:  probe.Failure,
+			expectedResult: probe.Success,
+		},
+		{
+			p:              &api.Probe{InitialDelaySeconds: 100},
+			defaultResult:  probe.Failure,
+			expectError:    false,
+			expectedResult: probe.Failure,
+		},
+		{
+			p: &api.Probe{
+				InitialDelaySeconds: -100,
+			},
+			defaultResult:  probe.Failure,
+			expectError:    false,
+			expectedResult: probe.Unknown,
+		},
+		{
+			p: &api.Probe{
+				InitialDelaySeconds: -100,
+				Handler: api.Handler{
+					Exec: &api.ExecAction{},
+				},
+			},
+			defaultResult:  probe.Failure,
+			expectError:    false,
+			expectedResult: probe.Success,
+		},
+		{
+			p: &api.Probe{
+				InitialDelaySeconds: -100,
+				Handler: api.Handler{
+					Exec: &api.ExecAction{},
+				},
+			},
+			defaultResult:  probe.Failure,
+			expectError:    true,
+			expectedResult: probe.Unknown,
+		},
+		{
+			p: &api.Probe{
+				InitialDelaySeconds: -100,
+				Handler: api.Handler{
+					Exec: &api.ExecAction{},
+				},
+			},
+			defaultResult:  probe.Success,
+			expectError:    false,
+			expectedResult: probe.Failure,
+		},
+	}
+
+	for _, test := range tests {
+		var kl *Kubelet
+
+		if test.expectError {
+			kl = makeTestKubelet(test.expectedResult, errors.New("error"))
+		} else {
+			kl = makeTestKubelet(test.expectedResult, nil)
+		}
+
+		result, err := kl.probeContainer(test.p, "", types.UID(""), api.PodStatus{}, api.Container{}, dc, test.defaultResult)
+		if test.expectError && err == nil {
+			t.Error("Expected error but did no error was returned.")
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("Expected error but got: %v", err)
+		}
+		if test.expectedResult != result {
+			t.Errorf("Expected result was %v but probeContainer() returned %v", test.expectedResult, result)
 		}
 	}
 }

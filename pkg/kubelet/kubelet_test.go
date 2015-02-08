@@ -255,31 +255,7 @@ func TestKubeletDirsCompat(t *testing.T) {
 }
 
 func TestKillContainerWithError(t *testing.T) {
-	fakeDocker := &dockertools.FakeDockerClient{
-		Err: fmt.Errorf("sample error"),
-		ContainerList: []docker.APIContainers{
-			{
-				ID:    "1234",
-				Names: []string{"/k8s_foo_qux_1234_42"},
-			},
-			{
-				ID:    "5678",
-				Names: []string{"/k8s_bar_qux_5678_42"},
-			},
-		},
-	}
-	kubelet, _ := newTestKubelet(t)
-	kubelet.dockerClient = fakeDocker
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
-	if err == nil {
-		t.Errorf("expected error, found nil")
-	}
-	verifyCalls(t, fakeDocker, []string{"stop"})
-}
-
-func TestKillContainer(t *testing.T) {
-	kubelet, fakeDocker := newTestKubelet(t)
-	fakeDocker.ContainerList = []docker.APIContainers{
+	containers := []docker.APIContainers{
 		{
 			ID:    "1234",
 			Names: []string{"/k8s_foo_qux_1234_42"},
@@ -289,8 +265,48 @@ func TestKillContainer(t *testing.T) {
 			Names: []string{"/k8s_bar_qux_5678_42"},
 		},
 	}
+	fakeDocker := &dockertools.FakeDockerClient{
+		Err:           fmt.Errorf("sample error"),
+		ContainerList: append([]docker.APIContainers{}, containers...),
+	}
+	kubelet, _ := newTestKubelet(t)
+	for _, c := range fakeDocker.ContainerList {
+		kubelet.readiness.set(c.ID, true)
+	}
+	kubelet.dockerClient = fakeDocker
+	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	if err == nil {
+		t.Errorf("expected error, found nil")
+	}
+	verifyCalls(t, fakeDocker, []string{"stop"})
+	killedContainer := containers[0]
+	liveContainer := containers[1]
+	if _, found := kubelet.readiness.states[killedContainer.ID]; found {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, kubelet.readiness.states)
+	}
+	if _, found := kubelet.readiness.states[liveContainer.ID]; !found {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, kubelet.readiness.states)
+	}
+}
+
+func TestKillContainer(t *testing.T) {
+	containers := []docker.APIContainers{
+		{
+			ID:    "1234",
+			Names: []string{"/k8s_foo_qux_1234_42"},
+		},
+		{
+			ID:    "5678",
+			Names: []string{"/k8s_bar_qux_5678_42"},
+		},
+	}
+	kubelet, fakeDocker := newTestKubelet(t)
+	fakeDocker.ContainerList = append([]docker.APIContainers{}, containers...)
 	fakeDocker.Container = &docker.Container{
 		Name: "foobar",
+	}
+	for _, c := range fakeDocker.ContainerList {
+		kubelet.readiness.set(c.ID, true)
 	}
 
 	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
@@ -298,6 +314,14 @@ func TestKillContainer(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	verifyCalls(t, fakeDocker, []string{"stop"})
+	killedContainer := containers[0]
+	liveContainer := containers[1]
+	if _, found := kubelet.readiness.states[killedContainer.ID]; found {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, kubelet.readiness.states)
+	}
+	if _, found := kubelet.readiness.states[liveContainer.ID]; !found {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, kubelet.readiness.states)
+	}
 }
 
 type channelReader struct {
@@ -2559,4 +2583,97 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
+}
+
+func TestGetPodReadyCondition(t *testing.T) {
+	ready := []api.PodCondition{{
+		Kind:   api.PodReady,
+		Status: api.ConditionFull,
+	}}
+	unready := []api.PodCondition{{
+		Kind:   api.PodReady,
+		Status: api.ConditionNone,
+	}}
+	tests := []struct {
+		spec     *api.PodSpec
+		info     api.PodInfo
+		expected []api.PodCondition
+	}{
+		{
+			spec:     nil,
+			info:     nil,
+			expected: unready,
+		},
+		{
+			spec:     &api.PodSpec{},
+			info:     api.PodInfo{},
+			expected: ready,
+		},
+		{
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "1234"},
+				},
+			},
+			info:     api.PodInfo{},
+			expected: unready,
+		},
+		{
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "1234"},
+				},
+			},
+			info: api.PodInfo{
+				"1234": api.ContainerStatus{Ready: true},
+			},
+			expected: ready,
+		},
+		{
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			info: api.PodInfo{
+				"1234": api.ContainerStatus{Ready: true},
+				"5678": api.ContainerStatus{Ready: true},
+			},
+			expected: ready,
+		},
+		{
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			info: api.PodInfo{
+				"1234": api.ContainerStatus{Ready: true},
+			},
+			expected: unready,
+		},
+		{
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "1234"},
+					{Name: "5678"},
+				},
+			},
+			info: api.PodInfo{
+				"1234": api.ContainerStatus{Ready: true},
+				"5678": api.ContainerStatus{Ready: false},
+			},
+			expected: unready,
+		},
+	}
+
+	for i, test := range tests {
+		condition := getPodReadyCondition(test.spec, test.info)
+		if !reflect.DeepEqual(condition, test.expected) {
+			t.Errorf("On test case %v, expected:\n%+v\ngot\n%+v\n", i, test.expected, condition)
+		}
+	}
+
 }
