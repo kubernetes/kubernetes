@@ -18,21 +18,20 @@ package main
 
 import (
 	kubeproxy "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 )
 
 // NewKubeProxy creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubeProxy() *hyperkube.Server {
+func NewKubeProxy() *Server {
 	s := kubeproxy.NewProxyServer()
 
-	hks := hyperkube.Server{
+	hks := Server{
 		SimpleUsage: "proxy",
 		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
 		services and forwarding it to the appropriate pods.  It generally runs on
 		nodes next to the Kubelet and proxies traffic from local pods to remote pods.
 		It is also used when handling incoming external traffic.`,
-		Run: func(_ *hyperkube.Server, args []string) error {
+		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
 		},
 	}

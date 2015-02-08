@@ -18,18 +18,17 @@ package main
 
 import (
 	kubeapiserver "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 )
 
 // NewKubeAPIServer creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubeAPIServer() *hyperkube.Server {
+func NewKubeAPIServer() *Server {
 	s := kubeapiserver.NewAPIServer()
 
-	hks := hyperkube.Server{
+	hks := Server{
 		SimpleUsage: "apiserver",
 		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
-		Run: func(_ *hyperkube.Server, args []string) error {
+		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
 		},
 	}

@@ -18,14 +18,13 @@ package main
 
 import (
 	kubelet "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 )
 
 // NewKubelet creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubelet() *hyperkube.Server {
+func NewKubelet() *Server {
 	s := kubelet.NewKubeletServer()
-	hks := hyperkube.Server{
+	hks := Server{
 		SimpleUsage: "kubelet",
 		Long: `The kubelet binary is responsible for maintaining a set of containers on a
 		particular node. It syncs data from a variety of sources including a
@@ -33,7 +32,7 @@ func NewKubelet() *hyperkube.Server {
 		queries Docker to see what is currently running.  It synchronizes the
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
-		Run: func(_ *hyperkube.Server, args []string) error {
+		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
 		},
 	}

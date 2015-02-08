@@ -18,18 +18,17 @@ package main
 
 import (
 	controllermgr "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-controller-manager/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 )
 
 // NewKubeControllerManager creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubeControllerManager() *hyperkube.Server {
+func NewKubeControllerManager() *Server {
 	s := controllermgr.NewCMServer()
 
-	hks := hyperkube.Server{
+	hks := Server{
 		SimpleUsage: "controller-manager",
 		Long:        "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
-		Run: func(_ *hyperkube.Server, args []string) error {
+		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
 		},
 	}
