@@ -145,7 +145,8 @@ var _ = Describe("Pods", func() {
 		}()
 
 		By("waiting for the pod to start running")
-		waitForPodRunning(c, pod.Name)
+		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -168,7 +169,8 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("waiting for the updated pod to start running")
-		waitForPodRunning(c, pod.Name)
+		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying the updated pod is in kubernetes")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -203,7 +205,8 @@ var _ = Describe("Pods", func() {
 			defer GinkgoRecover()
 			c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
 		}()
-		waitForPodRunning(c, serverPod.Name)
+		err = waitForPodRunning(c, serverPod.Name, 300*time.Second)
+		Expect(err).NotTo(HaveOccurred())
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
 		// TODO(filbranden): We would like to use a unique service name such as:

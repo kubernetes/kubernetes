@@ -123,7 +123,11 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	for _, pod := range pods.Items {
-		waitForPodRunning(c, pod.Name)
+		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		if err != nil {
+			glog.Errorf("waitForPodRunningFailed: %v", err.Error())
+			return false
+		}
 	}
 
 	// Try to make sure we get a hostIP for each pod.

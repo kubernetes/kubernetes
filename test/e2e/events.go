@@ -80,7 +80,8 @@ var _ = Describe("Events", func() {
 		}()
 
 		By("waiting for the pod to start running")
-		waitForPodRunning(c, pod.Name)
+		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
