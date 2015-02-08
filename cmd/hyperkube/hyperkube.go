@@ -21,7 +21,6 @@ package main
 import (
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controllermanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	sched "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
 )
@@ -33,7 +32,7 @@ func main() {
 	}
 
 	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(controllermanager.NewHyperkubeServer())
+	hk.AddServer(NewKubeControllerManager())
 	hk.AddServer(sched.NewHyperkubeServer())
 	hk.AddServer(NewKubelet())
 	hk.AddServer(NewKubeProxy())

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllermanager
+package app
 
 import (
 	// This file exists to force the desired plugin implementations to be linked.
