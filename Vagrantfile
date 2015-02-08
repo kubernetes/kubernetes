@@ -50,11 +50,11 @@ else # sorry Windows folks, I can't help you
   $vm_cpus = 2
 end
 
-# Give VM 1024MB of RAM
+# Give VM 1024MB of RAM by default
 # In Fedora VM, tmpfs device is mapped to /tmp.  tmpfs is given 50% of RAM allocation.
 # When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
 # This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
-$vm_mem = 1024
+$vm_mem = (ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def customize_vm(config)
