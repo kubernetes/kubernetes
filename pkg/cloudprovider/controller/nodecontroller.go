@@ -47,6 +47,7 @@ type NodeController struct {
 	nodes              []string
 	kubeClient         client.Interface
 	kubeletClient      client.KubeletHealthChecker
+	registerRetryCount int
 	podEvictionTimeout time.Duration
 }
 
@@ -60,6 +61,7 @@ func NewNodeController(
 	staticResources *api.NodeResources,
 	kubeClient client.Interface,
 	kubeletClient client.KubeletHealthChecker,
+	registerRetryCount int,
 	podEvictionTimeout time.Duration) *NodeController {
 	return &NodeController{
 		cloud:              cloud,
@@ -68,13 +70,14 @@ func NewNodeController(
 		staticResources:    staticResources,
 		kubeClient:         kubeClient,
 		kubeletClient:      kubeletClient,
+		registerRetryCount: registerRetryCount,
 		podEvictionTimeout: podEvictionTimeout,
 	}
 }
 
 // Run creates initial node list and start syncing instances from cloudprovider if any.
 // It also starts syncing cluster node status.
-func (s *NodeController) Run(period time.Duration, retryCount int, syncNodeList bool) {
+func (s *NodeController) Run(period time.Duration, syncNodeList bool) {
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
@@ -98,7 +101,7 @@ func (s *NodeController) Run(period time.Duration, retryCount int, syncNodeList 
 	if err != nil {
 		glog.Errorf("Error getting nodes ips: %v", err)
 	}
-	if err = s.RegisterNodes(nodes, retryCount, period); err != nil {
+	if err = s.RegisterNodes(nodes, s.registerRetryCount, period); err != nil {
 		glog.Errorf("Error registrying node list %+v: %v", nodes, err)
 	}
 
@@ -327,7 +330,7 @@ func (s *NodeController) checkNodeReady(node *api.Node) *api.NodeCondition {
 func (s *NodeController) deletePods(nodeID string) error {
 	glog.V(2).Infof("Delete all pods from %v", nodeID)
 	// TODO: We don't yet have field selectors from client, see issue #1362.
-	pods, err := s.kubeClient.Pods(api.NamespaceAll).List(labels.Set{}.AsSelector())
+	pods, err := s.kubeClient.Pods(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		return err
 	}

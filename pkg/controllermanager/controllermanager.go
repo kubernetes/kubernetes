@@ -54,11 +54,8 @@ type CMServer struct {
 	ResourceQuotaSyncPeriod time.Duration
 	RegisterRetryCount      int
 	MachineList             util.StringList
-<<<<<<< HEAD
 	SyncNodeList            bool
-=======
 	PodEvictionTimeout      time.Duration
->>>>>>> Remove pods from failed node
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
@@ -176,8 +173,9 @@ func (s *CMServer) Run(_ []string) error {
 		},
 	}
 
-	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources, kubeClient, kubeletClient, s.PodEvictionTimeout)
-	nodeController.Run(s.NodeSyncPeriod, s.RegisterRetryCount, s.SyncNodeList)
+	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
+		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout)
+	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)

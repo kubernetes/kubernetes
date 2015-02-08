@@ -230,7 +230,7 @@ func TestRegisterNodes(t *testing.T) {
 		for _, machine := range item.machines {
 			nodes.Items = append(nodes.Items, *newNode(machine))
 		}
-		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil, time.Minute)
+		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
 		err := nodeController.RegisterNodes(&nodes, item.retryCount, time.Millisecond)
 		if !item.expectedFail && err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -268,10 +268,27 @@ func TestCreateStaticNodes(t *testing.T) {
 				},
 			},
 		},
+		{
+			machines: []string{"node0", "node1"},
+			expectedNodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Spec:       api.NodeSpec{},
+						Status:     api.NodeStatus{},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node1"},
+						Spec:       api.NodeSpec{},
+						Status:     api.NodeStatus{},
+					},
+				},
+			},
+		},
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, nil, nil, time.Minute)
+		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, nil, nil, 10, time.Minute)
 		nodes, err := nodeController.StaticNodes()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -311,10 +328,28 @@ func TestCreateCloudNodes(t *testing.T) {
 				},
 			},
 		},
+		{
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines:      []string{"node0", "node1"},
+				NodeResources: &api.NodeResources{Capacity: resourceList},
+			},
+			expectedNodes: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Spec:       api.NodeSpec{Capacity: resourceList},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{Name: "node1"},
+						Spec:       api.NodeSpec{Capacity: resourceList},
+					},
+				},
+			},
+		},
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil, 10, time.Minute)
 		nodes, err := nodeController.CloudNodes()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -335,6 +370,20 @@ func TestSyncCloud(t *testing.T) {
 		expectedDeleted      []string
 	}{
 		{
+			// 1 existing node, 1 cloud nodes: do nothing.
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0")},
+			},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0"},
+			},
+			matchRE:              ".*",
+			expectedRequestCount: 1, // List
+			expectedCreated:      []string{},
+			expectedDeleted:      []string{},
+		},
+		{
+			// 1 existing node, 2 cloud nodes: create 1.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0")},
 			},
@@ -347,6 +396,7 @@ func TestSyncCloud(t *testing.T) {
 			expectedDeleted:      []string{},
 		},
 		{
+			// 2 existing nodes, 1 cloud node: delete 1.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
 			},
@@ -359,6 +409,7 @@ func TestSyncCloud(t *testing.T) {
 			expectedDeleted:      []string{"node1"},
 		},
 		{
+			// 1 existing node, 3 cloud nodes but only 2 match regex: delete 1.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0")},
 			},
@@ -373,7 +424,7 @@ func TestSyncCloud(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
 		if err := nodeController.SyncCloud(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -451,7 +502,7 @@ func TestSyncCloudDeletePods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
 		if err := nodeController.SyncCloud(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -503,7 +554,7 @@ func TestHealthCheckNode(t *testing.T) {
 			},
 		},
 		{
-			node: newNode("node1"),
+			node: newNode("node0"),
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
 				Err:    errors.New("Error"),
@@ -519,7 +570,7 @@ func TestHealthCheckNode(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient, time.Minute)
+		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient, 10, time.Minute)
 		conditions := nodeController.DoCheck(item.node)
 		for i := range conditions {
 			if conditions[i].LastTransitionTime.IsZero() {
@@ -557,7 +608,7 @@ func TestPopulateNodeIPs(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil, 10, time.Minute)
 		result, err := nodeController.PopulateIPs(item.nodes)
 		// In case of IP querying error, we should continue.
 		if err != nil {
@@ -633,7 +684,7 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
 		if err := nodeController.SyncNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -792,7 +843,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 5*time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, 5*time.Minute)
 		if err := nodeController.SyncNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -857,7 +908,7 @@ func TestSyncNodeStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
 		if err := nodeController.SyncNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
