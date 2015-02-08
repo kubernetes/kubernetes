@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package server implements a Server object for running the scheduler.
-package server
+// Package app implements a Server object for running the scheduler.
+package app
 
 import (
 	"net"
@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -53,22 +52,6 @@ func NewSchedulerServer() *SchedulerServer {
 		AlgorithmProvider: factory.DefaultProvider,
 	}
 	return &s
-}
-
-// NewHyperkubeServer creates a new hyperkube Server object that includes the
-// description and flags.
-func NewHyperkubeServer() *hyperkube.Server {
-	s := NewSchedulerServer()
-
-	hks := hyperkube.Server{
-		SimpleUsage: "scheduler",
-		Long:        "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
-		Run: func(_ *hyperkube.Server, args []string) error {
-			return s.Run(args)
-		},
-	}
-	s.AddFlags(hks.Flags())
-	return &hks
 }
 
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet

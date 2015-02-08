@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,27 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A binary that can morph into all of the other kubernetes binaries. You can
-// also soft-link to it busybox style.
 package main
 
 import (
-	"os"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
+	scheduler "github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
-func main() {
-	hk := hyperkube.HyperKube{
-		Name: "hyperkube",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
+// NewScheduler creates a new hyperkube Server object that includes the
+// description and flags.
+func NewScheduler() *hyperkube.Server {
+	s := scheduler.NewSchedulerServer()
+
+	hks := hyperkube.Server{
+		SimpleUsage: "scheduler",
+		Long:        "Implements a Kubernetes scheduler.  This will assign pods to kubelets based on capacity and constraints.",
+		Run: func(_ *hyperkube.Server, args []string) error {
+			return s.Run(args)
+		},
 	}
-
-	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewKubeControllerManager())
-	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubelet())
-	hk.AddServer(NewKubeProxy())
-
-	hk.RunToExit(os.Args)
+	s.AddFlags(hks.Flags())
+	return &hks
 }
