@@ -313,7 +313,6 @@
     "KubernetesNodeLaunchConfig": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
-        "SubnetId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]},
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
