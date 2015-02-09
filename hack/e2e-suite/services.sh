@@ -33,6 +33,11 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  echo "WARNING: Skipping services.sh for ${KUBERNETES_PROVIDER}.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/3655"
+  exit 0
+fi
+
 function error() {
   echo "$@" >&2
   exit 1
@@ -261,7 +266,7 @@ function verify_from_container() {
           for i in $(seq -s' ' 1 $4); do
             ok=false
             for j in $(seq -s' ' 1 10); do
-              if wget -q -T 5 -O - http://$2:$3; then
+              if wget -q -T 1 -O - http://$2:$3; then
                 echo
                 ok=true
                 break
@@ -415,11 +420,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 echo "Test 6: Restart the master, make sure portals come back."
 echo "Restarting the master"
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-    restart-apiserver "${master}"
-else
-    ssh-to-node "${master}" "sudo /etc/init.d/kube-apiserver restart"
-fi
+ssh-to-node "${master}" "sudo /etc/init.d/kube-apiserver restart"
 sleep 5
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
