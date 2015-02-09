@@ -39,32 +39,24 @@ $ <kubernetes>/cluster/kube-up.sh
 
 where `<kubernetes>` is the path to your Kubernetes installation.
 
-## Create and format two persistent disks
+## Create two persistent disks
 
 For this WordPress installation, we're going to configure our Kubernetes [pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
 
-Before doing anything else, we'll create and format the persistent disks that we'll use for the installation: one for the mysql pod, and one for the wordpress pod.
+Before doing anything else, we'll create the persistent disks that we'll use for the installation: one for the mysql pod, and one for the wordpress pod.
 The general series of steps required is as described [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md), where $ZONE is the zone where your cluster is running, and $DISK_SIZE is specified as, e.g. '500GB'.  In future, this process will be more streamlined.
 
 So for the two disks used in this example, do the following.
-First create and format the mysql disk, setting the disk size to meet your needs:
+First create the mysql disk, setting the disk size to meet your needs:
 
 ```shell
 gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE mysql-disk
-gcloud compute instances attach-disk --zone=$ZONE --disk=mysql-disk --device-name temp-data kubernetes-master
-gcloud compute ssh --zone=$ZONE kubernetes-master \
-  --command "sudo mkdir -p /mnt/tmp && sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
-gcloud compute instances detach-disk --zone=$ZONE --disk mysql-disk kubernetes-master
 ```
 
-Then create and format the wordpress disk.  Note that you may not want as large a disk size for the wordpress code as for the mysql disk.
+Then create the wordpress disk.  Note that you may not want as large a disk size for the wordpress code as for the mysql disk.
 
 ```shell
 gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE wordpress-disk
-gcloud compute instances attach-disk --zone=$ZONE --disk=$wordpress-disk --device-name temp-data kubernetes-master
-gcloud compute ssh --zone=$ZONE kubernetes-master \
-  --command "sudo mkdir -p /mnt/tmp && sudo /usr/share/google/safe_format_and_mount /dev/disk/by-id/google-temp-data /mnt/tmp"
-gcloud compute instances detach-disk --zone=$ZONE --disk wordpress-disk kubernetes-master
 ```
 
 ## Start the Mysql Pod and Service
@@ -102,7 +94,7 @@ desiredState:
       - name: mysql-persistent-storage
         source:
           persistentDisk:
-            # This GCE PD must already exist and be formatted ext4
+            # This GCE PD must already exist
             pdName: mysql-disk
             fsType: ext4
 labels:
@@ -207,7 +199,7 @@ desiredState:
         source:
           # emptyDir: {}
           persistentDisk:
-            # This GCE PD must already exist and be formatted ext4
+            # This GCE PD must already exist
             pdName: wordpress-disk
             fsType: ext4
 labels:
