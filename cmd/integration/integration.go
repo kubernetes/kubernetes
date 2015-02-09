@@ -82,7 +82,7 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 	default:
 		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
 	}
-	r, err := c.GetPodStatus("localhost", podNamespace, podID)
+	r, err := c.GetPodStatus("127.0.0.1", podNamespace, podID)
 	if err != nil {
 		return r, err
 	}
@@ -114,7 +114,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func startComponents(manifestURL string) (apiServerURL string) {
 	// Setup
-	servers := []string{"http://localhost:4001"}
+	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
 	machineList := []string{"localhost", "127.0.0.1"}
 
@@ -163,6 +163,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		glog.Fatalf("Nonnumeric port? %v", err)
 	}
 
+	publicAddress := net.ParseIP(host)
+	if publicAddress == nil {
+		glog.Fatalf("no public address for %s", host)
+	}
+
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		Client:            cl,
@@ -174,7 +179,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 		ReadWritePort:     portNumber,
 		ReadOnlyPort:      portNumber,
-		PublicAddress:     net.ParseIP(host),
+		PublicAddress:     publicAddress,
 		CacheTimeout:      2 * time.Second,
 	})
 	handler.delegate = m.Handler
