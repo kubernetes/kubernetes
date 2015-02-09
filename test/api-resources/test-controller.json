@@ -1,0 +1,29 @@
+{
+  "id": "test-controller",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 1,
+    "replicaSelector": {"name": "test-pod"},
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "test-pod",
+          "containers": [{
+            "name": "redis-master",
+            "image": "dockerfile/redis",
+	          "cpu": 100,
+	          "ports": [{"containerPort": 6379}]
+          }]
+        }
+      },
+      "labels": {
+        "name": "test-pod",
+      }
+    }
+  },
+  "labels": {
+    "name": "test-controller"
+  }
+}
