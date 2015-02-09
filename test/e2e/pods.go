@@ -36,7 +36,9 @@ var _ = Describe("Pods", func() {
 	)
 
 	BeforeEach(func() {
-		c = loadClientOrDie()
+		var err error
+		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should be submitted and removed", func() {

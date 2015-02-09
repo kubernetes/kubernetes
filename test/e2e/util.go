@@ -18,17 +18,14 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
@@ -114,80 +111,30 @@ func waitForPodSuccess(c *client.Client, podName string, contName string) bool {
 	return false
 }
 
-// assetPath returns a path to the requested file; safe on all
-// OSes. NOTE: If you use an asset in this test, you MUST add it to
-// the KUBE_TEST_PORTABLE array in hack/lib/golang.sh.
-func assetPath(pathElements ...string) string {
-	return filepath.Join(testContext.repoRoot, filepath.Join(pathElements...))
-}
-
-func loadObjectOrDie(filePath string) runtime.Object {
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		glog.Fatalf("Failed to read object: %v", err)
-	}
-	return decodeObjectOrDie(data)
-}
-
-func decodeObjectOrDie(data []byte) runtime.Object {
-	obj, err := latest.Codec.Decode(data)
-	if err != nil {
-		glog.Fatalf("Failed to decode object: %v", err)
-	}
-	return obj
-}
-
-func loadPodOrDie(filePath string) *api.Pod {
-	obj := loadObjectOrDie(filePath)
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		glog.Fatalf("Failed to load pod: %v", obj)
-	}
-	return pod
-}
-
-func loadClientOrDie() *client.Client {
+func loadClient() (*client.Client, error) {
 	config := client.Config{
 		Host: testContext.host,
 	}
 	info, err := clientauth.LoadFromFile(testContext.authConfig)
 	if err != nil {
-		glog.Fatalf("Error loading auth: %v", err)
+		return nil, fmt.Errorf("Error loading auth: %v", err.Error())
 	}
 	// If the certificate directory is provided, set the cert paths to be there.
 	if testContext.certDir != "" {
-		glog.Infof("Expecting certs in %v.", testContext.certDir)
+		By(fmt.Sprintf("Expecting certs in %v.", testContext.certDir))
 		info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
 		info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
 		info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
 	}
 	config, err = info.MergeWithConfig(config)
 	if err != nil {
-		glog.Fatalf("Error creating client")
+		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
 	c, err := client.New(&config)
 	if err != nil {
-		glog.Fatalf("Error creating client")
+		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
-	return c
-}
-
-func parsePodOrDie(json string) *api.Pod {
-	obj := decodeObjectOrDie([]byte(json))
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		glog.Fatalf("Failed to cast pod: %v", obj)
-	}
-	return pod
-}
-
-func parseServiceOrDie(json string) *api.Service {
-	obj := decodeObjectOrDie([]byte(json))
-	service, ok := obj.(*api.Service)
-	if !ok {
-		glog.Fatalf("Failed to cast service: %v", obj)
-	}
-	return service
+	return c, nil
 }
 
 // TODO: Allow service names to have the same form as names

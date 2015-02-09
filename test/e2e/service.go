@@ -32,7 +32,9 @@ var _ = Describe("Services", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		c = loadClientOrDie()
+		var err error
+		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should provide DNS for the cluster", func() {

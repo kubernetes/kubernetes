@@ -189,8 +189,8 @@ func TestEndpoints(c *client.Client) bool {
 
 var _ = Describe("TestEndpoints", func() {
 	It("should pass", func() {
-		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
-		// In general tests should Fail() instead of glog.Fatalf().
-		Expect(TestEndpoints(loadClientOrDie())).To(BeTrue())
+		c, err := loadClient()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(TestEndpoints(c)).To(BeTrue())
 	})
 })

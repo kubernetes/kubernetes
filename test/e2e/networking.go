@@ -33,7 +33,9 @@ var _ = Describe("Networking", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		c = loadClientOrDie()
+		var err error
+		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should function for pods", func() {
