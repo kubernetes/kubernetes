@@ -275,10 +275,8 @@ var _ = Describe("Pods", func() {
 		}()
 
 		// Wait for client pod to complete.
-		success := waitForPodSuccess(c, clientPod.Name, clientPod.Spec.Containers[0].Name)
-		if !success {
-			Fail(fmt.Sprintf("Failed to run client pod to detect service env vars."))
-		}
+		err = waitForPodSuccess(c, clientPod.Name, clientPod.Spec.Containers[0].Name, 60*time.Second)
+		Expect(err).NotTo(HaveOccurred())
 
 		// Grab its logs.  Get host first.
 		clientPodStatus, err := c.Pods(api.NamespaceDefault).Get(clientPod.Name)

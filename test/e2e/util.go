@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -79,36 +78,36 @@ func waitForPodNotPending(c *client.Client, ns, podName string, tryFor time.Dura
 }
 
 // waitForPodSuccess returns true if the pod reached state success, or false if it reached failure or ran too long.
-func waitForPodSuccess(c *client.Client, podName string, contName string) bool {
-	for i := 0; i < 10; i++ {
+func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor time.Duration) error {
+	trySecs := int(tryFor.Seconds())
+	for i := 0; i <= trySecs; i += 5 {
 		if i > 0 {
 			time.Sleep(5 * time.Second)
 		}
 		pod, err := c.Pods(api.NamespaceDefault).Get(podName)
 		if err != nil {
-			glog.Warningf("Get pod failed: %v", err)
+			By(fmt.Sprintf("Get pod failed, ignoring for 5s: %v", err))
 			continue
 		}
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := pod.Status.Info[contName]
 		if !ok {
-			glog.Infof("No Status.Info for container %s in pod %s yet", contName, podName)
+			By(fmt.Sprintf("No Status.Info for container %s in pod %s yet", contName, podName))
 		} else {
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
-					glog.Infof("Saw pod success")
-					return true
+					By("Saw pod success")
+					return nil
 				} else {
-					glog.Infof("Saw pod failure: %+v", ci.State.Termination)
+					By(fmt.Sprintf("Saw pod failure: %+v", ci.State.Termination))
 				}
-				glog.Infof("Waiting for pod %q status to be success or failure", podName)
+				By(fmt.Sprintf("Waiting for pod %q status to be success or failure", podName))
 			} else {
-				glog.Infof("Nil State.Termination for container %s in pod %s so far", contName, podName)
+				By(fmt.Sprintf("Nil State.Termination for container %s in pod %s so far", contName, podName))
 			}
 		}
 	}
-	glog.Warningf("Gave up waiting for pod %q status to be success or failure", podName)
-	return false
+	return fmt.Errorf("Gave up waiting for pod %q status to be success or failure after %d seconds", podName, trySecs)
 }
 
 func loadClient() (*client.Client, error) {
