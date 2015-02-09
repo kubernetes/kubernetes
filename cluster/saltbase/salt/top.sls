@@ -40,6 +40,9 @@ base:
     - kube-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
+{% else %}
+    - docker
+    - sdn
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':

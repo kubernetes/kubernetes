@@ -70,4 +70,7 @@ kubelet:
       - file: /etc/init.d/kubelet
 {% endif %}
       - file: /var/lib/kubelet/kubernetes_auth
+{% if grains.network_mode is defined and grains.network_mode == 'openvswitch' %}
+      - sls: sdn
+{% endif %}
 
