@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"path/filepath"
@@ -29,6 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
+
+	. "github.com/onsi/ginkgo"
 )
 
 type testContextType struct {
@@ -41,19 +44,20 @@ type testContextType struct {
 
 var testContext testContextType
 
-func waitForPodRunning(c *client.Client, id string) {
-	for {
+func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
+	trySecs := int(tryFor.Seconds())
+	for i := 0; i <= trySecs; i += 5 {
 		time.Sleep(5 * time.Second)
 		pod, err := c.Pods(api.NamespaceDefault).Get(id)
 		if err != nil {
-			glog.Warningf("Get pod %s failed: %v", id, err)
-			continue
+			return fmt.Errorf("Get pod %s failed: %v", id, err.Error())
 		}
 		if pod.Status.Phase == api.PodRunning {
-			break
+			return nil
 		}
-		glog.Infof("Waiting for pod %s status to be %q (found %q)", id, api.PodRunning, pod.Status.Phase)
+		By(fmt.Sprintf("Waiting for pod %s status to be %q (found %q) (%d secs)", id, api.PodRunning, pod.Status.Phase, i))
 	}
+	return fmt.Errorf("Gave up waiting for pod %s to be running after %d seconds", id, trySecs)
 }
 
 // waitForPodNotPending returns false if it took too long for the pod to go out of pending state.

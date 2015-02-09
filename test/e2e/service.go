@@ -116,7 +116,8 @@ var _ = Describe("Services", func() {
 		}()
 
 		By("waiting for the pod to start running")
-		waitForPodRunning(c, pod.Name)
+		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		Expect(err).NotTo(HaveOccurred())
 
 		By("retrieving the pod")
 		pod, err = podClient.Get(pod.Name)
