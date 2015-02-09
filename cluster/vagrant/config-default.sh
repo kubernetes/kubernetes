@@ -17,7 +17,7 @@
 ## Contains configuration values for interacting with the Vagrant cluster
 
 # Number of minions in the cluster
-NUM_MINIONS=${NUM_MINIONS-"2"}
+NUM_MINIONS=${NUM_MINIONS-"1"}
 export NUM_MINIONS
 
 # The IP of the master
