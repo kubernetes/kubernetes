@@ -98,6 +98,7 @@ type SecurityContextProvider interface {
 	ModifyHostConfig(pod *api.BoundPod, container *api.Container, hostConfig *docker.HostConfig)
 }
 ```
+
 If the value of the SecurityContextProvider field on the Kubelet is nil, the kubelet will create and run the container as it does today.   
 
 ### Security Context
@@ -106,52 +107,83 @@ A security context has a 1:1 correspondence to a service account and it can be i
 part of the service account resource. Following is an example of an initial implementation:
 
 ```go
+
+// SecurityContext specifies the security constraints associated with a service account
 type SecurityContext struct {
     // user is the uid to use when running the container
 	User int
 	
-	// allowPrivileged indicates whether this context allows privileged mode containers
+	// AllowPrivileged indicates whether this context allows privileged mode containers
 	AllowPrivileged bool
 	
-	// allowedVolumeTypes lists the types of volumes that a container can bind
+	// AllowedVolumeTypes lists the types of volumes that a container can bind
 	AllowedVolumeTypes []string
 	
-	// addCapabilities is the list of Linux kernel capabilities to add
+	// AddCapabilities is the list of Linux kernel capabilities to add
 	AddCapabilities []string
 	
-	// removeCapabilities is the list of Linux kernel capabilities to remove
+	// RemoveCapabilities is the list of Linux kernel capabilities to remove
 	RemoveCapabilities []string
 	
-	// SELinux specific settings (optional)
-	SELinux *SELinuxContext
-	
-	// AppArmor specific settings (optional)
-	AppArmor *AppArmorContext
-	
-	// FUTURE:
-	// With Linux user namespace support, it should be possible to map
-	// a range of container uids/gids to arbitrary host uids/gids
-	// UserMappings []IDMapping
-	// GroupMappings []IDMapping
+	// Isolation specifies the type of isolation required for containers 
+	// in this security context 
+	Isolation ContainerIsolationSpec
 }
 
-type SELinuxContext struct {
-    // MCS label/SELinux level to run the container under
-    Level string
-    
-    // SELinux type label for container processes
-    Type  string    
-    
-    // FUTURE:
-    // LabelVolumeMountsExclusive []Volume
-    // LabelVolumeMountsShared    []Volume
+// ContainerIsolationSpec indicates intent for container isolation
+type ContainerIsolationSpec struct {
+	// Type is the container isolation type (None, Private)
+	Type ContainerIsolationType
+	
+	// FUTURE: IDMapping specifies how users and groups from the host will be mapped
+	IDMapping *IDMapping
 }
 
-type AppArmorContext struct {
-	// AppArmor profile
-	Profile string
+// ContainerIsolationType is the type of container isolation for a security context
+type ContainerIsolationType string
+
+const (
+    // ContainerIsolationNone means that no additional consraints are added to
+    // containers to isolate them from their host
+	ContainerIsolationNone ContainerIsolationType = "None"
+	
+	// ContainerIsolationPrivate means that containers are isolated in process
+	// and storage from their host and other containers.
+	ContainerIsolationPrivate ContainerIsolationType = "Private"
+)
+
+// IDMapping specifies the requested user and group mappings for containers 
+// associated with a specific security context
+type IDMapping struct {
+	// SharedUsers is the set of user ranges that must be unique to the entire cluster
+	SharedUsers []IDMappingRange
+	
+	// SharedGroups is the set of group ranges that must be unique to the entire cluster
+	SharedGroups []IDMappingRange
+
+	// PrivateUsers are mapped to users on the host node, but are not necessarily
+	// unique to the entire cluster
+	PrivateUsers []IDMappingRange
+
+	// PrivateGroups are mapped to groups on the host node, but are not necessarily
+	// unique to the entire cluster
+	PrivateGroups []IDMappingRange
 }
+
+// IDMappingRange specifies a mapping between container IDs and node IDs
+type IDMappingRange struct {
+	// ContainerID is the starting container ID
+	ContainerID int
+
+	// HostID is the starting host ID
+	HostID int
+	
+	// Length is the length of the ID range
+	Length int
+}
+
 ```
+
 
 #### Security Context Lifecycle
  
