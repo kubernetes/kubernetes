@@ -378,7 +378,7 @@ func TestValidateContainers(t *testing.T) {
 		{
 			Name:  "resources-test",
 			Image: "image",
-			Resources: api.ResourceRequirementSpec{
+			Resources: api.ResourceRequirements{
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
@@ -459,7 +459,7 @@ func TestValidateContainers(t *testing.T) {
 			{
 				Name:  "abc-123",
 				Image: "image",
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"disk": resource.MustParse("10G"),
 					},
@@ -471,7 +471,7 @@ func TestValidateContainers(t *testing.T) {
 			{
 				Name:  "abc-123",
 				Image: "image",
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: getResourceLimits("-10", "0"),
 				},
 				ImagePullPolicy: "IfNotPresent",
@@ -481,7 +481,7 @@ func TestValidateContainers(t *testing.T) {
 			{
 				Name:  "abc-123",
 				Image: "image",
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: getResourceLimits("0", "-10"),
 				},
 				ImagePullPolicy: "IfNotPresent",
@@ -554,7 +554,7 @@ func TestValidateManifest(t *testing.T) {
 					Image:      "image",
 					Command:    []string{"foo", "bar"},
 					WorkingDir: "/tmp",
-					Resources: api.ResourceRequirementSpec{
+					Resources: api.ResourceRequirements{
 						Limits: api.ResourceList{
 							"cpu":    resource.MustParse("1"),
 							"memory": resource.MustParse("1"),
@@ -877,7 +877,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "foo:V1",
-							Resources: api.ResourceRequirementSpec{
+							Resources: api.ResourceRequirements{
 								Limits: getResourceLimits("100m", "0"),
 							},
 						},
@@ -890,7 +890,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "foo:V2",
-							Resources: api.ResourceRequirementSpec{
+							Resources: api.ResourceRequirements{
 								Limits: getResourceLimits("1000m", "0"),
 							},
 						},

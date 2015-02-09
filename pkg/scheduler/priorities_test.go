@@ -58,14 +58,14 @@ func TestLeastRequested(t *testing.T) {
 	cpuOnly := api.PodSpec{
 		Containers: []api.Container{
 			{
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse("1000m"),
 					},
 				},
 			},
 			{
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu": resource.MustParse("2000m"),
 					},
@@ -76,7 +76,7 @@ func TestLeastRequested(t *testing.T) {
 	cpuAndMemory := api.PodSpec{
 		Containers: []api.Container{
 			{
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("2000"),
@@ -84,7 +84,7 @@ func TestLeastRequested(t *testing.T) {
 				},
 			},
 			{
-				Resources: api.ResourceRequirementSpec{
+				Resources: api.ResourceRequirements{
 					Limits: api.ResourceList{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("3000"),

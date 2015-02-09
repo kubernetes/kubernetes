@@ -65,7 +65,7 @@ func TestIgnoreAdmission(t *testing.T) {
 				{
 					Name:  "ctr",
 					Image: "image",
-					Resources: api.ResourceRequirementSpec{
+					Resources: api.ResourceRequirements{
 						Limits: getResourceLimits("2", "750Mi"),
 					},
 				},

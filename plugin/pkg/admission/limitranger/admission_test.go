@@ -23,8 +23,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
-func getResourceRequirements(cpu, memory string) api.ResourceRequirementSpec {
-	res := api.ResourceRequirementSpec{}
+func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
+	res := api.ResourceRequirements{}
 	res.Limits = api.ResourceList{}
 	if cpu != "" {
 		res.Limits[api.ResourceCPU] = resource.MustParse(cpu)
