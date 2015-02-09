@@ -124,7 +124,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	}
 	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
 	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, kubeClient)
-	nodeController.Run(10*time.Second, 10)
+	nodeController.Run(10*time.Second, 10, true)
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
