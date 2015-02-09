@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -180,4 +181,131 @@ var _ = Describe("Services", func() {
 		Expect(foundRW).To(Equal(true))
 		Expect(foundRO).To(Equal(true))
 	})
+
+	It("should serve basic a endpoint from pods", func(done Done) {
+		serviceName := "endpoint-test"
+		ns := api.NamespaceDefault
+		labels := map[string]string{
+			"foo": "bar",
+			"baz": "blah",
+		}
+
+		defer func() {
+			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: serviceName,
+			},
+			Spec: api.ServiceSpec{
+				Port:          80,
+				Selector:      labels,
+				ContainerPort: util.NewIntOrStringFromInt(80),
+			},
+		}
+		_, err := c.Services(ns).Create(service)
+		Expect(err).NotTo(HaveOccurred())
+		expectedPort := "80"
+
+		validateEndpointsOrFail(c, ns, serviceName, expectedPort, []string{})
+
+		name1 := "test1"
+		addEndpointPodOrFail(c, ns, name1, labels)
+		names := []string{name1}
+		defer func() {
+			for _, name := range names {
+				err := c.Pods(ns).Delete(name)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		}()
+
+		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+
+		name2 := "test2"
+		addEndpointPodOrFail(c, ns, name2, labels)
+		names = append(names, name2)
+
+		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+
+		err = c.Pods(ns).Delete(name1)
+		Expect(err).NotTo(HaveOccurred())
+		names = []string{name2}
+
+		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+
+		err = c.Pods(ns).Delete(name2)
+		Expect(err).NotTo(HaveOccurred())
+		names = []string{}
+
+		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+
+		// We deferred Gingko pieces that may Fail, we aren't done.
+		defer func() {
+			close(done)
+		}()
+	}, 120.0)
 })
+
+func validateIPsOrFail(c *client.Client, ns, expectedPort string, expectedEndpoints []string, endpoints *api.Endpoints) {
+	ips := util.StringSet{}
+	for _, spec := range endpoints.Endpoints {
+		host, port, err := net.SplitHostPort(spec)
+		if err != nil {
+			Fail(fmt.Sprintf("invalid endpoint spec: %s (%v)", spec, err))
+		}
+		if port != expectedPort {
+			Fail(fmt.Sprintf("invalid port, expected %s, got %s", expectedPort, port))
+		}
+		ips.Insert(host)
+	}
+
+	for _, name := range expectedEndpoints {
+		pod, err := c.Pods(ns).Get(name)
+		if err != nil {
+			Fail(fmt.Sprintf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err))
+		}
+		if !ips.Has(pod.Status.PodIP) {
+			Fail(fmt.Sprintf("ip validation failed, expected: %v, saw: %v", ips, pod.Status.PodIP))
+		}
+	}
+}
+
+func validateEndpointsOrFail(c *client.Client, ns, serviceName, expectedPort string, expectedEndpoints []string) {
+	for {
+		endpoints, err := c.Endpoints(ns).Get(serviceName)
+		if err == nil {
+			if len(endpoints.Endpoints) == len(expectedEndpoints) {
+				validateIPsOrFail(c, ns, expectedPort, expectedEndpoints, endpoints)
+				return
+			} else {
+				By(fmt.Sprintf("Unexpected endpoints: %v, expected %v", endpoints.Endpoints, expectedEndpoints))
+			}
+		} else {
+			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1s)", err))
+		}
+		time.Sleep(time.Second)
+	}
+}
+
+func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string) {
+	By(fmt.Sprintf("Adding pod %v", name))
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "test",
+					Image: "kubernetes/pause",
+					Ports: []api.Port{{ContainerPort: 80}},
+				},
+			},
+		},
+	}
+	_, err := c.Pods(ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+}
