@@ -40,7 +40,8 @@ base:
     - kube-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
-{% else %}
+{% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'vagrant' %}
     - docker
     - sdn
 {% endif %}
