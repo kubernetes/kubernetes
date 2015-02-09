@@ -39,8 +39,8 @@ func TestPrivate(c *client.Client) bool {
 
 var _ = Describe("TestPrivate", func() {
 	It("should pass", func() {
-		// TODO: Instead of OrDie, client should Fail the test if there's a problem.
-		// In general tests should Fail() instead of glog.Fatalf().
-		Expect(TestPrivate(loadClientOrDie())).To(BeTrue())
+		c, err := loadClient()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(TestPrivate(c)).To(BeTrue())
 	})
 })

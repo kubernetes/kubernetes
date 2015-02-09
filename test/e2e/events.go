@@ -34,7 +34,9 @@ var _ = Describe("Events", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		c = loadClientOrDie()
+		var err error
+		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running", func() {

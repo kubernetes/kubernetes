@@ -18,18 +18,14 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -61,133 +57,83 @@ func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error 
 }
 
 // waitForPodNotPending returns false if it took too long for the pod to go out of pending state.
-func waitForPodNotPending(c *client.Client, ns, podName string) bool {
-	for i := 0; i < 10; i++ {
+func waitForPodNotPending(c *client.Client, ns, podName string, tryFor time.Duration) error {
+	trySecs := int(tryFor.Seconds())
+	for i := 0; i <= trySecs; i += 5 {
 		if i > 0 {
 			time.Sleep(5 * time.Second)
 		}
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
-			glog.Warningf("Get pod %s in namespace %s failed: %v", podName, ns, err)
+			By(fmt.Sprintf("Get pod %s in namespace %s failed, ignoring for 5s: %v", podName, ns, err))
 			continue
 		}
 		if pod.Status.Phase != api.PodPending {
-			glog.Infof("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
-			return true
+			By(fmt.Sprintf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase))
+			return nil
 		}
-		glog.Infof("Waiting for status of pod %s in namespace %s to be !%q (found %q)", podName, ns, api.PodPending, pod.Status.Phase)
+		By(fmt.Sprintf("Waiting for status of pod %s in namespace %s to be !%q (found %q) (%v secs)", podName, ns, api.PodPending, pod.Status.Phase, i))
 	}
-	glog.Warningf("Gave up waiting for status of pod %s in namespace %s to go out of pending", podName, ns)
-	return false
+	return fmt.Errorf("Gave up waiting for status of pod %s in namespace %s to go out of pending after %d seconds", podName, ns, trySecs)
 }
 
 // waitForPodSuccess returns true if the pod reached state success, or false if it reached failure or ran too long.
-func waitForPodSuccess(c *client.Client, podName string, contName string) bool {
-	for i := 0; i < 10; i++ {
+func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor time.Duration) error {
+	trySecs := int(tryFor.Seconds())
+	for i := 0; i <= trySecs; i += 5 {
 		if i > 0 {
 			time.Sleep(5 * time.Second)
 		}
 		pod, err := c.Pods(api.NamespaceDefault).Get(podName)
 		if err != nil {
-			glog.Warningf("Get pod failed: %v", err)
+			By(fmt.Sprintf("Get pod failed, ignoring for 5s: %v", err))
 			continue
 		}
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := pod.Status.Info[contName]
 		if !ok {
-			glog.Infof("No Status.Info for container %s in pod %s yet", contName, podName)
+			By(fmt.Sprintf("No Status.Info for container %s in pod %s yet", contName, podName))
 		} else {
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
-					glog.Infof("Saw pod success")
-					return true
+					By("Saw pod success")
+					return nil
 				} else {
-					glog.Infof("Saw pod failure: %+v", ci.State.Termination)
+					By(fmt.Sprintf("Saw pod failure: %+v", ci.State.Termination))
 				}
-				glog.Infof("Waiting for pod %q status to be success or failure", podName)
+				By(fmt.Sprintf("Waiting for pod %q status to be success or failure", podName))
 			} else {
-				glog.Infof("Nil State.Termination for container %s in pod %s so far", contName, podName)
+				By(fmt.Sprintf("Nil State.Termination for container %s in pod %s so far", contName, podName))
 			}
 		}
 	}
-	glog.Warningf("Gave up waiting for pod %q status to be success or failure", podName)
-	return false
+	return fmt.Errorf("Gave up waiting for pod %q status to be success or failure after %d seconds", podName, trySecs)
 }
 
-// assetPath returns a path to the requested file; safe on all
-// OSes. NOTE: If you use an asset in this test, you MUST add it to
-// the KUBE_TEST_PORTABLE array in hack/lib/golang.sh.
-func assetPath(pathElements ...string) string {
-	return filepath.Join(testContext.repoRoot, filepath.Join(pathElements...))
-}
-
-func loadObjectOrDie(filePath string) runtime.Object {
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		glog.Fatalf("Failed to read object: %v", err)
-	}
-	return decodeObjectOrDie(data)
-}
-
-func decodeObjectOrDie(data []byte) runtime.Object {
-	obj, err := latest.Codec.Decode(data)
-	if err != nil {
-		glog.Fatalf("Failed to decode object: %v", err)
-	}
-	return obj
-}
-
-func loadPodOrDie(filePath string) *api.Pod {
-	obj := loadObjectOrDie(filePath)
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		glog.Fatalf("Failed to load pod: %v", obj)
-	}
-	return pod
-}
-
-func loadClientOrDie() *client.Client {
+func loadClient() (*client.Client, error) {
 	config := client.Config{
 		Host: testContext.host,
 	}
 	info, err := clientauth.LoadFromFile(testContext.authConfig)
 	if err != nil {
-		glog.Fatalf("Error loading auth: %v", err)
+		return nil, fmt.Errorf("Error loading auth: %v", err.Error())
 	}
 	// If the certificate directory is provided, set the cert paths to be there.
 	if testContext.certDir != "" {
-		glog.Infof("Expecting certs in %v.", testContext.certDir)
+		By(fmt.Sprintf("Expecting certs in %v.", testContext.certDir))
 		info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
 		info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
 		info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
 	}
 	config, err = info.MergeWithConfig(config)
 	if err != nil {
-		glog.Fatalf("Error creating client")
+		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
 	c, err := client.New(&config)
 	if err != nil {
-		glog.Fatalf("Error creating client")
+		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
-	return c
-}
-
-func parsePodOrDie(json string) *api.Pod {
-	obj := decodeObjectOrDie([]byte(json))
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		glog.Fatalf("Failed to cast pod: %v", obj)
-	}
-	return pod
-}
-
-func parseServiceOrDie(json string) *api.Service {
-	obj := decodeObjectOrDie([]byte(json))
-	service, ok := obj.(*api.Service)
-	if !ok {
-		glog.Fatalf("Failed to cast service: %v", obj)
-	}
-	return service
+	return c, nil
 }
 
 // TODO: Allow service names to have the same form as names
