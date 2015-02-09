@@ -17,20 +17,24 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	gpath "path"
 	"reflect"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
 )
 
 type APIInstaller struct {
-	prefix      string // Path prefix where API resources are to be registered.
-	version     string // The API version being installed.
-	restHandler *RESTHandler
-	mapper      meta.RESTMapper
+	group   *APIGroupVersion
+	prefix  string // Path prefix where API resources are to be registered.
+	version string // The API version being installed.
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -49,16 +53,16 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 
 	// Initialize the custom handlers.
 	watchHandler := (&WatchHandler{
-		storage:                a.restHandler.storage,
-		codec:                  a.restHandler.codec,
-		canonicalPrefix:        a.restHandler.canonicalPrefix,
-		selfLinker:             a.restHandler.selfLinker,
-		apiRequestInfoResolver: a.restHandler.apiRequestInfoResolver,
+		storage: a.group.storage,
+		codec:   a.group.codec,
+		prefix:  a.group.prefix,
+		linker:  a.group.linker,
+		info:    a.group.info,
 	})
-	redirectHandler := (&RedirectHandler{a.restHandler.storage, a.restHandler.codec, a.restHandler.apiRequestInfoResolver})
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.restHandler.storage, a.restHandler.codec, a.restHandler.apiRequestInfoResolver})
+	redirectHandler := (&RedirectHandler{a.group.storage, a.group.codec, a.group.info})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.storage, a.group.codec, a.group.info})
 
-	for path, storage := range a.restHandler.storage {
+	for path, storage := range a.group.storage {
 		if err := a.registerResourceHandlers(path, storage, ws, watchHandler, redirectHandler, proxyHandler); err != nil {
 			errors = append(errors, err)
 		}
@@ -78,8 +82,11 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 }
 
 func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage, ws *restful.WebService, watchHandler http.Handler, redirectHandler http.Handler, proxyHandler http.Handler) error {
-	// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-	restVerbHandler := restfulStripPrefix(a.prefix, a.restHandler)
+	codec := a.group.codec
+	admit := a.group.admit
+	linker := a.group.linker
+	resource := path
+
 	object := storage.New()
 	// TODO: add scheme to APIInstaller rather than using api.Scheme
 	_, kind, err := api.Scheme.ObjectVersionAndKind(object)
@@ -103,28 +110,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	mapping, err := a.mapper.RESTMapping(kind, a.version)
+	mapping, err := a.group.mapper.RESTMapping(kind, a.version)
 	if err != nil {
 		return err
 	}
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	storageVerbs := map[string]bool{}
-	if _, ok := storage.(RESTCreater); ok {
-		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+	creater, ok := storage.(RESTCreater)
+	if ok {
 		storageVerbs["RESTCreater"] = true
 	}
-	if _, ok := storage.(RESTLister); ok {
-		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+	lister, ok := storage.(RESTLister)
+	if ok {
 		storageVerbs["RESTLister"] = true
 	}
-	if _, ok := storage.(RESTGetter); ok {
+	getter, ok := storage.(RESTGetter)
+	if ok {
 		storageVerbs["RESTGetter"] = true
 	}
-	if _, ok := storage.(RESTDeleter); ok {
+	deleter, ok := storage.(RESTDeleter)
+	if ok {
 		storageVerbs["RESTDeleter"] = true
 	}
-	if _, ok := storage.(RESTUpdater); ok {
+	updater, ok := storage.(RESTUpdater)
+	if ok {
 		storageVerbs["RESTUpdater"] = true
 	}
 	if _, ok := storage.(ResourceWatcher); ok {
@@ -134,6 +144,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		storageVerbs["Redirector"] = true
 	}
 
+	var namespaceFn ResourceNamespaceFunc
+	var nameFn ResourceNameFunc
+	var generateLinkFn linkFunc
+	var objNameFn ObjectNameFunc
+	linkFn := func(req *restful.Request, obj runtime.Object) error {
+		return setSelfLink(obj, req.Request, a.group.linker, generateLinkFn)
+	}
+
 	allowWatchList := storageVerbs["ResourceWatcher"] && storageVerbs["RESTLister"] // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
@@ -141,6 +159,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	actions := []action{}
 	// Get the list of actions for the given scope.
 	if scope.Name() != meta.RESTScopeNameNamespace {
+		objNameFn = func(obj runtime.Object) (namespace, name string, err error) {
+			name, err = linker.Name(obj)
+			return
+		}
+
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		actions = appendIf(actions, action{"LIST", path, params}, storageVerbs["RESTLister"])
 		actions = appendIf(actions, action{"POST", path, params}, storageVerbs["RESTCreater"])
@@ -148,6 +171,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 
 		itemPath := path + "/{name}"
 		nameParams := append(params, nameParam)
+		namespaceFn = func(req *restful.Request) (namespace string, err error) {
+			return
+		}
+		nameFn = func(req *restful.Request) (namespace, name string, err error) {
+			name = req.PathParameter("name")
+			return
+		}
+		generateLinkFn = func(namespace, name string) (path string, query string) {
+			path = strings.Replace(itemPath, "{name}", name, 1)
+			path = gpath.Join(a.prefix, path)
+			return
+		}
+
 		actions = appendIf(actions, action{"GET", itemPath, nameParams}, storageVerbs["RESTGetter"])
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams}, storageVerbs["RESTUpdater"])
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams}, storageVerbs["RESTDeleter"])
@@ -156,18 +192,46 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath + "/{path:*}", nameParams}, storageVerbs["Redirector"])
 		actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath, nameParams}, storageVerbs["Redirector"])
 	} else {
+		objNameFn = func(obj runtime.Object) (namespace, name string, err error) {
+			if name, err = linker.Name(obj); err != nil {
+				return
+			}
+			namespace, err = linker.Namespace(obj)
+			return
+		}
+
 		// v1beta3 format with namespace in path
 		if scope.ParamPath() {
 			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 			namespaceParam := ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
 			namespacedPath := scope.ParamName() + "/{" + scope.ParamName() + "}/" + path
 			namespaceParams := []*restful.Parameter{namespaceParam}
+			namespaceFn = func(req *restful.Request) (namespace string, err error) {
+				namespace = req.PathParameter(scope.ParamName())
+				if len(namespace) == 0 {
+					namespace = api.NamespaceDefault
+				}
+				return
+			}
+
 			actions = appendIf(actions, action{"LIST", namespacedPath, namespaceParams}, storageVerbs["RESTLister"])
 			actions = appendIf(actions, action{"POST", namespacedPath, namespaceParams}, storageVerbs["RESTCreater"])
 			actions = appendIf(actions, action{"WATCHLIST", "/watch/" + namespacedPath, namespaceParams}, allowWatchList)
 
 			itemPath := namespacedPath + "/{name}"
 			nameParams := append(namespaceParams, nameParam)
+			nameFn = func(req *restful.Request) (namespace, name string, err error) {
+				namespace, _ = namespaceFn(req)
+				name = req.PathParameter("name")
+				return
+			}
+			generateLinkFn = func(namespace, name string) (path string, query string) {
+				path = strings.Replace(itemPath, "{name}", name, 1)
+				path = strings.Replace(path, "{"+scope.ParamName()+"}", namespace, 1)
+				path = gpath.Join(a.prefix, path)
+				return
+			}
+
 			actions = appendIf(actions, action{"GET", itemPath, nameParams}, storageVerbs["RESTGetter"])
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams}, storageVerbs["RESTUpdater"])
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams}, storageVerbs["RESTDeleter"])
@@ -184,12 +248,36 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			// v1beta1/v1beta2 format where namespace was a query parameter
 			namespaceParam := ws.QueryParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
 			namespaceParams := []*restful.Parameter{namespaceParam}
+			namespaceFn = func(req *restful.Request) (namespace string, err error) {
+				namespace = req.QueryParameter(scope.ParamName())
+				if len(namespace) == 0 {
+					namespace = api.NamespaceDefault
+				}
+				return
+			}
+
 			actions = appendIf(actions, action{"LIST", path, namespaceParams}, storageVerbs["RESTLister"])
 			actions = appendIf(actions, action{"POST", path, namespaceParams}, storageVerbs["RESTCreater"])
 			actions = appendIf(actions, action{"WATCHLIST", "/watch/" + path, namespaceParams}, allowWatchList)
 
 			itemPath := path + "/{name}"
 			nameParams := append(namespaceParams, nameParam)
+			nameFn = func(req *restful.Request) (namespace, name string, err error) {
+				namespace, _ = namespaceFn(req)
+				name = req.PathParameter("name")
+				return
+			}
+			generateLinkFn = func(namespace, name string) (path string, query string) {
+				path = strings.Replace(itemPath, "{name}", name, -1)
+				path = gpath.Join(a.prefix, path)
+				if len(namespace) > 0 {
+					values := make(url.Values)
+					values.Set(scope.ParamName(), namespace)
+					query = values.Encode()
+				}
+				return
+			}
+
 			actions = appendIf(actions, action{"GET", itemPath, nameParams}, storageVerbs["RESTGetter"])
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams}, storageVerbs["RESTUpdater"])
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams}, storageVerbs["RESTDeleter"])
@@ -220,35 +308,35 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	for _, action := range actions {
 		switch action.Verb {
 		case "GET": // Get a resource.
-			route := ws.GET(action.Path).To(restVerbHandler).
+			route := ws.GET(action.Path).To(GetResource(getter, nameFn, linkFn, codec)).
 				Doc("read the specified " + kind).
 				Operation("read" + kind).
 				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(restVerbHandler).
+			route := ws.GET(action.Path).To(ListResource(lister, namespaceFn, linkFn, codec)).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
 				Writes(versionedList)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
-			route := ws.PUT(action.Path).To(restVerbHandler).
+			route := ws.PUT(action.Path).To(UpdateResource(updater, nameFn, objNameFn, linkFn, codec, resource, admit)).
 				Doc("update the specified " + kind).
 				Operation("update" + kind).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
-			route := ws.POST(action.Path).To(restVerbHandler).
+			route := ws.POST(action.Path).To(CreateResource(creater, namespaceFn, linkFn, codec, resource, admit)).
 				Doc("create a " + kind).
 				Operation("create" + kind).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
-			route := ws.DELETE(action.Path).To(restVerbHandler).
+			route := ws.DELETE(action.Path).To(DeleteResource(deleter, nameFn, linkFn, codec, resource, kind, admit)).
 				Doc("delete a " + kind).
 				Operation("delete" + kind)
 			addParams(route, action.Params)
@@ -281,6 +369,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, action.Params)
 			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, action.Params)
 			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, action.Params)
+		default:
+			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
 		// Note: update GetAttribs() when adding a custom handler.
 	}

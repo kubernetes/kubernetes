@@ -56,14 +56,22 @@ type RESTDeleter interface {
 }
 
 type RESTCreater interface {
+	// New returns an empty object that can be used with Create after request data has been put into it.
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
+	New() runtime.Object
+
 	// Create creates a new version of a resource.
 	Create(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error)
 }
 
 type RESTUpdater interface {
+	// New returns an empty object that can be used with Update after request data has been put into it.
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
+	New() runtime.Object
+
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the Created flag of
-	// the returned RESTResultto true. In the event of an asynchronous error returned
+	// the returned RESTResult to true. In the event of an asynchronous error returned
 	// via an api.Status object, the Created flag is ignored.
 	Update(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error)
 }

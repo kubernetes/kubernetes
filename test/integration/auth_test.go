@@ -78,6 +78,20 @@ var aPod string = `
   }%s
 }
 `
+var aPodInBar string = `
+{
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "a",
+      "containers": [{ "name": "foo", "image": "bar/foo", }]
+    }
+  }%s
+}
+`
 var aRC string = `
 {
   "kind": "ReplicationController",
@@ -126,7 +140,6 @@ var aEvent string = `
 {
   "kind": "Event",
   "apiVersion": "v1beta1",
-  "namespace": "default",
   "id": "a",
   "involvedObject": {
     "kind": "Minion",
@@ -316,14 +329,16 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
-			bodyStr = fmt.Sprintf(r.body, "")
+			sub := ""
 			if r.verb == "PUT" && r.body != "" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
-					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
+				namespace := "default"
+				sub += fmt.Sprintf(",\r\n\"namespace\": %v", namespace)
 			}
+			bodyStr = fmt.Sprintf(r.body, sub)
 		}
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -483,14 +498,16 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
-			bodyStr = fmt.Sprintf(r.body, "")
+			sub := ""
 			if r.verb == "PUT" && r.body != "" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
-					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
+				namespace := "default"
+				sub += fmt.Sprintf(",\r\n\"namespace\": %v", namespace)
 			}
+			bodyStr = fmt.Sprintf(r.body, sub)
 		}
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
@@ -705,24 +722,25 @@ func TestNamespaceAuthorization(t *testing.T) {
 	requests := []struct {
 		verb        string
 		URL         string
+		namespace   string
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=foo", aPod, code200},
-		{"GET", "/api/v1beta1/pods?namespace=foo", "", code200},
-		{"GET", "/api/v1beta1/pods/a?namespace=foo", "", code200},
-		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=foo", "", code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=foo", "foo", aPod, code200},
+		{"GET", "/api/v1beta1/pods?namespace=foo", "foo", "", code200},
+		{"GET", "/api/v1beta1/pods/a?namespace=foo", "foo", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=foo", "foo", "", code200},
 
-		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=bar", aPod, code403},
-		{"GET", "/api/v1beta1/pods?namespace=bar", "", code403},
-		{"GET", "/api/v1beta1/pods/a?namespace=bar", "", code403},
-		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=bar", "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=bar", "bar", aPod, code403},
+		{"GET", "/api/v1beta1/pods?namespace=bar", "bar", "", code403},
+		{"GET", "/api/v1beta1/pods/a?namespace=bar", "bar", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=bar", "bar", "", code403},
 
-		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code403},
-		{"GET", "/api/v1beta1/pods", "", code403},
-		{"GET", "/api/v1beta1/pods/a", "", code403},
-		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, "", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", "", code403},
 	}
 
 	for _, r := range requests {
@@ -730,14 +748,19 @@ func TestNamespaceAuthorization(t *testing.T) {
 		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
-			bodyStr = fmt.Sprintf(r.body, "")
+			sub := ""
 			if r.verb == "PUT" && r.body != "" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
-					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
+				namespace := r.namespace
+				if len(namespace) == 0 {
+					namespace = "default"
+				}
+				sub += fmt.Sprintf(",\r\n\"namespace\": %v", namespace)
 			}
+			bodyStr = fmt.Sprintf(r.body, sub)
 		}
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
