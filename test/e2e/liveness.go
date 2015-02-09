@@ -44,8 +44,9 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) bool {
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	if !waitForPodNotPending(c, ns, podDescr.Name) {
-		glog.Infof("Failed to start pod %s in namespace %s", podDescr.Name, ns)
+	err = waitForPodNotPending(c, ns, podDescr.Name, 60*time.Second)
+	if err != nil {
+		glog.Infof("Failed to start pod %s in namespace %s: %v", podDescr.Name, ns, err)
 		return false
 	}
 	glog.Infof("Started pod %s in namespace %s", podDescr.Name, ns)
