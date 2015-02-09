@@ -33,45 +33,45 @@ func IsDNSSubdomain(value string) bool {
 	return IsDNS1123Subdomain(value)
 }
 
-const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+const DNS1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 
-var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
+var dns1123LabelRegexp = regexp.MustCompile("^" + DNS1123LabelFmt + "$")
 
-const dns1123LabelMaxLength int = 63
+const DNS1123LabelMaxLength int = 63
 
 // IsDNS1123Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 1123).
 func IsDNS1123Label(value string) bool {
-	return len(value) <= dns1123LabelMaxLength && dns1123LabelRegexp.MatchString(value)
+	return len(value) <= DNS1123LabelMaxLength && dns1123LabelRegexp.MatchString(value)
 }
 
-const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
+const DNS1123SubdomainFmt string = DNS1123LabelFmt + "(\\." + DNS1123LabelFmt + ")*"
 
-var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
+var dns1123SubdomainRegexp = regexp.MustCompile("^" + DNS1123SubdomainFmt + "$")
 
-const dns1123SubdomainMaxLength int = 253
+const DNS1123SubdomainMaxLength int = 253
 
 // IsDNS1123Subdomain tests for a string that conforms to the definition of a
 // subdomain in DNS (RFC 1123).
 func IsDNS1123Subdomain(value string) bool {
-	return len(value) <= dns1123SubdomainMaxLength && dns1123SubdomainRegexp.MatchString(value)
+	return len(value) <= DNS1123SubdomainMaxLength && dns1123SubdomainRegexp.MatchString(value)
 }
 
-const dns952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const DNS952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 
-var dns952LabelRegexp = regexp.MustCompile("^" + dns952LabelFmt + "$")
+var dns952LabelRegexp = regexp.MustCompile("^" + DNS952LabelFmt + "$")
 
-const dns952LabelMaxLength int = 24
+const DNS952LabelMaxLength int = 24
 
 // IsDNS952Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 952).
 func IsDNS952Label(value string) bool {
-	return len(value) <= dns952LabelMaxLength && dns952LabelRegexp.MatchString(value)
+	return len(value) <= DNS952LabelMaxLength && dns952LabelRegexp.MatchString(value)
 }
 
-const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
+const CIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
 
-var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
+var cIdentifierRegexp = regexp.MustCompile("^" + CIdentifierFmt + "$")
 
 // IsCIdentifier tests for a string that conforms the definition of an identifier
 // in C. This checks the format, but not the length.
