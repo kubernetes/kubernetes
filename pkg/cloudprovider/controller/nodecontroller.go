@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -121,14 +122,14 @@ func (s *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, retr
 				continue
 			}
 			_, err := s.kubeClient.Nodes().Create(&node)
-			if err == nil {
+			if err == nil || apierrors.IsAlreadyExists(err) {
 				registered.Insert(node.Name)
 				glog.Infof("Registered node in registry: %s", node.Name)
 			} else {
-				glog.Errorf("Error registrying node %s, retrying: %s", node.Name, err)
+				glog.Errorf("Error registering node %s, retrying: %s", node.Name, err)
 			}
 			if registered.Len() == len(nodes.Items) {
-				glog.Infof("Successfully Registered all nodes")
+				glog.Infof("Successfully registered all nodes")
 				return nil
 			}
 		}
