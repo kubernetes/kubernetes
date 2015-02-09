@@ -78,22 +78,28 @@ func (c *cache) Add(obj interface{}) error {
 	if err != nil {
 		return fmt.Errorf("couldn't create key for object: %v", err)
 	}
+	// keep a pointer to whatever could have been there previously
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	oldObject := c.items[key]
 	c.items[key] = obj
-	c.updateIndices(obj)
+	c.updateIndices(oldObject, obj)
 	return nil
 }
 
-// updateIndices modifies the objects location in the managed indexes
+// updateIndices modifies the objects location in the managed indexes, if this is an update, you must provide an oldObj
 // updateIndices must be called from a function that already has a lock on the cache
-func (c *cache) updateIndices(obj interface{}) error {
-	key, err := c.keyFunc(obj)
+func (c *cache) updateIndices(oldObj interface{}, newObj interface{}) error {
+	// if we got an old object, we need to remove it before we add it again
+	if oldObj != nil {
+		c.deleteFromIndices(oldObj)
+	}
+	key, err := c.keyFunc(newObj)
 	if err != nil {
 		return err
 	}
 	for name, indexFunc := range c.indexers {
-		indexValue, err := indexFunc(obj)
+		indexValue, err := indexFunc(newObj)
 		if err != nil {
 			return err
 		}
@@ -143,8 +149,9 @@ func (c *cache) Update(obj interface{}) error {
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	oldObject := c.items[key]
 	c.items[key] = obj
-	c.updateIndices(obj)
+	c.updateIndices(oldObject, obj)
 	return nil
 }
 
@@ -236,7 +243,7 @@ func (c *cache) Replace(list []interface{}) error {
 	// rebuild any index
 	c.indices = Indices{}
 	for _, item := range c.items {
-		c.updateIndices(item)
+		c.updateIndices(nil, item)
 	}
 
 	return nil
