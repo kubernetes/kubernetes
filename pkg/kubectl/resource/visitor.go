@@ -87,6 +87,7 @@ func (i *Info) Visit(fn VisitorFunc) error {
 	return fn(i)
 }
 
+// Get retrieves the object from the Namespace and Name fields
 func (i *Info) Get() error {
 	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name)
 	if err != nil {
@@ -94,6 +95,38 @@ func (i *Info) Get() error {
 	}
 	i.Object = obj
 	i.ResourceVersion, _ = i.Mapping.MetadataAccessor.ResourceVersion(obj)
+	return nil
+}
+
+// Refresh updates the object with another object. If ignoreError is set
+// the Object will be updated even if name, namespace, or resourceVersion
+// attributes cannot be loaded from the object.
+func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
+	name, err := i.Mapping.MetadataAccessor.Name(obj)
+	if err != nil {
+		if !ignoreError {
+			return err
+		}
+	} else {
+		i.Name = name
+	}
+	namespace, err := i.Mapping.MetadataAccessor.Namespace(obj)
+	if err != nil {
+		if !ignoreError {
+			return err
+		}
+	} else {
+		i.Namespace = namespace
+	}
+	version, err := i.Mapping.MetadataAccessor.ResourceVersion(obj)
+	if err != nil {
+		if !ignoreError {
+			return err
+		}
+	} else {
+		i.ResourceVersion = version
+	}
+	i.Object = obj
 	return nil
 }
 

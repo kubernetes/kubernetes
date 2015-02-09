@@ -67,7 +67,7 @@ func TestUpdateObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "redis-master\n" {
+	if buf.String() != "foo\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -104,7 +104,7 @@ func TestUpdateMultipleObject(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "redis-master\nfrontend\n" {
+	if buf.String() != "foo\nbaz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -139,7 +139,7 @@ func TestUpdateDirectory(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend-controller\nfrontend\nredis-master\nredis-master\nredis-slave-controller\nredisslave\n" {
+	if buf.String() != "qux\nbaz\nbaz\nfoo\nqux\nbaz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

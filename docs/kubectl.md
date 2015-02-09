@@ -232,7 +232,7 @@ Examples:
 
   $ cat pod.json | kubectl update -f -
   <update a pod based on the json passed into stdin>
-  
+
   $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
   <update a pod by downloading it, applying the patch, then updating, requires apiVersion be specified>
 
