@@ -148,7 +148,9 @@ func (p *PodCache) updatePodStatus(pod *api.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	// Map accesses must be locked.
-	p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
+	if err == nil {
+		p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
+	}
 
 	return err
 }
@@ -187,13 +189,11 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	result, err := p.containerInfo.GetPodStatus(pod.Status.Host, pod.Namespace, pod.Name)
-	newStatus.HostIP = nodeStatus.HostIP
 
 	if err != nil {
-		glog.Errorf("error getting pod status: %v, setting status to unknown", err)
-		newStatus.Phase = api.PodUnknown
-		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
+		glog.Infof("error getting pod %s status: %v, retry later", pod.Name, err)
 	} else {
+		newStatus.HostIP = nodeStatus.HostIP
 		newStatus.Info = result.Status.Info
 		newStatus.PodIP = result.Status.PodIP
 		if newStatus.Info == nil {

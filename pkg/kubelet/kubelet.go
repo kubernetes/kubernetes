@@ -1449,10 +1449,6 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
 
 // getPhase returns the phase of a pod given its container info.
 func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
-	if info == nil {
-		return api.PodPending
-	}
-
 	running := 0
 	waiting := 0
 	stopped := 0
@@ -1481,6 +1477,7 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 	}
 	switch {
 	case waiting > 0:
+		glog.V(5).Infof("pod waiting > 0, pending")
 		// One or more containers has not been started
 		return api.PodPending
 	case running > 0 && unknown == 0:
@@ -1507,6 +1504,7 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 		// and in the process of restarting
 		return api.PodRunning
 	default:
+		glog.V(5).Infof("pod default case, pending")
 		return api.PodPending
 	}
 }
@@ -1555,10 +1553,19 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
 
 	if err != nil {
-		glog.Infof("Query docker container info failed with error: %v", err)
-		return podStatus, err
+		// Error handling
+		glog.Infof("Query docker container info for pod %s failed with error (%v)", podFullName, err)
+		if strings.Contains(err.Error(), "resource temporarily unavailable") {
+			// Leave upstream layer to decide what to do
+			return podStatus, err
+		} else {
+			podStatus.Phase = api.PodPending
+			podStatus.Message = fmt.Sprintf("Query docker container info failed with error (%v)", err)
+			return podStatus, nil
+		}
 	}
 
+	// Assume info is ready to process
 	podStatus.Phase = getPhase(&spec, info)
 	for _, c := range spec.Containers {
 		containerStatus := info[c.Name]
@@ -1575,7 +1582,7 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	// TODO(dchen1107): Change Info to list from map
 	podStatus.Info = info
 
-	return podStatus, err
+	return podStatus, nil
 }
 
 // Returns logs of current machine.
