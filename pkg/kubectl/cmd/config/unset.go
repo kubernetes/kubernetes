@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -73,8 +72,11 @@ func (o unsetOptions) run() error {
 		return errors.New("cannot set property without using a specific file")
 	}
 
-	parts := strings.Split(o.propertyName, ".")
-	err = modifyConfig(reflect.ValueOf(config), parts, "", true)
+	steps, err := newNavigationSteps(o.propertyName)
+	if err != nil {
+		return err
+	}
+	err = modifyConfig(reflect.ValueOf(config), steps, "", true)
 	if err != nil {
 		return err
 	}

@@ -33,8 +33,6 @@ const (
 	additionStepRequiredUnlessUnsettingError = "Must have additional steps after %v unless you are unsetting it"
 )
 
-type navigationSteps []string
-
 type setOptions struct {
 	pathOptions   *pathOptions
 	propertyName  string
@@ -83,8 +81,11 @@ func (o setOptions) run() error {
 		return errors.New("cannot set property without using a specific file")
 	}
 
-	parts := strings.Split(o.propertyName, ".")
-	err = modifyConfig(reflect.ValueOf(config), parts, o.propertyValue, false)
+	steps, err := newNavigationSteps(o.propertyName)
+	if err != nil {
+		return err
+	}
+	err = modifyConfig(reflect.ValueOf(config), steps, o.propertyValue, false)
 	if err != nil {
 		return err
 	}
@@ -121,28 +122,8 @@ func (o setOptions) validate() error {
 	return nil
 }
 
-// moreStepsRemaining just makes code read cleaner
-func moreStepsRemaining(remainder []string) bool {
-	return len(remainder) != 0
-}
-
-func (s navigationSteps) nextSteps() navigationSteps {
-	if len(s) < 2 {
-		return make([]string, 0, 0)
-	} else {
-		return s[1:]
-	}
-}
-func (s navigationSteps) moreStepsRemaining() bool {
-	return len(s) != 0
-}
-func (s navigationSteps) nextStep() string {
-	return s[0]
-}
-
-func modifyConfig(curr reflect.Value, steps navigationSteps, propertyValue string, unset bool) error {
-	shouldUnsetNextField := !steps.nextSteps().moreStepsRemaining() && unset
-	shouldSetThisField := !steps.moreStepsRemaining() && !unset
+func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue string, unset bool) error {
+	currStep := steps.pop()
 
 	actualCurrValue := curr
 	if curr.Kind() == reflect.Ptr {
@@ -151,14 +132,14 @@ func modifyConfig(curr reflect.Value, steps navigationSteps, propertyValue strin
 
 	switch actualCurrValue.Kind() {
 	case reflect.Map:
-		if shouldSetThisField {
+		if !steps.moreStepsRemaining() && !unset {
 			return fmt.Errorf("Can't set a map to a value: %v", actualCurrValue)
 		}
 
-		mapKey := reflect.ValueOf(steps.nextStep())
+		mapKey := reflect.ValueOf(currStep.stepValue)
 		mapValueType := curr.Type().Elem().Elem()
 
-		if shouldUnsetNextField {
+		if !steps.moreStepsRemaining() && unset {
 			actualCurrValue.SetMapIndex(mapKey, reflect.Value{})
 			return nil
 		}
@@ -181,7 +162,7 @@ func modifyConfig(curr reflect.Value, steps navigationSteps, propertyValue strin
 		if modifiableMapValue.Kind() == reflect.Struct {
 			modifiableMapValue = modifiableMapValue.Addr()
 		}
-		err := modifyConfig(modifiableMapValue, steps.nextSteps(), propertyValue, unset)
+		err := modifyConfig(modifiableMapValue, steps, propertyValue, unset)
 		if err != nil {
 			return err
 		}
@@ -208,40 +189,36 @@ func modifyConfig(curr reflect.Value, steps navigationSteps, propertyValue strin
 		return nil
 
 	case reflect.Struct:
-		if !steps.moreStepsRemaining() {
-			return fmt.Errorf("Can't set a struct to a value: %v", actualCurrValue)
-		}
-
 		for fieldIndex := 0; fieldIndex < actualCurrValue.NumField(); fieldIndex++ {
 			currFieldValue := actualCurrValue.Field(fieldIndex)
 			currFieldType := actualCurrValue.Type().Field(fieldIndex)
 			currYamlTag := currFieldType.Tag.Get("json")
 			currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
 
-			if currFieldTypeYamlName == steps.nextStep() {
+			if currFieldTypeYamlName == currStep.stepValue {
 				thisMapHasNoValue := (currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil())
 
 				if thisMapHasNoValue {
 					newValue := reflect.MakeMap(currFieldValue.Type())
 					currFieldValue.Set(newValue)
 
-					if shouldUnsetNextField {
+					if !steps.moreStepsRemaining() && unset {
 						return nil
 					}
 				}
 
-				if shouldUnsetNextField {
+				if !steps.moreStepsRemaining() && unset {
 					// if we're supposed to unset the value or if the value is a map that doesn't exist, create a new value and overwrite
 					newValue := reflect.New(currFieldValue.Type()).Elem()
 					currFieldValue.Set(newValue)
 					return nil
 				}
 
-				return modifyConfig(currFieldValue.Addr(), steps.nextSteps(), propertyValue, unset)
+				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset)
 			}
 		}
 
-		return fmt.Errorf("Unable to locate path %v under %v", steps, actualCurrValue)
+		return fmt.Errorf("Unable to locate path %#v under %v", currStep, actualCurrValue)
 
 	}
 
