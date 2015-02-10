@@ -44,6 +44,10 @@ func Logf(format string, a ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
 }
 
+func Failf(format string, a ...interface{}) {
+	Fail(fmt.Sprintf(format, a...))
+}
+
 func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
 	trySecs := int(tryFor.Seconds())
 	for i := 0; i <= trySecs; i += 5 {

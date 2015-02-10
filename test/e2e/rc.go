@@ -120,9 +120,8 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 			break
 		}
 		if time.Since(t) > listTimeout {
-			Fail(fmt.Sprintf(
-				"Controller %s: Gave up waiting for %d pods to come up after seeing only %d pods after %v seconds",
-				name, replicas, len(pods.Items), time.Since(t).Seconds()))
+			Failf("Controller %s: Gave up waiting for %d pods to come up after seeing only %d pods after %v seconds",
+				name, replicas, len(pods.Items), time.Since(t).Seconds())
 		}
 		time.Sleep(5 * time.Second)
 		pods, err = c.Pods(ns).List(label)
@@ -150,8 +149,8 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 				break
 			}
 			if time.Since(t) >= hostIPTimeout {
-				Fail(fmt.Sprintf("Controller %s: Gave up waiting for hostIP of replica %d after %v seconds",
-					name, i, time.Since(t).Seconds()))
+				Failf("Controller %s: Gave up waiting for hostIP of replica %d after %v seconds",
+					name, i, time.Since(t).Seconds())
 			}
 			Logf("Controller %s: Retrying to get the hostIP of replica %d", name, i+1)
 			time.Sleep(5 * time.Second)
@@ -168,20 +167,20 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	for i, pod := range pods.Items {
 		resp, err := http.Get(fmt.Sprintf("http://%s:8080", pod.Status.HostIP))
 		if err != nil {
-			Fail(fmt.Sprintf("Controller %s: Failed to GET from replica %d: %v", name, i+1, err))
+			Failf("Controller %s: Failed to GET from replica %d: %v", name, i+1, err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			Fail(fmt.Sprintf("Controller %s: Expected OK status code for replica %d but got %d", name, i+1, resp.StatusCode))
+			Failf("Controller %s: Expected OK status code for replica %d but got %d", name, i+1, resp.StatusCode)
 		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			Fail(fmt.Sprintf("Controller %s: Failed to read the body of the GET response from replica %d: %v",
-				name, i+1, err))
+			Failf("Controller %s: Failed to read the body of the GET response from replica %d: %v",
+				name, i+1, err)
 		}
 		// The body should be the pod name.
 		if string(body) != pod.Name {
-			Fail(fmt.Sprintf("Controller %s: Replica %d expected response %s but got %s", name, i+1, pod.Name, string(body)))
+			Failf("Controller %s: Replica %d expected response %s but got %s", name, i+1, pod.Name, string(body))
 		}
 		Logf("Controller %s: Got expected result from replica %d: %s", name, i+1, string(body))
 	}
