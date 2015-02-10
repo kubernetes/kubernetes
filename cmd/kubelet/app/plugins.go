@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/gce_pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/git_repo"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/nfs"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/secret"
 )
 
@@ -41,6 +42,7 @@ func ProbeVolumePlugins() []volume.Plugin {
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins()...)
 
 	return allPlugins
 }

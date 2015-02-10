@@ -78,6 +78,8 @@ type VolumeSource struct {
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret is a secret to populate the volume with
 	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume"`
+	// NFS represents an NFS mount on the host that shares a pod's lifetime
+	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine"`
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -1213,6 +1215,19 @@ type ResourceQuotaList struct {
 
 	// Items is a list of ResourceQuota objects
 	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects"`
+}
+
+// NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod
+type NFSVolumeSource struct {
+	// Server is the hostname or IP address of the NFS server
+	Server string `json:"server" description:"the hostname or IP address of the NFS server"`
+
+	// Path is the exported NFS share
+	Path string `json:"path" description:"the path that is exported by the NFS server"`
+
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the NFS export to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty" description:"forces the NFS export to be mounted with read-only permissions"`
 }
 
 // Secret holds secret data of a certain type.  The total bytes of the values in

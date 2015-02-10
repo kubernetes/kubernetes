@@ -1,0 +1,21 @@
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    containers:
+      - name: testpd
+        image: dockerfile/nginx
+        volumeMounts:
+            # name must match the volume name below
+            - name: nfs
+              mountPath: "/var/www/html/mount-test"
+    id: nfspd
+    version: v1beta1
+    volumes:
+      - name: nfs
+        source:
+          nfs:
+            server: "172.17.0.2"
+            path: "/tmp"
+            readOnly: false
+id: nfspd
+kind: Pod
