@@ -71,6 +71,7 @@ Examples:
 				ResourceTypeOrNameArgs(args...).
 				Flatten().
 				Do()
+			checkErr(r.Err())
 
 			found := 0
 			err = r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {

@@ -86,6 +86,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 			ResourceTypeOrNameArgs(args...).
 			SingleResourceType().
 			Do()
+		checkErr(r.Err())
 
 		mapping, err := r.ResourceMapping()
 		checkErr(err)
