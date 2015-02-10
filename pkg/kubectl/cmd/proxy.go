@@ -42,13 +42,20 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 			if !strings.HasSuffix(staticPrefix, "/") {
 				staticPrefix += "/"
 			}
-			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), staticPrefix, clientConfig)
+
+			apiProxyPrefix := util.GetFlagString(cmd, "api-prefix")
+			if !strings.HasSuffix(apiProxyPrefix, "/") {
+				apiProxyPrefix += "/"
+			}
+			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+
 			checkErr(err)
 			glog.Fatal(server.Serve(port))
 		},
 	}
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix")
 	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file dir is specified")
+	cmd.Flags().StringP("api-prefix", "", "/api/", "Prefix to serve the proxied API under")
 	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy")
 	return cmd
 }

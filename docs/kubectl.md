@@ -49,6 +49,7 @@ Usage:
 
  Available Flags:
       --alsologtostderr=false: log to standard error as well as files
+      --api-prefix="/api/": Prefix to serve the proxied API under
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
       --certificate-authority="": Path to a cert. file for the certificate authority.
