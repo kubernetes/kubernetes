@@ -99,12 +99,12 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		// Resize the replication controller to zero to get rid of pods.
 		controller.Spec.Replicas = 0
 		if _, err = c.ReplicationControllers(ns).Update(controller); err != nil {
-			By(fmt.Sprintf("Failed to resize replication controller %s to zero: %v", name, err))
+			Logf("Failed to resize replication controller %s to zero: %v", name, err)
 		}
 
 		// Delete the replication controller.
 		if err = c.ReplicationControllers(ns).Delete(name); err != nil {
-			By(fmt.Sprintf("Failed to delete replication controller %s: %v", name, err))
+			Logf("Failed to delete replication controller %s: %v", name, err)
 		}
 	}()
 
@@ -115,7 +115,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	Expect(err).NotTo(HaveOccurred())
 	t := time.Now()
 	for {
-		By(fmt.Sprintf("Controller %s: Found %d pods out of %d", name, len(pods.Items), replicas))
+		Logf("Controller %s: Found %d pods out of %d", name, len(pods.Items), replicas)
 		if len(pods.Items) == replicas {
 			break
 		}
@@ -128,6 +128,8 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		pods, err = c.Pods(ns).List(label)
 		Expect(err).NotTo(HaveOccurred())
 	}
+
+	By("Ensuring each pod is running and has a hostIP")
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
@@ -144,14 +146,14 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 			p, err := c.Pods(ns).Get(pod.Name)
 			Expect(err).NotTo(HaveOccurred())
 			if p.Status.HostIP != "" {
-				By(fmt.Sprintf("Controller %s: Replica %d has hostIP: %s", name, i+1, p.Status.HostIP))
+				Logf("Controller %s: Replica %d has hostIP: %s", name, i+1, p.Status.HostIP)
 				break
 			}
 			if time.Since(t) >= hostIPTimeout {
 				Fail(fmt.Sprintf("Controller %s: Gave up waiting for hostIP of replica %d after %v seconds",
 					name, i, time.Since(t).Seconds()))
 			}
-			By(fmt.Sprintf("Controller %s: Retrying to get the hostIP of replica %d", name, i+1))
+			Logf("Controller %s: Retrying to get the hostIP of replica %d", name, i+1)
 			time.Sleep(5 * time.Second)
 		}
 	}
@@ -161,6 +163,8 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that something is listening.
+	By("Trying to dial each unique pod")
+
 	for i, pod := range pods.Items {
 		resp, err := http.Get(fmt.Sprintf("http://%s:8080", pod.Status.HostIP))
 		if err != nil {
@@ -179,6 +183,6 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		if string(body) != pod.Name {
 			Fail(fmt.Sprintf("Controller %s: Replica %d expected response %s but got %s", name, i+1, pod.Name, string(body)))
 		}
-		By(fmt.Sprintf("Controller %s: Got expected result from replica %d: %s", name, i+1, string(body)))
+		Logf("Controller %s: Got expected result from replica %d: %s", name, i+1, string(body))
 	}
 }

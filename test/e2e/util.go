@@ -40,6 +40,10 @@ type testContextType struct {
 
 var testContext testContextType
 
+func Logf(format string, a ...interface{}) {
+	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
+}
+
 func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
 	trySecs := int(tryFor.Seconds())
 	for i := 0; i <= trySecs; i += 5 {
@@ -51,7 +55,7 @@ func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error 
 		if pod.Status.Phase == api.PodRunning {
 			return nil
 		}
-		By(fmt.Sprintf("Waiting for pod %s status to be %q (found %q) (%d secs)", id, api.PodRunning, pod.Status.Phase, i))
+		Logf("Waiting for pod %s status to be %q (found %q) (%d secs)", id, api.PodRunning, pod.Status.Phase, i)
 	}
 	return fmt.Errorf("Gave up waiting for pod %s to be running after %d seconds", id, trySecs)
 }
@@ -65,14 +69,14 @@ func waitForPodNotPending(c *client.Client, ns, podName string, tryFor time.Dura
 		}
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
-			By(fmt.Sprintf("Get pod %s in namespace %s failed, ignoring for 5s: %v", podName, ns, err))
+			Logf("Get pod %s in namespace %s failed, ignoring for 5s: %v", podName, ns, err)
 			continue
 		}
 		if pod.Status.Phase != api.PodPending {
-			By(fmt.Sprintf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase))
+			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
 			return nil
 		}
-		By(fmt.Sprintf("Waiting for status of pod %s in namespace %s to be !%q (found %q) (%v secs)", podName, ns, api.PodPending, pod.Status.Phase, i))
+		Logf("Waiting for status of pod %s in namespace %s to be !%q (found %q) (%v secs)", podName, ns, api.PodPending, pod.Status.Phase, i)
 	}
 	return fmt.Errorf("Gave up waiting for status of pod %s in namespace %s to go out of pending after %d seconds", podName, ns, trySecs)
 }
@@ -86,24 +90,24 @@ func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor
 		}
 		pod, err := c.Pods(api.NamespaceDefault).Get(podName)
 		if err != nil {
-			By(fmt.Sprintf("Get pod failed, ignoring for 5s: %v", err))
+			Logf("Get pod failed, ignoring for 5s: %v", err)
 			continue
 		}
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := pod.Status.Info[contName]
 		if !ok {
-			By(fmt.Sprintf("No Status.Info for container %s in pod %s yet", contName, podName))
+			Logf("No Status.Info for container %s in pod %s yet", contName, podName)
 		} else {
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
 					By("Saw pod success")
 					return nil
 				} else {
-					By(fmt.Sprintf("Saw pod failure: %+v", ci.State.Termination))
+					Logf("Saw pod failure: %+v", ci.State.Termination)
 				}
-				By(fmt.Sprintf("Waiting for pod %q status to be success or failure", podName))
+				Logf("Waiting for pod %q status to be success or failure", podName)
 			} else {
-				By(fmt.Sprintf("Nil State.Termination for container %s in pod %s so far", contName, podName))
+				Logf("Nil State.Termination for container %s in pod %s so far", contName, podName)
 			}
 		}
 	}
@@ -120,7 +124,7 @@ func loadClient() (*client.Client, error) {
 	}
 	// If the certificate directory is provided, set the cert paths to be there.
 	if testContext.certDir != "" {
-		By(fmt.Sprintf("Expecting certs in %v.", testContext.certDir))
+		Logf("Expecting certs in %v.", testContext.certDir)
 		info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
 		info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
 		info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
