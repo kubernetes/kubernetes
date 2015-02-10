@@ -27,12 +27,16 @@ import (
 )
 
 func New() TCPProber {
-	return TCPProber{}
+	return tcpProber{}
 }
 
-type TCPProber struct{}
+type TCPProber interface {
+	Probe(host string, port int, timeout time.Duration) (probe.Result, error)
+}
 
-func (pr TCPProber) Probe(host string, port int, timeout time.Duration) (probe.Result, error) {
+type tcpProber struct{}
+
+func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
 

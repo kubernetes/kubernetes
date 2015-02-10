@@ -240,10 +240,11 @@ type Container struct {
 	// Optional: Defaults to unlimited.
 	CPU int `json:"cpu,omitempty" description:"CPU share in thousandths of a core"`
 	// Optional: Defaults to unlimited.
-	Memory        int64          `json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
-	VolumeMounts  []VolumeMount  `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesystem"`
-	LivenessProbe *LivenessProbe `json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails"`
-	Lifecycle     *Lifecycle     `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events"`
+	Memory         int64          `json:"memory,omitempty" description:"memory limit in bytes; defaults to unlimited"`
+	VolumeMounts   []VolumeMount  `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesystem"`
+	LivenessProbe  *LivenessProbe `json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails"`
+	ReadinessProbe *LivenessProbe `json:"readinessProbe,omitempty" description:"periodic probe of container service readiness; container will be removed from service endpoints if the probe fails"`
+	Lifecycle      *Lifecycle     `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log"`
 	// Optional: Default to false.
@@ -316,6 +317,18 @@ type TypeMeta struct {
 	Annotations map[string]string `json:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"`
 }
 
+type ConditionStatus string
+
+// These are valid condition statuses. "ConditionFull" means a resource is in the condition;
+// "ConditionNone" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionFull    ConditionStatus = "Full"
+	ConditionNone    ConditionStatus = "None"
+	ConditionUnknown ConditionStatus = "Unknown"
+)
+
 // PodStatus represents a status of a pod.
 type PodStatus string
 
@@ -364,6 +377,7 @@ type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State ContainerState `json:"state,omitempty" description:"details about the container's current condition"`
+	Ready bool           `json:"ready" description:"specifies whether the container has passed its readiness probe"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount" description:"the number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed"`
@@ -374,6 +388,21 @@ type ContainerStatus struct {
 	Image       string `json:"image" description:"image of the container"`
 	ImageID     string `json:"imageID" description:"ID of the container's image"`
 	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
+}
+
+type PodConditionKind string
+
+// These are valid conditions of pod.
+const (
+	// PodReady means the pod is able to service requests and should be added to the
+	// load balancing pools of all matching services.
+	PodReady PodConditionKind = "Ready"
+)
+
+// TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
+type PodCondition struct {
+	Kind   PodConditionKind `json:"kind"`
+	Status ConditionStatus  `json:"status"`
 }
 
 // PodInfo contains one entry for every container with available info.
@@ -404,8 +433,9 @@ type RestartPolicy struct {
 
 // PodState is the state of a pod, used as either input (desired state) or output (current state).
 type PodState struct {
-	Manifest ContainerManifest `json:"manifest,omitempty" description:"manifest of containers and volumes comprising the pod"`
-	Status   PodStatus         `json:"status,omitempty" description:"current condition of the pod, Waiting, Running, or Terminated"`
+	Manifest   ContainerManifest `json:"manifest,omitempty" description:"manifest of containers and volumes comprising the pod"`
+	Status     PodStatus         `json:"status,omitempty" description:"current condition of the pod, Waiting, Running, or Terminated"`
+	Conditions []PodCondition    `json:"Condition,omitempty" description:"current service state of pod"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty" description:"human readable message indicating details about why the pod is in this condition"`
 	Host    string `json:"host,omitempty" description:"host to which the pod is assigned; empty if not yet scheduled"`
@@ -568,25 +598,13 @@ const (
 	NodeReady NodeConditionKind = "Ready"
 )
 
-type NodeConditionStatus string
-
-// These are valid condition status. "ConditionFull" means node is in the condition;
-// "ConditionNone" means node is not in the condition; "ConditionUnknown" means kubernetes
-// can't decide if node is in the condition or not. In the future, we could add other
-// intermediate conditions, e.g. ConditionDegraded.
-const (
-	ConditionFull    NodeConditionStatus = "Full"
-	ConditionNone    NodeConditionStatus = "None"
-	ConditionUnknown NodeConditionStatus = "Unknown"
-)
-
 type NodeCondition struct {
-	Kind               NodeConditionKind   `json:"kind" description:"kind of the condition, one of reachable, ready"`
-	Status             NodeConditionStatus `json:"status" description:"status of the condition, one of full, none, unknown"`
-	LastProbeTime      util.Time           `json:"lastProbeTime,omitempty" description:"last time the condition was probed"`
-	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
-	Reason             string              `json:"reason,omitempty" description:"(brief) reason for the condition's last transition"`
-	Message            string              `json:"message,omitempty" description:"human readable message indicating details about last transition"`
+	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, one of reachable, ready"`
+	Status             ConditionStatus   `json:"status" description:"status of the condition, one of full, none, unknown"`
+	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty" description:"last time the condition was probed"`
+	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
+	Reason             string            `json:"reason,omitempty" description:"(brief) reason for the condition's last transition"`
+	Message            string            `json:"message,omitempty" description:"human readable message indicating details about last transition"`
 }
 
 // NodeResources represents resources on a Kubernetes system node

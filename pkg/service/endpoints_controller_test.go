@@ -49,6 +49,12 @@ func newPodList(count int) *api.PodList {
 			},
 			Status: api.PodStatus{
 				PodIP: "1.2.3.4",
+				Conditions: []api.PodCondition{
+					{
+						Kind:   api.PodReady,
+						Status: api.ConditionFull,
+					},
+				},
 			},
 		})
 	}

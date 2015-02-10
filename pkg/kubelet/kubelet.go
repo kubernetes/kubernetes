@@ -55,7 +55,6 @@ const defaultChanSize = 1024
 const minShares = 2
 const sharesPerCPU = 1024
 const milliCPUToCPU = 1000
-const maxRetries int = 3
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
@@ -121,6 +120,8 @@ func NewMainKubelet(
 		clusterDNS:             clusterDNS,
 		serviceLister:          serviceLister,
 		masterServiceNamespace: masterServiceNamespace,
+		prober:                 newProbeHolder(),
+		readiness:              newReadinessStates(),
 	}
 
 	if err := klet.setupDataDirs(); err != nil {
@@ -197,6 +198,11 @@ type Kubelet struct {
 
 	// Volume plugins.
 	volumePluginMgr volume.PluginMgr
+
+	// probe runner holder
+	prober probeHolder
+	// container readiness state holder
+	readiness *readinessStates
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -876,6 +882,7 @@ func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 
 func (kl *Kubelet) killContainerByID(ID, name string) error {
 	glog.V(2).Infof("Killing container with id %q and name %q", ID, name)
+	kl.readiness.remove(ID)
 	err := kl.dockerClient.StopContainer(ID, 10)
 	if len(name) == 0 {
 		return err
@@ -1048,17 +1055,29 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			// look for changes in the container.
 			if hash == 0 || hash == expectedHash {
 				// TODO: This should probably be separated out into a separate goroutine.
-				healthy, err := kl.probeLiveness(podFullName, uid, podStatus, container, dockerContainer)
+				// If the container's liveness probe is unsuccessful, set readiness to false. If liveness is succesful, do a readiness check and set
+				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
+				// If the initial delay on the readiness probe has not passed the probe will return Failure.
+				ready := probe.Unknown
+				live, err := kl.probeContainer(container.LivenessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Success)
+				if live == probe.Success {
+					ready, _ = kl.probeContainer(container.ReadinessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Failure)
+				}
+				if ready == probe.Success {
+					kl.readiness.set(dockerContainer.ID, true)
+				} else {
+					kl.readiness.set(dockerContainer.ID, false)
+				}
 				if err != nil {
 					glog.V(1).Infof("health check errored: %v", err)
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				if healthy == probe.Success {
+				if live == probe.Success {
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, healthy)
+				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
 				glog.V(1).Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
@@ -1083,6 +1102,10 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			glog.Errorf("Error listing recent containers:%s", dockerContainerName)
 			// TODO(dawnchen): error handling here?
 		}
+		// set dead containers to unready state
+		for _, c := range recentContainers {
+			kl.readiness.remove(c.ID)
+		}
 
 		if len(recentContainers) > 0 && pod.Spec.RestartPolicy.Always == nil {
 			if pod.Spec.RestartPolicy.Never != nil {
@@ -1098,6 +1121,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					continue
 				}
 			}
+
 		}
 
 		glog.V(3).Infof("Container with name %s doesn't exist, creating %#v", dockerContainerName)
@@ -1487,6 +1511,31 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 	}
 }
 
+// getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
+func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodCondition {
+	ready := []api.PodCondition{{
+		Kind:   api.PodReady,
+		Status: api.ConditionFull,
+	}}
+	unready := []api.PodCondition{{
+		Kind:   api.PodReady,
+		Status: api.ConditionNone,
+	}}
+	if info == nil {
+		return unready
+	}
+	for _, container := range spec.Containers {
+		if containerStatus, ok := info[container.Name]; ok {
+			if !containerStatus.Ready {
+				return unready
+			}
+		} else {
+			return unready
+		}
+	}
+	return ready
+}
+
 // GetPodStatus returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
 	var spec api.PodSpec
@@ -1499,8 +1548,15 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 
 	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
 
+	for _, c := range spec.Containers {
+		containerStatus := info[c.Name]
+		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
+		info[c.Name] = containerStatus
+	}
+
 	var podStatus api.PodStatus
 	podStatus.Phase = getPhase(&spec, info)
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(&spec, info)...)
 	netContainerInfo, found := info[dockertools.PodInfraContainerName]
 	if found {
 		podStatus.PodIP = netContainerInfo.PodIP
@@ -1510,23 +1566,6 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	podStatus.Info = info
 
 	return podStatus, err
-}
-
-func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (healthStatus probe.Result, err error) {
-	// Give the container 60 seconds to start up.
-	if container.LivenessProbe == nil {
-		return probe.Success, nil
-	}
-	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return probe.Success, nil
-	}
-	for i := 0; i < maxRetries; i++ {
-		healthStatus, err = kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
-		if healthStatus == probe.Success {
-			return
-		}
-	}
-	return healthStatus, err
 }
 
 // Returns logs of current machine.

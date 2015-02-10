@@ -76,6 +76,19 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
+
+			inService := false
+			for _, c := range pod.Status.Conditions {
+				if c.Kind == api.PodReady && c.Status == api.ConditionFull {
+					inService = true
+					break
+				}
+			}
+			if !inService {
+				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+				continue
+			}
+
 			endpoints = append(endpoints, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(port)))
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)

@@ -339,10 +339,11 @@ type Container struct {
 	Ports      []Port   `json:"ports,omitempty"`
 	Env        []EnvVar `json:"env,omitempty"`
 	// Compute resource requirements.
-	Resources     ResourceRequirements `json:"resources,omitempty"`
-	VolumeMounts  []VolumeMount        `json:"volumeMounts,omitempty"`
-	LivenessProbe *Probe               `json:"livenessProbe,omitempty"`
-	Lifecycle     *Lifecycle           `json:"lifecycle,omitempty"`
+	Resources      ResourceRequirements `json:"resources,omitempty"`
+	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty"`
+	LivenessProbe  *Probe               `json:"livenessProbe,omitempty"`
+	ReadinessProbe *Probe               `json:"readinessProbe,omitempty"`
+	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.
@@ -380,27 +381,16 @@ type Lifecycle struct {
 
 // The below types are used by kube_client and api_server.
 
-// PodPhase is a label for the condition of a pod at the current time.
-type PodPhase string
+type ConditionStatus string
 
-// These are the valid statuses of pods.
+// These are valid condition statuses. "ConditionFull" means a resource is in the condition;
+// "ConditionNone" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
 const (
-	// PodPending means the pod has been accepted by the system, but one or more of the containers
-	// has not been started. This includes time before being bound to a node, as well as time spent
-	// pulling images onto the host.
-	PodPending PodPhase = "Pending"
-	// PodRunning means the pod has been bound to a node and all of the containers have been started.
-	// At least one container is still running or is in the process of being restarted.
-	PodRunning PodPhase = "Running"
-	// PodSucceeded means that all containers in the pod have voluntarily terminated
-	// with a container exit code of 0, and the system is not going to restart any of these containers.
-	PodSucceeded PodPhase = "Succeeded"
-	// PodFailed means that all containers in the pod have terminated, and at least one container has
-	// terminated in a failure (exited with a non-zero exit code or was stopped by the system).
-	PodFailed PodPhase = "Failed"
-	// PodUnknown means that for some reason the state of the pod could not be obtained, typically due
-	// to an error in communicating with the host of the pod.
-	PodUnknown PodPhase = "Unknown"
+	ConditionFull    ConditionStatus = "Full"
+	ConditionNone    ConditionStatus = "None"
+	ConditionUnknown ConditionStatus = "Unknown"
 )
 
 type ContainerStateWaiting struct {
@@ -434,6 +424,8 @@ type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State ContainerState `json:"state,omitempty"`
+	// Ready specifies whether the conatiner has passed its readiness check.
+	Ready bool `json:"ready"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount"`
@@ -444,6 +436,44 @@ type ContainerStatus struct {
 	Image       string `json:"image"`
 	ImageID     string `json:"imageID" description:"ID of the container's image"`
 	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
+}
+
+// PodPhase is a label for the condition of a pod at the current time.
+type PodPhase string
+
+// These are the valid statuses of pods.
+const (
+	// PodPending means the pod has been accepted by the system, but one or more of the containers
+	// has not been started. This includes time before being bound to a node, as well as time spent
+	// pulling images onto the host.
+	PodPending PodPhase = "Pending"
+	// PodRunning means the pod has been bound to a node and all of the containers have been started.
+	// At least one container is still running or is in the process of being restarted.
+	PodRunning PodPhase = "Running"
+	// PodSucceeded means that all containers in the pod have voluntarily terminated
+	// with a container exit code of 0, and the system is not going to restart any of these containers.
+	PodSucceeded PodPhase = "Succeeded"
+	// PodFailed means that all containers in the pod have terminated, and at least one container has
+	// terminated in a failure (exited with a non-zero exit code or was stopped by the system).
+	PodFailed PodPhase = "Failed"
+	// PodUnknown means that for some reason the state of the pod could not be obtained, typically due
+	// to an error in communicating with the host of the pod.
+	PodUnknown PodPhase = "Unknown"
+)
+
+type PodConditionKind string
+
+// These are valid conditions of pod.
+const (
+	// PodReady means the pod is able to service requests and should be added to the
+	// load balancing pools of all matching services.
+	PodReady PodConditionKind = "Ready"
+)
+
+// TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
+type PodCondition struct {
+	Kind   PodConditionKind `json:"kind"`
+	Status ConditionStatus  `json:"status"`
 }
 
 // PodInfo contains one entry for every container with available info.
@@ -516,8 +546,8 @@ type PodSpec struct {
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
-	Phase PodPhase `json:"phase,omitempty"`
-
+	Phase      PodPhase       `json:"phase,omitempty"`
+	Conditions []PodCondition `json:"Condition,omitempty"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty"`
 
@@ -759,25 +789,13 @@ const (
 	NodeReady NodeConditionKind = "Ready"
 )
 
-type NodeConditionStatus string
-
-// These are valid condition status. "ConditionFull" means node is in the condition;
-// "ConditionNone" means node is not in the condition; "ConditionUnknown" means kubernetes
-// can't decide if node is in the condition or not. In the future, we could add other
-// intermediate conditions, e.g. ConditionDegraded.
-const (
-	ConditionFull    NodeConditionStatus = "Full"
-	ConditionNone    NodeConditionStatus = "None"
-	ConditionUnknown NodeConditionStatus = "Unknown"
-)
-
 type NodeCondition struct {
-	Kind               NodeConditionKind   `json:"kind"`
-	Status             NodeConditionStatus `json:"status"`
-	LastProbeTime      util.Time           `json:"lastProbeTime,omitempty"`
-	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty"`
-	Reason             string              `json:"reason,omitempty"`
-	Message            string              `json:"message,omitempty"`
+	Kind               NodeConditionKind `json:"kind"`
+	Status             ConditionStatus   `json:"status"`
+	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty"`
+	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty"`
+	Reason             string            `json:"reason,omitempty"`
+	Message            string            `json:"message,omitempty"`
 }
 
 // NodeResources is an object for conveying resource information about a node.
