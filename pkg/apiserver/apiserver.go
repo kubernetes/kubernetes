@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,17 +43,34 @@ import (
 )
 
 var (
-	apiserverLatencies = prometheus.NewSummaryVec(
+	// TODO(a-robinson): Add unit tests for the handling of these metrics once
+	// the upstream library supports it.
+	requestCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_request_count",
+			Help: "Counter of apiserver requests broken out for each request handler, verb, API resource, and HTTP response code.",
+		},
+		[]string{"handler", "verb", "resource", "code"},
+	)
+	requestLatencies = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name: "apiserver_request_latencies",
-			Help: "Response latency summary in microseconds for each request handler, verb, and HTTP response code.",
+			Help: "Response latency summary in microseconds for each request handler and verb.",
 		},
-		[]string{"handler", "verb", "code"},
+		[]string{"handler", "verb"},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(apiserverLatencies)
+	prometheus.MustRegister(requestCounter)
+	prometheus.MustRegister(requestLatencies)
+}
+
+// monitor is a helper function for each HTTP request handler to use for
+// instrumenting basic request counter and latency metrics.
+func monitor(handler, verb, resource string, httpCode int, reqStart time.Time) {
+	requestCounter.WithLabelValues(handler, verb, resource, strconv.Itoa(httpCode)).Inc()
+	requestLatencies.WithLabelValues(handler, verb).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
 // mux is an object that can register http handlers.

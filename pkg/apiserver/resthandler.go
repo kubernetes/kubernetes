@@ -19,7 +19,6 @@ package apiserver
 import (
 	"net/http"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
@@ -29,22 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
-
-var (
-	restCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "apiserver_rest_count",
-			Help: "Counter of REST requests broken out for each verb, apiserver resource, and HTTP response code.",
-		},
-		[]string{"verb", "resource", "code"},
-	)
-)
-
-func init() {
-	prometheus.MustRegister(restCounter)
-}
 
 // RESTHandler implements HTTP verbs on a set of RESTful resources identified by name.
 type RESTHandler struct {
@@ -59,14 +43,11 @@ type RESTHandler struct {
 
 // ServeHTTP handles requests to all RESTStorage objects.
 func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	verb := ""
-	apiResource := ""
+	var verb string
+	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer func() {
-		restCounter.WithLabelValues(verb, apiResource, strconv.Itoa(httpCode)).Inc()
-		apiserverLatencies.WithLabelValues("rest", verb, strconv.Itoa(httpCode)).Observe(float64((time.Since(reqStart)) / time.Microsecond))
-	}()
+	defer func() { monitor("rest", verb, apiResource, httpCode, reqStart) }()
 
 	requestInfo, err := h.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {

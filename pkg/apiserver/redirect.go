@@ -18,30 +18,13 @@ package apiserver
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
-
-var (
-	redirectCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "apiserver_redirect_count",
-			Help: "Counter of redirect requests broken out by apiserver resource and HTTP response code.",
-		},
-		[]string{"resource", "code"},
-	)
-)
-
-func init() {
-	prometheus.MustRegister(redirectCounter)
-}
 
 type RedirectHandler struct {
 	storage                map[string]RESTStorage
@@ -50,13 +33,11 @@ type RedirectHandler struct {
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	apiResource := ""
+	var verb string
+	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer func() {
-		redirectCounter.WithLabelValues(apiResource, strconv.Itoa(httpCode)).Inc()
-		apiserverLatencies.WithLabelValues("redirect", "get", strconv.Itoa(httpCode)).Observe(float64((time.Since(reqStart)) / time.Microsecond))
-	}()
+	defer func() { monitor("redirect", verb, apiResource, httpCode, reqStart) }()
 
 	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
@@ -64,6 +45,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
+	verb = requestInfo.Verb
 	resource, parts := requestInfo.Resource, requestInfo.Parts
 	ctx := api.WithNamespace(api.NewContext(), requestInfo.Namespace)
 
@@ -78,7 +60,6 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
 		notFound(w, req)
-		apiResource = "invalidResource"
 		httpCode = http.StatusNotFound
 		return
 	}
