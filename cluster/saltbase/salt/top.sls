@@ -41,6 +41,10 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'vagrant' %}
+    - docker
+    - sdn
+{% endif %}
 
   'roles:kubernetes-pool-vsphere':
     - match: grain
