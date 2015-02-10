@@ -774,6 +774,7 @@ const (
 type NodeCondition struct {
 	Kind               NodeConditionKind   `json:"kind"`
 	Status             NodeConditionStatus `json:"status"`
+	LastProbeTime      util.Time           `json:"lastProbeTime,omitempty"`
 	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty"`
 	Reason             string              `json:"reason,omitempty"`
 	Message            string              `json:"message,omitempty"`

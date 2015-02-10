@@ -583,6 +583,7 @@ const (
 type NodeCondition struct {
 	Kind               NodeConditionKind   `json:"kind" description:"kind of the condition, one of reachable, ready"`
 	Status             NodeConditionStatus `json:"status" description:"status of the condition, one of full, none, unknown"`
+	LastProbeTime      util.Time           `json:"lastProbeTime,omitempty" description:"last time the condition was probed"`
 	LastTransitionTime util.Time           `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
 	Reason             string              `json:"reason,omitempty" description:"(brief) reason for the condition's last transition"`
 	Message            string              `json:"message,omitempty" description:"human readable message indicating details about last transition"`

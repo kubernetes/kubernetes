@@ -55,6 +55,7 @@ type CMServer struct {
 	RegisterRetryCount      int
 	MachineList             util.StringList
 	SyncNodeList            bool
+	PodEvictionTimeout      time.Duration
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
@@ -63,7 +64,7 @@ type CMServer struct {
 	KubeletConfig client.KubeletConfig
 }
 
-// NewCMServer creates a new CMServer with default a default config.
+// NewCMServer creates a new CMServer with a default config.
 func NewCMServer() *CMServer {
 	s := CMServer{
 		Port:                    ports.ControllerManagerPort,
@@ -71,6 +72,7 @@ func NewCMServer() *CMServer {
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
 		RegisterRetryCount:      10,
+		PodEvictionTimeout:      5 * time.Minute,
 		NodeMilliCPU:            1000,
 		NodeMemory:              resource.MustParse("3Gi"),
 		SyncNodeList:            true,
@@ -110,6 +112,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource_quota_sync_period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
+	fs.DurationVar(&s.PodEvictionTimeout, "pod_eviction_timeout", s.PodEvictionTimeout, "The grace peroid for deleting pods on failed nodes.")
 	fs.IntVar(&s.RegisterRetryCount, "register_retry_count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
 	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
@@ -169,8 +172,10 @@ func (s *CMServer) Run(_ []string) error {
 			api.ResourceMemory: s.NodeMemory,
 		},
 	}
-	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources, kubeClient, kubeletClient)
-	nodeController.Run(s.NodeSyncPeriod, s.RegisterRetryCount, s.SyncNodeList)
+
+	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
+		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout)
+	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)
