@@ -26,17 +26,39 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/golang/glog"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("ReplicationController", func() {
+	var c *client.Client
+
+	BeforeEach(func() {
+		var err error
+		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should serve a basic image on each replica with a public image", func() {
+		ServeImageOrFail(c, "basic", "kubernetes/serve_hostname:1.1")
+	})
+
+	It("should serve a basic image on each replica with a private image", func() {
+		switch testContext.provider {
+		case "gce", "gke", "aws":
+			ServeImageOrFail(c, "private", "gcr.io/_b_k8s_test/serve_hostname:1.0")
+		default:
+			By(fmt.Sprintf("Skipping private variant, which is only supported for providers gce, gke and aws (not %s)",
+				testContext.provider))
+		}
+	})
+})
+
 // A basic test to check the deployment of an image using
 // a replication controller. The image serves its hostname
 // which is checked for each replica.
-func TestBasicImage(c *client.Client, test string, image string) bool {
-	testStart := time.Now()
+func ServeImageOrFail(c *client.Client, test string, image string) {
 	ns := api.NamespaceDefault
 	name := "my-hostname-" + test + "-" + string(util.NewUUID())
 	replicas := 2
@@ -45,7 +67,7 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 	// that serves its hostname on port 8080.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
-	glog.Infof("Creating replication controller %s", name)
+	By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -71,63 +93,47 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 			},
 		},
 	})
-	if err != nil {
-		glog.Infof("Failed to create replication controller %s: %v", name, err)
-		return false
-	}
+	Expect(err).NotTo(HaveOccurred())
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
 		controller.Spec.Replicas = 0
 		if _, err = c.ReplicationControllers(ns).Update(controller); err != nil {
-			glog.Errorf("Failed to resize replication controller %s to zero: %v", name, err)
+			By(fmt.Sprintf("Failed to resize replication controller %s to zero: %v", name, err))
 		}
 
 		// Delete the replication controller.
 		if err = c.ReplicationControllers(ns).Delete(name); err != nil {
-			glog.Errorf("Failed to delete replication controller %s: %v", name, err)
+			By(fmt.Sprintf("Failed to delete replication controller %s: %v", name, err))
 		}
-
-		// Report running time for test.
-		glog.Infof("Controller %s test took %v seconds", name, time.Since(testStart).Seconds())
 	}()
 
 	// List the pods, making sure we observe all the replicas.
 	listTimeout := time.Minute
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	pods, err := c.Pods(ns).List(label)
-	if err != nil {
-		glog.Errorf("Controller %s: Failed to list pods: %v", name, err)
-	}
+	Expect(err).NotTo(HaveOccurred())
 	t := time.Now()
 	for {
-		glog.Infof("Controller %s: Found %d pods out of %d", name, len(pods.Items), replicas)
+		By(fmt.Sprintf("Controller %s: Found %d pods out of %d", name, len(pods.Items), replicas))
 		if len(pods.Items) == replicas {
 			break
 		}
 		if time.Since(t) > listTimeout {
-			glog.Errorf("Controller %s: Gave up waiting for %d pods to come up after seeing only %d pods after %v seconds",
-				name, replicas, len(pods.Items), time.Since(t).Seconds())
-			return false
+			Fail(fmt.Sprintf(
+				"Controller %s: Gave up waiting for %d pods to come up after seeing only %d pods after %v seconds",
+				name, replicas, len(pods.Items), time.Since(t).Seconds()))
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
 		pods, err = c.Pods(ns).List(label)
-		if err != nil {
-			glog.Errorf("Controller %s: Failed to list pods: %v", name, err)
-		}
+		Expect(err).NotTo(HaveOccurred())
 	}
 
-	for i, pod := range pods.Items {
-		glog.Infof("Controller %s: Replica %d: pod: %s hostPort: %s\n", name, i+1, pod.Name, pod.Status.HostIP)
-	}
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	for _, pod := range pods.Items {
 		err = waitForPodRunning(c, pod.Name, 300*time.Second)
-		if err != nil {
-			glog.Errorf("waitForPodRunningFailed: %v", err.Error())
-			return false
-		}
+		Expect(err).NotTo(HaveOccurred())
 	}
 
 	// Try to make sure we get a hostIP for each pod.
@@ -136,71 +142,43 @@ func TestBasicImage(c *client.Client, test string, image string) bool {
 	for i, pod := range pods.Items {
 		for {
 			p, err := c.Pods(ns).Get(pod.Name)
-			if err != nil {
-				glog.Errorf("Controller %s: Failed to get status for pod %s: %v", name, pod.Name, err)
-				return false
-			}
+			Expect(err).NotTo(HaveOccurred())
 			if p.Status.HostIP != "" {
-				glog.Infof("Controller %s: Replica %d has hostIP: %s", name, i+1, p.Status.HostIP)
+				By(fmt.Sprintf("Controller %s: Replica %d has hostIP: %s", name, i+1, p.Status.HostIP))
 				break
 			}
 			if time.Since(t) >= hostIPTimeout {
-				glog.Errorf("Controller %s: Gave up waiting for hostIP of replica %d after %v seconds",
-					name, i, time.Since(t).Seconds())
-				return false
+				Fail(fmt.Sprintf("Controller %s: Gave up waiting for hostIP of replica %d after %v seconds",
+					name, i, time.Since(t).Seconds()))
 			}
-			glog.Infof("Controller %s: Retrying to get the hostIP of replica %d", name, i+1)
+			By(fmt.Sprintf("Controller %s: Retrying to get the hostIP of replica %d", name, i+1))
 			time.Sleep(5 * time.Second)
 		}
 	}
 
 	// Re-fetch the pod information to update the host port information.
 	pods, err = c.Pods(ns).List(label)
-	if err != nil {
-		glog.Errorf("Controller %s: Failed to list pods: %v", name, err)
-	}
+	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that something is listening.
 	for i, pod := range pods.Items {
-		glog.Infof("Pod: %s hostIP: %s", pod.Name, pod.Status.HostIP)
 		resp, err := http.Get(fmt.Sprintf("http://%s:8080", pod.Status.HostIP))
 		if err != nil {
-			glog.Errorf("Controller %s: Failed to GET from replica %d: %v", name, i+1, err)
-			return false
+			Fail(fmt.Sprintf("Controller %s: Failed to GET from replica %d: %v", name, i+1, err))
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			glog.Errorf("Controller %s: Expected OK status code for replica %d but got %d", name, i+1, resp.StatusCode)
-			return false
+			Fail(fmt.Sprintf("Controller %s: Expected OK status code for replica %d but got %d", name, i+1, resp.StatusCode))
 		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			glog.Errorf("Controller %s: Failed to read the body of the GET response from replica %d: %v",
-				name, i+1, err)
-			return false
+			Fail(fmt.Sprintf("Controller %s: Failed to read the body of the GET response from replica %d: %v",
+				name, i+1, err))
 		}
 		// The body should be the pod name.
 		if string(body) != pod.Name {
-			glog.Errorf("Controller %s: Replica %d expected response %s but got %s",
-				name, i+1, pod.Name, string(body))
-			return false
+			Fail(fmt.Sprintf("Controller %s: Replica %d expected response %s but got %s", name, i+1, pod.Name, string(body)))
 		}
-		glog.Infof("Controller %s: Got expected result from replica %d: %s", name, i+1, string(body))
+		By(fmt.Sprintf("Controller %s: Got expected result from replica %d: %s", name, i+1, string(body)))
 	}
-
-	return true
 }
-
-// TestBasic performs the TestBasicImage check with the
-// image kubernetes/serve_hostname
-func TestBasic(c *client.Client) bool {
-	return TestBasicImage(c, "basic", "kubernetes/serve_hostname:1.1")
-}
-
-var _ = Describe("TestBasic", func() {
-	It("should pass", func() {
-		c, err := loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(TestBasic(c)).To(BeTrue())
-	})
-})
