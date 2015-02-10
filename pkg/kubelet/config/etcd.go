@@ -61,6 +61,10 @@ func (s *sourceEtcd) run() {
 	boundPods := api.BoundPods{}
 	err := s.helper.ExtractObj(s.key, &boundPods, false)
 	if err != nil {
+		if tools.IsEtcdNotFound(err) {
+			glog.V(4).Infof("etcd failed to retrieve the value for the key %q. Error: %v", s.key, err)
+			return
+		}
 		glog.Errorf("etcd failed to retrieve the value for the key %q. Error: %v", s.key, err)
 		return
 	}
