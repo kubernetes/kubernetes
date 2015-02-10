@@ -31,17 +31,18 @@ Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. 
 ### Installing godep
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
 
-1. Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
+1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
 source control system).  Use ```apt-get install mercurial``` or ```yum install mercurial``` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
 directly from mercurial.
-2. Create a new GOPATH for your tools and install godep:
+
+2) Create a new GOPATH for your tools and install godep:
 ```
 export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
 go get github.com/tools/godep
 ```
 
-3. Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
+3) Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
 ```
 export GOPATH=$HOME/go-tools
 export PATH=$PATH:$GOPATH/bin
@@ -50,8 +51,7 @@ export PATH=$PATH:$GOPATH/bin
 ### Using godep
 Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace. Here is the recommended way to set up your system. There are other ways that may work, but this is the easiest one I know of.
 
-1. Devote a directory to this endeavor:
-
+1) Devote a directory to this endeavor:
 ```
 export KPATH=$HOME/code/kubernetes
 mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
@@ -60,8 +60,7 @@ git clone https://path/to/your/fork .
 # Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
 ```
 
-2. Set up your GOPATH.
-
+2) Set up your GOPATH.
 ```
 # Option A: this will let your builds see packages that exist elsewhere on your system.
 export GOPATH=$KPATH:$GOPATH
@@ -70,23 +69,26 @@ export GOPATH=$KPATH
 # Option B is recommended if you're going to mess with the dependencies.
 ```
 
-3. Populate your new $GOPATH.
-
+3) Populate your new $GOPATH.
 ```
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 godep restore
 ```
 
-4. To add a dependency, you can do ```go get path/to/dependency``` as usual.
-
-5. To package up a dependency, do
-
+4) Next, you can either add a new dependency or update an existing one.
 ```
+# To add a new dependency, run:
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+go get path/to/dependency
 godep save ./...
-# Sanity check that your Godeps.json file is ok by re-restoring:
-godep restore
+
+# To update an existing dependency, do
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+go get -u path/to/dependency
+godep update path/to/dependency
 ```
+
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: ```godep restore```
 
 I (lavalamp) have sometimes found it expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
