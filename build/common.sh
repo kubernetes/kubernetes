@@ -478,7 +478,6 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
-  
   kube::release::package_client_tarballs
   kube::release::package_server_tarballs
   kube::release::package_salt_tarball
@@ -489,7 +488,7 @@ function kube::release::package_tarballs() {
 # Package up all of the cross compiled clients.  Over time this should grow into
 # a full SDK
 function kube::release::package_client_tarballs() {
-   # Find all of the built kubecfg binaries
+   # Find all of the built client binaries
   local platform platforms
   platforms=($(cd "${LOCAL_OUTPUT_BINPATH}" ; echo */*))
   for platform in "${platforms[@]}" ; do
