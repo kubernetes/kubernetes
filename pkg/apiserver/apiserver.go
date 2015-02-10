@@ -38,7 +38,22 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	apiserverLatencies = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "apiserver_request_latencies",
+			Help: "Response latency summary in microseconds for each request handler, verb, and HTTP response code.",
+		},
+		[]string{"handler", "verb", "code"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(apiserverLatencies)
+}
 
 // mux is an object that can register http handlers.
 type Mux interface {
@@ -126,8 +141,9 @@ func InstallValidator(mux Mux, servers func() map[string]Server) {
 // TODO: document all handlers
 // InstallSupport registers the APIServer support functions
 func InstallSupport(mux Mux, ws *restful.WebService) {
-	// TODO: convert healthz to restful and remove container arg
+	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux)
+	mux.Handle("/metrics", prometheus.Handler())
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")
@@ -196,25 +212,28 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 	w.Write(formatted.Bytes())
 }
 
-// errorJSON renders an error to the response.
-func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
+// errorJSON renders an error to the response. Returns the HTTP status code of the error.
+func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
 	writeJSON(status.Code, codec, status, w)
+	return status.Code
 }
 
-// errorJSONFatal renders an error to the response, and if codec fails will render plaintext
-func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) {
+// errorJSONFatal renders an error to the response, and if codec fails will render plaintext.
+// Returns the HTTP status code of the error.
+func errorJSONFatal(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	util.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := errToAPIStatus(err)
 	output, err := codec.Encode(status)
 	if err != nil {
 		w.WriteHeader(status.Code)
 		fmt.Fprintf(w, "%s: %s", status.Reason, status.Message)
-		return
+		return status.Code
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status.Code)
 	w.Write(output)
+	return status.Code
 }
 
 // writeRawJSON writes a non-API object in JSON.

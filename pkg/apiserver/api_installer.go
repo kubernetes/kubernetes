@@ -78,7 +78,6 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 }
 
 func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage, ws *restful.WebService, watchHandler http.Handler, redirectHandler http.Handler, proxyHandler http.Handler) error {
-
 	// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 	restVerbHandler := restfulStripPrefix(a.prefix, a.restHandler)
 	object := storage.New()

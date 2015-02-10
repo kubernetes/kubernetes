@@ -18,12 +18,30 @@ package apiserver
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	redirectCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_redirect_count",
+			Help: "Counter of redirect requests broken out by apiserver resource and HTTP response code.",
+		},
+		[]string{"resource", "code"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(redirectCounter)
+}
 
 type RedirectHandler struct {
 	storage                map[string]RESTStorage
@@ -32,9 +50,18 @@ type RedirectHandler struct {
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	apiResource := ""
+	var httpCode int
+	reqStart := time.Now()
+	defer func() {
+		redirectCounter.WithLabelValues(apiResource, strconv.Itoa(httpCode)).Inc()
+		apiserverLatencies.WithLabelValues("redirect", "get", strconv.Itoa(httpCode)).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+	}()
+
 	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 	resource, parts := requestInfo.Resource, requestInfo.Parts
@@ -43,6 +70,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// redirection requires /resource/resourceName path parts
 	if len(parts) != 2 || req.Method != "GET" {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 	id := parts[1]
@@ -50,13 +78,16 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
 		notFound(w, req)
+		apiResource = "invalidResource"
+		httpCode = http.StatusNotFound
 		return
 	}
+	apiResource = resource
 
 	redirector, ok := storage.(Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		errorJSON(errors.NewMethodNotSupported(resource, "redirect"), r.codec, w)
+		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "redirect"), r.codec, w)
 		return
 	}
 
@@ -64,9 +95,11 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
 		return
 	}
 
 	w.Header().Set("Location", location)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+	httpCode = http.StatusTemporaryRedirect
 }

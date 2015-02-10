@@ -19,6 +19,7 @@ package apiserver
 import (
 	"net/http"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
@@ -28,7 +29,22 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	restCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "apiserver_rest_count",
+			Help: "Counter of REST requests broken out for each verb, apiserver resource, and HTTP response code.",
+		},
+		[]string{"verb", "resource", "code"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(restCounter)
+}
 
 // RESTHandler implements HTTP verbs on a set of RESTful resources identified by name.
 type RESTHandler struct {
@@ -43,18 +59,32 @@ type RESTHandler struct {
 
 // ServeHTTP handles requests to all RESTStorage objects.
 func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	verb := ""
+	apiResource := ""
+	var httpCode int
+	reqStart := time.Now()
+	defer func() {
+		restCounter.WithLabelValues(verb, apiResource, strconv.Itoa(httpCode)).Inc()
+		apiserverLatencies.WithLabelValues("rest", verb, strconv.Itoa(httpCode)).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+	}()
+
 	requestInfo, err := h.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
+	verb = requestInfo.Verb
+
 	storage, ok := h.storage[requestInfo.Resource]
 	if !ok {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
+	apiResource = requestInfo.Resource
 
-	h.handleRESTStorage(requestInfo.Parts, req, w, storage, requestInfo.Namespace, requestInfo.Resource)
+	httpCode = h.handleRESTStorage(requestInfo.Parts, req, w, storage, requestInfo.Namespace, requestInfo.Resource)
 }
 
 // Sets the SelfLink field of the object.
@@ -142,11 +172,12 @@ func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(
 //   POST       /foo          create
 //   PUT        /foo/bar      update 'bar'
 //   DELETE     /foo/bar      delete 'bar'
-// Returns 404 if the method/pattern doesn't match one of these entries
+// Responds with a 404 if the method/pattern doesn't match one of these entries.
 // The s accepts several query parameters:
 //    timeout=<duration> Timeout for synchronous requests
 //    labels=<label-selector> Used for filtering list operations
-func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage, namespace, kind string) {
+// Returns the HTTP status code written to the response.
+func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage, namespace, kind string) int {
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	// TODO: Document the timeout query parameter.
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -156,154 +187,136 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 		case 1:
 			label, err := labels.ParseSelector(req.URL.Query().Get("labels"))
 			if err != nil {
-				errorJSON(err, h.codec, w)
-				return
+				return errorJSON(err, h.codec, w)
 			}
 			field, err := labels.ParseSelector(req.URL.Query().Get("fields"))
 			if err != nil {
-				errorJSON(err, h.codec, w)
-				return
+				return errorJSON(err, h.codec, w)
 			}
 			lister, ok := storage.(RESTLister)
 			if !ok {
-				errorJSON(errors.NewMethodNotSupported(kind, "list"), h.codec, w)
-				return
+				return errorJSON(errors.NewMethodNotSupported(kind, "list"), h.codec, w)
 			}
 			list, err := lister.List(ctx, label, field)
 			if err != nil {
-				errorJSON(err, h.codec, w)
-				return
+				return errorJSON(err, h.codec, w)
 			}
 			if err := h.setSelfLink(list, req); err != nil {
-				errorJSON(err, h.codec, w)
-				return
+				return errorJSON(err, h.codec, w)
 			}
 			writeJSON(http.StatusOK, h.codec, list, w)
 		case 2:
 			getter, ok := storage.(RESTGetter)
 			if !ok {
-				errorJSON(errors.NewMethodNotSupported(kind, "get"), h.codec, w)
-				return
+				return errorJSON(errors.NewMethodNotSupported(kind, "get"), h.codec, w)
 			}
 			item, err := getter.Get(ctx, parts[1])
 			if err != nil {
-				errorJSON(err, h.codec, w)
-				return
+				return errorJSON(err, h.codec, w)
 			}
 			if err := h.setSelfLink(item, req); err != nil {
-				errorJSON(err, h.codec, w)
-				return
+				return errorJSON(err, h.codec, w)
 			}
 			writeJSON(http.StatusOK, h.codec, item, w)
 		default:
 			notFound(w, req)
+			return http.StatusNotFound
 		}
 
 	case "POST":
 		if len(parts) != 1 {
 			notFound(w, req)
-			return
+			return http.StatusNotFound
 		}
 		creater, ok := storage.(RESTCreater)
 		if !ok {
-			errorJSON(errors.NewMethodNotSupported(kind, "create"), h.codec, w)
-			return
+			return errorJSON(errors.NewMethodNotSupported(kind, "create"), h.codec, w)
 		}
 
 		body, err := readBody(req)
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 		obj := storage.New()
 		err = h.codec.DecodeInto(body, obj)
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 
 		// invoke admission control
 		err = h.admissionControl.Admit(admission.NewAttributesRecord(obj, namespace, parts[0], "CREATE"))
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 
 		out, err := creater.Create(ctx, obj)
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 		op := h.createOperation(out, timeout, curry(h.setSelfLinkAddName, req))
-		h.finishReq(op, req, w)
+		return h.finishReq(op, req, w)
 
 	case "DELETE":
 		if len(parts) != 2 {
 			notFound(w, req)
-			return
+			return http.StatusNotFound
 		}
 		deleter, ok := storage.(RESTDeleter)
 		if !ok {
-			errorJSON(errors.NewMethodNotSupported(kind, "delete"), h.codec, w)
-			return
+			return errorJSON(errors.NewMethodNotSupported(kind, "delete"), h.codec, w)
 		}
 
 		// invoke admission control
 		err := h.admissionControl.Admit(admission.NewAttributesRecord(nil, namespace, parts[0], "DELETE"))
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 
 		out, err := deleter.Delete(ctx, parts[1])
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 		op := h.createOperation(out, timeout, nil)
-		h.finishReq(op, req, w)
+		return h.finishReq(op, req, w)
 
 	case "PUT":
 		if len(parts) != 2 {
 			notFound(w, req)
-			return
+			return http.StatusNotFound
 		}
 		updater, ok := storage.(RESTUpdater)
 		if !ok {
-			errorJSON(errors.NewMethodNotSupported(kind, "create"), h.codec, w)
-			return
+			return errorJSON(errors.NewMethodNotSupported(kind, "create"), h.codec, w)
 		}
 
 		body, err := readBody(req)
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 		obj := storage.New()
 		err = h.codec.DecodeInto(body, obj)
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 
 		// invoke admission control
 		err = h.admissionControl.Admit(admission.NewAttributesRecord(obj, namespace, parts[0], "UPDATE"))
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 
 		out, err := updater.Update(ctx, obj)
 		if err != nil {
-			errorJSON(err, h.codec, w)
-			return
+			return errorJSON(err, h.codec, w)
 		}
 		op := h.createOperation(out, timeout, curry(h.setSelfLink, req))
-		h.finishReq(op, req, w)
+		return h.finishReq(op, req, w)
 
 	default:
 		notFound(w, req)
+		return http.StatusNotFound
 	}
+	return http.StatusOK
 }
 
 // createOperation creates an operation to process a channel response.
@@ -315,11 +328,13 @@ func (h *RESTHandler) createOperation(out <-chan RESTResult, timeout time.Durati
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to receive the result and returning its ID down the writer.
-func (h *RESTHandler) finishReq(op *Operation, req *http.Request, w http.ResponseWriter) {
+// Returns the HTTP status code written to the response.
+func (h *RESTHandler) finishReq(op *Operation, req *http.Request, w http.ResponseWriter) int {
 	result, complete := op.StatusOrResult()
 	obj := result.Object
+	var status int
 	if complete {
-		status := http.StatusOK
+		status = http.StatusOK
 		if result.Created {
 			status = http.StatusCreated
 		}
@@ -329,8 +344,9 @@ func (h *RESTHandler) finishReq(op *Operation, req *http.Request, w http.Respons
 				status = stat.Code
 			}
 		}
-		writeJSON(status, h.codec, obj, w)
 	} else {
-		writeJSON(http.StatusAccepted, h.codec, obj, w)
+		status = http.StatusAccepted
 	}
+	writeJSON(status, h.codec, obj, w)
+	return status
 }
