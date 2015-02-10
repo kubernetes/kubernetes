@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -145,29 +144,20 @@ func CreateResource(r RESTCreater, namespaceFn ResourceNamespaceFunc, linkFn Lin
 			return
 		}
 
-		out, err := r.Create(ctx, obj)
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			return r.Create(ctx, obj)
+		})
 		if err != nil {
 			errorJSON(err, codec, w)
 			return
 		}
 
-		result, err := finishRequest(out, timeout, codec)
-		if err != nil {
+		if err := linkFn(req, result); err != nil {
 			errorJSON(err, codec, w)
 			return
 		}
 
-		item := result.Object
-		if err := linkFn(req, item); err != nil {
-			errorJSON(err, codec, w)
-			return
-		}
-
-		status := http.StatusOK
-		if result.Created {
-			status = http.StatusCreated
-		}
-		writeJSON(status, codec, item, w)
+		writeJSON(http.StatusCreated, codec, result, w)
 	}
 }
 
@@ -223,29 +213,27 @@ func UpdateResource(r RESTUpdater, nameFn ResourceNameFunc, objNameFunc ObjectNa
 			return
 		}
 
-		out, err := r.Update(ctx, obj)
+		wasCreated := false
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			obj, created, err := r.Update(ctx, obj)
+			wasCreated = created
+			return obj, err
+		})
 		if err != nil {
 			errorJSON(err, codec, w)
 			return
 		}
 
-		result, err := finishRequest(out, timeout, codec)
-		if err != nil {
-			errorJSON(err, codec, w)
-			return
-		}
-
-		item := result.Object
-		if err := linkFn(req, item); err != nil {
+		if err := linkFn(req, result); err != nil {
 			errorJSON(err, codec, w)
 			return
 		}
 
 		status := http.StatusOK
-		if result.Created {
+		if wasCreated {
 			status = http.StatusCreated
 		}
-		writeJSON(status, codec, item, w)
+		writeJSON(status, codec, result, w)
 	}
 }
 
@@ -273,13 +261,9 @@ func DeleteResource(r RESTDeleter, nameFn ResourceNameFunc, linkFn LinkResourceF
 			return
 		}
 
-		out, err := r.Delete(ctx, name)
-		if err != nil {
-			errorJSON(err, codec, w)
-			return
-		}
-
-		result, err := finishRequest(out, timeout, codec)
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			return r.Delete(ctx, name)
+		})
 		if err != nil {
 			errorJSON(err, codec, w)
 			return
@@ -287,9 +271,8 @@ func DeleteResource(r RESTDeleter, nameFn ResourceNameFunc, linkFn LinkResourceF
 
 		// if the RESTDeleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
-		item := result.Object
-		if item == nil {
-			item = &api.Status{
+		if result == nil {
+			result = &api.Status{
 				Status: api.StatusSuccess,
 				Code:   http.StatusOK,
 				Details: &api.StatusDetails{
@@ -297,24 +280,43 @@ func DeleteResource(r RESTDeleter, nameFn ResourceNameFunc, linkFn LinkResourceF
 					Kind: kind,
 				},
 			}
+		} else {
+			// when a non-status response is returned, set the self link
+			if _, ok := result.(*api.Status); !ok {
+				if err := linkFn(req, result); err != nil {
+					errorJSON(err, codec, w)
+					return
+				}
+			}
 		}
-		writeJSON(http.StatusOK, codec, item, w)
+		writeJSON(http.StatusOK, codec, result, w)
 	}
 }
 
-// finishRequest waits for the result channel to close or clear, and writes the appropriate response.
+// resultFunc is a function that returns a rest result and can be run in a goroutine
+type resultFunc func() (runtime.Object, error)
+
+// finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
 // Any api.Status object returned is considered an "error", which interrupts the normal response flow.
-func finishRequest(ch <-chan RESTResult, timeout time.Duration, codec runtime.Codec) (*RESTResult, error) {
-	select {
-	case result, ok := <-ch:
-		if !ok {
-			// likely programming error
-			return nil, fmt.Errorf("operation channel closed without returning result")
+func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
+	ch := make(chan runtime.Object)
+	errCh := make(chan error)
+	go func() {
+		if result, err := fn(); err != nil {
+			errCh <- err
+		} else {
+			ch <- result
 		}
-		if status, ok := result.Object.(*api.Status); ok {
+	}()
+
+	select {
+	case result = <-ch:
+		if status, ok := result.(*api.Status); ok {
 			return nil, errors.FromObject(status)
 		}
-		return &result, nil
+		return result, nil
+	case err = <-errCh:
+		return nil, err
 	case <-time.After(timeout):
 		return nil, errors.NewTimeoutError("request did not complete within allowed duration")
 	}

@@ -180,17 +180,17 @@ func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Objec
 	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan RESTResult, error) {
+func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	storage.deleted = id
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
 	}
-	return MakeAsync(func() (runtime.Object, error) {
-		if storage.injectedFunction != nil {
-			return storage.injectedFunction(&Simple{ObjectMeta: api.ObjectMeta{Name: id}})
-		}
-		return &api.Status{Status: api.StatusSuccess}, nil
-	}), nil
+	var obj runtime.Object = &api.Status{Status: api.StatusSuccess}
+	var err error
+	if storage.injectedFunction != nil {
+		obj, err = storage.injectedFunction(&Simple{ObjectMeta: api.ObjectMeta{Name: id}})
+	}
+	return obj, err
 }
 
 func (storage *SimpleRESTStorage) New() runtime.Object {
@@ -201,30 +201,28 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error) {
+func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	storage.created = obj.(*Simple)
 	if err := storage.errors["create"]; err != nil {
 		return nil, err
 	}
-	return MakeAsync(func() (runtime.Object, error) {
-		if storage.injectedFunction != nil {
-			return storage.injectedFunction(obj)
-		}
-		return obj, nil
-	}), nil
+	var err error
+	if storage.injectedFunction != nil {
+		obj, err = storage.injectedFunction(obj)
+	}
+	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error) {
+func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	storage.updated = obj.(*Simple)
 	if err := storage.errors["update"]; err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return MakeAsync(func() (runtime.Object, error) {
-		if storage.injectedFunction != nil {
-			return storage.injectedFunction(obj)
-		}
-		return obj, nil
-	}), nil
+	var err error
+	if storage.injectedFunction != nil {
+		obj, err = storage.injectedFunction(obj)
+	}
+	return obj, false, err
 }
 
 // Implement ResourceWatcher.
@@ -994,7 +992,7 @@ func TestCreate(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
 	if !selfLinker.called {

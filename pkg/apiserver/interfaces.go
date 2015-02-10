@@ -52,7 +52,9 @@ type RESTDeleter interface {
 	// Delete finds a resource in the storage and deletes it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Delete(ctx api.Context, id string) (<-chan RESTResult, error)
+	// Delete *may* return the object that was deleted, or a status object indicating additional
+	// information about deletion.
+	Delete(ctx api.Context, id string) (runtime.Object, error)
 }
 
 type RESTCreater interface {
@@ -61,7 +63,7 @@ type RESTCreater interface {
 	New() runtime.Object
 
 	// Create creates a new version of a resource.
-	Create(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error)
+	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
 }
 
 type RESTUpdater interface {
@@ -70,10 +72,9 @@ type RESTUpdater interface {
 	New() runtime.Object
 
 	// Update finds a resource in the storage and updates it. Some implementations
-	// may allow updates creates the object - they should set the Created flag of
-	// the returned RESTResult to true. In the event of an asynchronous error returned
-	// via an api.Status object, the Created flag is ignored.
-	Update(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error)
+	// may allow updates creates the object - they should set the created boolean
+	// to true.
+	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
 }
 
 // RESTResult indicates the result of a REST transformation.
