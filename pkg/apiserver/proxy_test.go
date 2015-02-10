@@ -244,6 +244,7 @@ func TestProxy(t *testing.T) {
 		{"DELETE", "/some/dir/id", "", "ok", "text/css", "default"},
 		{"GET", "/some/dir/id", "", "answer", "text/css", "other"},
 		{"GET", "/trailing/slash/", "", "answer", "text/css", "default"},
+		{"GET", "/", "", "answer", "text/css", "default"},
 	}
 
 	for _, item := range table {

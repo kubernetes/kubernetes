@@ -155,6 +155,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		actions = appendIf(actions, action{"WATCH", "/watch/" + itemPath, nameParams}, storageVerbs["ResourceWatcher"])
 		actions = appendIf(actions, action{"REDIRECT", "/redirect/" + itemPath, nameParams}, storageVerbs["Redirector"])
 		actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath + "/{path:*}", nameParams}, storageVerbs["Redirector"])
+		actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath, nameParams}, storageVerbs["Redirector"])
 	} else {
 		// v1beta3 format with namespace in path
 		if scope.ParamPath() {
@@ -174,6 +175,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			actions = appendIf(actions, action{"WATCH", "/watch/" + itemPath, nameParams}, storageVerbs["ResourceWatcher"])
 			actions = appendIf(actions, action{"REDIRECT", "/redirect/" + itemPath, nameParams}, storageVerbs["Redirector"])
 			actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath + "/{path:*}", nameParams}, storageVerbs["Redirector"])
+			actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath, nameParams}, storageVerbs["Redirector"])
 
 			// list across namespace.
 			actions = appendIf(actions, action{"LIST", path, params}, storageVerbs["RESTLister"])
@@ -195,6 +197,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			actions = appendIf(actions, action{"WATCH", "/watch/" + itemPath, nameParams}, storageVerbs["ResourceWatcher"])
 			actions = appendIf(actions, action{"REDIRECT", "/redirect/" + itemPath, nameParams}, storageVerbs["Redirector"])
 			actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath + "/{path:*}", nameParams}, storageVerbs["Redirector"])
+			actions = appendIf(actions, action{"PROXY", "/proxy/" + itemPath, nameParams}, storageVerbs["Redirector"])
 		}
 	}
 
