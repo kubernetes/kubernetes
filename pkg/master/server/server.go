@@ -45,7 +45,7 @@ import (
 
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	Port                       int
+	WideOpenPort               int
 	Address                    util.IP
 	PublicAddressOverride      util.IP
 	ReadOnlyPort               int
@@ -78,13 +78,13 @@ type APIServer struct {
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
-		Port:                   8080,
+		WideOpenPort:           8080,
 		Address:                util.IP(net.ParseIP("127.0.0.1")),
 		PublicAddressOverride:  util.IP(net.ParseIP("")),
 		ReadOnlyPort:           7080,
 		APIRate:                10.0,
 		APIBurst:               200,
-		SecurePort:             8443,
+		SecurePort:             6443,
 		APIPrefix:              "/api",
 		EventTTL:               48 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
@@ -122,7 +122,7 @@ func NewHyperkubeServer() *hyperkube.Server {
 func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	fs.IntVar(&s.Port, "port", s.Port, ""+
+	fs.IntVar(&s.WideOpenPort, "port", s.WideOpenPort, ""+
 		"The port to listen on. Default 8080. It is assumed that firewall rules are "+
 		"set up such that this port is not reachable from outside of the cluster. It is "+
 		"further assumed that port 443 on the cluster's public address is proxied to this "+
@@ -209,7 +209,7 @@ func (s *APIServer) Run(_ []string) error {
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(s.Address.String(), strconv.Itoa(int(s.Port))),
+		Host:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort)),
 		Version: s.StorageVersion,
 	}
 	client, err := client.New(clientConfig)
@@ -251,7 +251,7 @@ func (s *APIServer) Run(_ []string) error {
 		APIPrefix:              s.APIPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadOnlyPort:           s.ReadOnlyPort,
-		ReadWritePort:          s.Port,
+		ReadWritePort:          s.SecurePort,
 		PublicAddress:          net.IP(s.PublicAddressOverride),
 		Authenticator:          authenticator,
 		Authorizer:             authorizer,
@@ -261,16 +261,16 @@ func (s *APIServer) Run(_ []string) error {
 	}
 	m := master.New(config)
 
-	// We serve on 3 ports.  See docs/reaching_the_api.md
+	// We serve on 3 ports.  See docs/accessing_the_api.md
 	roLocation := ""
 	if s.ReadOnlyPort != 0 {
-		roLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(config.ReadOnlyPort))
+		roLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.ReadOnlyPort))
 	}
 	secureLocation := ""
 	if s.SecurePort != 0 {
 		secureLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.SecurePort))
 	}
-	rwLocation := net.JoinHostPort(s.Address.String(), strconv.Itoa(int(s.Port)))
+	wideOpenLocation := net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort))
 
 	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
 
@@ -333,13 +333,13 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	http := &http.Server{
-		Addr:           rwLocation,
+		Addr:           wideOpenLocation,
 		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
-	glog.Infof("Serving insecurely on %s", rwLocation)
+	glog.Infof("Serving insecurely on %s", wideOpenLocation)
 	glog.Fatal(http.ListenAndServe())
 	return nil
 }
