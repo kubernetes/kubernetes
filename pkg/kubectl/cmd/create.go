@@ -57,6 +57,7 @@ Examples:
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
+			checkErr(r.Err())
 
 			count := 0
 			err = r.Visit(func(info *resource.Info) error {

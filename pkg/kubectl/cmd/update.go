@@ -60,6 +60,7 @@ Examples:
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
+			checkErr(r.Err())
 
 			patch := cmdutil.GetFlagString(cmd, "patch")
 			if len(flags.Filenames) == 0 && len(patch) == 0 {
