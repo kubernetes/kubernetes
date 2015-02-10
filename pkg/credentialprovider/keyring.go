@@ -143,3 +143,12 @@ func (dk *lazyDockerKeyring) Lookup(image string) (docker.AuthConfiguration, boo
 
 	return keyring.Lookup(image)
 }
+
+type FakeKeyring struct {
+	auth docker.AuthConfiguration
+	ok   bool
+}
+
+func (f *FakeKeyring) Lookup(image string) (docker.AuthConfiguration, bool) {
+	return f.auth, f.ok
+}
