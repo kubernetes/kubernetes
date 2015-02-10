@@ -23,7 +23,6 @@ import (
 	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -44,48 +43,44 @@ func NewREST(registry generic.Registry) *REST {
 }
 
 // Create creates a Namespace object
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	namespace := obj.(*api.Namespace)
 	if err := rest.BeforeCreate(rest.Namespaces, ctx, obj); err != nil {
 		return nil, err
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.Create(ctx, namespace.Name, namespace); err != nil {
-			err = rest.CheckGeneratedNameError(rest.Namespaces, err, namespace)
-			return nil, err
-		}
-		return rs.registry.Get(ctx, namespace.Name)
-	}), nil
+	if err := rs.registry.Create(ctx, namespace.Name, namespace); err != nil {
+		err = rest.CheckGeneratedNameError(rest.Namespaces, err, namespace)
+		return nil, err
+	}
+	return rs.registry.Get(ctx, namespace.Name)
 }
 
 // Update updates a Namespace object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	namespace, ok := obj.(*api.Namespace)
 	if !ok {
-		return nil, fmt.Errorf("not a namespace: %#v", obj)
+		return nil, false, fmt.Errorf("not a namespace: %#v", obj)
 	}
 
 	oldObj, err := rs.registry.Get(ctx, namespace.Name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	oldNamespace := oldObj.(*api.Namespace)
 	if errs := validation.ValidateNamespaceUpdate(oldNamespace, namespace); len(errs) > 0 {
-		return nil, kerrors.NewInvalid("namespace", namespace.Name, errs)
+		return nil, false, kerrors.NewInvalid("namespace", namespace.Name, errs)
 	}
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Update(ctx, oldNamespace.Name, oldNamespace)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.Get(ctx, oldNamespace.Name)
-	}), nil
+	if err := rs.registry.Update(ctx, oldNamespace.Name, oldNamespace); err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.Get(ctx, oldNamespace.Name)
+	return out, false, err
 }
 
 // Delete deletes the Namespace with the specified name
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	obj, err := rs.registry.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -94,10 +89,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
-	}), nil
+	return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {

@@ -71,22 +71,20 @@ func TestRESTPost(t *testing.T) {
 		}
 		ctx := api.NewContext()
 		b := NewREST(mockRegistry)
-		resultChan, err := b.Create(ctx, item.b)
-		if err != nil {
+		result, err := b.Create(ctx, item.b)
+		if err != nil && item.err == nil {
 			t.Errorf("Unexpected error %v", err)
 			continue
 		}
-		var expect *api.Status
-		if item.err == nil {
-			expect = &api.Status{Status: api.StatusSuccess}
-		} else {
-			expect = &api.Status{
-				Status:  api.StatusFailure,
-				Code:    http.StatusInternalServerError,
-				Message: item.err.Error(),
-			}
+		if err == nil && item.err != nil {
+			t.Errorf("Unexpected error %v", err)
+			continue
 		}
-		if e, a := expect, (<-resultChan).Object; !reflect.DeepEqual(e, a) {
+		var expect interface{}
+		if item.err == nil {
+			expect = &api.Status{Status: api.StatusSuccess, Code: http.StatusCreated}
+		}
+		if e, a := expect, result; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: expected %#v, got %#v", i, e, a)
 		}
 	}

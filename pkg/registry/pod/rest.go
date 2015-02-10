@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -55,32 +54,28 @@ func NewREST(config *RESTConfig) *REST {
 	}
 }
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	pod := obj.(*api.Pod)
 
 	if err := rest.BeforeCreate(rest.Pods, ctx, obj); err != nil {
 		return nil, err
 	}
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.CreatePod(ctx, pod); err != nil {
-			err = rest.CheckGeneratedNameError(rest.Pods, err, pod)
-			return nil, err
-		}
-		return rs.registry.GetPod(ctx, pod.Name)
-	}), nil
+	if err := rs.registry.CreatePod(ctx, pod); err != nil {
+		err = rest.CheckGeneratedNameError(rest.Pods, err, pod)
+		return nil, err
+	}
+	return rs.registry.GetPod(ctx, pod.Name)
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		namespace, found := api.NamespaceFrom(ctx)
-		if !found {
-			return &api.Status{Status: api.StatusFailure}, nil
-		}
-		rs.podCache.ClearPodStatus(namespace, id)
+func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
+	namespace, found := api.NamespaceFrom(ctx)
+	if !found {
+		return &api.Status{Status: api.StatusFailure}, nil
+	}
+	rs.podCache.ClearPodStatus(namespace, id)
 
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(ctx, id)
-	}), nil
+	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(ctx, id)
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
@@ -167,20 +162,19 @@ func (*REST) NewList() runtime.Object {
 	return &api.PodList{}
 }
 
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	pod := obj.(*api.Pod)
 	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
-		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
-		return nil, errors.NewInvalid("pod", pod.Name, errs)
+		return nil, false, errors.NewInvalid("pod", pod.Name, errs)
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.UpdatePod(ctx, pod); err != nil {
-			return nil, err
-		}
-		return rs.registry.GetPod(ctx, pod.Name)
-	}), nil
+	if err := rs.registry.UpdatePod(ctx, pod); err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.GetPod(ctx, pod.Name)
+	return out, false, err
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.

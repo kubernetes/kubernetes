@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -268,23 +267,17 @@ func TestCreateController(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	channel, err := storage.Create(ctx, controller)
+	obj, err := storage.Create(ctx, controller)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	if obj == nil {
+		t.Errorf("unexpected object")
 	}
 	if !api.HasObjectMetaSystemFieldValues(&controller.ObjectMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 
-	select {
-	case <-channel:
-		// expected case
-	case <-time.After(time.Millisecond * 100):
-		t.Error("Unexpected timeout from async channel")
-	}
 }
 
 // TODO: remove, covered by TestCreate
@@ -338,9 +331,9 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 	}
 	ctx := api.NewDefaultContext()
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(ctx, &failureCase)
-		if c != nil {
-			t.Errorf("Expected nil channel")
+		c, created, err := storage.Update(ctx, &failureCase)
+		if c != nil || created {
+			t.Errorf("Expected nil object and not created")
 		}
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
@@ -441,9 +434,9 @@ func TestUpdateControllerWithConflictingNamespace(t *testing.T) {
 	}
 
 	ctx := api.NewDefaultContext()
-	channel, err := storage.Update(ctx, controller)
-	if channel != nil {
-		t.Error("Expected a nil channel, but we got a value")
+	obj, created, err := storage.Update(ctx, controller)
+	if obj != nil || created {
+		t.Error("Expected a nil object, but we got a value or created was true")
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")

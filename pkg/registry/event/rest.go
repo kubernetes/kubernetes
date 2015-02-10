@@ -22,7 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -42,7 +41,7 @@ func NewREST(registry generic.Registry) *REST {
 	}
 }
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	event, ok := obj.(*api.Event)
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
@@ -57,41 +56,38 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Create(ctx, event.Name, event)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.Get(ctx, event.Name)
-	}), nil
+	err := rs.registry.Create(ctx, event.Name, event)
+	if err != nil {
+		return nil, err
+	}
+	return rs.registry.Get(ctx, event.Name)
 }
 
 // Update replaces an existing Event instance in storage.registry, with the given instance.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	event, ok := obj.(*api.Event)
 	if !ok {
-		return nil, fmt.Errorf("not an event object: %#v", obj)
+		return nil, false, fmt.Errorf("not an event object: %#v", obj)
 	}
 	if api.NamespaceValue(ctx) != "" {
 		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
-			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
+			return nil, false, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
 		}
 	}
 	if errs := validation.ValidateEvent(event); len(errs) > 0 {
-		return nil, errors.NewInvalid("event", event.Name, errs)
+		return nil, false, errors.NewInvalid("event", event.Name, errs)
 	}
 	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Update(ctx, event.Name, event)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.Get(ctx, event.Name)
-	}), nil
+	err := rs.registry.Update(ctx, event.Name, event)
+	if err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.Get(ctx, event.Name)
+	return out, false, err
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	obj, err := rs.registry.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -100,9 +96,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
-	}), nil
+	return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {

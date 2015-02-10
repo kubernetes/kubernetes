@@ -26,7 +26,6 @@ import (
 	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -49,7 +48,7 @@ var ErrDoesNotExist = errors.New("The requested resource does not exist.")
 var ErrNotHealty = errors.New("The requested minion is not healthy.")
 
 // Create satisfies the RESTStorage interface.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	minion, ok := obj.(*api.Node)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
@@ -59,17 +58,15 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, err
 	}
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.CreateMinion(ctx, minion); err != nil {
-			err = rest.CheckGeneratedNameError(rest.Nodes, err, minion)
-			return nil, err
-		}
-		return minion, nil
-	}), nil
+	if err := rs.registry.CreateMinion(ctx, minion); err != nil {
+		err = rest.CheckGeneratedNameError(rest.Nodes, err, minion)
+		return nil, err
+	}
+	return minion, nil
 }
 
 // Delete satisfies the RESTStorage interface.
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	minion, err := rs.registry.GetMinion(ctx, id)
 	if minion == nil {
 		return nil, ErrDoesNotExist
@@ -77,9 +74,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult,
 	if err != nil {
 		return nil, err
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteMinion(ctx, id)
-	}), nil
+	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteMinion(ctx, id)
 }
 
 // Get satisfies the RESTStorage interface.
@@ -108,10 +103,10 @@ func (*REST) NewList() runtime.Object {
 }
 
 // Update satisfies the RESTStorage interface.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	minion, ok := obj.(*api.Node)
 	if !ok {
-		return nil, fmt.Errorf("not a minion: %#v", obj)
+		return nil, false, fmt.Errorf("not a minion: %#v", obj)
 	}
 	// This is hacky, but minions don't really have a namespace, but kubectl currently automatically
 	// stuffs one in there.  Fix it here temporarily until we fix kubectl
@@ -123,7 +118,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 
 	oldMinion, err := rs.registry.GetMinion(ctx, minion.Name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// This is hacky, but minion HostIP has been moved from spec to status since v1beta2. When updating
@@ -134,16 +129,14 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 
 	if errs := validation.ValidateMinionUpdate(oldMinion, minion); len(errs) > 0 {
-		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
+		return nil, false, kerrors.NewInvalid("minion", minion.Name, errs)
 	}
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateMinion(ctx, minion)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.GetMinion(ctx, minion.Name)
-	}), nil
+	if err := rs.registry.UpdateMinion(ctx, minion); err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.GetMinion(ctx, minion.Name)
+	return out, false, err
 }
 
 // Watch returns Minions events via a watch.Interface.

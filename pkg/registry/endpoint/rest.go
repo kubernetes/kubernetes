@@ -21,7 +21,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -59,7 +58,7 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 }
 
 // Create satisfies the RESTStorage interface.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
@@ -72,28 +71,25 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 	api.FillObjectMetaSystemFields(ctx, &endpoints.ObjectMeta)
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateEndpoints(ctx, endpoints)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.GetEndpoints(ctx, endpoints.Name)
-	}), nil
+	err := rs.registry.UpdateEndpoints(ctx, endpoints)
+	if err != nil {
+		return nil, err
+	}
+	return rs.registry.GetEndpoints(ctx, endpoints.Name)
 }
 
 // Update satisfies the RESTStorage interface.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
-		return nil, fmt.Errorf("not an endpoints: %#v", obj)
+		return nil, false, fmt.Errorf("not an endpoints: %#v", obj)
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateEndpoints(ctx, endpoints)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.GetEndpoints(ctx, endpoints.Name)
-	}), nil
+	err := rs.registry.UpdateEndpoints(ctx, endpoints)
+	if err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.GetEndpoints(ctx, endpoints.Name)
+	return out, false, err
 }
 
 // New implements the RESTStorage interface.

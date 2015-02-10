@@ -175,6 +175,7 @@ var timeoutFlag = "?timeout=60s"
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
 var code200 = map[int]bool{200: true}
+var code201 = map[int]bool{201: true}
 var code400 = map[int]bool{400: true}
 var code403 = map[int]bool{403: true}
 var code404 = map[int]bool{404: true}
@@ -197,7 +198,7 @@ func getTestRequests() []struct {
 	}{
 		// Normal methods on pods
 		{"GET", "/api/v1beta1/pods", "", code200},
-		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code201},
 		{"PUT", "/api/v1beta1/pods/a" + timeoutFlag, aPod, code200},
 		{"GET", "/api/v1beta1/pods", "", code200},
 		{"GET", "/api/v1beta1/pods/a", "", code200},
@@ -217,7 +218,7 @@ func getTestRequests() []struct {
 
 		// Normal methods on services
 		{"GET", "/api/v1beta1/services", "", code200},
-		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code200},
+		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code201},
 		{"PUT", "/api/v1beta1/services/a" + timeoutFlag, aService, code200},
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"GET", "/api/v1beta1/services/a", "", code200},
@@ -225,7 +226,7 @@ func getTestRequests() []struct {
 
 		// Normal methods on replicationControllers
 		{"GET", "/api/v1beta1/replicationControllers", "", code200},
-		{"POST", "/api/v1beta1/replicationControllers" + timeoutFlag, aRC, code200},
+		{"POST", "/api/v1beta1/replicationControllers" + timeoutFlag, aRC, code201},
 		{"PUT", "/api/v1beta1/replicationControllers/a" + timeoutFlag, aRC, code200},
 		{"GET", "/api/v1beta1/replicationControllers", "", code200},
 		{"GET", "/api/v1beta1/replicationControllers/a", "", code200},
@@ -233,7 +234,7 @@ func getTestRequests() []struct {
 
 		// Normal methods on endpoints
 		{"GET", "/api/v1beta1/endpoints", "", code200},
-		{"POST", "/api/v1beta1/endpoints" + timeoutFlag, aEndpoints, code200},
+		{"POST", "/api/v1beta1/endpoints" + timeoutFlag, aEndpoints, code201},
 		{"PUT", "/api/v1beta1/endpoints/a" + timeoutFlag, aEndpoints, code200},
 		{"GET", "/api/v1beta1/endpoints", "", code200},
 		{"GET", "/api/v1beta1/endpoints/a", "", code200},
@@ -241,7 +242,7 @@ func getTestRequests() []struct {
 
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200},
-		{"POST", "/api/v1beta1/minions" + timeoutFlag, aMinion, code200},
+		{"POST", "/api/v1beta1/minions" + timeoutFlag, aMinion, code201},
 		{"PUT", "/api/v1beta1/minions/a" + timeoutFlag, aMinion, code409}, // See #2115 about why 409
 		{"GET", "/api/v1beta1/minions", "", code200},
 		{"GET", "/api/v1beta1/minions/a", "", code200},
@@ -249,7 +250,7 @@ func getTestRequests() []struct {
 
 		// Normal methods on events
 		{"GET", "/api/v1beta1/events", "", code200},
-		{"POST", "/api/v1beta1/events" + timeoutFlag, aEvent, code200},
+		{"POST", "/api/v1beta1/events" + timeoutFlag, aEvent, code201},
 		{"PUT", "/api/v1beta1/events/a" + timeoutFlag, aEvent, code200},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events", "", code200},
@@ -258,8 +259,8 @@ func getTestRequests() []struct {
 
 		// Normal methods on bindings
 		{"GET", "/api/v1beta1/bindings", "", code405},              // Bindings are write-only
-		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code200}, // Need a pod to bind or you get a 404
-		{"POST", "/api/v1beta1/bindings" + timeoutFlag, aBinding, code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code201}, // Need a pod to bind or you get a 404
+		{"POST", "/api/v1beta1/bindings" + timeoutFlag, aBinding, code201},
 		{"PUT", "/api/v1beta1/bindings/a" + timeoutFlag, aBinding, code404},
 		{"GET", "/api/v1beta1/bindings", "", code405},
 		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
@@ -727,7 +728,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=foo", "foo", aPod, code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=foo", "foo", aPod, code201},
 		{"GET", "/api/v1beta1/pods?namespace=foo", "foo", "", code200},
 		{"GET", "/api/v1beta1/pods/a?namespace=foo", "foo", "", code200},
 		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=foo", "foo", "", code200},
@@ -838,7 +839,7 @@ func TestKindAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code200},
+		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code201},
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"GET", "/api/v1beta1/services/a", "", code200},
 		{"DELETE", "/api/v1beta1/services/a" + timeoutFlag, "", code200},
