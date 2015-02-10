@@ -55,7 +55,6 @@ grains:
   apiservers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   roles:
     - kubernetes-pool
-    - kubernetes-pool-vagrant
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   minion_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF

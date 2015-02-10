@@ -45,7 +45,3 @@ base:
   'roles:kubernetes-pool-vsphere':
     - match: grain
     - static-routes
-
-  'roles:kubernetes-pool-vagrant':
-    - match: grain
-    - vagrant
