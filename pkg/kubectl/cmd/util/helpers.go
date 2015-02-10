@@ -36,7 +36,7 @@ import (
 
 func checkErr(err error) {
 	if err != nil {
-		glog.FatalDepth(1, err)
+		glog.FatalDepth(1, err.Error())
 	}
 }
 
