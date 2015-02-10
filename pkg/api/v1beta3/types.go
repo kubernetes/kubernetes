@@ -866,6 +866,35 @@ type NodeList struct {
 	Items []Node `json:"items"`
 }
 
+// NamespaceSpec describes the attributes on a Namespace
+type NamespaceSpec struct {
+}
+
+// NamespaceStatus is information about the current status of a Namespace.
+type NamespaceStatus struct {
+}
+
+// A namespace provides a scope for Names.
+// Use of multiple namespaces is optional
+type Namespace struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the behavior of the Namespace.
+	Spec NamespaceSpec `json:"spec,omitempty"`
+
+	// Status describes the current status of a Namespace
+	Status NamespaceStatus `json:"status,omitempty"`
+}
+
+// NamespaceList is a list of Namespaces.
+type NamespaceList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []Namespace `json:"items"`
+}
+
 // Binding is written by a scheduler to cause a pod to be bound to a node. Name is not
 // required for Bindings.
 type Binding struct {

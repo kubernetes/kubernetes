@@ -304,7 +304,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
 	})).
 		NamespaceParam("test")
 
@@ -337,7 +337,7 @@ func TestResourceByName(t *testing.T) {
 func TestResourceByNameAndEmptySelector(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
 	})).
 		NamespaceParam("test").
 		SelectorParam("").
@@ -364,8 +364,8 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
-		"/ns/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
+		"/namespaces/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
@@ -494,7 +494,7 @@ func TestSingularObject(t *testing.T) {
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/pods?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
@@ -526,8 +526,8 @@ func TestListObject(t *testing.T) {
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
-		"/ns/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
+		"/namespaces/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
@@ -552,7 +552,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 func TestWatch(t *testing.T) {
 	pods, _ := testData()
 	w, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/watch/ns/test/pods/redis-master?resourceVersion=10": watchBody(watch.Event{
+		"/watch/namespaces/test/pods/redis-master?resourceVersion=10": watchBody(watch.Event{
 			Type:   watch.Added,
 			Object: &pods.Items[0],
 		}),
@@ -607,9 +607,9 @@ func TestLatest(t *testing.T) {
 	}
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, newPod),
-		"/ns/test/pods/bar":     runtime.EncodeOrDie(latest.Codec, newPod2),
-		"/ns/test/services/baz": runtime.EncodeOrDie(latest.Codec, newSvc),
+		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, newPod),
+		"/namespaces/test/pods/bar":     runtime.EncodeOrDie(latest.Codec, newPod2),
+		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, newSvc),
 	})).
 		NamespaceParam("other").Stream(r, "STDIN").Flatten().Latest()
 

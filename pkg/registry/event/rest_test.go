@@ -77,7 +77,7 @@ func TestRESTCreate(t *testing.T) {
 		c, err := rest.Create(item.ctx, item.event)
 		if !item.valid {
 			if err == nil {
-				ctxNS := api.Namespace(item.ctx)
+				ctxNS := api.NamespaceValue(item.ctx)
 				t.Errorf("unexpected non-error for %v (%v, %v)", item.event.Name, ctxNS, item.event.Namespace)
 			}
 			continue

@@ -45,6 +45,7 @@ type RESTHandler struct {
 func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestInfo, err := h.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
+		glog.Errorf("Unable to handle request %s %s %v", requestInfo.Namespace, requestInfo.Kind, err)
 		notFound(w, req)
 		return
 	}

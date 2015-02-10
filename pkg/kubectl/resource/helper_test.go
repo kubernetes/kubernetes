@@ -318,7 +318,7 @@ func TestHelperList(t *testing.T) {
 					t.Errorf("unexpected method: %#v", req)
 					return false
 				}
-				if req.URL.Path != "/ns/bar" {
+				if req.URL.Path != "/namespaces/bar" {
 					t.Errorf("url doesn't contain name: %#v", req.URL)
 					return false
 				}

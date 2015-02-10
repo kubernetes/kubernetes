@@ -112,7 +112,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 			Path: "/",
 		},
 	}).Namespace("foo")
-	if s := r.finalURL(); s != "ns/foo" {
+	if s := r.finalURL(); s != "namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
 }
@@ -122,7 +122,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 		baseURL: &url.URL{},
 		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
-	if s := r.finalURL(); s != "/test/ns/foo/baz/bar" {
+	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
 	}
 }

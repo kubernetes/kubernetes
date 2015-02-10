@@ -109,6 +109,13 @@ func ValidateNodeName(name string, prefix bool) (bool, string) {
 	return nameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateNamespaceName can be used to check whether the given namespace name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateNamespaceName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -836,6 +843,30 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 	}
 	for k := range resourceQuota.Status.Used {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
+	}
+	return allErrs
+}
+
+// ValidateNamespace tests if required fields are set.
+func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName).Prefix("metadata")...)
+	return allErrs
+}
+
+// ValidateNamespaceUpdate tests to make sure a mamespace update can be applied.  Modifies oldNamespace.
+func ValidateNamespaceUpdate(oldNamespace *api.Namespace, namespace *api.Namespace) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &namespace.ObjectMeta).Prefix("metadata")...)
+
+	// TODO: move reset function to its own location
+	// Ignore metadata changes now that they have been tested
+	oldNamespace.ObjectMeta = namespace.ObjectMeta
+
+	// TODO: Add a 'real' ValidationError type for this error and provide print actual diffs.
+	if !api.Semantic.DeepEqual(oldNamespace, namespace) {
+		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNamespace, namespace)
+		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or annotation changes"))
 	}
 	return allErrs
 }

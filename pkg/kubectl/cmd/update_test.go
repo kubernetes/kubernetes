@@ -49,9 +49,9 @@ func TestUpdateObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "GET":
+			case p == "/namespaces/test/pods/redis-master" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/pods/redis-master" && m == "PUT":
+			case p == "/namespaces/test/pods/redis-master" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -81,14 +81,14 @@ func TestUpdateMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods/redis-master" && m == "GET":
+			case p == "/namespaces/test/pods/redis-master" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/pods/redis-master" && m == "PUT":
+			case p == "/namespaces/test/pods/redis-master" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
 
-			case p == "/ns/test/services/frontend" && m == "GET":
+			case p == "/namespaces/test/services/frontend" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/ns/test/services/frontend" && m == "PUT":
+			case p == "/namespaces/test/services/frontend" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -119,11 +119,11 @@ func TestUpdateDirectory(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/ns/test/pods/") && (m == "GET" || m == "PUT"):
+			case strings.HasPrefix(p, "/namespaces/test/pods/") && (m == "GET" || m == "PUT"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
-			case strings.HasPrefix(p, "/ns/test/services/") && (m == "GET" || m == "PUT"):
+			case strings.HasPrefix(p, "/namespaces/test/services/") && (m == "GET" || m == "PUT"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case strings.HasPrefix(p, "/ns/test/replicationcontrollers/") && (m == "GET" || m == "PUT"):
+			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && (m == "GET" || m == "PUT"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

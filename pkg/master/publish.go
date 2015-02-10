@@ -34,6 +34,9 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
 		// TODO: add endpoints of all replicas, not just the elected master.
+		if err := m.createMasterNamespaceIfNeeded(api.NamespaceDefault); err != nil {
+			glog.Errorf("Can't create master namespace: %v", err)
+		}
 		if m.serviceReadWriteIP != nil {
 			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
@@ -56,6 +59,9 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 		// Update service & endpoint records.
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
+		if err := m.createMasterNamespaceIfNeeded(api.NamespaceDefault); err != nil {
+			glog.Errorf("Can't create master namespace: %v", err)
+		}
 		if m.serviceReadOnlyIP != nil {
 			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
@@ -71,6 +77,30 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 		case <-time.After(10 * time.Second):
 		}
 	}
+}
+
+// createMasterNamespaceIfNeeded will create the namespace that contains the master services if it doesn't already exist
+func (m *Master) createMasterNamespaceIfNeeded(ns string) error {
+	ctx := api.NewContext()
+	if _, err := m.namespaceRegistry.Get(ctx, api.NamespaceDefault); err == nil {
+		// the namespace already exists
+		return nil
+	}
+	namespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name:      ns,
+			Namespace: "",
+		},
+	}
+	c, err := m.storage["namespaces"].(apiserver.RESTCreater).Create(ctx, namespace)
+	if err != nil {
+		return err
+	}
+	resp := <-c
+	if _, ok := resp.Object.(*api.Service); ok {
+		return nil
+	}
+	return fmt.Errorf("unexpected response %#v", resp)
 }
 
 // createMasterServiceIfNeeded will create the specified service if it

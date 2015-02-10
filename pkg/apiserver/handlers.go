@@ -223,8 +223,10 @@ type APIRequestInfoResolver struct {
 // GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
 // Valid Inputs:
 // Storage paths
-// /ns/{namespace}/{resource}
-// /ns/{namespace}/{resource}/{resourceName}
+// /namespaces
+// /namespaces/{namespace}
+// /namespaces/{namespace}/{resource}
+// /namespaces/{namespace}/{resource}/{resourceName}
 // /{resource}
 // /{resource}/{resourceName}
 // /{resource}/{resourceName}?namespace={namespace}
@@ -287,15 +289,16 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	}
 
-	// URL forms: /ns/{namespace}/{resource}/*, where parts are adjusted to be relative to kind
-	if currentParts[0] == "ns" {
+	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
+	if currentParts[0] == "namespaces" {
 		if len(currentParts) < 3 {
-			return requestInfo, fmt.Errorf("ResourceTypeAndNamespace expects a path of form /ns/{namespace}/*")
+			requestInfo.Namespace = ""
+			requestInfo.Resource = "namespaces"
+		} else {
+			requestInfo.Resource = currentParts[2]
+			requestInfo.Namespace = currentParts[1]
+			currentParts = currentParts[2:]
 		}
-		requestInfo.Resource = currentParts[2]
-		requestInfo.Namespace = currentParts[1]
-		currentParts = currentParts[2:]
-
 	} else {
 		// URL forms: /{resource}/*
 		// URL forms: POST /{resource} is a legacy API convention to create in "default" namespace

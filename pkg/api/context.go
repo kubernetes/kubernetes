@@ -63,8 +63,8 @@ func NamespaceFrom(ctx Context) (string, bool) {
 	return namespace, ok
 }
 
-// Namespace returns the value of the namespace key on the ctx, or the empty string if none
-func Namespace(ctx Context) string {
+// NamespaceValue returns the value of the namespace key on the ctx, or the empty string if none
+func NamespaceValue(ctx Context) string {
 	namespace, _ := NamespaceFrom(ctx)
 	return namespace
 }

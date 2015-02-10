@@ -743,6 +743,21 @@ func init() {
 			}
 			return nil
 		},
+		func(in *Namespace, out *newer.Namespace, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		func(in *newer.LimitRangeSpec, out *LimitRangeSpec, s conversion.Scope) error {
 			*out = LimitRangeSpec{}
 			out.Limits = make([]LimitRangeItem, len(in.Limits), len(in.Limits))

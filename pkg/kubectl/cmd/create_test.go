@@ -34,7 +34,7 @@ func TestCreateObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods" && m == "POST":
+			case p == "/namespaces/test/pods" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -64,9 +64,9 @@ func TestCreateMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods" && m == "POST":
+			case p == "/namespaces/test/pods" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/services" && m == "POST":
+			case p == "/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -98,11 +98,11 @@ func TestCreateDirectory(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods" && m == "POST":
+			case p == "/namespaces/test/pods" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/services" && m == "POST":
+			case p == "/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/ns/test/replicationcontrollers" && m == "POST":
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

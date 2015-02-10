@@ -232,7 +232,7 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Sel
 	storage.requestedLabelSelector = label
 	storage.requestedFieldSelector = field
 	storage.requestedResourceVersion = resourceVersion
-	storage.requestedResourceNamespace = api.Namespace(ctx)
+	storage.requestedResourceNamespace = api.NamespaceValue(ctx)
 	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Sel
 // Implement Redirector.
 func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (string, error) {
 	// validate that the namespace context on the request matches the expected input
-	storage.requestedResourceNamespace = api.Namespace(ctx)
+	storage.requestedResourceNamespace = api.NamespaceValue(ctx)
 	if storage.expectedResourceNamespace != storage.requestedResourceNamespace {
 		return "", fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, storage.requestedResourceNamespace)
 	}
