@@ -25,7 +25,7 @@ import (
 func TestResourceHelpers(t *testing.T) {
 	cpuLimit := resource.MustParse("10")
 	memoryLimit := resource.MustParse("10G")
-	resourceSpec := ResourceRequirementSpec{
+	resourceSpec := ResourceRequirements{
 		Limits: ResourceList{
 			"cpu":             cpuLimit,
 			"memory":          memoryLimit,
@@ -38,7 +38,7 @@ func TestResourceHelpers(t *testing.T) {
 	if res := resourceSpec.Limits.Memory(); *res != memoryLimit {
 		t.Errorf("expected memorylimit %d, got %d", memoryLimit, res)
 	}
-	resourceSpec = ResourceRequirementSpec{
+	resourceSpec = ResourceRequirements{
 		Limits: ResourceList{
 			"memory":          memoryLimit,
 			"kube.io/storage": memoryLimit,

@@ -149,8 +149,8 @@ func TestPullPolicyConversion(t *testing.T) {
 	}
 }
 
-func getResourceRequirements(cpu, memory resource.Quantity) current.ResourceRequirementSpec {
-	res := current.ResourceRequirementSpec{}
+func getResourceRequirements(cpu, memory resource.Quantity) current.ResourceRequirements {
+	res := current.ResourceRequirements{}
 	res.Limits = current.ResourceList{}
 	if cpu.Value() > 0 {
 		res.Limits[current.ResourceCPU] = util.NewIntOrStringFromInt(int(cpu.Value()))

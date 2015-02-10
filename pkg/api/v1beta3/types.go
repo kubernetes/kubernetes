@@ -337,8 +337,8 @@ type Capabilities struct {
 	Drop []CapabilityType `json:"drop,omitempty"`
 }
 
-// ResourceRequirementSpec describes the compute resource requirements.
-type ResourceRequirementSpec struct {
+// ResourceRequirements describes the compute resource requirements.
+type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
 }
@@ -358,13 +358,13 @@ type Container struct {
 	// Optional: Defaults to whatever is defined in the image.
 	Command []string `json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir    string                  `json:"workingDir,omitempty"`
-	Ports         []Port                  `json:"ports,omitempty"`
-	Env           []EnvVar                `json:"env,omitempty"`
-	Resources     ResourceRequirementSpec `json:"resources,omitempty" description:"Compute Resources required by this container"`
-	VolumeMounts  []VolumeMount           `json:"volumeMounts,omitempty"`
-	LivenessProbe *Probe                  `json:"livenessProbe,omitempty"`
-	Lifecycle     *Lifecycle              `json:"lifecycle,omitempty"`
+	WorkingDir    string               `json:"workingDir,omitempty"`
+	Ports         []Port               `json:"ports,omitempty"`
+	Env           []EnvVar             `json:"env,omitempty"`
+	Resources     ResourceRequirements `json:"resources,omitempty" description:"Compute Resources required by this container"`
+	VolumeMounts  []VolumeMount        `json:"volumeMounts,omitempty"`
+	LivenessProbe *Probe               `json:"livenessProbe,omitempty"`
+	Lifecycle     *Lifecycle           `json:"lifecycle,omitempty"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.

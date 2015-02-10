@@ -319,8 +319,8 @@ type Capabilities struct {
 	Drop []CapabilityType `json:"drop,omitempty"`
 }
 
-// ResourceRequirementSpec describes the compute resource requirements.
-type ResourceRequirementSpec struct {
+// ResourceRequirements describes the compute resource requirements.
+type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty"`
 }
@@ -339,10 +339,10 @@ type Container struct {
 	Ports      []Port   `json:"ports,omitempty"`
 	Env        []EnvVar `json:"env,omitempty"`
 	// Compute resource requirements.
-	Resources     ResourceRequirementSpec `json:"resources,omitempty"`
-	VolumeMounts  []VolumeMount           `json:"volumeMounts,omitempty"`
-	LivenessProbe *Probe                  `json:"livenessProbe,omitempty"`
-	Lifecycle     *Lifecycle              `json:"lifecycle,omitempty"`
+	Resources     ResourceRequirements `json:"resources,omitempty"`
+	VolumeMounts  []VolumeMount        `json:"volumeMounts,omitempty"`
+	LivenessProbe *Probe               `json:"livenessProbe,omitempty"`
+	Lifecycle     *Lifecycle           `json:"lifecycle,omitempty"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.
