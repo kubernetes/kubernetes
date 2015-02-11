@@ -306,9 +306,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	for _, action := range actions {
+		m := monitorFilter(action.Verb, resource)
 		switch action.Verb {
 		case "GET": // Get a resource.
 			route := ws.GET(action.Path).To(GetResource(getter, nameFn, linkFn, codec)).
+				Filter(m).
 				Doc("read the specified " + kind).
 				Operation("read" + kind).
 				Writes(versionedObject)
@@ -316,6 +318,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, namespaceFn, linkFn, codec)).
+				Filter(m).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
 				Writes(versionedList)
@@ -323,6 +326,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "PUT": // Update a resource.
 			route := ws.PUT(action.Path).To(UpdateResource(updater, nameFn, objNameFn, linkFn, codec, resource, admit)).
+				Filter(m).
 				Doc("update the specified " + kind).
 				Operation("update" + kind).
 				Reads(versionedObject)
@@ -330,6 +334,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "POST": // Create a resource.
 			route := ws.POST(action.Path).To(CreateResource(creater, namespaceFn, linkFn, codec, resource, admit)).
+				Filter(m).
 				Doc("create a " + kind).
 				Operation("create" + kind).
 				Reads(versionedObject)
@@ -337,12 +342,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
 			route := ws.DELETE(action.Path).To(DeleteResource(deleter, nameFn, linkFn, codec, resource, kind, admit)).
+				Filter(m).
 				Doc("delete a " + kind).
 				Operation("delete" + kind)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "WATCH": // Watch a resource.
 			route := ws.GET(action.Path).To(restfulStripPrefix(a.prefix+"/watch", watchHandler)).
+				Filter(m).
 				Doc("watch a particular " + kind).
 				Operation("watch" + kind).
 				Writes(versionedObject)
@@ -350,6 +357,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "WATCHLIST": // Watch all resources of a kind.
 			route := ws.GET(action.Path).To(restfulStripPrefix(a.prefix+"/watch", watchHandler)).
+				Filter(m).
 				Doc("watch a list of " + kind).
 				Operation("watch" + kind + "list").
 				Writes(versionedList)
@@ -357,6 +365,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "REDIRECT": // Get the redirect URL for a resource.
 			route := ws.GET(action.Path).To(restfulStripPrefix(a.prefix+"/redirect", redirectHandler)).
+				Filter(m).
 				Doc("redirect GET request to " + kind).
 				Operation("redirect" + kind).
 				Produces("*/*").
@@ -365,10 +374,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
 			// Accept all methods as per https://github.com/GoogleCloudPlatform/kubernetes/issues/3996
-			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, action.Params)
-			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, action.Params)
-			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, action.Params)
-			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, action.Params)
+			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 		default:
 			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
@@ -396,8 +405,9 @@ func restfulStripPrefix(prefix string, handler http.Handler) restful.RouteFuncti
 	}
 }
 
-func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind string, params []*restful.Parameter) {
+func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource string, params []*restful.Parameter) {
 	proxyRoute := ws.Method(method).Path(path).To(restfulStripPrefix(prefix+"/proxy", proxyHandler)).
+		Filter(monitorFilter("PROXY", resource)).
 		Doc("proxy " + method + " requests to " + kind).
 		Operation("proxy" + method + kind).
 		Produces("*/*").

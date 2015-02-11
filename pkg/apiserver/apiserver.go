@@ -73,6 +73,15 @@ func monitor(handler, verb, resource string, httpCode int, reqStart time.Time) {
 	requestLatencies.WithLabelValues(handler, verb).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
+// monitorFilter creates a filter that reports the metrics for a given resource and action.
+func monitorFilter(action, resource string) restful.FilterFunction {
+	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
+		reqStart := time.Now()
+		chain.ProcessFilter(req, res)
+		monitor("rest", action, resource, res.StatusCode(), reqStart)
+	}
+}
+
 // mux is an object that can register http handlers.
 type Mux interface {
 	Handle(pattern string, handler http.Handler)
