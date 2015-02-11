@@ -415,11 +415,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 echo "Test 6: Restart the master, make sure portals come back."
 echo "Restarting the master"
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-    restart-apiserver "${master}"
-else
-    ssh-to-node "${master}" "sudo /etc/init.d/kube-apiserver restart"
-fi
+restart-apiserver "${master}"
 sleep 5
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \

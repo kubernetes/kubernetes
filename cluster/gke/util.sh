@@ -214,6 +214,12 @@ function restart-kube-proxy() {
   ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
+# Restart the kube-proxy on master ($1)
+function restart-apiserver() {
+  echo "... in restart-kube-apiserver()"  >&2
+  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+}
+
 # Execute after running tests to perform any required clean-up.  This is called
 # from hack/e2e-test.sh. This calls kube-down, so the cluster still exists when
 # this is called.

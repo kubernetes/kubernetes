@@ -306,7 +306,7 @@ function restart-kube-proxy {
 
 # Restart the apiserver
 function restart-apiserver {
-  ssh-to-node "${master}" "sudo systemctl restart kube-apiserver"
+  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
 }
 
 function setup-monitoring-firewall {

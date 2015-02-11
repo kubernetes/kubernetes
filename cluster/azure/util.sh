@@ -555,6 +555,11 @@ function restart-kube-proxy {
     ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
+# Restart the kube-proxy on the master ($1)
+function restart-apiserver {
+    ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+}
+
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring-firewall {
     echo "not implemented"  >/dev/null
