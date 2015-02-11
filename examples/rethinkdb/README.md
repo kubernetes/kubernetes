@@ -13,8 +13,8 @@ Quick start
 
 **Step 1**
 
-antmanler/rethinkdb will discover peer using endpoints porvided by kubernetes_ro service,
-so firstly create a service so the following pod can query its endpoint
+antmanler/rethinkdb will discover peer using endpoints provided by kubernetes_ro service,
+so first create a service so the following pod can query its endpoint
 
 ```shell
 kubectl create -f driver-service.yaml
