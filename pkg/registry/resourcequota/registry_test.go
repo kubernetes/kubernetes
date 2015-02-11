@@ -104,7 +104,7 @@ func TestResourceQuotaCreate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestLimitRangeEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Create(ctx, key, item.toCreate)
+		err := registry.CreateWithName(ctx, key, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v, %v", name, err, path)
 		}

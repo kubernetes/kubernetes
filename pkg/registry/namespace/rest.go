@@ -48,7 +48,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if err := rest.BeforeCreate(rest.Namespaces, ctx, obj); err != nil {
 		return nil, err
 	}
-	if err := rs.registry.Create(ctx, namespace.Name, namespace); err != nil {
+	if err := rs.registry.CreateWithName(ctx, namespace.Name, namespace); err != nil {
 		err = rest.CheckGeneratedNameError(rest.Namespaces, err, namespace)
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		return nil, false, kerrors.NewInvalid("namespace", namespace.Name, errs)
 	}
 
-	if err := rs.registry.Update(ctx, oldNamespace.Name, oldNamespace); err != nil {
+	if err := rs.registry.UpdateWithName(ctx, oldNamespace.Name, oldNamespace); err != nil {
 		return nil, false, err
 	}
 	out, err := rs.registry.Get(ctx, oldNamespace.Name)
@@ -80,8 +80,8 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 }
 
 // Delete deletes the Namespace with the specified name
-func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, id)
+func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
+	obj, err := rs.registry.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
+	return rs.registry.Delete(ctx, name)
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
