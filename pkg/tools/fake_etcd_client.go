@@ -34,6 +34,7 @@ type EtcdResponseWithError struct {
 
 // TestLogger is a type passed to Test functions to support formatted test logs.
 type TestLogger interface {
+	Fatalf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 	Logf(format string, args ...interface{})
 }
@@ -85,12 +86,23 @@ func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	return ret
 }
 
+func (f *FakeEtcdClient) SetError(err error) {
+	f.Err = err
+}
+
 func (f *FakeEtcdClient) GetCluster() []string {
 	return f.Machines
 }
 
 func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {
 	f.expectNotFoundGetSet[key] = struct{}{}
+}
+
+func (f *FakeEtcdClient) NewError(code int) *etcd.EtcdError {
+	return &etcd.EtcdError{
+		ErrorCode: code,
+		Index:     f.ChangeIndex,
+	}
 }
 
 func (f *FakeEtcdClient) generateIndex() uint64 {
@@ -121,6 +133,10 @@ func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response,
 }
 
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
 	defer f.updateResponse(key)
@@ -128,9 +144,9 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		if _, ok := f.expectNotFoundGetSet[key]; !ok {
-			f.t.Errorf("Unexpected get for %s", key)
+			f.t.Fatalf("data for %s was not defined prior to invoking Get", key)
 		}
-		return &etcd.Response{}, EtcdErrorNotFound
+		return &etcd.Response{}, f.NewError(EtcdErrorCodeNotFound)
 	}
 	f.t.Logf("returning %v: %#v %#v", key, result.R, result.E)
 
@@ -166,7 +182,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 	if f.nodeExists(key) {
 		prevResult := f.Data[key]
 		createdIndex := prevResult.R.Node.CreatedIndex
-		f.t.Logf("updating %v, index %v -> %v", key, createdIndex, i)
+		f.t.Logf("updating %v, index %v -> %v (ttl: %d)", key, createdIndex, i, ttl)
 		result := EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
@@ -181,7 +197,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 		return result.R, nil
 	}
 
-	f.t.Logf("creating %v, index %v", key, i)
+	f.t.Logf("creating %v, index %v (ttl: %d)", key, i, ttl)
 	result := EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -262,15 +278,27 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	existing := f.Data[key]
+	index := f.generateIndex()
 	f.Data[key] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
+		R: &etcd.Response{},
+		E: &etcd.EtcdError{
+			ErrorCode: EtcdErrorCodeNotFound,
+			Index:     index,
 		},
-		E: EtcdErrorNotFound,
+	}
+	res := &etcd.Response{
+		Action:    "delete",
+		Node:      nil,
+		PrevNode:  nil,
+		EtcdIndex: index,
+	}
+	if existing.R != nil && existing.R.Node != nil {
+		res.PrevNode = existing.R.Node
 	}
 
 	f.DeletedKeys = append(f.DeletedKeys, key)
-	return &etcd.Response{}, nil
+	return res, nil
 }
 
 func (f *FakeEtcdClient) WaitForWatchCompletion() {

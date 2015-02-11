@@ -520,13 +520,13 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	// Update an existing node with the same data
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	fakeClient.Err = errors.New("should not be called")
 	err = helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, error) {
+		fakeClient.Err = errors.New("should not be called")
 		callbackCalled = true
 		return objUpdate, nil
 	})
 	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
+		t.Fatalf("Unexpected error %#v", err)
 	}
 	if !callbackCalled {
 		t.Errorf("tryUpdate callback should have been called.")

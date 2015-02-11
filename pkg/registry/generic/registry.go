@@ -67,21 +67,26 @@ func (m matcherFunc) Matches(obj runtime.Object) (bool, error) {
 	return m(obj)
 }
 
+// DecoratorFunc can mutate the provided object prior to being returned.
+type DecoratorFunc func(obj runtime.Object) error
+
 // Registry knows how to store & list any runtime.Object. Can be used for
 // any object types which don't require special features from the storage
 // layer.
+// DEPRECATED: replace with direct implementation of RESTStorage
 type Registry interface {
 	List(api.Context, Matcher) (runtime.Object, error)
-	Create(ctx api.Context, id string, obj runtime.Object) error
-	Update(ctx api.Context, id string, obj runtime.Object) error
+	CreateWithName(ctx api.Context, id string, obj runtime.Object) error
+	UpdateWithName(ctx api.Context, id string, obj runtime.Object) error
 	Get(ctx api.Context, id string) (runtime.Object, error)
-	Delete(ctx api.Context, id string) error
+	Delete(ctx api.Context, id string) (runtime.Object, error)
 	Watch(ctx api.Context, m Matcher, resourceVersion string) (watch.Interface, error)
 }
 
 // FilterList filters any list object that conforms to the api conventions,
-// provided that 'm' works with the concrete type of list.
-func FilterList(list runtime.Object, m Matcher) (filtered runtime.Object, err error) {
+// provided that 'm' works with the concrete type of list. d is an optional
+// decorator for the returned functions. Only matching items are decorated.
+func FilterList(list runtime.Object, m Matcher, d DecoratorFunc) (filtered runtime.Object, err error) {
 	// TODO: push a matcher down into tools.EtcdHelper to avoid all this
 	// nonsense. This is a lot of unnecessary copies.
 	items, err := runtime.ExtractList(list)
@@ -95,6 +100,11 @@ func FilterList(list runtime.Object, m Matcher) (filtered runtime.Object, err er
 			return nil, err
 		}
 		if match {
+			if d != nil {
+				if err := d(obj); err != nil {
+					return nil, err
+				}
+			}
 			filteredItems = append(filteredItems, obj)
 		}
 	}
