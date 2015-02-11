@@ -461,7 +461,7 @@ func TestRootHelp(t *testing.T) {
 	x := fullSetupTest("--help")
 
 	checkResultContains(t, x, "Available Commands:")
-	checkResultContains(t, x, "for more information about that command")
+	checkResultContains(t, x, "for more information about a command")
 
 	if strings.Contains(x.Output, "unknown flag: --help") {
 		t.Errorf("--help shouldn't trigger an error, Got: \n %s", x.Output)
@@ -470,7 +470,7 @@ func TestRootHelp(t *testing.T) {
 	x = fullSetupTest("echo --help")
 
 	checkResultContains(t, x, "Available Commands:")
-	checkResultContains(t, x, "for more information about that command")
+	checkResultContains(t, x, "for more information about a command")
 
 	if strings.Contains(x.Output, "unknown flag: --help") {
 		t.Errorf("--help shouldn't trigger an error, Got: \n %s", x.Output)
@@ -482,7 +482,7 @@ func TestRootNoCommandHelp(t *testing.T) {
 	x := rootOnlySetupTest("--help")
 
 	checkResultOmits(t, x, "Available Commands:")
-	checkResultOmits(t, x, "for more information about that command")
+	checkResultOmits(t, x, "for more information about a command")
 
 	if strings.Contains(x.Output, "unknown flag: --help") {
 		t.Errorf("--help shouldn't trigger an error, Got: \n %s", x.Output)
@@ -491,7 +491,7 @@ func TestRootNoCommandHelp(t *testing.T) {
 	x = rootOnlySetupTest("echo --help")
 
 	checkResultOmits(t, x, "Available Commands:")
-	checkResultOmits(t, x, "for more information about that command")
+	checkResultOmits(t, x, "for more information about a command")
 
 	if strings.Contains(x.Output, "unknown flag: --help") {
 		t.Errorf("--help shouldn't trigger an error, Got: \n %s", x.Output)
