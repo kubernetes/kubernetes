@@ -40,9 +40,9 @@ type Command struct {
 	Short string
 	// The long message shown in the 'help <this-command>' output.
 	Long string
-	// Set of flags specific to this command.
+	// Full set of flags
 	flags *flag.FlagSet
-	// Set of flags children commands will inherit
+	// Set of flags childrens of this command will inherit
 	pflags *flag.FlagSet
 	// Run runs the command.
 	// The args are the arguments after the command name.
@@ -200,12 +200,14 @@ Aliases:
 Available Commands: {{range .Commands}}{{if .Runnable}}
   {{rpad .Use .UsagePadding }} {{.Short}}{{end}}{{end}}
 {{end}}
-{{ if .HasFlags}} Available Flags:
-{{.Flags.FlagUsages}}{{end}}{{if .HasParent}}{{if and (gt .Commands 0) (gt .Parent.Commands 1) }}
+{{ if .HasLocalFlags}}Flags:
+{{.LocalFlags.FlagUsages}}{{end}}
+{{ if .HasAnyPersistentFlags}}Global Flags:
+{{.AllPersistentFlags.FlagUsages}}{{end}}{{if .HasParent}}{{if and (gt .Commands 0) (gt .Parent.Commands 1) }}
 Additional help topics: {{if gt .Commands 0 }}{{range .Commands}}{{if not .Runnable}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if gt .Parent.Commands 1 }}{{range .Parent.Commands}}{{if .Runnable}}{{if not (eq .Name $cmd.Name) }}{{end}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{end}}
 {{end}}{{ if .HasSubCommands }}
-Use "{{.Root.Name}} help [command]" for more information about that command.
+Use "{{.Root.Name}} help [command]" for more information about a command.
 {{end}}`
 	}
 }
@@ -682,7 +684,7 @@ func (c *Command) HasParent() bool {
 	return c.parent != nil
 }
 
-// Get the Commands FlagSet
+// Get the complete FlagSet that applies to this command (local and persistent declared here and by all parents)
 func (c *Command) Flags() *flag.FlagSet {
 	if c.flags == nil {
 		c.flags = flag.NewFlagSet(c.Name(), flag.ContinueOnError)
@@ -695,7 +697,23 @@ func (c *Command) Flags() *flag.FlagSet {
 	return c.flags
 }
 
-// Get the Commands Persistent FlagSet
+// Get the local FlagSet specifically set in the current command
+func (c *Command) LocalFlags() *flag.FlagSet {
+	c.mergePersistentFlags()
+
+	local := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
+	allPersistent := c.AllPersistentFlags()
+
+	c.Flags().VisitAll(func(f *flag.Flag) {
+		if allPersistent.Lookup(f.Name) == nil {
+			local.AddFlag(f)
+		}
+	})
+
+	return local
+}
+
+// Get the Persistent FlagSet specifically set in the current command
 func (c *Command) PersistentFlags() *flag.FlagSet {
 	if c.pflags == nil {
 		c.pflags = flag.NewFlagSet(c.Name(), flag.ContinueOnError)
@@ -705,6 +723,29 @@ func (c *Command) PersistentFlags() *flag.FlagSet {
 		c.pflags.SetOutput(c.flagErrorBuf)
 	}
 	return c.pflags
+}
+
+// Get the Persistent FlagSet traversing the Command hierarchy
+func (c *Command) AllPersistentFlags() *flag.FlagSet {
+	allPersistent := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
+
+	var visit func(x *Command)
+	visit = func(x *Command) {
+		if x.HasPersistentFlags() {
+			x.PersistentFlags().VisitAll(func(f *flag.Flag) {
+				if allPersistent.Lookup(f.Name) == nil {
+					allPersistent.AddFlag(f)
+				}
+			})
+		}
+		if x.HasParent() {
+			visit(x.parent)
+		}
+	}
+
+	visit(c)
+
+	return allPersistent
 }
 
 // For use in testing
@@ -717,7 +758,7 @@ func (c *Command) ResetFlags() {
 	c.pflags.SetOutput(c.flagErrorBuf)
 }
 
-// Does the command contain flags (local not persistent)
+// Does the command contain any flags (local plus persistent from the entire structure)
 func (c *Command) HasFlags() bool {
 	return c.Flags().HasFlags()
 }
@@ -725,6 +766,16 @@ func (c *Command) HasFlags() bool {
 // Does the command contain persistent flags
 func (c *Command) HasPersistentFlags() bool {
 	return c.PersistentFlags().HasFlags()
+}
+
+// Does the command hierarchy contain persistent flags
+func (c *Command) HasAnyPersistentFlags() bool {
+	return c.AllPersistentFlags().HasFlags()
+}
+
+// Does the command has flags specifically declared locally
+func (c *Command) HasLocalFlags() bool {
+	return c.LocalFlags().HasFlags()
 }
 
 // Climbs up the command tree looking for matching flag
@@ -766,6 +817,10 @@ func (c *Command) ParseFlags(args []string) (err error) {
 	return nil
 }
 
+func (c *Command) Parent() *Command {
+	return c.parent
+}
+
 func (c *Command) mergePersistentFlags() {
 	var rmerge func(x *Command)
 
@@ -783,8 +838,4 @@ func (c *Command) mergePersistentFlags() {
 	}
 
 	rmerge(c)
-}
-
-func (c *Command) Parent() *Command {
-	return c.parent
 }
