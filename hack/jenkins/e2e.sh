@@ -83,5 +83,7 @@ export E2E_REPORT_DIR=${WORKSPACE}
 go run ./hack/e2e.go ${E2E_OPT} -v --down
 go run ./hack/e2e.go ${E2E_OPT} -v --up
 go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
-go run ./hack/e2e.go ${E2E_OPT} -v --test || echo "Ignored, Jenkins will pass/fail based on test failures"
+status=0
+go run ./hack/e2e.go ${E2E_OPT} -v --test || status=$?
 go run ./hack/e2e.go ${E2E_OPT} -v --down
+exit $status
