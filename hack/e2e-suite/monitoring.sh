@@ -59,7 +59,7 @@ function setup {
 function cleanup {
   "${KUBECTL}" stop rc monitoring-influx-grafana-controller &> /dev/null || true
   "${KUBECTL}" stop rc monitoring-heapster-controller &> /dev/null || true
-r "${KUBECTL}" delete -f "${MONITORING}/" &> /dev/null || true
+  "${KUBECTL}" delete -f "${MONITORING}/" &> /dev/null || true
 
   # This only has work to do on gce and gke
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
