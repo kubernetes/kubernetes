@@ -11,7 +11,7 @@
         "image": "dockerfile/nginx",
         "ports": [{
           "containerPort": 80,
-          "hostPort": 8080
+          "hostPort": 8081
         }],
         "livenessProbe": {
           "enabled": true,
@@ -19,7 +19,7 @@
           "initialDelaySeconds": 30,
           "httpGet": {
             "path": "/index.html",
-            "port": "8080"
+            "port": "8081"
           }
         }
       }]
