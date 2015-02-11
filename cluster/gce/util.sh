@@ -507,7 +507,7 @@ function kube-up {
   local kube_auth="kubernetes_auth"
 
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  local context="${INSTANCE_PREFIX}"
+  local context="${PROJECT}-${INSTANCE_PREFIX}"
   local user="${INSTANCE_PREFIX}-admin"
   local config_dir="${HOME}/.kube/${context}"
 
