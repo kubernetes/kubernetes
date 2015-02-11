@@ -1042,7 +1042,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	podStatus, err := kl.GetPodStatus(podFullName, uid)
 	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info, health checks may be invalid", podFullName, uid)
+		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 	}
 
 	for _, container := range pod.Spec.Containers {
@@ -1539,24 +1539,34 @@ func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodConditio
 // GetPodStatus returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
 	var spec api.PodSpec
+	var podStatus api.PodStatus
+	found := false
 	for _, pod := range kl.pods {
 		if GetPodFullName(&pod) == podFullName {
 			spec = pod.Spec
+			found = true
 			break
 		}
+	}
+	if !found {
+		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
 	}
 
 	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
 
+	if err != nil {
+		glog.Infof("Query docker container info failed with error: %v", err)
+		return podStatus, err
+	}
+
+	podStatus.Phase = getPhase(&spec, info)
 	for _, c := range spec.Containers {
 		containerStatus := info[c.Name]
 		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
 		info[c.Name] = containerStatus
 	}
-
-	var podStatus api.PodStatus
-	podStatus.Phase = getPhase(&spec, info)
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(&spec, info)...)
+
 	netContainerInfo, found := info[dockertools.PodInfraContainerName]
 	if found {
 		podStatus.PodIP = netContainerInfo.PodIP

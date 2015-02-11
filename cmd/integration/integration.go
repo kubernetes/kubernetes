@@ -242,6 +242,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 				return false, nil
 			}
 			if _, err := podInfo.GetPodStatus(host, namespace, id); err != nil {
+				glog.Infof("GetPodStatus error: %v", err)
 				return false, nil
 			}
 		}

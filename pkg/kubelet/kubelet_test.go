@@ -365,7 +365,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -379,7 +379,8 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -394,7 +395,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 		TerminationMessagePath: "/dev/somepath",
 	}
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -408,13 +409,14 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	kubelet.drainWorkers()
 	verifyCalls(t, fakeDocker, []string{
-		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+		"list", "create", "start", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
@@ -452,7 +454,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -466,14 +468,15 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+		"list", "create", "start", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 
@@ -501,7 +504,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	puller.HasImages = []string{}
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -515,14 +518,15 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+		"list", "create", "start", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 
@@ -547,7 +551,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -561,14 +565,15 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "inspect_container", "list", "create", "start"})
+		"list", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -589,7 +594,7 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -614,14 +619,15 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "inspect_container", "list", "create", "start"})
+		"list", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -643,7 +649,7 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 			ID:    "1234",
 		},
 	}
-	err := kubelet.SyncPods([]api.BoundPod{
+	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "12345678",
@@ -657,14 +663,15 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 				},
 			},
 		},
-	})
+	}
+	err := kubelet.SyncPods(kubelet.pods)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "stop", "create", "start", "list", "list", "inspect_container", "list", "create", "start"})
+		"list", "stop", "create", "start", "list", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -844,7 +851,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 			ID:    "2304",
 		},
 	}
-	err := kubelet.syncPod(&api.BoundPod{
+	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         "12345678",
 			Name:        "bar",
@@ -856,13 +863,14 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 				{Name: "foo"},
 			},
 		},
-	}, dockerContainers)
+	}
+	kubelet.pods = append(kubelet.pods, bound)
+	err := kubelet.syncPod(&bound, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	verifyCalls(t, fakeDocker, []string{"list", "stop"})
-
 	// Expect one of the duplicates to be killed.
 	if len(fakeDocker.Stopped) != 1 || (fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
@@ -883,7 +891,7 @@ func TestSyncPodBadHash(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	err := kubelet.syncPod(&api.BoundPod{
+	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         "12345678",
 			Name:        "foo",
@@ -895,7 +903,9 @@ func TestSyncPodBadHash(t *testing.T) {
 				{Name: "bar"},
 			},
 		},
-	}, dockerContainers)
+	}
+	kubelet.pods = append(kubelet.pods, bound)
+	err := kubelet.syncPod(&bound, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -929,7 +939,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	err := kubelet.syncPod(&api.BoundPod{
+	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         "12345678",
 			Name:        "foo",
@@ -945,7 +955,9 @@ func TestSyncPodUnhealthy(t *testing.T) {
 				},
 			},
 		},
-	}, dockerContainers)
+	}
+	kubelet.pods = append(kubelet.pods, bound)
+	err := kubelet.syncPod(&bound, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1580,7 +1592,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	err := kubelet.syncPod(&api.BoundPod{
+	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         "12345678",
 			Name:        "foo",
@@ -1602,7 +1614,9 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 				},
 			},
 		},
-	}, dockerContainers)
+	}
+	kubelet.pods = append(kubelet.pods, bound)
+	err := kubelet.syncPod(&bound, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
