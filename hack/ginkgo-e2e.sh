@@ -103,4 +103,4 @@ fi
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
-  "${@}"
+  "${@:-}"
