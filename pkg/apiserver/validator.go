@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
@@ -72,6 +73,10 @@ type ServerStatus struct {
 }
 
 func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var httpCode int
+	reqStart := time.Now()
+	defer func() { monitor("validate", "get", "", httpCode, reqStart) }()
+
 	reply := []ServerStatus{}
 	for name, server := range v.servers() {
 		status, msg, err := server.check(v.client)
@@ -85,11 +90,13 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.MarshalIndent(reply, "", "  ")
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		httpCode = http.StatusInternalServerError
+		w.WriteHeader(httpCode)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	httpCode = http.StatusOK
+	w.WriteHeader(httpCode)
 	w.Write(data)
 }
 
