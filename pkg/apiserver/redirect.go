@@ -29,6 +29,7 @@ import (
 type RedirectHandler struct {
 	storage                map[string]RESTStorage
 	codec                  runtime.Codec
+	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
@@ -47,7 +48,11 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	verb = requestInfo.Verb
 	resource, parts := requestInfo.Resource, requestInfo.Parts
-	ctx := api.WithNamespace(api.NewContext(), requestInfo.Namespace)
+	ctx, ok := r.context.Get(req)
+	if !ok {
+		ctx = api.NewContext()
+	}
+	ctx = api.WithNamespace(ctx, requestInfo.Namespace)
 
 	// redirection requires /resource/resourceName path parts
 	if len(parts) != 2 || req.Method != "GET" {
