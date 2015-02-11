@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 
@@ -36,9 +35,7 @@ import (
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, tools.RuntimeVersionAdapter{latest.ResourceVersioner}},
-		&pod.BasicBoundPodFactory{
-			ServiceRegistry: &registrytest.ServiceRegistry{},
-		})
+		&pod.BasicBoundPodFactory{})
 	return registry
 }
 

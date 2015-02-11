@@ -253,12 +253,7 @@ func setDefaults(c *Config) {
 //   any unhandled paths to "Handler".
 func New(c *Config) *Master {
 	setDefaults(c)
-	minionRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
-	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
-	boundPodFactory := &pod.BasicBoundPodFactory{
-		ServiceRegistry:        serviceRegistry,
-		MasterServiceNamespace: c.MasterServiceNamespace,
-	}
+	boundPodFactory := &pod.BasicBoundPodFactory{}
 	if c.KubeletClient == nil {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
@@ -277,12 +272,12 @@ func New(c *Config) *Master {
 	m := &Master{
 		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
-		serviceRegistry:       serviceRegistry,
+		serviceRegistry:       etcd.NewRegistry(c.EtcdHelper, nil),
 		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
 		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		namespaceRegistry:     namespace.NewEtcdRegistry(c.EtcdHelper),
-		minionRegistry:        minionRegistry,
+		minionRegistry:        etcd.NewRegistry(c.EtcdHelper, nil),
 		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
 		resourceQuotaRegistry: resourcequota.NewEtcdRegistry(c.EtcdHelper),
 		client:                c.Client,
