@@ -34,6 +34,7 @@ func TestGenerate(t *testing.T) {
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
+				"port":     "-1",
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
