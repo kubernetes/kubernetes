@@ -146,21 +146,21 @@ func main() {
 		}
 	}
 
-	failure := false
+	success := true
 	switch {
 	case *ctlCmd != "":
 		ctlArgs := strings.Fields(*ctlCmd)
 		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		failure = !finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
+		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
 	case *test:
-		failure = Test()
+		success = Test()
 	}
 
 	if *down {
 		TearDown()
 	}
 
-	if failure {
+	if !success {
 		os.Exit(1)
 	}
 }
@@ -277,8 +277,8 @@ func Test() bool {
 // call the returned anonymous function to stop.
 func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 	log.Printf("Running in background: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
+	output := bytes.NewBuffer(nil)
+	cmd.Stdout, cmd.Stderr = output, output
 	if err := cmd.Start(); err != nil {
 		log.Printf("Unable to start '%v': '%v'", stepName, err)
 		return func() {}
@@ -287,7 +287,7 @@ func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 		cmd.Process.Signal(os.Interrupt)
 		headerprefix := stepName + " "
 		lineprefix := "  "
-		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()), false)
+		printBashOutputs(headerprefix, lineprefix, string(output.Bytes()), false)
 	}
 }
 
@@ -327,44 +327,11 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	return result
 }
 
-func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bool) {
-	// The |'s (plus appropriate prefixing) are to make this look
-	// "YAMLish" to the Jenkins TAP plugin:
-	//   https://wiki.jenkins-ci.org/display/JENKINS/TAP+Plugin
-	if stdout != "" {
-		fmt.Printf("%vstdout: |\n", headerprefix)
-		if escape {
-			stdout = escapeOutput(stdout)
-		}
-		printPrefixedLines(lineprefix, stdout)
+func printBashOutputs(headerprefix, lineprefix, output string, escape bool) {
+	if output != "" {
+		fmt.Printf("%voutput: |\n", headerprefix)
+		printPrefixedLines(lineprefix, output)
 	}
-	if stderr != "" {
-		fmt.Printf("%vstderr: |\n", headerprefix)
-		if escape {
-			stderr = escapeOutput(stderr)
-		}
-		printPrefixedLines(lineprefix, stderr)
-	}
-}
-
-// Escape stdout/stderr so the Jenkins YAMLish parser doesn't barf on
-// it. This escaping is crude (it masks all colons as something humans
-// will hopefully see as a colon, for instance), but it should get the
-// job done without pulling in a whole YAML package.
-func escapeOutput(s string) (out string) {
-	for _, r := range s {
-		switch {
-		case r == '\n':
-			out += string(r)
-		case !strconv.IsPrint(r):
-			out += " "
-		case r == ':':
-			out += "\ua789" // "꞉", modifier letter colon
-		default:
-			out += string(r)
-		}
-	}
-	return
 }
 
 func printPrefixedLines(prefix, s string) {
