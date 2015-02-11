@@ -20,7 +20,7 @@ You need [go](https://golang.org/doc/install) in your path, please make sure it 
 
 ### Starting the cluster
 
-In a separate tab of your terminal, run:
+In a separate tab of your terminal, run the following (since one needs sudo access to start/stop kubernetes daemons, it is easier to run the entire script as root):
 
 ```
 cd kubernetes
@@ -31,12 +31,10 @@ This will build and start a lightweight local cluster, consisting of a master
 and a single minion. Type Control-C to shut it down.
 
 You can use the cluster/kubectl.sh script to interact with the local cluster.
-You must set the KUBERNETES_PROVIDER and KUBERNETES_MASTER environment variables to let other programs
-know how to reach your master.
+You must set the KUBERNETES_PROVIDER environment variable.
 
 ```
 export KUBERNETES_PROVIDER=local
-export KUBERNETES_MASTER=http://localhost:8080
 ```
 
 ### Running a container
@@ -66,6 +64,19 @@ cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationControllers
 ```
 
+
+### Running a user defined pod
+
+Note the difference between a [container](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/containers.md)
+and a [pod](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
+However you can't view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
+
+You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
+
+```
+cluster/kubectl.sh create -f api/examples/pod.json
+```
+
 Congratulations!
 
 ### Troubleshooting
@@ -92,3 +103,7 @@ cd kubernetes
 hack/build-go.sh
 hack/local-up-cluster.sh
 ```
+
+#### kubectl claims to start a container but `get pods` and `docker ps` don't show it.
+
+One or more of the kubernetes daemons might've crashed. Tail the logs of each in /tmp.
