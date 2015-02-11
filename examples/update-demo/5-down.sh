@@ -24,5 +24,9 @@ export KUBECTL=${KUBE_ROOT}/cluster/kubectl.sh
 set -x
 
 rc="update-demo-kitten"
+echo "Stopping replicationController ${rc}"
+$KUBECTL stop rc ${rc} || true
 
-$KUBECTL stop rc ${rc}
+rc="update-demo-nautilus"
+echo "Stopping replicationController ${rc}"
+$KUBECTL stop rc ${rc} || true
