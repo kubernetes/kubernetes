@@ -81,7 +81,7 @@ coreos:
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
         --address=0.0.0.0 \
-        --portal_net=10.244.0.0/16 \
+        --portal_net=10.100.0.0/16 \
         --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
         --public_address_override=127.0.0.1 \
