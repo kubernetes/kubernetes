@@ -690,6 +690,8 @@ type Minion struct {
 	Status NodeStatus `json:"status,omitempty" description:"current status of node"`
 	// Labels for the node
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize minions; labels of a minion assigned by the scheduler must match the scheduled pod's nodeSelector"`
+	// External ID of the node
+	ExternalID string `json:"externalID,omitempty" description:"external id of the node assigned by some machine database (e.g. a cloud provider)"`
 }
 
 // MinionList is a list of minions.

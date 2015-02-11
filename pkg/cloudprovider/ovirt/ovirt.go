@@ -153,6 +153,11 @@ func (v *OVirtCloud) IPAddress(name string) (net.IP, error) {
 	return address, nil
 }
 
+// ExternalID returns the cloud provider ID of the specified instance.
+func (v *OVirtCloud) ExternalID(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
 	if body == nil {
 		return nil, fmt.Errorf("ovirt rest-api response body is missing")

@@ -119,6 +119,11 @@ func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
 	return nil, fmt.Errorf("unable to find IP address for instance: %s", instance)
 }
 
+// ExternalID returns the cloud provider ID of the specified instance.
+func (v *VagrantCloud) ExternalID(instance string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
 // saltMinionsByRole filters a list of minions that have a matching role.
 func (v *VagrantCloud) saltMinionsByRole(minions []SaltMinion, role string) []SaltMinion {
 	var filteredMinions []SaltMinion

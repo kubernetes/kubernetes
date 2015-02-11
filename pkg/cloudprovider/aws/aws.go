@@ -150,6 +150,11 @@ func (aws *AWSCloud) IPAddress(name string) (net.IP, error) {
 	return ip, nil
 }
 
+// ExternalID returns the cloud provider ID of the specified instance.
+func (aws *AWSCloud) ExternalID(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
 // Return a list of instances matching regex string.
 func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 	resp, err := aws.ec2.Instances(nil, nil)

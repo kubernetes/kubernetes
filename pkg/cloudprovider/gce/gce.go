@@ -294,6 +294,11 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
+// ExternalID returns the cloud provider ID of the specified instance.
+func (gce *GCECloud) ExternalID(instance string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
 // fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
 func fqdnSuffix() (string, error) {
 	fullHostname, err := exec.Command("hostname", "-f").Output()
