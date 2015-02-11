@@ -18,13 +18,13 @@
 ZONE=${KUBE_AWS_ZONE:-us-west-2}
 MASTER_SIZE=t2.micro
 MINION_SIZE=t2.micro
-NUM_MINIONS=${NUM_MINIONS:-4}
+NUM_MINIONS=${NUM_MINIONS:-2}
 
 # This is the ubuntu 14.04 image for us-west-2 + ebs
 # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
 # This will need to be updated from time to time as amis are deprecated
 IMAGE=ami-39501209
-INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
+INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-e2e-test-${USER}}"
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 IAM_PROFILE="kubernetes"
 
@@ -47,14 +47,14 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
 # Optional: When set to true, heapster will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-false}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
 LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
+ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-false}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Don't require https for registries in our local RFC1918 network
