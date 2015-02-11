@@ -43,6 +43,8 @@ import (
 // ResourceVersion and semantics. The RESTCreateStrategy and
 // RESTUpdateStrategy are generic across all backends, and encapsulate
 // logic specific to the API.
+//
+// TODO: make the default exposed methods exactly match a generic RESTStorage
 type Etcd struct {
 	// Called to make a new object, should return e.g., &api.Pod{}
 	NewFunc func() runtime.Object
@@ -116,6 +118,8 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 }
 
 // List returns a list of all the items matching m.
+// TODO: rename this to ListPredicate, take the default predicate function on the constructor, and
+// introduce a List method that uses the default predicate function
 func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
 	err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
@@ -126,6 +130,7 @@ func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) 
 }
 
 // CreateWithName inserts a new item with the provided name
+// DEPRECATED: use Create instead
 func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) error {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -191,6 +196,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 }
 
 // UpdateWithName updates the item with the provided name
+// DEPRECATED: use Update instead
 func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) error {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -323,6 +329,8 @@ func (e *Etcd) Delete(ctx api.Context, name string) (runtime.Object, error) {
 
 // Watch starts a watch for the items that m matches.
 // TODO: Detect if m references a single object instead of a list.
+// TODO: rename this to WatchPredicate, take the default predicate function on the constructor, and
+// introduce a Watch method that uses the default predicate function
 func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
 	if err != nil {
