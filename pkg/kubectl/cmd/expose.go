@@ -32,15 +32,16 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 		Short: "Take a replicated application and expose it as Kubernetes Service",
 		Long: `Take a replicated application and expose it as Kubernetes Service.
 		
-Looks up a ReplicationController named <name>, and uses the selector for that replication controller
-as the selector for a new Service which services on <port>
+Looks up a ReplicationController by name, and uses the selector for that replication controller
+as the selector for a new Service on the specified port.
 
 Examples:
-$ kubectl expose nginx --port=80 --container-port=8000
-<creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000>
 
-$ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
-<create a service for a replicated streaming application on port 4100 balancing UDP traffic and is named 'video-stream'>
+    $ kubectl expose nginx --port=80 --container-port=8000
+    // Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+
+    $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
+    // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
 `,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
@@ -99,15 +100,15 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 		},
 	}
 	util.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "service/v1", "The name of the api generator that you want to use.  Default 'service/v1'")
-	cmd.Flags().String("protocol", "TCP", "The network protocol for the service you want to be created. Default 'tcp'")
+	cmd.Flags().String("generator", "service/v1", "The name of the API generator to use.  Default is 'service/v1'.")
+	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")
-	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default false")
-	cmd.Flags().String("selector", "", "A label selector to use for this service.  If empty (the default) infer the selector from the replication controller")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, don't actually do anything")
+	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.")
+	cmd.Flags().String("selector", "", "A label selector to use for this service. If empty (the default) infer the selector from the replication controller.")
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
 	cmd.Flags().String("container-port", "", "Name or number for the port on the container that the service should direct traffic to. Optional.")
-	cmd.Flags().String("public-ip", "", "Name of a public ip address to set for the service.  The service will be assigned this IP in addition to its generated service IP.")
-	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object.  If this is non-empty, it is parsed used to override the generated object.  Requires that the object supply a valid apiVersion field.")
+	cmd.Flags().String("public-ip", "", "Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.")
+	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("service-name", "", "The name for the newly created service.")
 	return cmd
 }

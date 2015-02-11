@@ -35,19 +35,20 @@ const (
 func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rollingupdate <old-controller-name> -f <new-controller.json>",
-		Short: "Perform a rolling update of the given ReplicationController",
+		Short: "Perform a rolling update of the given ReplicationController.",
 		Long: `Perform a rolling update of the given ReplicationController.
 
-Replaces named controller with new controller, updating one pod at a time to use the
+Replaces the specified controller with new controller, updating one pod at a time to use the
 new PodTemplate. The new-controller.json must specify the same namespace as the
 existing controller and overwrite at least one (common) label in its replicaSelector.
 
 Examples:
-$ kubectl rollingupdate frontend-v1 -f frontend-v2.json
-  <update pods of frontend-v1 using new controller data in frontend-v2.json>
 
-$ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
-  <update pods of frontend-v1 using json data passed into stdin>`,
+    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
+    // Update pods of frontend-v1 using new controller data in frontend-v2.json.
+
+    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
+    // Update pods of frontend-v1 using JSON data passed into stdin.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			filename := util.GetFlagString(cmd, "filename")
 			if len(filename) == 0 {
@@ -119,6 +120,6 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 	cmd.Flags().String("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().String("poll-interval", pollInterval, `Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().String("timeout", timeout, `Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
-	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the new controller")
+	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the new controller.")
 	return cmd
 }
