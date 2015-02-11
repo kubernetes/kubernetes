@@ -207,10 +207,6 @@
 			"Rev": "da56de6a59e53fdd61be1b5d9b87df34c47ac420"
 		},
 		{
-			"ImportPath": "github.com/skratchdot/open-golang/open",
-			"Rev": "ba570a111973b539baf23c918213059543b5bb6e"
-		},
-		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
 			"Comment": "2.0.1d-2-g245a121",
 			"Rev": "245a1216be2a7f5377ea56e957fdfa0de6ecd067"
