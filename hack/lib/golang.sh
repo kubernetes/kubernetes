@@ -35,7 +35,6 @@ readonly KUBE_SERVER_PLATFORMS=(
 
 # The set of client targets that we are building for all platforms
 readonly KUBE_CLIENT_TARGETS=(
-  cmd/kubecfg
   cmd/kubectl
   cmd/kubernetes
 )

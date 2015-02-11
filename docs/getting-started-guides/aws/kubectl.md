@@ -1,6 +1,6 @@
-# Install and configure kubecfg
+# Install and configure kubectl
 
-## Download the kubecfg CLI tool
+## Download the kubectl CLI tool
 
 ### Darwin
 
