@@ -456,7 +456,7 @@ func TestAtomicUpdate(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	})
 	if err != nil {
@@ -475,7 +475,7 @@ func TestAtomicUpdate(t *testing.T) {
 	// Update an existing node.
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
 		if in.(*TestResource).Value != 1 {
@@ -510,7 +510,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	})
 	if err != nil {
@@ -521,7 +521,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 	fakeClient.Err = errors.New("should not be called")
-	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 		return objUpdate, nil
 	})
@@ -530,6 +530,32 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	}
 	if !callbackCalled {
 		t.Errorf("tryUpdate callback should have been called.")
+	}
+}
+
+func TestAtomicUpdateKeyNotFound(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	helper := EtcdHelper{fakeClient, codec, versioner}
+
+	// Create a new node.
+	fakeClient.ExpectNotFoundGet("/some/key")
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+
+	f := func(in runtime.Object) (runtime.Object, error) {
+		return obj, nil
+	}
+
+	ignoreNotFound := false
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
+	if err == nil {
+		t.Errorf("Expected error for key not found.")
+	}
+
+	ignoreNotFound = true
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
+	if err != nil {
+		t.Errorf("Unexpected error %v.", err)
 	}
 }
 
@@ -552,7 +578,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 			defer wgDone.Done()
 
 			firstCall := true
-			err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
+			err := helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, error) {
 				defer func() { firstCall = false }()
 
 				if firstCall {
