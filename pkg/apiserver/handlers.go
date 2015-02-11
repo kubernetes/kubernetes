@@ -292,8 +292,10 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
 	if currentParts[0] == "namespaces" {
 		if len(currentParts) < 3 {
-			requestInfo.Namespace = ""
 			requestInfo.Resource = "namespaces"
+			if len(currentParts) > 1 {
+				requestInfo.Namespace = currentParts[1]
+			}
 		} else {
 			requestInfo.Resource = currentParts[2]
 			requestInfo.Namespace = currentParts[1]

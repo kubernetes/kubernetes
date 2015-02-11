@@ -80,7 +80,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 
 		// resource paths
 		{"GET", "/namespaces", "list", "", "", "namespaces", "Namespace", "", []string{"namespaces"}},
-		{"GET", "/namespaces/other", "get", "", "", "namespaces", "Namespace", "other", []string{"namespaces", "other"}},
+		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "Namespace", "other", []string{"namespaces", "other"}},
 
 		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
 		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
