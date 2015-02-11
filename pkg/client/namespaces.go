@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type NamespacesInterface interface {
@@ -34,6 +35,7 @@ type NamespaceInterface interface {
 	List(selector labels.Selector) (*api.NamespaceList, error)
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // namespaces implements NamespacesInterface
@@ -85,4 +87,15 @@ func (c *namespaces) Get(name string) (*api.Namespace, error) {
 // Delete deletes an existing namespace.
 func (c *namespaces) Delete(name string) error {
 	return c.r.Delete().Resource("namespaces").Name(name).Do().Error()
+}
+
+// Watch returns a watch.Interface that watches the requested namespaces.
+func (c *namespaces) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.r.Get().
+		Prefix("watch").
+		Resource("namespaces").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
 }
