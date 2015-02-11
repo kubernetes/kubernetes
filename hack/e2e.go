@@ -184,12 +184,16 @@ func Up() bool {
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
 	// Check that there are at least 3 minions running
-	res, stdout, _ := finishRunningWithOutputs("validate cluster size", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh")))
-	if !res {
-		log.Fatal("Could not get nodes to validate cluster size")
+	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
+	if *verbose {
+		cmd.Stderr = os.Stderr
+	}
+	stdout, err := cmd.Output()
+	if err != nil {
+		log.Fatal("Could not get nodes to validate cluster size (%s)", err)
 	}
 
-	numNodes, err := strconv.Atoi(strings.TrimSpace(stdout))
+	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
 	if err != nil {
 		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
 	}
