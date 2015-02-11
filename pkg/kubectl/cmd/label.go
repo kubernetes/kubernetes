@@ -156,6 +156,10 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 		}
 	}
 
+	if meta.Labels == nil {
+		meta.Labels = make(map[string]string)
+	}
+
 	for key, value := range labels {
 		meta.Labels[key] = value
 	}
