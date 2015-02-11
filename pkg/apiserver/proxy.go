@@ -31,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -79,6 +80,7 @@ type ProxyHandler struct {
 	storage                map[string]RESTStorage
 	codec                  runtime.Codec
 	apiRequestInfoResolver *APIRequestInfoResolver
+	mapper                 meta.RESTMapper
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -96,7 +98,6 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	verb = requestInfo.Verb
 	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
-
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	if len(parts) < 2 {
 		notFound(w, req)
@@ -146,6 +147,29 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	mapping, err := r.mapper.RESTMapping(requestInfo.Kind, requestInfo.APIVersion)
+	if err != nil {
+		httplog.LogOf(req, w).Addf("Mapping not found for kind %v and version %v''", requestInfo.Kind, requestInfo.APIVersion)
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
+		return
+	}
+
+	// if the resource is not namespaced, it is just /prefix/{resource}/{id}
+	proxyPathPrepend := path.Join(r.prefix, resource, id)
+	scope := mapping.Scope
+	// if the apiversion and kind has a scope (like a namespace, the path has to change)
+	if len(scope.ParamName()) > 0 {
+		// v1beta3 format
+		if scope.ParamPath() {
+			proxyPathPrepend = path.Join(r.prefix, scope.ParamName(), namespace, resource, id)
+		} else {
+			// v1beta1 format
+			proxyPathPrepend = strings.Join([]string{path.Join(r.prefix, resource, id), "?", scope.ParamName(), "=", namespace}, "")
+		}
+	}
+
 	destURL, err := url.Parse(location)
 	if err != nil {
 		status := errToAPIStatus(err)
@@ -175,7 +199,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxy.Transport = &proxyTransport{
 		proxyScheme:      req.URL.Scheme,
 		proxyHost:        req.URL.Host,
-		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, resource, id),
+		proxyPathPrepend: proxyPathPrepend,
 	}
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)

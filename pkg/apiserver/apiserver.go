@@ -29,7 +29,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -128,7 +127,7 @@ func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, api
 			selfLinker:             selfLinker,
 			ops:                    NewOperations(),
 			admissionControl:       admissionControl,
-			apiRequestInfoResolver: &APIRequestInfoResolver{util.NewStringSet(apiRoot), latest.RESTMapper},
+			apiRequestInfoResolver: &APIRequestInfoResolver{util.NewStringSet(apiRoot), mapper},
 		},
 		mapper: mapper,
 	}

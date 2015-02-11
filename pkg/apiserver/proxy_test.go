@@ -280,12 +280,12 @@ func TestProxy(t *testing.T) {
 		}
 
 		namespaceHandler := Handle(map[string]RESTStorage{
-			"foo": simpleStorage,
+			"simples": simpleStorage,
 		}, codec, "/prefix", "version", selfLinker, admissionControl, namespaceMapper)
 		namespaceServer := httptest.NewServer(namespaceHandler)
 		defer namespaceServer.Close()
 		legacyNamespaceHandler := Handle(map[string]RESTStorage{
-			"foo": simpleStorage,
+			"simples": simpleStorage,
 		}, codec, "/prefix", "version", selfLinker, admissionControl, legacyNamespaceMapper)
 		legacyNamespaceServer := httptest.NewServer(legacyNamespaceHandler)
 		defer legacyNamespaceServer.Close()
@@ -295,8 +295,8 @@ func TestProxy(t *testing.T) {
 			server           *httptest.Server
 			proxyTestPattern string
 		}{
-			{namespaceServer, "/prefix/version/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
-			{legacyNamespaceServer, "/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
+			{namespaceServer, "/prefix/version/proxy/namespaces/" + item.reqNamespace + "/simples/id" + item.path},
+			{legacyNamespaceServer, "/prefix/version/proxy/simples/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
 
 		for _, serverPattern := range serverPatterns {

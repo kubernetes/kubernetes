@@ -56,7 +56,7 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 		apiRequestInfoResolver: a.restHandler.apiRequestInfoResolver,
 	})
 	redirectHandler := (&RedirectHandler{a.restHandler.storage, a.restHandler.codec, a.restHandler.apiRequestInfoResolver})
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.restHandler.storage, a.restHandler.codec, a.restHandler.apiRequestInfoResolver})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.restHandler.storage, a.restHandler.codec, a.restHandler.apiRequestInfoResolver, a.mapper})
 
 	for path, storage := range a.restHandler.storage {
 		if err := a.registerResourceHandlers(path, storage, ws, watchHandler, redirectHandler, proxyHandler); err != nil {
