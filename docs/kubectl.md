@@ -11,12 +11,14 @@ Usage:
 ```
   kubectl version [flags]
 
- Available Flags:
+Flags:
+  -c, --client=false: Client version only (no server required).
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
       --certificate-authority="": Path to a cert. file for the certificate authority.
-  -c, --client=false: Client version only (no server required).
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
@@ -47,9 +49,14 @@ Usage:
 ```
   kubectl proxy [flags]
 
- Available Flags:
-      --alsologtostderr=false: log to standard error as well as files
+Flags:
       --api-prefix="/api/": Prefix to serve the proxied API under.
+  -p, --port=8001: The port on which to run the proxy.
+  -w, --www="": Also serve static files from the given directory under the specified prefix.
+  -P, --www-prefix="/static/": Prefix to serve static files under, if static file directory is specified.
+
+Global Flags:
+      --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
       --certificate-authority="": Path to a cert. file for the certificate authority.
@@ -66,7 +73,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-  -p, --port=8001: The port on which to run the proxy.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -74,8 +80,6 @@ Usage:
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
-  -w, --www="": Also serve static files from the given directory under the specified prefix.
-  -P, --www-prefix="/static/": Prefix to serve static files under, if static file directory is specified.
 
 ```
 
@@ -109,7 +113,16 @@ Usage:
 ```
   kubectl get [(-o|--output=)json|yaml|template|...] <resource> [<id>] [flags]
 
- Available Flags:
+Flags:
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+  -l, --selector="": Selector (label query) to filter on
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -w, --watch=false: After listing/getting the requested object, watch for changes.
+      --watch-only=false: Watch for changes to the requested object(s), without listing/getting first.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -127,20 +140,13 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --no-headers=false: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|template|templatefile.
-      --output-version="": Output the formatted object with the given version (default api-version).
-  -l, --selector="": Selector (label query) to filter on
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
-  -w, --watch=false: After listing/getting the requested object, watch for changes.
-      --watch-only=false: Watch for changes to the requested object(s), without listing/getting first.
 
 ```
 
@@ -154,7 +160,8 @@ Usage:
 ```
   kubectl describe <resource> <id> [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -163,6 +170,7 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for describe
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
@@ -198,7 +206,10 @@ Usage:
 ```
   kubectl create -f filename [flags]
 
- Available Flags:
+Flags:
+  -f, --filename=[]: Filename, directory, or URL to file to use to create the resource
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -207,7 +218,6 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -f, --filename=[]: Filename, directory, or URL to file to use to create the resource
   -h, --help=false: help for create
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -247,7 +257,11 @@ Usage:
 ```
   kubectl update -f filename [flags]
 
- Available Flags:
+Flags:
+  -f, --filename=[]: Filename, directory, or URL to file to use to update the resource.
+      --patch="": A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -256,7 +270,6 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -f, --filename=[]: Filename, directory, or URL to file to use to update the resource.
   -h, --help=false: help for update
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -266,7 +279,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --patch="": A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -307,7 +319,11 @@ Usage:
 ```
   kubectl delete ([-f filename] | (<resource> [(<id> | -l <label>)] [flags]
 
- Available Flags:
+Flags:
+  -f, --filename=[]: Filename, directory, or URL to a file containing the resource to delete
+  -l, --selector="": Selector (label query) to filter on
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -316,7 +332,6 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -f, --filename=[]: Filename, directory, or URL to a file containing the resource to delete
   -h, --help=false: help for delete
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -326,7 +341,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-  -l, --selector="": Selector (label query) to filter on
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -354,7 +368,8 @@ Available Commands:
   unset property-name                                                                                                                                               Unsets an individual value in a .kubeconfig file
   use-context context-name                                                                                                                                          Sets the current-context in a .kubeconfig file
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -365,6 +380,7 @@ Available Commands:
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
@@ -400,7 +416,7 @@ Additional help topics:
   kubectl expose        Take a replicated application and expose it as Kubernetes Service
   kubectl label         Update the labels on a resource
 
-Use "kubectl help [command]" for more information about that command.
+Use "kubectl help [command]" for more information about a command.
 ```
 
 #### config view
@@ -416,7 +432,14 @@ Usage:
 ```
   kubectl config view [flags]
 
- Available Flags:
+Flags:
+      --merge=true: merge together the full hierarchy of .kubeconfig files
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -436,14 +459,9 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-      --merge=true: merge together the full hierarchy of .kubeconfig files
       --namespace="": If present, the namespace scope for this CLI request.
-      --no-headers=false: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|template|templatefile.
-      --output-version="": Output the formatted object with the given version (default api-version).
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
@@ -464,11 +482,12 @@ Usage:
 ```
   kubectl config set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true] [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
-      --api-version=: api-version for the cluster entry in .kubeconfig
+      --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
-      --certificate-authority=: certificate-authority for the cluster entry in .kubeconfig
+      --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
@@ -476,7 +495,7 @@ Usage:
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for set-cluster
-      --insecure-skip-tls-verify=false: insecure-skip-tls-verify for the cluster entry in .kubeconfig
+      --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
@@ -485,7 +504,7 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --server=: server for the cluster entry in .kubeconfig
+  -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
@@ -507,13 +526,14 @@ Usage:
 ```
   kubectl config set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
-      --auth-path=: auth-path for the user entry in .kubeconfig
+  -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
       --certificate-authority="": Path to a cert. file for the certificate authority.
-      --client-certificate=: client-certificate for the user entry in .kubeconfig
-      --client-key=: client-key for the user entry in .kubeconfig
+      --client-certificate="": Path to a client key file for TLS.
+      --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
@@ -530,7 +550,7 @@ Usage:
       --namespace="": If present, the namespace scope for this CLI request.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-      --token=: token for the user entry in .kubeconfig
+      --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
@@ -550,14 +570,15 @@ Usage:
 ```
   kubectl config set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace] [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
-      --cluster=: cluster for the context entry in .kubeconfig
+      --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
@@ -570,11 +591,11 @@ Usage:
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
-      --namespace=: namespace for the context entry in .kubeconfig
+      --namespace="": If present, the namespace scope for this CLI request.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
-      --user=: user for the context entry in .kubeconfig
+      --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -593,7 +614,8 @@ Usage:
 ```
   kubectl config set property-name property-value [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -604,7 +626,7 @@ Usage:
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
-  -h, --help=false: help for config
+  -h, --help=false: help for set
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
@@ -634,7 +656,8 @@ Usage:
 ```
   kubectl config unset property-name [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -645,7 +668,7 @@ Usage:
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
-  -h, --help=false: help for config
+  -h, --help=false: help for unset
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
@@ -672,7 +695,8 @@ Usage:
 ```
   kubectl config use-context context-name [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -683,7 +707,7 @@ Usage:
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
-  -h, --help=false: help for config
+  -h, --help=false: help for use-context
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
@@ -713,7 +737,8 @@ Usage:
 ```
   kubectl namespace [<namespace>] [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -722,6 +747,7 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for namespace
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
@@ -755,7 +781,10 @@ Usage:
 ```
   kubectl log [-f] <pod> [<container>] [flags]
 
- Available Flags:
+Flags:
+  -f, --follow=false: Specify if the logs should be streamed.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -764,7 +793,6 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -f, --follow=false: Specify if the logs should be streamed.
   -h, --help=false: help for log
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -803,7 +831,13 @@ Usage:
 ```
   kubectl rollingupdate <old-controller-name> -f <new-controller.json> [flags]
 
- Available Flags:
+Flags:
+  -f, --filename="": Filename or URL to file to use to create the new controller.
+      --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+      --timeout="5m0s": Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+      --update-period="1m0s": Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -812,7 +846,6 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -f, --filename="": Filename or URL to file to use to create the new controller.
   -h, --help=false: help for rollingupdate
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -822,12 +855,9 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-      --timeout="5m0s": Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --token="": Bearer token for authentication to the API server.
-      --update-period="1m0s": Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
@@ -855,7 +885,12 @@ Usage:
 ```
   kubectl resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id> [flags]
 
- Available Flags:
+Flags:
+      --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.
+      --replicas=-1: The new desired number of replicas. Required.
+      --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -864,7 +899,6 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.
   -h, --help=false: help for resize
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -874,8 +908,6 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --replicas=-1: The new desired number of replicas. Required.
-      --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
@@ -908,7 +940,20 @@ Usage:
 ```
   kubectl run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>] [flags]
 
- Available Flags:
+Flags:
+      --dry-run=false: If true, only print the object that would be sent, without sending it.
+      --generator="run-container/v1": The name of the API generator to use.  Default is 'run-container-controller/v1'.
+      --image="": The image for the container to run.
+  -l, --labels="": Labels to apply to the pod(s) created by this call to run-container.
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+      --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
+      --port=-1: The port that this container exposes.
+  -r, --replicas=1: Number of replicas to create for this container. Default is 1.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -917,28 +962,17 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --dry-run=false: If true, only print the object that would be sent, without sending it.
-      --generator="run-container/v1": The name of the API generator to use.  Default is 'run-container-controller/v1'.
   -h, --help=false: help for run-container
-      --image="": The image for the container to run.
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
-  -l, --labels="": Labels to apply to the pod(s) created by this call to run-container.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --no-headers=false: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|template|templatefile.
-      --output-version="": Output the formatted object with the given version (default api-version).
-      --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
-      --port=-1: The port that this container exposes.
-  -r, --replicas=1: Number of replicas to create for this container. Default is 1.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
@@ -963,7 +997,8 @@ Usage:
 ```
   kubectl stop <resource> <id> [flags]
 
- Available Flags:
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -972,6 +1007,7 @@ Usage:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for stop
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
@@ -1009,7 +1045,23 @@ Usage:
 ```
   kubectl expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer] [flags]
 
- Available Flags:
+Flags:
+      --container-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
+      --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
+      --dry-run=false: If true, only print the object that would be sent, without creating it.
+      --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+      --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
+      --port=-1: The port that the service should serve on. Required.
+      --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
+      --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
+      --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
+      --service-name="": The name for the newly created service.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -1017,11 +1069,7 @@ Usage:
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
-      --container-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
       --context="": The name of the kubeconfig context to use
-      --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
-      --dry-run=false: If true, only print the object that would be sent, without creating it.
-      --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
   -h, --help=false: help for expose
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
@@ -1031,18 +1079,8 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --no-headers=false: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|template|templatefile.
-      --output-version="": Output the formatted object with the given version (default api-version).
-      --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
-      --port=-1: The port that the service should serve on. Required.
-      --protocol="TCP": The network protocol for the service to be created. Default is 'tcp'.
-      --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
-      --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
   -s, --server="": The address of the Kubernetes API server
-      --service-name="": The name for the newly created service.
       --stderrthreshold=2: logs at or above this threshold go to stderr
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
@@ -1074,7 +1112,15 @@ Usage:
 ```
   kubectl label [--overwrite] <resource> <name> <key-1>=<val-1> ... <key-n>=<val-n> [--resource-version=<version>] [flags]
 
- Available Flags:
+Flags:
+      --no-headers=false: When using the default output, don't print headers.
+  -o, --output="": Output format. One of: json|yaml|template|templatefile.
+      --output-version="": Output the formatted object with the given version (default api-version).
+      --overwrite=false: If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
+      --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+
+Global Flags:
       --alsologtostderr=false: log to standard error as well as files
       --api-version="": The API version to use when talking to the server
   -a, --auth-path="": Path to the auth info file. If missing, prompt the user. Only used if using https.
@@ -1092,14 +1138,8 @@ Usage:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
-      --no-headers=false: When using the default output, don't print headers.
-  -o, --output="": Output format. One of: json|yaml|template|templatefile.
-      --output-version="": Output the formatted object with the given version (default api-version).
-      --overwrite=false: If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
-      --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object.
   -s, --server="": The address of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
       --v=0: log level for V logs
