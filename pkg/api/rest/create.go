@@ -87,12 +87,12 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
-func objectMetaAndKind(strategy RESTCreateStrategy, obj runtime.Object) (*api.ObjectMeta, string, error) {
+func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, string, error) {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return nil, "", errors.NewInternalError(err)
 	}
-	_, kind, err := strategy.ObjectVersionAndKind(obj)
+	_, kind, err := typer.ObjectVersionAndKind(obj)
 	if err != nil {
 		return nil, "", errors.NewInternalError(err)
 	}
