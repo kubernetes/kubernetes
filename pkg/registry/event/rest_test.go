@@ -64,7 +64,7 @@ func TestRESTCreate(t *testing.T) {
 		}, {
 			ctx:   api.NewContext(),
 			event: testEvent("bar"),
-			valid: true,
+			valid: false,
 		}, {
 			ctx:   api.WithNamespace(api.NewContext(), "nondefault"),
 			event: testEvent("bazzzz"),

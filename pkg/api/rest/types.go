@@ -128,7 +128,31 @@ func (nodeStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	return validation.ValidateMinion(node)
 }
 
-// namespaceStrategy implements behavior for nodes
+// eventStrategy implements behavior for events
+type eventStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+// Events is the default logic that applies when creating and updating event objects.
+var Events RESTCreateStrategy = eventStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for events.
+func (eventStrategy) NamespaceScoped() bool {
+	return true
+}
+
+func (eventStrategy) ResetBeforeCreate(obj runtime.Object) {
+	_ = obj.(*api.Event)
+}
+
+// Validate validates a new event.
+func (eventStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	event := obj.(*api.Event)
+	return validation.ValidateEvent(event)
+}
+
+// namespaceStrategy implements behavior for namespace
 type namespaceStrategy struct {
 	runtime.ObjectTyper
 	api.NameGenerator
