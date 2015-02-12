@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -68,7 +67,7 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient, h := newHelper(t)
-	storage, bindingStorage := NewREST(h, &pod.BasicBoundPodFactory{ServiceRegistry: &registrytest.ServiceRegistry{}})
+	storage, bindingStorage := NewREST(h, &pod.BasicBoundPodFactory{})
 	storage = storage.WithPodStatus(&fakeCache{statusToReturn: &api.PodStatus{}})
 	return storage, bindingStorage, fakeEtcdClient, h
 }

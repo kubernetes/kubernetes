@@ -40,6 +40,8 @@ type Registry interface {
 	DeletePod(ctx api.Context, podID string) error
 }
 
+// Storage is an interface for a standard REST Storage backend
+// TODO: move me somewhere common
 type Storage interface {
 	apiserver.RESTDeleter
 	apiserver.RESTLister
@@ -50,10 +52,13 @@ type Storage interface {
 	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
 }
 
+// storage puts strong typing around storage calls
 type storage struct {
 	Storage
 }
 
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
 func NewRegistry(s Storage) Registry {
 	return &storage{s}
 }
