@@ -199,7 +199,8 @@ function detect-master () {
 #   KUBE_PASSWORD
 function get-password {
   # go template to extract the auth-path of the current-context user
-  local template='{{with $ctx := index . "current-context"}}{{$user := index . "contexts" $ctx "user"}}{{index . "users" $user "auth-path"}}{{end}}'
+  # Note: we save dot ('.') to $dot because the 'with' action overrides dot
+  local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "auth-path"}}{{end}}'
   local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
   if [[ ! -z "$file" && -r "$file" ]]; then
     KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
