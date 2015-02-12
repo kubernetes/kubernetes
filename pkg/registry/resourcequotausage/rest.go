@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -42,15 +41,13 @@ func (*REST) New() runtime.Object {
 }
 
 // Create takes the incoming ResourceQuotaUsage and applies the latest status atomically to a ResourceQuota
-func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (b *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	resourceQuotaUsage, ok := obj.(*api.ResourceQuotaUsage)
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := b.registry.ApplyStatus(ctx, resourceQuotaUsage); err != nil {
-			return nil, err
-		}
-		return &api.Status{Status: api.StatusSuccess}, nil
-	}), nil
+	if err := b.registry.ApplyStatus(ctx, resourceQuotaUsage); err != nil {
+		return nil, err
+	}
+	return &api.Status{Status: api.StatusSuccess}, nil
 }

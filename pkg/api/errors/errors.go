@@ -29,6 +29,12 @@ import (
 const (
 	StatusUnprocessableEntity = 422
 	StatusTooManyRequests     = 429
+	// HTTP recommendations are for servers to define 5xx error codes
+	// for scenarios not covered by behavior. In this case, TryAgainLater
+	// is an indication that a transient server error has occured and the
+	// client *should* retry, with an optional Retry-After header to specify
+	// the back off window.
+	StatusTryAgainLater = 504
 )
 
 // StatusError is an error intended for consumption by a REST API server; it can also be
@@ -199,6 +205,17 @@ func NewInternalError(err error) error {
 			Causes: []api.StatusCause{{Message: err.Error()}},
 		},
 		Message: fmt.Sprintf("Internal error occurred: %v", err),
+	}}
+}
+
+// NewTimeoutError returns an error indicating that a timeout occurred before the request
+// could be completed.  Clients may retry, but the operation may still complete.
+func NewTimeoutError(message string) error {
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    StatusTryAgainLater,
+		Reason:  api.StatusReasonTimeout,
+		Message: fmt.Sprintf("Timeout: %s", message),
 	}}
 }
 

@@ -56,9 +56,8 @@ func TestServiceRegistryCreate(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c, _ := storage.Create(ctx, svc)
-	created_svc := <-c
-	created_service := created_svc.Object.(*api.Service)
+	created_svc, _ := storage.Create(ctx, svc)
+	created_service := created_svc.(*api.Service)
 	if !api.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
@@ -109,7 +108,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	for _, failureCase := range failureCases {
 		c, err := storage.Create(ctx, &failureCase)
 		if c != nil {
-			t.Errorf("Expected nil channel")
+			t.Errorf("Expected nil object")
 		}
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
@@ -129,7 +128,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 		},
 	})
 	storage := NewREST(registry, nil, nil, makeIPNet(t))
-	c, err := storage.Update(ctx, &api.Service{
+	updated_svc, created, err := storage.Update(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Port:            6502,
@@ -141,11 +140,13 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if c == nil {
-		t.Errorf("Expected non-nil channel")
+	if updated_svc == nil {
+		t.Errorf("Expected non-nil object")
 	}
-	updated_svc := <-c
-	updated_service := updated_svc.Object.(*api.Service)
+	if created {
+		t.Errorf("expected not created")
+	}
+	updated_service := updated_svc.(*api.Service)
 	if updated_service.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", updated_service.Name)
 	}
@@ -186,9 +187,9 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(ctx, &failureCase)
-		if c != nil {
-			t.Errorf("Expected nil channel")
+		c, created, err := storage.Update(ctx, &failureCase)
+		if c != nil || created {
+			t.Errorf("Expected nil object or created false")
 		}
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
@@ -212,8 +213,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			SessionAffinity:            api.AffinityTypeNone,
 		},
 	}
-	c, _ := storage.Create(ctx, svc)
-	<-c
+	storage.Create(ctx, svc)
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -244,8 +244,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c, _ := storage.Create(ctx, svc)
-	<-c
+	storage.Create(ctx, svc)
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "get-zone" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -269,8 +268,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 		},
 	}
 	registry.CreateService(ctx, svc)
-	c, _ := storage.Delete(ctx, svc.Name)
-	<-c
+	storage.Delete(ctx, svc.Name)
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -295,8 +293,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		},
 	}
 	registry.CreateService(ctx, svc)
-	c, _ := storage.Delete(ctx, svc.Name)
-	<-c
+	storage.Delete(ctx, svc.Name)
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -413,9 +410,8 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c1, _ := rest.Create(ctx, svc1)
-	created_svc1 := <-c1
-	created_service_1 := created_svc1.Object.(*api.Service)
+	created_svc1, _ := rest.Create(ctx, svc1)
+	created_service_1 := created_svc1.(*api.Service)
 	if created_service_1.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", created_service_1.Name)
 	}
@@ -432,9 +428,8 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			SessionAffinity: api.AffinityTypeNone,
 		}}
 	ctx = api.NewDefaultContext()
-	c2, _ := rest.Create(ctx, svc2)
-	created_svc2 := <-c2
-	created_service_2 := created_svc2.Object.(*api.Service)
+	created_svc2, _ := rest.Create(ctx, svc2)
+	created_service_2 := created_svc2.(*api.Service)
 	if created_service_2.Name != "bar" {
 		t.Errorf("Expected bar, but got %v", created_service_2.Name)
 	}
@@ -453,9 +448,8 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		},
 	}
 	ctx = api.NewDefaultContext()
-	c3, _ := rest.Create(ctx, svc3)
-	created_svc3 := <-c3
-	created_service_3 := created_svc3.Object.(*api.Service)
+	created_svc3, _ := rest.Create(ctx, svc3)
+	created_service_3 := created_svc3.(*api.Service)
 	if created_service_3.Spec.PortalIP != "1.2.3.93" { // specific IP
 		t.Errorf("Unexpected PortalIP: %s", created_service_3.Spec.PortalIP)
 	}
@@ -478,9 +472,8 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c1, _ := rest.Create(ctx, svc1)
-	created_svc1 := <-c1
-	created_service_1 := created_svc1.Object.(*api.Service)
+	created_svc1, _ := rest.Create(ctx, svc1)
+	created_service_1 := created_svc1.(*api.Service)
 	if created_service_1.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", created_service_1.Name)
 	}
@@ -488,8 +481,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		t.Errorf("Unexpected PortalIP: %s", created_service_1.Spec.PortalIP)
 	}
 
-	c, _ := rest.Delete(ctx, created_service_1.Name)
-	<-c
+	rest.Delete(ctx, created_service_1.Name)
 
 	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
@@ -501,9 +493,8 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		},
 	}
 	ctx = api.NewDefaultContext()
-	c2, _ := rest.Create(ctx, svc2)
-	created_svc2 := <-c2
-	created_service_2 := created_svc2.Object.(*api.Service)
+	created_svc2, _ := rest.Create(ctx, svc2)
+	created_service_2 := created_svc2.(*api.Service)
 	if created_service_2.Name != "bar" {
 		t.Errorf("Expected bar, but got %v", created_service_2.Name)
 	}
@@ -529,9 +520,8 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c, _ := rest.Create(ctx, svc)
-	created_svc := <-c
-	created_service := created_svc.Object.(*api.Service)
+	created_svc, _ := rest.Create(ctx, svc)
+	created_service := created_svc.(*api.Service)
 	if created_service.Spec.Port != 6502 {
 		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Port)
 	}
@@ -543,9 +533,8 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	*update = *created_service
 	update.Spec.Port = 6503
 
-	c, _ = rest.Update(ctx, update)
-	updated_svc := <-c
-	updated_service := updated_svc.Object.(*api.Service)
+	updated_svc, _, _ := rest.Update(ctx, update)
+	updated_service := updated_svc.(*api.Service)
 	if updated_service.Spec.Port != 6503 {
 		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Port)
 	}
@@ -554,7 +543,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update.Spec.Port = 6503
 	update.Spec.PortalIP = "1.2.3.76" // error
 
-	_, err := rest.Update(ctx, update)
+	_, _, err := rest.Update(ctx, update)
 	if err == nil || !errors.IsInvalid(err) {
 		t.Error("Unexpected error type: %v", err)
 	}
@@ -578,9 +567,8 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c, _ := rest.Create(ctx, svc)
-	created_svc := <-c
-	created_service := created_svc.Object.(*api.Service)
+	created_svc, _ := rest.Create(ctx, svc)
+	created_service := created_svc.(*api.Service)
 	if created_service.Spec.Port != 6502 {
 		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Port)
 	}
@@ -591,7 +579,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	update := new(api.Service)
 	*update = *created_service
 
-	_, err := rest.Update(ctx, update)
+	_, _, err := rest.Update(ctx, update)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -614,8 +602,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	c, _ := rest1.Create(ctx, svc)
-	<-c
+	rest1.Create(ctx, svc)
 	svc = &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
@@ -625,8 +612,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
-	c, _ = rest1.Create(ctx, svc)
-	<-c
+	rest1.Create(ctx, svc)
 
 	// This will reload from storage, finding the previous 2
 	rest2 := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
@@ -641,9 +627,8 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
-	c, _ = rest2.Create(ctx, svc)
-	created_svc := <-c
-	created_service := created_svc.Object.(*api.Service)
+	created_svc, _ := rest2.Create(ctx, svc)
+	created_service := created_svc.(*api.Service)
 	if created_service.Spec.PortalIP != "1.2.3.3" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
@@ -657,9 +642,9 @@ func TestCreateServiceWithConflictingNamespace(t *testing.T) {
 	}
 
 	ctx := api.NewDefaultContext()
-	channel, err := storage.Create(ctx, service)
-	if channel != nil {
-		t.Error("Expected a nil channel, but we got a value")
+	obj, err := storage.Create(ctx, service)
+	if obj != nil {
+		t.Error("Expected a nil object, but we got a value")
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
@@ -675,9 +660,9 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	}
 
 	ctx := api.NewDefaultContext()
-	channel, err := storage.Update(ctx, service)
-	if channel != nil {
-		t.Error("Expected a nil channel, but we got a value")
+	obj, created, err := storage.Update(ctx, service)
+	if obj != nil || created {
+		t.Error("Expected a nil object, but we got a value or created was true")
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")

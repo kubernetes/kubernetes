@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -92,15 +91,8 @@ func (m *Master) createMasterNamespaceIfNeeded(ns string) error {
 			Namespace: "",
 		},
 	}
-	c, err := m.storage["namespaces"].(apiserver.RESTCreater).Create(ctx, namespace)
-	if err != nil {
-		return err
-	}
-	resp := <-c
-	if _, ok := resp.Object.(*api.Service); ok {
-		return nil
-	}
-	return fmt.Errorf("unexpected response %#v", resp)
+	_, err := m.storage["namespaces"].(apiserver.RESTCreater).Create(ctx, namespace)
+	return err
 }
 
 // createMasterServiceIfNeeded will create the specified service if it
@@ -126,18 +118,8 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
-	// Kids, don't do this at home: this is a hack. There's no good way to call the business
-	// logic which lives in the REST object from here.
-	c, err := m.storage["services"].(apiserver.RESTCreater).Create(ctx, svc)
-	if err != nil {
-		return err
-	}
-	resp := <-c
-	if _, ok := resp.Object.(*api.Service); ok {
-		// If all worked, we get back an *api.Service object.
-		return nil
-	}
-	return fmt.Errorf("unexpected response: %#v", resp.Object)
+	_, err := m.storage["services"].(apiserver.RESTCreater).Create(ctx, svc)
+	return err
 }
 
 // ensureEndpointsContain sets the endpoints for the given service. Also removes

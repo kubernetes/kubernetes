@@ -73,6 +73,15 @@ func monitor(handler, verb, resource string, httpCode int, reqStart time.Time) {
 	requestLatencies.WithLabelValues(handler, verb).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
+// monitorFilter creates a filter that reports the metrics for a given resource and action.
+func monitorFilter(action, resource string) restful.FilterFunction {
+	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
+		reqStart := time.Now()
+		chain.ProcessFilter(req, res)
+		monitor("rest", action, resource, res.StatusCode(), reqStart)
+	}
+}
+
 // mux is an object that can register http handlers.
 type Mux interface {
 	Handle(pattern string, handler http.Handler)
@@ -89,9 +98,9 @@ type defaultAPIServer struct {
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
 // Note: This method is used only in tests.
-func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) http.Handler {
-	prefix := root + "/" + version
-	group := NewAPIGroupVersion(storage, codec, root, prefix, selfLinker, admissionControl, mapper)
+func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, linker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) http.Handler {
+	prefix := path.Join(root, version)
+	group := NewAPIGroupVersion(storage, codec, root, prefix, linker, admissionControl, mapper)
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -102,16 +111,19 @@ func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, ve
 	return &defaultAPIServer{mux, group}
 }
 
-// TODO: This is a whole API version right now. Maybe should rename it.
-// APIGroupVersion is a http.Handler that exposes multiple RESTStorage objects
+// APIGroupVersion is a helper for exposing RESTStorage objects as http.Handlers via go-restful
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
 // Where 'storage_key' points to a RESTStorage object stored in storage.
-//
-// TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIGroupVersion struct {
-	handler RESTHandler
+	storage map[string]RESTStorage
+	codec   runtime.Codec
+	prefix  string
+	linker  runtime.SelfLinker
+	admit   admission.Interface
 	mapper  meta.RESTMapper
+	// TODO: put me into a cleaner interface
+	info *APIRequestInfoResolver
 }
 
 // NewAPIGroupVersion returns an object that will serve a set of REST resources and their
@@ -119,18 +131,15 @@ type APIGroupVersion struct {
 // This is a helper method for registering multiple sets of REST handlers under different
 // prefixes onto a server.
 // TODO: add multitype codec serialization
-func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, apiRoot, canonicalPrefix string, selfLinker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) *APIGroupVersion {
+func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, root, prefix string, linker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) *APIGroupVersion {
 	return &APIGroupVersion{
-		handler: RESTHandler{
-			storage:                storage,
-			codec:                  codec,
-			canonicalPrefix:        canonicalPrefix,
-			selfLinker:             selfLinker,
-			ops:                    NewOperations(),
-			admissionControl:       admissionControl,
-			apiRequestInfoResolver: &APIRequestInfoResolver{util.NewStringSet(apiRoot), latest.RESTMapper},
-		},
-		mapper: mapper,
+		storage: storage,
+		codec:   codec,
+		prefix:  prefix,
+		linker:  linker,
+		admit:   admissionControl,
+		mapper:  mapper,
+		info:    &APIRequestInfoResolver{util.NewStringSet(root), latest.RESTMapper},
 	}
 }
 
@@ -139,7 +148,12 @@ func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, api
 // in a slash. A restful WebService is created for the group and version.
 func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) error {
 	prefix := path.Join(root, version)
-	ws, registrationErrors := (&APIInstaller{prefix, version, &g.handler, g.mapper}).Install()
+	installer := &APIInstaller{
+		group:   g,
+		prefix:  prefix,
+		version: version,
+	}
+	ws, registrationErrors := installer.Install()
 	container.Add(ws)
 	return errors.NewAggregate(registrationErrors)
 }
@@ -186,15 +200,15 @@ func AddApiWebService(container *restful.Container, apiPrefix string, versions [
 	// TODO: InstallREST should register each version automatically
 
 	versionHandler := APIVersionHandler(versions[:]...)
-	getApiVersionsWebService := new(restful.WebService)
-	getApiVersionsWebService.Path(apiPrefix)
-	getApiVersionsWebService.Doc("get available api versions")
-	getApiVersionsWebService.Route(getApiVersionsWebService.GET("/").To(versionHandler).
-		Doc("get available api versions").
-		Operation("getApiVersions").
+	ws := new(restful.WebService)
+	ws.Path(apiPrefix)
+	ws.Doc("get available API versions")
+	ws.Route(ws.GET("/").To(versionHandler).
+		Doc("get available API versions").
+		Operation("getAPIVersions").
 		Produces(restful.MIME_JSON).
 		Consumes(restful.MIME_JSON))
-	container.Add(getApiVersionsWebService)
+	container.Add(ws)
 }
 
 // handleVersion writes the server's version information.

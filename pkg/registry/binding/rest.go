@@ -18,9 +18,9 @@ package binding
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -44,15 +44,13 @@ func (*REST) New() runtime.Object {
 }
 
 // Create attempts to make the assignment indicated by the binding it recieves.
-func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (b *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	binding, ok := obj.(*api.Binding)
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := b.registry.ApplyBinding(ctx, binding); err != nil {
-			return nil, err
-		}
-		return &api.Status{Status: api.StatusSuccess}, nil
-	}), nil
+	if err := b.registry.ApplyBinding(ctx, binding); err != nil {
+		return nil, err
+	}
+	return &api.Status{Status: api.StatusSuccess, Code: http.StatusCreated}, nil
 }

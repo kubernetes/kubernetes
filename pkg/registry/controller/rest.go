@@ -50,7 +50,7 @@ func NewREST(registry Registry, podLister PodLister) *REST {
 }
 
 // Create registers the given ReplicationController.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -60,20 +60,16 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, err
 	}
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.CreateController(ctx, controller); err != nil {
-			err = rest.CheckGeneratedNameError(rest.ReplicationControllers, err, controller)
-			return apiserver.RESTResult{}, err
-		}
-		return rs.registry.GetController(ctx, controller.Name)
-	}), nil
+	if err := rs.registry.CreateController(ctx, controller); err != nil {
+		err = rest.CheckGeneratedNameError(rest.ReplicationControllers, err, controller)
+		return apiserver.RESTResult{}, err
+	}
+	return rs.registry.GetController(ctx, controller.Name)
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(ctx, id)
-	}), nil
+func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
+	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(ctx, id)
 }
 
 // Get obtains the ReplicationController specified by its id.
@@ -117,24 +113,23 @@ func (*REST) NewList() runtime.Object {
 
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
-		return nil, fmt.Errorf("not a replication controller: %#v", obj)
+		return nil, false, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
-		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
+		return nil, false, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateController(ctx, controller)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.GetController(ctx, controller.Name)
-	}), nil
+	err := rs.registry.UpdateController(ctx, controller)
+	if err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.GetController(ctx, controller.Name)
+	return out, false, err
 }
 
 // Watch returns ReplicationController events via a watch.Interface.

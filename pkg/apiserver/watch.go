@@ -37,24 +37,24 @@ import (
 )
 
 type WatchHandler struct {
-	storage                map[string]RESTStorage
-	codec                  runtime.Codec
-	canonicalPrefix        string
-	selfLinker             runtime.SelfLinker
-	apiRequestInfoResolver *APIRequestInfoResolver
+	storage map[string]RESTStorage
+	codec   runtime.Codec
+	prefix  string
+	linker  runtime.SelfLinker
+	info    *APIRequestInfoResolver
 }
 
 // setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
 func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) error {
-	name, err := h.selfLinker.Name(obj)
+	name, err := h.linker.Name(obj)
 	if err != nil {
 		return err
 	}
 	newURL := *req.URL
-	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
+	newURL.Path = path.Join(h.prefix, req.URL.Path, name)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
-	return h.selfLinker.SetSelfLink(obj, newURL.String())
+	return h.linker.SetSelfLink(obj, newURL.String())
 }
 
 func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string, err error) {
@@ -96,7 +96,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	requestInfo, err := h.apiRequestInfoResolver.GetAPIRequestInfo(req)
+	requestInfo, err := h.info.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
 		httpCode = http.StatusNotFound
