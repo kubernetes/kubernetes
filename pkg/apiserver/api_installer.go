@@ -44,6 +44,9 @@ type action struct {
 	Params []*restful.Parameter // List of parameters associated with the action.
 }
 
+// errEmptyName is returned when API requests do not fill the name section of the path.
+var errEmptyName = fmt.Errorf("name must be provided")
+
 // Installs handlers for API resources.
 func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	errors = make([]error, 0)
@@ -161,6 +164,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	if scope.Name() != meta.RESTScopeNameNamespace {
 		objNameFn = func(obj runtime.Object) (namespace, name string, err error) {
 			name, err = linker.Name(obj)
+			if len(name) == 0 {
+				err = errEmptyName
+			}
 			return
 		}
 
@@ -176,6 +182,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		}
 		nameFn = func(req *restful.Request) (namespace, name string, err error) {
 			name = req.PathParameter("name")
+			if len(name) == 0 {
+				err = errEmptyName
+			}
 			return
 		}
 		generateLinkFn = func(namespace, name string) (path string, query string) {
@@ -223,6 +232,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			nameFn = func(req *restful.Request) (namespace, name string, err error) {
 				namespace, _ = namespaceFn(req)
 				name = req.PathParameter("name")
+				if len(name) == 0 {
+					err = errEmptyName
+				}
 				return
 			}
 			generateLinkFn = func(namespace, name string) (path string, query string) {
@@ -265,6 +277,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			nameFn = func(req *restful.Request) (namespace, name string, err error) {
 				namespace, _ = namespaceFn(req)
 				name = req.PathParameter("name")
+				if len(name) == 0 {
+					err = errEmptyName
+				}
 				return
 			}
 			generateLinkFn = func(namespace, name string) (path string, query string) {
