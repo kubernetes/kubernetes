@@ -131,7 +131,7 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
-	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address of the Kubernetes API server")
+	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address and port of the Kubernetes API server")
 	flags.StringVar(&clusterInfo.APIVersion, flagNames.APIVersion, "", "The API version to use when talking to the server")
 	flags.StringVar(&clusterInfo.CertificateAuthority, flagNames.CertificateAuthority, "", "Path to a cert. file for the certificate authority.")
 	flags.BoolVar(&clusterInfo.InsecureSkipTLSVerify, flagNames.InsecureSkipTLSVerify, false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
