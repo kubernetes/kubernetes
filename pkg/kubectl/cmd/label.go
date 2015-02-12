@@ -39,17 +39,18 @@ If --overwrite is true, then existing labels can be overwritten, otherwise attem
 If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
 Examples:
+  // Update pod 'foo' with the label 'unhealthy' and the value 'true'.
   $ kubectl label pods foo unhealthy=true
-  <update a pod with the label 'unhealthy' and the value 'true'>
 
+  // Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
   $ kubectl label --overwrite pods foo status=unhealthy
-  <update a pod with the label 'status' and the value 'unhealthy' overwritting an existing value>
   
+  // Update pod 'foo' only if the resource is unchanged from version 1.
   $ kubectl label pods foo status=unhealthy --resource-version=1
-  <update a pod with the label 'status' and the value 'unhealthy' if the resource is unchanged from version 1>
   
-  $ kubectl label pods foo bar-
-  <update a pod by removing a label named 'bar' if it exists. Does not require the --overwrite flag.>`,
+  // Update pod 'foo' by removing a label named 'bar' if it exists.
+  // Does not require the --overwrite flag.
+  $ kubectl label pods foo bar-`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 2 {
 				usageError(cmd, "<resource> <name> is required")

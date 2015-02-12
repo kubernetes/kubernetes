@@ -38,11 +38,11 @@ resize is sent to the server.
 
 Examples:
 
-    $ kubectl resize --replicas=3 replicationcontrollers foo
     // Resize replication controller named 'foo' to 3.
+    $ kubectl resize --replicas=3 replicationcontrollers foo
 
-    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
-    // If the replication controller named foo's current size is 2, resize foo to 3.`,
+    // If the replication controller named foo's current size is 2, resize foo to 3.
+    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`,
 		Run: func(cmd *cobra.Command, args []string) {
 			count := util.GetFlagInt(cmd, "replicas")
 			if len(args) != 2 || count < 0 {

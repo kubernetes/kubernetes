@@ -32,11 +32,11 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 
 Examples:
 
-    $ kubectl log 123456-7890 ruby-container
     // Returns snapshot of ruby-container logs from pod 123456-7890.
+    $ kubectl log 123456-7890 ruby-container
 
-    $ kubectl log -f 123456-7890 ruby-container
-    // Starts streaming of ruby-container logs from pod 123456-7890.`,
+    // Starts streaming of ruby-container logs from pod 123456-7890.
+    $ kubectl log -f 123456-7890 ruby-container`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				usageError(cmd, "<pod> is required for log")

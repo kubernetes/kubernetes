@@ -46,20 +46,20 @@ of the --template flag, you can filter the attributes of the fetched resource(s)
 
 Examples:
 
-    $ kubectl get pods
     // List all pods in ps output format.
+    $ kubectl get pods
 
-    $ kubectl get replicationController 1234-56-7890-234234-456456
     // List a single replication controller with specified ID in ps output format.
+    $ kubectl get replicationController 1234-56-7890-234234-456456
 
-    $ kubectl get -o json pod 1234-56-7890-234234-456456
     // List a single pod in JSON output format.
+    $ kubectl get -o json pod 1234-56-7890-234234-456456
 
-    $ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
     // Return only the status value of the specified pod.
+    $ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
 
-    $ kubectl get rc,services
-    // List all replication controllers and services together in ps output format.`,
+    // List all replication controllers and services together in ps output format.
+    $ kubectl get rc,services`,
 		Run: func(cmd *cobra.Command, args []string) {
 			RunGet(f, out, cmd, args)
 		},

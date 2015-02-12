@@ -37,12 +37,11 @@ as the selector for a new Service on the specified port.
 
 Examples:
 
-    $ kubectl expose nginx --port=80 --container-port=8000
     // Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+    $ kubectl expose nginx --port=80 --container-port=8000
 
-    $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
     // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-`,
+    $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				usageError(cmd, "<name> is required for expose")

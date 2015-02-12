@@ -39,11 +39,11 @@ JSON and YAML formats are accepted.
 
 Examples:
 
-    $ kubectl create -f pod.json
     // Create a pod using the data in pod.json.
+    $ kubectl create -f pod.json
 
-    $ cat pod.json | kubectl create -f -
-    // Create a pod based on the JSON passed into stdin.`,
+    // Create a pod based on the JSON passed into stdin.
+    $ cat pod.json | kubectl create -f -`,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
 			checkErr(err)
