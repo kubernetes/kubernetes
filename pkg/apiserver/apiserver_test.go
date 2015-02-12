@@ -1147,7 +1147,7 @@ func TestCreateTimeout(t *testing.T) {
 
 	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
-	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?timeout=4ms", data, apierrs.StatusTryAgainLater)
+	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
 	if itemOut.Status != api.StatusFailure || itemOut.Reason != api.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
