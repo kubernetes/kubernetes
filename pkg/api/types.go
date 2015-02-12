@@ -228,8 +228,8 @@ type GitRepo struct {
 	// TODO: Consider credentials here.
 }
 
-// Port represents a network port in a single container
-type Port struct {
+// ContainerPort represents a network port in a single container
+type ContainerPort struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
@@ -335,9 +335,9 @@ type Container struct {
 	// Optional: Defaults to whatever is defined in the image.
 	Command []string `json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir string   `json:"workingDir,omitempty"`
-	Ports      []Port   `json:"ports,omitempty"`
-	Env        []EnvVar `json:"env,omitempty"`
+	WorkingDir string          `json:"workingDir,omitempty"`
+	Ports      []ContainerPort `json:"ports,omitempty"`
+	Env        []EnvVar        `json:"env,omitempty"`
 	// Compute resource requirements.
 	Resources      ResourceRequirements `json:"resources,omitempty"`
 	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty"`
@@ -688,15 +688,13 @@ type ServiceStatus struct{}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Port is the TCP or UDP port that will be made available to each pod for connecting to the pods
-	// proxied by this service.
-	Port int `json:"port"`
+	// Required: The list of ports that are exposed.
+	// FIXME: this would be nicer as a map of name -> struct
+	Ports []ServicePort
 
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
-	Protocol Protocol `json:"protocol,omitempty"`
-
-	// This service will route traffic to pods having labels matching this selector. If empty or not present,
-	// the service is assumed to have endpoints set by an external process and Kubernetes will not modify
+	// This service will route traffic to pods having labels matching this
+	// selector. If empty or not present, the service is assumed to have
+	// endpoints set by an external process and Kubernetes will not modify
 	// those endpoints.
 	Selector map[string]string `json:"selector"`
 
@@ -705,17 +703,39 @@ type ServiceSpec struct {
 	// not be changed by updates.
 	PortalIP string `json:"portalIP,omitempty"`
 
-	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
+	//FIXME: Should these next 3 be per-port (different external IPs?) or for all ports?
+	// CreateExternalLoadBalancer indicates whether a load balancer should
+	// be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
+
 	// PublicIPs are used by external load balancers.
 	PublicIPs []string `json:"publicIPs,omitempty"`
 
-	// ContainerPort is the name of the port on the container to direct traffic to.
-	// Optional, if unspecified use the first port on the container.
-	ContainerPort util.IntOrString `json:"containerPort,omitempty"`
-
-	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
+	// Optional: Supports "ClientIP" and "None".  Used to maintain session
+	// affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
+}
+
+type ServicePort struct {
+	// Optional if only one ServicePort is defined on this service,
+	// otherwise required: The name of this port within the service.  This
+	// must be a DNS_LABEL.  All ports within a ServiceSpec must have
+	// unique roles.  This maps to the 'Role' field in Endpoint objects.
+	Role string
+
+	// Optional: The IP protocol for this port.  Supports "TCP" and "UDP".
+	// Defaults to "TCP".
+	Protocol Protocol
+
+	// Required: The port that will be exposed by this service.
+	Port int
+
+	// Optional: The destination port on pods selected by this service.
+	// If this is a string, it will be looked up as a named port in the
+	// target Pod's container ports.  If this is not specified, the value of
+	// 'Port' is used (an identity map).
+	// FIXME: This is a change in semantic in the not-specified case.  Can we get away with it?  is it worthwhile?
+	DestinationPort util.IntOrString
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -738,7 +758,31 @@ type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	Endpoints []string `json:"endpoints,omitempty"`
+	Endpoints []Endpoint `json:"endpoints,omitempty"`
+}
+
+type Endpoint struct {
+	// Required: The IP of this endpoint.
+	//FIXME: should we allow hostname-or-IP?  If so, maybe in other places.
+	IP string
+
+	// The ports exposed on this endpoint.
+	// FIXME: this would be nicer as a map of name -> struct
+	Ports []EndpointPort
+}
+
+type EndpointPort struct {
+	// Optional if only one EndpointPort is defined in this endpoint,
+	// otherwise required: The name of this port within the larger
+	// service/endpoint structure. This must be a DNS_LABEL.
+	Role string
+
+	// Optional: The IP protocol for this port.  Supports "TCP" and "UDP".
+	// Defaults to "TCP".
+	Protocol Protocol
+
+	// Required: The destination port to access.
+	Port int
 }
 
 // EndpointsList is a list of endpoints.
