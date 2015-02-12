@@ -3,3 +3,4 @@ DOCKER_OPTS=""
 DOCKER_OPTS="${DOCKER_OPTS} {{grains.docker_opts}}"
 {% endif %}
 DOCKER_OPTS="${DOCKER_OPTS} --bridge cbr0 --iptables=false --ip-masq=false -r=false"
+DOCKER_NOFILE=1000000
