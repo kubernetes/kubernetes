@@ -56,9 +56,9 @@ func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingRE
 		},
 		EndpointName: "pods",
 
-		CreateStrategy: rest.Pods,
+		CreateStrategy: pod.Strategy,
 
-		UpdateStrategy: rest.Pods,
+		UpdateStrategy: pod.Strategy,
 		AfterUpdate:    bindings.AfterUpdate,
 
 		ReturnDeletedObject: true,

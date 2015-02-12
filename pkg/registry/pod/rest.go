@@ -24,10 +24,52 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
+
+// podStrategy implements behavior for Pods
+// TODO: move to a pod specific package.
+type podStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+// Strategy is the default logic that applies when creating and updating Pod
+// objects via the REST API.
+// TODO: Create other strategies for updating status, bindings, etc
+var Strategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for pods.
+func (podStrategy) NamespaceScoped() bool {
+	return true
+}
+
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
+	pod := obj.(*api.Pod)
+	pod.Status = api.PodStatus{
+		Phase: api.PodPending,
+	}
+}
+
+// Validate validates a new pod.
+func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	pod := obj.(*api.Pod)
+	return validation.ValidatePod(pod)
+}
+
+// AllowCreateOnUpdate is false for pods.
+func (podStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+// ValidateUpdate is the default update validation for an end user.
+func (podStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
+}
 
 // PodStatusGetter is an interface used by Pods to fetch and retrieve status info.
 type PodStatusGetter interface {

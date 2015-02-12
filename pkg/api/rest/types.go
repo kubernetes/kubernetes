@@ -72,46 +72,6 @@ func (rcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	return validation.ValidateReplicationController(controller)
 }
 
-// podStrategy implements behavior for Pods
-// TODO: move to a pod specific package.
-type podStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
-}
-
-// Pods is the default logic that applies when creating and updating Pod
-// objects.
-var Pods = podStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is true for pods.
-func (podStrategy) NamespaceScoped() bool {
-	return true
-}
-
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
-	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{
-		Phase: api.PodPending,
-	}
-}
-
-// Validate validates a new pod.
-func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
-	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
-}
-
-// AllowCreateOnUpdate is false for pods.
-func (podStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (podStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
-	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
-}
-
 // svcStrategy implements behavior for Services
 // TODO: move to a service specific package.
 type svcStrategy struct {
