@@ -42,7 +42,8 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	selector labels.Selector
+	selector  labels.Selector
+	selectAll bool
 
 	resources []string
 
@@ -171,6 +172,10 @@ func (b *Builder) SelectorParam(s string) *Builder {
 	if selector.Empty() {
 		return b
 	}
+	if b.selectAll {
+		b.errs = append(b.errs, fmt.Errorf("found non empty selector %q with previously set 'all' parameter. ", s))
+		return b
+	}
 	return b.Selector(selector)
 }
 
@@ -202,19 +207,29 @@ func (b *Builder) RequireNamespace() *Builder {
 	return b
 }
 
+// SelectEverythingParam
+func (b *Builder) SelectAllParam(selectAll bool) *Builder {
+	if selectAll && b.selector != nil {
+		b.errs = append(b.errs, fmt.Errorf("setting 'all' parameter but found a non empty selector. "))
+		return b
+	}
+	b.selectAll = selectAll
+	return b
+}
+
 // ResourceTypeOrNameArgs indicates that the builder should accept one or two arguments
 // of the form `(<type1>[,<type2>,...]|<type> <name>)`. When one argument is received, the types
 // provided will be retrieved from the server (and be comma delimited).  When two arguments are
 // received, they must be a single type and name. If more than two arguments are provided an
-// error is set.
-func (b *Builder) ResourceTypeOrNameArgs(args ...string) *Builder {
+// error is set. The allowEmptySelector permits to select all the resources (via Everything func).
+func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
 	switch len(args) {
 	case 2:
 		b.name = args[1]
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
 	case 1:
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
-		if b.selector == nil {
+		if b.selector == nil && allowEmptySelector {
 			b.selector = labels.Everything()
 		}
 	case 0:
@@ -289,6 +304,10 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 func (b *Builder) visitorResult() *Result {
 	if len(b.errs) > 0 {
 		return &Result{err: errors.NewAggregate(b.errs)}
+	}
+
+	if b.selectAll {
+		b.selector = labels.Everything()
 	}
 
 	// visit selectors

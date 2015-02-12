@@ -33,7 +33,7 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:   "delete ([-f filename] | (<resource> [(<id> | -l <label>)]",
+		Use:   "delete ([-f filename] | (<resource> [(<id> | -l <label> | --all)]",
 		Short: "Delete a resource by filename, stdin, or resource and ID.",
 		Long: `Delete a resource by filename, stdin, resource and ID, or by resources and label selector.
 
@@ -58,18 +58,22 @@ Examples:
     $ kubectl delete pods,services -l name=myLabel
 
     // Delete a pod with ID 1234-56-7890-234234-456456.
-    $ kubectl delete pod 1234-56-7890-234234-456456`,
+    $ kubectl delete pod 1234-56-7890-234234-456456
+
+    // Delete all pods
+    $ kubectl delete pods --all`,
+
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			checkErr(err)
-
 			mapper, typer := f.Object(cmd)
 			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
 				NamespaceParam(cmdNamespace).DefaultNamespace().
 				FilenameParam(flags.Filenames...).
 				SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
-				ResourceTypeOrNameArgs(args...).
+				SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
+				ResourceTypeOrNameArgs(false, args...).
 				Flatten().
 				Do()
 			checkErr(r.Err())
@@ -91,5 +95,6 @@ Examples:
 	}
 	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to a file containing the resource to delete")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd
 }
