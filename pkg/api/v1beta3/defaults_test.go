@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1_test
+package v1beta3_test
 
 import (
 	"reflect"
 	"testing"
 
-	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -43,11 +43,11 @@ func TestSetDefaultService(t *testing.T) {
 	svc := &current.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*current.Service)
-	if svc2.Protocol != current.ProtocolTCP {
-		t.Errorf("Expected default protocol :%s, got: %s", current.ProtocolTCP, svc2.Protocol)
+	if svc2.Spec.Protocol != current.ProtocolTCP {
+		t.Errorf("Expected default protocol :%s, got: %s", current.ProtocolTCP, svc2.Spec.Protocol)
 	}
-	if svc2.SessionAffinity != current.AffinityTypeNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.SessionAffinity)
+	if svc2.Spec.SessionAffinity != current.AffinityTypeNone {
+		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.Spec.SessionAffinity)
 	}
 }
 
