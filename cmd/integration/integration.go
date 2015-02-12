@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"reflect"
 	"runtime"
@@ -335,7 +336,9 @@ func runSelfLinkTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed creating selflinktest service: %v", err)
 	}
-	err = c.Get().AbsPath(svc.SelfLink).Do().Into(&svc)
+	// TODO: this is not namespace aware
+	link, _ := url.Parse(svc.SelfLink)
+	err = c.Get().AbsPath(link.Path).Do().Into(&svc)
 	if err != nil {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
@@ -346,7 +349,8 @@ func runSelfLinkTest(c *client.Client) {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
 
-	err = c.Get().AbsPath(svcList.SelfLink).Do().Into(&svcList)
+	link, _ = url.Parse(svcList.SelfLink)
+	err = c.Get().AbsPath(link.Path).Do().Into(&svcList)
 	if err != nil {
 		glog.Fatalf("Failed listing services with supplied self link '%v': %v", svcList.SelfLink, err)
 	}
@@ -358,7 +362,8 @@ func runSelfLinkTest(c *client.Client) {
 			continue
 		}
 		found = true
-		err = c.Get().AbsPath(item.SelfLink).Do().Into(&svc)
+		link, _ = url.Parse(item.SelfLink)
+		err = c.Get().AbsPath(link.Path).Do().Into(&svc)
 		if err != nil {
 			glog.Fatalf("Failed listing service with supplied self link '%v': %v", item.SelfLink, err)
 		}
