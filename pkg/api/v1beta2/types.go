@@ -537,9 +537,10 @@ type Service struct {
 	// PublicIPs are used by external load balancers.
 	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs from which to select the address for the external load balancer"`
 
-	// ContainerPort is the name of the port on the container to direct traffic to.
-	// Optional, if unspecified use the first port on the container.
-	ContainerPort util.IntOrString `json:"containerPort,omitempty" description:"number or name of the port to access on the containers belonging to pods targeted by the service"`
+	// ContainerPort is the name or number of the port on the container to direct traffic to.
+	// This is useful if the containers the service points to have multiple open ports.
+	// Optional: If unspecified, the first port on the container will be used.
+	ContainerPort util.IntOrString `json:"containerPort,omitempty" description:"number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"`
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
