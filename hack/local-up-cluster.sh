@@ -87,6 +87,22 @@ esac
 
 GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 
+cleanup()
+{
+    echo "Cleaning up..."
+    [[ -n "${APISERVER_PID-}" ]] && sudo kill "${APISERVER_PID}"
+    [[ -n "${CTLRMGR_PID-}" ]] && sudo kill "${CTLRMGR_PID}"
+    [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}"
+    [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
+    [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
+
+    [[ -n "${ETCD_PID-}" ]] && kill "${ETCD_PID}"
+    [[ -n "${ETCD_DIR-}" ]] && rm -rf "${ETCD_DIR}"
+    exit 0
+}
+
+trap cleanup EXIT
+
 APISERVER_LOG=/tmp/kube-apiserver.log
 sudo "${GO_OUT}/kube-apiserver" \
   --v=${LOG_LEVEL} \
@@ -99,7 +115,8 @@ sudo "${GO_OUT}/kube-apiserver" \
 APISERVER_PID=$!
 
 # Wait for kube-apiserver to come up before launching the rest of the components.
-kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: "
+echo "Waiting for apiserver to come up"
+kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: " 1 10 || exit 1
 
 CTLRMGR_LOG=/tmp/kube-controller-manager.log
 sudo "${GO_OUT}/kube-controller-manager" \
@@ -146,21 +163,5 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
   cluster/kubectl.sh
 EOF
-
-cleanup()
-{
-    echo "Cleaning up..."
-    sudo kill "${APISERVER_PID}"
-    sudo kill "${CTLRMGR_PID}"
-    sudo kill "${KUBELET_PID}"
-    sudo kill "${PROXY_PID}"
-    sudo kill "${SCHEDULER_PID}"
-
-    kill "${ETCD_PID}"
-    rm -rf "${ETCD_DIR}"
-    exit 0
-}
-
-trap cleanup EXIT
 
 while true; do sleep 1; done
