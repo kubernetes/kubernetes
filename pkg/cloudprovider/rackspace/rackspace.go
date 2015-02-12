@@ -472,7 +472,7 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (net.IP, error) {
+func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (*api.LoadBalancerInfo, error) {
 	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, port, hosts)
 	if affinity != api.AffinityTypeNone {
 		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
@@ -487,7 +487,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 	pool, err := lbs.Create(lb.network, lbs.CreateOpts{
 		Name:     name,
-		Protocol: "TCP",
+		Protocol: "TCP_CLIENT_FIRST",
 		VIPs:     vipList,
 		Port:     port,
 	}).Extract()
@@ -524,7 +524,11 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		return nil, err
 	}
 
-	return net.ParseIP(pool.SourceAddrs.IPv4Private), nil
+	glog.V(2).Infof("LB Source Address is %+v", pool.SourceAddrs)
+	loadBalancerInfo := &api.LoadBalancerInfo{Rewrite: true}
+	loadBalancerInfo.DestIP = pool.VIPs[0].Address
+	loadBalancerInfo.SourceIP = pool.SourceAddrs.IPv4Private
+	return loadBalancerInfo, nil
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {

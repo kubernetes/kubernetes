@@ -141,11 +141,17 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 				}
 			}
 		} else {
-			ip, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+			lb, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 			if err != nil {
+				// TODO: have to roll-back any successful calls.
 				return nil, err
 			}
-			service.Spec.PublicIPs = []string{ip.String()}
+			if lb.Rewrite {
+				service.Spec.PublicIPs = []string{lb.SourceIP}
+			} else {
+				service.Spec.PublicIPs = []string{lb.DestIP}
+			}
+			service.Spec.Rewrite = lb.Rewrite
 		}
 	}
 
