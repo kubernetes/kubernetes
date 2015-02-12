@@ -45,7 +45,7 @@ func Logf(format string, a ...interface{}) {
 }
 
 func Failf(format string, a ...interface{}) {
-	Fail(fmt.Sprintf(format, a...))
+	Fail(fmt.Sprintf(format, a...), 1)
 }
 
 func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
