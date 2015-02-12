@@ -228,7 +228,7 @@ type GitRepo struct {
 	// TODO: Consider credentials here.
 }
 
-// ContainerPort represents a network port in a single container
+// ContainerPort represents a network port or ports exposed by a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
@@ -237,6 +237,9 @@ type ContainerPort struct {
 	HostPort int `json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `json:"containerPort"`
+	// Optional: How many contiguous ports to expose.  If this is not
+	// specified, defaults to 1.
+	Count int
 	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
 	Protocol Protocol `json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
@@ -730,6 +733,10 @@ type ServicePort struct {
 	// Required: The port that will be exposed by this service.
 	Port int
 
+	// Optional: How many contiguous ports to expose.  If this is not
+	// specified, defaults to 1.
+	Count int
+
 	// Optional: The destination port on pods selected by this service.
 	// If this is a string, it will be looked up as a named port in the
 	// target Pod's container ports.  If this is not specified, the value of
@@ -783,6 +790,10 @@ type EndpointPort struct {
 
 	// Required: The destination port to access.
 	Port int
+
+	// Optional: How many contiguous ports to expose.  If this is not
+	// specified, defaults to 1.
+	Count int
 }
 
 // EndpointsList is a list of endpoints.
