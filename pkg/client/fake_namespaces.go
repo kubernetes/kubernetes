@@ -19,6 +19,7 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // FakeNamespaces implements NamespacesInterface. Meant to be embedded into a struct to get a default
@@ -50,4 +51,9 @@ func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-namespace", Value: namespace.Name})
 	return &api.Namespace{}, nil
+}
+
+func (c *FakeNamespaces) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-namespaces", Value: resourceVersion})
+	return c.Fake.Watch, nil
 }

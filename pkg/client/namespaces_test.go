@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -130,5 +131,14 @@ func TestNamespaceDelete(t *testing.T) {
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().Namespaces().Delete("foo")
+	c.Validate(t, nil, err)
+}
+
+func TestNamespaceWatch(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "GET", Path: "/watch/namespaces", Query: url.Values{"resourceVersion": []string{}}},
+		Response: Response{StatusCode: 200},
+	}
+	_, err := c.Setup().Namespaces().Watch(labels.Everything(), labels.Everything(), "")
 	c.Validate(t, nil, err)
 }
