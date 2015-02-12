@@ -35,7 +35,7 @@ func TestCheckGeneratedNameError(t *testing.T) {
 	}
 
 	expect = errors.NewAlreadyExists("foo", "bar")
-	if err := CheckGeneratedNameError(Pods, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsTryAgainLater(err) {
+	if err := CheckGeneratedNameError(Pods, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }

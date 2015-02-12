@@ -66,7 +66,7 @@ func copyOrDie(obj runtime.Object) runtime.Object {
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.TestCreateHasMetadata(copyOrDie(valid))
 	t.TestCreateGeneratesName(copyOrDie(valid))
-	t.TestCreateGeneratesNameReturnsTryAgain(copyOrDie(valid))
+	t.TestCreateGeneratesNameReturnsServerTimeout(copyOrDie(valid))
 	if t.clusterScope {
 		t.TestCreateRejectsNamespace(copyOrDie(valid))
 	} else {
@@ -140,7 +140,7 @@ func (t *Tester) TestCreateGeneratesName(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) TestCreateGeneratesNameReturnsTryAgain(valid runtime.Object) {
+func (t *Tester) TestCreateGeneratesNameReturnsServerTimeout(valid runtime.Object) {
 	objectMeta, err := api.ObjectMetaFor(valid)
 	if err != nil {
 		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, valid)
@@ -149,7 +149,7 @@ func (t *Tester) TestCreateGeneratesNameReturnsTryAgain(valid runtime.Object) {
 	objectMeta.GenerateName = "test-"
 	t.withStorageError(errors.NewAlreadyExists("kind", "thing"), func() {
 		_, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
-		if err == nil || !errors.IsTryAgainLater(err) {
+		if err == nil || !errors.IsServerTimeout(err) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 	})

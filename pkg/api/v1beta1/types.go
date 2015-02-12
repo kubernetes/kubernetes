@@ -343,7 +343,7 @@ type TypeMeta struct {
 	//
 	// If this field is specified, and Name is not present, the server will NOT return a 409 if the
 	// generated name exists - instead, it will either return 201 Created or 500 with Reason
-	// TryAgainLater indicating a unique name could not be found in the time allotted, and the client
+	// ServerTimeout indicating a unique name could not be found in the time allotted, and the client
 	// should retry (optionally after the time indicated in the Retry-After header).
 	GenerateName string `json:"generateName,omitempty" description:"an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"`
 
@@ -804,7 +804,7 @@ const (
 	// Status code 409
 	StatusReasonConflict StatusReason = "Conflict"
 
-	// StatusReasonTryAgainLater means the server can be reached and understood the request,
+	// StatusReasonServerTimeout means the server can be reached and understood the request,
 	// but cannot complete the action in a reasonable time. The client should retry the request.
 	// This is may be due to temporary server load or a transient communication issue with
 	// another server. Status code 500 is used because the HTTP spec provides no suitable
@@ -813,7 +813,7 @@ const (
 	//   "kind" string - the kind attribute of the resource being acted on.
 	//   "id"   string - the operation that is being attempted.
 	// Status code 500
-	StatusReasonTryAgainLater StatusReason = "TryAgainLater"
+	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 )
 
 // StatusCause provides more information about an api.Status failure, including
