@@ -34,6 +34,7 @@ import (
 )
 
 type OVirtInstance struct {
+	UUID      string
 	Name      string
 	IPAddress string
 }
@@ -61,6 +62,7 @@ type XmlVmAddress struct {
 }
 
 type XmlVmInfo struct {
+	UUID      string         `xml:"id,attr"`
 	Name      string         `xml:"name"`
 	Hostname  string         `xml:"guest_info>fqdn"`
 	Addresses []XmlVmAddress `xml:"guest_info>ips>ip"`
@@ -155,7 +157,11 @@ func (v *OVirtCloud) IPAddress(name string) (net.IP, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance.
 func (v *OVirtCloud) ExternalID(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
+	instance, err := v.fetchInstance(name)
+	if err != nil {
+		return "", err
+	}
+	return instance.UUID, nil
 }
 
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
@@ -185,6 +191,7 @@ func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
 			}
 
 			instances[vm.Hostname] = OVirtInstance{
+				UUID:      vm.UUID,
 				Name:      vm.Name,
 				IPAddress: address,
 			}
