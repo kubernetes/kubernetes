@@ -34,6 +34,7 @@ type EventNamespacer interface {
 // EventInterface has methods to work with Event resources
 type EventInterface interface {
 	Create(event *api.Event) (*api.Event, error)
+	Update(event *api.Event) (*api.Event, error)
 	List(label, field labels.Selector) (*api.EventList, error)
 	Get(name string) (*api.Event, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
@@ -67,6 +68,26 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	err := e.client.Post().
 		Namespace(event.Namespace).
 		Resource("events").
+		Body(event).
+		Do().
+		Into(result)
+	return result, err
+}
+
+// Update modifies an existing event. It returns the copy of the event that the server returns,
+// or an error. The namespace and key to update the event within is deduced from the event. The
+// namespace must either match this event client's namespace, or this event client must have been
+// created with the "" namespace. Update also requires the ResourceVersion to be set in the event
+// object.
+func (e *events) Update(event *api.Event) (*api.Event, error) {
+	if len(event.ResourceVersion) == 0 {
+		return nil, fmt.Errorf("invalid event update object, missing resource version: %#v", event)
+	}
+	result := &api.Event{}
+	err := e.client.Put().
+		Namespace(event.Namespace).
+		Resource("events").
+		Name(event.Name).
 		Body(event).
 		Do().
 		Into(result)
