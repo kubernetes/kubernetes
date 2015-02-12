@@ -695,11 +695,17 @@ type ServiceSpec struct {
 	// FIXME: this would be nicer as a map of name -> struct
 	Ports []ServicePort
 
+	// Either 'Selector' or 'Endpoints' must be set:
+
 	// This service will route traffic to pods having labels matching this
-	// selector. If empty or not present, the service is assumed to have
-	// endpoints set by an external process and Kubernetes will not modify
-	// those endpoints.
+	// selector.
 	Selector map[string]string `json:"selector"`
+
+	// Use the specified endpoints.
+	// FIXME: Some weird interaction.  All the fields of Ports[] are basically
+	//   ignored in favor of Endpoints.  Maybe make this just a list of IPs,
+	//   and disallow named DestinationPorts if using this mode?
+	Endpoints []Endpoint
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
