@@ -26,13 +26,14 @@ import (
 )
 
 func GetVersion(w io.Writer, kubeClient client.Interface) {
+	GetClientVersion(w)
+
 	serverVersion, err := kubeClient.ServerVersion()
 	if err != nil {
 		fmt.Printf("Couldn't read version from server: %v\n", err)
 		os.Exit(1)
 	}
 
-	GetClientVersion(w)
 	fmt.Fprintf(w, "Server Version: %#v\n", *serverVersion)
 }
 
