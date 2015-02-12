@@ -184,7 +184,7 @@ func (r *Registry) setPodHostTo(ctx api.Context, podID, oldMachine, machine stri
 	if err != nil {
 		return nil, err
 	}
-	err = r.AtomicUpdate(podKey, &api.Pod{}, func(obj runtime.Object) (runtime.Object, error) {
+	err = r.AtomicUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
@@ -211,7 +211,7 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 	}
 	// Doing the constraint check this way provides atomicity guarantees.
 	contKey := makeBoundPodsKey(machine)
-	err = r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
+	err = r.AtomicUpdate(contKey, &api.BoundPods{}, true, func(in runtime.Object) (runtime.Object, error) {
 		boundPodList := in.(*api.BoundPods)
 		boundPodList.Items = append(boundPodList.Items, *boundPod)
 		if errors := constraint.Allowed(boundPodList.Items); len(errors) > 0 {
@@ -261,7 +261,7 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	}
 
 	containerKey := makeBoundPodsKey(podOut.Status.Host)
-	return r.AtomicUpdate(containerKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
+	return r.AtomicUpdate(containerKey, &api.BoundPods{}, true, func(in runtime.Object) (runtime.Object, error) {
 		boundPods := in.(*api.BoundPods)
 		for ix := range boundPods.Items {
 			if boundPods.Items[ix].Name == pod.Name {
@@ -299,7 +299,7 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 	}
 	// Next, remove the pod from the machine atomically.
 	contKey := makeBoundPodsKey(machine)
-	return r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
+	return r.AtomicUpdate(contKey, &api.BoundPods{}, true, func(in runtime.Object) (runtime.Object, error) {
 		pods := in.(*api.BoundPods)
 		newPods := make([]api.BoundPod, 0, len(pods.Items))
 		found := false
@@ -553,7 +553,7 @@ func (r *Registry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) er
 		return err
 	}
 	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
-	err = r.AtomicUpdate(key, &api.Endpoints{},
+	err = r.AtomicUpdate(key, &api.Endpoints{}, true,
 		func(input runtime.Object) (runtime.Object, error) {
 			// TODO: racy - label query is returning different results for two simultaneous updaters
 			return endpoints, nil

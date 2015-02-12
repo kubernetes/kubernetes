@@ -310,7 +310,7 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error
 // Example:
 //
 // h := &util.EtcdHelper{client, encoding, versioning}
-// err := h.AtomicUpdate("myKey", &MyType{}, func(input runtime.Object) (runtime.Object, error) {
+// err := h.AtomicUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, error) {
 //	// Before this function is called, currentObj has been reset to etcd's current
 //	// contents for "myKey".
 //
@@ -323,7 +323,7 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error
 //	return cur, nil
 // })
 //
-func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, tryUpdate EtcdUpdateFunc) error {
+func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
@@ -331,7 +331,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, tryUpdat
 	}
 	for {
 		obj := reflect.New(v.Type()).Interface().(runtime.Object)
-		origBody, index, err := h.bodyAndExtractObj(key, obj, true)
+		origBody, index, err := h.bodyAndExtractObj(key, obj, ignoreNotFound)
 		if err != nil {
 			return err
 		}
