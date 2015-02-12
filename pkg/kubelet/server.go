@@ -185,7 +185,18 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
 	if !ok {
-		http.Error(w, "Pod does not exist", http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("Pod %q does not exist", podID), http.StatusNotFound)
+		return
+	}
+	// Check if containerName is valid.
+	containerExists := false
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			containerExists = true
+		}
+	}
+	if !containerExists {
+		http.Error(w, fmt.Sprintf("Container %q not found in Pod %q", containerName, podID), http.StatusNotFound)
 		return
 	}
 
