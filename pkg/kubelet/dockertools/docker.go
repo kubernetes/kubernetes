@@ -513,7 +513,7 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName 
 
 	if len(info) < (len(manifest.Containers) + 1) {
 		var containerStatus api.ContainerStatus
-		// Not all containers expected are created, verify if there are
+		// Not all containers expected are created, check if there are
 		// image related issues
 		for _, container := range manifest.Containers {
 			if _, found := info[container.Name]; found {

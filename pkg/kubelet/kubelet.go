@@ -1415,19 +1415,33 @@ func (kl *Kubelet) GetDockerVersion() ([]uint, error) {
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
 // or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
-	_, err := kl.GetPodStatus(podFullName, "")
-	if err == dockertools.ErrNoContainersInPod {
-		return fmt.Errorf("pod not found (%q)\n", podFullName)
-	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, true)
+	podStatus, err := kl.GetPodStatus(podFullName, "")
 	if err != nil {
-		return err
+		if err == dockertools.ErrNoContainersInPod {
+			return fmt.Errorf("pod %q not found\n", podFullName)
+		} else {
+			return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
+		}
 	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, "", containerName)
-	if !found {
-		return fmt.Errorf("container not found (%q)\n", containerName)
+	if podStatus.Phase != api.PodRunning {
+		return fmt.Errorf("pod %q is not in 'Running' state - State: %q", podFullName, podStatus.Phase)
 	}
-	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail, follow, stdout, stderr)
+	exists := false
+	dockerContainerID := ""
+	for cName, cStatus := range podStatus.Info {
+		if containerName == cName {
+			exists = true
+			if !cStatus.Ready {
+				return fmt.Errorf("container %q is not ready.", containerName)
+			}
+			dockerContainerID = strings.Replace(podStatus.Info[containerName].ContainerID, dockertools.DockerPrefix, "", 1)
+		}
+	}
+	if !exists {
+		return fmt.Errorf("container %q not found in pod %q", containerName, podFullName)
+	}
+
+	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainerID, tail, follow, stdout, stderr)
 }
 
 // GetBoundPods returns all pods bound to the kubelet and their spec
