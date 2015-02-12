@@ -1,0 +1,36 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "ReplicationController",
+  "id": "sleepy-controller",
+  "desiredState": {
+    "replicas": 3,
+    "replicaSelector": { "name": "sleepy" },
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "sleepy-controller",
+          "containers": [{
+            "image": "kubernetes/sleepy",
+            "name": "sleepy",
+	    "command": ["/dev/sleepy-log"],
+	    "volumeMounts": [{
+		    "name": "dev",
+		    "mountPath": "/dev"
+	    }]
+           }],
+          "volumes": [{
+	    "name": "dev",
+	    "source": {
+	      "hostDir": {
+	       "path": "/dev"
+	      }
+	    }
+	  }]
+        }
+      },
+      "labels": { "name": "sleepy" }
+    }
+  },
+  "labels": { "name": "sleepy" }
+}
