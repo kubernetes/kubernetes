@@ -198,7 +198,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 		diff *= -1
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
-		glog.V(2).Infof("Too few replicas, creating %d\n", diff)
+		glog.V(2).Infof("Too few \"%s\" replicas, creating %d\n", controller.Name, diff)
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
@@ -207,7 +207,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 		}
 		wait.Wait()
 	} else if diff > 0 {
-		glog.V(2).Infof("Too many replicas, deleting %d\n", diff)
+		glog.V(2).Infof("Too many \"%s\" replicas, deleting %d\n", controller.Name, diff)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
 		for i := 0; i < diff; i++ {
