@@ -35,7 +35,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
 	_, err := c.Pods(ns).Create(podDescr)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("creating pod %s", podDescr.Name))
+	expectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
@@ -47,14 +47,14 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
 	By("waiting for the pod to be something other than pending")
-	err = waitForPodNotPending(c, ns, podDescr.Name, 60*time.Second)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
+	expectNoError(waitForPodNotPending(c, ns, podDescr.Name, 60*time.Second),
+		fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
 	By(fmt.Sprintf("Started pod %s in namespace %s", podDescr.Name, ns))
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := c.Pods(ns).Get(podDescr.Name)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("getting pod %s in namespace %s", podDescr.Name, ns))
+	expectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", podDescr.Name, ns))
 	initialRestartCount := pod.Status.Info["liveness"].RestartCount
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
@@ -64,7 +64,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 		// Wait until restartCount is incremented.
 		time.Sleep(5 * time.Second)
 		pod, err = c.Pods(ns).Get(podDescr.Name)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("getting pod %s", podDescr.Name))
+		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
 		restartCount := pod.Status.Info["liveness"].RestartCount
 		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
 		if restartCount > initialRestartCount {
@@ -85,7 +85,7 @@ var _ = Describe("Pods", func() {
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(err)
 	})
 
 	It("should be submitted and removed", func() {
@@ -192,8 +192,7 @@ var _ = Describe("Pods", func() {
 		}()
 
 		By("waiting for the pod to start running")
-		err = waitForPodRunning(c, pod.Name, 300*time.Second)
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -216,8 +215,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("waiting for the updated pod to start running")
-		err = waitForPodRunning(c, pod.Name, 300*time.Second)
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
 
 		By("verifying the updated pod is in kubernetes")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -251,8 +249,7 @@ var _ = Describe("Pods", func() {
 		defer func() {
 			c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
 		}()
-		err = waitForPodRunning(c, serverPod.Name, 300*time.Second)
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(waitForPodRunning(c, serverPod.Name, 300*time.Second))
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
 		// TODO(filbranden): We would like to use a unique service name such as:
@@ -317,8 +314,7 @@ var _ = Describe("Pods", func() {
 		}()
 
 		// Wait for client pod to complete.
-		err = waitForPodSuccess(c, clientPod.Name, clientPod.Spec.Containers[0].Name, 60*time.Second)
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(waitForPodSuccess(c, clientPod.Name, clientPod.Spec.Containers[0].Name, 60*time.Second))
 
 		// Grab its logs.  Get host first.
 		clientPodStatus, err := c.Pods(api.NamespaceDefault).Get(clientPod.Name)

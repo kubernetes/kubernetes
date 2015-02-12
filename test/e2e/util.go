@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 type testContextType struct {
@@ -151,4 +152,8 @@ func loadClient() (*client.Client, error) {
 func randomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
+}
+
+func expectNoError(err error, explain ...interface{}) {
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
