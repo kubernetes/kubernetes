@@ -128,5 +128,5 @@ if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@}" >&2
-"${kubectl}" "${config[@]:+${config[@]}}" "${@}"
+echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+"${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
