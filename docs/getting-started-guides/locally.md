@@ -33,12 +33,9 @@ hack/local-up-cluster.sh
 This will build and start a lightweight local cluster, consisting of a master
 and a single minion. Type Control-C to shut it down.
 
-You can use the cluster/kubectl.sh script to interact with the local cluster.
-You must set the KUBERNETES_PROVIDER environment variable.
+You can use the cluster/kubectl.sh script to interact with the local cluster. hack/local-up-cluster.sh will
+print the commands to run to point kubectl at the local cluster.
 
-```
-export KUBERNETES_PROVIDER=local
-```
 
 ### Running a container
 

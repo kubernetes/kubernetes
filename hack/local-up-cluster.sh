@@ -98,6 +98,7 @@ cleanup()
 
     [[ -n "${ETCD_PID-}" ]] && kill "${ETCD_PID}"
     [[ -n "${ETCD_DIR-}" ]] && rm -rf "${ETCD_DIR}"
+
     exit 0
 }
 
@@ -160,7 +161,9 @@ Logs:
 
 To start using your cluster, open up another terminal/tab and run:
 
-  export KUBERNETES_PROVIDER=local
+  cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true --global
+  cluster/kubectl.sh config set-context local --cluster=local --global
+  cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
 
