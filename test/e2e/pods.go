@@ -31,7 +31,6 @@ import (
 )
 
 func runLivenessTest(c *client.Client, podDescr *api.Pod) {
-	defer GinkgoRecover()
 	ns := "e2e-test-" + string(util.NewUUID())
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
@@ -132,7 +131,6 @@ var _ = Describe("Pods", func() {
 			// We call defer here in case there is a problem with
 			// the test so we can ensure that we clean up after
 			// ourselves
-			defer GinkgoRecover()
 			podClient.Delete(pod.Name)
 		}()
 
@@ -190,7 +188,6 @@ var _ = Describe("Pods", func() {
 		}
 		defer func() {
 			By("deleting the pod")
-			defer GinkgoRecover()
 			podClient.Delete(pod.Name)
 		}()
 
@@ -252,7 +249,6 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
 		}
 		defer func() {
-			defer GinkgoRecover()
 			c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
 		}()
 		err = waitForPodRunning(c, serverPod.Name, 300*time.Second)
@@ -287,7 +283,6 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create service: %v", err))
 		}
 		defer func() {
-			defer GinkgoRecover()
 			c.Services(api.NamespaceDefault).Delete(svc.Name)
 		}()
 
@@ -318,7 +313,6 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
 		defer func() {
-			defer GinkgoRecover()
 			c.Pods(api.NamespaceDefault).Delete(clientPod.Name)
 		}()
 
