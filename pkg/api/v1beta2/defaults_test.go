@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1_test
+package v1beta2_test
 
 import (
 	"reflect"
 	"testing"
 
-	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
