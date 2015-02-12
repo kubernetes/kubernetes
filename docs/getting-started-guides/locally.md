@@ -8,7 +8,10 @@ Not running Linux? Consider running Linux in a local virtual machine with [Vagra
 
 #### Docker
 
-At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. Ensure the Docker daemon is running and can be contacted (try `docker ps`).  Some of the kubernetes components need to run as root, which normally works fine with docker.
+At least [Docker](https://docs.docker.com/installation/#installation)
+1.3+. Ensure the Docker daemon is running and can be contacted (try `docker
+ps`).  Some of the kubernetes components need to run as root, which normally
+works fine with docker.
 
 #### etcd
 
