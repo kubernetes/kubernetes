@@ -264,8 +264,9 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	return r.AtomicUpdate(containerKey, &api.BoundPods{}, true, func(in runtime.Object) (runtime.Object, error) {
 		boundPods := in.(*api.BoundPods)
 		for ix := range boundPods.Items {
-			if boundPods.Items[ix].Name == pod.Name {
-				boundPods.Items[ix].Spec = pod.Spec
+			item := &boundPods.Items[ix]
+			if item.Name == pod.Name && item.Namespace == pod.Namespace {
+				item.Spec = pod.Spec
 				return boundPods, nil
 			}
 		}
@@ -303,9 +304,9 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 		pods := in.(*api.BoundPods)
 		newPods := make([]api.BoundPod, 0, len(pods.Items))
 		found := false
-		for _, pod := range pods.Items {
-			if pod.Name != podID {
-				newPods = append(newPods, pod)
+		for _, item := range pods.Items {
+			if item.Name != pod.Name || item.Namespace != pod.Namespace {
+				newPods = append(newPods, item)
 			} else {
 				found = true
 			}

@@ -467,7 +467,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.PodSpec{
 			//			Host: "machine",
 			Containers: []api.Container{
@@ -485,7 +485,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 	fakeClient.Set(contKey, runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -494,7 +494,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 					},
 				},
 			}, {
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -510,6 +510,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 	podIn := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
+			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "1",
 			Labels: map[string]string{
 				"foo": "bar",
@@ -553,8 +554,8 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 		t.Fatalf("unexpected error decoding response: %v", err)
 	}
 
-	if len(list.Items) != 2 || !api.Semantic.DeepEqual(list.Items[0].Spec, podIn.Spec) {
-		t.Errorf("unexpected container list: %d\n items[0] -   %#v\n podin.spec - %#v\n", len(list.Items), list.Items[0].Spec, podIn.Spec)
+	if len(list.Items) != 2 || !api.Semantic.DeepEqual(list.Items[1].Spec, podIn.Spec) {
+		t.Errorf("unexpected container list: %d\n items[0] -   %#v\n podin.spec - %#v\n", len(list.Items), list.Items[1].Spec, podIn.Spec)
 	}
 }
 
@@ -565,12 +566,12 @@ func TestEtcdDeletePod(t *testing.T) {
 
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Status:     api.PodStatus{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
-			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault}},
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
@@ -601,13 +602,13 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient.TestIndex = true
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Status:     api.PodStatus{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
-			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault}},
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
@@ -631,7 +632,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	if len(boundPods.Items) != 1 {
 		t.Fatalf("Unexpected boundPod set: %#v, expected empty", boundPods)
 	}
-	if boundPods.Items[0].Name != "bar" {
+	if boundPods.Items[0].Namespace != "other" {
 		t.Errorf("Deleted wrong boundPod: %#v", boundPods)
 	}
 }
