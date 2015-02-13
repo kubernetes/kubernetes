@@ -39,14 +39,14 @@ JSON and YAML formats are accepted.
 
 Examples:
 
-    $ kubectl update -f pod.json
     // Update a pod using the data in pod.json.
+    $ kubectl update -f pod.json
 
-    $ cat pod.json | kubectl update -f -
     // Update a pod based on the JSON passed into stdin.
+    $ cat pod.json | kubectl update -f -
 
-    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
-    // Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.`,
+    // Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
+    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'`,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
 			checkErr(err)

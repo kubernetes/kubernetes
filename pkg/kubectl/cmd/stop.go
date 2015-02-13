@@ -35,9 +35,8 @@ If the resource is resizable it will be resized to 0 before deletion.
 
 Examples:
 
-    $ kubectl stop replicationcontroller foo
     // Shut down foo.
-`,
+    $ kubectl stop replicationcontroller foo`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 2 {
 				usageError(cmd, "<resource> <id>")

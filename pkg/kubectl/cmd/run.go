@@ -35,17 +35,17 @@ Creates a replication controller to manage the created container(s).
 
 Examples:
 
-    $ kubectl run-container nginx --image=dockerfile/nginx
     // Starts a single instance of nginx.
+    $ kubectl run-container nginx --image=dockerfile/nginx
 
-    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
     // Starts a replicated instance of nginx.
+    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
 
-    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
     // Dry run. Print the corresponding API objects without creating them.
+    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
   
-    $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
-    // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON`,
+    // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
+    $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				usageError(cmd, "<name> is required for run-container")
