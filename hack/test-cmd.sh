@@ -128,7 +128,7 @@ for version in "${kube_api_versions[@]}"; do
   fi
 
   # passing no arguments to create is an error
-  [ ! $(kubectl create) ]
+  ! kubectl create
 
   kube::log::status "Testing kubectl(${version}:pods)"
   kubectl get pods "${kube_flags[@]}"
