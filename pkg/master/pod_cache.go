@@ -172,7 +172,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	// Assigned to non-existing node.
 	if err != nil || len(nodeStatus.Conditions) == 0 {
-		glog.V(5).Infof("node doesn't exist: %v %v, setting pod status to unknown", err, nodeStatus)
+		glog.V(5).Infof("node doesn't exist: %v %v, setting pod %q status to unknown", err, nodeStatus, pod.Name)
 		newStatus.Phase = api.PodUnknown
 		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 		return newStatus, nil
@@ -181,7 +181,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	// Assigned to an unhealthy node.
 	for _, condition := range nodeStatus.Conditions {
 		if (condition.Kind == api.NodeReady || condition.Kind == api.NodeReachable) && condition.Status == api.ConditionNone {
-			glog.V(5).Infof("node status: %v, setting pod status to unknown", condition)
+			glog.V(5).Infof("node status: %v, setting pod %q status to unknown", condition, pod.Name)
 			newStatus.Phase = api.PodUnknown
 			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 			return newStatus, nil
@@ -191,7 +191,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	result, err := p.containerInfo.GetPodStatus(pod.Status.Host, pod.Namespace, pod.Name)
 
 	if err != nil {
-		glog.Infof("error getting pod %s status: %v, retry later", pod.Name, err)
+		glog.V(5).Infof("error getting pod %s status: %v, retry later", pod.Name, err)
 	} else {
 		newStatus.HostIP = nodeStatus.HostIP
 		newStatus.Info = result.Status.Info
