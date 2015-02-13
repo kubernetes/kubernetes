@@ -1053,7 +1053,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
 			// look for changes in the container.
-			if hash == 0 || hash == expectedHash {
+			podChanged := hash != 0 && hash != expectedHash
+			if !podChanged {
 				// TODO: This should probably be separated out into a separate goroutine.
 				// If the container's liveness probe is unsuccessful, set readiness to false. If liveness is succesful, do a readiness check and set
 				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
@@ -1093,11 +1094,13 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 			killedContainers[containerID] = empty{}
 
-			// Also kill associated pod infra container
-			if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
-				if err := kl.killContainer(podInfraContainer); err != nil {
-					glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
-					continue
+			if podChanged {
+				// Also kill associated pod infra container if the pod changed.
+				if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+					if err := kl.killContainer(podInfraContainer); err != nil {
+						glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
+						continue
+					}
 				}
 			}
 		}

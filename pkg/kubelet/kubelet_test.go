@@ -983,17 +983,15 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list", "create", "start"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
 	expectedToStop := map[string]bool{
 		"1234": true,
-		"9876": true,
 	}
-	if len(fakeDocker.Stopped) != 2 ||
-		(!expectedToStop[fakeDocker.Stopped[0]] &&
-			expectedToStop[fakeDocker.Stopped[0]]) {
+	if len(fakeDocker.Stopped) != len(expectedToStop) ||
+		!expectedToStop[fakeDocker.Stopped[0]] {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 }
