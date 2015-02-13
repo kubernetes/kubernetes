@@ -27,7 +27,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -63,7 +62,6 @@ const (
 )
 
 var (
-	signals = make(chan os.Signal, 100)
 	// Root directory of the specified cluster version, rather than of where
 	// this script is being run from.
 	versionRoot = *root
@@ -86,7 +84,6 @@ type ResultsByTest map[string]TestResult
 
 func main() {
 	flag.Parse()
-	signal.Notify(signals, os.Interrupt)
 
 	if *isup {
 		status := 1
@@ -295,40 +292,17 @@ func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 	}
 }
 
-func finishRunningWithOutputs(stepName string, cmd *exec.Cmd) (bool, string, string) {
-	log.Printf("Running: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	if *verbose {
-		cmd.Stdout = io.MultiWriter(os.Stdout, stdout)
-		cmd.Stderr = io.MultiWriter(os.Stderr, stderr)
-	} else {
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 	}
-
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case s := <-signals:
-				cmd.Process.Signal(s)
-			}
-		}
-	}()
-
+	log.Printf("Running: %v", stepName)
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
-		return false, string(stdout.Bytes()), string(stderr.Bytes())
+		return false
 	}
-	return true, string(stdout.Bytes()), string(stderr.Bytes())
-}
-
-func finishRunning(stepName string, cmd *exec.Cmd) bool {
-	result, _, _ := finishRunningWithOutputs(stepName, cmd)
-	return result
+	return true
 }
 
 func printBashOutputs(headerprefix, lineprefix, output string, escape bool) {
