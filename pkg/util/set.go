@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"sort"
 )
 
@@ -30,6 +31,18 @@ func NewStringSet(items ...string) StringSet {
 	ss := StringSet{}
 	ss.Insert(items...)
 	return ss
+}
+
+// KeySet creates a StringSet from a keys of a map[string](? extends interface{}).  Since you can't describe that map type in the Go type system
+// the reflected value is required.
+func KeySet(theMap reflect.Value) StringSet {
+	ret := StringSet{}
+
+	for _, keyValue := range theMap.MapKeys() {
+		ret.Insert(keyValue.String())
+	}
+
+	return ret
 }
 
 // Insert adds items to the set.
