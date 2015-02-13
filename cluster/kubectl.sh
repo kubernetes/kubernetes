@@ -103,15 +103,6 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
   export PATH=$(get_absolute_dirname $kubectl):$PATH
   kubectl="${GCLOUD}"
-fi
-
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded auth.  We repeat that here so that
-  # we don't clobber auth that might be used for a publicly facing cluster.
-  config=(
-    "--auth-path=$HOME/.kubernetes_vagrant_auth"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   # GKE runs kubectl through gcloud.
   config=(
     "preview"
@@ -121,12 +112,15 @@ elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     "--zone=${ZONE}"
     "--cluster=${CLUSTER_NAME}"
   )
+elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  # When we are using vagrant it has hard coded auth.  We repeat that here so that
+  # we don't clobber auth that might be used for a publicly facing cluster.
+  config=(
+    "--auth-path=$HOME/.kubernetes_vagrant_auth"
+  )
 fi
 
-detect-master > /dev/null
-if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
-  export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
-fi
+echo "current-context: \"$(${kubectl} config view -o template --template='{{index . "current-context"}}')\""
 
 echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
 "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
