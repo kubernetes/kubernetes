@@ -1077,6 +1077,12 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					containersToKeep[containerID] = empty{}
 					continue
 				}
+				ref, ok := kl.getRef(containerID)
+				if !ok {
+					glog.Warningf("No ref for pod '%v' - '%v'", ID, name)
+				} else {
+					record.Eventf(ref, "unhealthy", "Health Check Failed %v - %v", ID, name)
+				}
 				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
 				glog.V(1).Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
