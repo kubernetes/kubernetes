@@ -224,7 +224,9 @@ func makeHealthyNode(name string, ip string) *api.Node {
 	return &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Status: api.NodeStatus{
-			HostIP: ip,
+			Addresses: []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: ip},
+			},
 			Conditions: []api.NodeCondition{
 				{Type: api.NodeReady, Status: api.ConditionFull},
 			},

@@ -696,8 +696,15 @@ func init() {
 			if err := s.Convert(&in.Status.Conditions, &out.Status.Conditions, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Status.Addresses, &out.Status.Addresses, 0); err != nil {
+				return err
+			}
 
-			out.HostIP = in.Status.HostIP
+			for _, address := range in.Status.Addresses {
+				if address.Type == newer.NodeLegacyHostIP {
+					out.HostIP = address.Address
+				}
+			}
 			out.PodCIDR = in.Spec.PodCIDR
 			out.ExternalID = in.Spec.ExternalID
 			return s.Convert(&in.Spec.Capacity, &out.NodeResources.Capacity, 0)
@@ -718,12 +725,19 @@ func init() {
 			if err := s.Convert(&in.Status.Conditions, &out.Status.Conditions, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Status.Addresses, &out.Status.Addresses, 0); err != nil {
+				return err
+			}
 
-			out.Status.HostIP = in.HostIP
+			if in.HostIP != "" {
+				out.Status.Addresses = append(out.Status.Addresses,
+					newer.NodeAddress{Type: newer.NodeLegacyHostIP, Address: in.HostIP})
+			}
 			out.Spec.PodCIDR = in.PodCIDR
 			out.Spec.ExternalID = in.ExternalID
 			return s.Convert(&in.NodeResources.Capacity, &out.Spec.Capacity, 0)
 		},
+
 		func(in *newer.LimitRange, out *LimitRange, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
@@ -748,6 +762,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *Namespace, out *newer.Namespace, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
@@ -763,6 +778,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *newer.LimitRangeSpec, out *LimitRangeSpec, s conversion.Scope) error {
 			*out = LimitRangeSpec{}
 			out.Limits = make([]LimitRangeItem, len(in.Limits), len(in.Limits))
@@ -783,6 +799,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *newer.LimitRangeItem, out *LimitRangeItem, s conversion.Scope) error {
 			*out = LimitRangeItem{}
 			out.Type = LimitType(in.Type)
@@ -805,6 +822,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *newer.ResourceQuota, out *ResourceQuota, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
@@ -835,6 +853,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *newer.ResourceQuotaUsage, out *ResourceQuotaUsage, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
@@ -859,6 +878,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *newer.ResourceQuotaSpec, out *ResourceQuotaSpec, s conversion.Scope) error {
 			*out = ResourceQuotaSpec{}
 			if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
@@ -873,6 +893,7 @@ func init() {
 			}
 			return nil
 		},
+
 		func(in *newer.ResourceQuotaStatus, out *ResourceQuotaStatus, s conversion.Scope) error {
 			*out = ResourceQuotaStatus{}
 			if err := s.Convert(&in.Hard, &out.Hard, 0); err != nil {
@@ -893,6 +914,7 @@ func init() {
 			}
 			return nil
 		},
+
 		// Object ID <-> Name
 		// TODO: amend the conversion package to allow overriding specific fields.
 		func(in *ObjectReference, out *newer.ObjectReference, s conversion.Scope) error {
@@ -1133,6 +1155,7 @@ func init() {
 			out.TimeoutSeconds = in.TimeoutSeconds
 			return nil
 		},
+
 		func(in *newer.Endpoints, out *Endpoints, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
