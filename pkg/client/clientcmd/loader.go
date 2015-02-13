@@ -56,26 +56,37 @@ func NewClientConfigLoadingRules() *ClientConfigLoadingRules {
 //   3.  CurrentDirectoryPath
 //   4.  HomeDirectoryPath
 // Empty filenames are ignored.  Files with non-deserializable content produced errors.
-// The first file to set a particular value or map key wins and the value or map key is never changed.
-// This means that the first file to set CurrentContext will have its context preserved.  It also means
-// that if two files specify a "red-user", only values from the first file's red-user are used.  Even
+// The first file to set a particular map key wins and map key's value is never changed.
+// BUT, if you set a struct value that is NOT contained inside of map, the value WILL be changed.
+// This results in some odd looking logic to merge in one direction, merge in the other, and then merge the two.
+// It also means that if two files specify a "red-user", only values from the first file's red-user are used.  Even
 // non-conflicting entries from the second file's "red-user" are discarded.
 // Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
 // and only absolute file paths are returned.
 func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
+
+	kubeConfigFiles := []string{rules.CommandLinePath, rules.EnvVarPath, rules.CurrentDirectoryPath, rules.HomeDirectoryPath}
+
+	// first merge all of our maps
+	mapConfig := clientcmdapi.NewConfig()
+	for _, file := range kubeConfigFiles {
+		mergeConfigWithFile(mapConfig, file)
+		resolveLocalPaths(file, mapConfig)
+	}
+
+	// merge all of the struct values in the reverse order so that priority is given correctly
+	nonMapConfig := clientcmdapi.NewConfig()
+	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
+		file := kubeConfigFiles[i]
+		mergeConfigWithFile(nonMapConfig, file)
+		resolveLocalPaths(file, nonMapConfig)
+	}
+
+	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
+	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-
-	mergeConfigWithFile(config, rules.CommandLinePath)
-	resolveLocalPaths(rules.CommandLinePath, config)
-
-	mergeConfigWithFile(config, rules.EnvVarPath)
-	resolveLocalPaths(rules.EnvVarPath, config)
-
-	mergeConfigWithFile(config, rules.CurrentDirectoryPath)
-	resolveLocalPaths(rules.CurrentDirectoryPath, config)
-
-	mergeConfigWithFile(config, rules.HomeDirectoryPath)
-	resolveLocalPaths(rules.HomeDirectoryPath, config)
+	mergo.Merge(config, mapConfig)
+	mergo.Merge(config, nonMapConfig)
 
 	return config, nil
 }

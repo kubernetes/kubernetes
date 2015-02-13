@@ -63,6 +63,7 @@ var (
 		Contexts: map[string]clientcmdapi.Context{
 			"gothic-context": {AuthInfo: "blue-user", Cluster: "chicken-cluster", Namespace: "plane-ns"}},
 	}
+
 	testConfigConflictAlfa = clientcmdapi.Config{
 		AuthInfos: map[string]clientcmdapi.AuthInfo{
 			"red-user":    {Token: "a-different-red-token"},
@@ -73,6 +74,37 @@ var (
 		CurrentContext: "federal-context",
 	}
 )
+
+func TestConflictingCurrentContext(t *testing.T) {
+	commandLineFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(commandLineFile.Name())
+	envVarFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(envVarFile.Name())
+
+	mockCommandLineConfig := clientcmdapi.Config{
+		CurrentContext: "any-context-value",
+	}
+	mockEnvVarConfig := clientcmdapi.Config{
+		CurrentContext: "a-different-context",
+	}
+
+	WriteToFile(mockCommandLineConfig, commandLineFile.Name())
+	WriteToFile(mockEnvVarConfig, envVarFile.Name())
+
+	loadingRules := ClientConfigLoadingRules{
+		CommandLinePath: commandLineFile.Name(),
+		EnvVarPath:      envVarFile.Name(),
+	}
+
+	mergedConfig, err := loadingRules.Load()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if mergedConfig.CurrentContext != mockCommandLineConfig.CurrentContext {
+		t.Errorf("expected %v, got %v", mockCommandLineConfig.CurrentContext, mergedConfig.CurrentContext)
+	}
+}
 
 func TestResolveRelativePaths(t *testing.T) {
 	pathResolutionConfig1 := clientcmdapi.Config{
