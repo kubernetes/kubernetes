@@ -57,6 +57,7 @@ var versioner runtime.ResourceVersioner = accessor
 var selfLinker runtime.SelfLinker = accessor
 var mapper, namespaceMapper, legacyNamespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
+var requestContextMapper api.RequestContextMapper
 
 func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
@@ -111,6 +112,7 @@ func init() {
 	legacyNamespaceMapper = legacyNsMapper
 	namespaceMapper = nsMapper
 	admissionControl = admit.NewAlwaysAdmit()
+	requestContextMapper = api.NewRequestContextMapper()
 }
 
 type Simple struct {
@@ -283,7 +285,7 @@ func TestNotFound(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &SimpleRESTStorage{},
-	}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -335,7 +337,7 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": UnimplementedRESTStorage{},
-	}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -360,7 +362,7 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	handler := Handle(map[string]RESTStorage{}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(map[string]RESTStorage{}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -395,7 +397,7 @@ func TestSimpleList(t *testing.T) {
 		namespace:   "other",
 		expectedSet: "/prefix/version/simple?namespace=other",
 	}
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -418,7 +420,7 @@ func TestErrorList(t *testing.T) {
 		errors: map[string]error{"list": fmt.Errorf("test Error")},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -444,7 +446,7 @@ func TestNonEmptyList(t *testing.T) {
 		},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -492,7 +494,7 @@ func TestGet(t *testing.T) {
 		namespace:   "default",
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -531,7 +533,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 		namespace:   "test",
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, legacyNamespaceMapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, legacyNamespaceMapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -569,7 +571,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 		namespace:   "foo",
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, namespaceMapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, namespaceMapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -598,7 +600,7 @@ func TestGetMissing(t *testing.T) {
 		errors: map[string]error{"get": apierrs.NewNotFound("simple", "id")},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -617,7 +619,7 @@ func TestDelete(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -640,7 +642,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -662,7 +664,7 @@ func TestDeleteMissing(t *testing.T) {
 		errors: map[string]error{"delete": apierrs.NewNotFound("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -689,7 +691,7 @@ func TestUpdate(t *testing.T) {
 		name:        ID,
 		namespace:   api.NamespaceDefault,
 	}
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -726,7 +728,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -759,7 +761,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -788,7 +790,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -820,7 +822,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -855,7 +857,7 @@ func TestUpdateMissing(t *testing.T) {
 		errors: map[string]error{"update": apierrs.NewNotFound("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -889,7 +891,7 @@ func TestCreateNotFound(t *testing.T) {
 			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrs.NewNotFound("simple", "id")},
 		},
-	}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -957,7 +959,7 @@ func TestCreate(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
-	}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -1015,7 +1017,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
-	}, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), mapper)
+	}, codec, "/prefix", testVersion, selfLinker, deny.NewAlwaysDeny(), requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -1075,7 +1077,7 @@ func TestDelayReturnsError(t *testing.T) {
 			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
 	}
-	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1141,7 +1143,7 @@ func TestCreateTimeout(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
-	}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper)
+	}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1173,7 +1175,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 		}
 
 		handler := CORS(
-			Handle(map[string]RESTStorage{}, codec, "/prefix", testVersion, selfLinker, admissionControl, mapper),
+			Handle(map[string]RESTStorage{}, codec, "/prefix", testVersion, selfLinker, admissionControl, requestContextMapper, mapper),
 			allowedOriginRegexps, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)

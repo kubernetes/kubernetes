@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	authhandlers "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -154,21 +153,24 @@ type RequestAttributeGetter interface {
 }
 
 type requestAttributeGetter struct {
-	userContexts           authhandlers.RequestContext
+	requestContextMapper   api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(userContexts authhandlers.RequestContext, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
-	return &requestAttributeGetter{userContexts, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
 	attribs := authorizer.AttributesRecord{}
 
-	user, ok := r.userContexts.Get(req)
+	ctx, ok := r.requestContextMapper.Get(req)
 	if ok {
-		attribs.User = user
+		user, ok := api.UserFrom(ctx)
+		if ok {
+			attribs.User = user
+		}
 	}
 
 	attribs.ReadOnly = IsReadOnlyReq(*req)

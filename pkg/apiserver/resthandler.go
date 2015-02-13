@@ -29,6 +29,9 @@ import (
 	"github.com/emicklei/go-restful"
 )
 
+// ContextFunc returns a Context given a request - a context must be returned
+type ContextFunc func(req *restful.Request) api.Context
+
 // ResourceNameFunc returns a name (and optional namespace) given a request - if no name is present
 // an error must be returned.
 type ResourceNameFunc func(req *restful.Request) (namespace, name string, err error)
@@ -45,7 +48,7 @@ type ResourceNamespaceFunc func(req *restful.Request) (namespace string, err err
 type LinkResourceFunc func(req *restful.Request, obj runtime.Object) error
 
 // GetResource returns a function that handles retrieving a single resource from a RESTStorage object.
-func GetResource(r RESTGetter, nameFn ResourceNameFunc, linkFn LinkResourceFunc, codec runtime.Codec) restful.RouteFunction {
+func GetResource(r RESTGetter, ctxFn ContextFunc, nameFn ResourceNameFunc, linkFn LinkResourceFunc, codec runtime.Codec) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := nameFn(req)
@@ -53,7 +56,7 @@ func GetResource(r RESTGetter, nameFn ResourceNameFunc, linkFn LinkResourceFunc,
 			notFound(w, req.Request)
 			return
 		}
-		ctx := api.NewContext()
+		ctx := ctxFn(req)
 		if len(namespace) > 0 {
 			ctx = api.WithNamespace(ctx, namespace)
 		}
@@ -71,7 +74,7 @@ func GetResource(r RESTGetter, nameFn ResourceNameFunc, linkFn LinkResourceFunc,
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a RESTStorage object.
-func ListResource(r RESTLister, namespaceFn ResourceNamespaceFunc, linkFn LinkResourceFunc, codec runtime.Codec) restful.RouteFunction {
+func ListResource(r RESTLister, ctxFn ContextFunc, namespaceFn ResourceNamespaceFunc, linkFn LinkResourceFunc, codec runtime.Codec) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -80,7 +83,7 @@ func ListResource(r RESTLister, namespaceFn ResourceNamespaceFunc, linkFn LinkRe
 			notFound(w, req.Request)
 			return
 		}
-		ctx := api.NewContext()
+		ctx := ctxFn(req)
 		if len(namespace) > 0 {
 			ctx = api.WithNamespace(ctx, namespace)
 		}
@@ -109,7 +112,7 @@ func ListResource(r RESTLister, namespaceFn ResourceNamespaceFunc, linkFn LinkRe
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r RESTCreater, namespaceFn ResourceNamespaceFunc, linkFn LinkResourceFunc, codec runtime.Codec, resource string, admit admission.Interface) restful.RouteFunction {
+func CreateResource(r RESTCreater, ctxFn ContextFunc, namespaceFn ResourceNamespaceFunc, linkFn LinkResourceFunc, codec runtime.Codec, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -121,7 +124,7 @@ func CreateResource(r RESTCreater, namespaceFn ResourceNamespaceFunc, linkFn Lin
 			notFound(w, req.Request)
 			return
 		}
-		ctx := api.NewContext()
+		ctx := ctxFn(req)
 		if len(namespace) > 0 {
 			ctx = api.WithNamespace(ctx, namespace)
 		}
@@ -162,7 +165,7 @@ func CreateResource(r RESTCreater, namespaceFn ResourceNamespaceFunc, linkFn Lin
 }
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r RESTUpdater, nameFn ResourceNameFunc, objNameFunc ObjectNameFunc, linkFn LinkResourceFunc, codec runtime.Codec, resource string, admit admission.Interface) restful.RouteFunction {
+func UpdateResource(r RESTUpdater, ctxFn ContextFunc, nameFn ResourceNameFunc, objNameFunc ObjectNameFunc, linkFn LinkResourceFunc, codec runtime.Codec, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -174,7 +177,7 @@ func UpdateResource(r RESTUpdater, nameFn ResourceNameFunc, objNameFunc ObjectNa
 			notFound(w, req.Request)
 			return
 		}
-		ctx := api.NewContext()
+		ctx := ctxFn(req)
 		if len(namespace) > 0 {
 			ctx = api.WithNamespace(ctx, namespace)
 		}
@@ -238,7 +241,7 @@ func UpdateResource(r RESTUpdater, nameFn ResourceNameFunc, objNameFunc ObjectNa
 }
 
 // DeleteResource returns a function that will handle a resource deletion
-func DeleteResource(r RESTDeleter, nameFn ResourceNameFunc, linkFn LinkResourceFunc, codec runtime.Codec, resource, kind string, admit admission.Interface) restful.RouteFunction {
+func DeleteResource(r RESTDeleter, ctxFn ContextFunc, nameFn ResourceNameFunc, linkFn LinkResourceFunc, codec runtime.Codec, resource, kind string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -250,7 +253,7 @@ func DeleteResource(r RESTDeleter, nameFn ResourceNameFunc, linkFn LinkResourceF
 			notFound(w, req.Request)
 			return
 		}
-		ctx := api.NewContext()
+		ctx := ctxFn(req)
 		if len(namespace) > 0 {
 			ctx = api.WithNamespace(ctx, namespace)
 		}

@@ -78,6 +78,7 @@ type ProxyHandler struct {
 	prefix                 string
 	storage                map[string]RESTStorage
 	codec                  runtime.Codec
+	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
@@ -97,7 +98,11 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	verb = requestInfo.Verb
 	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
 
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx, ok := r.context.Get(req)
+	if !ok {
+		ctx = api.NewContext()
+	}
+	ctx = api.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
 		notFound(w, req)
 		httpCode = http.StatusNotFound

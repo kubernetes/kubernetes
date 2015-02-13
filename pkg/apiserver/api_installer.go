@@ -62,8 +62,8 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 		linker:  a.group.linker,
 		info:    a.group.info,
 	})
-	redirectHandler := (&RedirectHandler{a.group.storage, a.group.codec, a.group.info})
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.storage, a.group.codec, a.group.info})
+	redirectHandler := (&RedirectHandler{a.group.storage, a.group.codec, a.group.context, a.group.info})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.storage, a.group.codec, a.group.context, a.group.info})
 
 	for path, storage := range a.group.storage {
 		if err := a.registerResourceHandlers(path, storage, ws, watchHandler, redirectHandler, proxyHandler); err != nil {
@@ -88,6 +88,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	codec := a.group.codec
 	admit := a.group.admit
 	linker := a.group.linker
+	context := a.group.context
 	resource := path
 
 	object := storage.New()
@@ -147,12 +148,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		storageVerbs["Redirector"] = true
 	}
 
+	var ctxFn ContextFunc
 	var namespaceFn ResourceNamespaceFunc
 	var nameFn ResourceNameFunc
 	var generateLinkFn linkFunc
 	var objNameFn ObjectNameFunc
 	linkFn := func(req *restful.Request, obj runtime.Object) error {
 		return setSelfLink(obj, req.Request, a.group.linker, generateLinkFn)
+	}
+	ctxFn = func(req *restful.Request) api.Context {
+		if ctx, ok := context.Get(req.Request); ok {
+			return ctx
+		}
+		return api.NewContext()
 	}
 
 	allowWatchList := storageVerbs["ResourceWatcher"] && storageVerbs["RESTLister"] // watching on lists is allowed only for kinds that support both watch and list.
@@ -324,7 +332,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		m := monitorFilter(action.Verb, resource)
 		switch action.Verb {
 		case "GET": // Get a resource.
-			route := ws.GET(action.Path).To(GetResource(getter, nameFn, linkFn, codec)).
+			route := ws.GET(action.Path).To(GetResource(getter, ctxFn, nameFn, linkFn, codec)).
 				Filter(m).
 				Doc("read the specified " + kind).
 				Operation("read" + kind).
@@ -332,7 +340,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, namespaceFn, linkFn, codec)).
+			route := ws.GET(action.Path).To(ListResource(lister, ctxFn, namespaceFn, linkFn, codec)).
 				Filter(m).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
@@ -340,7 +348,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
-			route := ws.PUT(action.Path).To(UpdateResource(updater, nameFn, objNameFn, linkFn, codec, resource, admit)).
+			route := ws.PUT(action.Path).To(UpdateResource(updater, ctxFn, nameFn, objNameFn, linkFn, codec, resource, admit)).
 				Filter(m).
 				Doc("update the specified " + kind).
 				Operation("update" + kind).
@@ -348,7 +356,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
-			route := ws.POST(action.Path).To(CreateResource(creater, namespaceFn, linkFn, codec, resource, admit)).
+			route := ws.POST(action.Path).To(CreateResource(creater, ctxFn, namespaceFn, linkFn, codec, resource, admit)).
 				Filter(m).
 				Doc("create a " + kind).
 				Operation("create" + kind).
@@ -356,7 +364,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
-			route := ws.DELETE(action.Path).To(DeleteResource(deleter, nameFn, linkFn, codec, resource, kind, admit)).
+			route := ws.DELETE(action.Path).To(DeleteResource(deleter, ctxFn, nameFn, linkFn, codec, resource, kind, admit)).
 				Filter(m).
 				Doc("delete a " + kind).
 				Operation("delete" + kind)

@@ -98,9 +98,9 @@ type defaultAPIServer struct {
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
 // Note: This method is used only in tests.
-func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, linker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) http.Handler {
+func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, linker runtime.SelfLinker, admissionControl admission.Interface, contextMapper api.RequestContextMapper, mapper meta.RESTMapper) http.Handler {
 	prefix := path.Join(root, version)
-	group := NewAPIGroupVersion(storage, codec, root, prefix, linker, admissionControl, mapper)
+	group := NewAPIGroupVersion(storage, codec, root, prefix, linker, admissionControl, contextMapper, mapper)
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -121,6 +121,7 @@ type APIGroupVersion struct {
 	prefix  string
 	linker  runtime.SelfLinker
 	admit   admission.Interface
+	context api.RequestContextMapper
 	mapper  meta.RESTMapper
 	// TODO: put me into a cleaner interface
 	info *APIRequestInfoResolver
@@ -131,13 +132,14 @@ type APIGroupVersion struct {
 // This is a helper method for registering multiple sets of REST handlers under different
 // prefixes onto a server.
 // TODO: add multitype codec serialization
-func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, root, prefix string, linker runtime.SelfLinker, admissionControl admission.Interface, mapper meta.RESTMapper) *APIGroupVersion {
+func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, root, prefix string, linker runtime.SelfLinker, admissionControl admission.Interface, contextMapper api.RequestContextMapper, mapper meta.RESTMapper) *APIGroupVersion {
 	return &APIGroupVersion{
 		storage: storage,
 		codec:   codec,
 		prefix:  prefix,
 		linker:  linker,
 		admit:   admissionControl,
+		context: contextMapper,
 		mapper:  mapper,
 		info:    &APIRequestInfoResolver{util.NewStringSet(root), latest.RESTMapper},
 	}
