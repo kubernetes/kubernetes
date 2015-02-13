@@ -118,7 +118,7 @@ Flags:
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
   -l, --selector="": Selector (label query) to filter on
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
   -w, --watch=false: After listing/getting the requested object, watch for changes.
       --watch-only=false: Watch for changes to the requested object(s), without listing/getting first.
 
@@ -437,7 +437,7 @@ Flags:
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
 
 Global Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -951,7 +951,7 @@ Flags:
       --overrides="": An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.
       --port=-1: The port that this container exposes.
   -r, --replicas=1: Number of replicas to create for this container. Default is 1.
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
 
 Global Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -1057,7 +1057,7 @@ Flags:
       --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
       --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
       --service-name="": The name for the newly created service.
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
 
 Global Flags:
       --alsologtostderr=false: log to standard error as well as files
@@ -1117,7 +1117,7 @@ Flags:
       --output-version="": Output the formatted object with the given version (default api-version).
       --overwrite=false: If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
       --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object.
-  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.
+  -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
 
 Global Flags:
       --alsologtostderr=false: log to standard error as well as files
