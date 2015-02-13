@@ -62,7 +62,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	}
 	api.FillObjectMetaSystemFields(ctx, &limitRange.ObjectMeta)
 
-	err := rs.registry.Create(ctx, limitRange.Name, limitRange)
+	err := rs.registry.CreateWithName(ctx, limitRange.Name, limitRange)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		return nil, false, errors.NewInvalid("limitRange", editLimitRange.Name, errs)
 	}
 
-	if err := rs.registry.Update(ctx, editLimitRange.Name, editLimitRange); err != nil {
+	if err := rs.registry.UpdateWithName(ctx, editLimitRange.Name, editLimitRange); err != nil {
 		return nil, false, err
 	}
 	out, err := rs.registry.Get(ctx, editLimitRange.Name)
@@ -114,7 +114,7 @@ func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, name)
+	return rs.registry.Delete(ctx, name)
 }
 
 // Get gets a LimitRange with the specified name

@@ -203,7 +203,7 @@ func TestEtcdCreate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Create(api.NewContext(), key, item.toCreate)
+		err := registry.CreateWithName(api.NewContext(), key, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
@@ -278,7 +278,7 @@ func TestEtcdUpdate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Update(api.NewContext(), key, item.toUpdate)
+		err := registry.UpdateWithName(api.NewContext(), key, item.toUpdate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
@@ -390,11 +390,14 @@ func TestEtcdDelete(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Delete(api.NewContext(), key)
+		_, err := registry.Delete(api.NewContext(), key)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
 
+		if item.expect.E != nil {
+			item.expect.E.(*etcd.EtcdError).Index = fakeClient.ChangeIndex
+		}
 		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}

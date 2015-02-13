@@ -56,7 +56,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	}
 	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
-	err := rs.registry.Create(ctx, event.Name, event)
+	err := rs.registry.CreateWithName(ctx, event.Name, event)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	}
 	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
-	err := rs.registry.Update(ctx, event.Name, event)
+	err := rs.registry.UpdateWithName(ctx, event.Name, event)
 	if err != nil {
 		return nil, false, err
 	}
@@ -87,8 +87,8 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	return out, false, err
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, id)
+func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
+	obj, err := rs.registry.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, id)
+	return rs.registry.Delete(ctx, name)
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {

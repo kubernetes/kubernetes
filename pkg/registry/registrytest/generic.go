@@ -49,7 +49,7 @@ func (r *GenericRegistry) List(ctx api.Context, m generic.Matcher) (runtime.Obje
 	if r.Err != nil {
 		return nil, r.Err
 	}
-	return generic.FilterList(r.ObjectList, m)
+	return generic.FilterList(r.ObjectList, m, nil)
 }
 
 func (r *GenericRegistry) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
@@ -63,7 +63,7 @@ func (r *GenericRegistry) Get(ctx api.Context, id string) (runtime.Object, error
 	return r.Object, r.Err
 }
 
-func (r *GenericRegistry) Create(ctx api.Context, id string, obj runtime.Object) error {
+func (r *GenericRegistry) CreateWithName(ctx api.Context, id string, obj runtime.Object) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Object = obj
@@ -71,7 +71,7 @@ func (r *GenericRegistry) Create(ctx api.Context, id string, obj runtime.Object)
 	return r.Err
 }
 
-func (r *GenericRegistry) Update(ctx api.Context, id string, obj runtime.Object) error {
+func (r *GenericRegistry) UpdateWithName(ctx api.Context, id string, obj runtime.Object) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Object = obj
@@ -79,9 +79,9 @@ func (r *GenericRegistry) Update(ctx api.Context, id string, obj runtime.Object)
 	return r.Err
 }
 
-func (r *GenericRegistry) Delete(ctx api.Context, id string) error {
+func (r *GenericRegistry) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
 	r.Broadcaster.Action(watch.Deleted, r.Object)
-	return r.Err
+	return &api.Status{Status: api.StatusSuccess}, r.Err
 }

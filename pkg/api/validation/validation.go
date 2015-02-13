@@ -561,7 +561,8 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	return allErrs
 }
 
-// ValidatePodUpdate tests to see if the update is legal
+// ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
+// that cannot be changed.
 func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
@@ -584,6 +585,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers, "some fields are immutable"))
 	}
 
+	newPod.Status = oldPod.Status
 	return allErrs
 }
 

@@ -148,7 +148,11 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namespaceFn ResourceNamesp
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Create(ctx, obj)
+			out, err := r.Create(ctx, obj)
+			if status, ok := out.(*api.Status); ok && err == nil && status.Code == 0 {
+				status.Code = http.StatusCreated
+			}
+			return out, err
 		})
 		if err != nil {
 			errorJSON(err, codec, w)

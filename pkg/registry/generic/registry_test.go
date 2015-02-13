@@ -124,6 +124,7 @@ func TestFilterList(t *testing.T) {
 			}
 			return i.ID[0] == 'b', nil
 		}),
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)

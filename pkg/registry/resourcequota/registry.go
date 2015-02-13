@@ -53,7 +53,7 @@ func (r *registry) ApplyStatus(ctx api.Context, usage *api.ResourceQuotaUsage) e
 	resourceQuota := obj.(*api.ResourceQuota)
 	resourceQuota.ResourceVersion = usage.ResourceVersion
 	resourceQuota.Status = usage.Status
-	return r.Update(ctx, resourceQuota.Name, resourceQuota)
+	return r.UpdateWithName(ctx, resourceQuota.Name, resourceQuota)
 }
 
 // NewEtcdRegistry returns a registry which will store ResourceQuota in the given helper
