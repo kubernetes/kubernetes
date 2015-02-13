@@ -395,7 +395,7 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 	}
 	uidToIDMap := map[string][]string{}
 	for _, container := range containers {
-		_, uid, name, _ := dockertools.ParseDockerName(container.ID)
+		_, uid, name, _ := dockertools.ParseDockerName(container.Names[0])
 		uidName := string(uid) + "." + name
 		uidToIDMap[uidName] = append(uidToIDMap[uidName], container.ID)
 	}

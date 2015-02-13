@@ -95,6 +95,27 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	}
 }
 
+func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
+	invalid := len(actual) != len(expected)
+	if !invalid {
+		for _, exp := range expected {
+			found := false
+			for _, act := range actual {
+				if exp == act {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Expected element %s not found in %#v", exp, actual)
+			}
+		}
+	}
+	if invalid {
+		t.Errorf("Expected: %#v, Actual: %#v", expected, actual)
+	}
+}
+
 func verifyBoolean(t *testing.T, expected, value bool) {
 	if expected != value {
 		t.Errorf("Unexpected boolean.  Expected %t.  Found %t", expected, value)
@@ -1634,6 +1655,7 @@ func TestKubeletGarbageCollection(t *testing.T) {
 		containerDetails map[string]*docker.Container
 		expectedRemoved  []string
 	}{
+		// Remove oldest containers.
 		{
 			containers: []docker.APIContainers{
 				{
@@ -1650,21 +1672,6 @@ func TestKubeletGarbageCollection(t *testing.T) {
 					// pod infra container
 					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
 					ID:    "3876",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
-					ID:    "4876",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
-					ID:    "5876",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
-					ID:    "6876",
 				},
 			},
 			containerDetails: map[string]*docker.Container{
@@ -1678,6 +1685,7 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			},
 			expectedRemoved: []string{"1876"},
 		},
+		// Only remove non-running containers.
 		{
 			containers: []docker.APIContainers{
 				{
@@ -1699,21 +1707,6 @@ func TestKubeletGarbageCollection(t *testing.T) {
 					// pod infra container
 					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
 					ID:    "4876",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
-					ID:    "5876",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
-					ID:    "6876",
-				},
-				{
-					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
-					ID:    "7876",
 				},
 			},
 			containerDetails: map[string]*docker.Container{
@@ -1734,6 +1727,7 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			},
 			expectedRemoved: []string{"2876"},
 		},
+		// Less than maxContainerCount doesn't delete any.
 		{
 			containers: []docker.APIContainers{
 				{
@@ -1743,10 +1737,62 @@ func TestKubeletGarbageCollection(t *testing.T) {
 				},
 			},
 		},
+		// maxContainerCount applies per container..
+		{
+			containers: []docker.APIContainers{
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD_foo2.new.test_.beefbeef_40"},
+					ID:    "1706",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD_foo2.new.test_.beefbeef_40"},
+					ID:    "2706",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD_foo2.new.test_.beefbeef_40"},
+					ID:    "3706",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					ID:    "1876",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					ID:    "2876",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					ID:    "3876",
+				},
+			},
+			containerDetails: map[string]*docker.Container{
+				"1706": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1706",
+					Created: time.Now(),
+				},
+				"1876": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1876",
+					Created: time.Now(),
+				},
+			},
+			expectedRemoved: []string{"1706", "1876"},
+		},
 	}
 	for _, test := range tests {
 		kubelet, fakeDocker := newTestKubelet(t)
-		kubelet.maxContainerCount = 5
+		kubelet.maxContainerCount = 2
 		fakeDocker.ContainerList = test.containers
 		fakeDocker.ContainerMap = test.containerDetails
 		fakeDocker.Container = &docker.Container{ID: "error", Created: time.Now()}
@@ -1754,9 +1800,7 @@ func TestKubeletGarbageCollection(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !reflect.DeepEqual(fakeDocker.Removed, test.expectedRemoved) {
-			t.Errorf("expected: %v, got: %v", test.expectedRemoved, fakeDocker.Removed)
-		}
+		verifyStringArrayEqualsAnyOrder(t, test.expectedRemoved, fakeDocker.Removed)
 	}
 }
 
