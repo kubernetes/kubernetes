@@ -94,20 +94,20 @@ of the --template flag, you can filter the attributes of the fetched resource(s)
 
 Examples:
 
-    $ kubectl get pods
     // List all pods in ps output format.
+    $ kubectl get pods
 
-    $ kubectl get replicationController 1234-56-7890-234234-456456
     // List a single replication controller with specified ID in ps output format.
+    $ kubectl get replicationController 1234-56-7890-234234-456456
 
-    $ kubectl get -o json pod 1234-56-7890-234234-456456
     // List a single pod in JSON output format.
+    $ kubectl get -o json pod 1234-56-7890-234234-456456
 
-    $ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
     // Return only the status value of the specified pod.
+    $ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
 
-    $ kubectl get rc,services
     // List all replication controllers and services together in ps output format.
+    $ kubectl get rc,services
 
 Usage:
 ```
@@ -196,11 +196,11 @@ JSON and YAML formats are accepted.
 
 Examples:
 
-    $ kubectl create -f pod.json
     // Create a pod using the data in pod.json.
+    $ kubectl create -f pod.json
 
-    $ cat pod.json | kubectl create -f -
     // Create a pod based on the JSON passed into stdin.
+    $ cat pod.json | kubectl create -f -
 
 Usage:
 ```
@@ -244,14 +244,14 @@ JSON and YAML formats are accepted.
 
 Examples:
 
-    $ kubectl update -f pod.json
     // Update a pod using the data in pod.json.
+    $ kubectl update -f pod.json
 
-    $ cat pod.json | kubectl update -f -
     // Update a pod based on the JSON passed into stdin.
+    $ cat pod.json | kubectl update -f -
 
-    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
     // Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
+    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'
 
 Usage:
 ```
@@ -303,17 +303,17 @@ will be lost along with the rest of the resource.
 
 Examples:
 
-    $ kubectl delete -f pod.json
     // Delete a pod using the type and ID specified in pod.json.
+    $ kubectl delete -f pod.json
 
-    $ cat pod.json | kubectl delete -f -
     // Delete a pod based on the type and ID in the JSON passed into stdin.
+    $ cat pod.json | kubectl delete -f -
 
-    $ kubectl delete pods,services -l name=myLabel
     // Delete pods and services with label name=myLabel.
+    $ kubectl delete pods,services -l name=myLabel
 
-    $ kubectl delete pod 1234-56-7890-234234-456456
     // Delete a pod with ID 1234-56-7890-234234-456456.
+    $ kubectl delete pod 1234-56-7890-234234-456456
 
 Usage:
 ```
@@ -771,11 +771,11 @@ Print the logs for a container in a pod. If the pod has only one container, the 
 
 Examples:
 
-    $ kubectl log 123456-7890 ruby-container
     // Returns snapshot of ruby-container logs from pod 123456-7890.
+    $ kubectl log 123456-7890 ruby-container
 
-    $ kubectl log -f 123456-7890 ruby-container
     // Starts streaming of ruby-container logs from pod 123456-7890.
+    $ kubectl log -f 123456-7890 ruby-container
 
 Usage:
 ```
@@ -821,11 +821,11 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 Examples:
 
-    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
     // Update pods of frontend-v1 using new controller data in frontend-v2.json.
+    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
 
-    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
     // Update pods of frontend-v1 using JSON data passed into stdin.
+    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 
 Usage:
 ```
@@ -875,11 +875,11 @@ resize is sent to the server.
 
 Examples:
 
-    $ kubectl resize --replicas=3 replicationcontrollers foo
     // Resize replication controller named 'foo' to 3.
+    $ kubectl resize --replicas=3 replicationcontrollers foo
 
-    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
     // If the replication controller named foo's current size is 2, resize foo to 3.
+    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 
 Usage:
 ```
@@ -924,17 +924,17 @@ Creates a replication controller to manage the created container(s).
 
 Examples:
 
-    $ kubectl run-container nginx --image=dockerfile/nginx
     // Starts a single instance of nginx.
+    $ kubectl run-container nginx --image=dockerfile/nginx
 
-    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
     // Starts a replicated instance of nginx.
+    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
 
-    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
     // Dry run. Print the corresponding API objects without creating them.
+    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
   
+    // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
     $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
-    // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON
 
 Usage:
 ```
@@ -989,9 +989,8 @@ If the resource is resizable it will be resized to 0 before deletion.
 
 Examples:
 
-    $ kubectl stop replicationcontroller foo
     // Shut down foo.
-
+    $ kubectl stop replicationcontroller foo
 
 Usage:
 ```
@@ -1034,12 +1033,11 @@ as the selector for a new Service on the specified port.
 
 Examples:
 
-    $ kubectl expose nginx --port=80 --container-port=8000
     // Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+    $ kubectl expose nginx --port=80 --container-port=8000
 
-    $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
     // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-
+    $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 
 Usage:
 ```
@@ -1096,17 +1094,18 @@ If --overwrite is true, then existing labels can be overwritten, otherwise attem
 If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
 Examples:
+  // Update pod 'foo' with the label 'unhealthy' and the value 'true'.
   $ kubectl label pods foo unhealthy=true
-  <update a pod with the label 'unhealthy' and the value 'true'>
 
+  // Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
   $ kubectl label --overwrite pods foo status=unhealthy
-  <update a pod with the label 'status' and the value 'unhealthy' overwritting an existing value>
   
+  // Update pod 'foo' only if the resource is unchanged from version 1.
   $ kubectl label pods foo status=unhealthy --resource-version=1
-  <update a pod with the label 'status' and the value 'unhealthy' if the resource is unchanged from version 1>
   
+  // Update pod 'foo' by removing a label named 'bar' if it exists.
+  // Does not require the --overwrite flag.
   $ kubectl label pods foo bar-
-  <update a pod by removing a label named 'bar' if it exists. Does not require the --overwrite flag.>
 
 Usage:
 ```
