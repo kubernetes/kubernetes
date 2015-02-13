@@ -120,7 +120,7 @@ elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
   )
 fi
 
-echo "current-context: \"$(${kubectl} config view -o template --template='{{index . "current-context"}}')\""
+echo "current-context: \"$(${kubectl} config view -o template --template='{{index . "current-context"}}')\"" >&2
 
 echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
 "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
