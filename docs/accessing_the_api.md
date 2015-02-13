@@ -50,14 +50,16 @@ variety of uses cases:
       operations on the apiserver.  Currently, these have to run on the same
       host as the apiserver and use the Localhost Port.
    4. Kubelets, which need to do read-write API operations and are necessarily 
-      on different machines than the apiserver.  Currently, kubelets do not
-      use the API.
+      on different machines than the apiserver.  Kubelet uses the Secure Port 
+      to get their pods, to find the services that a pod can see, and to
+      write events.  Credentials are distributed to kubelets at cluster
+      setup time.
 
-## Expected Changes.
-The following changes to what is decribed above are planned:
-   - Kubelets will soon begin using the Secure Port to get their pods and
-     report events.  Credentials will be distributed to kubelets at cluster
-     setup time initially.  Policy will limit the actions kubelets can do.
+## Expected changes
+   - Policy will limit the actions kubelets can do via the authed port.
+   - Kube-proxy currently uses the readonly port to read services and endpoints,
+     but will eventually use the auth port.
+   - Kubelets may change from token-based authentication to cert-based-auth.
    - Scheduler and Controller-manager will use the Secure Port too.  They
      will then be able to run on different machines than the apiserver.
    - A general mechanism will be provided for [giving credentials to
