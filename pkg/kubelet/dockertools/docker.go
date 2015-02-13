@@ -578,6 +578,7 @@ func BuildDockerName(podUID types.UID, podFullName string, container *api.Contai
 		rand.Uint32())
 }
 
+// TODO(vmarmol): This should probably return an error.
 // Unpacks a container name, returning the pod full name and container name we would have used to
 // construct the docker name. If the docker name isn't the one we created, we may return empty strings.
 func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64) {
