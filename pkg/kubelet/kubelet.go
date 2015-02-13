@@ -1423,8 +1423,11 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 			return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
 		}
 	}
-	if podStatus.Phase != api.PodRunning {
-		return fmt.Errorf("pod %q is not in 'Running' state - State: %q", podFullName, podStatus.Phase)
+	switch podStatus.Phase {
+	case api.PodRunning, api.PodSucceeded, api.PodFailed:
+		break
+	default:
+		return fmt.Errorf("pod %q is not in 'Running', 'Succeeded' or 'Failed' state - State: %q", podFullName, podStatus.Phase)
 	}
 	exists := false
 	dockerContainerID := ""
