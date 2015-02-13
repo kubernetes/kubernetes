@@ -1063,15 +1063,15 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				if live == probe.Success {
 					ready, _ = kl.probeContainer(container.ReadinessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Failure)
 				}
+				if err != nil {
+					glog.V(1).Infof("liveness/readiness probe errored: %v", err)
+					containersToKeep[containerID] = empty{}
+					continue
+				}
 				if ready == probe.Success {
 					kl.readiness.set(dockerContainer.ID, true)
 				} else {
 					kl.readiness.set(dockerContainer.ID, false)
-				}
-				if err != nil {
-					glog.V(1).Infof("health check errored: %v", err)
-					containersToKeep[containerID] = empty{}
-					continue
 				}
 				if live == probe.Success {
 					containersToKeep[containerID] = empty{}
@@ -1079,13 +1079,13 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				}
 				ref, ok := kl.getRef(containerID)
 				if !ok {
-					glog.Warningf("No ref for pod '%v' - '%v'", ID, name)
+					glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
 				} else {
-					record.Eventf(ref, "unhealthy", "Health Check Failed %v - %v", ID, name)
+					record.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
 				}
-				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, live)
+				glog.Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
-				glog.V(1).Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
+				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
 			if err := kl.killContainer(dockerContainer); err != nil {
 				glog.V(1).Infof("Failed to kill container %q: %v", dockerContainer.ID, err)
