@@ -57,7 +57,10 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
-	return meta.Namespace() + "/" + meta.Name(), nil
+	if len(meta.Namespace()) > 0 {
+		return meta.Namespace() + "/" + meta.Name(), nil
+	}
+	return meta.Name(), nil
 }
 
 type cache struct {
