@@ -71,7 +71,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, container
 	if cc == nil {
 		return nil, fmt.Errorf("no cadvisor connection")
 	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.containerRuntime, false)
 	if err != nil {
 		return nil, err
 	}

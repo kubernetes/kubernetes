@@ -54,7 +54,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient) {
 	}
 
 	kubelet := &Kubelet{}
-	kubelet.dockerClient = fakeDocker
+	kubelet.containerRuntime = fakeDocker
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -296,7 +296,7 @@ func TestKillContainerWithError(t *testing.T) {
 	for _, c := range fakeDocker.ContainerList {
 		kubelet.readiness.set(c.ID, true)
 	}
-	kubelet.dockerClient = fakeDocker
+	kubelet.containerRuntime = fakeDocker
 	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
 	if err == nil {
 		t.Errorf("expected error, found nil")
@@ -1343,10 +1343,10 @@ func TestGetRootInfo(t *testing.T) {
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
-		dockerClient:   &fakeDocker,
-		dockerPuller:   &dockertools.FakeDockerPuller{},
-		cadvisorClient: mockCadvisor,
-		podWorkers:     newPodWorkers(),
+		containerRuntime: &fakeDocker,
+		dockerPuller:     &dockertools.FakeDockerPuller{},
+		cadvisorClient:   mockCadvisor,
+		podWorkers:       newPodWorkers(),
 	}
 
 	// If the container name is an empty string, then it means the root container.

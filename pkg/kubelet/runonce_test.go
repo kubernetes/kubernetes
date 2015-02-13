@@ -84,7 +84,7 @@ func TestRunOnce(t *testing.T) {
 			Status: "running",
 		},
 	}
-	kb.dockerClient = &testDocker{
+	kb.containerRuntime = &testDocker{
 		listContainersResults: []listContainersResult{
 			{label: "list pod container", containers: []docker.APIContainers{}},
 			{label: "syncPod", containers: []docker.APIContainers{}},
