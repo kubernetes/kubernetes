@@ -51,7 +51,10 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			// This set of reflective code pulls the type of the map values, uses that type to look up the set of legal tags.  Those legal tags are used to
 			// walk the list of remaining parts until we find a match to a legal tag or the end of the string.  That name is used to burn all the used parts.
 			mapValueType := currType.Elem()
-			mapValueOptions := getPotentialTypeValues(mapValueType)
+			mapValueOptions, err := getPotentialTypeValues(mapValueType)
+			if err != nil {
+				return nil, err
+			}
 			nextPart := findNameStep(individualParts[currPartIndex:], util.KeySet(reflect.ValueOf(mapValueOptions)))
 
 			steps = append(steps, navigationStep{nextPart, mapValueType})
@@ -61,7 +64,10 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 		case reflect.Struct:
 			nextPart := individualParts[currPartIndex]
 
-			options := getPotentialTypeValues(currType)
+			options, err := getPotentialTypeValues(currType)
+			if err != nil {
+				return nil, err
+			}
 			fieldType, exists := options[nextPart]
 			if !exists {
 				return nil, fmt.Errorf("unable to parse %v after %v at %v", path, steps, currType)
@@ -113,7 +119,11 @@ func findNameStep(parts []string, typeOptions util.StringSet) string {
 }
 
 // getPotentialTypeValues takes a type and looks up the tags used to represent its fields when serialized.
-func getPotentialTypeValues(typeValue reflect.Type) map[string]reflect.Type {
+func getPotentialTypeValues(typeValue reflect.Type) (map[string]reflect.Type, error) {
+	if typeValue.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("%v is not of type struct", typeValue)
+	}
+
 	ret := make(map[string]reflect.Type)
 
 	for fieldIndex := 0; fieldIndex < typeValue.NumField(); fieldIndex++ {
@@ -124,7 +134,7 @@ func getPotentialTypeValues(typeValue reflect.Type) map[string]reflect.Type {
 		ret[yamlTagName] = fieldType.Type
 	}
 
-	return ret
+	return ret, nil
 }
 
 func findKnownValue(parts []string, valueOptions util.StringSet) int {
