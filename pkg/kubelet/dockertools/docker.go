@@ -222,7 +222,21 @@ func (p dockerPuller) Pull(image string) error {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 	}
 
-	return p.client.PullImage(opts, creds)
+	err := p.client.PullImage(opts, creds)
+	// If there was no error, or we had credentials, just return the error.
+	if err == nil || ok {
+		return err
+	}
+	// Image spec: [<registry>/]<repository>/<image>[:<version] so we count '/'
+	explicitRegistry := (strings.Count(image, "/") == 2)
+	glog.Errorf("Foo: %s", explicitRegistry)
+	// Hack, look for a private registry, and decorate the error with the lack of
+	// credentials.  This is heuristic, and really probably could be done better
+	// by talking to the registry API directly from the kubelet here.
+	if explicitRegistry {
+		return fmt.Errorf("image pull failed for %s, this may be because there are no credentials on this request.  details: (%v)", image, err)
+	}
+	return err
 }
 
 func (p throttledDockerPuller) Pull(image string) error {

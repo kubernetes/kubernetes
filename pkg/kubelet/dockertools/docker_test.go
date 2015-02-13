@@ -196,6 +196,27 @@ func TestParseImageName(t *testing.T) {
 	}
 }
 
+func TestDockerKeyringLookupFails(t *testing.T) {
+	fakeKeyring := &credentialprovider.FakeKeyring{}
+	fakeClient := &FakeDockerClient{
+		Err: fmt.Errorf("test error"),
+	}
+
+	dp := dockerPuller{
+		client:  fakeClient,
+		keyring: fakeKeyring,
+	}
+
+	err := dp.Pull("host/repository/image:version")
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	msg := "image pull failed for host/repository/image, this may be because there are no credentials on this request.  details: (test error)"
+	if err.Error() != msg {
+		t.Errorf("expected: %s, saw: %s", msg, err.Error())
+	}
+}
+
 func TestDockerKeyringLookup(t *testing.T) {
 	empty := docker.AuthConfiguration{}
 
