@@ -98,3 +98,22 @@ func TestStringSetList(t *testing.T) {
 		t.Errorf("List gave unexpected result: %#v", s.List())
 	}
 }
+
+func TestStringSetDifference(t *testing.T) {
+	a := NewStringSet("1", "2", "3")
+	b := NewStringSet("1", "2", "4", "5")
+	c := a.Difference(b)
+	d := b.Difference(a)
+	if len(c) != 1 {
+		t.Errorf("Expected len=1: %d", len(c))
+	}
+	if !c.Has("3") {
+		t.Errorf("Unexpected contents: %#v", c.List())
+	}
+	if len(d) != 2 {
+		t.Errorf("Expected len=2: %d", len(d))
+	}
+	if !d.Has("4") || !d.Has("5") {
+		t.Errorf("Unexpected contents: %#v", d.List())
+	}
+}

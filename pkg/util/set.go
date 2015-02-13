@@ -62,6 +62,22 @@ func (s StringSet) HasAll(items ...string) bool {
 	return true
 }
 
+// Difference returns a set of objects that are not in s2
+// For example:
+// s1 = {1, 2, 3}
+// s2 = {1, 2, 4, 5}
+// s1.Difference(s2) = {3}
+// s2.Difference(s1) = {4, 5}
+func (s StringSet) Difference(s2 StringSet) StringSet {
+	result := NewStringSet()
+	for key := range s {
+		if !s2.Has(key) {
+			result.Insert(key)
+		}
+	}
+	return result
+}
+
 // IsSuperset returns true iff s1 is a superset of s2.
 func (s1 StringSet) IsSuperset(s2 StringSet) bool {
 	for item := range s2 {
