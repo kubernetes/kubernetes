@@ -1265,6 +1265,16 @@ type mockCadvisorClient struct {
 	mock.Mock
 }
 
+type errorTestingDockerClient struct {
+	dockertools.FakeDockerClient
+	listContainersError error
+	containerList       []docker.APIContainers
+}
+
+func (f *errorTestingDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+	return f.containerList, f.listContainersError
+}
+
 // ContainerInfo is a mock implementation of CadvisorInterface.ContainerInfo.
 func (c *mockCadvisorClient) ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	args := c.Called(name, req)
@@ -1369,8 +1379,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerInfo := info.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
 	cadvisorReq := &info.ContainerInfoRequest{}
-	expectedErr := fmt.Errorf("some error")
-	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, expectedErr)
+	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, ErrCadvisorApiFailure)
 
 	kubelet, fakeDocker := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
@@ -1391,8 +1400,8 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 		t.Errorf("expect error but received nil error")
 		return
 	}
-	if err.Error() != expectedErr.Error() {
-		t.Errorf("wrong error message. expect %v, got %v", err, expectedErr)
+	if err.Error() != ErrCadvisorApiFailure.Error() {
+		t.Errorf("wrong error message. expect %v, got %v", ErrCadvisorApiFailure, err)
 	}
 	mockCadvisor.AssertExpectations(t)
 }
@@ -1409,6 +1418,71 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 		t.Errorf("non-nil stats on non exist container")
 	}
 	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetContainerInfoWhenDockerToolsFailed(t *testing.T) {
+	mockCadvisor := &mockCadvisorClient{}
+
+	kubelet, _ := newTestKubelet(t)
+	kubelet.cadvisorClient = mockCadvisor
+	expectedErr := fmt.Errorf("List containers error")
+	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: expectedErr}
+
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	if err == nil {
+		t.Errorf("Expected error from dockertools, got none")
+	}
+	if err.Error() != expectedErr.Error() {
+		t.Errorf("Expected error %v got %v", expectedErr.Error(), err.Error())
+	}
+	if stats != nil {
+		t.Errorf("non-nil stats when dockertools failed")
+	}
+}
+
+func TestGetContainerInfoWithNoContainers(t *testing.T) {
+	mockCadvisor := &mockCadvisorClient{}
+
+	kubelet, _ := newTestKubelet(t)
+	kubelet.cadvisorClient = mockCadvisor
+
+	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil}
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	if err == nil {
+		t.Errorf("Expected error from cadvisor client, got none")
+	}
+	if err != ErrNoKubeletContainers {
+		t.Errorf("Expected error %v, got %v", ErrNoKubeletContainers.Error(), err.Error())
+	}
+	if stats != nil {
+		t.Errorf("non-nil stats when dockertools returned no containers")
+	}
+}
+
+func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
+	mockCadvisor := &mockCadvisorClient{}
+
+	kubelet, _ := newTestKubelet(t)
+	kubelet.cadvisorClient = mockCadvisor
+
+	containerList := []docker.APIContainers{
+		{
+			ID:    "fakeId",
+			Names: []string{"/k8s_bar_qux_1234_42"},
+		},
+	}
+
+	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil, containerList: containerList}
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	if err == nil {
+		t.Errorf("Expected error from cadvisor client, got none")
+	}
+	if err != ErrContainerNotFound {
+		t.Errorf("Expected error %v, got %v", ErrContainerNotFound.Error(), err.Error())
+	}
+	if stats != nil {
+		t.Errorf("non-nil stats when dockertools returned no containers")
+	}
 }
 
 type fakeContainerCommandRunner struct {

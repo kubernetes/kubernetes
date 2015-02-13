@@ -400,7 +400,13 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return
 	}
-	if err != nil {
+	switch err {
+	case nil:
+		break
+	case ErrNoKubeletContainers, ErrContainerNotFound:
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	default:
 		s.error(w, err)
 		return
 	}
