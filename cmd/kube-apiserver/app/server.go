@@ -72,6 +72,7 @@ type APIServer struct {
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
 	KubeletConfig              client.KubeletConfig
+	ClusterName                string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -90,6 +91,7 @@ func NewAPIServer() *APIServer {
 		AdmissionControl:       "AlwaysAdmit",
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
+		ClusterName:            "kubernetes",
 
 		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: client.KubeletConfig{
@@ -146,6 +148,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.RuntimeConfig, "runtime_config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
+	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -241,6 +244,7 @@ func (s *APIServer) Run(_ []string) error {
 		AdmissionControl:       admissionController,
 		EnableV1Beta3:          v1beta3,
 		MasterServiceNamespace: s.MasterServiceNamespace,
+		ClusterName:            s.ClusterName,
 	}
 	m := master.New(config)
 

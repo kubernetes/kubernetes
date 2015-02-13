@@ -36,14 +36,16 @@ import (
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	registry  Registry
-	cloud     cloudprovider.Interface
-	machines  minion.Registry
-	portalMgr *ipAllocator
+	registry    Registry
+	cloud       cloudprovider.Interface
+	machines    minion.Registry
+	portalMgr   *ipAllocator
+	clusterName string
 }
 
 // NewREST returns a new REST.
-func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet) *REST {
+func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet,
+	clusterName string) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
 	if ipa == nil {
@@ -52,10 +54,11 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 	reloadIPsFromStorage(ipa, registry)
 
 	return &REST{
-		registry:  registry,
-		cloud:     cloud,
-		machines:  machines,
-		portalMgr: ipa,
+		registry:    registry,
+		cloud:       cloud,
+		machines:    machines,
+		portalMgr:   ipa,
+		clusterName: clusterName,
 	}
 }
 
@@ -259,14 +262,14 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 	var affinityType api.AffinityType = service.Spec.SessionAffinity
 	if len(service.Spec.PublicIPs) > 0 {
 		for _, publicIP := range service.Spec.PublicIPs {
-			_, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+			_, err = balancer.CreateTCPLoadBalancer(rs.clusterName+"-"+service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 			if err != nil {
 				// TODO: have to roll-back any successful calls.
 				return err
 			}
 		}
 	} else {
-		ip, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+		ip, err := balancer.CreateTCPLoadBalancer(rs.clusterName+"-"+service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 		if err != nil {
 			return err
 		}
@@ -295,7 +298,7 @@ func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
 	if err != nil {
 		return err
 	}
-	if err := balancer.DeleteTCPLoadBalancer(service.Name, zone.Region); err != nil {
+	if err := balancer.DeleteTCPLoadBalancer(rs.clusterName+"-"+service.Name, zone.Region); err != nil {
 		return err
 	}
 	return nil
