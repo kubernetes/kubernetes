@@ -203,9 +203,8 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
 
-	// Prove that controllerManager's watch works by making it not sync until after this
-	// test is over. (Hopefully we don't take 10 minutes!)
-	controllerManager.Run(10 * time.Minute)
+	// TODO: Write an integration test for the replication controllers watch.
+	controllerManager.Run(1 * time.Second)
 
 	nodeResources := &api.NodeResources{}
 

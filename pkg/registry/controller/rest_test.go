@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -352,37 +351,6 @@ type fakePodLister struct {
 func (f *fakePodLister) ListPods(ctx api.Context, s labels.Selector) (*api.PodList, error) {
 	f.s = s
 	return &f.l, f.e
-}
-
-func TestFillCurrentState(t *testing.T) {
-	fakeLister := fakePodLister{
-		l: api.PodList{
-			Items: []api.Pod{
-				{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-				{ObjectMeta: api.ObjectMeta{Name: "bar"}},
-			},
-		},
-	}
-	mockRegistry := registrytest.ControllerRegistry{}
-	storage := REST{
-		registry:  &mockRegistry,
-		podLister: &fakeLister,
-	}
-	controller := api.ReplicationController{
-		Spec: api.ReplicationControllerSpec{
-			Selector: map[string]string{
-				"foo": "bar",
-			},
-		},
-	}
-	ctx := api.NewContext()
-	storage.fillCurrentState(ctx, &controller)
-	if controller.Status.Replicas != 2 {
-		t.Errorf("expected 2, got: %d", controller.Status.Replicas)
-	}
-	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.Spec.Selector).AsSelector()) {
-		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.Spec.Selector).AsSelector(), fakeLister.s)
-	}
 }
 
 // TODO: remove, covered by TestCreate

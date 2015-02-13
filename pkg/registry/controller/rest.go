@@ -23,7 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	rc "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -78,7 +77,6 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	rs.fillCurrentState(ctx, controller)
 	return controller, err
 }
 
@@ -94,7 +92,6 @@ func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Select
 	filtered := []api.ReplicationController{}
 	for _, controller := range controllers.Items {
 		if label.Matches(labels.Set(controller.Labels)) {
-			rs.fillCurrentState(ctx, &controller)
 			filtered = append(filtered, controller)
 		}
 	}
@@ -132,17 +129,4 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 // It implements apiserver.ResourceWatcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchControllers(ctx, label, field, resourceVersion)
-}
-
-// TODO #2726: The controller should populate the current state, not the apiserver
-func (rs *REST) fillCurrentState(ctx api.Context, controller *api.ReplicationController) error {
-	if rs.podLister == nil {
-		return nil
-	}
-	list, err := rs.podLister.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
-	if err != nil {
-		return err
-	}
-	controller.Status.Replicas = len(rc.FilterActivePods(list.Items))
-	return nil
 }
