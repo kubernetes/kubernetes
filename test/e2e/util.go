@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 type testContextType struct {
@@ -45,7 +46,7 @@ func Logf(format string, a ...interface{}) {
 }
 
 func Failf(format string, a ...interface{}) {
-	Fail(fmt.Sprintf(format, a...))
+	Fail(fmt.Sprintf(format, a...), 1)
 }
 
 func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
@@ -151,4 +152,8 @@ func loadClient() (*client.Client, error) {
 func randomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
+}
+
+func expectNoError(err error, explain ...interface{}) {
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
