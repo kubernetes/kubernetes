@@ -323,16 +323,24 @@ var _ = Describe("Pods", func() {
 		}
 		By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
 			clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
-		logs, err := c.Get().
-			Prefix("proxy").
-			Resource("minions").
-			Name(clientPodStatus.Status.Host).
-			Suffix("containerLogs", api.NamespaceDefault, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name).
-			Do().
-			Raw()
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
-				clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
+		var logs []byte
+		start := time.Now()
+		// Sometimes the actual containers take a second to get started, try to get logs for 60s
+		for time.Now().Sub(start) < (60 * time.Second) {
+			logs, err = c.Get().
+				Prefix("proxy").
+				Resource("minions").
+				Name(clientPodStatus.Status.Host).
+				Suffix("containerLogs", api.NamespaceDefault, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name).
+				Do().
+				Raw()
+			if err != nil {
+				By(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
+					clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			break
 		}
 		fmt.Sprintf("clientPod logs:%v\n", string(logs))
 
