@@ -416,7 +416,7 @@ Additional help topics:
   kubectl rollingupdate Perform a rolling update of the given ReplicationController.
   kubectl resize        Set a new size for a Replication Controller.
   kubectl run-container Run a particular image on the cluster.
-  kubectl stop          Gracefully shut down a resource.
+  kubectl stop          Gracefully shut down a resource by id or filename.
   kubectl expose        Take a replicated application and expose it as Kubernetes Service
   kubectl label         Update the labels on a resource
 
@@ -986,7 +986,7 @@ Global Flags:
 ```
 
 #### stop
-Gracefully shut down a resource.
+Gracefully shut down a resource by id or filename.
 
 Attempts to shut down and delete a resource that supports graceful termination.
 If the resource is resizable it will be resized to 0 before deletion.
@@ -996,10 +996,18 @@ Examples:
     // Shut down foo.
     $ kubectl stop replicationcontroller foo
 
+    // Shut down the service defined in service.json
+    $ kubectl stop -f service.json
+
+    // Shut down all resources in the path/to/resources directory
+    $ kubectl stop -f path/to/resources
+
 Usage:
 ```
-  kubectl stop <resource> <id> [flags]
+  kubectl stop (<resource> <id>|-f filename) [flags]
 
+Flags:
+  -f, --filename=[]: Filename, directory, or URL to file of resource(s) to be stopped
 
 Global Flags:
       --alsologtostderr=false: log to standard error as well as files
