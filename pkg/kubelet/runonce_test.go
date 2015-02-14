@@ -84,7 +84,7 @@ func TestRunOnce(t *testing.T) {
 			Status: "running",
 		},
 	}
-	kb.containerRuntime = &testDocker{
+	td := &testDocker{
 		listContainersResults: []listContainersResult{
 			{label: "list pod container", containers: []docker.APIContainers{}},
 			{label: "syncPod", containers: []docker.APIContainers{}},
@@ -124,6 +124,7 @@ func TestRunOnce(t *testing.T) {
 		},
 		t: t,
 	}
+	kb.containerRuntime = dockertools.NewDockerRuntime(td)
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
 	results, err := kb.runOnce([]api.BoundPod{
 		{

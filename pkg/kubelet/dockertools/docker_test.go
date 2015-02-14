@@ -65,7 +65,7 @@ func TestGetContainerID(t *testing.T) {
 		ID: "foobar",
 	}
 
-	dockerContainers, err := GetKubeletDockerContainers(fakeDocker, false)
+	dockerContainers, err := GetKubeletDockerContainers(NewDockerRuntime(fakeDocker), false)
 	if err != nil {
 		t.Errorf("Expected no error, Got %#v", err)
 	}
@@ -122,7 +122,7 @@ func TestContainerManifestNaming(t *testing.T) {
 
 func TestGetDockerServerVersion(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	runner := dockerContainerCommandRunner{NewDockerRuntime(fakeDocker)}
 	version, err := runner.GetDockerServerVersion()
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
@@ -141,7 +141,7 @@ func TestGetDockerServerVersion(t *testing.T) {
 
 func TestExecSupportExists(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.3.0", "Server API version=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	runner := dockerContainerCommandRunner{NewDockerRuntime(fakeDocker)}
 	useNativeExec, err := runner.nativeExecSupportExists()
 	if err != nil {
 		t.Errorf("got error while checking for exec support - %s", err)
@@ -153,7 +153,7 @@ func TestExecSupportExists(t *testing.T) {
 
 func TestExecSupportNotExists(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.2", "Server API version=1.14"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	runner := dockerContainerCommandRunner{NewDockerRuntime(fakeDocker)}
 	useNativeExec, _ := runner.nativeExecSupportExists()
 	if useNativeExec {
 		t.Errorf("invalid exec support check output.")
@@ -203,7 +203,7 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 	}
 
 	dp := dockerPuller{
-		client:  fakeClient,
+		client:  NewDockerRuntime(fakeClient),
 		keyring: fakeKeyring,
 	}
 
@@ -341,7 +341,7 @@ func (f *imageTrackingDockerClient) InspectImage(name string) (image *docker.Ima
 func TestIsImagePresent(t *testing.T) {
 	cl := &imageTrackingDockerClient{&FakeDockerClient{}, ""}
 	puller := &dockerPuller{
-		client: cl,
+		client: NewDockerRuntime(cl),
 	}
 	_, _ = puller.IsImagePresent("abc:123")
 	if cl.imageName != "abc:123" {
@@ -433,7 +433,7 @@ func TestGetRunningContainers(t *testing.T) {
 	for _, test := range tests {
 		fakeDocker.ContainerMap = test.containers
 		fakeDocker.Err = test.err
-		if results, err := GetRunningContainers(fakeDocker, test.inputIDs); err == nil {
+		if results, err := GetRunningContainers(NewDockerRuntime(fakeDocker), test.inputIDs); err == nil {
 			resultIDs := []string{}
 			for _, result := range results {
 				resultIDs = append(resultIDs, result.ID)

@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -62,6 +63,86 @@ type DockerInterface interface {
 	StartExec(string, docker.StartExecOptions) error
 }
 
+// DockerRuntime implements the ContainerRuntime interface for docker.
+type DockerRuntime struct {
+	docker DockerInterface
+}
+
+// NewDockerRuntime creates a ContainerRuntimeInterface with a DockerInterface.
+func NewDockerRuntime(docker DockerInterface) container.ContainerRuntimeInterface {
+	return &DockerRuntime{docker: docker}
+}
+
+// ListContainers implements ContainerRuntime.ListContainers.
+func (dr *DockerRuntime) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+	return dr.docker.ListContainers(options)
+}
+
+// InspectContainer implements ContainerRuntime.InspectContainer.
+func (dr *DockerRuntime) InspectContainer(id string) (*docker.Container, error) {
+	return dr.docker.InspectContainer(id)
+}
+
+// CreateContainer implements ContainerRuntime.CreateContainer.
+func (dr *DockerRuntime) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
+	return dr.docker.CreateContainer(opts)
+}
+
+// StartContainer implements ContainerRuntime.StartContainer.
+func (dr *DockerRuntime) StartContainer(id string, hostConfig *docker.HostConfig) error {
+	return dr.docker.StartContainer(id, hostConfig)
+}
+
+// StopContainer implements ContainerRuntime.StopContainer.
+func (dr *DockerRuntime) StopContainer(id string, timeout uint) error {
+	return dr.docker.StopContainer(id, timeout)
+}
+
+// RemoveContainer implements ContainerRuntime.RemoveContainer.
+func (dr *DockerRuntime) RemoveContainer(opts docker.RemoveContainerOptions) error {
+	return dr.docker.RemoveContainer(opts)
+}
+
+// InspectImage implements ContainerRuntime.InspectImage.
+func (dr *DockerRuntime) InspectImage(image string) (*docker.Image, error) {
+	return dr.docker.InspectImage(image)
+}
+
+// ListImage implements ContainerRuntime.ListImage.
+func (dr *DockerRuntime) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
+	return dr.docker.ListImages(opts)
+}
+
+// PullImage implements ContainerRuntime.PullImage.
+func (dr *DockerRuntime) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+	return dr.docker.PullImage(opts, auth)
+}
+
+// RemoveImage implements ContainerRuntime.RemoveImage.
+func (dr *DockerRuntime) RemoveImage(image string) error {
+	return dr.docker.RemoveImage(image)
+}
+
+// Logs implements ContainerRuntime.Logs.
+func (dr *DockerRuntime) Logs(opts docker.LogsOptions) error {
+	return dr.docker.Logs(opts)
+}
+
+// Version implements ContainerRuntime.Version.
+func (dr *DockerRuntime) Version() (*docker.Env, error) {
+	return dr.docker.Version()
+}
+
+// CreateExec implements ContainerRuntime.CreateExec.
+func (dr *DockerRuntime) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+	return dr.docker.CreateExec(opts)
+}
+
+// StartExec implements ContainerRuntime.StartExec.
+func (dr *DockerRuntime) StartExec(id string, opts docker.StartExecOptions) error {
+	return dr.docker.StartExec(id, opts)
+}
+
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
 
@@ -73,7 +154,7 @@ type DockerPuller interface {
 
 // dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
-	client  DockerInterface
+	client  container.ContainerRuntimeInterface
 	keyring credentialprovider.DockerKeyring
 }
 
@@ -83,7 +164,7 @@ type throttledDockerPuller struct {
 }
 
 // NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
+func NewDockerPuller(client container.ContainerRuntimeInterface, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
 		keyring: credentialprovider.NewDockerKeyring(),
@@ -99,7 +180,7 @@ func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 }
 
 type dockerContainerCommandRunner struct {
-	client DockerInterface
+	client container.ContainerRuntimeInterface
 }
 
 // The first version of docker that supports exec natively is 1.3.0 == API 1.15
@@ -321,7 +402,7 @@ func (d *dockerContainerCommandRunner) PortForward(podInfraContainerID string, p
 
 // NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
 // inside a container.
-func NewDockerContainerCommandRunner(client DockerInterface) ContainerCommandRunner {
+func NewDockerContainerCommandRunner(client container.ContainerRuntimeInterface) ContainerCommandRunner {
 	return &dockerContainerCommandRunner{client: client}
 }
 
@@ -431,7 +512,7 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 
 // GetKubeletDockerContainers takes client and boolean whether to list all container or just the running ones.
 // Returns a map of docker containers that we manage. The map key is the docker container ID
-func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (DockerContainers, error) {
+func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allContainers bool) (DockerContainers, error) {
 	result := make(DockerContainers)
 	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
 	if err != nil {
@@ -457,7 +538,7 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 
 // GetRecentDockerContainersWithNameAndUUID returns a list of dead docker containers which matches the name
 // and uid given.
-func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullName string, uid types.UID, containerName string) ([]*docker.Container, error) {
+func GetRecentDockerContainersWithNameAndUUID(client container.ContainerRuntimeInterface, podFullName string, uid types.UID, containerName string) ([]*docker.Container, error) {
 	var result []*docker.Container
 	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
@@ -490,7 +571,7 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 // Log streaming is possible if 'follow' param is set to true
 // Log tailing is possible when number of tailed lines are set and only if 'follow' is false
 // TODO: Make 'RawTerminal' option  flagable.
-func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func GetKubeletDockerContainerLogs(client container.ContainerRuntimeInterface, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
 	opts := docker.LogsOptions{
 		Container:    containerID,
 		Stdout:       true,
@@ -521,7 +602,7 @@ var (
 	ErrContainerCannotRun = errors.New("Container cannot run")
 )
 
-func inspectContainer(client DockerInterface, dockerID, containerName, tPath string) (*api.ContainerStatus, error) {
+func inspectContainer(client container.ContainerRuntimeInterface, dockerID, containerName, tPath string) (*api.ContainerStatus, error) {
 	inspectResult, err := client.InspectContainer(dockerID)
 
 	if err != nil {
@@ -591,7 +672,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 }
 
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
-func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
+func GetDockerPodInfo(client container.ContainerRuntimeInterface, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
 	info := api.PodInfo{}
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -740,7 +821,7 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	return
 }
 
-func GetRunningContainers(client DockerInterface, ids []string) ([]*docker.Container, error) {
+func GetRunningContainers(client container.ContainerRuntimeInterface, ids []string) ([]*docker.Container, error) {
 	result := []*docker.Container{}
 	if client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
@@ -795,17 +876,20 @@ func getDockerEndpoint(dockerEndpoint string) string {
 	return endpoint
 }
 
-func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
+// ConnectToDockerOrDie creates a DockerRuntime.
+func ConnectToDockerOrDie(dockerEndpoint string) container.ContainerRuntimeInterface {
 	if dockerEndpoint == "fake://" {
-		return &FakeDockerClient{
-			VersionInfo: []string{"apiVersion=1.16"},
+		return &DockerRuntime{
+			docker: &FakeDockerClient{
+				VersionInfo: []string{"apiVersion=1.16"},
+			},
 		}
 	}
 	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))
 	if err != nil {
 		glog.Fatal("Couldn't connect to docker.")
 	}
-	return client
+	return &DockerRuntime{docker: client}
 }
 
 type ContainerCommandRunner interface {
