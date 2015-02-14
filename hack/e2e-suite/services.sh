@@ -59,7 +59,6 @@ function join() {
 svcs_to_clean=()
 function do_teardown() {
   local svc
-  return
   for svc in "${svcs_to_clean[@]:+${svcs_to_clean[@]}}"; do
     stop_service "${svc}"
   done
@@ -284,7 +283,7 @@ function verify_from_container() {
   fi
 }
 
-trap "do_teardown" EXIT
+trap do_teardown EXIT
 
 # Get node IP addresses and pick one as our test point.
 detect-minions

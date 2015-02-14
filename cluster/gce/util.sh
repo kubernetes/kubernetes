@@ -509,7 +509,7 @@ function kube-up {
 
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   local context="${PROJECT}_${INSTANCE_PREFIX}"
-  local user="${INSTANCE_PREFIX}-admin"
+  local user="${context}-admin"
   local config_dir="${HOME}/.kube/${context}"
 
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
