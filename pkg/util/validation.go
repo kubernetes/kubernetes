@@ -103,3 +103,13 @@ func IsQualifiedName(value string) bool {
 	}
 	return true
 }
+
+const LabelValueFmt string = "([A-Za-z0-9_\\-\\\\.]*)"
+
+var labelValueRegexp = regexp.MustCompile("^" + LabelValueFmt + "$")
+
+const labelValueMaxLength int = 63
+
+func IsValidLabelValue(value string) bool {
+	return (len(value) <= labelValueMaxLength && labelValueRegexp.MatchString(value))
+}

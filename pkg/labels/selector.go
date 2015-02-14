@@ -19,7 +19,6 @@ package labels
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -38,7 +37,6 @@ type Selector interface {
 	// RequiresExactMatch allows a caller to introspect whether a given selector
 	// requires a single specific label to be set, and if so returns the value it
 	// requires.
-	// TODO: expand this to be more general
 	RequiresExactMatch(label string) (value string, found bool)
 
 	// String returns a human readable string that represents this selector.
@@ -139,43 +137,40 @@ func (t andTerm) String() string {
 	return strings.Join(terms, ",")
 }
 
-// TODO Support forward and reverse indexing (#1183, #1348). Eliminate uses of Selector.RequiresExactMatch.
-// TODO rename to Selector after Selector interface above removed
-type SetBasedSelector interface {
-	// Matches returns true if this selector matches the given set of labels.
-	Matches(Labels) (bool, error)
-
-	// String returns a human-readable string that represents this selector.
-	String() (string, error)
-}
-
 // Operator represents a key's relationship
 // to a set of values in a Requirement.
-type Operator int
+type Operator string
 
 const (
-	In Operator = iota + 1
-	NotIn
-	Exists
+	EqualsOperator       Operator = "="
+	DoubleEqualsOperator Operator = "=="
+	InOperator           Operator = "in"
+	NotEqualsOperator    Operator = "!="
+	NotInOperator        Operator = "notin"
+	ExistsOperator       Operator = "exists"
 )
 
 // LabelSelector contains a list of Requirements.
 // LabelSelector is set-based and is distinguished from exact
 // match-based selectors composed of key=value matching conjunctions.
-// TODO: Remove previous sentence when exact match-based
-// selectors are removed.
 type LabelSelector struct {
 	Requirements []Requirement
 }
 
+// Sort by  obtain determisitic parser (minimic previous andTerm based stuff)
+type ByKey []Requirement
+
+func (a ByKey) Len() int { return len(a) }
+
+func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
+
 // Requirement is a selector that contains values, a key
 // and an operator that relates the key and values. The zero
-// value of Requirement is invalid. See the NewRequirement
-// constructor for creating a valid Requirement.
-// Requirement is set-based and is distinguished from exact
-// match-based selectors composed of key=value matching.
-// TODO: Remove previous sentence when exact match-based
-// selectors are removed.
+// value of Requirement is invalid.
+// Requirement implements both set based match and exact match
+// Requirement is initialized via NewRequirement constructor for creating a valid Requirement.
 type Requirement struct {
 	key       string
 	operator  Operator
@@ -196,13 +191,23 @@ func NewRequirement(key string, op Operator, vals util.StringSet) (*Requirement,
 		return nil, err
 	}
 	switch op {
-	case In, NotIn:
+	case InOperator, NotInOperator:
 		if len(vals) == 0 {
 			return nil, fmt.Errorf("for In,NotIn operators, values set can't be empty")
 		}
-	case Exists:
+	case EqualsOperator, DoubleEqualsOperator, NotEqualsOperator:
+		if len(vals) != 1 {
+			return nil, fmt.Errorf("exact match compatibility requires one single value")
+		}
+	case ExistsOperator:
 	default:
 		return nil, fmt.Errorf("operator '%v' is not recognized", op)
+	}
+
+	for v := range vals {
+		if err := validateLabelValue(v); err != nil {
+			return nil, err
+		}
 	}
 	return &Requirement{key: key, operator: op, strValues: vals}, nil
 }
@@ -216,86 +221,484 @@ func NewRequirement(key string, op Operator, vals util.StringSet) (*Requirement,
 //     Labels' value for that key is not in Requirement's value set.
 // (4) The operator is NotIn and Labels does not have the
 //     Requirement's key.
-//
-// If called on an invalid Requirement, an error is returned. See
-// NewRequirement for creating a valid Requirement.
-func (r *Requirement) Matches(ls Labels) (bool, error) {
+func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
-	case In:
+	case InOperator, EqualsOperator, DoubleEqualsOperator:
 		if !ls.Has(r.key) {
-			return false, nil
+			return false
 		}
-		return r.strValues.Has(ls.Get(r.key)), nil
-	case NotIn:
+		return r.strValues.Has(ls.Get(r.key))
+	case NotInOperator, NotEqualsOperator:
 		if !ls.Has(r.key) {
-			return true, nil
+			return true
 		}
-		return !r.strValues.Has(ls.Get(r.key)), nil
-	case Exists:
-		return ls.Has(r.key), nil
+		return !r.strValues.Has(ls.Get(r.key))
+	case ExistsOperator:
+		return ls.Has(r.key)
 	default:
-		return false, fmt.Errorf("requirement is not set: %+v", r)
+		return false
 	}
+}
+
+// Return true if the LabelSelector doesn't restrict selection space
+func (lsel LabelSelector) Empty() bool {
+	if len(lsel.Requirements) == 0 {
+		return true
+	}
+
+	return false
+}
+
+// RequiresExactMatch allows a caller to introspect whether a given selector
+// requires a single specific label to be set, and if so returns the value it
+// requires.
+func (r *Requirement) RequiresExactMatch(label string) (string, bool) {
+	if len(r.strValues) == 1 && r.operator == InOperator && r.key == label {
+		return r.strValues.List()[0], true
+	}
+	return "", false
 }
 
 // String returns a human-readable string that represents this
 // Requirement. If called on an invalid Requirement, an error is
 // returned. See NewRequirement for creating a valid Requirement.
-func (r *Requirement) String() (string, error) {
+func (r *Requirement) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString(r.key)
 
 	switch r.operator {
-	case In:
+	case EqualsOperator:
+		buffer.WriteString("=")
+	case DoubleEqualsOperator:
+		buffer.WriteString("==")
+	case NotEqualsOperator:
+		buffer.WriteString("!=")
+	case InOperator:
 		buffer.WriteString(" in ")
-	case NotIn:
-		buffer.WriteString(" not in ")
-	case Exists:
-		return buffer.String(), nil
-	default:
-		return "", fmt.Errorf("requirement is not set: %+v", r)
+	case NotInOperator:
+		buffer.WriteString(" notin ")
+	case ExistsOperator:
+		return buffer.String()
 	}
 
-	buffer.WriteString("(")
+	switch r.operator {
+	case InOperator, NotInOperator:
+		buffer.WriteString("(")
+	}
 	if len(r.strValues) == 1 {
 		buffer.WriteString(r.strValues.List()[0])
 	} else { // only > 1 since == 0 prohibited by NewRequirement
 		buffer.WriteString(strings.Join(r.strValues.List(), ","))
 	}
-	buffer.WriteString(")")
-	return buffer.String(), nil
+
+	switch r.operator {
+	case InOperator, NotInOperator:
+		buffer.WriteString(")")
+	}
+	return buffer.String()
 }
 
 // Matches for a LabelSelector returns true if all
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
-// An error is returned if any match attempt between
-// a Requirement and the input Labels returns an error.
-func (lsel *LabelSelector) Matches(l Labels) (bool, error) {
+func (lsel LabelSelector) Matches(l Labels) bool {
 	for _, req := range lsel.Requirements {
-		if matches, err := req.Matches(l); err != nil {
-			return false, err
-		} else if !matches {
-			return false, nil
+		if matches := req.Matches(l); !matches {
+			return false
 		}
 	}
-	return true, nil
+	return true
+}
+
+// RequiresExactMatch allows a caller to introspect whether a given selector
+// requires a single specific label to be set, and if so returns the value it
+// requires.
+func (lsel LabelSelector) RequiresExactMatch(label string) (value string, found bool) {
+	for _, req := range lsel.Requirements {
+		if value, found = req.RequiresExactMatch(label); found {
+			return value, found
+		}
+	}
+	return "", false
 }
 
 // String returns a comma-separated string of all
 // the LabelSelector Requirements' human-readable strings.
-// An error is returned if any attempt to get a
-// Requirement's  human-readable string returns an error.
-func (lsel *LabelSelector) String() (string, error) {
+func (lsel LabelSelector) String() string {
 	var reqs []string
 	for _, req := range lsel.Requirements {
-		if str, err := req.String(); err != nil {
-			return "", err
+		reqs = append(reqs, req.String())
+	}
+	return strings.Join(reqs, ",")
+}
+
+// constants definition for lexer token
+type Token int
+
+const (
+	ERROR Token = iota
+	EOS         // end of string
+	CPAR
+	COMMA
+	EEQUAL
+	EQUAL
+	IDENTIFIER
+	IN
+	NEQUAL
+	NOTIN
+	OPAR
+	OR
+)
+
+// string2token contains the mapping between lexer Token and token literal
+// (except IDENTIFIER, EOS and ERROR since it makes no sense)
+var string2token = map[string]Token{
+	")":     CPAR,
+	",":     COMMA,
+	"==":    EEQUAL,
+	"=":     EQUAL,
+	"in":    IN,
+	"!=":    NEQUAL,
+	"notin": NOTIN,
+	"(":     OPAR,
+}
+
+// The item produced by the lexer. It contains the Token and the literal.
+type ScannedItem struct {
+	tok     Token
+	literal string
+}
+
+// isWhitespace returns true if the rune is a space, tab, or newline.
+func isWhitespace(ch byte) bool {
+	return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n'
+}
+
+// isSpecialSymbol detect if the character ch can be an operator
+func isSpecialSymbol(ch byte) bool {
+	switch ch {
+	case '=', '!', '(', ')', ',':
+		return true
+	}
+	return false
+}
+
+// Lexer struct
+type Lexer struct {
+	// s stores the string to be lexed
+	s string
+	// pos is the position currently lexed
+	pos int
+}
+
+// read return the character currently lexed
+// increment the position and check the buffer overflow
+func (l *Lexer) read() (b byte) {
+	b = 0
+	if l.pos < len(l.s) {
+		b = l.s[l.pos]
+		l.pos++
+	}
+	return b
+}
+
+// no return simply unread
+func (l *Lexer) unread() {
+	l.pos--
+}
+
+// func return a literal token (for example IN) and or an identifier.
+func (l *Lexer) scanIdOrKeyword() (tok Token, lit string) {
+	var buffer []byte
+	for {
+		if ch := l.read(); ch == 0 { // end of string found
+			break
+		} else if isSpecialSymbol(ch) || isWhitespace(ch) {
+			l.unread() // stop scanning and unread
+			break
 		} else {
-			reqs = append(reqs, str)
+			buffer = append(buffer, ch)
 		}
 	}
-	return strings.Join(reqs, ","), nil
+	s := string(buffer)
+	if val, ok := string2token[s]; ok { // is a literal token?
+		return val, s
+	}
+	return IDENTIFIER, s // otherwise is an identifier
+}
+
+// scan string starting with specail symbol. At the moment this special symbols
+// identify not literal operators
+func (l *Lexer) scanSpecialSymbol() (Token, string) {
+	lastScannedItem := ScannedItem{}
+	var buffer []byte
+	for {
+		if ch := l.read(); ch == 0 {
+			break
+		} else if isSpecialSymbol(ch) {
+			buffer = append(buffer, ch)
+			if token, ok := string2token[string(buffer)]; ok {
+				lastScannedItem = ScannedItem{tok: token, literal: string(buffer)}
+			} else if lastScannedItem.tok != 0 {
+				l.unread()
+				break
+			}
+		} else { // in any other cases (identifer or whitespace) stop
+			l.unread()
+			break
+		}
+	}
+	if lastScannedItem.tok == 0 {
+		return ERROR, fmt.Sprintf("error expected keyword found '%s'", buffer)
+	} else {
+		return lastScannedItem.tok, lastScannedItem.literal
+	}
+}
+
+// func Lex return Token and the literal (meaningfull only in case of IDENTIFIER)
+func (l *Lexer) Lex() (tok Token, lit string) {
+	ch := l.read()
+	for { // consume spaces until no more spaces
+		if !isWhitespace(ch) {
+			break
+		}
+		ch = l.read()
+	}
+	if ch == 0 { // end of the string?
+		return EOS, ""
+	} else if isSpecialSymbol(ch) {
+		l.unread()
+		return l.scanSpecialSymbol() // can be an operator
+	} else {
+		l.unread()
+		return l.scanIdOrKeyword()
+	}
+}
+
+// Parser data structure contains the label selector parser data and algos
+type Parser struct {
+	l            *Lexer
+	scannedItems []ScannedItem
+	position     int
+}
+
+type ParserContext int
+
+const (
+	KeyAndOperator ParserContext = iota
+	Values
+)
+
+// lookahead func returns the current token and string. No increment of current position
+func (p *Parser) lookahead(context ParserContext) (Token, string) {
+	tok, lit := p.scannedItems[p.position].tok, p.scannedItems[p.position].literal
+	if context == Values {
+		switch tok {
+		case IN, NOTIN:
+			tok = IDENTIFIER
+		}
+	}
+	return tok, lit
+}
+
+// return current token and string. Increments the the position
+func (p *Parser) consume(context ParserContext) (Token, string) {
+	p.position++
+	tok, lit := p.scannedItems[p.position-1].tok, p.scannedItems[p.position-1].literal
+	if context == Values {
+		switch tok {
+		case IN, NOTIN:
+			tok = IDENTIFIER
+		}
+	}
+	return tok, lit
+}
+
+// scan method scan all the input string and storin <token, literal> pairs in
+// scanned items slice.
+// The Parser can now lookahead and consume the tokens
+func (p *Parser) scan() {
+	for {
+		token, literal := p.l.Lex()
+		p.scannedItems = append(p.scannedItems, ScannedItem{token, literal})
+		if token == EOS {
+			break
+		}
+	}
+}
+
+// the entry function to parse list of requirements
+func (p *Parser) parse() ([]Requirement, error) {
+	p.scan() // init scannedItems
+
+	var requirements []Requirement
+	for {
+		tok, lit := p.lookahead(Values)
+		switch tok {
+		case IDENTIFIER:
+			r, err := p.parseRequirement()
+			if err != nil {
+				return nil, fmt.Errorf("Error: ", err)
+			}
+			requirements = append(requirements, *r)
+			t, l := p.consume(Values)
+			switch t {
+			case EOS:
+				return requirements, nil
+			case COMMA:
+				t2, l2 := p.lookahead(Values)
+				if t2 != IDENTIFIER {
+					return nil, fmt.Errorf("Expected identifier after comma, found '%s'", l2)
+				}
+			default:
+				return nil, fmt.Errorf("Bad value '%s', expetected comma or 'end of string'", l)
+			}
+		case EOS:
+			return requirements, nil
+		default:
+			return nil, fmt.Errorf("Bad value %s. Expected identifier or 'end of string'", lit)
+		}
+	}
+	return requirements, nil
+}
+
+// parse a Requirement data structure
+func (p *Parser) parseRequirement() (*Requirement, error) {
+	key, operator, err := p.parseKeyAndInferOperator()
+	if err != nil {
+		return nil, err
+	}
+	if operator == ExistsOperator { // operator Exists found lookahead set checked
+		return NewRequirement(key, operator, nil)
+	}
+	operator, err = p.parseOperator()
+	if err != nil {
+		return nil, err
+	}
+	var values util.StringSet
+	switch operator {
+	case InOperator, NotInOperator:
+		values, err = p.parseValues()
+	case EqualsOperator, DoubleEqualsOperator, NotEqualsOperator:
+		values, err = p.parseExactValue()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return NewRequirement(key, operator, values)
+
+}
+
+// parseKeyAndInferOperator parse literals.
+func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
+	tok, literal := p.consume(Values)
+	if tok != IDENTIFIER {
+		err := fmt.Errorf("Found '%s' instead of expected IDENTIFIER", literal)
+		return "", "", err
+	}
+	if err := validateLabelKey(literal); err != nil {
+		return "", "", err
+	}
+	var operator Operator
+	if t, _ := p.lookahead(Values); t == EOS || t == COMMA {
+		operator = ExistsOperator
+	}
+	return literal, operator, nil
+}
+
+// parseOperator return operator and eventually matchType
+// matchType can be exact
+func (p *Parser) parseOperator() (op Operator, err error) {
+	tok, lit := p.consume(KeyAndOperator)
+	switch tok {
+	case IN:
+		op = InOperator
+	case EQUAL:
+		op = EqualsOperator
+	case EEQUAL:
+		op = DoubleEqualsOperator
+	case NOTIN:
+		op = NotInOperator
+	case NEQUAL:
+		op = NotEqualsOperator
+	default:
+		return "", fmt.Errorf("Expected '=', '!=', '==', 'in', notin', found %s", lit)
+	}
+	return op, nil
+}
+
+// parse values parse the values for set based matching (x,y,z)
+func (p *Parser) parseValues() (util.StringSet, error) {
+	tok, lit := p.consume(Values)
+	if tok != OPAR {
+		return nil, fmt.Errorf("Found '%s' expected '('", lit)
+	}
+	tok, lit = p.lookahead(Values)
+	switch tok {
+	case IDENTIFIER, COMMA:
+		s, err := p.parseIdentifiersList() // handles general cases
+		if err != nil {
+			return s, err
+		}
+		if tok, _ = p.consume(Values); tok != CPAR {
+			return nil, fmt.Errorf("Expected a ')', found '%s'", lit)
+		}
+		return s, nil
+	case CPAR: // handles "()"
+		p.consume(Values)
+		return util.NewStringSet(""), nil
+	default:
+		return nil, fmt.Errorf("Expected ')' or ',' or identifier. Found '%s'", lit)
+	}
+	return util.NewStringSet(), nil
+}
+
+// parseIdentifiersList parse a (possibly empty) list of
+// of comma separated (possibly empty) identifiers
+func (p *Parser) parseIdentifiersList() (util.StringSet, error) {
+	s := util.NewStringSet()
+	for {
+		tok, lit := p.consume(Values)
+		switch tok {
+		case IDENTIFIER:
+			s.Insert(lit)
+			tok2, lit2 := p.lookahead(Values)
+			switch tok2 {
+			case COMMA:
+				continue
+			case CPAR:
+				return s, nil
+			default:
+				return nil, fmt.Errorf("Found '%s', expected ',' or ')'", lit2)
+			}
+		case COMMA: // handled here since we can have "(,"
+			if s.Len() == 0 {
+				s.Insert("") // to handle (,
+			}
+			tok2, _ := p.lookahead(Values)
+			if tok2 == CPAR {
+				s.Insert("") // to handle ,)  Double "" removed by StringSet
+				return s, nil
+			}
+			if tok2 == COMMA {
+				p.consume(Values)
+				s.Insert("") // to handle ,, Double "" removed by StringSet
+			}
+		default: // it can be operator
+			return s, fmt.Errorf("Found '%s', expected ',', or identifier", lit)
+		}
+	}
+}
+
+// parse the only value for exact match style
+func (p *Parser) parseExactValue() (util.StringSet, error) {
+	s := util.NewStringSet()
+	if tok, lit := p.consume(Values); tok == IDENTIFIER {
+		s.Insert(lit)
+	} else {
+		return nil, fmt.Errorf("Found '%s', expected identifier", lit)
+	}
+	return s, nil
 }
 
 // Parse takes a string representing a selector and returns a selector
@@ -303,24 +706,18 @@ func (lsel *LabelSelector) String() (string, error) {
 // as they parse different selectors with different syntaxes.
 // The input will cause an error if it does not follow this form:
 //
-//     <selector-syntax> ::= <requirement> | <requirement> "," <selector-syntax>
-//         <requirement> ::= WHITESPACE_OPT KEY <set-restriction>
-//     <set-restriction> ::= "" | <inclusion-exclusion> <value-set>
+// <selector-syntax> ::= <requirement> | <requirement> "," <selector-syntax> ]
+// <requirement> ::= KEY [ <set-based-restriction> | <exact-match-restriction>
+// <set-based-restriction> ::= "" | <inclusion-exclusion> <value-set>
 // <inclusion-exclusion> ::= <inclusion> | <exclusion>
-//           <exclusion> ::= WHITESPACE "not" <inclusion>
-//           <inclusion> ::= WHITESPACE "in" WHITESPACE
+//           <exclusion> ::= "not" <inclusion>
+//           <inclusion> ::= "in"
 //           <value-set> ::= "(" <values> ")"
 //              <values> ::= VALUE | VALUE "," <values>
-//
-// KEY is a sequence of one or more characters that does not contain ',' or ' '
-//      [^, ]+
-// VALUE is a sequence of zero or more characters that does not contain ',', ' ' or ')'
-//      [^, )]*
-// WHITESPACE_OPT is a sequence of zero or more whitespace characters
-//      \s*
-// WHITESPACE is a sequence of one or more whitespace characters
-//      \s+
-//
+// <exact-match-restriction> ::= ["="|"=="|"!="] VALUE
+// KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL
+// VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 64 character.
+// Delimiter is white space: (' ', '\t')
 // Example of valid syntax:
 //  "x in (foo,,baz),y,z not in ()"
 //
@@ -333,115 +730,28 @@ func (lsel *LabelSelector) String() (string, error) {
 //  (4) A requirement with just a KEY - as in "y" above - denotes that
 //      the KEY exists and can be any VALUE.
 //
-// TODO: value validation possibly including duplicate value check, restricting certain characters
-func Parse(selector string) (SetBasedSelector, error) {
-	var items []Requirement
-	var key string
-	var op Operator
-	var vals util.StringSet
-	const (
-		startReq int = iota
-		inKey
-		waitOp
-		inVals
-	)
-	const pos = "position %d:%s"
-	inRegex, errIn := regexp.Compile("^\\s*in\\s+\\(")
-	if errIn != nil {
-		return nil, errIn
+func Parse(selector string) (Selector, error) {
+	p := &Parser{l: &Lexer{s: selector, pos: 0}}
+	items, error := p.parse()
+	if error == nil {
+		sort.Sort(ByKey(items)) // sort to grant determistic parsing
+		return &LabelSelector{Requirements: items}, error
 	}
-	notInRegex, errNotIn := regexp.Compile("^\\s*not\\s+in\\s+\\(")
-	if errNotIn != nil {
-		return nil, errNotIn
-	}
-
-	state := startReq
-	strStart := 0
-	for i := 0; i < len(selector); i++ {
-		switch state {
-		case startReq:
-			switch selector[i] {
-			case ',':
-				return nil, fmt.Errorf("a requirement can't be empty. "+pos, i, selector)
-			case ' ', '\t', '\n', '\f', '\r':
-			default:
-				state = inKey
-				strStart = i
-			}
-		case inKey:
-			switch selector[i] {
-			case ',':
-				state = startReq
-				if req, err := NewRequirement(selector[strStart:i], Exists, nil); err != nil {
-					return nil, err
-				} else {
-					items = append(items, *req)
-				}
-			case ' ', '\t', '\n', '\f', '\r':
-				state = waitOp
-				key = selector[strStart:i]
-			}
-		case waitOp:
-			if loc := inRegex.FindStringIndex(selector[i:]); loc != nil {
-				op = In
-				i += loc[1] - loc[0] - 1
-			} else if loc = notInRegex.FindStringIndex(selector[i:]); loc != nil {
-				op = NotIn
-				i += loc[1] - loc[0] - 1
-			} else {
-				return nil, fmt.Errorf("expected \" in (\"/\" not in (\" after key. "+pos, i, selector)
-			}
-			state = inVals
-			vals = util.NewStringSet()
-			strStart = i + 1
-		case inVals:
-			switch selector[i] {
-			case ',':
-				vals.Insert(selector[strStart:i])
-				strStart = i + 1
-			case ' ':
-				return nil, fmt.Errorf("white space not allowed in set strings. "+pos, i, selector)
-			case ')':
-				if i+1 == len(selector)-1 && selector[i+1] == ',' {
-					return nil, fmt.Errorf("expected requirement after comma. "+pos, i+1, selector)
-				}
-				if i+1 < len(selector) && selector[i+1] != ',' {
-					return nil, fmt.Errorf("requirements must be comma-separated. "+pos, i+1, selector)
-				}
-				state = startReq
-				vals.Insert(selector[strStart:i])
-				if req, err := NewRequirement(key, op, vals); err != nil {
-					return nil, err
-				} else {
-					items = append(items, *req)
-				}
-				if i+1 < len(selector) {
-					i += 1 //advance past comma
-				}
-			}
-		}
-	}
-
-	switch state {
-	case inKey:
-		if req, err := NewRequirement(selector[strStart:], Exists, nil); err != nil {
-			return nil, err
-		} else {
-			items = append(items, *req)
-		}
-	case waitOp:
-		return nil, fmt.Errorf("input terminated while waiting for operator \"in \"/\"not in \":%s", selector)
-	case inVals:
-		return nil, fmt.Errorf("input terminated while waiting for value set:%s", selector)
-	}
-
-	return &LabelSelector{Requirements: items}, nil
+	return nil, error
 }
 
-// TODO: unify with validation.validateLabels
+const qualifiedNameErrorMsg string = "must match regex [" + util.DNS1123SubdomainFmt + " / ] " + util.DNS1123LabelFmt
+
 func validateLabelKey(k string) error {
-	if !util.IsDNSLabel(k) {
-		return errors.NewFieldNotSupported("key", k)
+	if !util.IsQualifiedName(k) {
+		return errors.NewFieldInvalid("label key", k, qualifiedNameErrorMsg)
+	}
+	return nil
+}
+
+func validateLabelValue(v string) error {
+	if !util.IsValidLabelValue(v) {
+		return errors.NewFieldInvalid("label value", v, qualifiedNameErrorMsg)
 	}
 	return nil
 }
@@ -468,6 +778,23 @@ func SelectorFromSet(ls Set) Selector {
 		return items[0]
 	}
 	return andTerm(items)
+}
+
+// SelectorFromSet returns a Selector which will match exactly the given Set. A
+// nil Set is considered equivalent to Everything().
+func SelectorFromSetParse(ls Set) (Selector, error) {
+	if ls == nil {
+		return LabelSelector{}, nil
+	}
+	var requirements []Requirement
+	for label, value := range ls {
+		if r, err := NewRequirement(label, InOperator, util.NewStringSet(value)); err != nil {
+			return LabelSelector{}, err
+		} else {
+			requirements = append(requirements, *r)
+		}
+	}
+	return LabelSelector{Requirements: requirements}, nil
 }
 
 // ParseSelector takes a string representing a selector and returns an
@@ -500,4 +827,13 @@ func ParseSelector(selector string) (Selector, error) {
 // Cannot return an error.
 func OneTermEqualSelector(k, v string) Selector {
 	return &hasTerm{label: k, value: v}
+}
+
+// OneTermEqualSelectorParse: implement OneTermEqualSelector using of LabelSelector and Requirement
+// TODO: remove the original OneTermSelector  and rename OneTermEqualSelectorParse to OneTermEqualSelector
+// Since OneTermEqualSelector cannot return an error. the Requirement based version ignore error.
+// it's up to the caller being sure that k and v are not empty
+func OneTermEqualSelectorParse(k, v string) Selector {
+	r, _ := NewRequirement(k, InOperator, util.NewStringSet(v))
+	return &LabelSelector{Requirements: []Requirement{*r}}
 }
