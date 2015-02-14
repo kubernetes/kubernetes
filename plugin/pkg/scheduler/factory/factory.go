@@ -143,11 +143,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 // createUnassignedPodLW returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-		Resource:      "pods",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{"DesiredState.Host": ""}.AsSelector())
 }
 
 func parseSelectorOrDie(s string) labels.Selector {
@@ -162,20 +158,12 @@ func parseSelectorOrDie(s string) labels.Selector {
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie("DesiredState.Host!="),
-		Resource:      "pods",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, parseSelectorOrDie("DesiredState.Host!="))
 }
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
 func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie(""),
-		Resource:      "minions",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "minions", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 // pollMinions lists all minions and filter out unhealthy ones, then returns
@@ -215,11 +203,7 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 
 // createServiceLW returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie(""),
-		Resource:      "services",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {

@@ -28,11 +28,7 @@ import (
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
 func NewSourceApiserver(client *client.Client, hostname string, updates chan<- interface{}) {
-	lw := &cache.ListWatch{
-		Client:        client,
-		FieldSelector: labels.OneTermEqualSelector("Status.Host", hostname),
-		Resource:      "pods",
-	}
+	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, labels.OneTermEqualSelector("Status.Host", hostname))
 	newSourceApiserverFromLW(lw, updates)
 }
 
