@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -274,7 +275,6 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		time.Sleep(2)
 		_, err = c.Services(api.NamespaceDefault).Create(svc)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create service: %v", err))
@@ -297,7 +297,7 @@ var _ = Describe("Pods", func() {
 					{
 						Name:    "env3cont",
 						Image:   "busybox",
-						Command: []string{"sh", "-c", "env"},
+						Command: []string{"sh", "-c", "env; sleep 600"},
 					},
 				},
 				RestartPolicy: api.RestartPolicy{
@@ -314,7 +314,7 @@ var _ = Describe("Pods", func() {
 		}()
 
 		// Wait for client pod to complete.
-		expectNoError(waitForPodSuccess(c, clientPod.Name, clientPod.Spec.Containers[0].Name, 60*time.Second))
+		expectNoError(waitForPodRunning(c, clientPod.Name, 60*time.Second))
 
 		// Grab its logs.  Get host first.
 		clientPodStatus, err := c.Pods(api.NamespaceDefault).Get(clientPod.Name)
@@ -325,6 +325,7 @@ var _ = Describe("Pods", func() {
 			clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
 		var logs []byte
 		start := time.Now()
+
 		// Sometimes the actual containers take a second to get started, try to get logs for 60s
 		for time.Now().Sub(start) < (60 * time.Second) {
 			logs, err = c.Get().
@@ -334,15 +335,16 @@ var _ = Describe("Pods", func() {
 				Suffix("containerLogs", api.NamespaceDefault, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name).
 				Do().
 				Raw()
-			if err != nil {
+			fmt.Sprintf("clientPod logs:%v\n", string(logs))
+			By(fmt.Sprintf("clientPod logs:%v\n", string(logs)))
+			if strings.Contains(string(logs), "Internal Error") {
 				By(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
-					clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
+					clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, string(logs)))
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			break
 		}
-		fmt.Sprintf("clientPod logs:%v\n", string(logs))
 
 		toFind := []string{
 			"FOOSERVICE_SERVICE_HOST=",
