@@ -304,6 +304,32 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 }
 
+func TestValidateProbe(t *testing.T) {
+	handler := api.Handler{Exec: &api.ExecAction{Command: []string{"echo"}}}
+	successCases := []*api.Probe{
+		nil,
+		{TimeoutSeconds: 10, InitialDelaySeconds: 0, Handler: handler},
+		{TimeoutSeconds: 0, InitialDelaySeconds: 10, Handler: handler},
+	}
+	for _, p := range successCases {
+		if errs := validateProbe(p); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []*api.Probe{
+		{TimeoutSeconds: 10, InitialDelaySeconds: 10},
+		{TimeoutSeconds: 10, InitialDelaySeconds: -10, Handler: handler},
+		{TimeoutSeconds: -10, InitialDelaySeconds: 10, Handler: handler},
+		{TimeoutSeconds: -10, InitialDelaySeconds: -10, Handler: handler},
+	}
+	for _, p := range errorCases {
+		if errs := validateProbe(p); len(errs) == 0 {
+			t.Errorf("expected failure for %v", p)
+		}
+	}
+}
+
 func TestValidatePullPolicy(t *testing.T) {
 	type T struct {
 		Container      api.Container
