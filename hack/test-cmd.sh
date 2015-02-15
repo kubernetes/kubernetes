@@ -159,9 +159,14 @@ for version in "${kube_api_versions[@]}"; do
           "apiVersion": "v1beta1",
           "id": "service-${version}-test",
           "port": 80,
-          "protocol": "TCP"
+          "protocol": "TCP",
+          "selector": {
+              "version": "old"
+          }
       }
 __EOF__
+  kubectl update service service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}" 
+  kubectl get service service-${version}-test -o json | kubectl update -f -
   kubectl get services "${kube_flags[@]}"
   kubectl get services "service-${version}-test" "${kube_flags[@]}"
   kubectl delete service frontend "${kube_flags[@]}"

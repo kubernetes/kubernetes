@@ -54,15 +54,6 @@ Examples:
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			checkErr(err)
 
-			mapper, typer := f.Object(cmd)
-			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
-				ContinueOnError().
-				NamespaceParam(cmdNamespace).RequireNamespace().
-				FilenameParam(flags.Filenames...).
-				Flatten().
-				Do()
-			checkErr(r.Err())
-
 			patch := cmdutil.GetFlagString(cmd, "patch")
 			if len(flags.Filenames) == 0 && len(patch) == 0 {
 				usageError(cmd, "Must specify --filename or --patch to update")
@@ -77,6 +68,15 @@ Examples:
 				fmt.Fprintf(out, "%s\n", name)
 				return
 			}
+
+			mapper, typer := f.Object(cmd)
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+				ContinueOnError().
+				NamespaceParam(cmdNamespace).RequireNamespace().
+				FilenameParam(flags.Filenames...).
+				Flatten().
+				Do()
+			checkErr(r.Err())
 
 			err = r.Visit(func(info *resource.Info) error {
 				data, err := info.Mapping.Codec.Encode(info.Object)
