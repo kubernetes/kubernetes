@@ -218,8 +218,8 @@ type APIRequestInfo struct {
 }
 
 type APIRequestInfoResolver struct {
-	apiPrefixes util.StringSet
-	restMapper  meta.RESTMapper
+	APIPrefixes util.StringSet
+	RestMapper  meta.RESTMapper
 }
 
 // GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
@@ -253,7 +253,7 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 		return requestInfo, fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
 	}
 
-	for _, currPrefix := range r.apiPrefixes.List() {
+	for _, currPrefix := range r.APIPrefixes.List() {
 		// handle input of form /api/{version}/* by adjusting special paths
 		if currentParts[0] == currPrefix {
 			if len(currentParts) > 1 {
@@ -334,7 +334,7 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	// if we have a resource, we have a good shot at being able to determine kind
 	if len(requestInfo.Resource) > 0 {
-		_, requestInfo.Kind, _ = r.restMapper.VersionAndKindForResource(requestInfo.Resource)
+		_, requestInfo.Kind, _ = r.RestMapper.VersionAndKindForResource(requestInfo.Resource)
 	}
 
 	return requestInfo, nil
