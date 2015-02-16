@@ -314,7 +314,11 @@ func (i *Instances) IPAddress(name string) (net.IP, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance.
 func (i *Instances) ExternalID(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return "", err
+	}
+	return srv.ID, nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
