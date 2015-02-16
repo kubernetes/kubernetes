@@ -78,11 +78,10 @@ func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *ap
 			return err
 		}
 		netInfo, found := status.Info[dockertools.PodInfraContainerName]
-		if found {
-			host = netInfo.PodIP
-		} else {
+		if !found {
 			return fmt.Errorf("failed to find networking container: %v", status)
 		}
+		host = netInfo.PodIP
 	}
 	var port int
 	if handler.HTTPGet.Port.Kind == util.IntstrString && len(handler.HTTPGet.Port.StrVal) == 0 {
