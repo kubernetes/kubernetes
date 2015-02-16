@@ -17,12 +17,12 @@ limitations under the License.
 package client
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	//"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestLimitRangeCreate(t *testing.T) {
@@ -190,5 +190,14 @@ func TestLimitRangeDelete(t *testing.T) {
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().LimitRanges(ns).Delete("foo")
+	c.Validate(t, nil, err)
+}
+
+func TestLimitRangeWatch(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "GET", Path: "/watch/limitRanges", Query: url.Values{"resourceVersion": []string{}}},
+		Response: Response{StatusCode: 200},
+	}
+	_, err := c.Setup().LimitRanges(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), "")
 	c.Validate(t, nil, err)
 }

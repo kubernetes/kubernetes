@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // ResourceQuotasNamespacer has methods to work with ResourceQuota resources in a namespace
@@ -36,6 +37,7 @@ type ResourceQuotaInterface interface {
 	Delete(name string) error
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // resourceQuotas implements ResourceQuotasNamespacer interface
@@ -91,4 +93,16 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	}
 	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).Body(resourceQuota).Do().Into(result)
 	return
+}
+
+// Watch returns a watch.Interface that watches the requested resource
+func (c *resourceQuotas) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.r.Get().
+		Prefix("watch").
+		Namespace(c.ns).
+		Resource("resourceQuotas").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
 }

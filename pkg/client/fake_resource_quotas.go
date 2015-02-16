@@ -19,6 +19,7 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // FakeResourceQuotas implements ResourceQuotaInterface. Meant to be embedded into a struct to get a default
@@ -51,4 +52,9 @@ func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.Reso
 func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-resourceQuota", Value: resourceQuota.Name})
 	return &api.ResourceQuota{}, nil
+}
+
+func (c *FakeResourceQuotas) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-resourceQuota", Value: resourceVersion})
+	return c.Fake.Watch, nil
 }

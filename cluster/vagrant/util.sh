@@ -88,6 +88,7 @@ function create-provision-scripts {
     echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
+    echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
