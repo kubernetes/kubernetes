@@ -812,6 +812,8 @@ type NodeSpec struct {
 	// Capacity represents the available resources of a node
 	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
 	Capacity ResourceList `json:"capacity,omitempty"`
+	// PodCIDR represents the pod IP range assigned to the node
+	PodCIDR string `json:"cidr,omitempty"`
 }
 
 // NodeStatus is information about the current status of a node.
