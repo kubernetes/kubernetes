@@ -1,27 +1,33 @@
 ## GuestBook example
 
-This example shows how to build a simple multi-tier web application using Kubernetes and Docker.
+This example shows how to build a simple, multi-tier web application using Kubernetes and Docker.
 
-The example combines a web frontend, a redis master for storage and a replicated set of redis slaves.
+The example consists of:
+- A web frontend
+- A redis master (for storage and a replicated set of redis slaves)
+
+The web front end interacts with the redis master via javascript redis API calls.
 
 ### Step Zero: Prerequisites
 
 This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
+This example requires a kubernetes cluster.  
 
-```shell
-$ cd kubernetes
-$ hack/dev-build-and-up.sh
-```
+See the companion [Setup Kubernetes](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/SETUP.md) for some quick notes on how to get started.
 
-### Step One: Turn up the redis master
+*If* you are running from source, replace commands such as "kubectl" below with calls to cluster/kubectl.sh.
 
-Use the file `examples/guestbook/redis-master.json` which describes a single pod running a redis key-value server in a container:
+### Step One: Fire up the redis master
+
+Note: This redis-master is *not* highly available.  Making it highly available would be a very interesting, but intricate exersize - redis doesn't actually support multi-master deployments at the time of this writing, so high availability would be a somewhat tricky thing implement, and might involve periodic serialization to disk, and so on.
+
+Use (or just create) the file `examples/guestbook/redis-master.json` which describes a single pod running a redis key-value server in a container:
 
 ```js
 {
   "id": "redis-master",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
+  "apiVersion": "v1beta1", 
   "desiredState": {
     "manifest": {
       "version": "v1beta1",
@@ -31,31 +37,31 @@ Use the file `examples/guestbook/redis-master.json` which describes a single pod
         "image": "dockerfile/redis",
         "cpu": 100,
         "ports": [{
-          "containerPort": 6379,
-          "hostPort": 6379
+          "containerPort": 6379,   # containerPort: Where traffic to redis ultimately is routed to.
+          "hostPort": 6379         # hostPort: The port on the host itself, that the service proxy sends traffic to.
         }]
       }]
     }
   },
   "labels": {
-    "name": "redis-master"
+    "name": "redis-master" # This label needed for when we start our redis-master service.
   }
 }
 ```
 
-Create the redis pod in your Kubernetes cluster by running:
+Now, create the redis pod in your Kubernetes cluster by running:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook/redis-master.json
+kubectl create -f examples/guestbook/redis-master.json
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master is running:
 
 ```shell
-cluster/kubectl.sh get pods
+kubectl get pods,services,rc
 ```
 
-You'll see a single redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
+You'll see all kubernetes components, most importantly the redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
 
 ```
 NAME                IMAGE(S)            HOST                                                       LABELS              STATUS
@@ -65,20 +71,25 @@ redis-master        dockerfile/redis    kubernetes-minion-2.c.myproject.internal
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-2
-
+me@workstation$ ssh me@kubernetes-minion-2
 me@kubernetes-minion-2:~$ sudo docker ps
 CONTAINER ID  IMAGE                     COMMAND                CREATED         STATUS        PORTS     NAMES
 e3eed3e5e6d1  dockerfile/redis:latest   "redis-server /etc/re  2 minutes ago   Up 2 minutes            k8s_master.9c0a9146_redis-master.etcd_6296f4bd-70fa-11e4-8469-0800279696e1_45331ebc
 ```
 
-(Note that initial `docker pull` may take a few minutes, depending on network conditions.  During this time, the `get pods` command will return `Pending` because the container has not yet started )
+(Note that initial `docker pull` may take a few minutes, depending on network conditions.  You can monitor the status of this by running `journalctl -f -u docker` to check when the image is being downloaded.  Of course, you can also run `journalctl -f -u kubelet` to see what state the kubelet is in as well during this time.
 
-### Step Two: Turn up the master service
+### Step Two: Fire up the master service
+A Kubernetes 'service' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.  
 
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) before proceeding.
+The services in a Kubernetes cluster are discoverable inside other containers via environment variables. 
+>>>>>>> Updated Guestbook tutorial to be more generic, compartmentalize the local/GCE setup, and added details around redis master and convenient cleanup utility script snippet.
 
-The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines which pods will receive the traffic sent to the service. Use the file `examples/guestbook/redis-master-service.json`:
+Services find the containers to load balance based on pod labels.
+
+The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines *which pods will receive the traffic* sent to the service, and the port and containerPort information defines what port the service proxy will run at. 
+
+Use the file `examples/guestbook/redis-master-service.json`:
 
 ```js
 {
@@ -99,7 +110,7 @@ The pod that you created in Step One has the label `name=redis-master`. The sele
 to create the service by running:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook/redis-master-service.json
+$ kubectl create -f examples/guestbook/redis-master-service.json
 redis-master
 
 $ cluster/kubectl.sh get services
@@ -110,14 +121,18 @@ redis-master        name=redis-master   name=redis-master                       
 ```
 
 
-This will cause all pods to see the redis master apparently running on <ip>:6379.
+This will cause all pods to see the redis master apparently running on <ip>:6379.  The traffic flow from slaves to masters can be described in three steps, like so.
 
-Once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
+- a *redis slave* will connect to "port" on the *redis master service*
+- traffic will be forwarded from the service "port" to the  *containerPort* on the bound pod (i.e. the redis-master pod that is running).
+- finally, the *redis-master* pod will receive traffic on *hostPort* which it exposed, and send that to its *containerPort*.
 
-### Step Three: Turn up the replicated slave pods
-Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.
+Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
 
-Use the file `examples/guestbook/redis-slave-controller.json`:
+### Step Three: Fire up the replicated slave pods
+Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replicationController will automatically launch new Pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
+
+Use the file `examples/guestbook/redis-slave-controller.json`, which looks like this:
 
 ```js
 {
@@ -142,7 +157,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`:
        },
        "labels": {
          "name": "redisslave",
-         "uses": "redis-master",
+         "uses": "redis-master"
        }
       }},
   "labels": {"name": "redisslave"}
@@ -152,12 +167,12 @@ Use the file `examples/guestbook/redis-slave-controller.json`:
 to create the replication controller by running:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook/redis-slave-controller.json
-redis-slave-controller
+$ kubectl create -f examples/guestbook/redis-slave-controller.json
+redisSlaveController
 
-# cluster/kubectl.sh get replicationcontrollers
-NAME                    IMAGE(S)                   SELECTOR            REPLICAS
-redis-slave-controller  brendanburns/redis-slave   name=redisslave     2
+# kubectl.sh get replicationcontrollers
+NAME                   IMAGE(S)                   SELECTOR            REPLICAS
+redisSlaveController   brendanburns/redis-slave   name=redisslave     2
 ```
 
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment. In particular, the redis slave is started with the following command:
@@ -171,7 +186,7 @@ You might be curious about where the *REDIS_MASTER_SERVICE_HOST* is coming from.
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
 ```shell
-$ cluster/kubectl.sh get pods
+$ kubectl get pods
 NAME                                   IMAGE(S)                   HOST                                                        LABELS                              STATUS
 redis-master                           dockerfile/redis           kubernetes-minion-2.c.myproject.internal/130.211.156.189    name=redis-master                   Running
 ee68394b-7fca-11e4-a220-42010af0a5f1   brendanburns/redis-slave   kubernetes-minion-3.c.myproject.internal/130.211.179.212    name=redisslave,uses=redis-master   Running
@@ -182,7 +197,9 @@ You will see a single redis master pod and two redis slave pods.
 
 ### Step Four: Create the redis slave service
 
-Just like the master, we want to have a service to proxy connections to the read slaves. In this case, in addition to discovery, the slave service provides transparent load balancing to clients. The service specification for the slaves is in `examples/guestbook/redis-slave-service.json`:
+Just like the master, we want to have a service to proxy connections to the read slaves. In this case, in addition to discovery, the slave service provides transparent load balancing to web app  clients. 
+
+The service specification for the slaves is in `examples/guestbook/redis-slave-service.json`:
 
 ```js
 {
@@ -220,6 +237,8 @@ redisslave          name=redisslave     name=redisslave                         
 ### Step Five: Create the frontend pod
 
 This is a simple PHP server that is configured to talk to either the slave or master services depending on whether the request is a read or a write. It exposes a simple AJAX interface, and serves an angular-based UX. Like the redis read slaves it is a replicated service instantiated by a replication controller.
+
+It can now leverage writes to the load balancing redis-slaves, which can be highly replicated.
 
 The pod is described in the file `examples/guestbook/frontend-controller.json`:
 
@@ -323,28 +342,47 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcloud` tool, and visit `http://<host-ip>:8000`.
+To play with the service itself, find the name of a frontend,
 
+### A few Google Container Engine specifics for playing around with the services.
+
+- In GCE, you can grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcloud` tool, and visit `http://<host-ip>:8000`.
 ```shell
 $ gcloud compute instances list
 ```
-
-You may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+In GCE, you also may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
 $ gcloud compute firewall-rules create --allow=tcp:8000 --target-tags=kubernetes-minion kubernetes-minion-8000
 ```
 
-If you are running Kubernetes locally, you can just visit http://localhost:8000.
-For details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
+For GCE details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
 
 [cloud-console]: https://console.developer.google.com
 [gce-firewall-docs]: https://cloud.google.com/compute/docs/networking#firewalls
 
+In other environments, you can get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
+
+And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:8000.  
+
 ### Step Six: Cleanup
 
-To turn down a Kubernetes cluster:
+To turn down a Kubernetes cluster, if you ran this from source, you can use 
 
 ```shell
 $ cluster/kube-down.sh
 ```
+
+If you are in a live kubernetes cluster, you can just kill the pods, using a script such as this (obviously, read through it and make sure you understand it before running it blindly, as it will kill several pods automatically for you).
+
+```shell
+### First, kill services and controllers.
+kubectl delete -f examples/guestbook/redis-slave-controller.json
+kubectl delete -f examples/guestbook/frontend-controller.json
+kubectl delete -f examples/guestbook/redis-master-service.json
+kubectl delete -f examples/guestbook/redis-slave-service.json
+### Now, we can delete all the pods.  Since we killed the controllers, they won't be realaunched.
+for line in $(kubectl get pods | grep frontend-controller | cut -d' ' -f 1 | grep 1); do kubectl delete pod $line ; done;
+for line in $(kubectl get pods | grep redis | cut -d' ' -f 1 | grep 1); do kubectl delete pod $line ; done;
+```
+
