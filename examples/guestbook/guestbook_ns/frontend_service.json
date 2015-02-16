@@ -1,0 +1,18 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "frontend",
+    "namespace": "default",
+    "labels": {},
+  },
+  "spec": {
+    "port": 80,
+    "protocol": "TCP",
+    "selector": {
+      "name": "frontend"
+    },
+    "containerPort": 80,
+    "sessionAffinity": "None"
+  }
+}
