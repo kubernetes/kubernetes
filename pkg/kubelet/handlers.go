@@ -74,7 +74,7 @@ func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *ap
 	if len(host) == 0 {
 		status, err := h.kubelet.GetPodStatus(podFullName, uid)
 		if err != nil {
-			glog.Errorf("unable to get pod info, event handlers may be invalid.")
+			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return err
 		}
 		netInfo, found := status.Info[dockertools.PodInfraContainerName]
