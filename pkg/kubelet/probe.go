@@ -71,12 +71,10 @@ func (kl *Kubelet) probeContainer(p *api.Probe,
 }
 
 func (kl *Kubelet) runProbe(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
-	var timeout time.Duration
+	timeout := defaultProbeTimeout
 	secs := p.TimeoutSeconds
 	if secs > 0 {
 		timeout = time.Duration(secs) * time.Second
-	} else {
-		timeout = defaultProbeTimeout
 	}
 	if p.Exec != nil {
 		return kl.prober.exec.Probe(kl.newExecInContainer(podFullName, podUID, container))
@@ -180,7 +178,6 @@ func (r *readinessStates) IsReady(c api.ContainerStatus) bool {
 		return false
 	}
 	return r.get(strings.TrimPrefix(c.ContainerID, "docker://"))
-
 }
 
 func (r *readinessStates) get(key string) bool {
