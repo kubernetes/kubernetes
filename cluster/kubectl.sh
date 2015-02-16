@@ -113,14 +113,13 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
     "--cluster=${CLUSTER_NAME}"
   )
 elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded auth.  We repeat that here so that
-  # we don't clobber auth that might be used for a publicly facing cluster.
+  # When we are using vagrant it has hard coded kubeconfig, and do not clobber public endpoints
   config=(
-    "--auth-path=$HOME/.kubernetes_vagrant_auth"
-  )
+    "--kubeconfig=$HOME/.kubernetes_vagrant_kubeconfig"
+  )  
 fi
 
-echo "current-context: \"$(${kubectl} config view -o template --template='{{index . "current-context"}}')\"" >&2
+echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
 
 echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
 "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
