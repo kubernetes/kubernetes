@@ -279,18 +279,19 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := c.ReplicationControllers(api.NamespaceDefault).Create(&controller); err != nil {
+	updated, err := c.ReplicationControllers(api.NamespaceDefault).Create(&controller)
+	if err != nil {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
 	glog.Infof("Done creating replication controllers")
 
 	// Give the controllers some time to actually create the pods
-	if err := wait.Poll(time.Second, time.Second*30, client.ControllerHasDesiredReplicas(c, &controller)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, client.ControllerHasDesiredReplicas(c, updated)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
 	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.Pods(api.NamespaceDefault).List(labels.Set(controller.Spec.Selector).AsSelector())
+	pods, err := c.Pods(api.NamespaceDefault).List(labels.Set(updated.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}
@@ -523,7 +524,7 @@ func runMasterServiceTest(client *client.Client) {
 }
 
 func runServiceTest(client *client.Client) {
-	pod := api.Pod{
+	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
@@ -548,14 +549,14 @@ func runServiceTest(client *client.Client) {
 			PodIP: "1.2.3.4",
 		},
 	}
-	_, err := client.Pods(api.NamespaceDefault).Create(&pod)
+	pod, err := client.Pods(api.NamespaceDefault).Create(pod)
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
 	if err := wait.Poll(time.Second, time.Second*20, podExists(client, pod.Namespace, pod.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
-	svc1 := api.Service{
+	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service1"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{
@@ -566,7 +567,7 @@ func runServiceTest(client *client.Client) {
 			SessionAffinity: "None",
 		},
 	}
-	_, err = client.Services(api.NamespaceDefault).Create(&svc1)
+	svc1, err = client.Services(api.NamespaceDefault).Create(svc1)
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc1, err)
 	}
@@ -574,7 +575,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	// A second service with the same port.
-	svc2 := api.Service{
+	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service2"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{
@@ -585,7 +586,7 @@ func runServiceTest(client *client.Client) {
 			SessionAffinity: "None",
 		},
 	}
-	_, err = client.Services(api.NamespaceDefault).Create(&svc2)
+	svc2, err = client.Services(api.NamespaceDefault).Create(svc2)
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
 	}

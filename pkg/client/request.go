@@ -181,6 +181,14 @@ func (r *Request) Namespace(namespace string) *Request {
 	return r
 }
 
+// NamespaceIfScoped is a convenience function to set a namespace if scoped is true
+func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
+	if scoped {
+		return r.Namespace(namespace)
+	}
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {
@@ -320,7 +328,7 @@ func (r *Request) finalURL() string {
 		query.Add(key, value)
 	}
 
-	if r.namespaceSet && r.namespaceInQuery && len(r.namespace) > 0 {
+	if r.namespaceSet && r.namespaceInQuery {
 		query.Add("namespace", r.namespace)
 	}
 
@@ -425,6 +433,14 @@ func (r *Request) Do() Result {
 	for {
 		if r.err != nil {
 			return Result{err: &RequestConstructionError{r.err}}
+		}
+
+		// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
+		if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
+			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set when a resource name is provided")}}
+		}
+		if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
+			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set during creation")}}
 		}
 
 		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)

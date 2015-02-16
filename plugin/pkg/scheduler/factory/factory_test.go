@@ -277,7 +277,13 @@ func TestBind(t *testing.T) {
 	table := []struct {
 		binding *api.Binding
 	}{
-		{binding: &api.Binding{PodID: "foo", Host: "foohost.kubernetes.mydomain.com"}},
+		{binding: &api.Binding{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+			},
+			PodID: "foo",
+			Host:  "foohost.kubernetes.mydomain.com",
+		}},
 	}
 
 	for _, item := range table {
@@ -296,7 +302,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings?namespace=default", "POST", &expectedBody)
 	}
 }
 
