@@ -90,7 +90,7 @@ type Request struct {
 	// generic components accessible via method setters
 	path    string
 	subpath string
-	params  map[string]string
+	params  url.Values
 
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
@@ -204,6 +204,29 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	return r
 }
 
+// RequestURI overwrites existing path and parameters with the value of the provided server relative
+// URI. Some parameters (those in specialParameters) cannot be overwritten.
+func (r *Request) RequestURI(uri string) *Request {
+	if r.err != nil {
+		return r
+	}
+	locator, err := url.Parse(uri)
+	if err != nil {
+		r.err = err
+		return r
+	}
+	r.path = locator.Path
+	if len(locator.Query()) > 0 {
+		if r.params == nil {
+			r.params = make(url.Values)
+		}
+		for k, v := range locator.Query() {
+			r.params[k] = v
+		}
+	}
+	return r
+}
+
 // ParseSelectorParam parses the given string as a resource label selector.
 // This is a convenience function so you don't have to first check that it's a
 // validly formatted selector.
@@ -252,9 +275,9 @@ func (r *Request) setParam(paramName, value string) *Request {
 		return r
 	}
 	if r.params == nil {
-		r.params = make(map[string]string)
+		r.params = make(url.Values)
 	}
-	r.params[paramName] = value
+	r.params[paramName] = []string{value}
 	return r
 }
 
@@ -325,16 +348,16 @@ func (r *Request) finalURL() string {
 
 	query := url.Values{}
 	for key, value := range r.params {
-		query.Add(key, value)
+		query[key] = value
 	}
 
 	if r.namespaceSet && r.namespaceInQuery {
-		query.Add("namespace", r.namespace)
+		query.Set("namespace", r.namespace)
 	}
 
 	// timeout is handled specially here.
 	if r.timeout != 0 {
-		query.Add("timeout", r.timeout.String())
+		query.Set("timeout", r.timeout.String())
 	}
 	finalURL.RawQuery = query.Encode()
 	return finalURL.String()
