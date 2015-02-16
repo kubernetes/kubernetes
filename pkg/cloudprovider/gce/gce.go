@@ -279,24 +279,37 @@ func canonicalizeInstanceName(name string) string {
 	return name
 }
 
-// IPAddress is an implementation of Instances.IPAddress.
-func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
-	instance = canonicalizeInstanceName(instance)
-	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, instance).Do()
+// Return the instances matching the relevant name.
+func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
+	name = canonicalizeInstanceName(name)
+	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, name).Do()
 	if err != nil {
-		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", instance)
+		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", name)
 		return nil, err
 	}
-	ip := net.ParseIP(res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+	return res, nil
+}
+
+// IPAddress is an implementation of Instances.IPAddress.
+func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
+	inst, err := gce.getInstanceByName(instance)
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	if ip == nil {
-		return nil, fmt.Errorf("invalid network IP: %s", res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
 	return ip, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
+	inst, err := gce.getInstanceByName(instance)
+	if err != nil {
+		return "", err
+	}
+	return string(inst.Id), nil
 }
 
 // fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
