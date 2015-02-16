@@ -753,7 +753,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	}
 	services, err := kl.serviceLister.List()
 	if err != nil {
-		return m, fmt.Errorf("Failed to list services when setting up env vars.")
+		return m, fmt.Errorf("failed to list services when setting up env vars.")
 	}
 
 	// project the services in namespace ns onto the master services
