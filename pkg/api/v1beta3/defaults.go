@@ -70,5 +70,10 @@ func init() {
 				obj.DNSPolicy = DNSClusterFirst
 			}
 		},
+		func(obj *Probe) {
+			if obj.TimeoutSeconds == 0 {
+				obj.TimeoutSeconds = 1
+			}
+		},
 	)
 }

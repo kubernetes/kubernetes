@@ -36,10 +36,7 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	defaultProbeTimeout = 1 * time.Second
-	maxProbeRetries     = 3
-)
+const maxProbeRetries = 3
 
 // probeContainer executes the given probe on a container and returns the result.
 // If the probe is nil this returns Success. If the probe's initial delay has not passed
@@ -71,11 +68,7 @@ func (kl *Kubelet) probeContainer(p *api.Probe,
 }
 
 func (kl *Kubelet) runProbe(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
-	timeout := defaultProbeTimeout
-	secs := p.TimeoutSeconds
-	if secs > 0 {
-		timeout = time.Duration(secs) * time.Second
-	}
+	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		return kl.prober.exec.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
