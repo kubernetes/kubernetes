@@ -35,9 +35,9 @@ import (
 )
 
 var (
-	PodLister     = &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	MinionLister  = &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	ServiceLister = &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	PodLister     = &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc, cache.DefaultIsOlder)}
+	MinionLister  = &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc, cache.DefaultIsOlder)}
+	ServiceLister = &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc, cache.DefaultIsOlder)}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -57,7 +57,7 @@ type ConfigFactory struct {
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
 		Client:        client,
-		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc, cache.DefaultIsOlder),
 		PodLister:     PodLister,
 		MinionLister:  MinionLister,
 		ServiceLister: ServiceLister,
