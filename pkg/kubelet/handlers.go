@@ -72,7 +72,6 @@ func ResolvePort(portReference util.IntOrString, container *api.Container) (int,
 func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
-		var status api.PodStatus
 		status, err := h.kubelet.GetPodStatus(podFullName, uid)
 		if err != nil {
 			glog.Errorf("unable to get pod info, event handlers may be invalid.")
