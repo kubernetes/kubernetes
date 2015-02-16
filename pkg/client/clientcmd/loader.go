@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/ghodss/yaml"
-	"github.com/imdario/mergo"
 
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	clientcmdlatest "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
@@ -33,78 +32,44 @@ const (
 	RecommendedConfigPathEnvVar = "KUBECONFIG"
 )
 
-// ClientConfigLoadingRules is a struct that calls our specific locations that are used for merging together a Config
-type ClientConfigLoadingRules struct {
-	CommandLinePath      string
-	EnvVarPath           string
-	CurrentDirectoryPath string
-	HomeDirectoryPath    string
+// ClientConfigLoadingOrder is a struct that calls our specific locations that are used for merging together a Config
+type ClientConfigLoadingOrder []string
+
+// DefaultClientConfigLoadingOrder returns a ClientConfigLoadingOrder object with default values.  Index 0, is empty to allow callers
+// to bind a command line flag if they like.  You are not required to use this constructor
+func DefaultClientConfigLoadingOrder() ClientConfigLoadingOrder {
+	return ClientConfigLoadingOrder([]string{
+		"", // usually bound to "--kubeconfig" flag
+		os.Getenv(RecommendedConfigPathEnvVar),
+		os.Getenv("HOME") + "/.kube/.kubeconfig",
+	})
 }
 
-// NewClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
-// use this constructor
-func NewClientConfigLoadingRules() *ClientConfigLoadingRules {
-	return &ClientConfigLoadingRules{
-		CurrentDirectoryPath: ".kubeconfig",
-		HomeDirectoryPath:    os.Getenv("HOME") + "/.kube/.kubeconfig",
-	}
-}
+// Load takes the loading order and returns the kubeconfig from the first existing file along with the filename used.
+// If no file in the order exists, it returns an empty config.
+// Empty filenames are ignored.  Missing files are ignored.  Files with non-deserializable content produced errors.
+func (order ClientConfigLoadingOrder) Load() (*clientcmdapi.Config, string, error) {
+	for _, file := range order {
+		if len(file) > 0 {
+			config, err := LoadFromFile(file)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// the config file didn't exist, try the next one
+					continue
+				}
 
-// Load takes the loading rules and merges together a Config object based on following order.
-//   1.  CommandLinePath
-//   2.  EnvVarPath
-//   3.  CurrentDirectoryPath
-//   4.  HomeDirectoryPath
-// Empty filenames are ignored.  Files with non-deserializable content produced errors.
-// The first file to set a particular map key wins and map key's value is never changed.
-// BUT, if you set a struct value that is NOT contained inside of map, the value WILL be changed.
-// This results in some odd looking logic to merge in one direction, merge in the other, and then merge the two.
-// It also means that if two files specify a "red-user", only values from the first file's red-user are used.  Even
-// non-conflicting entries from the second file's "red-user" are discarded.
-// Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
-// and only absolute file paths are returned.
-func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
+				return nil, file, err
+			}
 
-	kubeConfigFiles := []string{rules.CommandLinePath, rules.EnvVarPath, rules.CurrentDirectoryPath, rules.HomeDirectoryPath}
+			if err := resolveLocalPaths(file, config); err != nil {
+				return nil, file, err
+			}
 
-	// first merge all of our maps
-	mapConfig := clientcmdapi.NewConfig()
-	for _, file := range kubeConfigFiles {
-		mergeConfigWithFile(mapConfig, file)
-		resolveLocalPaths(file, mapConfig)
+			return config, file, nil
+		}
 	}
 
-	// merge all of the struct values in the reverse order so that priority is given correctly
-	nonMapConfig := clientcmdapi.NewConfig()
-	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
-		file := kubeConfigFiles[i]
-		mergeConfigWithFile(nonMapConfig, file)
-		resolveLocalPaths(file, nonMapConfig)
-	}
-
-	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
-	// get the values we expect.
-	config := clientcmdapi.NewConfig()
-	mergo.Merge(config, mapConfig)
-	mergo.Merge(config, nonMapConfig)
-
-	return config, nil
-}
-
-func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) error {
-	if len(filename) == 0 {
-		// no work to do
-		return nil
-	}
-
-	config, err := LoadFromFile(filename)
-	if err != nil {
-		return err
-	}
-
-	mergo.Merge(startingConfig, config)
-
-	return nil
+	return clientcmdapi.NewConfig(), "", nil
 }
 
 // resolveLocalPaths resolves all relative paths in the config object with respect to the parent directory of the filename
@@ -158,6 +123,13 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	kubeconfigBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
+	}
+
+	// decode doesn't allow empty files, but they are valid for this sort of an operation.  Empty files can still be loaded,
+	// they just have no contents.  This is what would be expected if a user cleared the contents of .kubeconfig files or just
+	// used a touch to create one in a particular location
+	if len(kubeconfigBytes) == 0 {
+		return config, nil
 	}
 
 	if err := clientcmdlatest.Codec.DecodeInto(kubeconfigBytes, config); err != nil {

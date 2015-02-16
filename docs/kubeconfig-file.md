@@ -1,7 +1,7 @@
 # .kubeconfig files
 In order to easily switch between multiple clusters, a .kubeconfig file was defined.  This file contains a series of authentication mechanisms and cluster connection information associated with nicknames.  It also introduces the concept of a tuple of authentication information (user) and cluster connection information called a context that is also associated with a nickname.
 
-Multiple files are .kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
+Multiple files are .kubeconfig files are allowed.  At runtime, the first available file is loaded based on the following order: --kubeconfig parameter, $KUBECONFIG environment variable, or ~/.kube/.kubeconfig.
 
 ## Related discussion
 https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
@@ -52,14 +52,9 @@ users:
 
 ## Loading and merging rules
 The rules for loading and merging the .kubeconfig files are straightforward, but there are a lot of them.  The final config is built in this order:
-  1.  Merge together the kubeconfig itself.  This is done with the following hierarchy and merge rules:
-      
-      Empty filenames are ignored.  Files with non-deserializable content produced errors.
-      The first file to set a particular value or map key wins and the value or map key is never changed.
-      This means that the first file to set CurrentContext will have its context preserved.  It also means that if two files specify a "red-user", only values from the first file's red-user are used.  Even non-conflicting entries from the second file's "red-user" are discarded.
+  1.  Read the first available kubeconfig file:
       1.  CommandLineLocation - the value of the `kubeconfig` command line option
       1.  EnvVarLocation - the value of $KUBECONFIG
-      1.  CurrentDirectoryLocation - ``pwd``/.kubeconfig
       1.  HomeDirectoryLocation = ~/.kube/.kubeconfig
   1.  Determine the context to use based on the first hit in this chain
       1.  command line argument - the value of the `context` command line option
@@ -93,10 +88,10 @@ kubectl config set property-name property-value
   Sets arbitrary value in .kubeconfig
 kubectl config unset property-name
   Unsets arbitrary value in .kubeconfig
-kubectl config view --local=true --global=false --kubeconfig=specific/filename --merged
-  Displays the merged (or not) result of the specified .kubeconfig file
+kubectl config view --kubeconfig=specific/filename
+  Displays the .kubeconfig file
 
---local, --global, and --kubeconfig are valid flags for all of these operations.
+--kubeconfig is a valid flags for all of these operations.
 ```
 
 ### Example

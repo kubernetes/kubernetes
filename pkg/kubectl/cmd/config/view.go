@@ -19,7 +19,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -31,7 +30,6 @@ import (
 
 type viewOptions struct {
 	pathOptions *pathOptions
-	merge       bool
 }
 
 func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
@@ -39,20 +37,17 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "view",
-		Short: "displays merged .kubeconfig settings or a specified .kubeconfig file.",
-		Long: `displays merged .kubeconfig settings or a specified .kubeconfig file.
+		Short: "displays .kubeconfig settings or a specified .kubeconfig file.",
+		Long: `displays .kubeconfig settings or a specified .kubeconfig file.
 Examples:
-  // Show merged .kubeconfig settings.
-  $ kubectl config view
-
-  // Show only local ./.kubeconfig settings
-  $ kubectl config view --local`,
+  // Show settings from specified file
+  $ kubectl config view --kubeconfig=path/to/my/.kubeconfig`,
 		Run: func(cmd *cobra.Command, args []string) {
 			printer, _, err := util.PrinterForCommand(cmd)
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
-			config, err := options.loadConfig()
+			config, err := options.getStartingConfig()
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
@@ -66,41 +61,20 @@ Examples:
 	util.AddPrinterFlags(cmd)
 	// Default to yaml
 	cmd.Flags().Set("output", "yaml")
-	cmd.Flags().BoolVar(&options.merge, "merge", true, "merge together the full hierarchy of .kubeconfig files")
 	return cmd
 }
 
-func (o viewOptions) loadConfig() (*clientcmdapi.Config, error) {
-	err := o.validate()
+// getStartingConfig returns the Config object built from the sources specified by the options and an error if something goes wrong
+func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
+	loadingOrder := clientcmd.DefaultClientConfigLoadingOrder()
+	loadingOrder[0] = o.pathOptions.specifiedFile
+
+	overrides := &clientcmd.ConfigOverrides{}
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingOrder, overrides)
+
+	config, err := clientConfig.RawConfig()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error getting config: %v", err)
 	}
-
-	config, _, err := o.getStartingConfig()
-	return config, err
-}
-
-func (o viewOptions) validate() error {
-	return nil
-}
-
-// getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
-func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, string, error) {
-	switch {
-	case o.merge:
-		loadingRules := clientcmd.NewClientConfigLoadingRules()
-		loadingRules.EnvVarPath = os.Getenv("KUBECONFIG")
-		loadingRules.CommandLinePath = o.pathOptions.specifiedFile
-
-		overrides := &clientcmd.ConfigOverrides{}
-		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
-
-		config, err := clientConfig.RawConfig()
-		if err != nil {
-			return nil, "", fmt.Errorf("Error getting config: %v", err)
-		}
-		return &config, "", nil
-	default:
-		return o.pathOptions.getStartingConfig()
-	}
+	return &config, nil
 }

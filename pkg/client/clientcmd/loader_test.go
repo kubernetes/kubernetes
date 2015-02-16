@@ -17,17 +17,15 @@ limitations under the License.
 package clientcmd
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"testing"
 
-	"github.com/ghodss/yaml"
-
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	clientcmdlatest "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 var (
@@ -47,62 +45,50 @@ var (
 		Contexts: map[string]clientcmdapi.Context{
 			"queen-anne-context": {AuthInfo: "black-user", Cluster: "pig-cluster", Namespace: "saw-ns"}},
 	}
-	testConfigCharlie = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
-			"green-user": {Token: "green-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
-			"horse-cluster": {Server: "http://horse.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "green-user", Cluster: "horse-cluster", Namespace: "chisel-ns"}},
-	}
-	testConfigDelta = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
-			"blue-user": {Token: "blue-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
-			"chicken-cluster": {Server: "http://chicken.org:8080"}},
-		Contexts: map[string]clientcmdapi.Context{
-			"gothic-context": {AuthInfo: "blue-user", Cluster: "chicken-cluster", Namespace: "plane-ns"}},
-	}
-
-	testConfigConflictAlfa = clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
-			"red-user":    {Token: "a-different-red-token"},
-			"yellow-user": {Token: "yellow-token"}},
-		Clusters: map[string]clientcmdapi.Cluster{
-			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
-			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
-		CurrentContext: "federal-context",
-	}
 )
 
-func TestConflictingCurrentContext(t *testing.T) {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
+func init() {
+	testSetNilMapsToEmpties(reflect.ValueOf(&testConfigAlfa))
+	testSetNilMapsToEmpties(reflect.ValueOf(&testConfigBravo))
+}
 
-	mockCommandLineConfig := clientcmdapi.Config{
-		CurrentContext: "any-context-value",
-	}
-	mockEnvVarConfig := clientcmdapi.Config{
-		CurrentContext: "a-different-context",
-	}
+func TestNoFilesFound(t *testing.T) {
+	loadingOrder := ClientConfigLoadingOrder([]string{"this/is/a/fake/file"})
 
-	WriteToFile(mockCommandLineConfig, commandLineFile.Name())
-	WriteToFile(mockEnvVarConfig, envVarFile.Name())
-
-	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: commandLineFile.Name(),
-		EnvVarPath:      envVarFile.Name(),
-	}
-
-	mergedConfig, err := loadingRules.Load()
+	loadedConfig, filename, err := loadingOrder.Load()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if mergedConfig.CurrentContext != mockCommandLineConfig.CurrentContext {
-		t.Errorf("expected %v, got %v", mockCommandLineConfig.CurrentContext, mergedConfig.CurrentContext)
+	if len(filename) > 0 {
+		t.Errorf("Expected %v, got %v", "", filename)
+	}
+
+	empty := clientcmdapi.NewConfig()
+	if !reflect.DeepEqual(*empty, *loadedConfig) {
+		t.Errorf("Values are not equal, diff: %v", util.ObjectGoPrintDiff(empty, loadedConfig))
+	}
+}
+
+func TestSkipMissingFile(t *testing.T) {
+	configFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(configFile.Name())
+
+	WriteToFile(testConfigAlfa, configFile.Name())
+
+	loadingOrder := ClientConfigLoadingOrder([]string{"this/is/a/fake/file", configFile.Name()})
+
+	loadedConfig, filename, err := loadingOrder.Load()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if filename != configFile.Name() {
+		t.Errorf("Expected %v, got %v", configFile, filename)
+	}
+
+	if !reflect.DeepEqual(testConfigAlfa, *loadedConfig) {
+		t.Errorf("Values are not equal, diff: %v", util.ObjectGoPrintDiff(testConfigAlfa, *loadedConfig))
 	}
 }
 
@@ -117,76 +103,43 @@ func TestResolveRelativePaths(t *testing.T) {
 			"absolute-server-1": {CertificateAuthority: "/absolute/ca"},
 		},
 	}
-	pathResolutionConfig2 := clientcmdapi.Config{
-		AuthInfos: map[string]clientcmdapi.AuthInfo{
-			"relative-user-2": {ClientCertificate: "relative/client/cert2", ClientKey: "../relative/client/key2", AuthPath: "../../relative/auth/path2"},
-			"absolute-user-2": {ClientCertificate: "/absolute/client/cert2", ClientKey: "/absolute/client/key2", AuthPath: "/absolute/auth/path2"},
-		},
-		Clusters: map[string]clientcmdapi.Cluster{
-			"relative-server-2": {CertificateAuthority: "../relative/ca2"},
-			"absolute-server-2": {CertificateAuthority: "/absolute/ca2"},
-		},
-	}
 
 	configDir1, _ := ioutil.TempDir("", "")
 	configFile1 := path.Join(configDir1, ".kubeconfig")
 	configDir1, _ = filepath.Abs(configDir1)
 	defer os.Remove(configFile1)
-	configDir2, _ := ioutil.TempDir("", "")
-	configDir2, _ = ioutil.TempDir(configDir2, "")
-	configFile2 := path.Join(configDir2, ".kubeconfig")
-	configDir2, _ = filepath.Abs(configDir2)
-	defer os.Remove(configFile2)
 
 	WriteToFile(pathResolutionConfig1, configFile1)
-	WriteToFile(pathResolutionConfig2, configFile2)
 
-	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: configFile1,
-		EnvVarPath:      configFile2,
-	}
+	loadingOrder := ClientConfigLoadingOrder([]string{configFile1})
 
-	mergedConfig, err := loadingRules.Load()
+	loadedConfig, _, err := loadingOrder.Load()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	foundClusterCount := 0
-	for key, cluster := range mergedConfig.Clusters {
+	for key, cluster := range loadedConfig.Clusters {
 		if key == "relative-server-1" {
 			foundClusterCount++
 			matchStringArg(path.Join(configDir1, pathResolutionConfig1.Clusters["relative-server-1"].CertificateAuthority), cluster.CertificateAuthority, t)
-		}
-		if key == "relative-server-2" {
-			foundClusterCount++
-			matchStringArg(path.Join(configDir2, pathResolutionConfig2.Clusters["relative-server-2"].CertificateAuthority), cluster.CertificateAuthority, t)
 		}
 		if key == "absolute-server-1" {
 			foundClusterCount++
 			matchStringArg(pathResolutionConfig1.Clusters["absolute-server-1"].CertificateAuthority, cluster.CertificateAuthority, t)
 		}
-		if key == "absolute-server-2" {
-			foundClusterCount++
-			matchStringArg(pathResolutionConfig2.Clusters["absolute-server-2"].CertificateAuthority, cluster.CertificateAuthority, t)
-		}
 	}
-	if foundClusterCount != 4 {
-		t.Errorf("Expected 4 clusters, found %v: %v", foundClusterCount, mergedConfig.Clusters)
+	if foundClusterCount != 2 {
+		t.Errorf("Expected 2 clusters, found %v: %v", foundClusterCount, loadedConfig.Clusters)
 	}
 
 	foundAuthInfoCount := 0
-	for key, authInfo := range mergedConfig.AuthInfos {
+	for key, authInfo := range loadedConfig.AuthInfos {
 		if key == "relative-user-1" {
 			foundAuthInfoCount++
 			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientCertificate), authInfo.ClientCertificate, t)
 			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientKey), authInfo.ClientKey, t)
 			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].AuthPath), authInfo.AuthPath, t)
-		}
-		if key == "relative-user-2" {
-			foundAuthInfoCount++
-			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientCertificate), authInfo.ClientCertificate, t)
-			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientKey), authInfo.ClientKey, t)
-			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].AuthPath), authInfo.AuthPath, t)
 		}
 		if key == "absolute-user-1" {
 			foundAuthInfoCount++
@@ -194,157 +147,97 @@ func TestResolveRelativePaths(t *testing.T) {
 			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].ClientKey, authInfo.ClientKey, t)
 			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].AuthPath, authInfo.AuthPath, t)
 		}
-		if key == "absolute-user-2" {
-			foundAuthInfoCount++
-			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientCertificate, authInfo.ClientCertificate, t)
-			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientKey, authInfo.ClientKey, t)
-			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].AuthPath, authInfo.AuthPath, t)
+	}
+	if foundAuthInfoCount != 2 {
+		t.Errorf("Expected 2 users, found %v: %v", foundAuthInfoCount, loadedConfig.AuthInfos)
+	}
+
+}
+
+func TestChooseFirstFile(t *testing.T) {
+	firstFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(firstFile.Name())
+	secondFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(secondFile.Name())
+
+	WriteToFile(testConfigAlfa, firstFile.Name())
+	WriteToFile(testConfigBravo, secondFile.Name())
+	loadingOrder := ClientConfigLoadingOrder([]string{firstFile.Name(), secondFile.Name()})
+
+	loadedConfig, filename, err := loadingOrder.Load()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if filename != firstFile.Name() {
+		t.Errorf("Expected %v, got %v", firstFile.Name(), filename)
+	}
+
+	if !reflect.DeepEqual(testConfigAlfa, *loadedConfig) {
+		t.Errorf("Values are not equal, diff: %v", util.ObjectGoPrintDiff(testConfigAlfa, loadedConfig))
+	}
+}
+
+func TestEmptyFileName(t *testing.T) {
+	bravoFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(bravoFile.Name())
+
+	WriteToFile(testConfigBravo, bravoFile.Name())
+
+	loadingOrder := ClientConfigLoadingOrder([]string{"", bravoFile.Name()})
+
+	loadedConfig, filename, err := loadingOrder.Load()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if filename != bravoFile.Name() {
+		t.Errorf("Expected %v, got %v", bravoFile.Name(), filename)
+	}
+
+	if !reflect.DeepEqual(testConfigBravo, *loadedConfig) {
+		t.Errorf("Values are not equal, diff: %v", util.ObjectGoPrintDiff(testConfigBravo, loadedConfig))
+	}
+}
+
+func testSetNilMapsToEmpties(curr reflect.Value) {
+	actualCurrValue := curr
+	if curr.Kind() == reflect.Ptr {
+		actualCurrValue = curr.Elem()
+	}
+
+	switch actualCurrValue.Kind() {
+	case reflect.Map:
+		for _, mapKey := range actualCurrValue.MapKeys() {
+			currMapValue := actualCurrValue.MapIndex(mapKey)
+
+			// our maps do not hold pointers to structs, they hold the structs themselves.  This means that MapIndex returns the struct itself
+			// That in turn means that they have kinds of type.Struct, which is not a settable type.  Because of this, we need to make new struct of that type
+			// copy all the data from the old value into the new value, then take the .addr of the new value to modify it in the next recursion.
+			// clear as mud
+			modifiableMapValue := reflect.New(currMapValue.Type()).Elem()
+			modifiableMapValue.Set(currMapValue)
+
+			if modifiableMapValue.Kind() == reflect.Struct {
+				modifiableMapValue = modifiableMapValue.Addr()
+			}
+
+			testSetNilMapsToEmpties(modifiableMapValue)
+			actualCurrValue.SetMapIndex(mapKey, reflect.Indirect(modifiableMapValue))
 		}
-	}
-	if foundAuthInfoCount != 4 {
-		t.Errorf("Expected 4 users, found %v: %v", foundAuthInfoCount, mergedConfig.AuthInfos)
-	}
 
-}
+	case reflect.Struct:
+		for fieldIndex := 0; fieldIndex < actualCurrValue.NumField(); fieldIndex++ {
+			currFieldValue := actualCurrValue.Field(fieldIndex)
 
-func ExampleMergingSomeWithConflict() {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
+			if currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil() {
+				newValue := reflect.MakeMap(currFieldValue.Type())
+				currFieldValue.Set(newValue)
+			} else {
+				testSetNilMapsToEmpties(currFieldValue.Addr())
+			}
+		}
 
-	WriteToFile(testConfigAlfa, commandLineFile.Name())
-	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
-
-	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: commandLineFile.Name(),
-		EnvVarPath:      envVarFile.Name(),
 	}
 
-	mergedConfig, err := loadingRules.Load()
-
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-	output, err := yaml.JSONToYAML(json)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-
-	fmt.Printf("%v", string(output))
-	// Output:
-	// apiVersion: v1
-	// clusters:
-	// - cluster:
-	//     server: http://cow.org:8080
-	//   name: cow-cluster
-	// - cluster:
-	//     insecure-skip-tls-verify: true
-	//     server: http://donkey.org:8080
-	//   name: donkey-cluster
-	// contexts:
-	// - context:
-	//     cluster: cow-cluster
-	//     namespace: hammer-ns
-	//     user: red-user
-	//   name: federal-context
-	// current-context: federal-context
-	// kind: Config
-	// preferences: {}
-	// users:
-	// - name: red-user
-	//   user:
-	//     token: red-token
-	// - name: yellow-user
-	//   user:
-	//     token: yellow-token
-}
-
-func ExampleMergingEverythingNoConflicts() {
-	commandLineFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(envVarFile.Name())
-	currentDirFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(currentDirFile.Name())
-	homeDirFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(homeDirFile.Name())
-
-	WriteToFile(testConfigAlfa, commandLineFile.Name())
-	WriteToFile(testConfigBravo, envVarFile.Name())
-	WriteToFile(testConfigCharlie, currentDirFile.Name())
-	WriteToFile(testConfigDelta, homeDirFile.Name())
-
-	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath:      commandLineFile.Name(),
-		EnvVarPath:           envVarFile.Name(),
-		CurrentDirectoryPath: currentDirFile.Name(),
-		HomeDirectoryPath:    homeDirFile.Name(),
-	}
-
-	mergedConfig, err := loadingRules.Load()
-
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-	output, err := yaml.JSONToYAML(json)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-
-	fmt.Printf("%v", string(output))
-	// Output:
-	// 	apiVersion: v1
-	// clusters:
-	// - cluster:
-	//     server: http://chicken.org:8080
-	//   name: chicken-cluster
-	// - cluster:
-	//     server: http://cow.org:8080
-	//   name: cow-cluster
-	// - cluster:
-	//     server: http://horse.org:8080
-	//   name: horse-cluster
-	// - cluster:
-	//     server: http://pig.org:8080
-	//   name: pig-cluster
-	// contexts:
-	// - context:
-	//     cluster: cow-cluster
-	//     namespace: hammer-ns
-	//     user: red-user
-	//   name: federal-context
-	// - context:
-	//     cluster: chicken-cluster
-	//     namespace: plane-ns
-	//     user: blue-user
-	//   name: gothic-context
-	// - context:
-	//     cluster: pig-cluster
-	//     namespace: saw-ns
-	//     user: black-user
-	//   name: queen-anne-context
-	// - context:
-	//     cluster: horse-cluster
-	//     namespace: chisel-ns
-	//     user: green-user
-	//   name: shaker-context
-	// current-context: ""
-	// kind: Config
-	// preferences: {}
-	// users:
-	// - name: black-user
-	//   user:
-	//     token: black-token
-	// - name: blue-user
-	//   user:
-	//     token: blue-token
-	// - name: green-user
-	//   user:
-	//     token: green-token
-	// - name: red-user
-	//   user:
-	//     token: red-token
 }

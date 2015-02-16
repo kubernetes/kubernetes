@@ -48,6 +48,7 @@ func init() {
 			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
 				return err
 			}
+
 			return nil
 		},
 		func(in *newer.Config, out *Config, s conversion.Scope) error {
@@ -68,6 +69,23 @@ func init() {
 			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
 				return err
 			}
+			out.Extensions = make([]NamedExtension, 0, 0)
+			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *Preferences, out *newer.Preferences, s conversion.Scope) error {
+			out.Colors = in.Colors
+			out.Extensions = make(map[string]runtime.EmbeddedObject)
+			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		func(in *newer.Preferences, out *Preferences, s conversion.Scope) error {
+			out.Colors = in.Colors
 			out.Extensions = make([]NamedExtension, 0, 0)
 			if err := s.Convert(&in.Extensions, &out.Extensions, 0); err != nil {
 				return err
