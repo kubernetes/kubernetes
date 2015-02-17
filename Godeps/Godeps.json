@@ -103,7 +103,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "3bc1590d16074751993dd3b1a76e7a8d1a916a11"
+			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
