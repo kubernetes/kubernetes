@@ -813,13 +813,15 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// Capacity represents the available resources of a node
+	// Capacity represents the available resources of a node.
 	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
 	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"`
 	// PodCIDR represents the pod IP range assigned to the node
 	PodCIDR string `json:"podCIDR,omitempty" description:"pod IP range assigned to the node"`
 	// External ID of the node assigned by some machine database (e.g. a cloud provider)
 	ExternalID string `json:"externalID,omitempty" description:"external ID assigned to the node by some machine database (e.g. a cloud provider)"`
+	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
+	Unschedulable bool `json:"unschedulable,omitempty" description:"disable pod scheduling on the node"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -873,6 +875,8 @@ const (
 	NodeReachable NodeConditionType = "Reachable"
 	// NodeReady means the node returns StatusOK for HTTP health check.
 	NodeReady NodeConditionType = "Ready"
+	// NodeSchedulable means the node is ready to accept new pods.
+	NodeSchedulable NodeConditionType = "Schedulable"
 )
 
 type NodeCondition struct {

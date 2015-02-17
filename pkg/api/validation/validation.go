@@ -862,6 +862,8 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	oldMinion.ObjectMeta = minion.ObjectMeta
 	// Allow users to update capacity
 	oldMinion.Spec.Capacity = minion.Spec.Capacity
+	// Allow users to unschedule node
+	oldMinion.Spec.Unschedulable = minion.Spec.Unschedulable
 	// Clear status
 	oldMinion.Status = minion.Status
 

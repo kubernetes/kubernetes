@@ -782,13 +782,18 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// Capacity represents the available resources of a node
+	// Capacity represents the available resources of a node.
 	Capacity ResourceList `json:"capacity,omitempty"`
+
 	// PodCIDR represents the pod IP range assigned to the node
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
 	PodCIDR string `json:"podCIDR,omitempty"`
+
 	// External ID of the node assigned by some machine database (e.g. a cloud provider)
 	ExternalID string `json:"externalID,omitempty"`
+
+	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
+	Unschedulable bool `json:"unschedulable,omitempty"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -842,6 +847,8 @@ const (
 	NodeReachable NodeConditionType = "Reachable"
 	// NodeReady means the node returns StatusOK for HTTP health check.
 	NodeReady NodeConditionType = "Ready"
+	// NodeSchedulable means the node is ready to accept new pods.
+	NodeSchedulable NodeConditionType = "Schedulable"
 )
 
 type NodeCondition struct {

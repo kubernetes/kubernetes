@@ -567,6 +567,26 @@ func TestPrintMinionStatus(t *testing.T) {
 			},
 			status: "Unknown",
 		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo7"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Type: api.NodeSchedulable, Status: api.ConditionFull},
+					{Type: api.NodeReady, Status: api.ConditionFull},
+					{Type: api.NodeReachable, Status: api.ConditionFull}}},
+			},
+			status: "Schedulable,Ready,Reachable",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo8"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Type: api.NodeSchedulable, Status: api.ConditionNone},
+					{Type: api.NodeReady, Status: api.ConditionNone},
+					{Type: api.NodeReachable, Status: api.ConditionFull}}},
+			},
+			status: "NotSchedulable,NotReady,Reachable",
+		},
 	}
 
 	for _, test := range table {

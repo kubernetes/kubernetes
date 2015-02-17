@@ -711,6 +711,7 @@ func init() {
 			}
 			out.PodCIDR = in.Spec.PodCIDR
 			out.ExternalID = in.Spec.ExternalID
+			out.Unschedulable = in.Spec.Unschedulable
 			return s.Convert(&in.Spec.Capacity, &out.NodeResources.Capacity, 0)
 		},
 		func(in *Minion, out *newer.Node, s conversion.Scope) error {
@@ -742,6 +743,7 @@ func init() {
 			}
 			out.Spec.PodCIDR = in.PodCIDR
 			out.Spec.ExternalID = in.ExternalID
+			out.Spec.Unschedulable = in.Unschedulable
 			return s.Convert(&in.NodeResources.Capacity, &out.Spec.Capacity, 0)
 		},
 

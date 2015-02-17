@@ -156,7 +156,15 @@ func TestPollMinions(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "baz"},
+					ObjectMeta: api.ObjectMeta{Name: "fiz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "biz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
 							{Type: api.NodeReady, Status: api.ConditionFull},
@@ -173,8 +181,47 @@ func TestPollMinions(t *testing.T) {
 						},
 					},
 				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "fuz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "buz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionNone},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foobar"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionNone},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "fizbiz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionNone},
+						},
+					},
+				},
 			},
-			expectedCount: 4,
+			expectedCount: 6,
 		},
 		{
 			minions: []api.Node{
@@ -191,6 +238,27 @@ func TestPollMinions(t *testing.T) {
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
 							{Type: api.NodeReady, Status: api.ConditionNone},
+						},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeSchedulable, Status: api.ConditionNone},
 						},
 					},
 				},

@@ -207,6 +207,11 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 			cond := node.Status.Conditions[i]
 			conditionMap[cond.Type] = &cond
 		}
+		if condition, ok := conditionMap[api.NodeSchedulable]; ok {
+			if condition.Status != api.ConditionFull {
+				continue
+			}
+		}
 		if condition, ok := conditionMap[api.NodeReady]; ok {
 			if condition.Status == api.ConditionFull {
 				nodes.Items = append(nodes.Items, node)
