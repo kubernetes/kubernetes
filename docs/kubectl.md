@@ -315,11 +315,15 @@ Examples:
     // Delete a pod with ID 1234-56-7890-234234-456456.
     $ kubectl delete pod 1234-56-7890-234234-456456
 
+    // Delete all pods
+    $ kubectl delete pods --all
+
 Usage:
 ```
-  kubectl delete ([-f filename] | (<resource> [(<id> | -l <label>)] [flags]
+  kubectl delete ([-f filename] | (<resource> [(<id> | -l <label> | --all)] [flags]
 
 Flags:
+      --all=false: [-all] to select all the specified resources
   -f, --filename=[]: Filename, directory, or URL to a file containing the resource to delete
   -l, --selector="": Selector (label query) to filter on
 

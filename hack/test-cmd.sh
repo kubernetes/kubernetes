@@ -145,6 +145,16 @@ for version in "${kube_api_versions[@]}"; do
   kubectl get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: redis-master"
   kubectl describe pod redis-master "${kube_flags[@]}" | grep -q 'Name:.*redis-master'
   kubectl delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl delete pods -l name=redis-master "${kube_flags[@]}"
+  [ ! $(kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master') ]
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
+  [ ! $(kubectl delete pods "${kube_flags[@]}" ) ]
+  kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
+  [ ! $(delete pods --all pods -l name=redis-master) ]   # not --all and label selector together
+  kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 0 ]
 
   kube::log::status "Testing kubectl(${version}:services)"
   kubectl get services "${kube_flags[@]}"

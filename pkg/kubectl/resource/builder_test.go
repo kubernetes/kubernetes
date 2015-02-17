@@ -315,7 +315,7 @@ func TestResourceByName(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 
-	b.ResourceTypeOrNameArgs("pods", "foo")
+	b.ResourceTypeOrNameArgs(true, "pods", "foo")
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
 	if err != nil || !singular || len(test.Infos) != 1 {
@@ -341,7 +341,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 	})).
 		NamespaceParam("test").
 		SelectorParam("").
-		ResourceTypeOrNameArgs("pods", "foo")
+		ResourceTypeOrNameArgs(true, "pods", "foo")
 
 	singular := false
 	infos, err := b.Do().IntoSingular(&singular).Infos()
@@ -378,7 +378,7 @@ func TestSelector(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 
-	b.ResourceTypeOrNameArgs("pods,service")
+	b.ResourceTypeOrNameArgs(true, "pods,service")
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
 	if err != nil || singular || len(test.Infos) != 3 {
@@ -408,7 +408,7 @@ func TestSingleResourceType(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		SelectorParam("a=b").
 		SingleResourceType().
-		ResourceTypeOrNameArgs("pods,services")
+		ResourceTypeOrNameArgs(true, "pods,services")
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
@@ -498,7 +498,7 @@ func TestListObject(t *testing.T) {
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
-		ResourceTypeOrNameArgs("pods").
+		ResourceTypeOrNameArgs(true, "pods").
 		Flatten()
 
 	obj, err := b.Do().Object()
@@ -531,7 +531,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
-		ResourceTypeOrNameArgs("pods,services").
+		ResourceTypeOrNameArgs(true, "pods,services").
 		Flatten().
 		Do().Object()
 

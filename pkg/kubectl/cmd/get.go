@@ -87,7 +87,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			SelectorParam(selector).
-			ResourceTypeOrNameArgs(args...).
+			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Do()
 		checkErr(r.Err())
@@ -124,7 +124,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
-		ResourceTypeOrNameArgs(args...).
+		ResourceTypeOrNameArgs(true, args...).
 		Latest()
 	printer, generic, err := util.PrinterForCommand(cmd)
 	checkErr(err)
