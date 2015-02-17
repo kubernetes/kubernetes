@@ -71,6 +71,8 @@ function teardown() {
   delete_pd_pod
   rm -rf ${config}
 
+  detect-minion-names
+
   # This should really work immediately after the pod is killed, but
   # it doesn't (yet). So let's be resilient to that.
   #
