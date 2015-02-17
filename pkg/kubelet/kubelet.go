@@ -1234,6 +1234,9 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 	currentVolumes := kl.getPodVolumesFromDisk()
 	runningSet := util.StringSet{}
 	for ix := range running {
+		if len(running[ix].Name) == 0 {
+			glog.V(2).Infof("Found running container ix=%d with info: %+v", ix, running[ix])
+		}
 		_, uid, _, _ := dockertools.ParseDockerName(running[ix].Name)
 		runningSet.Insert(string(uid))
 	}
