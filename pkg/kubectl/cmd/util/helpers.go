@@ -29,8 +29,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/merge"
 	"github.com/golang/glog"
-	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
 )
 
@@ -188,36 +188,40 @@ func ReadConfigDataFromLocation(location string) ([]byte, error) {
 	}
 }
 
-func Merge(dst runtime.Object, fragment, kind string) error {
+func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	// Ok, this is a little hairy, we'd rather not force the user to specify a kind for their JSON
 	// So we pull it into a map, add the Kind field, and then reserialize.
 	// We also pull the apiVersion for proper parsing
 	var intermediate interface{}
 	if err := json.Unmarshal([]byte(fragment), &intermediate); err != nil {
-		return err
+		return nil, err
 	}
 	dataMap, ok := intermediate.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("Expected a map, found something else: %s", fragment)
+		return nil, fmt.Errorf("Expected a map, found something else: %s", fragment)
 	}
 	version, found := dataMap["apiVersion"]
 	if !found {
-		return fmt.Errorf("Inline JSON requires an apiVersion field")
+		return nil, fmt.Errorf("Inline JSON requires an apiVersion field")
 	}
 	versionString, ok := version.(string)
 	if !ok {
-		return fmt.Errorf("apiVersion must be a string")
+		return nil, fmt.Errorf("apiVersion must be a string")
 	}
-	codec := runtime.CodecFor(api.Scheme, versionString)
 
-	dataMap["kind"] = kind
-	data, err := json.Marshal(intermediate)
+	codec := runtime.CodecFor(api.Scheme, versionString)
+	// encode dst into versioned json and apply fragment directly too it
+	target, err := codec.Encode(dst)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	src, err := codec.Decode(data)
+	patched, err := merge.MergeJSON(target, []byte(fragment))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return mergo.Merge(dst, src)
+	out, err := codec.Decode(patched)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }

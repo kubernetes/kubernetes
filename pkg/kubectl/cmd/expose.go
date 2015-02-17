@@ -85,7 +85,8 @@ Examples:
 
 			inline := util.GetFlagString(cmd, "overrides")
 			if len(inline) > 0 {
-				util.Merge(service, inline, "Service")
+				service, err = util.Merge(service, inline, "Service")
+				checkErr(err)
 			}
 
 			// TODO: extract this flag to a central location, when such a location exists.
