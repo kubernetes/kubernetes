@@ -582,6 +582,10 @@ func BuildDockerName(podUID types.UID, podFullName string, container *api.Contai
 // Unpacks a container name, returning the pod full name and container name we would have used to
 // construct the docker name. If the docker name isn't the one we created, we may return empty strings.
 func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64) {
+	// TODO: return error if the name is nil or empty?
+	if len(name) == 0 {
+		return
+	}
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
 	if name[0] == '/' {
