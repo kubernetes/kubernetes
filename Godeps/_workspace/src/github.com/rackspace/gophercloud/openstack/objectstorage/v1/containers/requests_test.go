@@ -58,8 +58,10 @@ func TestCreateContainer(t *testing.T) {
 
 	options := CreateOpts{ContentType: "application/json", Metadata: map[string]string{"foo": "bar"}}
 	res := Create(fake.ServiceClient(), "testContainer", options)
-	th.CheckNoErr(t, res.Err)
+	c, err := res.Extract()
+	th.CheckNoErr(t, err)
 	th.CheckEquals(t, "bar", res.Header["X-Container-Meta-Foo"][0])
+	th.CheckEquals(t, "1234567", c.TransID)
 }
 
 func TestDeleteContainer(t *testing.T) {

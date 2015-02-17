@@ -1,4 +1,5 @@
 // +build fixtures
+
 package images
 
 import (

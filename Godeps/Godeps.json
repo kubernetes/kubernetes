@@ -203,8 +203,8 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
-			"Comment": "v1.0.0",
-			"Rev": "da56de6a59e53fdd61be1b5d9b87df34c47ac420"
+			"Comment": "v1.0.0-336-g2a6e319",
+			"Rev": "2a6e3190447abe5d000f951595ead1cf98df72d8"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",

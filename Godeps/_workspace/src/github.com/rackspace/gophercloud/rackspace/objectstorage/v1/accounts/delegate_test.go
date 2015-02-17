@@ -8,20 +8,22 @@ import (
 	fake "github.com/rackspace/gophercloud/testhelper/client"
 )
 
-func TestGetAccounts(t *testing.T) {
+func TestUpdateAccounts(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	os.HandleGetAccountSuccessfully(t)
+
+	os.HandleUpdateAccountSuccessfully(t)
 
 	options := &UpdateOpts{Metadata: map[string]string{"gophercloud-test": "accounts"}}
 	res := Update(fake.ServiceClient(), options)
 	th.CheckNoErr(t, res.Err)
 }
 
-func TestUpdateAccounts(t *testing.T) {
+func TestGetAccounts(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	os.HandleUpdateAccountSuccessfully(t)
+
+	os.HandleGetAccountSuccessfully(t)
 
 	expected := map[string]string{"Foo": "bar"}
 	actual, err := Get(fake.ServiceClient()).ExtractMetadata()

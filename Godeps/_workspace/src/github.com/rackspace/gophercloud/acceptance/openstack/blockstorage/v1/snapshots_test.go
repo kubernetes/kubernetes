@@ -13,9 +13,9 @@ import (
 
 func TestSnapshots(t *testing.T) {
 
-	client, err := newClient()
+	client, err := newClient(t)
 	th.AssertNoErr(t, err)
-	
+
 	v, err := volumes.Create(client, &volumes.CreateOpts{
 		Name: "gophercloud-test-volume",
 		Size: 1,

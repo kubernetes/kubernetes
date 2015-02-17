@@ -82,7 +82,7 @@ func listPorts(t *testing.T) {
 		th.AssertNoErr(t, err)
 
 		for _, p := range portList {
-			t.Logf("Port: ID [%s] Name [%s] Status [%d] MAC addr [%s] Fixed IPs [%#v] Security groups [%#v]",
+			t.Logf("Port: ID [%s] Name [%s] Status [%s] MAC addr [%s] Fixed IPs [%#v] Security groups [%#v]",
 				p.ID, p.Name, p.Status, p.MACAddress, p.FixedIPs, p.SecurityGroups)
 		}
 

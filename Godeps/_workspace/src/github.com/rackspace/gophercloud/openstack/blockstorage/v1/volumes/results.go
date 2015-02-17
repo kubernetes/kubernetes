@@ -28,7 +28,7 @@ type Volume struct {
 	CreatedAt string `mapstructure:"created_at"`
 
 	// Human-readable description for the volume.
-	Description string `mapstructure:"display_discription"`
+	Description string `mapstructure:"display_description"`
 
 	// The type of volume to create, either SATA or SSD.
 	VolumeType string `mapstructure:"volume_type"`

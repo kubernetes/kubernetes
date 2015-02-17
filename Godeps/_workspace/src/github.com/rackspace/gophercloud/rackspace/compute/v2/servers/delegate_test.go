@@ -77,6 +77,28 @@ func TestGetServer(t *testing.T) {
 	th.CheckDeepEquals(t, &GophercloudServer, actual)
 }
 
+func TestUpdateServer(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	th.Mux.HandleFunc("/servers/8c65cb68-0681-4c30-bc88-6b83a8a26aee", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "PUT")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `{ "server": { "name": "test-server-updated" } }`)
+
+		w.Header().Add("Content-Type", "application/json")
+
+		fmt.Fprintf(w, UpdateOutput)
+	})
+
+	opts := os.UpdateOpts{
+		Name: "test-server-updated",
+	}
+	actual, err := Update(client.ServiceClient(), "8c65cb68-0681-4c30-bc88-6b83a8a26aee", opts).Extract()
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, &GophercloudUpdatedServer, actual)
+}
+
 func TestChangeAdminPassword(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()

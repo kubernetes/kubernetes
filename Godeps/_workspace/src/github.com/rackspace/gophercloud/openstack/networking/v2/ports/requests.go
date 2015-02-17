@@ -164,7 +164,6 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 		ReqBody:     &reqBody,
 		Results:     &res.Body,
 		OkCodes:     []int{201},
-		DumpReqJson: true,
 	})
 
 	return res

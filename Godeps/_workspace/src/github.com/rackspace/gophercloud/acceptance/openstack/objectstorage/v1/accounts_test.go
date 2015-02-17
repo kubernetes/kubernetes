@@ -17,7 +17,10 @@ func TestAccounts(t *testing.T) {
 
 	// Update an account's metadata.
 	updateres := accounts.Update(client, accounts.UpdateOpts{Metadata: metadata})
-	th.AssertNoErr(t, updateres.Err)
+	t.Logf("Update Account Response: %+v\n", updateres)
+	updateHeaders, err := updateres.Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("Update Account Response Headers: %+v\n", updateHeaders)
 
 	// Defer the deletion of the metadata set above.
 	defer func() {
@@ -29,11 +32,14 @@ func TestAccounts(t *testing.T) {
 		th.AssertNoErr(t, updateres.Err)
 	}()
 
-	// Retrieve account metadata.
-	getres := accounts.Get(client, nil)
-	th.AssertNoErr(t, getres.Err)
 	// Extract the custom metadata from the 'Get' response.
-	am, err := getres.ExtractMetadata()
+	res := accounts.Get(client, nil)
+
+	h, err := res.Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("Get Account Response Headers: %+v\n", h)
+
+	am, err := res.ExtractMetadata()
 	th.AssertNoErr(t, err)
 	for k := range metadata {
 		if am[k] != metadata[strings.Title(k)] {

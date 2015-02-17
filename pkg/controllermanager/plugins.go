@@ -24,5 +24,6 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
 )
