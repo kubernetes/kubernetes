@@ -302,6 +302,50 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	}
 }
 
+func TestServiceRegistryUpdateExternalService(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	registry := registrytest.NewServiceRegistry()
+	fakeCloud := &cloud.FakeCloud{}
+	machines := []string{"foo", "bar", "baz"}
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+
+	// Create non-external load balancer.
+	svc1 := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Port:                       6502,
+			Selector:                   map[string]string{"bar": "baz"},
+			CreateExternalLoadBalancer: false,
+			Protocol:                   api.ProtocolTCP,
+			SessionAffinity:            api.AffinityTypeNone,
+		},
+	}
+	storage.Create(ctx, svc1)
+	if len(fakeCloud.Calls) != 0 {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+
+	// Modify load balancer to be external.
+	svc2 := new(api.Service)
+	*svc2 = *svc1
+	svc2.Spec.CreateExternalLoadBalancer = true
+	storage.Update(ctx, svc2)
+	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+
+	// Change port.
+	svc3 := new(api.Service)
+	*svc3 = *svc2
+	svc3.Spec.Port = 6504
+	storage.Update(ctx, svc3)
+	if len(fakeCloud.Calls) != 6 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" ||
+		fakeCloud.Calls[2] != "get-zone" || fakeCloud.Calls[3] != "delete" ||
+		fakeCloud.Calls[4] != "get-zone" || fakeCloud.Calls[5] != "create" {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+}
+
 func TestServiceRegistryGet(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	registry := registrytest.NewServiceRegistry()
