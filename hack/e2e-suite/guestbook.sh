@@ -37,8 +37,9 @@ prepare-e2e
 
 GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
+echo "WARNING: this test is a no op that only attempts to launch guestbook resources."
 # Launch the guestbook example
-${KUBECTL} create -f  "${GUESTBOOK}"
+${KUBECTL} create -f "${GUESTBOOK}"
 
 sleep 15
 
@@ -48,9 +49,7 @@ echo "Pods running: ${POD_LIST_1}"
 # TODO make this an actual test. Open up a firewall and use curl to post and
 # read a message via the frontend
 
-${KUBECTL} stop rc redis-slave-controller
-${KUBECTL} delete services redis-master
-${KUBECTL} delete pods redis-master
+${KUBECTL} stop -f "${GUESTBOOK}"
 
 POD_LIST_2=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
 echo "Pods running after shutdown: ${POD_LIST_2}"
