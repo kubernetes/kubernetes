@@ -15,7 +15,7 @@ works fine with docker.
 
 #### etcd
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases) in your path, please make sure it is installed and in your ``$PATH``.
 
 #### go
 
