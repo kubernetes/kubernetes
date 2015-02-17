@@ -70,7 +70,7 @@ function test-build-release() {
 function verify-prereqs() {
   echo "... in verify-prereqs()" >&2
 
-  ${GCLOUD} preview --help >/dev/null 2>&1 || {
+  ${GCLOUD} preview --help >/dev/null || {
     echo "Either the GCLOUD environment variable is wrong, or the 'preview' component"
     echo "is not installed. (Fix with 'gcloud components update preview')"
   }
