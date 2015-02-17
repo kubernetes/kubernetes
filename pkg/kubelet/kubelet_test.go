@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
@@ -297,7 +298,8 @@ func TestKillContainerWithError(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 	kubelet.containerRuntime = dockertools.NewDockerRuntime(fakeDocker)
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	container := dockertools.ToContainer(fakeDocker.ContainerList[0])
+	err := kubelet.killContainer(&container)
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -332,7 +334,8 @@ func TestKillContainer(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	container := dockertools.ToContainer(fakeDocker.ContainerList[0])
+	err := kubelet.killContainer(&container)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -853,22 +856,22 @@ func TestSyncPodsDeletes(t *testing.T) {
 func TestSyncPodDeletesDuplicate(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
-		"1234": &docker.APIContainers{
+		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
 			Names: []string{"/k8s_foo_bar.new.test_12345678_1111"},
 			ID:    "1234",
 		},
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
 			Names: []string{"/k8s_POD_bar.new.test_12345678_2222"},
 			ID:    "9876",
 		},
-		"4567": &docker.APIContainers{
+		"4567": &container.Container{
 			// Duplicate for the same container.
 			Names: []string{"/k8s_foo_bar.new.test_12345678_3333"},
 			ID:    "4567",
 		},
-		"2304": &docker.APIContainers{
+		"2304": &container.Container{
 			// Container for another pod, untouched.
 			Names: []string{"/k8s_baz_fiz.new.test_6_42"},
 			ID:    "2304",
@@ -903,12 +906,12 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 func TestSyncPodBadHash(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
-		"1234": &docker.APIContainers{
+		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
 			Names: []string{"/k8s_bar.1234_foo.new.test_12345678_42"},
 			ID:    "1234",
 		},
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
 			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
 			ID:    "9876",
@@ -951,12 +954,12 @@ func TestSyncPodBadHash(t *testing.T) {
 func TestSyncPodUnhealthy(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
-		"1234": &docker.APIContainers{
+		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
 			Names: []string{"/k8s_bar_foo.new.test_12345678_42"},
 			ID:    "1234",
 		},
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
 			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
 			ID:    "9876",
@@ -1704,7 +1707,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		err: fmt.Errorf("test error"),
 	}
 	dockerContainers := dockertools.DockerContainers{
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
 			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
 			ID:    "9876",

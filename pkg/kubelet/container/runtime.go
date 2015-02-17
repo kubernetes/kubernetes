@@ -16,13 +16,11 @@ limitations under the License.
 
 package container
 
-import (
-	"github.com/fsouza/go-dockerclient"
-)
+import "github.com/fsouza/go-dockerclient"
 
 // ContainerRuntimeInterface is the abstract interface for container runtime.
 type ContainerRuntimeInterface interface {
-	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
+	ListContainers(options ListContainersOptions) ([]Container, error)
 	InspectContainer(id string) (*docker.Container, error)
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error

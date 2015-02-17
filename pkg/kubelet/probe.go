@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	execprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/exec"
 	httprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/http"
@@ -32,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -48,7 +48,7 @@ func (kl *Kubelet) probeContainer(p *api.Probe,
 	podUID types.UID,
 	status api.PodStatus,
 	container api.Container,
-	dockerContainer *docker.APIContainers,
+	dockerContainer *container.Container,
 	defaultResult probe.Result) (probe.Result, error) {
 	var err error
 	result := probe.Unknown

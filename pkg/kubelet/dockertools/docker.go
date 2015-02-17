@@ -73,9 +73,44 @@ func NewDockerRuntime(docker DockerInterface) container.ContainerRuntimeInterfac
 	return &DockerRuntime{docker: docker}
 }
 
+// ToContainer converts a docker.APIContainer to container.Container.
+func ToContainer(dockerContainer docker.APIContainers) container.Container {
+	c := container.Container{
+		ID:         dockerContainer.ID,
+		Image:      dockerContainer.Image,
+		Command:    dockerContainer.Command,
+		Created:    dockerContainer.Created,
+		Status:     dockerContainer.Status,
+		SizeRw:     dockerContainer.SizeRw,
+		SizeRootFs: dockerContainer.SizeRootFs,
+		Names:      dockerContainer.Names,
+	}
+	// Copy ports field too.
+	c.Ports = make([]container.Port, len(dockerContainer.Ports))
+	for i, p := range dockerContainer.Ports {
+		c.Ports[i] = container.Port{
+			PrivatePort: p.PrivatePort,
+			PublicPort:  p.PublicPort,
+			Type:        p.Type,
+			IP:          p.IP,
+		}
+	}
+	return c
+}
+
 // ListContainers implements ContainerRuntime.ListContainers.
-func (dr *DockerRuntime) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	return dr.docker.ListContainers(options)
+func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]container.Container, error) {
+	dockerContainers, err := dr.docker.ListContainers(docker.ListContainersOptions{
+		All: options.All,
+	})
+	if err != nil {
+		return nil, err
+	}
+	containers := make([]container.Container, len(dockerContainers))
+	for i, c := range dockerContainers {
+		containers[i] = ToContainer(c)
+	}
+	return containers, nil
 }
 
 // InspectContainer implements ContainerRuntime.InspectContainer.
@@ -476,9 +511,9 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 }
 
 // DockerContainers is a map of containers
-type DockerContainers map[DockerID]*docker.APIContainers
+type DockerContainers map[DockerID]*container.Container
 
-func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
+func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, containerName string) (*container.Container, bool, uint64) {
 	for _, dockerContainer := range c {
 		if len(dockerContainer.Names) == 0 {
 			continue
@@ -495,8 +530,8 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 }
 
 // Note, this might return containers belong to a different Pod instance with the same name
-func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[string]*docker.APIContainers {
-	containers := make(map[string]*docker.APIContainers)
+func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[string]*container.Container {
+	containers := make(map[string]*container.Container)
 
 	for _, dockerContainer := range c {
 		if len(dockerContainer.Names) == 0 {
@@ -514,7 +549,7 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 // Returns a map of docker containers that we manage. The map key is the docker container ID
 func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allContainers bool) (DockerContainers, error) {
 	result := make(DockerContainers)
-	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
+	containers, err := client.ListContainers(container.ListContainersOptions{All: allContainers})
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +575,7 @@ func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allC
 // and uid given.
 func GetRecentDockerContainersWithNameAndUUID(client container.ContainerRuntimeInterface, podFullName string, uid types.UID, containerName string) ([]*docker.Container, error) {
 	var result []*docker.Container
-	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
+	containers, err := client.ListContainers(container.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -680,7 +715,7 @@ func GetDockerPodInfo(client container.ContainerRuntimeInterface, manifest api.P
 	}
 	expectedContainers[PodInfraContainerName] = api.Container{}
 
-	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
+	containers, err := client.ListContainers(container.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}

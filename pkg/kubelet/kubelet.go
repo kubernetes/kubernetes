@@ -889,7 +889,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 }
 
 // Kill a docker container
-func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
+func (kl *Kubelet) killContainer(dockerContainer *container.Container) error {
 	return kl.killContainerByID(dockerContainer.ID, dockerContainer.Names[0])
 }
 
