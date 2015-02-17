@@ -70,33 +70,31 @@ func buildLocation(resourcePath string, query url.Values) string {
 
 func TestListWatchesCanList(t *testing.T) {
 	table := []struct {
-		location string
-		lw       ListWatch
+		location      string
+		resource      string
+		namespace     string
+		fieldSelector labels.Selector
 	}{
 		// Minion
 		{
-			location: buildLocation(buildResourcePath("", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, nil)),
-			lw: ListWatch{
-				FieldSelector: parseSelectorOrDie(""),
-				Resource:      "minions",
-			},
+			location:      buildLocation(buildResourcePath("", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, nil)),
+			resource:      "minions",
+			namespace:     api.NamespaceAll,
+			fieldSelector: parseSelectorOrDie(""),
 		},
 		// pod with "assigned" field selector.
 		{
-			location: buildLocation(buildResourcePath("", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{"DesiredState.Host="}})),
-			lw: ListWatch{
-				FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-				Resource:      "pods",
-			},
+			location:      buildLocation(buildResourcePath("", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{"DesiredState.Host="}})),
+			resource:      "pods",
+			namespace:     api.NamespaceAll,
+			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
 		},
 		// pod in namespace "foo"
 		{
-			location: buildLocation(buildResourcePath("", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{"DesiredState.Host="}})),
-			lw: ListWatch{
-				FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-				Resource:      "pods",
-				Namespace:     "foo",
-			},
+			location:      buildLocation(buildResourcePath("", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{"DesiredState.Host="}})),
+			resource:      "pods",
+			namespace:     "foo",
+			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
 		},
 	}
 	for _, item := range table {
@@ -107,54 +105,52 @@ func TestListWatchesCanList(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		item.lw.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		item.lw.List()
+		lw.List()
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
 	table := []struct {
-		rv       string
-		location string
-		lw       ListWatch
+		rv            string
+		location      string
+		resource      string
+		namespace     string
+		fieldSelector labels.Selector
 	}{
 		// Minion
 		{
-			location: buildLocation(buildResourcePath("watch", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{""}})),
-			rv:       "",
-			lw: ListWatch{
-				FieldSelector: parseSelectorOrDie(""),
-				Resource:      "minions",
-			},
+			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{""}})),
+			rv:            "",
+			resource:      "minions",
+			namespace:     api.NamespaceAll,
+			fieldSelector: parseSelectorOrDie(""),
 		},
 		{
-			location: buildLocation(buildResourcePath("watch", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{"42"}})),
-			rv:       "42",
-			lw: ListWatch{
-				FieldSelector: parseSelectorOrDie(""),
-				Resource:      "minions",
-			},
+			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{"42"}})),
+			rv:            "42",
+			resource:      "minions",
+			namespace:     api.NamespaceAll,
+			fieldSelector: parseSelectorOrDie(""),
 		},
 		// pod with "assigned" field selector.
 		{
-			location: buildLocation(buildResourcePath("watch", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{"DesiredState.Host="}, "resourceVersion": []string{"0"}})),
-			rv:       "0",
-			lw: ListWatch{
-				FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-				Resource:      "pods",
-			},
+			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{"DesiredState.Host="}, "resourceVersion": []string{"0"}})),
+			rv:            "0",
+			resource:      "pods",
+			namespace:     api.NamespaceAll,
+			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
 		},
 		// pod with namespace foo and assigned field selector
 		{
-			location: buildLocation(buildResourcePath("watch", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{"DesiredState.Host="}, "resourceVersion": []string{"0"}})),
-			rv:       "0",
-			lw: ListWatch{
-				FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-				Resource:      "pods",
-				Namespace:     "foo",
-			},
+			location:      buildLocation(buildResourcePath("watch", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{"DesiredState.Host="}, "resourceVersion": []string{"0"}})),
+			rv:            "0",
+			resource:      "pods",
+			namespace:     "foo",
+			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
 		},
 	}
 
@@ -166,10 +162,10 @@ func TestListWatchesCanWatch(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		item.lw.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
-
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		item.lw.Watch(item.rv)
+		lw.Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
