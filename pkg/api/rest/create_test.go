@@ -25,17 +25,17 @@ import (
 
 func TestCheckGeneratedNameError(t *testing.T) {
 	expect := errors.NewNotFound("foo", "bar")
-	if err := CheckGeneratedNameError(Pods, expect, &api.Pod{}); err != expect {
+	if err := CheckGeneratedNameError(Services, expect, &api.Pod{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists("foo", "bar")
-	if err := CheckGeneratedNameError(Pods, expect, &api.Pod{}); err != expect {
+	if err := CheckGeneratedNameError(Services, expect, &api.Pod{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists("foo", "bar")
-	if err := CheckGeneratedNameError(Pods, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+	if err := CheckGeneratedNameError(Services, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }

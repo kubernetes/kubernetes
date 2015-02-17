@@ -42,7 +42,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
@@ -52,6 +51,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -117,20 +117,9 @@ type Config struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	podRegistry           pod.Registry
-	controllerRegistry    controller.Registry
-	serviceRegistry       service.Registry
-	endpointRegistry      endpoint.Registry
-	minionRegistry        minion.Registry
-	bindingRegistry       binding.Registry
-	eventRegistry         generic.Registry
-	limitRangeRegistry    generic.Registry
-	resourceQuotaRegistry resourcequota.Registry
-	namespaceRegistry     generic.Registry
-	storage               map[string]apiserver.RESTStorage
-	client                *client.Client
-	portalNet             *net.IPNet
-	cacheTimeout          time.Duration
+	client       *client.Client
+	portalNet    *net.IPNet
+	cacheTimeout time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -156,6 +145,17 @@ type Master struct {
 	serviceReadWriteIP   net.IP
 	serviceReadWritePort int
 	masterServices       *util.Runner
+
+	// storage contains the RESTful endpoints exposed by this master
+	storage map[string]apiserver.RESTStorage
+
+	// registries are internal client APIs for accessing the storage layer
+	// TODO: define the internal typed interface in a way that clients can
+	// also be replaced
+	nodeRegistry      minion.Registry
+	namespaceRegistry generic.Registry
+	serviceRegistry   service.Registry
+	endpointRegistry  endpoint.Registry
 
 	// "Outputs"
 	Handler         http.Handler
@@ -260,7 +260,6 @@ func setDefaults(c *Config) {
 //   any unhandled paths to "Handler".
 func New(c *Config) *Master {
 	setDefaults(c)
-	boundPodFactory := &pod.BasicBoundPodFactory{}
 	if c.KubeletClient == nil {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
@@ -277,16 +276,6 @@ func New(c *Config) *Master {
 	glog.Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
 
 	m := &Master{
-		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
-		serviceRegistry:       etcd.NewRegistry(c.EtcdHelper, nil),
-		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
-		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
-		namespaceRegistry:     namespace.NewEtcdRegistry(c.EtcdHelper),
-		minionRegistry:        etcd.NewRegistry(c.EtcdHelper, nil),
-		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
-		resourceQuotaRegistry: resourcequota.NewEtcdRegistry(c.EtcdHelper),
 		client:                c.Client,
 		portalNet:             c.PortalNet,
 		rootWebService:        new(restful.WebService),
@@ -376,34 +365,51 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 // init initializes master.
 func (m *Master) init(c *Config) {
 
-	nodeRESTStorage := minion.NewREST(m.minionRegistry)
+	boundPodFactory := &pod.BasicBoundPodFactory{}
+	podStorage, bindingStorage := podetcd.NewREST(c.EtcdHelper, boundPodFactory)
+	podRegistry := pod.NewRegistry(podStorage)
+
+	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
+	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
+	resourceQuotaRegistry := resourcequota.NewEtcdRegistry(c.EtcdHelper)
+	m.namespaceRegistry = namespace.NewEtcdRegistry(c.EtcdHelper)
+
+	// TODO: split me up into distinct storage registries
+	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry)
+
+	m.serviceRegistry = registry
+	m.endpointRegistry = registry
+	m.nodeRegistry = registry
+
+	nodeStorage := minion.NewREST(m.nodeRegistry)
+	// TODO: unify the storage -> registry and storage -> client patterns
+	nodeStorageClient := RESTStorageToNodes(nodeStorage)
 	podCache := NewPodCache(
 		c.KubeletClient,
-		RESTStorageToNodes(nodeRESTStorage).Nodes(),
-		m.podRegistry,
+		nodeStorageClient.Nodes(),
+		podRegistry,
 	)
 	go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
 	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
 
+	// TODO: refactor podCache to sit on top of podStorage via status calls
+	podStorage = podStorage.WithPodStatus(podCache)
+
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods": pod.NewREST(&pod.RESTConfig{
-			PodCache: podCache,
-			Registry: m.podRegistry,
-		}),
-		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
+		"pods":     podStorage,
+		"bindings": bindingStorage,
+
+		"replicationControllers": controller.NewREST(registry, podRegistry),
+		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
-		"minions":                nodeRESTStorage,
-		"nodes":                  nodeRESTStorage,
-		"events":                 event.NewREST(m.eventRegistry),
+		"minions":                nodeStorage,
+		"nodes":                  nodeStorage,
+		"events":                 event.NewREST(eventRegistry),
 
-		// TODO: should appear only in scheduler API group.
-		"bindings": binding.NewREST(m.bindingRegistry),
-
-		"limitRanges":         limitrange.NewREST(m.limitRangeRegistry),
-		"resourceQuotas":      resourcequota.NewREST(m.resourceQuotaRegistry),
-		"resourceQuotaUsages": resourcequotausage.NewREST(m.resourceQuotaRegistry),
+		"limitRanges":         limitrange.NewREST(limitRangeRegistry),
+		"resourceQuotas":      resourcequota.NewREST(resourceQuotaRegistry),
+		"resourceQuotaUsages": resourcequotausage.NewREST(resourceQuotaRegistry),
 		"namespaces":          namespace.NewREST(m.namespaceRegistry),
 	}
 
@@ -542,7 +548,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		}
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
 	}
-	nodes, err := m.minionRegistry.ListMinions(api.NewDefaultContext())
+	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext())
 	if err != nil {
 		glog.Errorf("Failed to list minions: %v", err)
 	}
