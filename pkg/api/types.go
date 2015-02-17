@@ -767,6 +767,9 @@ type Endpoint struct {
 
 	// Required: The destination port to access.
 	Port int `json:"port"`
+
+	// Optional: The kubernetes object related to the entry point.
+	TargetRef *ObjectReference `json:"targetRef,omitempty"`
 }
 
 // EndpointsList is a list of endpoints.

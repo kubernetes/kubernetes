@@ -93,7 +93,17 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				continue
 			}
 
-			endpoints = append(endpoints, api.Endpoint{IP: pod.Status.PodIP, Port: port})
+			endpoints = append(endpoints, api.Endpoint{
+				IP:   pod.Status.PodIP,
+				Port: port,
+				TargetRef: &api.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       pod.ObjectMeta.Namespace,
+					Name:            pod.ObjectMeta.Name,
+					UID:             pod.ObjectMeta.UID,
+					ResourceVersion: pod.ObjectMeta.ResourceVersion,
+				},
+			})
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
@@ -118,7 +128,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsEqual(currentEndpoints, endpoints) {
+			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsListEqual(currentEndpoints, endpoints) {
 				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
@@ -132,19 +142,31 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	return resultErr
 }
 
+func endpointEqual(this, that *api.Endpoint) bool {
+	if this.IP != that.IP || this.Port != that.Port {
+		return false
+	}
+
+	if this.TargetRef == nil || that.TargetRef == nil {
+		return this.TargetRef == that.TargetRef
+	}
+
+	return *this.TargetRef == *that.TargetRef
+}
+
 func containsEndpoint(haystack *api.Endpoints, needle *api.Endpoint) bool {
 	if haystack == nil || needle == nil {
 		return false
 	}
 	for ix := range haystack.Endpoints {
-		if haystack.Endpoints[ix] == *needle {
+		if endpointEqual(&haystack.Endpoints[ix], needle) {
 			return true
 		}
 	}
 	return false
 }
 
-func endpointsEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
+func endpointsListEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
 	if len(eps.Endpoints) != len(endpoints) {
 		return false
 	}
