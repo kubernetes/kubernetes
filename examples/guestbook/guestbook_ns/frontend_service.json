@@ -3,7 +3,6 @@
   "apiVersion": "v1beta3",
   "metadata": {
     "name": "frontend",
-    "namespace": "default",
     "labels": {},
   },
   "spec": {

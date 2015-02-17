@@ -3,7 +3,6 @@
     "apiVersion": "v1beta3",
     "metadata": {
         "name": "redis-slave-controller",
-        "namespace": "default",
         "labels": {
             "name": "redisslave",
             "template": "redisslave"
@@ -17,7 +16,6 @@
         "template": {
             "metadata": {
                 "name": "redis-slave-controller",
-                "namespace": "default",
                 "labels": {
                     "name": "redisslave",
                     "template": "redisslave",

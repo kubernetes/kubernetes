@@ -4,7 +4,6 @@
     "id": "redis-master",
     "metadata": {
         "name": "redis-master",
-        "namespace": "default",
         "labels": {
             "name": "redis-master"
         }
