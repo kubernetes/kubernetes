@@ -264,12 +264,18 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 			}
 		}
 	} else {
-		ip, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+		lb, err := balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 		if err != nil {
 			return err
 		}
-		service.Spec.PublicIPs = []string{ip.String()}
+		if lb.Rewrite {
+			service.Spec.PublicIPs = []string{lb.SourceIP}
+		} else {
+			service.Spec.PublicIPs = []string{lb.DestIP}
+		}
+		service.Spec.Rewrite = lb.Rewrite
 	}
+
 	return nil
 }
 

@@ -709,6 +709,14 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
+// LoadBalancerInfo defines whether the LoadBalancer is rewriting or
+// pass through
+type LoadBalancerInfo struct {
+	DestIP   string `json:"destIP,omitempty" description:"External IP of the Load Balancer"`
+	SourceIP string `json:"sourceIP,omitempty" description:"Source IP of the Load Balancer"`
+	Rewrite  bool   `json:"rewrite,omitempty" description:"Does the LB rewrite packets"`
+}
+
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct{}
 
@@ -728,6 +736,8 @@ type ServiceSpec struct {
 	// we will try to respect it or else fail the request.  This field can
 	// not be changed by updates.
 	PortalIP string `json:"portalIP,omitempty"`
+
+	Rewrite bool `json:"rewrite,omitempty" description:"Does the load balancer rewrite packets or pass them through"`
 
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
