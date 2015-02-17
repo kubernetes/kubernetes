@@ -683,11 +683,13 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			containerLogPath := path.Join(p, dockerContainer.ID)
 			fs, err := os.Create(containerLogPath)
 			if err != nil {
+				// TODO: Clean up the previouly created dir? return the error?
 				glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
+			} else {
+				defer fs.Close()
+				b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+				binds = append(binds, b)
 			}
-			defer fs.Close()
-			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
-			binds = append(binds, b)
 		}
 	}
 	privileged := false
@@ -751,7 +753,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	}
 	services, err := kl.serviceLister.List()
 	if err != nil {
-		return m, fmt.Errorf("Failed to list services when setting up env vars.")
+		return m, fmt.Errorf("failed to list services when setting up env vars.")
 	}
 
 	// project the services in namespace ns onto the master services
