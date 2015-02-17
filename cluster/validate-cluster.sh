@@ -55,7 +55,7 @@ echo "Found ${found} nodes."
 cat -n "${MINIONS_FILE}"
 
 # On vSphere, use minion IPs as their names
-if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]]; then
+if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]] || [[ "${KUBERNETES_PROVIDER}" == "libvirt-coreos" ]]; then
   MINION_NAMES=("${KUBE_MINION_IP_ADDRESSES[@]}")
 fi
 
