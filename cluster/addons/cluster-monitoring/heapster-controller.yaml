@@ -1,24 +1,25 @@
-apiVersion: "v1beta1"
-id: "monitoring-heapster-controller"
-kind: "ReplicationController"
+apiVersion: v1beta1
+id: monitoring-heapster-controller
+kind: ReplicationController
 desiredState: 
   replicas: 1
   replicaSelector:    
-    name: "heapster"
+    name: heapster
   podTemplate:
     desiredState:
       manifest:
-        version: "v1beta1"
-        id: "monitoring-heapster-controller"
+        version: v1beta1
+        id: monitoring-heapster
         containers:
-          - name: "heapster"
-            image: "kubernetes/heapster:v0.6"
+          - name: heapster
+            image: kubernetes/heapster:v0.7
             env: 
               - name: "INFLUXDB_HOST"
                 value: "monitoring-influxdb"
-
     labels: 
-      name: "heapster"
-      uses: "monitoring-influxdb"
+      name: heapster
+      uses: monitoring-influxdb
+      kubernetes.io/cluster-service: "true"
 labels: 
-  name: "heapster"
+  name: heapster
+  kubernetes.io/cluster-service: "true"
