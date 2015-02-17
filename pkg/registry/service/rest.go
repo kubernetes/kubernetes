@@ -205,7 +205,7 @@ func (*REST) New() runtime.Object {
 }
 
 func (*REST) NewList() runtime.Object {
-	return &api.Service{}
+	return &api.ServiceList{}
 }
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
