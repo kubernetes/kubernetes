@@ -17,6 +17,8 @@
 
 FROM  golang:1.4
 MAINTAINER  Joe Beda <jbeda@google.com>
+RUN sed -i 's/http.debian.net/ftp.debian.org/g' /etc/apt/sources.list
+RUN apt-get update
 
 ENV KUBE_CROSSPLATFORMS \
   linux/386 linux/arm \
