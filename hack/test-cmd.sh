@@ -156,6 +156,11 @@ for version in "${kube_api_versions[@]}"; do
   howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   [ "$howmanypods" -eq 0 ]
 
+  # make calls in another namespace
+  kubectl create --namespace=other -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl get pod --namespace=other redis-master
+  kubectl delete pod --namespace=other redis-master
+
   kube::log::status "Testing kubectl(${version}:services)"
   kubectl get services "${kube_flags[@]}"
   kubectl create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"

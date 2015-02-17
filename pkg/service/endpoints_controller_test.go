@@ -260,7 +260,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{},
 				},
@@ -290,14 +290,14 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=other", "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -329,14 +329,14 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=bar", "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -360,14 +360,14 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "GET", nil)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=default", "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -392,7 +392,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints", "POST", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints?namespace=other", "POST", &data)
 }
 
 func TestSyncEndpointsPodError(t *testing.T) {

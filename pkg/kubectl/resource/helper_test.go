@@ -75,6 +75,10 @@ func TestHelperDelete(t *testing.T) {
 					return false
 				}
 				parts := splitPath(req.URL.Path)
+				if len(parts) < 3 {
+					t.Errorf("expected URL path to have 3 parts: %s", req.URL.Path)
+					return false
+				}
 				if parts[1] != "bar" {
 					t.Errorf("url doesn't contain namespace: %#v", req)
 					return false
@@ -94,7 +98,8 @@ func TestHelperDelete(t *testing.T) {
 			Err:   test.HttpErr,
 		}
 		modifier := &Helper{
-			RESTClient: client,
+			RESTClient:      client,
+			NamespaceScoped: true,
 		}
 		err := modifier.Delete("bar", "foo")
 		if (err != nil) != test.Err {
@@ -185,9 +190,10 @@ func TestHelperCreate(t *testing.T) {
 			client.Client = test.RespFunc
 		}
 		modifier := &Helper{
-			RESTClient: client,
-			Codec:      testapi.Codec(),
-			Versioner:  testapi.MetadataAccessor(),
+			RESTClient:      client,
+			Codec:           testapi.Codec(),
+			Versioner:       testapi.MetadataAccessor(),
+			NamespaceScoped: true,
 		}
 		data := []byte{}
 		if test.Object != nil {
@@ -267,7 +273,8 @@ func TestHelperGet(t *testing.T) {
 			Err:   test.HttpErr,
 		}
 		modifier := &Helper{
-			RESTClient: client,
+			RESTClient:      client,
+			NamespaceScoped: true,
 		}
 		obj, err := modifier.Get("bar", "foo")
 		if (err != nil) != test.Err {
@@ -337,7 +344,8 @@ func TestHelperList(t *testing.T) {
 			Err:   test.HttpErr,
 		}
 		modifier := &Helper{
-			RESTClient: client,
+			RESTClient:      client,
+			NamespaceScoped: true,
 		}
 		obj, err := modifier.List("bar", labels.SelectorFromSet(labels.Set{"foo": "baz"}))
 		if (err != nil) != test.Err {
@@ -440,9 +448,10 @@ func TestHelperUpdate(t *testing.T) {
 			client.Client = test.RespFunc
 		}
 		modifier := &Helper{
-			RESTClient: client,
-			Codec:      testapi.Codec(),
-			Versioner:  testapi.MetadataAccessor(),
+			RESTClient:      client,
+			Codec:           testapi.Codec(),
+			Versioner:       testapi.MetadataAccessor(),
+			NamespaceScoped: true,
 		}
 		data := []byte{}
 		if test.Object != nil {

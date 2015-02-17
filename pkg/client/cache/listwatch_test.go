@@ -42,7 +42,7 @@ func buildResourcePath(prefix, namespace, resource string) string {
 	base := path.Join("/api", testapi.Version(), prefix)
 	if len(namespace) > 0 {
 		if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
-			base = path.Join(base, "ns", namespace)
+			base = path.Join(base, "namespaces", namespace)
 		}
 	}
 	return path.Join(base, resource)
@@ -58,10 +58,8 @@ func buildQueryValues(namespace string, query url.Values) url.Values {
 			}
 		}
 	}
-	if len(namespace) > 0 {
-		if testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2" {
-			v.Set("namespace", namespace)
-		}
+	if testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2" {
+		v.Set("namespace", namespace)
 	}
 	return v
 }

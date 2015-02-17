@@ -66,7 +66,7 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Post().
-		Namespace(event.Namespace).
+		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
 		Do().
@@ -85,7 +85,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Put().
-		Namespace(event.Namespace).
+		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
 		Body(event).
@@ -98,7 +98,7 @@ func (e *events) Update(event *api.Event) (*api.Event, error) {
 func (e *events) List(label, field labels.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
-		Namespace(e.namespace).
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
@@ -115,7 +115,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 
 	result := &api.Event{}
 	err := e.client.Get().
-		Namespace(e.namespace).
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Name(name).
 		Do().
@@ -127,7 +127,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 func (e *events) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
-		Namespace(e.namespace).
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).

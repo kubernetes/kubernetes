@@ -90,7 +90,7 @@ type Request struct {
 	// generic components accessible via method setters
 	path    string
 	subpath string
-	params  map[string]string
+	params  url.Values
 
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
@@ -181,6 +181,14 @@ func (r *Request) Namespace(namespace string) *Request {
 	return r
 }
 
+// NamespaceIfScoped is a convenience function to set a namespace if scoped is true
+func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
+	if scoped {
+		return r.Namespace(namespace)
+	}
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {
@@ -192,6 +200,29 @@ func (r *Request) AbsPath(segments ...string) *Request {
 		r.path = segments[0]
 	} else {
 		r.path = path.Join(segments...)
+	}
+	return r
+}
+
+// RequestURI overwrites existing path and parameters with the value of the provided server relative
+// URI. Some parameters (those in specialParameters) cannot be overwritten.
+func (r *Request) RequestURI(uri string) *Request {
+	if r.err != nil {
+		return r
+	}
+	locator, err := url.Parse(uri)
+	if err != nil {
+		r.err = err
+		return r
+	}
+	r.path = locator.Path
+	if len(locator.Query()) > 0 {
+		if r.params == nil {
+			r.params = make(url.Values)
+		}
+		for k, v := range locator.Query() {
+			r.params[k] = v
+		}
 	}
 	return r
 }
@@ -244,9 +275,9 @@ func (r *Request) setParam(paramName, value string) *Request {
 		return r
 	}
 	if r.params == nil {
-		r.params = make(map[string]string)
+		r.params = make(url.Values)
 	}
-	r.params[paramName] = value
+	r.params[paramName] = []string{value}
 	return r
 }
 
@@ -317,16 +348,16 @@ func (r *Request) finalURL() string {
 
 	query := url.Values{}
 	for key, value := range r.params {
-		query.Add(key, value)
+		query[key] = value
 	}
 
-	if r.namespaceSet && r.namespaceInQuery && len(r.namespace) > 0 {
-		query.Add("namespace", r.namespace)
+	if r.namespaceSet && r.namespaceInQuery {
+		query.Set("namespace", r.namespace)
 	}
 
 	// timeout is handled specially here.
 	if r.timeout != 0 {
-		query.Add("timeout", r.timeout.String())
+		query.Set("timeout", r.timeout.String())
 	}
 	finalURL.RawQuery = query.Encode()
 	return finalURL.String()
@@ -425,6 +456,14 @@ func (r *Request) Do() Result {
 	for {
 		if r.err != nil {
 			return Result{err: &RequestConstructionError{r.err}}
+		}
+
+		// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
+		if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
+			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set when a resource name is provided")}}
+		}
+		if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
+			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set during creation")}}
 		}
 
 		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)

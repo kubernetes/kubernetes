@@ -148,7 +148,19 @@ func TestRequestParseSelectorParam(t *testing.T) {
 
 func TestRequestParam(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
-	if !api.Semantic.DeepDerivative(r.params, map[string]string{"foo": "a"}) {
+	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+}
+
+func TestRequestURI(t *testing.T) {
+	r := (&Request{}).Param("foo", "a")
+	r.Prefix("other")
+	r.RequestURI("/test?foo=b&a=b")
+	if r.path != "/test" {
+		t.Errorf("path is wrong: %#v", r)
+	}
+	if !api.Semantic.DeepDerivative(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 }
