@@ -1234,8 +1234,10 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 	currentVolumes := kl.getPodVolumesFromDisk()
 	runningSet := util.StringSet{}
 	for ix := range running {
-		_, uid, _, _ := dockertools.ParseDockerName(running[ix].Name)
-		runningSet.Insert(string(uid))
+		if len(running[ix].Name) != 0 {
+			_, uid, _, _ := dockertools.ParseDockerName(running[ix].Name)
+			runningSet.Insert(string(uid))
+		}
 	}
 	for name, vol := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
