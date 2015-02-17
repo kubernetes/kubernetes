@@ -154,3 +154,36 @@ func NewBlockStorageV1(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 
 	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
 }
+
+// NewLBV1 creates a ServiceClient that can be used to access the Rackspace
+// Cloud Load Balancer v1 API.
+func NewLBV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("rax:load-balancer")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+// NewNetworkV2 creates a ServiceClient that can be used to access the Rackspace
+// Networking v2 API.
+func NewNetworkV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("network")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+// NewCDNV1 creates a ServiceClient that may be used to access the Rackspace v1
+// CDN service.
+func NewCDNV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("rax:cdn")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}

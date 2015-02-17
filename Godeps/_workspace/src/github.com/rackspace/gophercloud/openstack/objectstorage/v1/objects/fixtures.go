@@ -105,13 +105,31 @@ func HandleListObjectNamesSuccessfully(t *testing.T) {
 	})
 }
 
-// HandleCreateObjectSuccessfully creates an HTTP handler at `/testContainer/testObject` on the test handler mux that
-// responds with a `Create` response.
-func HandleCreateObjectSuccessfully(t *testing.T) {
+// HandleCreateTextObjectSuccessfully creates an HTTP handler at `/testContainer/testObject` on the test handler mux
+// that responds with a `Create` response. A Content-Type of "text/plain" is expected.
+func HandleCreateTextObjectSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/testContainer/testObject", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "PUT")
+		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
+		th.TestHeader(t, r, "Content-Type", "text/plain")
+		th.TestHeader(t, r, "Accept", "application/json")
+		w.WriteHeader(http.StatusCreated)
+	})
+}
+
+// HandleCreateTypelessObjectSuccessfully creates an HTTP handler at `/testContainer/testObject` on the test handler
+// mux that responds with a `Create` response. No Content-Type header may be present in the request, so that server-
+// side content-type detection will be triggered properly.
+func HandleCreateTypelessObjectSuccessfully(t *testing.T) {
 	th.Mux.HandleFunc("/testContainer/testObject", func(w http.ResponseWriter, r *http.Request) {
 		th.TestMethod(t, r, "PUT")
 		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
 		th.TestHeader(t, r, "Accept", "application/json")
+
+		if contentType, present := r.Header["Content-Type"]; present {
+			t.Errorf("Expected Content-Type header to be omitted, but was %#v", contentType)
+		}
+
 		w.WriteHeader(http.StatusCreated)
 	})
 }

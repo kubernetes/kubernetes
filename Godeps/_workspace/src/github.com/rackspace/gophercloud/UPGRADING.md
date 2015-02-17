@@ -238,7 +238,7 @@ err := pager.EachPage(func(page pagination.Page) (bool, error) {
   imageList, err := images.ExtractImages(page)
 
   for _, i := range imageList {
-    // "i" will be a images.Image
+    // "i" will be an images.Image
   }
 })
 ```
@@ -284,7 +284,7 @@ err := pager.EachPage(func(page pagination.Page) (bool, error) {
   imageList, err := images.ExtractImages(page)
 
   for _, i := range imageList {
-    // "i" will be a images.Image
+    // "i" will be an images.Image
   }
 })
 ```

@@ -128,7 +128,7 @@ ensure_dev_container() {
   SWIFTLY_CMD="swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD}"
 
   if ! ${SWIFTLY_CMD} get ${CLOUDFILES_CONTAINER} > /dev/null 2>&1 ; then
-    echo "cluster/rackspace/util.sh: Container doesn't exist. Creating container ${KUBE_RACKSPACE_RELEASE_BUCKET}"
+    echo "cluster/rackspace/util.sh: Container doesn't exist. Creating container ${CLOUDFILES_CONTAINER}"
     ${SWIFTLY_CMD} put ${CLOUDFILES_CONTAINER} > /dev/null 2>&1
   fi
 }
@@ -155,6 +155,11 @@ rax-boot-master() {
       -e "s|KUBE_USER|${KUBE_USER}|" \
       -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
       -e "s|PORTAL_NET|${PORTAL_NET}|" \
+      -e "s|OS_AUTH_URL|${OS_AUTH_URL}|" \
+      -e "s|OS_USERNAME|${OS_USERNAME}|" \
+      -e "s|OS_PASSWORD|${OS_PASSWORD}|" \
+      -e "s|OS_TENANT_NAME|${OS_TENANT_NAME}|" \
+      -e "s|OS_REGION_NAME|${OS_REGION_NAME}|" \
       $(dirname $0)/rackspace/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
 

@@ -11,7 +11,7 @@ As a contributor you will need to setup your workspace in a slightly different
 way than just downloading it. Here are the basic installation instructions:
 
 1. Configure your `$GOPATH` and run `go get` as described in the main
-[README](/#how-to-install).
+[README](/README.md#how-to-install).
 
 2. Move into the directory that houses your local repository:
 

@@ -5,8 +5,33 @@ import (
 
 	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"
 )
+
+// CreateOptsExt adds a KeyPair option to the base CreateOpts.
+type CreateOptsExt struct {
+	servers.CreateOptsBuilder
+	KeyName string `json:"key_name,omitempty"`
+}
+
+// ToServerCreateMap adds the key_name and, optionally, key_data options to
+// the base server creation options.
+func (opts CreateOptsExt) ToServerCreateMap() (map[string]interface{}, error) {
+	base, err := opts.CreateOptsBuilder.ToServerCreateMap()
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.KeyName == "" {
+		return base, nil
+	}
+
+	serverMap := base["server"].(map[string]interface{})
+	serverMap["key_name"] = opts.KeyName
+
+	return base, nil
+}
 
 // List returns a Pager that allows you to iterate over a collection of KeyPairs.
 func List(client *gophercloud.ServiceClient) pagination.Pager {
@@ -21,7 +46,7 @@ type CreateOptsBuilder interface {
 	ToKeyPairCreateMap() (map[string]interface{}, error)
 }
 
-// CreateOpts species keypair creation or import parameters.
+// CreateOpts specifies keypair creation or import parameters.
 type CreateOpts struct {
 	// Name [required] is a friendly name to refer to this KeyPair in other services.
 	Name string

@@ -39,11 +39,14 @@ func createServer(t *testing.T, client *gophercloud.ServiceClient, keyName strin
 
 	name := tools.RandomString("Gophercloud-", 8)
 
+	pwd := tools.MakeNewPassword("")
+
 	opts := &servers.CreateOpts{
 		Name:       name,
 		ImageRef:   options.imageID,
 		FlavorRef:  options.flavorID,
 		DiskConfig: diskconfig.Manual,
+		AdminPass:  pwd,
 	}
 
 	if keyName != "" {
@@ -58,6 +61,8 @@ func createServer(t *testing.T, client *gophercloud.ServiceClient, keyName strin
 	err = servers.WaitForStatus(client, s.ID, "ACTIVE", 300)
 	th.AssertNoErr(t, err)
 	t.Logf("Server created successfully.")
+
+	th.CheckEquals(t, pwd, s.AdminPass)
 
 	return s
 }
@@ -95,6 +100,18 @@ func getServer(t *testing.T, client *gophercloud.ServiceClient, server *os.Serve
 	logServer(t, details, -1)
 }
 
+func updateServer(t *testing.T, client *gophercloud.ServiceClient, server *os.Server) {
+	t.Logf("> servers.Get")
+
+	opts := os.UpdateOpts{
+		Name: "updated-server",
+	}
+	updatedServer, err := servers.Update(client, server.ID, opts).Extract()
+	th.AssertNoErr(t, err)
+	th.AssertEquals(t, "updated-server", updatedServer.Name)
+	logServer(t, updatedServer, -1)
+}
+
 func listServers(t *testing.T, client *gophercloud.ServiceClient) {
 	t.Logf("> servers.List")
 
@@ -120,7 +137,7 @@ func changeAdminPassword(t *testing.T, client *gophercloud.ServiceClient, server
 	original := server.AdminPass
 
 	t.Logf("Changing server password.")
-	err := servers.ChangeAdminPassword(client, server.ID, tools.MakeNewPassword(original)).Extract()
+	err := servers.ChangeAdminPassword(client, server.ID, tools.MakeNewPassword(original)).ExtractErr()
 	th.AssertNoErr(t, err)
 
 	err = servers.WaitForStatus(client, server.ID, "ACTIVE", 300)
@@ -131,7 +148,7 @@ func changeAdminPassword(t *testing.T, client *gophercloud.ServiceClient, server
 func rebootServer(t *testing.T, client *gophercloud.ServiceClient, server *os.Server) {
 	t.Logf("> servers.Reboot")
 
-	err := servers.Reboot(client, server.ID, os.HardReboot).Extract()
+	err := servers.Reboot(client, server.ID, os.HardReboot).ExtractErr()
 	th.AssertNoErr(t, err)
 
 	err = servers.WaitForStatus(client, server.ID, "ACTIVE", 300)
@@ -192,6 +209,7 @@ func TestServerOperations(t *testing.T) {
 	defer deleteServer(t, client, server)
 
 	getServer(t, client, server)
+	updateServer(t, client, server)
 	listServers(t, client)
 	changeAdminPassword(t, client, server)
 	rebootServer(t, client, server)

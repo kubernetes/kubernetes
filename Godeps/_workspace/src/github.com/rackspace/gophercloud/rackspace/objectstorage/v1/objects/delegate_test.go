@@ -66,11 +66,21 @@ func TestListObjectNames(t *testing.T) {
 func TestCreateObject(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
-	os.HandleCreateObjectSuccessfully(t)
+	os.HandleCreateTextObjectSuccessfully(t)
 
 	content := bytes.NewBufferString("Did gyre and gimble in the wabe")
-	options := &os.CreateOpts{ContentType: "application/json"}
+	options := &os.CreateOpts{ContentType: "text/plain"}
 	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, options)
+	th.AssertNoErr(t, res.Err)
+}
+
+func TestCreateObjectWithoutContentType(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	os.HandleCreateTypelessObjectSuccessfully(t)
+
+	content := bytes.NewBufferString("The sky was the color of television, tuned to a dead channel.")
+	res := Create(fake.ServiceClient(), "testContainer", "testObject", content, &os.CreateOpts{})
 	th.AssertNoErr(t, res.Err)
 }
 

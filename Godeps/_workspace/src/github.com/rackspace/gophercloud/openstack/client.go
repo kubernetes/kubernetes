@@ -203,3 +203,14 @@ func NewBlockStorageV1(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 	}
 	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
 }
+
+// NewCDNV1 creates a ServiceClient that may be used to access the OpenStack v1
+// CDN service.
+func NewCDNV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("cdn")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}

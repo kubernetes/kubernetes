@@ -215,6 +215,77 @@ const GetOutput = `
 }
 `
 
+// UpdateOutput is the recorded output of a Rackspace servers.Update request.
+const UpdateOutput = `
+{
+	"server": {
+		"OS-DCF:diskConfig": "AUTO",
+		"OS-EXT-STS:power_state": 1,
+		"OS-EXT-STS:task_state": null,
+		"OS-EXT-STS:vm_state": "active",
+		"accessIPv4": "1.2.4.8",
+		"accessIPv6": "2001:4800:6666:105:2a0f:c056:f594:7777",
+		"addresses": {
+			"private": [
+			{
+				"addr": "10.20.40.80",
+				"version": 4
+			}
+			],
+			"public": [
+			{
+				"addr": "1.2.4.8",
+				"version": 4
+				},
+				{
+					"addr": "2001:4800:6666:105:2a0f:c056:f594:7777",
+					"version": 6
+				}
+			]
+		},
+		"created": "2014-10-21T14:42:16Z",
+		"flavor": {
+			"id": "performance1-1",
+			"links": [
+			{
+				"href": "https://dfw.servers.api.rackspacecloud.com/111111/flavors/performance1-1",
+				"rel": "bookmark"
+			}
+			]
+		},
+		"hostId": "430d2ae02de0a7af77012c94778145eccf67e75b1fac0528aa10d4a7",
+		"id": "8c65cb68-0681-4c30-bc88-6b83a8a26aee",
+		"image": {
+			"id": "e19a734c-c7e6-443a-830c-242209c4d65d",
+			"links": [
+			{
+				"href": "https://dfw.servers.api.rackspacecloud.com/111111/images/e19a734c-c7e6-443a-830c-242209c4d65d",
+				"rel": "bookmark"
+			}
+			]
+		},
+		"key_name": null,
+		"links": [
+		{
+			"href": "https://dfw.servers.api.rackspacecloud.com/v2/111111/servers/8c65cb68-0681-4c30-bc88-6b83a8a26aee",
+			"rel": "self"
+		},
+		{
+			"href": "https://dfw.servers.api.rackspacecloud.com/111111/servers/8c65cb68-0681-4c30-bc88-6b83a8a26aee",
+			"rel": "bookmark"
+		}
+		],
+		"metadata": {},
+		"name": "test-server-updated",
+		"progress": 100,
+		"status": "ACTIVE",
+		"tenant_id": "111111",
+		"updated": "2014-10-21T14:42:57Z",
+		"user_id": "14ae7bb21d81423694655f4dd30f2930"
+	}
+}
+`
+
 // CreateOutput contains a sample of Rackspace's response to a Create call.
 const CreateOutput = `
 {
@@ -368,6 +439,70 @@ var PerilServer = os.Server{
 var GophercloudServer = os.Server{
 	ID:         "8c65cb68-0681-4c30-bc88-6b83a8a26aee",
 	Name:       "Gophercloud-pxpGGuey",
+	TenantID:   "111111",
+	UserID:     "14ae7bb21d81423694655f4dd30f2930",
+	HostID:     "430d2ae02de0a7af77012c94778145eccf67e75b1fac0528aa10d4a7",
+	Updated:    "2014-10-21T14:42:57Z",
+	Created:    "2014-10-21T14:42:16Z",
+	AccessIPv4: "1.2.4.8",
+	AccessIPv6: "2001:4800:6666:105:2a0f:c056:f594:7777",
+	Progress:   100,
+	Status:     "ACTIVE",
+	Image: map[string]interface{}{
+		"id": "e19a734c-c7e6-443a-830c-242209c4d65d",
+		"links": []interface{}{
+			map[string]interface{}{
+				"href": "https://dfw.servers.api.rackspacecloud.com/111111/images/e19a734c-c7e6-443a-830c-242209c4d65d",
+				"rel":  "bookmark",
+			},
+		},
+	},
+	Flavor: map[string]interface{}{
+		"id": "performance1-1",
+		"links": []interface{}{
+			map[string]interface{}{
+				"href": "https://dfw.servers.api.rackspacecloud.com/111111/flavors/performance1-1",
+				"rel":  "bookmark",
+			},
+		},
+	},
+	Addresses: map[string]interface{}{
+		"private": []interface{}{
+			map[string]interface{}{
+				"addr":    "10.20.40.80",
+				"version": float64(4.0),
+			},
+		},
+		"public": []interface{}{
+			map[string]interface{}{
+				"addr":    "2001:4800:6666:105:2a0f:c056:f594:7777",
+				"version": float64(6.0),
+			},
+			map[string]interface{}{
+				"addr":    "1.2.4.8",
+				"version": float64(4.0),
+			},
+		},
+	},
+	Metadata: map[string]interface{}{},
+	Links: []interface{}{
+		map[string]interface{}{
+			"href": "https://dfw.servers.api.rackspacecloud.com/v2/111111/servers/8c65cb68-0681-4c30-bc88-6b83a8a26aee",
+			"rel":  "self",
+		},
+		map[string]interface{}{
+			"href": "https://dfw.servers.api.rackspacecloud.com/111111/servers/8c65cb68-0681-4c30-bc88-6b83a8a26aee",
+			"rel":  "bookmark",
+		},
+	},
+	KeyName:   "",
+	AdminPass: "",
+}
+
+// GophercloudUpdatedServer is the expected result from parsing UpdateOutput.
+var GophercloudUpdatedServer = os.Server{
+	ID:         "8c65cb68-0681-4c30-bc88-6b83a8a26aee",
+	Name:       "test-server-updated",
 	TenantID:   "111111",
 	UserID:     "14ae7bb21d81423694655f4dd30f2930",
 	HostID:     "430d2ae02de0a7af77012c94778145eccf67e75b1fac0528aa10d4a7",
