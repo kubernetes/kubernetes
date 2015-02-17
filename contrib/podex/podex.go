@@ -40,7 +40,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
-	goyaml "gopkg.in/v2/yaml"
+	goyaml "gopkg.in/yaml.v2"
 )
 
 const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES..."
