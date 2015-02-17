@@ -127,11 +127,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		if err != nil {
 			return nil, err
 		}
-		// TODO: We should be able to rely on valid input, and not do defaulting here.
 		var affinityType api.AffinityType = service.Spec.SessionAffinity
-		if affinityType == "" {
-			affinityType = api.AffinityTypeNone
-		}
 		if len(service.Spec.PublicIPs) > 0 {
 			for _, publicIP := range service.Spec.PublicIPs {
 				_, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
