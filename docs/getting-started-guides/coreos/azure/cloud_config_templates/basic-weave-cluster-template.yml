@@ -1,0 +1,73 @@
+## This file is used as input to deployment script, which ammends it as needed.
+## More specifically, we need to add environment files for as many nodes as we
+## are going to deploy.
+
+coreos:
+  units:
+  - name: dhcpcd.service
+    enable: true
+    command: start
+
+  - name: systemd-resolved.service
+    command: stop
+
+  - name: 10-weave.network
+    runtime: false
+    content: |
+      [Match]
+      Type=bridge
+      Name=weave*
+      [Network]
+
+  - name: weave.service
+    content: |
+      [Unit]
+      After=install-weave.service
+      Description=Weave Network
+      Documentation=http://zettio.github.io/weave/
+      Requires=install-weave.service
+      [Service]
+      EnvironmentFile=/etc/weave.%H.env
+      ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
+      ExecStartPre=/opt/bin/weave launch-dns $WEAVEDNS_ADDR
+      ExecStart=/usr/bin/docker attach weave
+      Restart=on-failure
+      ExecStop=/opt/bin/weave stop
+      ExecStop=/opt/bin/weave stop-dns
+
+  - name: install-weave.service
+    command: start
+    enable: true
+    content: |
+      [Unit]
+      After=network-online.target
+      After=docker.service
+      Description=Install Weave
+      Documentation=http://zettio.github.io/weave/
+      Requires=network-online.target
+      Requires=docker.service
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/usr/bin/docker pull zettio/weave:latest
+      ExecStartPre=/usr/bin/docker pull zettio/weavedns:latest
+      ExecStartPre=/usr/bin/docker pull zettio/weavetools:latest
+      ExecStartPre=/bin/mkdir -p /opt/bin/
+      ExecStartPre=/usr/bin/curl \
+        --silent \
+        --location \
+        https://github.com/zettio/weave/releases/download/latest_release/weave \
+        --output /opt/bin/weave
+      ExecStartPre=/usr/bin/chmod +x /opt/bin/weave
+      ExecStart=/bin/echo Weave Installed
+
+  - name: weave-network.target
+    command: start
+    enable: true
+    content: |
+      [Unit]
+      Requires=weave.service
+      RefuseManualStart=no
+      Wants=weave.service
+      [Install]
+      WantedBy=multi-user.target
