@@ -59,7 +59,7 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 		event = &eventCopy
 		event.Source = source
 
-		previousEvent := GetEvent(event)
+		previousEvent := getEvent(event)
 		updateExistingEvent := previousEvent.Count > 0
 		if updateExistingEvent {
 			event.Count = previousEvent.Count + 1
@@ -102,7 +102,7 @@ func recordEvent(recorder EventRecorder, event *api.Event, updateExistingEvent b
 		newEvent, err = recorder.Create(event)
 	}
 	if err == nil {
-		AddOrUpdateEvent(newEvent)
+		addOrUpdateEvent(newEvent)
 		return true
 	}
 

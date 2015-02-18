@@ -45,7 +45,7 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 	}
 
 	// Act
-	result := AddOrUpdateEvent(&event)
+	result := addOrUpdateEvent(&event)
 
 	// Assert
 	compareEventWithHistoryEntry(&event, &result, t)
@@ -99,9 +99,9 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 	}
 
 	// Act
-	AddOrUpdateEvent(&event1)
-	result1 := AddOrUpdateEvent(&event2)
-	result2 := GetEvent(&event1)
+	addOrUpdateEvent(&event1)
+	result1 := addOrUpdateEvent(&event2)
+	result2 := getEvent(&event1)
 
 	// Assert
 	compareEventWithHistoryEntry(&event2, &result1, t)
@@ -128,7 +128,7 @@ func TestGetEventNoExisting(t *testing.T) {
 	}
 
 	// Act
-	existingEvent := GetEvent(&event)
+	existingEvent := getEvent(&event)
 
 	// Assert
 	if existingEvent.Count != 0 {
@@ -157,16 +157,16 @@ func TestGetEventExisting(t *testing.T) {
 		FirstTimestamp: eventTime,
 		LastTimestamp:  eventTime,
 	}
-	AddOrUpdateEvent(&event)
+	addOrUpdateEvent(&event)
 
 	// Act
-	existingEvent := GetEvent(&event)
+	existingEvent := getEvent(&event)
 
 	// Assert
 	compareEventWithHistoryEntry(&event, &existingEvent, t)
 }
 
-func compareEventWithHistoryEntry(expected *api.Event, actual *History, t *testing.T) {
+func compareEventWithHistoryEntry(expected *api.Event, actual *history, t *testing.T) {
 
 	if actual.Count != expected.Count {
 		t.Fatalf("There should be one existing instance of this event in the hash table.")
