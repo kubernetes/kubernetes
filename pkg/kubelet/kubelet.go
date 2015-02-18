@@ -1389,29 +1389,45 @@ func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 // state every sync_frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	for {
+		unsyncedPod := false
 		select {
 		case u := <-updates:
-			switch u.Op {
-			case SET:
-				glog.V(3).Infof("SET: Containers changed")
-				kl.pods = u.Pods
-				kl.pods = filterHostPortConflicts(kl.pods)
-			case UPDATE:
-				glog.V(3).Infof("Update: Containers changed")
-				kl.pods = updateBoundPods(u.Pods, kl.pods)
-				kl.pods = filterHostPortConflicts(kl.pods)
-
-			default:
-				panic("syncLoop does not support incremental changes")
-			}
+			kl.updatePods(u)
+			unsyncedPod = true
 		case <-time.After(kl.resyncInterval):
 			glog.V(4).Infof("Periodic sync")
+		}
+		// If we already caught some update, try to wait for some short time
+		// to possibly batch it with other incoming updates.
+		for ; unsyncedPod; {
+			select {
+				case u := <-updates:
+					kl.updatePods(u)
+				case <-time.After(5 * time.Millisecond):
+					// Break the for loop.
+					unsyncedPod = false
+			}
 		}
 
 		err := handler.SyncPods(kl.pods)
 		if err != nil {
 			glog.Errorf("Couldn't sync containers: %v", err)
 		}
+	}
+}
+
+func (kl *Kubelet) updatePods(u PodUpdate) {
+	switch u.Op {
+		case SET:
+			glog.V(3).Infof("SET: Containers changed")
+			kl.pods = u.Pods
+			kl.pods = filterHostPortConflicts(kl.pods)
+		case UPDATE:
+			glog.V(3).Infof("Update: Containers changed")
+			kl.pods = updateBoundPods(u.Pods, kl.pods)
+			kl.pods = filterHostPortConflicts(kl.pods)
+		default:
+			panic("syncLoop does not support incremental changes")
 	}
 }
 
