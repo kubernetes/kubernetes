@@ -28,7 +28,7 @@ import (
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -80,7 +80,7 @@ func (fake *fakeMounter) List() ([]mount.MountPoint, error) {
 
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -146,7 +146,7 @@ func TestPlugin(t *testing.T) {
 
 func TestPluginLegacy(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
 
 	plug, err := plugMgr.FindPluginByName("gce-pd")
 	if err != nil {

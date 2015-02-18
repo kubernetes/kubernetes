@@ -2497,7 +2497,7 @@ func TestValidateSecret(t *testing.T) {
 		return api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Data: map[string][]byte{
-				"foo": []byte("bar"),
+				"data-1": []byte("bar"),
 			},
 		}
 	}
@@ -2508,6 +2508,7 @@ func TestValidateSecret(t *testing.T) {
 		emptyNs     = validSecret()
 		invalidNs   = validSecret()
 		overMaxSize = validSecret()
+		invalidKey  = validSecret()
 	)
 
 	emptyName.Name = ""
@@ -2517,6 +2518,7 @@ func TestValidateSecret(t *testing.T) {
 	overMaxSize.Data = map[string][]byte{
 		"over": make([]byte, api.MaxSecretSize+1),
 	}
+	invalidKey.Data["a..b"] = []byte("whoops")
 
 	tests := map[string]struct {
 		secret api.Secret
@@ -2528,6 +2530,7 @@ func TestValidateSecret(t *testing.T) {
 		"empty namespace":   {emptyNs, false},
 		"invalid namespace": {invalidNs, false},
 		"over max size":     {overMaxSize, false},
+		"invalid key":       {invalidKey, false},
 	}
 
 	for name, tc := range tests {

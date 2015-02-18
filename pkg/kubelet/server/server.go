@@ -179,6 +179,8 @@ func (s *KubeletServer) Run(_ []string) error {
 		glog.Warningf("No API client: %v", err)
 	}
 
+	glog.Infof("Using root directory: %v", s.RootDirectory)
+
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
 
 	kcfg := KubeletConfig{

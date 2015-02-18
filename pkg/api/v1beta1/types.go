@@ -1100,12 +1100,20 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota `json:"items"`
 }
 
+// Secret holds secret data of a certain type.  The total bytes of the values in
+// the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
 	TypeMeta `json:",inline"`
 
+	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
+	// The serialized form of the secret data is a base64 encoded string.
 	Data map[string][]byte `json:"data,omitempty"`
-	Type SecretType        `json:"type,omitempty"`
+
+	// Used to facilitate programatic handling of secret data.
+	Type SecretType `json:"type,omitempty"`
 }
+
+const MaxSecretSize = 1 * 1024 * 1024
 
 type SecretType string
 
