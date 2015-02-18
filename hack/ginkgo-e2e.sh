@@ -32,6 +32,8 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 prepare-e2e
 
 detect-master >/dev/null
+# Export the master name to make it available to the ginkgo tests.
+export KUBE_MASTER
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -91,10 +93,15 @@ elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     "--auth_config=${cfg_dir}/kubernetes_auth"
     "--cert_dir=${cfg_dir}"
   )
+  # Export the project and zone env vars to make them available to the tests.
+  export PROJECT
+  export ZONE
 elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   auth_config=(
     "--auth_config=${HOME}/.kube/${PROJECT}_${INSTANCE_PREFIX}/kubernetes_auth"
   )
+  export PROJECT
+  export ZONE
 else
   auth_config=()
 fi
