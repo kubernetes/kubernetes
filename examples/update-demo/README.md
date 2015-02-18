@@ -38,7 +38,7 @@ You may need to open the firewall for port 8080 using the [console][cloud-consol
 ```bash
 $ gcloud compute firewall-rules create \
   --allow tcp:8080 --target-tags=kubernetes-minion \
-  --zone=us-central1-a kubernetes-minion-8080
+  kubernetes-minion-8080
 ```
 
 ### Step Zero: Build the Docker images
