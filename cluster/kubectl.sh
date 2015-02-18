@@ -20,7 +20,10 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+UTILS=${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh
+if [ -f ${UTILS} ]; then
+    source "${UTILS}"
+fi
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -116,7 +119,7 @@ elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
   # When we are using vagrant it has hard coded kubeconfig, and do not clobber public endpoints
   config=(
     "--kubeconfig=$HOME/.kubernetes_vagrant_kubeconfig"
-  )  
+  )
 fi
 
 echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
