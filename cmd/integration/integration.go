@@ -239,7 +239,9 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	return func() (bool, error) {
 		for i := range pods.Items {
 			host, id, namespace := pods.Items[i].Status.Host, pods.Items[i].Name, pods.Items[i].Namespace
+			glog.Infof("Check whether pod %s.%s exists on node %q", id, namespace, host)
 			if len(host) == 0 {
+				glog.Infof("Pod %s.%s is not bound to a host yet", id, namespace)
 				return false, nil
 			}
 			if _, err := podInfo.GetPodStatus(host, namespace, id); err != nil {
