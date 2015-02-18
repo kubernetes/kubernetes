@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
@@ -58,7 +59,7 @@ type proxySocket interface {
 	// while sessions are active.
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service string, info *serviceInfo, proxier *Proxier)
+	ProxyLoop(service types.NamespacedName, info *serviceInfo, proxier *Proxier)
 }
 
 // tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
@@ -67,7 +68,7 @@ type tcpProxySocket struct {
 	net.Listener
 }
 
-func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
+func tryConnect(service types.NamespacedName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
 	for _, retryTimeout := range endpointDialTimeout {
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
 		if err != nil {
@@ -87,7 +88,7 @@ func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Prox
 	return nil, fmt.Errorf("failed to connect to an endpoint.")
 }
 
-func (tcp *tcpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxier *Proxier) {
+func (tcp *tcpProxySocket) ProxyLoop(service types.NamespacedName, myInfo *serviceInfo, proxier *Proxier) {
 	for {
 		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 			// The service port was closed or replaced.
@@ -162,7 +163,7 @@ func newClientCache() *clientCache {
 	return &clientCache{clients: map[string]net.Conn{}}
 }
 
-func (udp *udpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxier *Proxier) {
+func (udp *udpProxySocket) ProxyLoop(service types.NamespacedName, myInfo *serviceInfo, proxier *Proxier) {
 	activeClients := newClientCache()
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
@@ -207,7 +208,7 @@ func (udp *udpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxie
 	}
 }
 
-func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service string, timeout time.Duration) (net.Conn, error) {
+func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service types.NamespacedName, timeout time.Duration) (net.Conn, error) {
 	activeClients.mu.Lock()
 	defer activeClients.mu.Unlock()
 
@@ -303,7 +304,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 type Proxier struct {
 	loadBalancer  LoadBalancer
 	mu            sync.Mutex // protects serviceMap
-	serviceMap    map[string]*serviceInfo
+	serviceMap    map[types.NamespacedName]*serviceInfo
 	numProxyLoops int32 // use atomic ops to access this; mostly for testing
 	listenIP      net.IP
 	iptables      iptables.Interface
@@ -341,7 +342,7 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 	}
 	return &Proxier{
 		loadBalancer: loadBalancer,
-		serviceMap:   make(map[string]*serviceInfo),
+		serviceMap:   make(map[types.NamespacedName]*serviceInfo),
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
@@ -389,26 +390,26 @@ func (proxier *Proxier) cleanupStaleStickySessions() {
 }
 
 // This assumes proxier.mu is not locked.
-func (proxier *Proxier) stopProxy(service string, info *serviceInfo) error {
+func (proxier *Proxier) stopProxy(service types.NamespacedName, info *serviceInfo) error {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
 // This assumes proxier.mu is locked.
-func (proxier *Proxier) stopProxyInternal(service string, info *serviceInfo) error {
+func (proxier *Proxier) stopProxyInternal(service types.NamespacedName, info *serviceInfo) error {
 	delete(proxier.serviceMap, service)
 	return info.socket.Close()
 }
 
-func (proxier *Proxier) getServiceInfo(service string) (*serviceInfo, bool) {
+func (proxier *Proxier) getServiceInfo(service types.NamespacedName) (*serviceInfo, bool) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	info, ok := proxier.serviceMap[service]
 	return info, ok
 }
 
-func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
+func (proxier *Proxier) setServiceInfo(service types.NamespacedName, info *serviceInfo) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.serviceMap[service] = info
@@ -417,7 +418,7 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 // addServiceOnPort starts listening for a new service, returning the serviceInfo.
 // Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnPort(service string, protocol api.Protocol, proxyPort int, timeout time.Duration) (*serviceInfo, error) {
+func (proxier *Proxier) addServiceOnPort(service types.NamespacedName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*serviceInfo, error) {
 	sock, err := newProxySocket(protocol, proxier.listenIP, proxyPort)
 	if err != nil {
 		return nil, err
@@ -443,7 +444,7 @@ func (proxier *Proxier) addServiceOnPort(service string, protocol api.Protocol, 
 	proxier.setServiceInfo(service, si)
 
 	glog.V(1).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
-	go func(service string, proxier *Proxier) {
+	go func(service types.NamespacedName, proxier *Proxier) {
 		defer util.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
 		sock.ProxyLoop(service, si, proxier)
@@ -463,28 +464,29 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	glog.V(4).Infof("Received update notice: %+v", services)
 	activeServices := util.StringSet{}
 	for _, service := range services {
-		activeServices.Insert(service.Name)
-		info, exists := proxier.getServiceInfo(service.Name)
+		cachekey := *types.NewNamespacedName(service.Namespace, service.Name).CacheKey()
+		activeServices.Insert(cachekey.String())
+		info, exists := proxier.getServiceInfo(cachekey)
 		serviceIP := net.ParseIP(service.Spec.PortalIP)
 		// TODO: check health of the socket?  What if ProxyLoop exited?
 		if exists && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) {
 			continue
 		}
 		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP) || !ipsEqual(service.Spec.PublicIPs, info.publicIP)) {
-			glog.V(4).Infof("Something changed for service %q: stopping it", service.Name)
-			err := proxier.closePortal(service.Name, info)
+			glog.V(4).Infof("Something changed for service %q: stopping it", cachekey)
+			err := proxier.closePortal(cachekey, info)
 			if err != nil {
-				glog.Errorf("Failed to close portal for %q: %v", service.Name, err)
+				glog.Errorf("Failed to close portal for %q: %v", cachekey, err)
 			}
-			err = proxier.stopProxy(service.Name, info)
+			err = proxier.stopProxy(cachekey, info)
 			if err != nil {
-				glog.Errorf("Failed to stop service %q: %v", service.Name, err)
+				glog.Errorf("Failed to stop service %q: %v", cachekey, err)
 			}
 		}
-		glog.V(1).Infof("Adding new service %q at %s:%d/%s", service.Name, serviceIP, service.Spec.Port, service.Spec.Protocol)
-		info, err := proxier.addServiceOnPort(service.Name, service.Spec.Protocol, 0, udpIdleTimeout)
+		glog.V(1).Infof("Adding new service %q at %s:%d/%s", cachekey, serviceIP, service.Spec.Port, service.Spec.Protocol)
+		info, err := proxier.addServiceOnPort(cachekey, service.Spec.Protocol, 0, udpIdleTimeout)
 		if err != nil {
-			glog.Errorf("Failed to start proxy for %q: %v", service.Name, err)
+			glog.Errorf("Failed to start proxy for %q: %v", cachekey, err)
 			continue
 		}
 		info.portalIP = serviceIP
@@ -495,16 +497,16 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info.stickyMaxAgeMinutes = 180
 		glog.V(4).Infof("info: %+v", info)
 
-		err = proxier.openPortal(service.Name, info)
+		err = proxier.openPortal(cachekey, info)
 		if err != nil {
-			glog.Errorf("Failed to open portal for %q: %v", service.Name, err)
+			glog.Errorf("Failed to open portal for %q: %v", cachekey, err)
 		}
-		proxier.loadBalancer.NewService(service.Name, info.sessionAffinityType, info.stickyMaxAgeMinutes)
+		proxier.loadBalancer.NewService(cachekey, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 	}
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	for name, info := range proxier.serviceMap {
-		if !activeServices.Has(name) {
+		if !activeServices.Has(name.String()) {
 			glog.V(1).Infof("Stopping service %q", name)
 			err := proxier.closePortal(name, info)
 			if err != nil {
@@ -530,7 +532,7 @@ func ipsEqual(lhs, rhs []string) bool {
 	return true
 }
 
-func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
+func (proxier *Proxier) openPortal(service types.NamespacedName, info *serviceInfo) error {
 	err := proxier.openOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 	if err != nil {
 		return err
@@ -544,7 +546,7 @@ func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
 	return nil
 }
 
-func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string) error {
+func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name types.NamespacedName) error {
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name)
 	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesContainerPortalChain, args...)
@@ -569,7 +571,7 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 	return nil
 }
 
-func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
+func (proxier *Proxier) closePortal(service types.NamespacedName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 	for _, publicIP := range info.publicIP {
@@ -583,7 +585,7 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 	return errors.NewAggregate(el)
 }
 
-func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string) []error {
+func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name types.NamespacedName) []error {
 	el := []error{}
 
 	// Handle traffic from containers.
@@ -662,7 +664,7 @@ var zeroIPv6 = net.ParseIP("::0")
 var localhostIPv6 = net.ParseIP("::1")
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
-func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, service string) []string {
+func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, service types.NamespacedName) []string {
 	// This list needs to include all fields as they are eventually spit out
 	// by iptables-save.  This is because some systems do not support the
 	// 'iptables -C' arg, and so fall back on parsing iptables-save output.
@@ -673,7 +675,7 @@ func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol
 	// iptables versions.
 	args := []string{
 		"-m", "comment",
-		"--comment", service,
+		"--comment", service.String(),
 		"-p", strings.ToLower(string(protocol)),
 		"-m", strings.ToLower(string(protocol)),
 		"-d", fmt.Sprintf("%s/32", destIP.String()),
@@ -683,7 +685,7 @@ func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol
 }
 
 // Build a slice of iptables args for a from-container portal rule.
-func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
+func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service types.NamespacedName) []string {
 	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service)
 
 	// This is tricky.
@@ -730,7 +732,7 @@ func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int,
 }
 
 // Build a slice of iptables args for a from-host portal rule.
-func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
+func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service types.NamespacedName) []string {
 	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service)
 
 	// This is tricky.
