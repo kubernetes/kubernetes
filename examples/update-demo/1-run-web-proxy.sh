@@ -25,7 +25,7 @@ echo "    http://localhost:8001/static/"
 echo
 
 export KUBE_ROOT=$(dirname $0)/../..
-export KUBECTL=${KUBE_REPO_ROOT}/cluster/kubectl.sh
+export KUBECTL=${KUBE_ROOT}/cluster/kubectl.sh
 
 set -x
 
