@@ -80,10 +80,15 @@ fi
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
 export E2E_REPORT_DIR=${WORKSPACE}
 
+### Set up ###
 go run ./hack/e2e.go ${E2E_OPT} -v --down
 go run ./hack/e2e.go ${E2E_OPT} -v --up
 go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
-status=0
-go run ./hack/e2e.go ${E2E_OPT} -v --test || status=$?
+
+### Run tests ###
+# Jenkins will look at the junit*.xml files for test failures, so don't exit
+# with a nonzero error code if it was only tests that failed.
+go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="--ginkgo.noColor" || true
+
+### Clean up ###
 go run ./hack/e2e.go ${E2E_OPT} -v --down
-exit $status
