@@ -177,10 +177,14 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq.Header = req.Header
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: destURL.Host})
+	proxyPathPrepend := path.Join(r.prefix, "ns", namespace, resource, id)
+	if namespace != "" {
+		proxyPathPrepend = path.Join(r.prefix, resource, id)
+	}
 	proxy.Transport = &proxyTransport{
 		proxyScheme:      req.URL.Scheme,
 		proxyHost:        req.URL.Host,
-		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, resource, id),
+		proxyPathPrepend: proxyPathPrepend,
 	}
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
