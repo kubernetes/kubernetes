@@ -130,18 +130,14 @@ func isValidDockerVersion(ver []uint) (bool, string) {
 func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
 	versions, err := s.host.GetDockerVersion()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("unknown Docker version"))
+		s.error(w, errors.New("unknown Docker version"))
 		return
 	}
 	valid, version := isValidDockerVersion(versions)
 	if !valid {
-		w.WriteHeader(http.StatusInternalServerError)
-		msg := "Docker version is too old (" + version + ")"
-		w.Write([]byte(msg))
+		s.error(w, errors.New("Docker version is too old ("+version+")"))
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
 }
 
@@ -230,7 +226,6 @@ func (s *Server) handleBoundPods(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 }
@@ -254,12 +249,10 @@ func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versi
 	podUID := types.UID(u.Query().Get("UUID"))
 	podNamespace := u.Query().Get("podNamespace")
 	if len(podID) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
 		http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
 		return
 	}
 	if len(podNamespace) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
 		http.Error(w, "Missing 'podNamespace=' query entry.", http.StatusBadRequest)
 		return
 	}
@@ -278,7 +271,6 @@ func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versi
 		s.error(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 }
@@ -307,7 +299,6 @@ func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
-
 }
 
 // handleRun handles requests to run a command inside a container.
@@ -380,7 +371,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	case 2:
 		// pod stats
 		// TODO(monnand) Implement this
-		errors.New("pod level status currently unimplemented")
+		err = errors.New("pod level status currently unimplemented")
 	case 3:
 		// Backward compatibility without uid information, does not support namespace
 		pod, ok := s.host.GetPodByName(api.NamespaceDefault, components[1])
@@ -405,7 +396,6 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if stats == nil {
-		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "{}")
 		return
 	}
@@ -414,7 +404,6 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 	return

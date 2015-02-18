@@ -380,6 +380,29 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 }
 
+// TODO: fix me when pod level stats get implemented
+func TestPodsInfo(t *testing.T) {
+	fw := newServerTest()
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/stats/goodpod")
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		// copying the response body did not work
+		t.Fatalf("Cannot copy resp: %#v", err)
+	}
+	result := string(body)
+	if !strings.Contains(result, "pod level status currently unimplemented") {
+		t.Errorf("expected body contains %s, got %d", "pod level status currently unimplemented", result)
+	}
+}
+
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
 	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*api.BoundPod, bool) {
 		return &api.BoundPod{
