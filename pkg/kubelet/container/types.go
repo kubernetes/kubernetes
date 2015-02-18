@@ -16,7 +16,14 @@ limitations under the License.
 
 package container
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrNoSuchImage = errors.New("no such image")
+)
 
 // Container represents a container.
 type Container struct {
@@ -78,6 +85,10 @@ type HostConfig struct {
 type PortBinding struct {
 	HostIP   string `json:"hostIP,omitempty"`
 	HostPort string `json:"hostPort,omitempty"`
+}
+
+type Image struct {
+	ID string `json:"id"`
 }
 
 // ListContainersOptions specify parameters to the ListContainers function.

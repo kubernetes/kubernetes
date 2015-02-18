@@ -241,8 +241,18 @@ func (dr *DockerRuntime) RemoveContainer(opts container.RemoveContainerOptions) 
 }
 
 // InspectImage implements ContainerRuntime.InspectImage.
-func (dr *DockerRuntime) InspectImage(image string) (*docker.Image, error) {
-	return dr.docker.InspectImage(image)
+func (dr *DockerRuntime) InspectImage(image string) (*container.Image, error) {
+	img, err := dr.docker.InspectImage(image)
+	if err != nil {
+		if err == docker.ErrNoSuchImage {
+			return nil, container.ErrNoSuchImage
+		}
+		return nil, err
+	}
+	if img == nil {
+		return nil, nil
+	}
+	return &container.Image{ID: img.ID}, nil
 }
 
 // ListImage implements ContainerRuntime.ListImage.
@@ -591,8 +601,8 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 		return true, nil
 	}
 	// This is super brittle, but its the best we got.
-	// TODO: Land code in the docker client to use docker.Error here instead.
-	if err.Error() == "no such image" {
+	// TODO(yifan): Merge DockerPuller into ContainerRuntimeInterface later?
+	if err == container.ErrNoSuchImage {
 		return false, nil
 	}
 	return false, err
@@ -867,12 +877,12 @@ func GetDockerPodInfo(client container.ContainerRuntimeInterface, manifest api.P
 		var containerStatus api.ContainerStatus
 		// Not all containers expected are created, check if there are
 		// image related issues
-		for _, container := range manifest.Containers {
-			if _, found := info[container.Name]; found {
+		for _, ctnr := range manifest.Containers {
+			if _, found := info[ctnr.Name]; found {
 				continue
 			}
 
-			image := container.Image
+			image := ctnr.Image
 			// Check image is ready on the node or not
 			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
 			_, err := client.InspectImage(image)
@@ -880,7 +890,7 @@ func GetDockerPodInfo(client container.ContainerRuntimeInterface, manifest api.P
 				containerStatus.State.Waiting = &api.ContainerStateWaiting{
 					Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
 				}
-			} else if err == docker.ErrNoSuchImage {
+			} else if err == container.ErrNoSuchImage {
 				containerStatus.State.Waiting = &api.ContainerStateWaiting{
 					Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
 				}
@@ -890,7 +900,7 @@ func GetDockerPodInfo(client container.ContainerRuntimeInterface, manifest api.P
 				}
 			}
 
-			info[container.Name] = containerStatus
+			info[ctnr.Name] = containerStatus
 		}
 	}
 
