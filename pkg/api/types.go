@@ -178,6 +178,8 @@ type VolumeSource struct {
 	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepo `json:"gitRepo"`
+	// Secret represents a secret that should populate this volume.
+	Secret *SecretSource `json:"secret"`
 }
 
 // HostPath represents bare host directory volume.
@@ -226,6 +228,12 @@ type GitRepo struct {
 	// Commit hash, this is optional
 	Revision string `json:"revision"`
 	// TODO: Consider credentials here.
+}
+
+// Adapts a Secret into a VolumeSource
+type SecretSource struct {
+	// Reference to a Secret
+	Target ObjectReference `json:"target"`
 }
 
 // Port represents a network port in a single container
@@ -1309,3 +1317,27 @@ type ResourceQuotaList struct {
 	// Items is a list of ResourceQuota objects
 	Items []ResourceQuota `json:"items"`
 }
+
+// Secret holds secret data of a certain type
+type Secret struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	Data map[string][]byte `json:"data,omitempty"`
+	Type SecretType        `json:"type,omitempty"`
+}
+
+type SecretType string
+
+const (
+	SecretTypeOpaque SecretType = "opaque" // Default; arbitrary user-defined data
+)
+
+type SecretList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []Secret `json:"items"`
+}
+
+const MaxSecretSize = 1 * 1024 * 1024

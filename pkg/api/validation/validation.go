@@ -247,6 +247,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
+	if source.Secret != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateSecretSource(source.Secret).Prefix("secret")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -279,6 +283,20 @@ func validateGCEPersistentDisk(PD *api.GCEPersistentDisk) errs.ValidationErrorLi
 	}
 	if PD.Partition < 0 || PD.Partition > 255 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("partition", PD.Partition, pdPartitionErrorMsg))
+	}
+	return allErrs
+}
+
+func validateSecretSource(secretSource *api.SecretSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if secretSource.Target.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("target.name", ""))
+	}
+	if secretSource.Target.Namespace == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("target.namespace", ""))
+	}
+	if secretSource.Target.Kind != "Secret" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("target.kind", secretSource.Target.Kind, "Secret"))
 	}
 	return allErrs
 }
@@ -817,6 +835,31 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].min[%s]", i, k))...)
 		}
 	}
+	return allErrs
+}
+
+// ValidateSecret tests if required fields in the Secret are set.
+func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(secret.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", secret.Name))
+	} else if !util.IsDNSSubdomain(secret.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", secret.Name, ""))
+	}
+	if len(secret.Namespace) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("namespace", secret.Namespace))
+	} else if !util.IsDNSSubdomain(secret.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", secret.Namespace, ""))
+	}
+
+	totalSize := 0
+	for _, value := range secret.Data {
+		totalSize += len(value)
+	}
+	if totalSize > api.MaxSecretSize {
+		allErrs = append(allErrs, errs.NewFieldForbidden("data", "Maximum secret size exceeded"))
+	}
+
 	return allErrs
 }
 

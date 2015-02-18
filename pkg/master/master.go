@@ -54,6 +54,7 @@ import (
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -372,6 +373,7 @@ func (m *Master) init(c *Config) {
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
 	resourceQuotaRegistry := resourcequota.NewEtcdRegistry(c.EtcdHelper)
+	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewEtcdRegistry(c.EtcdHelper)
 
 	// TODO: split me up into distinct storage registries
@@ -411,6 +413,7 @@ func (m *Master) init(c *Config) {
 		"resourceQuotas":      resourcequota.NewREST(resourceQuotaRegistry),
 		"resourceQuotaUsages": resourcequotausage.NewREST(resourceQuotaRegistry),
 		"namespaces":          namespace.NewREST(m.namespaceRegistry),
+		"secrets":             secret.NewREST(secretRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

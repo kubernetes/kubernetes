@@ -225,6 +225,7 @@ var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "S
 var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS"}
+var secretColumns = []string{"NAME", "DATA"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -246,6 +247,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(resourceQuotaColumns, printResourceQuotaList)
 	h.Handler(namespaceColumns, printNamespace)
 	h.Handler(namespaceColumns, printNamespaceList)
+	h.Handler(secretColumns, printSecret)
+	h.Handler(secretColumns, printSecretList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -380,6 +383,21 @@ func printNamespaceList(list *api.NamespaceList, w io.Writer) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func printSecret(item *api.Secret, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%v\n", item.Name, len(item.Data))
+	return err
+}
+
+func printSecretList(list *api.SecretList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printSecret(&item, w); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
