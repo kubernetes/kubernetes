@@ -29,6 +29,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
@@ -73,18 +74,26 @@ func NewDockerRuntime(docker DockerInterface) container.ContainerRuntimeInterfac
 	return &DockerRuntime{docker: docker}
 }
 
-// ToContainer converts a docker.APIContainer to container.Container.
-func ToContainer(dockerContainer docker.APIContainers) container.Container {
+// ConvertAPIContainer converts a docker.APIContainer to container.Container.
+func ConvertAPIContainer(dockerContainer docker.APIContainers) container.Container {
 	c := container.Container{
 		ID:         dockerContainer.ID,
 		Image:      dockerContainer.Image,
 		Command:    dockerContainer.Command,
-		Created:    dockerContainer.Created,
+		Created:    time.Unix(dockerContainer.Created, 0),
 		Status:     dockerContainer.Status,
 		SizeRw:     dockerContainer.SizeRw,
 		SizeRootFs: dockerContainer.SizeRootFs,
 		Names:      dockerContainer.Names,
 	}
+
+	// Copy Name.
+	if len(dockerContainer.Names) == 0 {
+		c.Name = ""
+	} else {
+		c.Name = dockerContainer.Names[0]
+	}
+
 	// Copy ports field too.
 	c.Ports = make([]container.Port, len(dockerContainer.Ports))
 	for i, p := range dockerContainer.Ports {
@@ -98,6 +107,47 @@ func ToContainer(dockerContainer docker.APIContainers) container.Container {
 	return c
 }
 
+// ConvertContainer converts a *docker.Container to *container.Container.
+func ConvertContainer(dc *docker.Container) *container.Container {
+	if dc == nil {
+		return nil
+	}
+
+	state := container.State{
+		Running:    dc.State.Running,
+		Paused:     dc.State.Paused,
+		OOMKilled:  dc.State.OOMKilled,
+		Pid:        dc.State.Pid,
+		ExitCode:   dc.State.ExitCode,
+		Error:      dc.State.Error,
+		StartedAt:  dc.State.StartedAt,
+		FinishedAt: dc.State.FinishedAt,
+	}
+
+	var networkSettings *container.NetworkSettings
+	if dc.NetworkSettings != nil {
+		networkSettings = &container.NetworkSettings{
+			IPAddress: dc.NetworkSettings.IPAddress,
+		}
+	}
+	var image string
+	if dc.Config != nil {
+		image = dc.Config.Image
+	}
+
+	return &container.Container{
+		ID:              dc.ID,
+		Name:            dc.Name,
+		Names:           []string{dc.Name},
+		Image:           image,
+		ImageID:         dc.Image,
+		Created:         dc.Created,
+		State:           state,
+		NetworkSettings: networkSettings,
+		Volumes:         dc.Volumes,
+	}
+}
+
 // ListContainers implements ContainerRuntime.ListContainers.
 func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]container.Container, error) {
 	dockerContainers, err := dr.docker.ListContainers(docker.ListContainersOptions{
@@ -108,14 +158,18 @@ func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions)
 	}
 	containers := make([]container.Container, len(dockerContainers))
 	for i, c := range dockerContainers {
-		containers[i] = ToContainer(c)
+		containers[i] = ConvertAPIContainer(c)
 	}
 	return containers, nil
 }
 
 // InspectContainer implements ContainerRuntime.InspectContainer.
-func (dr *DockerRuntime) InspectContainer(id string) (*docker.Container, error) {
-	return dr.docker.InspectContainer(id)
+func (dr *DockerRuntime) InspectContainer(id string) (*container.Container, error) {
+	dc, err := dr.docker.InspectContainer(id)
+	if err != nil {
+		return nil, err
+	}
+	return ConvertContainer(dc), nil
 }
 
 // CreateContainer implements ContainerRuntime.CreateContainer.
@@ -573,8 +627,8 @@ func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allC
 
 // GetRecentDockerContainersWithNameAndUUID returns a list of dead docker containers which matches the name
 // and uid given.
-func GetRecentDockerContainersWithNameAndUUID(client container.ContainerRuntimeInterface, podFullName string, uid types.UID, containerName string) ([]*docker.Container, error) {
-	var result []*docker.Container
+func GetRecentDockerContainersWithNameAndUUID(client container.ContainerRuntimeInterface, podFullName string, uid types.UID, containerName string) ([]*container.Container, error) {
+	var result []*container.Container
 	containers, err := client.ListContainers(container.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
@@ -650,8 +704,8 @@ func inspectContainer(client container.ContainerRuntimeInterface, dockerID, cont
 
 	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
 	containerStatus := api.ContainerStatus{
-		Image:       inspectResult.Config.Image,
-		ImageID:     DockerPrefix + inspectResult.Image,
+		Image:       inspectResult.Image,
+		ImageID:     DockerPrefix + inspectResult.ImageID,
 		ContainerID: DockerPrefix + dockerID,
 	}
 
@@ -856,8 +910,8 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	return
 }
 
-func GetRunningContainers(client container.ContainerRuntimeInterface, ids []string) ([]*docker.Container, error) {
-	result := []*docker.Container{}
+func GetRunningContainers(client container.ContainerRuntimeInterface, ids []string) ([]*container.Container, error) {
+	var result []*container.Container
 	if client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
 	}

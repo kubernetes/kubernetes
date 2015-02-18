@@ -231,7 +231,7 @@ func TestProbeContainer(t *testing.T) {
 			kl = makeTestKubelet(test.expectedResult, nil)
 		}
 
-		container := dockertools.ToContainer(*dc)
+		container := dockertools.ConvertAPIContainer(*dc)
 		result, err := kl.probeContainer(test.p, "", types.UID(""), api.PodStatus{}, api.Container{}, &container, test.defaultResult)
 		if test.expectError && err == nil {
 			t.Error("Expected error but did no error was returned.")

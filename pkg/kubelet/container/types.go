@@ -16,28 +16,52 @@ limitations under the License.
 
 package container
 
+import "time"
+
 // Container represents a container.
 type Container struct {
-	ID         string   `json:"id"`
-	Image      string   `json:"image,omitempty"`
-	Command    string   `json:"command,omitempty"`
-	Created    int64    `json:"created,omitempty"`
-	Status     string   `json:"status,omitempty"`
-	Ports      []Port   `json:"ports,omitempty"`
-	SizeRw     int64    `json:"sizeRw,omitempty"`
-	SizeRootFs int64    `json:"sizeRootFs,omitempty"`
-	Names      []string `json:"names,omitempty"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name,omitempty"`
+	Names           []string          `json:"names,omitempty"`
+	Image           string            `json:"image,omitempty"`
+	ImageID         string            `json:"imageID`
+	Command         string            `json:"command,omitempty"`
+	Created         time.Time         `json:"created,omitempty"`
+	State           State             `json:"state,omitempty"`
+	Status          string            `json:"status,omitempty"`
+	NetworkSettings *NetworkSettings  `json:"networkSettings`
+	Ports           []Port            `json:"ports,omitempty"`
+	SizeRw          int64             `json:"sizeRw,omitempty"`
+	SizeRootFs      int64             `json:"sizeRootFs,omitempty"`
+	Volumes         map[string]string `json:"volumes,omitempty"`
 }
 
 // Port is a type that represents a port mapping.
 type Port struct {
-	PrivatePort int64  `json:"PrivatePort,omitempty" yaml:"PrivatePort,omitempty"`
-	PublicPort  int64  `json:"PublicPort,omitempty" yaml:"PublicPort,omitempty"`
-	Type        string `json:"Type,omitempty" yaml:"Type,omitempty"`
-	IP          string `json:"IP,omitempty" yaml:"IP,omitempty"`
+	PrivatePort int64  `json:"privatePort,omitempty"`
+	PublicPort  int64  `json:"publicPort,omitempty"`
+	Type        string `json:"type,omitempty"`
+	IP          string `json:"ip,omitempty"`
 }
 
 // ListContainersOptions specify parameters to the ListContainers function.
 type ListContainersOptions struct {
 	All bool
+}
+
+// State represents the state of a container.
+type State struct {
+	Running    bool      `json:"running,omitempty"`
+	Paused     bool      `json:"paused,omitempty"`
+	OOMKilled  bool      `json:"oomkilled,omitempty"`
+	Pid        int       `json:"pid,omitempty"`
+	ExitCode   int       `json:"exitCode,omitempty"`
+	Error      string    `json:"error,omitempty"`
+	StartedAt  time.Time `json:"startedAt,omitempty"`
+	FinishedAt time.Time `json:"finishedAt,omitempty"`
+}
+
+// NetworkSettings contains network-related information about a container.
+type NetworkSettings struct {
+	IPAddress string `json:"ipAddress,omitempty"`
 }

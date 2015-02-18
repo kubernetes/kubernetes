@@ -298,7 +298,7 @@ func TestKillContainerWithError(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 	kubelet.containerRuntime = dockertools.NewDockerRuntime(fakeDocker)
-	container := dockertools.ToContainer(fakeDocker.ContainerList[0])
+	container := dockertools.ConvertAPIContainer(fakeDocker.ContainerList[0])
 	err := kubelet.killContainer(&container)
 	if err == nil {
 		t.Errorf("expected error, found nil")
@@ -334,7 +334,7 @@ func TestKillContainer(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 
-	container := dockertools.ToContainer(fakeDocker.ContainerList[0])
+	container := dockertools.ConvertAPIContainer(fakeDocker.ContainerList[0])
 	err := kubelet.killContainer(&container)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

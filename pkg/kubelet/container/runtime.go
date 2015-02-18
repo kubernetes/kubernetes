@@ -21,7 +21,7 @@ import "github.com/fsouza/go-dockerclient"
 // ContainerRuntimeInterface is the abstract interface for container runtime.
 type ContainerRuntimeInterface interface {
 	ListContainers(options ListContainersOptions) ([]Container, error)
-	InspectContainer(id string) (*docker.Container, error)
+	InspectContainer(id string) (*Container, error)
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error

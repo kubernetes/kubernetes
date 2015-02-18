@@ -55,7 +55,7 @@ func (kl *Kubelet) probeContainer(p *api.Probe,
 	if p == nil {
 		return probe.Success, nil
 	}
-	if time.Now().Unix()-dockerContainer.Created < p.InitialDelaySeconds {
+	if time.Now().Unix()-dockerContainer.Created.Unix() < p.InitialDelaySeconds {
 		return defaultResult, nil
 	}
 	for i := 0; i < maxProbeRetries; i++ {

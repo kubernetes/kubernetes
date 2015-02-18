@@ -355,7 +355,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-type ByCreated []*docker.Container
+type ByCreated []*container.Container
 
 func (a ByCreated) Len() int           { return len(a) }
 func (a ByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -363,7 +363,7 @@ func (a ByCreated) Less(i, j int) bool { return a[i].Created.After(a[j].Created)
 
 // TODO: these removals are racy, we should make dockerclient threadsafe across List/Inspect transactions.
 func (kl *Kubelet) purgeOldest(ids []string) error {
-	dockerData := []*docker.Container{}
+	var dockerData []*container.Container
 	for _, id := range ids {
 		data, err := kl.containerRuntime.InspectContainer(id)
 		if err != nil {
@@ -1272,7 +1272,7 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker.Container) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*container.Container) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
 	runningSet := util.StringSet{}
