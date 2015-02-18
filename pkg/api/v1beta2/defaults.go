@@ -87,5 +87,10 @@ func init() {
 				obj.Type = SecretTypeOpaque
 			}
 		},
+		func(obj *Endpoints) {
+			if obj.Protocol == "" {
+				obj.Protocol = "TCP"
+			}
+		},
 	)
 }

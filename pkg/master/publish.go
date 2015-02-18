@@ -135,6 +135,7 @@ func (m *Master) ensureEndpointsContain(serviceName string, endpoint string) err
 				Name:      serviceName,
 				Namespace: api.NamespaceDefault,
 			},
+			Protocol: "TCP",
 		}
 	}
 	found := false

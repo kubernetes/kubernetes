@@ -747,6 +747,9 @@ type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
+	// Optional: The IP protocol for these endpoints. Supports "TCP" and
+	// "UDP".  Defaults to "TCP".
+	Protocol  Protocol `json:"protocol,omitempty"`
 	Endpoints []string `json:"endpoints,omitempty"`
 }
 

@@ -779,6 +779,10 @@ type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata"`
 
+	// Optional: The IP protocol for these endpoints. Supports "TCP" and
+	// "UDP".  Defaults to "TCP".
+	Protocol Protocol `json:"protocol,omitempty"`
+
 	// Endpoints is the list of host ports that satisfy the service selector
 	Endpoints []string `json:"endpoints"`
 }

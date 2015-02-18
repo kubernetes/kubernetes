@@ -98,6 +98,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
+					Protocol: service.Spec.Protocol,
 				}
 			} else {
 				glog.Errorf("Error getting endpoints: %v", err)
@@ -113,8 +114,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsEqual(currentEndpoints, endpoints) {
+				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
