@@ -80,5 +80,10 @@ func init() {
 				obj.TimeoutSeconds = 1
 			}
 		},
+		func(obj *Secret) {
+			if obj.Type == "" {
+				obj.Type = SecretTypeOpaque
+			}
+		},
 	)
 }

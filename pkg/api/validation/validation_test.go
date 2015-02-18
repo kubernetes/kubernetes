@@ -153,12 +153,13 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
 		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
 		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
+		{Name: "secret", Source: api.VolumeSource{Secret: &api.SecretSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != 6 || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo") {
+	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret") {
 		t.Errorf("wrong names result: %v", names)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDir{}}
@@ -2487,6 +2488,55 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}
 		if !test.valid && len(errs) == 0 {
 			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
+
+func TestValidateSecret(t *testing.T) {
+	validSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Data: map[string][]byte{
+				"foo": []byte("bar"),
+			},
+		}
+	}
+
+	var (
+		emptyName   = validSecret()
+		invalidName = validSecret()
+		emptyNs     = validSecret()
+		invalidNs   = validSecret()
+		overMaxSize = validSecret()
+	)
+
+	emptyName.Name = ""
+	invalidName.Name = "NoUppercaseOrSpecialCharsLike=Equals"
+	emptyNs.Namespace = ""
+	invalidNs.Namespace = "NoUppercaseOrSpecialCharsLike=Equals"
+	overMaxSize.Data = map[string][]byte{
+		"over": make([]byte, api.MaxSecretSize+1),
+	}
+
+	tests := map[string]struct {
+		secret api.Secret
+		valid  bool
+	}{
+		"valid":             {validSecret(), true},
+		"empty name":        {emptyName, false},
+		"invalid name":      {invalidName, false},
+		"empty namespace":   {emptyNs, false},
+		"invalid namespace": {invalidNs, false},
+		"over max size":     {overMaxSize, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateSecret(&tc.secret)
+		if tc.valid && len(errs) > 0 {
+			t.Errorf("%v: Unexpected error: %v", name, errs)
+		}
+		if !tc.valid && len(errs) == 0 {
+			t.Errorf("%v: Unexpected non-error", name)
 		}
 	}
 }

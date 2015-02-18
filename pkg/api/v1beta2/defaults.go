@@ -21,12 +21,14 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 func init() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.Source) {
+				glog.Errorf("Defaulting volume source for %v", obj)
 				obj.Source = VolumeSource{
 					EmptyDir: &EmptyDir{},
 				}
@@ -78,6 +80,11 @@ func init() {
 		func(obj *LivenessProbe) {
 			if obj.TimeoutSeconds == 0 {
 				obj.TimeoutSeconds = 1
+			}
+		},
+		func(obj *Secret) {
+			if obj.Type == "" {
+				obj.Type = SecretTypeOpaque
 			}
 		},
 	)

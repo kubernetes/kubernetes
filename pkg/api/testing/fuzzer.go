@@ -227,6 +227,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				c.Fuzz(&e.Count)
 			}
 		},
+		func(s *api.Secret, c fuzz.Continue) {
+			c.Fuzz(&s.TypeMeta)
+			c.Fuzz(&s.ObjectMeta)
+
+			s.Type = api.SecretTypeOpaque
+		},
 	)
 	return f
 }

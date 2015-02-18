@@ -943,6 +943,9 @@ func init() {
 			if err := s.Convert(&in.HostPath, &out.HostDir, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Secret, &out.Secret, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *VolumeSource, out *newer.VolumeSource, s conversion.Scope) error {
@@ -956,6 +959,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.HostDir, &out.HostPath, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Secret, &out.Secret, 0); err != nil {
 				return err
 			}
 			return nil
