@@ -81,9 +81,9 @@ func (u *UndeltaStore) Replace(list []interface{}) error {
 }
 
 // NewUndeltaStore returns an UndeltaStore implemented with a Store.
-func NewUndeltaStore(pushFunc func([]interface{}), keyFunc KeyFunc, isOlder IsOlder) *UndeltaStore {
+func NewUndeltaStore(pushFunc func([]interface{}), keyFunc KeyFunc, canReplace CanReplace) *UndeltaStore {
 	return &UndeltaStore{
-		ActualStore: NewStore(keyFunc, isOlder),
+		ActualStore: NewStore(keyFunc, canReplace),
 		PushFunc:    pushFunc,
 	}
 }

@@ -49,8 +49,8 @@ type Store interface {
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
 type KeyFunc func(obj interface{}) (string, error)
 
-// IsOlder returns true if a is older than b, and returns false if a is equal to or newer than b.
-type IsOlder func(a, b interface{}) (bool, error)
+// CanReplace returns true if a can replace b, and returns false otherwise.
+type CanReplace func(a, b interface{}) (bool, error)
 
 // MetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
 // keys for API objects which implement meta.Interface.
@@ -66,10 +66,10 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	return meta.Name(), nil
 }
 
-// MetaNamespaceIsOlder is an IsOlder implementation which requires both a and b to
-// implement meta.Interface. It returns true if ResourceVersion of a is less than
+// ReplaceIfNewer is a CanReplace implementation which requires both a and b to
+// implement meta.Interface. It returns true if ResourceVersion of a is greater than
 // ResourceVersion of b, and returns false otherwise.
-func MetaNamespaceIsOlder(a, b interface{}) (bool, error) {
+func ReplaceIfNewer(a, b interface{}) (bool, error) {
 	metaA, errA := meta.Accessor(a)
 	if errA != nil {
 		return false, fmt.Errorf("object has no meta: %v", errA)
@@ -80,14 +80,14 @@ func MetaNamespaceIsOlder(a, b interface{}) (bool, error) {
 		return false, fmt.Errorf("object has no meta: %v", errB)
 	}
 
-	return metaA.ResourceVersion() < metaB.ResourceVersion(), nil
+	return metaA.ResourceVersion() > metaB.ResourceVersion(), nil
 }
 
-// DefaultIsOlder is a simple IsOlder implementation which will always return false, resulting
+// AlwaysReplace is a simple CanReplace implementation which will always return true, resulting
 // in a always being accepted into Store implementations (which is the expected behavior for
 // users of Store who don't care about versioning in detail).
-func DefaultIsOlder(a, b interface{}) (bool, error) {
-	return false, nil
+func AlwaysReplace(a, b interface{}) (bool, error) {
+	return true, nil
 }
 
 type cache struct {
@@ -96,8 +96,8 @@ type cache struct {
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	keyFunc KeyFunc
-	// isOlder is used to accept or reject objects which are older than what's already stored.
-	isOlder IsOlder
+	// canReplace is used to drive acceptance of objects passed to Add or Update.
+	canReplace CanReplace
 	// indexers maps a name to an IndexFunc
 	indexers Indexers
 	// indices maps a name to an Index
@@ -115,13 +115,14 @@ func (c *cache) Add(obj interface{}) error {
 	defer c.lock.Unlock()
 	oldObject := c.items[key]
 
-	// reject attempts to add older entries
-	if older, err := c.isOlder(obj, oldObject); err != nil {
+	// Reject invalid attempts to add objects
+	canReplace, err := c.canReplace(obj, oldObject)
+	if err != nil {
 		return fmt.Errorf("couldn't compare objects: %v", err)
-	} else {
-		if older {
-			return nil
-		}
+	}
+
+	if !canReplace {
+		return nil
 	}
 
 	c.items[key] = obj
@@ -193,13 +194,14 @@ func (c *cache) Update(obj interface{}) error {
 	defer c.lock.Unlock()
 	oldObject := c.items[key]
 
-	// reject attempts to add older entries
-	if older, err := c.isOlder(obj, oldObject); err != nil {
+	// Reject attempts to update invalid entries
+	canReplace, err := c.canReplace(obj, oldObject)
+	if err != nil {
 		return fmt.Errorf("couldn't compare objects: %v", err)
-	} else {
-		if older {
-			return nil
-		}
+	}
+
+	if !canReplace {
+		return nil
 	}
 
 	c.items[key] = obj
@@ -302,8 +304,8 @@ func (c *cache) Replace(list []interface{}) error {
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.
-func NewStore(keyFunc KeyFunc, isOlder IsOlder) Store {
-	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, isOlder: isOlder, indexers: Indexers{}, indices: Indices{}}
+func NewStore(keyFunc KeyFunc, canReplace CanReplace) Store {
+	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, canReplace: canReplace, indexers: Indexers{}, indices: Indices{}}
 }
 
 // NewIndexer returns an Indexer implemented simply with a map and a lock.

@@ -76,7 +76,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 }
 
 func NewProvision(c client.Interface) admission.Interface {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc, cache.DefaultIsOlder)
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc, cache.AlwaysReplace)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			Client:        c.(*client.Client),
