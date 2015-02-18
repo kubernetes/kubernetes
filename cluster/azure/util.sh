@@ -363,16 +363,14 @@ function kube-up {
             -subj "/CN=azure-ssh-key"
     fi
 
-    if [[ -z "$(azure_call network vnet show $AZ_VNET 2>/dev/null | grep data)" ]]; then
-        #azure network vnet create with $AZ_SUBNET
-        #FIXME not working
+    if [[ -z "$(azure_call network vnet show "$AZ_VNET" 2>/dev/null | grep data)" ]]; then
         echo error create vnet $AZ_VNET with subnet $AZ_SUBNET
         exit 1
     fi
 
     echo "--> Starting VM"
     azure_call vm create \
-        -w $AZ_VNET \
+        -w "$AZ_VNET" \
         -n $MASTER_NAME \
         -l "$AZ_LOCATION" \
         -t $AZ_SSH_CERT \
@@ -399,7 +397,7 @@ function kube-up {
 
         echo "--> Starting VM"
         azure_call vm create \
-            -c -w $AZ_VNET \
+            -c -w "$AZ_VNET" \
             -n ${MINION_NAMES[$i]} \
             -l "$AZ_LOCATION" \
             -t $AZ_SSH_CERT \
