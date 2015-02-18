@@ -47,6 +47,8 @@ type AuthOverrideFlags struct {
 	ClientCertificate string
 	ClientKey         string
 	Token             string
+	Username          string
+	Password          string
 }
 
 // ContextOverrideFlags holds the flag names to be used for binding command line flags for Cluster objects
@@ -80,6 +82,8 @@ const (
 	FlagKeyFile      = "client-key"
 	FlagCAFile       = "certificate-authority"
 	FlagBearerToken  = "token"
+	FlagUsername     = "username"
+	FlagPassword     = "password"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -89,6 +93,8 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientCertificate: prefix + FlagCertFile,
 		ClientKey:         prefix + FlagKeyFile,
 		Token:             prefix + FlagBearerToken,
+		Username:          prefix + FlagUsername,
+		Password:          prefix + FlagPassword,
 	}
 }
 
@@ -127,6 +133,8 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flags.StringVar(&authInfo.ClientCertificate, flagNames.ClientCertificate, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.ClientKey, flagNames.ClientKey, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.Token, flagNames.Token, "", "Bearer token for authentication to the API server.")
+	flags.StringVar(&authInfo.Username, flagNames.Username, "", "Username for basic authentication to the API server.")
+	flags.StringVar(&authInfo.Password, flagNames.Password, "", "Password for basic authentication to the API server.")
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables

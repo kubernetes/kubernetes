@@ -66,6 +66,71 @@ func TestMergeContext(t *testing.T) {
 	matchStringArg(namespace, actual, t)
 }
 
+func TestCertificateData(t *testing.T) {
+	caData := []byte("ca-data")
+	certData := []byte("cert-data")
+	keyData := []byte("key-data")
+
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = clientcmdapi.Cluster{
+		Server:                   "https://localhost:8443",
+		APIVersion:               latest.Version,
+		CertificateAuthorityData: caData,
+	}
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+		ClientCertificateData: certData,
+		ClientKeyData:         keyData,
+	}
+	config.Contexts["clean"] = clientcmdapi.Context{
+		Cluster:  "clean",
+		AuthInfo: "clean",
+	}
+	config.CurrentContext = "clean"
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Make sure cert data gets into config (will override file paths)
+	matchByteArg(caData, clientConfig.TLSClientConfig.CAData, t)
+	matchByteArg(certData, clientConfig.TLSClientConfig.CertData, t)
+	matchByteArg(keyData, clientConfig.TLSClientConfig.KeyData, t)
+}
+
+func TestBasicAuthData(t *testing.T) {
+	username := "myuser"
+	password := "mypass"
+
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = clientcmdapi.Cluster{
+		Server:     "https://localhost:8443",
+		APIVersion: latest.Version,
+	}
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+		Username: username,
+		Password: password,
+	}
+	config.Contexts["clean"] = clientcmdapi.Context{
+		Cluster:  "clean",
+		AuthInfo: "clean",
+	}
+	config.CurrentContext = "clean"
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Make sure basic auth data gets into config
+	matchStringArg(username, clientConfig.Username, t)
+	matchStringArg(password, clientConfig.Password, t)
+}
+
 func TestCreateClean(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
@@ -120,6 +185,12 @@ func matchBoolArg(expected, got bool, t *testing.T) {
 
 func matchStringArg(expected, got string, t *testing.T) {
 	if expected != got {
+		t.Errorf("Expected %v, got %v", expected, got)
+	}
+}
+
+func matchByteArg(expected, got []byte, t *testing.T) {
+	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("Expected %v, got %v", expected, got)
 	}
 }
