@@ -49,7 +49,7 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 ### Using godep
-Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace. Here is the recommended way to set up your system. There are other ways that may work, but this is the easiest one I know of.
+Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
 1) Devote a directory to this endeavor:
 ```
@@ -69,7 +69,7 @@ export GOPATH=$KPATH
 # Option B is recommended if you're going to mess with the dependencies.
 ```
 
-3) Populate your new $GOPATH.
+3) Populate your new GOPATH.
 ```
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 godep restore
@@ -77,20 +77,22 @@ godep restore
 
 4) Next, you can either add a new dependency or update an existing one.
 ```
-# To add a new dependency, run:
+# To add a new dependency, do:
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 go get path/to/dependency
+# Change code in Kubernetes to use the dependency.
 godep save ./...
 
-# To update an existing dependency, do
+# To update an existing dependency, do:
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 go get -u path/to/dependency
+# Change code in Kubernetes accordingly if necessary.
 godep update path/to/dependency
 ```
 
 5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: ```godep restore```
 
-I (lavalamp) have sometimes found it expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
+It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
 
@@ -207,26 +209,6 @@ go run e2e.go -ctl='delete pod foobar'
 
 ## Testing out flaky tests
 [Instructions here](flaky-tests.md)
-
-## Add/Update dependencies
-
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. To add or update a package, please follow the instructions on [godep's document](https://github.com/tools/godep).
-
-To add a new package ``foo/bar``:
-
-- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
-- Run ``godep restore`` to make sure you have all dependancies pulled.
-- Download foo/bar into the first directory in GOPATH: ``go get foo/bar``.
-- Change code in kubernetes to use ``foo/bar``.
-- Run ``godep save ./...`` under kubernetes' root directory.
-
-To update a package ``foo/bar``:
-
-- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
-- Run ``godep restore`` to make sure you have all dependancies pulled.
-- Update the package with ``go get -u foo/bar``.
-- Change code in kubernetes accordingly if necessary.
-- Run ``godep update foo/bar`` under kubernetes' root directory.
 
 ## Keeping your development fork in sync
 
