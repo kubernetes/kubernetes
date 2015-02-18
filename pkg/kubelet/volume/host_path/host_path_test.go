@@ -26,7 +26,7 @@ import (
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"fake", nil})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -45,7 +45,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"fake", nil})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {

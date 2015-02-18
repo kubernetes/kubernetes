@@ -853,9 +853,14 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	}
 
 	totalSize := 0
-	for _, value := range secret.Data {
+	for key, value := range secret.Data {
+		if !util.IsDNSSubdomain(key) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%v]", key), key, cIdentifierErrorMsg))
+		}
+
 		totalSize += len(value)
 	}
+
 	if totalSize > api.MaxSecretSize {
 		allErrs = append(allErrs, errs.NewFieldForbidden("data", "Maximum secret size exceeded"))
 	}

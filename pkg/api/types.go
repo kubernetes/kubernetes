@@ -230,7 +230,10 @@ type GitRepo struct {
 	// TODO: Consider credentials here.
 }
 
-// Adapts a Secret into a VolumeSource
+// Adapts a Secret into a VolumeSource.
+//
+// The contents of the target Secret's Data field will be presented in a volume
+// as files using the keys in the Data field as the file names.
 type SecretSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target"`
@@ -1318,14 +1321,21 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota `json:"items"`
 }
 
-// Secret holds secret data of a certain type
+// Secret holds secret data of a certain type.  The total bytes of the values in
+// the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
+	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
+	// The serialized form of the secret data is a base64 encoded string.
 	Data map[string][]byte `json:"data,omitempty"`
-	Type SecretType        `json:"type,omitempty"`
+
+	// Used to facilitate programatic handling of secret data.
+	Type SecretType `json:"type,omitempty"`
 }
+
+const MaxSecretSize = 1 * 1024 * 1024
 
 type SecretType string
 
@@ -1339,5 +1349,3 @@ type SecretList struct {
 
 	Items []Secret `json:"items"`
 }
-
-const MaxSecretSize = 1 * 1024 * 1024
