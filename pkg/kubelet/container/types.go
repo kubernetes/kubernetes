@@ -65,3 +65,16 @@ type State struct {
 type NetworkSettings struct {
 	IPAddress string `json:"ipAddress,omitempty"`
 }
+
+// CreateContainerOptions specify parameters to the CreateContainer function.
+type CreateContainerOptions struct {
+	Name         string              `json:"name,omitempty"`
+	Cmd          []string            `json:"cmd,omitempty"`
+	Env          []string            `json:"env,omitempty"`
+	ExposedPorts map[string]struct{} `json:"exposedPorts,omitempty"`
+	Hostname     string              `json:"hostname,omitempty"`
+	Image        string              `json:"image,omitempty"`
+	Memory       int64               `json:"memory,omitempty"`
+	CPUShares    int64               `json:"cpuShares,omitempty"`
+	WorkingDir   string              `json:"workingDir,omitempty`
+}

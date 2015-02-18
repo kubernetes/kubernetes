@@ -177,8 +177,30 @@ func (dr *DockerRuntime) InspectContainer(id string) (*container.Container, erro
 }
 
 // CreateContainer implements ContainerRuntime.CreateContainer.
-func (dr *DockerRuntime) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
-	return dr.docker.CreateContainer(opts)
+func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) (*container.Container, error) {
+	// Copy exposedPorts.
+	exposedPorts := make(map[docker.Port]struct{})
+	for port := range opts.ExposedPorts {
+		exposedPorts[docker.Port(port)] = struct{}{}
+	}
+	dockerOptions := docker.CreateContainerOptions{
+		Name: opts.Name,
+		Config: &docker.Config{
+			Cmd:          opts.Cmd,
+			Env:          opts.Env,
+			ExposedPorts: exposedPorts,
+			Hostname:     opts.Hostname,
+			Image:        opts.Image,
+			Memory:       opts.Memory,
+			CPUShares:    opts.CPUShares,
+			WorkingDir:   opts.WorkingDir,
+		},
+	}
+	dc, err := dr.docker.CreateContainer(dockerOptions)
+	if err != nil {
+		return nil, err
+	}
+	return ConvertContainer(dc), nil
 }
 
 // StartContainer implements ContainerRuntime.StartContainer.

@@ -646,31 +646,35 @@ func (kl *Kubelet) getRef(id dockertools.DockerID) (ref *api.ObjectReference, ok
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (id dockertools.DockerID, err error) {
-	ref, err := containerRef(pod, container)
+func (kl *Kubelet) runContainer(pod *api.BoundPod, ctnr *api.Container, podVolumes volumeMap, netMode, ipcMode string) (id dockertools.DockerID, err error) {
+	ref, err := containerRef(pod, ctnr)
 	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, ctnr.Name, err)
 	}
 
-	envVariables, err := kl.makeEnvironmentVariables(pod.Namespace, container)
+	envVariables, err := kl.makeEnvironmentVariables(pod.Namespace, ctnr)
 	if err != nil {
 		return "", err
 	}
-	binds := makeBinds(pod, container, podVolumes)
-	exposedPorts, portBindings := makePortsAndBindings(container)
+	binds := makeBinds(pod, ctnr, podVolumes)
+	exposedPorts, portBindings := makePortsAndBindings(ctnr)
 
-	opts := docker.CreateContainerOptions{
-		Name: dockertools.BuildDockerName(pod.UID, GetPodFullName(pod), container),
-		Config: &docker.Config{
-			Cmd:          container.Command,
-			Env:          envVariables,
-			ExposedPorts: exposedPorts,
-			Hostname:     pod.Name,
-			Image:        container.Image,
-			Memory:       container.Resources.Limits.Memory().Value(),
-			CPUShares:    milliCPUToShares(container.Resources.Limits.Cpu().MilliValue()),
-			WorkingDir:   container.WorkingDir,
-		},
+	// Copy exposedPorts.
+	ports := make(map[string]struct{})
+	for port := range exposedPorts {
+		ports[string(port)] = struct{}{}
+	}
+
+	opts := container.CreateContainerOptions{
+		Name:         dockertools.BuildDockerName(pod.UID, GetPodFullName(pod), ctnr),
+		Cmd:          ctnr.Command,
+		Env:          envVariables,
+		ExposedPorts: ports,
+		Hostname:     pod.Name,
+		Image:        ctnr.Image,
+		Memory:       ctnr.Resources.Limits.Memory().Value(),
+		CPUShares:    milliCPUToShares(ctnr.Resources.Limits.Cpu().MilliValue()),
+		WorkingDir:   ctnr.WorkingDir,
 	}
 	dockerContainer, err := kl.containerRuntime.CreateContainer(opts)
 	if err != nil {
@@ -686,8 +690,8 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 		record.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
 	}
 
-	if len(container.TerminationMessagePath) != 0 {
-		p := kl.getPodContainerDir(pod.UID, container.Name)
+	if len(ctnr.TerminationMessagePath) != 0 {
+		p := kl.getPodContainerDir(pod.UID, ctnr.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			glog.Errorf("Error on creating %q: %v", p, err)
 		} else {
@@ -698,19 +702,19 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 				glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
 			} else {
 				fs.Close() // Close immediately; we're just doing a `touch` here
-				b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+				b := fmt.Sprintf("%s:%s", containerLogPath, ctnr.TerminationMessagePath)
 				binds = append(binds, b)
 			}
 		}
 	}
 	privileged := false
 	if capabilities.Get().AllowPrivileged {
-		privileged = container.Privileged
-	} else if container.Privileged {
+		privileged = ctnr.Privileged
+	} else if ctnr.Privileged {
 		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
 	}
 
-	capAdd, capDrop := makeCapabilites(container.Capabilities.Add, container.Capabilities.Drop)
+	capAdd, capDrop := makeCapabilites(ctnr.Capabilities.Add, ctnr.Capabilities.Drop)
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
@@ -737,8 +741,8 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 		record.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
 	}
 
-	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
-		handlerErr := kl.runHandler(GetPodFullName(pod), pod.UID, container, container.Lifecycle.PostStart)
+	if ctnr.Lifecycle != nil && ctnr.Lifecycle.PostStart != nil {
+		handlerErr := kl.runHandler(GetPodFullName(pod), pod.UID, ctnr, ctnr.Lifecycle.PostStart)
 		if handlerErr != nil {
 			kl.killContainerByID(dockerContainer.ID, "")
 			return dockertools.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
