@@ -90,6 +90,9 @@ Examples:
 			checkErr(err)
 			newRc := obj.(*api.ReplicationController)
 
+			if len(namespace) == 0 {
+				namespace = api.NamespaceDefault
+			}
 			updater := kubectl.NewRollingUpdater(namespace, client)
 
 			// fetch rc
