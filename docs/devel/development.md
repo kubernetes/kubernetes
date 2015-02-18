@@ -182,8 +182,11 @@ go run hack/e2e.go --pushup
 # Run all tests
 go run hack/e2e.go --test
 
-# Run tests matching a glob.
-go run hack/e2e.go --tests=...
+# Run tests matching the regex "Pods.*env"
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+
+# Alternately, if you have the e2e cluster up and no desire to see the event stream, you can run ginkgo-e2e.sh directly:
+hack/ginkgo-e2e.sh --ginkgo.focus=Pods.*env
 ```
 
 ### Combining flags
