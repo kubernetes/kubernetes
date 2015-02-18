@@ -108,7 +108,7 @@ func TestSecure(t *testing.T) {
 	key.Algorithm = RSASHA256
 	key.PublicKey = "AwEAAcNEU67LJI5GEgF9QLNqLO1SMq1EdoQ6E9f85ha0k0ewQGCblyW2836GiVsm6k8Kr5ECIoMJ6fZWf3CQSQ9ycWfTyOHfmI3eQ/1Covhb2y4bAmL/07PhrL7ozWBW3wBfM335Ft9xjtXHPy7ztCbV9qZ4TVDTW/Iyg0PiwgoXVesz"
 
-	// It should validate. Period is checked seperately, so this will keep on working
+	// It should validate. Period is checked separately, so this will keep on working
 	if sig.Verify(key, []RR{soa}) != nil {
 		t.Log("failure to validate")
 		t.Fail()
@@ -438,7 +438,7 @@ PrivateKey: WURgWHCcYIYUPWgeLmiPY2DJJk02vgrmTfitxgqcL4vwW7BOrbawVmVe0d9V94SR`
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	// TODO: Create seperate test for this
+	// TODO: Create separate test for this
 	ds := eckey.(*DNSKEY).ToDS(SHA384)
 	if ds.KeyTag != 10771 {
 		t.Fatal("wrong keytag on DS")

@@ -10,7 +10,7 @@
 #   kubelet.service
 #   kube-proxy.service
 
-# Comma seperated list of nodes in the etcd cluster
+# Comma separated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
 # logging to stderr means we get it in the systemd journal

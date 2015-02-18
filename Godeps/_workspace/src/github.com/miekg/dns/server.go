@@ -369,7 +369,7 @@ func (srv *Server) getReadTimeout() time.Duration {
 }
 
 // serveTCP starts a TCP listener for the server.
-// Each request is handled in a seperate goroutine.
+// Each request is handled in a separate goroutine.
 func (srv *Server) serveTCP(l *net.TCPListener) error {
 	defer l.Close()
 
@@ -404,7 +404,7 @@ func (srv *Server) serveTCP(l *net.TCPListener) error {
 }
 
 // serveUDP starts a UDP listener for the server.
-// Each request is handled in a seperate goroutine.
+// Each request is handled in a separate goroutine.
 func (srv *Server) serveUDP(l *net.UDPConn) error {
 	defer l.Close()
 
