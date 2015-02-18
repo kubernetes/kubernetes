@@ -74,29 +74,33 @@ func NewDockerRuntime(docker DockerInterface) container.ContainerRuntimeInterfac
 	return &DockerRuntime{docker: docker}
 }
 
-// ConvertAPIContainer converts a docker.APIContainer to container.Container.
-func ConvertAPIContainer(dockerContainer docker.APIContainers) container.Container {
-	c := container.Container{
-		ID:         dockerContainer.ID,
-		Image:      dockerContainer.Image,
-		Command:    dockerContainer.Command,
-		Created:    time.Unix(dockerContainer.Created, 0),
-		Status:     dockerContainer.Status,
-		SizeRw:     dockerContainer.SizeRw,
-		SizeRootFs: dockerContainer.SizeRootFs,
-		Names:      dockerContainer.Names,
+// ConvertAPIContainer converts a *docker.APIContainers to *container.Container.
+func ConvertAPIContainer(dc *docker.APIContainers) *container.Container {
+	if dc == nil {
+		return nil
+	}
+
+	c := &container.Container{
+		ID:         dc.ID,
+		Image:      dc.Image,
+		Command:    dc.Command,
+		Created:    time.Unix(dc.Created, 0),
+		Status:     dc.Status,
+		SizeRw:     dc.SizeRw,
+		SizeRootFs: dc.SizeRootFs,
+		Names:      dc.Names,
 	}
 
 	// Copy Name.
-	if len(dockerContainer.Names) == 0 {
+	if len(dc.Names) == 0 {
 		c.Name = ""
 	} else {
-		c.Name = dockerContainer.Names[0]
+		c.Name = dc.Names[0]
 	}
 
 	// Copy ports field too.
-	c.Ports = make([]container.Port, len(dockerContainer.Ports))
-	for i, p := range dockerContainer.Ports {
+	c.Ports = make([]container.Port, len(dc.Ports))
+	for i, p := range dc.Ports {
 		c.Ports[i] = container.Port{
 			PrivatePort: p.PrivatePort,
 			PublicPort:  p.PublicPort,
@@ -149,16 +153,16 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 }
 
 // ListContainers implements ContainerRuntime.ListContainers.
-func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]container.Container, error) {
-	dockerContainers, err := dr.docker.ListContainers(docker.ListContainersOptions{
+func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]*container.Container, error) {
+	dc, err := dr.docker.ListContainers(docker.ListContainersOptions{
 		All: options.All,
 	})
 	if err != nil {
 		return nil, err
 	}
-	containers := make([]container.Container, len(dockerContainers))
-	for i, c := range dockerContainers {
-		containers[i] = ConvertAPIContainer(c)
+	containers := make([]*container.Container, len(dc))
+	for i, c := range dc {
+		containers[i] = ConvertAPIContainer(&c)
 	}
 	return containers, nil
 }
@@ -607,8 +611,7 @@ func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allC
 	if err != nil {
 		return nil, err
 	}
-	for i := range containers {
-		container := &containers[i]
+	for _, container := range containers {
 		if len(container.Names) == 0 {
 			continue
 		}
