@@ -28,7 +28,7 @@ type Runtime interface {
 	RemoveContainer(opts RemoveContainerOptions) error
 	InspectImage(image string) (*Image, error)
 	ListImages(opts ListImagesOptions) ([]*Image, error)
-	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
+	PullImage(opts PullImageOptions) error
 	RemoveImage(image string) error
 	Logs(opts docker.LogsOptions) error
 	Version() (*docker.Env, error)

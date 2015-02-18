@@ -259,8 +259,12 @@ func (dr *DockerRuntime) ListImages(opts container.ListImagesOptions) ([]*contai
 }
 
 // PullImage implements ContainerRuntime.PullImage.
-func (dr *DockerRuntime) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
-	return dr.docker.PullImage(opts, auth)
+func (dr *DockerRuntime) PullImage(opts container.PullImageOptions) error {
+	dockerOpts := docker.PullImageOptions{
+		Repository: opts.Repository,
+		Tag:        opts.Tag,
+	}
+	return dr.docker.PullImage(dockerOpts, opts.DockerAuthConfig)
 }
 
 // RemoveImage implements ContainerRuntime.RemoveImage.
@@ -559,17 +563,18 @@ func (p dockerPuller) Pull(image string) error {
 		tag = "latest"
 	}
 
-	opts := docker.PullImageOptions{
-		Repository: image,
-		Tag:        tag,
-	}
-
-	creds, ok := p.keyring.Lookup(image)
+	auth, ok := p.keyring.Lookup(image)
 	if !ok {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 	}
 
-	err := p.client.PullImage(opts, creds)
+	opts := container.PullImageOptions{
+		Repository:       image,
+		Tag:              tag,
+		DockerAuthConfig: auth,
+	}
+
+	err := p.client.PullImage(opts)
 	// If there was no error, or we had credentials, just return the error.
 	if err == nil || ok {
 		return err

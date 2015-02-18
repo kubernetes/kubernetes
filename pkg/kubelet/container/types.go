@@ -19,6 +19,8 @@ package container
 import (
 	"errors"
 	"time"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 var (
@@ -89,12 +91,12 @@ type PortBinding struct {
 
 // Image represents a container image.
 type Image struct {
-	ID string `json:"id"`
+	ID string `json:"id,omitempty"`
 }
 
 // ListContainersOptions specify parameters to the ListContainers function.
 type ListContainersOptions struct {
-	All bool `json:"all"`
+	All bool `json:"all,omitempty"`
 }
 
 // CreateContainerOptions specify parameters to the CreateContainer function.
@@ -112,10 +114,17 @@ type CreateContainerOptions struct {
 
 // RemoveContainerOptions specify parameters to the RemoveContainer funcion.
 type RemoveContainerOptions struct {
-	ID string `json:"id"`
+	ID string `json:"id,omitempty"`
 }
 
 // ListImagesOptions specify parameters to the ListImages function.
 type ListImagesOptions struct {
-	All bool
+	All bool `json:"all,omitempty"`
+}
+
+// PullImageOptions specify parameters to the PullImage function.
+type PullImageOptions struct {
+	Repository       string                   `json:"repostory,omitempty"`
+	Tag              string                   `json:"tag,omitempty"`
+	DockerAuthConfig docker.AuthConfiguration `json:"dockerAuth,omitempty"`
 }
