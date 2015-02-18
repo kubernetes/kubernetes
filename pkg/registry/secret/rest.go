@@ -70,19 +70,19 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 }
 
 // Update updates a Secret object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	secret, ok := obj.(*api.Secret)
 	if !ok {
-		return nil, fmt.Errorf("not a secret: %#v", obj)
+		return nil, false, fmt.Errorf("not a secret: %#v", obj)
 	}
 
 	if !api.ValidNamespace(ctx, &secret.ObjectMeta) {
-		return nil, errors.NewConflict("secret", secret.Namespace, fmt.Errorf("Secret.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict("secret", secret.Namespace, fmt.Errorf("Secret.Namespace does not match the provided context"))
 	}
 
 	oldObj, err := rs.registry.Get(ctx, secret.Name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	editSecret := oldObj.(*api.Secret)
@@ -91,16 +91,19 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	editSecret.Labels = secret.Labels
 	editSecret.ResourceVersion = secret.ResourceVersion
 	editSecret.Annotations = secret.Annotations
+	editSecret.Data = secret.Data
+	editSecret.Type = secret.Type
 
 	if errs := validation.ValidateSecret(editSecret); len(errs) > 0 {
-		return nil, errors.NewInvalid("secret", editSecret.Name, errs)
+		return nil, false, errors.NewInvalid("secret", editSecret.Name, errs)
 	}
 
 	err = rs.registry.UpdateWithName(ctx, editSecret.Name, editSecret)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return rs.registry.Get(ctx, editSecret.Name)
+	out, err := rs.registry.Get(ctx, editSecret.Name)
+	return out, false, err
 }
 
 // Delete deletes the Secret with the specified name
@@ -131,7 +134,14 @@ func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, err error) {
-	return labels.Set{}, labels.Set{}, nil
+	secret, ok := obj.(*api.Secret)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid object type")
+	}
+
+	return labels.Set{}, labels.Set{
+		"type": string(secret.Type),
+	}, nil
 }
 
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {

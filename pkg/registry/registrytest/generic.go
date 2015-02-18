@@ -25,8 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// GenericRegistry knows how to store & list any runtime.Object. Events don't require
-// any non-generic features from the storage layer.
+// GenericRegistry knows how to store & list any runtime.Object.
 type GenericRegistry struct {
 	Err        error
 	Object     runtime.Object
