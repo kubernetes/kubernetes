@@ -60,7 +60,7 @@ clustered database or key-value store. We will target such workloads for our
   - Status:
 4. Scheduling throughput: 99% of scheduling decisions made in less than 1s on 100 node, 3000 pod cluster; linear time to number of nodes and pods (#3954)
   - Status:
-5. API performance: 99% of API calls return in less than 1s; constant time to number of nodes and pods
+5. API performance: 99% of API calls return in less than 1s; constant time to number of nodes and pods (#4521)
   - Status:
 6. Manage and report disk space on nodes (#4135)
   - Status: in progress
