@@ -32,8 +32,6 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 prepare-e2e
 
 detect-master >/dev/null
-# Export the master name to make it available to the ginkgo tests.
-export KUBE_MASTER
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -79,6 +77,9 @@ locations=(
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
+PROJECT=""
+ZONE=""
+KUBE_MASTER=""
 if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
   # When we are using vagrant it has hard coded auth.  We repeat that here so that
   # we don't clobber auth that might be used for a publicly facing cluster.
@@ -93,15 +94,10 @@ elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     "--auth_config=${cfg_dir}/kubernetes_auth"
     "--cert_dir=${cfg_dir}"
   )
-  # Export the project and zone env vars to make them available to the tests.
-  export PROJECT
-  export ZONE
 elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   auth_config=(
     "--auth_config=${HOME}/.kube/${PROJECT}_${INSTANCE_PREFIX}/kubernetes_auth"
   )
-  export PROJECT
-  export ZONE
 else
   auth_config=()
 fi
@@ -109,5 +105,8 @@ fi
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
+  --gce_project="${PROJECT}" \
+  --gce_zone="${ZONE}" \
+  --kube_master="${KUBE_MASTER}" \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@:-}"

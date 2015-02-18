@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -42,25 +41,10 @@ var _ = Describe("MasterCerts", func() {
 			return
 		}
 
-		// gcloud requires the project, zone and master VM name, it can't SSH
-		// based only on the host IP. Unfortunately, you can't SSH into a GCE VM
-		// without using gcloud SSH or doing out-of-band configuration.
-		project := os.Getenv("PROJECT")
-		if project == "" {
-			Fail(fmt.Sprintf("Error getting PROJECT environment variable"))
-		}
-		zone := os.Getenv("ZONE")
-		if zone == "" {
-			Fail(fmt.Sprintf("Error getting ZONE environment variable"))
-		}
-		master := os.Getenv("KUBE_MASTER")
-		if master == "" {
-			Fail(fmt.Sprintf("Error getting KUBE_MASTER environment variable"))
-		}
-
 		for _, certFile := range []string{"kubecfg.key", "kubecfg.crt", "ca.crt"} {
-			cmd := exec.Command("gcloud", "compute", "ssh", "--project", project, "--zone", zone,
-				master, "--command", fmt.Sprintf("ls /srv/kubernetes/%s", certFile))
+			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.gceConfig.ProjectID,
+				"--zone", testContext.gceConfig.Zone, testContext.gceConfig.MasterName,
+				"--command", fmt.Sprintf("ls /srv/kubernetes/%s", certFile))
 			if _, err := cmd.CombinedOutput(); err != nil {
 				Fail(fmt.Sprintf("Error checking for cert file %s on master: %v", certFile, err))
 			}
