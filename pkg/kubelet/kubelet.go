@@ -72,7 +72,7 @@ type volumeMap map[string]volume.Interface
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
 	hostname string,
-	containerRuntime container.ContainerRuntimeInterface,
+	containerRuntime container.Runtime,
 	etcdClient tools.EtcdClient,
 	kubeClient *client.Client,
 	rootDirectory string,
@@ -151,7 +151,7 @@ type serviceLister interface {
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname               string
-	containerRuntime       container.ContainerRuntimeInterface
+	containerRuntime       container.Runtime
 	kubeClient             *client.Client
 	rootDirectory          string
 	podInfraContainerImage string

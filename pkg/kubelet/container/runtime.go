@@ -18,8 +18,8 @@ package container
 
 import "github.com/fsouza/go-dockerclient"
 
-// ContainerRuntimeInterface is the abstract interface for container runtime.
-type ContainerRuntimeInterface interface {
+// Runtime is the abstract interface for container runtime.
+type Runtime interface {
 	ListContainers(options ListContainersOptions) ([]*Container, error)
 	InspectContainer(id string) (*Container, error)
 	CreateContainer(options CreateContainerOptions) (*Container, error)

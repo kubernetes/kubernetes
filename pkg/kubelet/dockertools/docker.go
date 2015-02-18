@@ -69,8 +69,8 @@ type DockerRuntime struct {
 	docker DockerInterface
 }
 
-// NewDockerRuntime creates a ContainerRuntimeInterface with a DockerInterface.
-func NewDockerRuntime(docker DockerInterface) container.ContainerRuntimeInterface {
+// NewDockerRuntime creates a container.Runtime with a DockerInterface.
+func NewDockerRuntime(docker DockerInterface) container.Runtime {
 	return &DockerRuntime{docker: docker}
 }
 
@@ -117,7 +117,9 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 		return nil
 	}
 
-	state := container.State{
+	var networkSettings *container.NetworkSettings
+	var image string
+	var state = container.State{
 		Running:    dc.State.Running,
 		Paused:     dc.State.Paused,
 		OOMKilled:  dc.State.OOMKilled,
@@ -127,14 +129,11 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 		StartedAt:  dc.State.StartedAt,
 		FinishedAt: dc.State.FinishedAt,
 	}
-
-	var networkSettings *container.NetworkSettings
 	if dc.NetworkSettings != nil {
 		networkSettings = &container.NetworkSettings{
 			IPAddress: dc.NetworkSettings.IPAddress,
 		}
 	}
-	var image string
 	if dc.Config != nil {
 		image = dc.Config.Image
 	}
@@ -154,26 +153,18 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 
 // ListContainers implements ContainerRuntime.ListContainers.
 func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]*container.Container, error) {
-	dc, err := dr.docker.ListContainers(docker.ListContainersOptions{
-		All: options.All,
-	})
-	if err != nil {
-		return nil, err
+	var containers []*container.Container
+	dc, err := dr.docker.ListContainers(docker.ListContainersOptions{All: options.All})
+	for _, c := range dc {
+		containers = append(containers, ConvertAPIContainer(&c))
 	}
-	containers := make([]*container.Container, len(dc))
-	for i, c := range dc {
-		containers[i] = ConvertAPIContainer(&c)
-	}
-	return containers, nil
+	return containers, err
 }
 
 // InspectContainer implements ContainerRuntime.InspectContainer.
 func (dr *DockerRuntime) InspectContainer(id string) (*container.Container, error) {
 	dc, err := dr.docker.InspectContainer(id)
-	if err != nil {
-		return nil, err
-	}
-	return ConvertContainer(dc), nil
+	return ConvertContainer(dc), err
 }
 
 // CreateContainer implements ContainerRuntime.CreateContainer.
@@ -183,6 +174,7 @@ func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) 
 	for port := range opts.ExposedPorts {
 		exposedPorts[docker.Port(port)] = struct{}{}
 	}
+
 	dockerOptions := docker.CreateContainerOptions{
 		Name: opts.Name,
 		Config: &docker.Config{
@@ -196,11 +188,9 @@ func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) 
 			WorkingDir:   opts.WorkingDir,
 		},
 	}
+
 	dc, err := dr.docker.CreateContainer(dockerOptions)
-	if err != nil {
-		return nil, err
-	}
-	return ConvertContainer(dc), nil
+	return ConvertContainer(dc), err
 }
 
 // StartContainer implements ContainerRuntime.StartContainer.
@@ -215,6 +205,7 @@ func (dr *DockerRuntime) StartContainer(id string, hc *container.HostConfig) err
 		DNS:         hc.DNS,
 		DNSSearch:   hc.DNSSearch,
 	}
+
 	// Convert to docker.PortBinding.
 	dockerHostConfig.PortBindings = make(map[docker.Port][]docker.PortBinding)
 	for name, bindings := range hc.PortBindings {
@@ -308,7 +299,7 @@ type DockerPuller interface {
 
 // dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
-	client  container.ContainerRuntimeInterface
+	client  container.Runtime
 	keyring credentialprovider.DockerKeyring
 }
 
@@ -318,7 +309,7 @@ type throttledDockerPuller struct {
 }
 
 // NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client container.ContainerRuntimeInterface, qps float32, burst int) DockerPuller {
+func NewDockerPuller(client container.Runtime, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
 		keyring: credentialprovider.NewDockerKeyring(),
@@ -334,7 +325,7 @@ func NewDockerPuller(client container.ContainerRuntimeInterface, qps float32, bu
 }
 
 type dockerContainerCommandRunner struct {
-	client container.ContainerRuntimeInterface
+	client container.Runtime
 }
 
 // The first version of docker that supports exec natively is 1.3.0 == API 1.15
@@ -556,7 +547,7 @@ func (d *dockerContainerCommandRunner) PortForward(podInfraContainerID string, p
 
 // NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
 // inside a container.
-func NewDockerContainerCommandRunner(client container.ContainerRuntimeInterface) ContainerCommandRunner {
+func NewDockerContainerCommandRunner(client container.Runtime) ContainerCommandRunner {
 	return &dockerContainerCommandRunner{client: client}
 }
 
@@ -608,7 +599,7 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 		return true, nil
 	}
 	// This is super brittle, but its the best we got.
-	// TODO(yifan): Merge DockerPuller into ContainerRuntimeInterface later?
+	// TODO(yifan): Merge DockerPuller into container.Runtime later?
 	if err == container.ErrNoSuchImage {
 		return false, nil
 	}
@@ -666,7 +657,7 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 
 // GetKubeletDockerContainers takes client and boolean whether to list all container or just the running ones.
 // Returns a map of docker containers that we manage. The map key is the docker container ID
-func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allContainers bool) (DockerContainers, error) {
+func GetKubeletDockerContainers(client container.Runtime, allContainers bool) (DockerContainers, error) {
 	result := make(DockerContainers)
 	containers, err := client.ListContainers(container.ListContainersOptions{All: allContainers})
 	if err != nil {
@@ -691,7 +682,7 @@ func GetKubeletDockerContainers(client container.ContainerRuntimeInterface, allC
 
 // GetRecentDockerContainersWithNameAndUUID returns a list of dead docker containers which matches the name
 // and uid given.
-func GetRecentDockerContainersWithNameAndUUID(client container.ContainerRuntimeInterface, podFullName string, uid types.UID, containerName string) ([]*container.Container, error) {
+func GetRecentDockerContainersWithNameAndUUID(client container.Runtime, podFullName string, uid types.UID, containerName string) ([]*container.Container, error) {
 	var result []*container.Container
 	containers, err := client.ListContainers(container.ListContainersOptions{All: true})
 	if err != nil {
@@ -724,7 +715,7 @@ func GetRecentDockerContainersWithNameAndUUID(client container.ContainerRuntimeI
 // Log streaming is possible if 'follow' param is set to true
 // Log tailing is possible when number of tailed lines are set and only if 'follow' is false
 // TODO: Make 'RawTerminal' option  flagable.
-func GetKubeletDockerContainerLogs(client container.ContainerRuntimeInterface, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func GetKubeletDockerContainerLogs(client container.Runtime, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
 	opts := docker.LogsOptions{
 		Container:    containerID,
 		Stdout:       true,
@@ -755,7 +746,7 @@ var (
 	ErrContainerCannotRun = errors.New("Container cannot run")
 )
 
-func inspectContainer(client container.ContainerRuntimeInterface, dockerID, containerName, tPath string) (*api.ContainerStatus, error) {
+func inspectContainer(client container.Runtime, dockerID, containerName, tPath string) (*api.ContainerStatus, error) {
 	inspectResult, err := client.InspectContainer(dockerID)
 
 	if err != nil {
@@ -825,7 +816,7 @@ func inspectContainer(client container.ContainerRuntimeInterface, dockerID, cont
 }
 
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
-func GetDockerPodInfo(client container.ContainerRuntimeInterface, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
+func GetDockerPodInfo(client container.Runtime, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
 	info := api.PodInfo{}
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -974,7 +965,7 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	return
 }
 
-func GetRunningContainers(client container.ContainerRuntimeInterface, ids []string) ([]*container.Container, error) {
+func GetRunningContainers(client container.Runtime, ids []string) ([]*container.Container, error) {
 	var result []*container.Container
 	if client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
@@ -1030,7 +1021,7 @@ func getDockerEndpoint(dockerEndpoint string) string {
 }
 
 // ConnectToDockerOrDie creates a DockerRuntime.
-func ConnectToDockerOrDie(dockerEndpoint string) container.ContainerRuntimeInterface {
+func ConnectToDockerOrDie(dockerEndpoint string) container.Runtime {
 	if dockerEndpoint == "fake://" {
 		return &DockerRuntime{
 			docker: &FakeDockerClient{

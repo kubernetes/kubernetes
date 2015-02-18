@@ -251,7 +251,7 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 // Under the hood it calls RunKubelet (below)
 func SimpleRunKubelet(client *client.Client,
 	etcdClient tools.EtcdClient,
-	containerRuntime container.ContainerRuntimeInterface,
+	containerRuntime container.Runtime,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
 	masterServiceNamespace string,
@@ -353,7 +353,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	EtcdClient                     tools.EtcdClient
 	KubeClient                     *client.Client
-	ContainerRuntime               container.ContainerRuntimeInterface
+	ContainerRuntime               container.Runtime
 	CAdvisorPort                   uint
 	Address                        util.IP
 	AllowPrivileged                bool
