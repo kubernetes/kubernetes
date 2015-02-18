@@ -193,6 +193,23 @@ function detect-minions() {
   echo "... in detect-minions()" >&2
 }
 
+# Detect minions created in the minion group
+#
+# Assumed vars:
+#   none
+# Vars set:
+#   MINION_NAMES
+function detect-minion-names {
+  detect-project
+  export MINION_NAMES=""
+  count=$("${GCLOUD}" preview container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" | grep numNodes | cut -f 2 -d ' ')
+  for x in $(seq 1 $count); do
+    export MINION_NAMES="${MINION_NAMES} k8s-${CLUSTER_NAME}-node-${x} ";
+  done
+  MINION_NAMES=(${MINION_NAMES})
+  echo "MINION_NAMES=${MINION_NAMES[*]}"
+}
+
 # SSH to a node by name ($1) and run a command ($2).
 #
 # Assumed vars:
