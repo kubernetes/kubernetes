@@ -23,10 +23,10 @@ Instead of a single Timestamp, each event object [contains](https://github.com/G
    * The number of occurrences of this event between FirstTimestamp and LastTimestamp
    * On first occurrence, this is 1.
 
-Each binary that generates events will:
- * Maintain a new global hash table to keep track of previously generated events (see ```pkg/client/record/events_cache.go```).
- * The code that “records/writes” events (see ```StartRecording``` in ```pkg/client/record/event.go```), uses the global hash table to check if any new event has been seen previously.
-   * The key for the hash table is generated from the event object minus timestamps/count/transient fields (see ```pkg/client/record/events_cache.go```), specifically the following events fields are used to construct a unique key for an event:
+Each binary that generates events:
+ * Maintains a historical record of previously generated events:
+   * Implmented with ["Least Recently Used Cache"](https://github.com/golang/groupcache/blob/master/lru/lru.go) in [```pkg/client/record/events_cache.go```](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/pkg/client/record/events_cache.go).
+   * The key in the cache is generated from the event object minus timestamps/count/transient fields, specifically the following events fields are used to construct a unique key for an event:
      * ```event.Source.Component```
      * ```event.Source.Host```
      * ```event.InvolvedObject.Kind```
@@ -36,26 +36,24 @@ Each binary that generates events will:
      * ```event.InvolvedObject.APIVersion```
      * ```event.Reason```
      * ```event.Message```
-   * If the key for a new event matches the key for a previously generated events (meaning all of the above fields match between the new event and some previously generated event), then the event is considered to be a duplicate:
-     * Instead of the usual POST/create event API, the new PUT (update) event API is called to update the existing event entry in etcd with the new last seen timestamp and count.
-     * The event is also updated in the global hash table with an incremented count, updated last seen timestamp, name, and new resource version (all required to issue a future event update).
-   * If the key for a new event does not match the key for any previously generated event (meaning none of the above fields match between the new event and any previously generated events), then the event is considered to be new/unique:
+   * The LRU cache is capped at 4096 events. That means if a component (e.g. kubelet) runs for a long period of time and generates tons of unique events, the previously generated events cache will not grow unchecked in memory. Instead, after 4096 unique events are generated, the oldest events are evicted from the cache.
+ * When an event is generated, the previously generated events cache is checked (see [```pkg/client/record/event.go```](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/pkg/client/record/event.go)).
+   * If the key for the new event matches the key for a previously generated event (meaning all of the above fields match between the new event and some previously generated event), then the event is considered to be a duplicate and the existing event entry is updated in etcd:
+     * The new PUT (update) event API is called to update the existing event entry in etcd with the new last seen timestamp and count.
+     * The event is also updated in the previously generated events cache with an incremented count, updated last seen timestamp, name, and new resource version (all required to issue a future event update).
+   * If the key for the new event does not match the key for any previously generated event (meaning none of the above fields match between the new event and any previously generated events), then the event is considered to be new/unique and a new event entry is created in etcd:
      * The usual POST/create event API is called to create a new event entry in etcd.
-     * An entry for the event is also added to the global hash table.
+     * An entry for the event is also added to the previously generated events cache.
 
 ## Issues/Risks
- * Hash table clean up
-   * If the component (e.g. kubelet) runs for a long period of time and generates a ton of unique events, the hash table could grow very large in memory.
-   * *Future consideration:* remove entries from the hash table that are older than some specified time.
- * Event history is not preserved across application restarts
-   * Each component keeps track of event history in memory, a restart causes event history to be cleared.
-   * That means that compression will not occur across component restarts.
-   * Similarly, if in the future events are aged out of the hash table, then events will only be compressed until they age out of the hash table, at which point any new instance of the event will cause a new entry to be created in etcd.
+ * Compression is not guaranteed, because each component keeps track of event history in memory
+   * An application restart causes event history to be cleared, meaning event history is not preserved across application restarts and compression will not occur across component restarts.
+   * Because an LRU cache is used to keep track of previously generated events, if too many unique events are generated, old events will be evicted from the cache, so events will only be compressed until they age out of the events cache, at which point any new instance of the event will cause a new entry to be created in etcd.
 
 ## Example
 Sample kubectl output
 ```
-FIRSTTIME                         LASTTIME                          COUNT               NAME                                          KIND                SUBOBJECT                                REASON              SOURCE                                                  MESSAGE
+FIRSTSEEN                         LASTSEEN                          COUNT               NAME                                          KIND                SUBOBJECT                                REASON              SOURCE                                                  MESSAGE
 Thu, 12 Feb 2015 01:13:02 +0000   Thu, 12 Feb 2015 01:13:02 +0000   1                   kubernetes-minion-4.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-4.c.saad-dev-vms.internal}   Starting kubelet.
 Thu, 12 Feb 2015 01:13:09 +0000   Thu, 12 Feb 2015 01:13:09 +0000   1                   kubernetes-minion-1.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-1.c.saad-dev-vms.internal}   Starting kubelet.
 Thu, 12 Feb 2015 01:13:09 +0000   Thu, 12 Feb 2015 01:13:09 +0000   1                   kubernetes-minion-3.c.saad-dev-vms.internal   Minion                                                       starting            {kubelet kubernetes-minion-3.c.saad-dev-vms.internal}   Starting kubelet.
@@ -77,3 +75,4 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
  * PR [#4157](https://github.com/GoogleCloudPlatform/kubernetes/issues/4157): Add "Update Event" to Kubernetes API
  * PR [#4206](https://github.com/GoogleCloudPlatform/kubernetes/issues/4206): Modify Event struct to allow compressing multiple recurring events in to a single event
  * PR [#4306](https://github.com/GoogleCloudPlatform/kubernetes/issues/4073): Compress recurring events in to a single event to optimize etcd storage
+ * PR [#4444](https://github.com/GoogleCloudPlatform/kubernetes/pull/4444): Switch events history to use LRU cache instead of map
