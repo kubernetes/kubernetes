@@ -236,8 +236,8 @@ func (dr *DockerRuntime) StopContainer(id string, timeout uint) error {
 }
 
 // RemoveContainer implements ContainerRuntime.RemoveContainer.
-func (dr *DockerRuntime) RemoveContainer(opts docker.RemoveContainerOptions) error {
-	return dr.docker.RemoveContainer(opts)
+func (dr *DockerRuntime) RemoveContainer(opts container.RemoveContainerOptions) error {
+	return dr.docker.RemoveContainer(docker.RemoveContainerOptions{ID: opts.ID})
 }
 
 // InspectImage implements ContainerRuntime.InspectImage.

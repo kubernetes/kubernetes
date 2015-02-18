@@ -25,7 +25,7 @@ type ContainerRuntimeInterface interface {
 	CreateContainer(options CreateContainerOptions) (*Container, error)
 	StartContainer(id string, hostConfig *HostConfig) error
 	StopContainer(id string, timeout uint) error
-	RemoveContainer(opts docker.RemoveContainerOptions) error
+	RemoveContainer(opts RemoveContainerOptions) error
 	InspectImage(image string) (*docker.Image, error)
 	ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error

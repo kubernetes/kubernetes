@@ -44,11 +44,6 @@ type Port struct {
 	IP          string `json:"ip,omitempty"`
 }
 
-// ListContainersOptions specify parameters to the ListContainers function.
-type ListContainersOptions struct {
-	All bool
-}
-
 // State represents the state of a container.
 type State struct {
 	Running    bool      `json:"running,omitempty"`
@@ -64,19 +59,6 @@ type State struct {
 // NetworkSettings contains network-related information about a container.
 type NetworkSettings struct {
 	IPAddress string `json:"ipAddress,omitempty"`
-}
-
-// CreateContainerOptions specify parameters to the CreateContainer function.
-type CreateContainerOptions struct {
-	Name         string              `json:"name,omitempty"`
-	Cmd          []string            `json:"cmd,omitempty"`
-	Env          []string            `json:"env,omitempty"`
-	ExposedPorts map[string]struct{} `json:"exposedPorts,omitempty"`
-	Hostname     string              `json:"hostname,omitempty"`
-	Image        string              `json:"image,omitempty"`
-	Memory       int64               `json:"memory,omitempty"`
-	CPUShares    int64               `json:"cpuShares,omitempty"`
-	WorkingDir   string              `json:"workingDir,omitempty`
 }
 
 // HostConfig contains the container options related to starting a container on a given host.
@@ -96,4 +78,27 @@ type HostConfig struct {
 type PortBinding struct {
 	HostIP   string `json:"hostIP,omitempty"`
 	HostPort string `json:"hostPort,omitempty"`
+}
+
+// ListContainersOptions specify parameters to the ListContainers function.
+type ListContainersOptions struct {
+	All bool `json:"all"`
+}
+
+// CreateContainerOptions specify parameters to the CreateContainer function.
+type CreateContainerOptions struct {
+	Name         string              `json:"name,omitempty"`
+	Cmd          []string            `json:"cmd,omitempty"`
+	Env          []string            `json:"env,omitempty"`
+	ExposedPorts map[string]struct{} `json:"exposedPorts,omitempty"`
+	Hostname     string              `json:"hostname,omitempty"`
+	Image        string              `json:"image,omitempty"`
+	Memory       int64               `json:"memory,omitempty"`
+	CPUShares    int64               `json:"cpuShares,omitempty"`
+	WorkingDir   string              `json:"workingDir,omitempty`
+}
+
+// RemoveContainerOptions specify parameters to the RemoveContainer funcion.
+type RemoveContainerOptions struct {
+	ID string `json:"id"`
 }

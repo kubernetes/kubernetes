@@ -46,7 +46,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -379,7 +378,7 @@ func (kl *Kubelet) purgeOldest(ids []string) error {
 	}
 	dockerData = dockerData[kl.maxContainerCount:]
 	for _, data := range dockerData {
-		if err := kl.containerRuntime.RemoveContainer(docker.RemoveContainerOptions{ID: data.ID}); err != nil {
+		if err := kl.containerRuntime.RemoveContainer(container.RemoveContainerOptions{ID: data.ID}); err != nil {
 			return err
 		}
 	}
