@@ -256,8 +256,15 @@ func (dr *DockerRuntime) InspectImage(image string) (*container.Image, error) {
 }
 
 // ListImage implements ContainerRuntime.ListImage.
-func (dr *DockerRuntime) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
-	return dr.docker.ListImages(opts)
+func (dr *DockerRuntime) ListImages(opts container.ListImagesOptions) ([]*container.Image, error) {
+	var imgs []*container.Image
+	dockerImages, err := dr.docker.ListImages(docker.ListImagesOptions{All: opts.All})
+	for i := range dockerImages {
+		imgs = append(imgs, &container.Image{
+			ID: dockerImages[i].ID,
+		})
+	}
+	return imgs, err
 }
 
 // PullImage implements ContainerRuntime.PullImage.

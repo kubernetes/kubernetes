@@ -87,6 +87,7 @@ type PortBinding struct {
 	HostPort string `json:"hostPort,omitempty"`
 }
 
+// Image represents a container image.
 type Image struct {
 	ID string `json:"id"`
 }
@@ -112,4 +113,9 @@ type CreateContainerOptions struct {
 // RemoveContainerOptions specify parameters to the RemoveContainer funcion.
 type RemoveContainerOptions struct {
 	ID string `json:"id"`
+}
+
+// ListImagesOptions specify parameters to the ListImages function.
+type ListImagesOptions struct {
+	All bool
 }
