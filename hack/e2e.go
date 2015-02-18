@@ -42,6 +42,7 @@ var (
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	test             = flag.Bool("test", false, "Run Ginkgo tests.")
+	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -270,7 +271,7 @@ func Test() bool {
 
 	ValidateClusterSize()
 
-	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh")))
+	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
 }
 
 // All nonsense below is temporary until we have go versions of these things.
