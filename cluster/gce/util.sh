@@ -168,7 +168,7 @@ function wait-for-minions-to-run {
     sleep 5
     running_minions=$(gcloud preview --project "${PROJECT}" instance-groups \
       --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
-      --running | wc -l)
+      --running | wc -l | xargs)
   done
 }
 
