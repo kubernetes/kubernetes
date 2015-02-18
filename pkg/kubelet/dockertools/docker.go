@@ -288,8 +288,9 @@ func (dr *DockerRuntime) Logs(opts container.LogsOptions) error {
 }
 
 // Version implements ContainerRuntime.Version.
-func (dr *DockerRuntime) Version() (*docker.Env, error) {
-	return dr.docker.Version()
+func (dr *DockerRuntime) Version() ([]string, error) {
+	env, err := dr.docker.Version()
+	return []string(*env), err
 }
 
 // CreateExec implements ContainerRuntime.CreateExec.
@@ -352,7 +353,7 @@ func (d *dockerContainerCommandRunner) GetDockerServerVersion() ([]uint, error) 
 		return nil, fmt.Errorf("failed to get docker server version - %v", err)
 	}
 	version := []uint{}
-	for _, entry := range *env {
+	for _, entry := range env {
 		if strings.Contains(strings.ToLower(entry), "apiversion") || strings.Contains(strings.ToLower(entry), "api version") {
 			elems := strings.Split(strings.Split(entry, "=")[1], ".")
 			for _, elem := range elems {
