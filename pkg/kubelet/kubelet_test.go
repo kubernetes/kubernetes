@@ -931,7 +931,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list", "create", "start"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start", "stop", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
