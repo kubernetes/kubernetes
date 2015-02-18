@@ -277,37 +277,25 @@ func (f *Factory) ClientMapperForCommand(cmd *cobra.Command) resource.ClientMapp
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
-//   1.  Use the kubeconfig builder.  The number of merges and overrides here gets a little crazy.  Stay with me.
-//       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy and merge rules:
-//           1.  CommandLineLocation - this parsed from the command line, so it must be late bound
-//           2.  EnvVarLocation
-//           3.  CurrentDirectoryLocation
-//           4.  HomeDirectoryLocation
-//           Empty filenames are ignored.  Files with non-deserializable content produced errors.
-//           The first file to set a particular value or map key wins and the value or map key is never changed.
-//           This means that the first file to set CurrentContext will have its context preserved.  It also means
-//           that if two files specify a "red-user", only values from the first file's red-user are used.  Even
-//           non-conflicting entries from the second file's "red-user" are discarded.
-//       2.  Determine the context to use based on the first hit in this chain
-//           1.  command line argument - again, parsed from the command line, so it must be late bound
-//           2.  CurrentContext from the merged kubeconfig file
-//           3.  Empty is allowed at this stage
-//       3.  Determine the cluster info and auth info to use.  At this point, we may or may not have a context.  They
-//           are built based on the first hit in this chain.  (run it twice, once for auth, once for cluster)
-//           1.  command line argument
-//           2.  If context is present, then use the context value
-//           3.  Empty is allowed
-//       4.  Determine the actual cluster info to use.  At this point, we may or may not have a cluster info.  Build
-//           each piece of the cluster info based on the chain:
-//           1.  command line argument
-//           2.  If cluster info is present and a value for the attribute is present, use it.
-//           3.  If you don't have a server location, bail.
-//       5.  Auth info is build using the same rules as cluster info, EXCEPT that you can only have one authentication
-//           technique per auth info.  The following conditions result in an error:
-//           1.  If there are two conflicting techniques specified from the command line, fail.
-//           2.  If the command line does not specify one, and the auth info has conflicting techniques, fail.
-//           3.  If the command line specifies one and the auth info specifies another, honor the command line technique.
-//   2.  Use default values and potentially prompt for auth information
+// 1.  Read the first available kubeconfig file:
+//     1.  CommandLineLocation - the value of the `kubeconfig` command line option
+//     2.  EnvVarLocation - the value of $KUBECONFIG
+//     3.  HomeDirectoryLocation = ~/.kube/.kubeconfig
+// 2.  Determine the context to use based on the first hit in this chain
+//     1.  command line argument - the value of the `context` command line option
+//     2.  current-context from the merged kubeconfig file
+//     3.  Empty is allowed at this stage
+// 3.  Determine the cluster info and user to use.  At this point, we may or may not have a context.  They are built based on the first hit in this chain.  (run it twice, once for user, once for cluster)
+//     1.  command line argument - `user` for user name and `cluster` for cluster name
+//     2.  If context is present, then use the context's value
+//     3.  Empty is allowed
+// 4.  Determine the actual cluster info to use.  At this point, we may or may not have a cluster info.  Build each piece of the cluster info based on the chain (first hit wins):
+//     1.  command line arguments - `server`, `api-version`, `certificate-authority`, and `insecure-skip-tls-verify`
+//     2.  If cluster info is present and a value for the attribute is present, use it.
+//     3.  If you don't have a server location, error.
+// 5.  User is build using the same rules as cluster info, EXCEPT that you can only have one authentication technique per user.
+//     The command line flags are: `auth-path`, `client-certificate`, `client-key`, and `token`.  If there are two conflicting techniques, fail.
+//     1.  For any information still missing, use default values and potentially prompt for authentication information
 func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	loadingOrder := clientcmd.DefaultClientConfigLoadingOrder()
 	flags.StringVar(&loadingOrder[0], "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")

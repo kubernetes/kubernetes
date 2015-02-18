@@ -91,7 +91,7 @@ kubectl config unset property-name
 kubectl config view --kubeconfig=specific/filename
   Displays the .kubeconfig file
 
---kubeconfig is a valid flags for all of these operations.
+--kubeconfig is a valid flag for all of these operations.
 ```
 
 ### Example

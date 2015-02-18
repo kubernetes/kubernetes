@@ -40,6 +40,9 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 		Short: "displays .kubeconfig settings or a specified .kubeconfig file.",
 		Long: `displays .kubeconfig settings or a specified .kubeconfig file.
 Examples:
+  // Show settings from $KUBECONFIG location if specified, otherwise show $HOME/.kube/.kubeconfig
+  $ kubectl config view
+
   // Show settings from specified file
   $ kubectl config view --kubeconfig=path/to/my/.kubeconfig`,
 		Run: func(cmd *cobra.Command, args []string) {

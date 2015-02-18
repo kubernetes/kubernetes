@@ -419,6 +419,9 @@ Use "kubectl help [command]" for more information about a command.
 #### config view
 displays .kubeconfig settings or a specified .kubeconfig file.
 Examples:
+  // Show settings from $KUBECONFIG location if specified, otherwise show $HOME/.kube/.kubeconfig
+  $ kubectl config view
+
   // Show settings from specified file
   $ kubectl config view --kubeconfig=path/to/my/.kubeconfig
 
