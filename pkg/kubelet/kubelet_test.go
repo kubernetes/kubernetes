@@ -1170,28 +1170,28 @@ func TestMakePortsAndBindings(t *testing.T) {
 	for key, value := range bindings {
 		switch value[0].HostPort {
 		case "8080":
-			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
+			if !reflect.DeepEqual("80/tcp", key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "127.0.0.1" {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		case "443":
-			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
+			if !reflect.DeepEqual("443/tcp", key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "" {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		case "444":
-			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
+			if !reflect.DeepEqual("444/udp", key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "" {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		case "445":
-			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
+			if !reflect.DeepEqual("445/tcp", key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "" {

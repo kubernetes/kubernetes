@@ -204,8 +204,30 @@ func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) 
 }
 
 // StartContainer implements ContainerRuntime.StartContainer.
-func (dr *DockerRuntime) StartContainer(id string, hostConfig *docker.HostConfig) error {
-	return dr.docker.StartContainer(id, hostConfig)
+func (dr *DockerRuntime) StartContainer(id string, hc *container.HostConfig) error {
+	dockerHostConfig := &docker.HostConfig{
+		Binds:       hc.Binds,
+		NetworkMode: hc.NetworkMode,
+		IpcMode:     hc.IpcMode,
+		Privileged:  hc.Privileged,
+		CapAdd:      hc.CapAdd,
+		CapDrop:     hc.CapDrop,
+		DNS:         hc.DNS,
+		DNSSearch:   hc.DNSSearch,
+	}
+	// Convert to docker.PortBinding.
+	dockerHostConfig.PortBindings = make(map[docker.Port][]docker.PortBinding)
+	for name, bindings := range hc.PortBindings {
+		dockerPortBindings := make([]docker.PortBinding, len(bindings))
+		for i := range bindings {
+			dockerPortBindings[i] = docker.PortBinding{
+				HostIP:   bindings[i].HostIP,
+				HostPort: bindings[i].HostPort,
+			}
+		}
+		dockerHostConfig.PortBindings[docker.Port(name)] = dockerPortBindings
+	}
+	return dr.docker.StartContainer(id, dockerHostConfig)
 }
 
 // StopContainer implements ContainerRuntime.StopContainer.

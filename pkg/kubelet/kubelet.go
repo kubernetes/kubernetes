@@ -498,10 +498,10 @@ func makeBinds(pod *api.BoundPod, container *api.Container, podVolumes volumeMap
 	}
 	return binds
 }
-func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
-	exposedPorts := map[docker.Port]struct{}{}
-	portBindings := map[docker.Port][]docker.PortBinding{}
-	for _, port := range container.Ports {
+func makePortsAndBindings(ctnr *api.Container) (map[string]struct{}, map[string][]container.PortBinding) {
+	exposedPorts := map[string]struct{}{}
+	portBindings := map[string][]container.PortBinding{}
+	for _, port := range ctnr.Ports {
 		exteriorPort := port.HostPort
 		if exteriorPort == 0 {
 			// No need to do port binding when HostPort is not specified
@@ -520,9 +520,9 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
 			protocol = "/tcp"
 		}
-		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
+		dockerPort := strconv.Itoa(interiorPort) + protocol
 		exposedPorts[dockerPort] = struct{}{}
-		portBindings[dockerPort] = []docker.PortBinding{
+		portBindings[dockerPort] = []container.PortBinding{
 			{
 				HostPort: strconv.Itoa(exteriorPort),
 				HostIP:   port.HostIP,
@@ -659,17 +659,11 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, ctnr *api.Container, podVolum
 	binds := makeBinds(pod, ctnr, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(ctnr)
 
-	// Copy exposedPorts.
-	ports := make(map[string]struct{})
-	for port := range exposedPorts {
-		ports[string(port)] = struct{}{}
-	}
-
 	opts := container.CreateContainerOptions{
 		Name:         dockertools.BuildDockerName(pod.UID, GetPodFullName(pod), ctnr),
 		Cmd:          ctnr.Command,
 		Env:          envVariables,
-		ExposedPorts: ports,
+		ExposedPorts: exposedPorts,
 		Hostname:     pod.Name,
 		Image:        ctnr.Image,
 		Memory:       ctnr.Resources.Limits.Memory().Value(),
@@ -715,7 +709,8 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, ctnr *api.Container, podVolum
 	}
 
 	capAdd, capDrop := makeCapabilites(ctnr.Capabilities.Add, ctnr.Capabilities.Drop)
-	hc := &docker.HostConfig{
+
+	hc := &container.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
@@ -836,7 +831,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 	return result, nil
 }
 
-func (kl *Kubelet) applyClusterDNS(hc *docker.HostConfig, pod *api.BoundPod) error {
+func (kl *Kubelet) applyClusterDNS(hc *container.HostConfig, pod *api.BoundPod) error {
 	// Get host DNS settings and append them to cluster DNS settings.
 	f, err := os.Open("/etc/resolv.conf")
 	if err != nil {

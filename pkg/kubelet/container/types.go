@@ -78,3 +78,22 @@ type CreateContainerOptions struct {
 	CPUShares    int64               `json:"cpuShares,omitempty"`
 	WorkingDir   string              `json:"workingDir,omitempty`
 }
+
+// HostConfig contains the container options related to starting a container on a given host.
+type HostConfig struct {
+	Binds        []string                 `json:"binds,omitempty"`
+	CapAdd       []string                 `json:"capAdd,omitempty"`
+	CapDrop      []string                 `json:"capDrop,omitempty"`
+	Privileged   bool                     `json:"privileged,omitempty"`
+	PortBindings map[string][]PortBinding `json:"portBindings,omitempty"`
+	DNS          []string                 `json:"dns,omitempty"`
+	DNSSearch    []string                 `json:"dnsSearch,omitempty"`
+	NetworkMode  string                   `json:"networkMode,omitempty"`
+	IpcMode      string                   `json:"ipcMode,omitempty"`
+}
+
+// PortBinding represents the host/container port mapping.
+type PortBinding struct {
+	HostIP   string `json:"hostIP,omitempty"`
+	HostPort string `json:"hostPort,omitempty"`
+}
