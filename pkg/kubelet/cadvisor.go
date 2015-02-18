@@ -17,11 +17,23 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	cadvisor "github.com/google/cadvisor/info"
+)
+
+var (
+	// ErrNoKubeletContainers returned when there are not containers managed by the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
+	ErrNoKubeletContainers = errors.New("No containers managed by kubelet")
+
+	// ErrContainerNotFound returned when a container in the given pod with the given container name was not found, amongst those managed by the kubelet.
+	ErrContainerNotFound = errors.New("No matching container")
+
+	// ErrCadvisorApiFailure returned when cadvisor couldn't retrieve stats for the given container, either because it isn't running or it was confused by the request
+	ErrCadvisorApiFailure = errors.New("Failed to retrieve cadvisor stats")
 )
 
 // cadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
@@ -63,11 +75,19 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, container
 	if err != nil {
 		return nil, err
 	}
+	if len(dockerContainers) == 0 {
+		return nil, ErrNoKubeletContainers
+	}
 	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, containerName)
 	if !found {
-		return nil, fmt.Errorf("couldn't find container")
+		return nil, ErrContainerNotFound
 	}
-	return kl.statsFromDockerContainer(cc, dockerContainer.ID, req)
+
+	ci, err := kl.statsFromDockerContainer(cc, dockerContainer.ID, req)
+	if err != nil {
+		return nil, ErrCadvisorApiFailure
+	}
+	return ci, nil
 }
 
 // GetRootInfo returns stats (from Cadvisor) of current machine (root container).

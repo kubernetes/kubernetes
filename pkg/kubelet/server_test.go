@@ -221,6 +221,25 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 	}
 }
 
+func TestContainerNotFound(t *testing.T) {
+	fw := newServerTest()
+	podID := "somepod"
+	expectedNamespace := "custom"
+	expectedContainerName := "slowstartcontainer"
+	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+		return nil, ErrContainerNotFound
+	}
+	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, expectedUid, expectedContainerName))
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Received status %d expecting %d", resp.StatusCode, http.StatusNotFound)
+	}
+	defer resp.Body.Close()
+}
+
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
 	expectedInfo := &info.ContainerInfo{}
