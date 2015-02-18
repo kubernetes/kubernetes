@@ -18,6 +18,7 @@ package container
 
 import (
 	"errors"
+	"io"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -127,4 +128,17 @@ type PullImageOptions struct {
 	Repository       string                   `json:"repostory,omitempty"`
 	Tag              string                   `json:"tag,omitempty"`
 	DockerAuthConfig docker.AuthConfiguration `json:"dockerAuth,omitempty"`
+}
+
+// LogsOptions specify parameters to the Logs function.
+type LogsOptions struct {
+	ID           string    `json:"id,omitempty"`
+	OutputStream io.Writer `json:"-"`
+	ErrorStream  io.Writer `json:"-"`
+	Follow       bool      `json:"follow,omitempty"`
+	Stdout       bool      `json:"stdout,omitempty"`
+	Stderr       bool      `json:"stderr,omitempty"`
+	Timestamps   bool      `json:"timestamp,omitempty"`
+	Tail         string    `json:"tail,omitempty"`
+	RawTerminal  bool      `json:"rawTerminal,omitempty"`
 }

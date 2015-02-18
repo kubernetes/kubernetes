@@ -273,8 +273,18 @@ func (dr *DockerRuntime) RemoveImage(image string) error {
 }
 
 // Logs implements ContainerRuntime.Logs.
-func (dr *DockerRuntime) Logs(opts docker.LogsOptions) error {
-	return dr.docker.Logs(opts)
+func (dr *DockerRuntime) Logs(opts container.LogsOptions) error {
+	return dr.docker.Logs(docker.LogsOptions{
+		Container:    opts.ID,
+		OutputStream: opts.OutputStream,
+		ErrorStream:  opts.ErrorStream,
+		Follow:       opts.Follow,
+		Stdout:       opts.Stdout,
+		Stderr:       opts.Stderr,
+		Timestamps:   opts.Timestamps,
+		Tail:         opts.Tail,
+		RawTerminal:  opts.RawTerminal,
+	})
 }
 
 // Version implements ContainerRuntime.Version.
@@ -721,8 +731,8 @@ func GetRecentDockerContainersWithNameAndUUID(client container.Runtime, podFullN
 // Log tailing is possible when number of tailed lines are set and only if 'follow' is false
 // TODO: Make 'RawTerminal' option  flagable.
 func GetKubeletDockerContainerLogs(client container.Runtime, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
-	opts := docker.LogsOptions{
-		Container:    containerID,
+	opts := container.LogsOptions{
+		ID:           containerID,
 		Stdout:       true,
 		Stderr:       true,
 		OutputStream: stdout,

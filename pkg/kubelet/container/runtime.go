@@ -30,7 +30,7 @@ type Runtime interface {
 	ListImages(opts ListImagesOptions) ([]*Image, error)
 	PullImage(opts PullImageOptions) error
 	RemoveImage(image string) error
-	Logs(opts docker.LogsOptions) error
+	Logs(opts LogsOptions) error
 	Version() (*docker.Env, error)
 	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
 	StartExec(string, docker.StartExecOptions) error
