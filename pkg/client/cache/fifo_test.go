@@ -160,3 +160,38 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
+
+func TestFIFO_processNextRetryTail(t *testing.T) {
+	mkObj := func(name string, val interface{}) testFifoObject {
+		return testFifoObject{name: name, val: val}
+	}
+	f := NewFIFO(testFifoObjectKeyFunc)
+
+	f.Add(mkObj("a", 1))
+	f.Add(mkObj("b", 2))
+	f.Add(mkObj("c", 3))
+
+	retriesLeft := 2
+	handler := func(obj interface{}) HandlerOutcome {
+		if obj.(testFifoObject).name == "a" {
+			if retriesLeft > 0 {
+				// Simulate a failure/retry
+				retriesLeft--
+				return RetryTailOutcome
+			} else {
+				// Retries exceeded, give up
+				return PopOutcome
+			}
+		}
+		return PopOutcome
+	}
+
+	expectedNames := []string{"a", "b", "c", "a", "a"}
+
+	for _, name := range expectedNames {
+		entry := f.HandleNext(handler)
+		if e, a := name, entry.(testFifoObject).name; e != a {
+			t.Fatalf("expected entry %s, got %s", e, a)
+		}
+	}
+}
