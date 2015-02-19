@@ -40,14 +40,13 @@ kube::test::find_dirs() {
   )
 }
 
-kube::test::find_pkgs() {
-  kube::test::find_dirs | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
-}
-
 # -covermode=atomic becomes default with -race in Go >=1.3
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 120s}
-KUBE_COVER=${KUBE_COVER:-} # use KUBE_COVER="-cover -covermode=atomic" for full coverage
+KUBE_COVER=${KUBE_COVER:-} # set to nonempty string to enable coverage collection
+KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
+# Set to the goveralls binary path to report coverage results to Coveralls.io.
+KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -104,6 +103,8 @@ for arg; do
 done
 set -- "${testcases[@]+${testcases[@]}}"
 
+# TODO: this should probably be refactored to avoid code duplication with the
+# coverage version.
 if [[ $iterations -gt 1 ]]; then
   if [[ $# -eq 0 ]]; then
     set -- $(kube::test::find_dirs)
@@ -135,33 +136,56 @@ if [[ $iterations -gt 1 ]]; then
   fi
 fi
 
-if [[ -n "${1-}" ]]; then
-  cover_report_dir=""
-  if [[ -n "${KUBE_COVER}" ]]; then
-    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
-    kube::log::status "Saving coverage output in '${cover_report_dir}'"
-  fi
-
-  for arg; do
-    trap 'exit 1' SIGINT
-    pkg=${KUBE_GO_PACKAGE}/${arg}
-
-    cover_params=()
-    if [[ -n "${KUBE_COVER}" ]]; then
-      mkdir -p "${cover_report_dir}/${arg}"
-      cover_params=(${KUBE_COVER} -coverprofile="${cover_report_dir}/${arg}/coverage.out")
-    fi
-
-    go test "${goflags[@]:+${goflags[@]}}" \
-        ${KUBE_RACE} \
-        ${KUBE_TIMEOUT} \
-        "${cover_params[@]+${cover_params[@]}}" \
-        "${pkg}"
-  done
-  exit 0
+cover_report_dir=""
+combined_cover_profile=""
+if [[ -n "${KUBE_COVER}" ]]; then
+  cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+  combined_cover_profile="${cover_report_dir}/combined-coverage.out"
+  kube::log::status "Saving coverage output in '${cover_report_dir}'"
+  mkdir -p ${cover_report_dir}
+  # The combined coverage profile needs to start with a line indicating which
+  # coverage mode was used (set, count, or atomic). This line is included in
+  # each of the coverage profiles generated when running 'go test -cover', but
+  # we strip these lines out when combining so that there's only one.
+  echo "mode: ${KUBE_COVERMODE}" >${combined_cover_profile}
 fi
 
-kube::test::find_pkgs | xargs go test "${goflags[@]:+${goflags[@]}}" \
-    ${KUBE_RACE} \
-    ${KUBE_TIMEOUT} \
-    ${KUBE_COVER}
+if [[ -n "${1-}" ]]; then
+  test_dirs=$@
+else
+  test_dirs=$(kube::test::find_dirs)
+fi
+
+# Run all specified tests, optionally collecting coverage if KUBE_COVER is set.
+for arg in ${test_dirs}; do
+  trap 'exit 1' SIGINT
+  pkg=${KUBE_GO_PACKAGE}/${arg}
+
+  cover_params=()
+  cover_profile=""
+  if [[ -n "${KUBE_COVER}" ]]; then
+    cover_profile=${cover_report_dir}/${arg}/coverage.out
+    mkdir -p "${cover_report_dir}/${arg}"
+    cover_params=(-cover -covermode="${KUBE_COVERMODE}" -coverprofile="${cover_profile}")
+  fi
+
+  go test "${goflags[@]:+${goflags[@]}}" \
+      ${KUBE_RACE} \
+      ${KUBE_TIMEOUT} \
+      "${cover_params[@]+${cover_params[@]}}" \
+      "${pkg}"
+  if [[ -f "${cover_profile}" ]]; then
+    # Include all coverage reach data in the combined profile, but exclude the
+    # 'mode' lines, as there should be only one.
+    grep -h -v "^mode:" ${cover_profile} >>${combined_cover_profile} || true
+  fi
+done
+
+if [[ -f ${combined_cover_profile} ]]; then
+  coverage_html_file="${cover_report_dir}/combined-coverage.html"
+  go tool cover -html="${combined_cover_profile}" -o="${coverage_html_file}"
+  kube::log::status "Combined coverage report: ${coverage_html_file}"
+  if [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
+    ${KUBE_GOVERALLS_BIN} -coverprofile="${combined_cover_profile}" || true
+  fi
+fi
