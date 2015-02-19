@@ -1,12 +1,15 @@
 .TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
 
+
 .SH NAME
 .PP
 kube\-proxy \- Provides network proxy services.
 
+
 .SH SYNOPSIS
 .PP
 \fBkube\-proxy\fP [OPTIONS]
+
 
 .SH DESCRIPTION
 .PP
@@ -14,6 +17,7 @@ The \fBkubernetes\fP network proxy runs on each node. This reflects services as 
 
 .PP
 The kube\-proxy takes several options.
+
 
 .SH OPTIONS
 .PP
@@ -73,6 +77,7 @@ The kube\-proxy takes several options.
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
+
 .SH EXAMPLES
 .PP
 .RS
@@ -81,6 +86,8 @@ The kube\-proxy takes several options.
 /usr/bin/kube\-proxy \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001
 
 .fi
+.RE
+
 
 .SH HISTORY
 .PP

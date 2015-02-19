@@ -1,12 +1,15 @@
 .TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
 
+
 .SH NAME
 .PP
 kube\-apiserver \- Provides the API for kubernetes orchestration.
 
+
 .SH SYNOPSIS
 .PP
 \fBkube\-apiserver\fP [OPTIONS]
+
 
 .SH DESCRIPTION
 .PP
@@ -14,6 +17,7 @@ The \fBkubernetes\fP API server validates and configures data for 3 types of obj
 
 .PP
 The the kube\-apiserver several options.
+
 
 .SH OPTIONS
 .PP
@@ -48,10 +52,6 @@ The the kube\-apiserver several options.
 \fB\-\-etcd\_servers\fP=[]
     List of etcd servers to watch (
 \[la]http://ip:port\[ra]), comma separated
-
-.PP
-\fB\-\-health\_check\_minions\fP=
-    If true, health check minions and filter unhealthy ones. Default true.
 
 .PP
 \fB\-\-log\_backtrace\_at=\fP:0
@@ -97,6 +97,7 @@ The the kube\-apiserver several options.
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
 
+
 .SH EXAMPLES
 .PP
 .RS
@@ -105,6 +106,8 @@ The the kube\-apiserver several options.
 /usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-address=0.0.0.0 \-\-port=8080 \-\-kubelet\_port=10250 \-\-allow\_privileged=false
 
 .fi
+.RE
+
 
 .SH HISTORY
 .PP

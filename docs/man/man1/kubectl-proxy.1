@@ -1,0 +1,44 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl proxy \- Run a proxy to the Kubernetes API server
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl proxy\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Run a proxy to the Kubernetes API server.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-api\-prefix\fP="/api/"
+    Prefix to serve the proxied API under.
+
+.PP
+\fB\-p\fP, \fB\-\-port\fP=8001
+    The port on which to run the proxy.
+
+.PP
+\fB\-w\fP, \fB\-\-www\fP=""
+    Also serve static files from the given directory under the specified prefix.
+
+.PP
+\fB\-P\fP, \fB\-\-www\-prefix\fP="/static/"
+    Prefix to serve static files under, if static file directory is specified.
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
