@@ -999,6 +999,11 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	killedContainers := make(map[dockertools.DockerID]empty)
 	glog.V(4).Infof("Syncing Pod, podFullName: %q, uid: %q", podFullName, uid)
 
+	ref, err := api.GetReference(pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	}
+
 	// Make data dirs.
 	if err := os.Mkdir(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
@@ -1038,6 +1043,10 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
+		if ref != nil {
+			record.Eventf(ref, "failedMount",
+				"Unable to mount volumes for pod %q: %v", podFullName, err)
+		}
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
 		return err
 	}
