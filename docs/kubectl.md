@@ -32,10 +32,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -73,10 +75,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -140,10 +144,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -179,10 +185,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -227,10 +235,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -279,10 +289,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -345,10 +357,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -364,13 +378,13 @@ Usage:
   kubectl config [command]
 
 Available Commands: 
-  view                                                                                                                                                              displays merged .kubeconfig settings or a specified .kubeconfig file.
-  set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]            Sets a cluster entry in .kubeconfig
-  set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] Sets a user entry in .kubeconfig
-  set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]                                                                      Sets a context entry in .kubeconfig
-  set property-name property-value                                                                                                                                  Sets an individual value in a .kubeconfig file
-  unset property-name                                                                                                                                               Unsets an individual value in a .kubeconfig file
-  use-context context-name                                                                                                                                          Sets the current-context in a .kubeconfig file
+  view                                                                                                                                                                          displays merged .kubeconfig settings or a specified .kubeconfig file.
+  set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]                        Sets a cluster entry in .kubeconfig
+  set-credentials name [--auth-path=authfile] [--client-certificate=certfile] [--client-key=keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password] Sets a user entry in .kubeconfig
+  set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]                                                                                  Sets a context entry in .kubeconfig
+  set property-name property-value                                                                                                                                              Sets an individual value in a .kubeconfig file
+  unset property-name                                                                                                                                                           Unsets an individual value in a .kubeconfig file
+  use-context context-name                                                                                                                                                      Sets the current-context in a .kubeconfig file
 
 
 Global Flags:
@@ -394,10 +408,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -464,10 +480,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -508,10 +526,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -520,15 +540,28 @@ Global Flags:
 
 #### config set-credentials
 Sets a user entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
-		kubectl config set-credentials cluster-admin --client-key=~/.kube/cluster-admin/.kubecfg.key
-		only sets the client-key field on the cluster-admin user entry without touching other values.
-		
+
+  Specifying a name that already exists will merge new fields on top of existing
+  values. For example, the following only sets the "client-key" field on the 
+  "cluster-admin" entry, without touching other values:
+
+    set-credentials cluster-admin --client-key=~/.kube/admin.key
+
+  Client-certificate flags:
+    --client-certificate=certfile --client-key=keyfile
+
+  Bearer token flags:
+    --token=bearer_token
+
+  Basic auth flags:
+    --username=basic_user --password=basic_password
+
+  Bearer token and basic auth are mutually exclusive.
+
 
 Usage:
 ```
-  kubectl config set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] [flags]
+  kubectl config set-credentials name [--auth-path=authfile] [--client-certificate=certfile] [--client-key=keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password] [flags]
 
 
 Global Flags:
@@ -552,10 +585,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -596,10 +631,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -640,10 +677,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -682,10 +721,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -721,10 +762,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -760,10 +803,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -806,10 +851,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -859,10 +906,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -912,10 +961,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -975,10 +1026,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -1027,10 +1080,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -1089,10 +1144,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -1149,10 +1206,12 @@ Global Flags:
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
+      --password="": Password for basic authentication to the API server.
   -s, --server="": The address and port of the Kubernetes API server
       --stderrthreshold=2: logs at or above this threshold go to stderr
       --token="": Bearer token for authentication to the API server.
       --user="": The name of the kubeconfig user to use
+      --username="": Username for basic authentication to the API server.
       --v=0: log level for V logs
       --validate=false: If true, use a schema to validate the input before sending it
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging

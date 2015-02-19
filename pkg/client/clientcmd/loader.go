@@ -173,36 +173,46 @@ func resolveLocalPath(startingDir, path string) string {
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
-	config := &clientcmdapi.Config{}
-
 	kubeconfigBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
+	return Load(kubeconfigBytes)
+}
 
-	if err := clientcmdlatest.Codec.DecodeInto(kubeconfigBytes, config); err != nil {
+// Load takes a byte slice and deserializes the contents into Config object.
+// Encapsulates deserialization without assuming the source is a file.
+func Load(data []byte) (*clientcmdapi.Config, error) {
+	config := &clientcmdapi.Config{}
+	if err := clientcmdlatest.Codec.DecodeInto(data, config); err != nil {
 		return nil, err
 	}
-
 	return config, nil
 }
 
-// WriteToFile serializes the config to yaml and writes it out to a file.  If no present, it creates the file with 0644.  If it is present
+// WriteToFile serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
 // it stomps the contents
 func WriteToFile(config clientcmdapi.Config, filename string) error {
+	content, err := Write(config)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Write serializes the config to yaml.
+// Encapsulates serialization without assuming the destination is a file.
+func Write(config clientcmdapi.Config) ([]byte, error) {
 	json, err := clientcmdlatest.Codec.Encode(&config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	content, err := yaml.JSONToYAML(json)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	if err := ioutil.WriteFile(filename, content, 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return content, nil
 }

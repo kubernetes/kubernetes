@@ -354,7 +354,9 @@ func IsConfigTransportTLS(config Config) bool {
 func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
-	defaultTLS := config.CertFile != "" || config.Insecure
+	hasCA := len(config.CAFile) != 0 || len(config.CAData) != 0
+	hasCert := len(config.CertFile) != 0 || len(config.CertData) != 0
+	defaultTLS := hasCA || hasCert || config.Insecure
 	host := config.Host
 	if host == "" {
 		host = "localhost"
