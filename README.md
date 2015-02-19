@@ -53,7 +53,7 @@ Folder Structure
 - **`/css`** - Generic CSS can be placed here.  The file *`main.scss`* is what generates SASS partials, alter it with extreme caution.
 - **`/img`** - Site images and SVGs are stored here, in appropriate sub folders.
 - **`/js`** - Javascript and jQuery files are stored here.
-- **`/legacy`** - Contains the old version of the Kubernetes.io website. Files in here can be linked to until they are replaced with newer versions.
+- **`/legacy`** - Contains the old version of the kubernetes.io website. Files in here can be linked to until they are replaced with newer versions.
 
 Events file example
 -
