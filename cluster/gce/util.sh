@@ -911,6 +911,10 @@ function teardown-logging-firewall {
 
   detect-project
   gcloud compute firewall-rules delete -q "${INSTANCE_PREFIX}-fluentd-elasticsearch-logging" --project "${PROJECT}" || true
+  # Also delete the logging services which will remove the associated forwarding rules (TCP load balancers).
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" delete services elasticsearch-logging || true
+  "${kubectl}" delete services kibana-logging || true
 }
 
 # Perform preparations required to run e2e tests
