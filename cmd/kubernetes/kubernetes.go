@@ -18,12 +18,14 @@ limitations under the License.
 // Expects an etcd server is available, or on the path somewhere.
 // Does *not* currently setup the Kubernetes network model, that must be done ahead of time.
 // TODO: Setup the k8s network bridge as part of setup.
+// TODO: combine this with the hypercube thingy.
 package main
 
 import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -152,6 +154,8 @@ func newApiClient(addr net.IP, port int) *client.Client {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
