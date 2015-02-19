@@ -95,6 +95,10 @@ elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   auth_config=(
     "--auth_config=${HOME}/.kube/${PROJECT}_${INSTANCE_PREFIX}/kubernetes_auth"
   )
+elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+  auth_config=(
+    "--auth_config=${HOME}/.kubernetes_auth"
+  )
 else
   auth_config=()
 fi
