@@ -8,7 +8,7 @@
         }
     },
     "spec": {
-        "port": 10001,
+        "port": 6379,
         "containerPort": 6379,
         "protocol": "TCP",
         "selector": {
