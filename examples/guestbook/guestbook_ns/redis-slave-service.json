@@ -2,18 +2,17 @@
     "kind": "Service",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "redisslave",
+        "name": "redis-slave",
         "labels": {
-            "name": "redisslave"
+            "name": "redis-slave"
         }
     },
     "spec": {
-        "port": 6379,
+        "port": 10001,
         "containerPort": 6379,
         "protocol": "TCP",
         "selector": {
-            "name": "redisslave"
-        },
-        "sessionAffinity": "None"
+            "name": "redis-slave"
+        }
     }
 }

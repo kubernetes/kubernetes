@@ -2,44 +2,35 @@
     "kind": "ReplicationController",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "redis-slave-controller",
+        "name": "redis-slave",
         "labels": {
-            "name": "redisslave",
-            "template": "redisslave"
+            "name": "redis-slave"
         }
     },
     "spec": {
         "replicas": 2,
         "selector": {
-            "name": "redisslave"
+            "name": "redis-slave"
         },
         "template": {
             "metadata": {
-                "name": "redis-slave-controller",
+                "name": "redis-slave",
                 "labels": {
-                    "name": "redisslave",
-                    "template": "redisslave",
-                    "uses": "redis-master"
+                    "name": "redis-slave"
                 }
             },
             "spec": {
-                "volumes": null,
                 "containers": [
                     {
                         "name": "slave",
                         "image": "brendanburns/redis-slave",
                         "ports": [
                             {
-                                "containerPort": 6379,
-                                "hostPort": 6380
+                                "containerPort": 6379
                             }
                         ]
                     }
-                ],
-                "restartPolicy": {
-                    "always": {}
-                },
-                "dnsPolicy": "ClusterFirst"
+                ]
             }
         }
     }

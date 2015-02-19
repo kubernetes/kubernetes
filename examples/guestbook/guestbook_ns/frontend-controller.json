@@ -2,10 +2,9 @@
     "kind": "ReplicationController",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "frontend-controller",
+        "name": "frontend",
         "labels": {
-            "name": "frontend",
-            "template": "frontend"
+            "name": "frontend"
         }
     },
     "spec": {
@@ -15,31 +14,23 @@
         },
         "template": {
             "metadata": {
-                "name": "frontend-controller",
+                "name": "frontend",
                 "labels": {
-                    "name": "frontend",
-                    "uses": "redisslave,redis-master",
-                    "template": "frontend"
+                    "name": "frontend"
                 }
             },
             "spec": {
-                "volumes": null,
                 "containers": [
                     {
                         "name": "php-redis",
                         "image": "kubernetes/example-guestbook-php-redis",
                         "ports": [
                             {
-                                "containerPort": 80,
-                                "hostPort": 8000
-                            }
+                                "containerPort": 80
+                           }
                         ]
                     }
-                ],
-                "restartPolicy": {
-                    "always": {}
-                },
-                "dnsPolicy": "ClusterFirst"
+                ]
             }
         }
     }

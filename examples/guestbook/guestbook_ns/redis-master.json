@@ -1,32 +1,39 @@
 {
+    "kind": "ReplicationController",
     "apiVersion": "v1beta3",
-    "kind": "Pod",
-    "id": "redis-master",
     "metadata": {
         "name": "redis-master",
         "labels": {
-            "name": "redis-master"
+            "name": "redis-master",
+            "template": "redis-master"
         }
     },
     "spec": {
-        "volumes": null,
-        "resources": {},
-        "containers": [
-            {
-                "name": "master",
-                "image": "dockerfile/redis",
-                "ports": [
+        "replicas": 1,
+        "selector": {
+            "name": "redis-master"
+        },
+        "template": {
+            "metadata": {
+                "name": "redis-master",
+                "labels": {
+                    "name": "redis-master"
+                }
+            },
+            "spec": {
+                "containers": [
                     {
-                        "containerPort": 6379,
-                        "hostPort": 6379,
-                        "protocol": "TCP"
+                        "name": "master",
+                        "image": "dockerfile/redis",
+                        "ports": [
+                            {
+                                "containerPort": 6379,
+                                "protocol": "TCP"
+                            }
+                        ]
                     }
                 ]
             }
-        ],
-        "restartPolicy": {
-            "always": {}
         }
     }
 }
-
