@@ -64,7 +64,7 @@ type DockerInterface interface {
 	StartExec(string, docker.StartExecOptions) error
 }
 
-// DockerRuntime implements the ContainerRuntime interface for docker.
+// DockerRuntime implements the container.Runtime interface for docker.
 type DockerRuntime struct {
 	docker DockerInterface
 }
@@ -151,7 +151,7 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 	}
 }
 
-// ListContainers implements ContainerRuntime.ListContainers.
+// ListContainers implements container.Runtime.ListContainers.
 func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]*container.Container, error) {
 	var containers []*container.Container
 	dc, err := dr.docker.ListContainers(docker.ListContainersOptions{All: options.All})
@@ -161,13 +161,13 @@ func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions)
 	return containers, err
 }
 
-// InspectContainer implements ContainerRuntime.InspectContainer.
+// InspectContainer implements container.Runtime.InspectContainer.
 func (dr *DockerRuntime) InspectContainer(id string) (*container.Container, error) {
 	dc, err := dr.docker.InspectContainer(id)
 	return ConvertContainer(dc), err
 }
 
-// CreateContainer implements ContainerRuntime.CreateContainer.
+// CreateContainer implements container.Runtime.CreateContainer.
 func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) (*container.Container, error) {
 	// Copy exposedPorts.
 	exposedPorts := make(map[docker.Port]struct{})
@@ -193,7 +193,7 @@ func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) 
 	return ConvertContainer(dc), err
 }
 
-// StartContainer implements ContainerRuntime.StartContainer.
+// StartContainer implements container.Runtime.StartContainer.
 func (dr *DockerRuntime) StartContainer(id string, hc *container.HostConfig) error {
 	dockerHostConfig := &docker.HostConfig{
 		Binds:       hc.Binds,
@@ -221,17 +221,17 @@ func (dr *DockerRuntime) StartContainer(id string, hc *container.HostConfig) err
 	return dr.docker.StartContainer(id, dockerHostConfig)
 }
 
-// StopContainer implements ContainerRuntime.StopContainer.
+// StopContainer implements container.Runtime.StopContainer.
 func (dr *DockerRuntime) StopContainer(id string, timeout uint) error {
 	return dr.docker.StopContainer(id, timeout)
 }
 
-// RemoveContainer implements ContainerRuntime.RemoveContainer.
+// RemoveContainer implements container.Runtime.RemoveContainer.
 func (dr *DockerRuntime) RemoveContainer(opts container.RemoveContainerOptions) error {
 	return dr.docker.RemoveContainer(docker.RemoveContainerOptions{ID: opts.ID})
 }
 
-// InspectImage implements ContainerRuntime.InspectImage.
+// InspectImage implements container.Runtime.InspectImage.
 func (dr *DockerRuntime) InspectImage(image string) (*container.Image, error) {
 	img, err := dr.docker.InspectImage(image)
 	if err != nil {
@@ -246,7 +246,7 @@ func (dr *DockerRuntime) InspectImage(image string) (*container.Image, error) {
 	return &container.Image{ID: img.ID}, nil
 }
 
-// ListImage implements ContainerRuntime.ListImage.
+// ListImage implements container.Runtime.ListImage.
 func (dr *DockerRuntime) ListImages(opts container.ListImagesOptions) ([]*container.Image, error) {
 	var imgs []*container.Image
 	dockerImages, err := dr.docker.ListImages(docker.ListImagesOptions{All: opts.All})
@@ -258,7 +258,7 @@ func (dr *DockerRuntime) ListImages(opts container.ListImagesOptions) ([]*contai
 	return imgs, err
 }
 
-// PullImage implements ContainerRuntime.PullImage.
+// PullImage implements container.Runtime.PullImage.
 func (dr *DockerRuntime) PullImage(opts container.PullImageOptions) error {
 	dockerOpts := docker.PullImageOptions{
 		Repository: opts.Repository,
@@ -267,12 +267,12 @@ func (dr *DockerRuntime) PullImage(opts container.PullImageOptions) error {
 	return dr.docker.PullImage(dockerOpts, opts.DockerAuthConfig)
 }
 
-// RemoveImage implements ContainerRuntime.RemoveImage.
+// RemoveImage implements container.Runtime.RemoveImage.
 func (dr *DockerRuntime) RemoveImage(image string) error {
 	return dr.docker.RemoveImage(image)
 }
 
-// Logs implements ContainerRuntime.Logs.
+// Logs implements container.Runtime.Logs.
 func (dr *DockerRuntime) Logs(opts container.LogsOptions) error {
 	return dr.docker.Logs(docker.LogsOptions{
 		Container:    opts.ID,
@@ -287,13 +287,13 @@ func (dr *DockerRuntime) Logs(opts container.LogsOptions) error {
 	})
 }
 
-// Version implements ContainerRuntime.Version.
+// Version implements container.Runtime.Version.
 func (dr *DockerRuntime) Version() ([]string, error) {
 	env, err := dr.docker.Version()
 	return []string(*env), err
 }
 
-// CreateExec implements ContainerRuntime.CreateExec.
+// CreateExec implements container.Runtime.CreateExec.
 func (dr *DockerRuntime) CreateExec(opts container.CreateExecOptions) (*container.Exec, error) {
 	exec, err := dr.docker.CreateExec(docker.CreateExecOptions{
 		AttachStdin:  opts.AttachStdin,
@@ -306,7 +306,7 @@ func (dr *DockerRuntime) CreateExec(opts container.CreateExecOptions) (*containe
 	return &container.Exec{ID: exec.ID}, err
 }
 
-// StartExec implements ContainerRuntime.StartExec.
+// StartExec implements container.Runtime.StartExec.
 func (dr *DockerRuntime) StartExec(id string, opts container.StartExecOptions) error {
 	dockerOpts := docker.StartExecOptions{
 		Detach:       opts.Detach,

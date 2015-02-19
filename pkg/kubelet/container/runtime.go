@@ -31,5 +31,5 @@ type Runtime interface {
 	Logs(opts LogsOptions) error
 	Version() ([]string, error)
 	CreateExec(opts CreateExecOptions) (*Exec, error)
-	StartExec(string, StartExecOptions) error
+	StartExec(id string, opts StartExecOptions) error
 }
