@@ -71,7 +71,7 @@ vagrant provision
 To stop and then restart the cluster:
 ```
 vagrant halt
-vagrant up
+cluster/kube-up.sh
 ```
 
 To destroy the cluster:
