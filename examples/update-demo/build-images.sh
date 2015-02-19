@@ -14,20 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script will build and push the images necessary for the demo.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
-  echo "Please set DOCKER_HUB_USER to your Docker hub account"
-  exit 1
-fi
-
-export KUBE_ROOT=${KUBE_ROOT-$(dirname $0)/../..}
-export KUBECTL=${KUBE_ROOT}/cluster/kubectl.sh
+DOCKER_HUB_USER=${DOCKER_HUB_USER:-kubernetes}
 
 set -x
 
-SCHEMA=${KUBE_ROOT}/examples/update-demo/nautilus-rc.yaml
+docker build -t "${DOCKER_HUB_USER}/update-demo:kitten" images/kitten
+docker build -t "${DOCKER_HUB_USER}/update-demo:nautilus" images/nautilus
 
-cat ${SCHEMA} | sed "s/DOCKER_HUB_USER/${DOCKER_HUB_USER}/" | ${KUBECTL} create -f -
+docker push "${DOCKER_HUB_USER}/update-demo"
