@@ -124,16 +124,14 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("submitting the pod to kubernetes")
+		// We call defer here in case there is a problem with
+		// the test so we can ensure that we clean up after
+		// ourselves
+		defer podClient.Delete(pod.Name)
 		_, err := podClient.Create(pod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
-		defer func() {
-			// We call defer here in case there is a problem with
-			// the test so we can ensure that we clean up after
-			// ourselves
-			podClient.Delete(pod.Name)
-		}()
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -183,14 +181,14 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("submitting the pod to kubernetes")
-		_, err := podClient.Create(pod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
-		}
 		defer func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name)
 		}()
+		_, err := podClient.Create(pod)
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+		}
 
 		By("waiting for the pod to start running")
 		expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
@@ -243,13 +241,11 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
+		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
 		_, err := c.Pods(api.NamespaceDefault).Create(serverPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
 		}
-		defer func() {
-			c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
-		}()
 		expectNoError(waitForPodRunning(c, serverPod.Name, 300*time.Second))
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
@@ -275,13 +271,11 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
+		defer c.Services(api.NamespaceDefault).Delete(svc.Name)
 		_, err = c.Services(api.NamespaceDefault).Create(svc)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create service: %v", err))
 		}
-		defer func() {
-			c.Services(api.NamespaceDefault).Delete(svc.Name)
-		}()
 
 		// TODO: we don't have a way to wait for a service to be "running".  // If this proves flaky, then we will need to retry the clientPod or insert a sleep.
 
@@ -305,13 +299,11 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
+		defer c.Pods(api.NamespaceDefault).Delete(clientPod.Name)
 		_, err = c.Pods(api.NamespaceDefault).Create(clientPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
-		defer func() {
-			c.Pods(api.NamespaceDefault).Delete(clientPod.Name)
-		}()
 
 		// Wait for client pod to complete.
 		expectNoError(waitForPodRunning(c, clientPod.Name, 60*time.Second))
