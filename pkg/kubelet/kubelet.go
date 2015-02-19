@@ -1399,13 +1399,13 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		}
 		// If we already caught some update, try to wait for some short time
 		// to possibly batch it with other incoming updates.
-		for ; unsyncedPod; {
+		for unsyncedPod {
 			select {
-				case u := <-updates:
-					kl.updatePods(u)
-				case <-time.After(5 * time.Millisecond):
-					// Break the for loop.
-					unsyncedPod = false
+			case u := <-updates:
+				kl.updatePods(u)
+			case <-time.After(5 * time.Millisecond):
+				// Break the for loop.
+				unsyncedPod = false
 			}
 		}
 
@@ -1418,16 +1418,16 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 
 func (kl *Kubelet) updatePods(u PodUpdate) {
 	switch u.Op {
-		case SET:
-			glog.V(3).Infof("SET: Containers changed")
-			kl.pods = u.Pods
-			kl.pods = filterHostPortConflicts(kl.pods)
-		case UPDATE:
-			glog.V(3).Infof("Update: Containers changed")
-			kl.pods = updateBoundPods(u.Pods, kl.pods)
-			kl.pods = filterHostPortConflicts(kl.pods)
-		default:
-			panic("syncLoop does not support incremental changes")
+	case SET:
+		glog.V(3).Infof("SET: Containers changed")
+		kl.pods = u.Pods
+		kl.pods = filterHostPortConflicts(kl.pods)
+	case UPDATE:
+		glog.V(3).Infof("Update: Containers changed")
+		kl.pods = updateBoundPods(u.Pods, kl.pods)
+		kl.pods = filterHostPortConflicts(kl.pods)
+	default:
+		panic("syncLoop does not support incremental changes")
 	}
 }
 
