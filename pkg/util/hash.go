@@ -26,6 +26,6 @@ import (
 // which follows pointers and prints actual values of the nested objects
 // ensuring the hash does not change when a pointer changes.
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
-  printer := spew.ConfigState{Indent: " ", SortKeys: true}
-  printer.Fprintf(hasher, "%#v", objectToWrite)
+	printer := spew.ConfigState{Indent: " ", SortKeys: true}
+	printer.Fprintf(hasher, "%#v", objectToWrite)
 }
