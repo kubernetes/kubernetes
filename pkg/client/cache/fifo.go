@@ -35,6 +35,8 @@ type FIFO struct {
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
 	keyFunc KeyFunc
+	// canReplace is used to drive acceptance of objects passed to Add or Update.
+	canReplace CanReplace
 }
 
 // Add inserts an item, and puts it in the queue. The item is only enqueued
@@ -46,7 +48,19 @@ func (f *FIFO) Add(obj interface{}) error {
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	if _, exists := f.items[id]; !exists {
+
+	existingObj, exists := f.items[id]
+	if exists {
+		// If the existing obj can't be replaced by the new one, exit early.
+		canReplace, err := f.canReplace(obj, existingObj)
+		if err != nil {
+			return fmt.Errorf("couldn't compare objects: %v", err)
+		}
+
+		if !canReplace {
+			return nil
+		}
+	} else {
 		f.queue = append(f.queue, id)
 	}
 	f.items[id] = obj
@@ -153,11 +167,12 @@ func (f *FIFO) Replace(list []interface{}) error {
 
 // NewFIFO returns a Store which can be used to queue up items to
 // process.
-func NewFIFO(keyFunc KeyFunc) *FIFO {
+func NewFIFO(keyFunc KeyFunc, canReplace CanReplace) *FIFO {
 	f := &FIFO{
-		items:   map[string]interface{}{},
-		queue:   []string{},
-		keyFunc: keyFunc,
+		items:      map[string]interface{}{},
+		queue:      []string{},
+		keyFunc:    keyFunc,
+		canReplace: canReplace,
 	}
 	f.cond.L = &f.lock
 	return f

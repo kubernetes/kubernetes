@@ -93,7 +93,7 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
 	}
 
-	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc, cache.AlwaysReplace)
 	if kubeClient != nil {
 		cache.NewReflector(cache.NewListWatchFromClient(kubeClient, "services", api.NamespaceAll, labels.Everything()), &api.Service{}, serviceStore).Run()
 	}
