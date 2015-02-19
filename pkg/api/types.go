@@ -248,7 +248,7 @@ type Port struct {
 	HostPort int `json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `json:"containerPort"`
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
+	// Required: Supports "TCP" and "UDP".
 	Protocol Protocol `json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
 	HostIP string `json:"hostIP,omitempty"`
@@ -355,11 +355,11 @@ type Container struct {
 	LivenessProbe  *Probe               `json:"livenessProbe,omitempty"`
 	ReadinessProbe *Probe               `json:"readinessProbe,omitempty"`
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty"`
-	// Optional: Defaults to /dev/termination-log
+	// Required.
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.
 	Privileged bool `json:"privileged,omitempty"`
-	// Optional: Policy for pulling images for this container
+	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy"`
 	// Optional: Capabilities for container.
 	Capabilities Capabilities `json:"capabilities,omitempty"`
@@ -543,7 +543,7 @@ type PodSpec struct {
 	Volumes       []Volume      `json:"volumes"`
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
-	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
+	// Required: Set DNS policy.
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
@@ -703,7 +703,7 @@ type ServiceSpec struct {
 	// proxied by this service.
 	Port int `json:"port"`
 
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
+	// Required: Supports "TCP" and "UDP".
 	Protocol Protocol `json:"protocol,omitempty"`
 
 	// This service will route traffic to pods having labels matching this selector. If empty or not present,
@@ -726,7 +726,7 @@ type ServiceSpec struct {
 	// Optional: If unspecified, the first port on the container will be used.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty"`
 
-	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
+	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
 }
 
@@ -1175,7 +1175,7 @@ type ContainerManifest struct {
 	Volumes       []Volume      `json:"volumes"`
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
-	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
+	// Required: Set DNS policy.
 	DNSPolicy DNSPolicy `json:"dnsPolicy"`
 }
 
