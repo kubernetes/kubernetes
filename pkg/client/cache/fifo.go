@@ -37,6 +37,26 @@ type FIFO struct {
 	keyFunc KeyFunc
 }
 
+// Handler processes obj in the context of HandleNext and responds with an outcome
+// dictating whether the FIFO should pop or retry the entry.
+type Handler func(obj interface{}) HandlerOutcome
+
+// HandlerOutcome informs HandleNext what to do with the result of a Handler execution.
+type HandlerOutcome string
+
+const (
+	// PopOutcome means the next entry should be popped from the queue. For example,
+	// if the entry was successfully handled, or if the entry has been retried more
+	// than a maximum amount of times.
+	PopOutcome HandlerOutcome = "Pop"
+	// RetryHeadOutcome means the entry should be requeued at the head of the queue
+	// so that it is handled during the next HandleNext invocation.
+	RetryHeadOutcome HandlerOutcome = "RetryHead"
+	// RetryHeadOutcome means the entry should be moved to the tail of the queue to
+	// give any other queued entries a chance to be handled.
+	RetryTailOutcome HandlerOutcome = "RetryTail"
+)
+
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *FIFO) Add(obj interface{}) error {
@@ -149,6 +169,53 @@ func (f *FIFO) Replace(list []interface{}) error {
 		f.cond.Broadcast()
 	}
 	return nil
+}
+
+// HandleNext gives a Handler an opportunity to do work with the next queue
+// entry in the context of a queue lock. The HandlerOutcome returned from the
+// Handler is used to decide whether to pop or safely re-requeue the entry at
+// either the head or tail of the queue.
+//
+// The re-queue operations are considered safe as long as the FIFO user takes
+// care to write to the queue with only a single producer: otherwise, there are
+// no guarantees about event ordering.
+//
+// Because HandleNext locks the queue, concurrent Add calls will block during
+// processing. This is a potential performance concern, but ensures that data
+// in the queue's cache will only move forward in time.
+func (f *FIFO) HandleNext(handler Handler) interface{} {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	for {
+		for len(f.queue) == 0 {
+			f.cond.Wait()
+		}
+		id := f.queue[0]
+		item, ok := f.items[id]
+		if !ok {
+			// Item may have been deleted subsequently. Dequeue and move on.
+			f.queue = f.queue[1:]
+			continue
+		}
+
+		outcome := handler(item)
+
+		switch outcome {
+		case PopOutcome:
+			// Pop with a dequeue and delete.
+			f.queue = f.queue[1:]
+			delete(f.items, id)
+		case RetryHeadOutcome:
+			// Leave at head of queue
+		case RetryTailOutcome:
+			// Move to tail of queue
+			f.queue = f.queue[1:]
+			f.queue = append(f.queue, id)
+		default:
+			// TODO: what should the default behavior be?
+		}
+		return item
+	}
 }
 
 // NewFIFO returns a Store which can be used to queue up items to
