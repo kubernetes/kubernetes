@@ -6,6 +6,7 @@ go:
 
 install:
   - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+  - go get github.com/mattn/goveralls
   - ./hack/travis/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
@@ -14,7 +15,7 @@ install:
   - ./hack/build-go.sh
 
 script:
-  - KUBE_RACE="-race" KUBE_COVER="-cover -covermode=atomic" KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh "" -p=4
+  - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh "" -p=4
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
