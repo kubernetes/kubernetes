@@ -34,7 +34,7 @@ func init() {
 				}
 			}
 		},
-		func(obj *Port) {
+		func(obj *ContainerPort) {
 			if obj.Protocol == "" {
 				obj.Protocol = ProtocolTCP
 			}

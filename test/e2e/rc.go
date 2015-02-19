@@ -86,7 +86,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 						{
 							Name:  name,
 							Image: image,
-							Ports: []api.Port{{ContainerPort: 9376, HostPort: 8080}},
+							Ports: []api.ContainerPort{{ContainerPort: 9376, HostPort: 8080}},
 						},
 					},
 				},

@@ -39,7 +39,7 @@ func newPodList(count int) *api.PodList {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Ports: []api.Port{
+						Ports: []api.ContainerPort{
 							{
 								ContainerPort: 8080,
 							},
@@ -69,7 +69,7 @@ func TestFindPort(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Ports: []api.Port{
+					Ports: []api.ContainerPort{
 						{
 							Name:          "foo",
 							ContainerPort: 8080,
@@ -90,7 +90,7 @@ func TestFindPort(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Ports: []api.Port{},
+					Ports: []api.ContainerPort{},
 				},
 			},
 		},

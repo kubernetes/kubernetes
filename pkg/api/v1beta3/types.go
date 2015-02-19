@@ -254,8 +254,8 @@ type SecretSource struct {
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 
-// Port represents a network port in a single container.
-type Port struct {
+// ContainerPort represents a network port in a single container.
+type ContainerPort struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
@@ -367,7 +367,7 @@ type Container struct {
 	Command []string `json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
 	WorkingDir     string               `json:"workingDir,omitempty"`
-	Ports          []Port               `json:"ports,omitempty"`
+	Ports          []ContainerPort      `json:"ports,omitempty"`
 	Env            []EnvVar             `json:"env,omitempty"`
 	Resources      ResourceRequirements `json:"resources,omitempty" description:"Compute Resources required by this container"`
 	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty"`

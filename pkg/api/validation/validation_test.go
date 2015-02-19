@@ -195,7 +195,7 @@ func TestValidateVolumes(t *testing.T) {
 }
 
 func TestValidatePorts(t *testing.T) {
-	successCase := []api.Port{
+	successCase := []api.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
 		{Name: "as", ContainerPort: 83, Protocol: "UDP"},
@@ -207,7 +207,7 @@ func TestValidatePorts(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	nonCanonicalCase := []api.Port{
+	nonCanonicalCase := []api.ContainerPort{
 		{ContainerPort: 80, Protocol: "TCP"},
 	}
 	if errs := validatePorts(nonCanonicalCase); len(errs) != 0 {
@@ -215,22 +215,22 @@ func TestValidatePorts(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		P []api.Port
+		P []api.ContainerPort
 		T errors.ValidationErrorType
 		F string
 		D string
 	}{
-		"name > 63 characters": {[]api.Port{{Name: strings.Repeat("a", 64), ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
-		"name not a DNS label": {[]api.Port{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
-		"name not unique": {[]api.Port{
+		"name > 63 characters": {[]api.ContainerPort{{Name: strings.Repeat("a", 64), ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
+		"name not a DNS label": {[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
+		"name not unique": {[]api.ContainerPort{
 			{Name: "abc", ContainerPort: 80, Protocol: "TCP"},
 			{Name: "abc", ContainerPort: 81, Protocol: "TCP"},
 		}, errors.ValidationErrorTypeDuplicate, "[1].name", ""},
-		"zero container port":    {[]api.Port{{ContainerPort: 0, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
-		"invalid container port": {[]api.Port{{ContainerPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
-		"invalid host port":      {[]api.Port{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].hostPort", portRangeErrorMsg},
-		"invalid protocol":       {[]api.Port{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", ""},
-		"protocol required":      {[]api.Port{{Name: "abc", ContainerPort: 80}}, errors.ValidationErrorTypeRequired, "[0].protocol", ""},
+		"zero container port":    {[]api.ContainerPort{{ContainerPort: 0, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
+		"invalid container port": {[]api.ContainerPort{{ContainerPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].containerPort", portRangeErrorMsg},
+		"invalid host port":      {[]api.ContainerPort{{ContainerPort: 80, HostPort: 65536, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].hostPort", portRangeErrorMsg},
+		"invalid protocol":       {[]api.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol", ""},
+		"protocol required":      {[]api.ContainerPort{{Name: "abc", ContainerPort: 80}}, errors.ValidationErrorTypeRequired, "[0].protocol", ""},
 	}
 	for k, v := range errorCases {
 		errs := validatePorts(v.P)
@@ -433,9 +433,9 @@ func TestValidateContainers(t *testing.T) {
 		},
 		"zero-length image": {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent"}},
 		"host port not unique": {
-			{Name: "abc", Image: "image", Ports: []api.Port{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
+			{Name: "abc", Image: "image", Ports: []api.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
 				ImagePullPolicy: "IfNotPresent"},
-			{Name: "def", Image: "image", Ports: []api.Port{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
+			{Name: "def", Image: "image", Ports: []api.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
 				ImagePullPolicy: "IfNotPresent"},
 		},
 		"invalid env var name": {
@@ -587,7 +587,7 @@ func TestValidateManifest(t *testing.T) {
 							"memory": resource.MustParse("1"),
 						},
 					},
-					Ports: []api.Port{
+					Ports: []api.ContainerPort{
 						{Name: "p1", ContainerPort: 80, HostPort: 8080, Protocol: "TCP"},
 						{Name: "p2", ContainerPort: 81, Protocol: "TCP"},
 						{ContainerPort: 82, Protocol: "TCP"},
@@ -934,7 +934,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "foo:V1",
-							Ports: []api.Port{
+							Ports: []api.ContainerPort{
 								{HostPort: 8080, ContainerPort: 80},
 							},
 						},
@@ -947,7 +947,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "foo:V2",
-							Ports: []api.Port{
+							Ports: []api.ContainerPort{
 								{HostPort: 8000, ContainerPort: 80},
 							},
 						},
