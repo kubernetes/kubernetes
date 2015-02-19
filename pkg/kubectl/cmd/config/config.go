@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -30,9 +29,6 @@ import (
 )
 
 type pathOptions struct {
-	local         bool
-	global        bool
-	envvar        bool
 	specifiedFile string
 }
 
@@ -49,9 +45,6 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	}
 
 	// file paths are common to all sub commands
-	cmd.PersistentFlags().BoolVar(&pathOptions.local, "local", false, "use the .kubeconfig in the current directory")
-	cmd.PersistentFlags().BoolVar(&pathOptions.global, "global", false, "use the .kubeconfig from "+os.Getenv("HOME"))
-	cmd.PersistentFlags().BoolVar(&pathOptions.envvar, "envvar", false, "use the .kubeconfig from $KUBECONFIG")
 	cmd.PersistentFlags().StringVar(&pathOptions.specifiedFile, "kubeconfig", "", "use a particular .kubeconfig file")
 
 	cmd.AddCommand(NewCmdConfigView(out, pathOptions))
@@ -66,54 +59,19 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 }
 
 func (o *pathOptions) getStartingConfig() (*clientcmdapi.Config, string, error) {
-	filename := ""
-	config := clientcmdapi.NewConfig()
-
-	if len(o.specifiedFile) > 0 {
-		filename = o.specifiedFile
-		config = getConfigFromFileOrDie(filename)
+	loadingOrder := clientcmd.DefaultClientConfigLoadingOrder()
+	loadingOrder[0] = o.specifiedFile
+	config, filename, err := loadingOrder.Load()
+	if err != nil {
+		return nil, "", err
 	}
 
-	if o.global {
-		if len(filename) > 0 {
-			return nil, "", fmt.Errorf("already loading from %v, cannot specify global as well", filename)
-		}
-
-		filename = os.Getenv("HOME") + "/.kube/.kubeconfig"
-		config = getConfigFromFileOrDie(filename)
-	}
-
-	if o.envvar {
-		if len(filename) > 0 {
-			return nil, "", fmt.Errorf("already loading from %v, cannot specify global as well", filename)
-		}
-
-		filename = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-		if len(filename) == 0 {
-			return nil, "", fmt.Errorf("environment variable %v does not have a value", clientcmd.RecommendedConfigPathEnvVar)
-		}
-
-		config = getConfigFromFileOrDie(filename)
-	}
-
-	if o.local {
-		if len(filename) > 0 {
-			return nil, "", fmt.Errorf("already loading from %v, cannot specify global as well", filename)
-		}
-
-		filename = ".kubeconfig"
-		config = getConfigFromFileOrDie(filename)
-
-	}
-
-	// no specific flag was set, first attempt to use the envvar, then use local
+	// no file was used, first attempt to use the envvar, then use global
 	if len(filename) == 0 {
 		if len(os.Getenv(clientcmd.RecommendedConfigPathEnvVar)) > 0 {
 			filename = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-			config = getConfigFromFileOrDie(filename)
 		} else {
-			filename = ".kubeconfig"
-			config = getConfigFromFileOrDie(filename)
+			filename = os.Getenv("HOME") + "/.kube/.kubeconfig"
 		}
 	}
 

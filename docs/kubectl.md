@@ -364,7 +364,7 @@ Usage:
   kubectl config [command]
 
 Available Commands: 
-  view                                                                                                                                                              displays merged .kubeconfig settings or a specified .kubeconfig file.
+  view                                                                                                                                                              displays .kubeconfig settings or a specified .kubeconfig file.
   set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]            Sets a cluster entry in .kubeconfig
   set-credentials name [--auth-path=path/to/auth/file] [--client-certificate=path/to/certficate/file] [--client-key=path/to/key/file] [--token=bearer_token_string] Sets a user entry in .kubeconfig
   set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]                                                                      Sets a context entry in .kubeconfig
@@ -382,12 +382,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -424,20 +421,19 @@ Use "kubectl help [command]" for more information about a command.
 ```
 
 #### config view
-displays merged .kubeconfig settings or a specified .kubeconfig file.
+displays .kubeconfig settings or a specified .kubeconfig file.
 Examples:
-  // Show merged .kubeconfig settings.
+  // Show settings from $KUBECONFIG location if specified, otherwise show $HOME/.kube/.kubeconfig
   $ kubectl config view
 
-  // Show only local ./.kubeconfig settings
-  $ kubectl config view --local
+  // Show settings from specified file
+  $ kubectl config view --kubeconfig=path/to/my/.kubeconfig
 
 Usage:
 ```
   kubectl config view [flags]
 
 Flags:
-      --merge=true: merge together the full hierarchy of .kubeconfig files
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
@@ -452,12 +448,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for view
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -496,12 +489,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for set-cluster
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -540,12 +530,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for set-credentials
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -584,12 +571,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for set-context
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -628,12 +612,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for set
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -670,12 +651,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for unset
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
@@ -709,12 +687,9 @@ Global Flags:
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
   -h, --help=false: help for use-context
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes

@@ -29,23 +29,23 @@ import (
 // the parse happens and you want your calling code to be ignorant of how the values are being mutated to avoid
 // passing extraneous information down a call stack
 type DeferredLoadingClientConfig struct {
-	loadingRules   *ClientConfigLoadingRules
+	loadingOrder   ClientConfigLoadingOrder
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
 }
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
-func NewNonInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides) ClientConfig {
-	return DeferredLoadingClientConfig{loadingRules, overrides, nil}
+func NewNonInteractiveDeferredLoadingClientConfig(loadingOrder ClientConfigLoadingOrder, overrides *ConfigOverrides) ClientConfig {
+	return DeferredLoadingClientConfig{loadingOrder, overrides, nil}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
-func NewInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return DeferredLoadingClientConfig{loadingRules, overrides, fallbackReader}
+func NewInteractiveDeferredLoadingClientConfig(loadingOrder ClientConfigLoadingOrder, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
+	return DeferredLoadingClientConfig{loadingOrder, overrides, fallbackReader}
 }
 
 func (config DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
-	mergedConfig, err := config.loadingRules.Load()
+	mergedConfig, _, err := config.loadingOrder.Load()
 	if err != nil {
 		return nil, err
 	}
