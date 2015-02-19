@@ -1,0 +1,51 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl create \- Create a resource by filename or stdin
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl create\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Create a resource by filename or stdin.
+
+.PP
+JSON and YAML formats are accepted.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+// Create a pod using the data in pod.json.
+$ kubectl create \-f pod.json
+
+// Create a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl create \-f \-
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to file to use to create the resource
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
