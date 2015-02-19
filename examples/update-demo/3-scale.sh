@@ -20,8 +20,8 @@ set -o pipefail
 
 NEW_SIZE=${1:-4}
 
-export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECTL=${KUBECTL-$KUBE_REPO_ROOT/cluster/kubectl.sh}
+export KUBE_ROOT=${KUBE_ROOT-$(dirname $0)/../..}
+export KUBECTL=${KUBECTL-$KUBE_ROOT/cluster/kubectl.sh}
 
 set -x
 
