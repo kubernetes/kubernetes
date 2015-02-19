@@ -1,20 +1,22 @@
 kind: ReplicationController
 apiVersion: v1beta1
-id: skydns
+id: kube-dns
 namespace: default
 labels:
-  k8s-app: skydns
+  k8s-app: kube-dns
+  kubernetes.io/cluster-service: "true"
 desiredState:
   replicas: {{ pillar['dns_replicas'] }}
   replicaSelector:
-    k8s-app: skydns
+    k8s-app: kube-dns
   podTemplate:
     labels:
-      k8s-app: skydns
+      k8s-app: kube-dns
+      kubernetes.io/cluster-service: "true"
     desiredState:
       manifest:
         version: v1beta2
-        id: skydns
+        id: kube-dns
         dnsPolicy: "Default"  # Don't use cluster DNS.
         containers:
           - name: etcd
