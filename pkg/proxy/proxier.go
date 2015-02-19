@@ -664,6 +664,14 @@ var localhostIPv4 = net.ParseIP("127.0.0.1")
 var zeroIPv6 = net.ParseIP("::0")
 var localhostIPv6 = net.ParseIP("::1")
 
+func getDestinationFlag(rewrite bool) string {
+	if rewrite {
+		return "-s"
+	} else {
+		return "-d"
+	}
+}
+
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
 func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, service string, rewrite bool) []string {
 	// This list needs to include all fields as they are eventually spit out
@@ -679,12 +687,8 @@ func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol
 		"--comment", service,
 		"-p", strings.ToLower(string(protocol)),
 		"-m", strings.ToLower(string(protocol)),
+		getDestinationFlag(rewrite), fmt.Sprintf("%s/32", destIP.String()),
 		"--dport", fmt.Sprintf("%d", destPort),
-	}
-	if rewrite {
-		args = append(args, "-s", fmt.Sprintf("%s/32", destIP.String()))
-	} else {
-		args = append(args, "-d", fmt.Sprintf("%s/32", destIP.String()))
 	}
 	return args
 }
