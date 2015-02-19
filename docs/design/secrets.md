@@ -29,6 +29,8 @@ Goals of this design:
       secrets belonging to containers scheduled onto it
    *  If the master is compromised, all secrets in the cluster may be exposed
 *  Secret rotation is an orthogonal concern, but it should be facilitated by this proposal
+*  A user who can consume a secret in a container can know the value of the secret; secrets must
+   be provisioned judiciously
 
 ## Use Cases
 
@@ -270,10 +272,12 @@ type Secret struct {
     TypeMeta
     ObjectMeta
 
-    // Keys in this map are the paths relative to the volume
-    // presented to a container for this secret data.
-    Data map[string][]byte
-    Type SecretType
+    // Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
+    // The serialized form of the secret data is a base64 encoded string.
+    Data map[string][]byte `json:"data,omitempty"`
+
+    // Used to facilitate programatic handling of secret data.
+    Type SecretType `json:"type,omitempty"`
 }
 
 type SecretType string
@@ -291,7 +295,8 @@ const MaxSecretSize = 1 * 1024 * 1024
 A Secret can declare a type in order to provide type information to system components that work
 with secrets.  The default type is `opaque`, which represents arbitrary user-owned data.
 
-Secrets are validated against `MaxSecretSize`.
+Secrets are validated against `MaxSecretSize`.  The keys in the `Data` field must be valid DNS
+subdomains.
 
 A new REST API and registry interface will be added to accompany the `Secret` resource.  The
 default implementation of the registry will store `Secret` information in etcd.  Future registry
@@ -324,6 +329,11 @@ type SecretSource struct {
 
 Secret volume sources are validated to ensure that the specified object reference actually points
 to an object of type `Secret`.
+
+In the future, the `SecretSource` will be extended to allow:
+
+1.  Fine-grained control over which pieces of secret data are exposed in the volume
+2.  The paths and filenames for how secret data are exposed
 
 ### Secret Volume Plugin
 
@@ -382,13 +392,14 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
   "kind": "Secret",
   "id": "ssh-key-secret",
   "data": {
-    "id_rsa.pub": "dmFsdWUtMQ0K",
-    "id_rsa": "dmFsdWUtMg0KDQo="
+    "id-rsa.pub": "dmFsdWUtMQ0K",
+    "id-rsa": "dmFsdWUtMg0KDQo="
   }
 }
 ```
 
-**Note:** The values of secret data are encoded as base64-encoded strings.
+**Note:** The values of secret data are encoded as base64-encoded strings.  Newlines are not
+valid within these strings and must be omitted.
 
 Now we can create a pod which references the secret with the ssh key and consumes it in a volume:
 
@@ -432,8 +443,8 @@ Now we can create a pod which references the secret with the ssh key and consume
 
 When the container's command runs, the pieces of the key will be available in:
 
-    /etc/secret-volume/id_rsa.pub
-    /etc/secret-volume/id_rsa
+    /etc/secret-volume/id-rsa.pub
+    /etc/secret-volume/id-rsa
 
 The container is then free to use the secret data to establish an ssh connection.
 
