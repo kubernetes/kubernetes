@@ -19,6 +19,7 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"reflect"
 	gruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -228,6 +230,12 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 		if tlsConfig != nil {
 			transport = &http.Transport{
 				TLSClientConfig: tlsConfig,
+				Proxy:           http.ProxyFromEnvironment,
+				Dial: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				TLSHandshakeTimeout: 10 * time.Second,
 			}
 		} else {
 			transport = http.DefaultTransport
