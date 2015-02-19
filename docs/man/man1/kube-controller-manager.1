@@ -1,12 +1,15 @@
 .TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
 
+
 .SH NAME
 .PP
 kube\-controller\-manager \- Enforces kubernetes services.
 
+
 .SH SYNOPSIS
 .PP
 \fBkube\-controller\-manager\fP [OPTIONS]
+
 
 .SH DESCRIPTION
 .PP
@@ -14,6 +17,7 @@ The \fBkubernetes\fP controller manager is really a service that is layered on t
 
 .PP
 The kube\-controller\-manager has several options.
+
 
 .SH OPTIONS
 .PP
@@ -70,11 +74,15 @@ The kube\-controller\-manager has several options.
 
 .PP
 \fB\-\-machines\fP=[]
-        List of machines to schedule onto, comma separated.
+    List of machines to schedule onto, comma separated.
 
 .PP
 \fB\-\-master\fP=""
     The address of the Kubernetes API server.
+
+.PP
+\fB\-\-node\_sync\_peroid\fP=10s
+    The period for syncing nodes from cloudprovider.
 
 .PP
 \fB\-\-port\fP=10252
@@ -96,6 +104,7 @@ The kube\-controller\-manager has several options.
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging.
 
+
 .SH EXAMPLES
 .PP
 .RS
@@ -104,6 +113,8 @@ The kube\-controller\-manager has several options.
 /usr/bin/kube\-controller\-manager \-\-logtostderr=true \-\-v=0 \-\-master=127.0.0.1:8080
 
 .fi
+.RE
+
 
 .SH HISTORY
 .PP

@@ -46,6 +46,7 @@ readonly KUBE_TEST_TARGETS=(
   cmd/e2e
   cmd/integration
   cmd/gendocs
+  cmd/genman
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")

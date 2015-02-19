@@ -1,0 +1,65 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl rollingupdate \- Perform a rolling update of the given ReplicationController.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl rollingupdate\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Perform a rolling update of the given ReplicationController.
+
+.PP
+Replaces the specified controller with new controller, updating one pod at a time to use the
+new PodTemplate. The new\-controller.json must specify the same namespace as the
+existing controller and overwrite at least one (common) label in its replicaSelector.
+
+.PP
+Examples:
+
+.PP
+.RS
+
+.nf
+// Update pods of frontend\-v1 using new controller data in frontend\-v2.json.
+$ kubectl rollingupdate frontend\-v1 \-f frontend\-v2.json
+
+// Update pods of frontend\-v1 using JSON data passed into stdin.
+$ cat frontend\-v2.json | kubectl rollingupdate frontend\-v1 \-f \-
+
+.fi
+.RE
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=""
+    Filename or URL to file to use to create the new controller.
+
+.PP
+\fB\-\-poll\-interval\fP="3s"
+    Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-timeout\fP="5m0s"
+    Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-update\-period\fP="1m0s"
+    Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

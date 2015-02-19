@@ -1,0 +1,36 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl config set \- Sets an individual value in a .kubeconfig file
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl config set\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Sets an individual value in a .kubeconfig file
+
+.PP
+.RS
+
+.nf
+    property\-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
+    property\-value is the new value you wish to set.
+
+.fi
+.RE
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl\-config(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

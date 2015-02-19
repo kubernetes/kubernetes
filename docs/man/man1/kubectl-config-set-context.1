@@ -1,0 +1,44 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl config set\-context \- Sets a context entry in .kubeconfig
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl config set\-context\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Sets a context entry in .kubeconfig
+    Specifying a name that already exists will merge new fields on top of existing values for those fields.
+    e.g.
+        kubectl config set\-context gce \-\-user=cluster\-admin
+        only sets the user field on the gce context entry without touching other values.
+
+
+.SH OPTIONS
+.PP
+\fB\-\-cluster\fP=""
+    cluster for the context entry in .kubeconfig
+
+.PP
+\fB\-\-namespace\fP=""
+    namespace for the context entry in .kubeconfig
+
+.PP
+\fB\-\-user\fP=""
+    user for the context entry in .kubeconfig
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl\-config(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!
