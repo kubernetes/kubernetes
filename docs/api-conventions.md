@@ -46,7 +46,7 @@ Every object MUST have the following metadata in a nested object field called "m
 
 Every object SHOULD have the following metadata in a nested object field called "metadata":
 
-* resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency), below, for more details)
+* resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency-control-and-consistency), below, for more details)
 * creationTimestamp: a string representing an RFC 3339 date of the date and time an object was created
 * labels: a map of string keys and values that can be used to organize and categorize objects (see [labels.md](labels.md))
 * annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [annotations.md](annotations.md))
@@ -63,7 +63,7 @@ When a new version of an object is POSTed or PUT, the "spec" is updated and avai
 
 The PUT and POST verbs will ignore the "status" values. Otherwise, PUT expects the whole object to be specified. Therefore, if a field is omitted it is assumed that the client wants to clear that field's value.
 
-Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](#concurrency), below, regarding read-modify-write consistency when using this pattern.
+Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](#concurrency-control-and-consistency), below, regarding read-modify-write consistency when using this pattern.
 
 #### Lists of named subobjects preferred over maps
 
@@ -151,7 +151,7 @@ achieve the state, and for the user to know what to anticipate.
 
 Concurrency Control and Consistency
 -----------------------------------
-<a name="#concurrency"></a>
+
 Read-modify-write consistency is accomplished with optimistic currency.
 
 All resources have "resourceVersion" as part of their metadata. resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. It is changed by the server every time an object is modified. If resourceVersion is included with the PUT operation the system will verify that there have not been other successful mutations to the resource during a read/modify/write cycle, by verifying that the current value of resourceVersion matches the specified value.
