@@ -137,6 +137,18 @@ All compatible Kubernetes APIs MUST support "name idempotency" and respond with 
 
 TODO: name generation
 
+Defaulting
+----------
+
+Default resource values are API version-specific, and they are applied during
+the conversion from API-versioned declarative configuration to internal objects
+representing the desired state (`Spec`) of the resource.
+
+Incorporating the default values into the `Spec` ensures that `Spec` depicts the
+full desired state so that it is easier for the system to determine how to
+achieve the state, and for the user to know what to anticipate.
+
+
 Concurrency Control and Consistency
 -----------------------------------
 <a name="#concurrency"></a>
