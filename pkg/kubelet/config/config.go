@@ -60,7 +60,7 @@ type PodConfig struct {
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
 func NewPodConfig(mode PodConfigNotificationMode) *PodConfig {
-	updates := make(chan kubelet.PodUpdate, 1)
+	updates := make(chan kubelet.PodUpdate, 50)
 	storage := newPodStorage(updates, mode)
 	podConfig := &PodConfig{
 		pods:    storage,
