@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -74,6 +75,74 @@ var (
 		CurrentContext: "federal-context",
 	}
 )
+
+func TestNonExistentCommandLineFile(t *testing.T) {
+	loadingRules := ClientConfigLoadingRules{
+		CommandLinePath: "bogus_file",
+	}
+
+	_, err := loadingRules.Load()
+	if err == nil {
+		t.Fatalf("Expected error for missing command-line file, got none")
+	}
+	if !strings.Contains(err.Error(), "bogus_file") {
+		t.Fatalf("Expected error about 'bogus_file', got %s", err.Error())
+	}
+}
+
+func TestToleratingMissingFiles(t *testing.T) {
+	loadingRules := ClientConfigLoadingRules{
+		EnvVarPath:           "bogus1",
+		CurrentDirectoryPath: "bogus2",
+		HomeDirectoryPath:    "bogus3",
+	}
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestErrorReadingFile(t *testing.T) {
+	commandLineFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(commandLineFile.Name())
+
+	if err := ioutil.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
+		t.Fatalf("Error creating tempfile: %v", err)
+	}
+
+	loadingRules := ClientConfigLoadingRules{
+		CommandLinePath: commandLineFile.Name(),
+	}
+
+	_, err := loadingRules.Load()
+	if err == nil {
+		t.Fatalf("Expected error for unloadable file, got none")
+	}
+	if !strings.Contains(err.Error(), commandLineFile.Name()) {
+		t.Fatalf("Expected error about '%s', got %s", commandLineFile.Name(), err.Error())
+	}
+}
+
+func TestErrorReadingNonFile(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.Remove(tmpdir)
+
+	loadingRules := ClientConfigLoadingRules{
+		CommandLinePath: tmpdir,
+	}
+
+	_, err = loadingRules.Load()
+	if err == nil {
+		t.Fatalf("Expected error for non-file, got none")
+	}
+	if !strings.Contains(err.Error(), tmpdir) {
+		t.Fatalf("Expected error about '%s', got %s", tmpdir, err.Error())
+	}
+}
 
 func TestConflictingCurrentContext(t *testing.T) {
 	commandLineFile, _ := ioutil.TempFile("", "")
