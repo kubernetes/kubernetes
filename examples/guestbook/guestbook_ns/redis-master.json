@@ -4,8 +4,7 @@
     "metadata": {
         "name": "redis-master",
         "labels": {
-            "name": "redis-master",
-            "template": "redis-master"
+            "name": "redis-master"
         }
     },
     "spec": {

@@ -6,7 +6,7 @@
     "labels": {"name": "frontend"},
   },
   "spec": {
-    "port": 0,
+    "port": 10002,
     "containerPort": 80,
     "protocol": "TCP",
     "selector": {

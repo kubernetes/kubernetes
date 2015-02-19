@@ -26,7 +26,8 @@
                         "image": "kubernetes/example-guestbook-php-redis",
                         "ports": [
                             {
-                                "containerPort": 80
+                                "containerPort": 80,
+				"protocol": "TCP"
                            }
                         ]
                     }

@@ -26,7 +26,8 @@
                         "image": "brendanburns/redis-slave",
                         "ports": [
                             {
-                                "containerPort": 6379
+                                "containerPort": 6379,
+				"protocol": "TCP"
                             }
                         ]
                     }
