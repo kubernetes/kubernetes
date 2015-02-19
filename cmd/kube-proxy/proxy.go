@@ -17,6 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
+	"os"
+	"runtime"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/server"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
@@ -25,6 +29,7 @@ import (
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := server.NewProxyServer()
 	s.AddFlags(pflag.CommandLine)
 
@@ -34,5 +39,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+		fmt.Fprint(os.Stderr, err.Error)
+		os.Exit(1)
+	}
 }
