@@ -179,43 +179,41 @@ func (f *FIFO) Replace(list []interface{}) error {
 // The re-queue operations are considered safe as long as the FIFO user takes
 // care to write to the queue with only a single producer: otherwise, there are
 // no guarantees about event ordering.
-//
-// Because HandleNext locks the queue, concurrent Add calls will block during
-// processing. This is a potential performance concern, but ensures that data
-// in the queue's cache will only move forward in time.
 func (f *FIFO) HandleNext(handler Handler) interface{} {
+	obj := f.Pop()
+
+	id, err := f.keyFunc(obj)
+	if err != nil {
+		// TODO: error handling
+		return nil
+	}
+
+	outcome := handler(obj)
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	for {
-		for len(f.queue) == 0 {
-			f.cond.Wait()
-		}
-		id := f.queue[0]
-		item, ok := f.items[id]
-		if !ok {
-			// Item may have been deleted subsequently. Dequeue and move on.
-			f.queue = f.queue[1:]
-			continue
-		}
 
-		outcome := handler(item)
-
-		switch outcome {
-		case PopOutcome:
-			// Pop with a dequeue and delete.
-			f.queue = f.queue[1:]
-			delete(f.items, id)
-		case RetryHeadOutcome:
-			// Leave at head of queue
-		case RetryTailOutcome:
-			// Move to tail of queue
-			f.queue = f.queue[1:]
+	switch outcome {
+	case PopOutcome:
+		// Accept the already-peformed pop
+	case RetryHeadOutcome:
+		// Requeue at head
+		if _, exists := f.items[id]; !exists {
+			f.queue = append([]string{id}, f.queue...)
+			f.items[id] = obj
+			f.cond.Broadcast()
+		}
+	case RetryTailOutcome:
+		// Requeue at tail
+		if _, exists := f.items[id]; !exists {
 			f.queue = append(f.queue, id)
-		default:
-			// TODO: what should the default behavior be?
+			f.items[id] = obj
+			f.cond.Broadcast()
 		}
-		return item
+	default:
+		// TODO: what should the default behavior be?
 	}
+	return obj
 }
 
 // NewFIFO returns a Store which can be used to queue up items to
