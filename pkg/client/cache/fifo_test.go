@@ -160,3 +160,27 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
+
+func TestFIFO_addIfNotPresent(t *testing.T) {
+	mkObj := func(name string, val interface{}) testFifoObject {
+		return testFifoObject{name: name, val: val}
+	}
+
+	f := NewFIFO(testFifoObjectKeyFunc)
+
+	f.Add(mkObj("a", 1))
+	f.Add(mkObj("b", 2))
+	f.AddIfNotPresent(mkObj("b", 3))
+	f.AddIfNotPresent(mkObj("c", 4))
+
+	if e, a := 3, len(f.items); a != e {
+		t.Fatalf("expected queue length %d, got %d", e, a)
+	}
+
+	expectedValues := []int{1, 2, 4}
+	for _, expected := range expectedValues {
+		if actual := f.Pop().(testFifoObject).val; actual != expected {
+			t.Fatalf("expected value %d, got %d", expected, actual)
+		}
+	}
+}
