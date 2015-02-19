@@ -1,0 +1,19 @@
+{
+    "kind": "Service",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "guestbook",
+        "labels": {
+            "name": "guestbook"
+        }
+    },
+    "spec": {
+        "port": 3000,
+        "containerPort": "http-server",
+        "protocol": "TCP",
+        "createExternalLoadBalancer": true,
+        "selector": {
+            "name": "guestbook"
+        }
+    }
+}
