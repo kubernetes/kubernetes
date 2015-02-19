@@ -117,29 +117,27 @@ function validate() {
   return 0
 }
 
-export DOCKER_HUB_USER=jlowdermilk
-
 function teardown() {
   echo "Cleaning up test artifacts"
-  ${KUBE_ROOT}/examples/update-demo/5-down.sh
+  ${KUBECTL} stop rc update-demo-kitten || true
+  ${KUBECTL} stop rc update-demo-nautilus || true
 }
 
 trap "teardown" EXIT
 
 # Launch a container
-${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh
-
+${KUBECTL} create -f "${KUBE_ROOT}/examples/update-demo/nautilus-rc.yaml"
 validate 2 nautilus
 
-${KUBE_ROOT}/examples/update-demo/3-scale.sh 1
+${KUBECTL} resize rc update-demo-nautilus --replicas=1
 sleep 2
 validate 1 nautilus
 
-${KUBE_ROOT}/examples/update-demo/3-scale.sh 2
+${KUBECTL} resize rc update-demo-nautilus --replicas=2
 sleep 2
 validate 2 nautilus
 
-${KUBE_ROOT}/examples/update-demo/4-rolling-update.sh kitten 1s
+${KUBECTL} rollingupdate update-demo-nautilus --update-period=1s -f "${KUBE_ROOT}/examples/update-demo/kitten-rc.yaml"
 sleep 2
 validate 2 kitten
 
