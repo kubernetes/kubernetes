@@ -269,7 +269,7 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
-		fmt.Fprintf(out, "Endpoints:\t%s\n", stringList(endpoints.Endpoints))
+		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints.Endpoints))
 		if events != nil {
 			describeEvents(events, out)
 		}

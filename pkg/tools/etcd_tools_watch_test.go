@@ -280,7 +280,7 @@ func TestWatchEtcdState(t *testing.T) {
 	codec := latest.Codec
 	type T struct {
 		Type      watch.EventType
-		Endpoints []string
+		Endpoints []api.Endpoint
 	}
 	testCases := map[string]struct {
 		Initial   map[string]EtcdResponseWithError
@@ -294,7 +294,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 					},
 				},
 			},
@@ -308,12 +308,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -321,7 +321,7 @@ func TestWatchEtcdState(t *testing.T) {
 			},
 			From: 1,
 			Expected: []*T{
-				{watch.Modified, []string{"127.0.0.1:9000"}},
+				{watch.Modified, []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}},
 			},
 		},
 		"from initial state": {
@@ -330,7 +330,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -343,12 +343,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -356,7 +356,7 @@ func TestWatchEtcdState(t *testing.T) {
 			},
 			Expected: []*T{
 				{watch.Added, nil},
-				{watch.Modified, []string{"127.0.0.1:9000"}},
+				{watch.Modified, []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}},
 			},
 		},
 	}

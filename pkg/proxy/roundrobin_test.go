@@ -24,22 +24,28 @@ import (
 )
 
 func TestValidateWorks(t *testing.T) {
-	if isValidEndpoint("") {
+	if isValidEndpoint(&api.Endpoint{}) {
 		t.Errorf("Didn't fail for empty string")
 	}
-	if isValidEndpoint("foobar") {
+	if isValidEndpoint(&api.Endpoint{IP: "foobar"}) {
 		t.Errorf("Didn't fail with no port")
 	}
-	if isValidEndpoint("foobar:-1") {
+	if isValidEndpoint(&api.Endpoint{IP: "foobar", Port: -1}) {
 		t.Errorf("Didn't fail with a negative port")
 	}
-	if !isValidEndpoint("foobar:8080") {
+	if !isValidEndpoint(&api.Endpoint{IP: "foobar", Port: 8080}) {
 		t.Errorf("Failed a valid config.")
 	}
 }
 
 func TestFilterWorks(t *testing.T) {
-	endpoints := []string{"foobar:1", "foobar:2", "foobar:-1", "foobar:3", "foobar:-2"}
+	endpoints := []api.Endpoint{
+		{IP: "foobar", Port: 1},
+		{IP: "foobar", Port: 2},
+		{IP: "foobar", Port: -1},
+		{IP: "foobar", Port: 3},
+		{IP: "foobar", Port: -2},
+	}
 	filtered := filterValidEndpoints(endpoints)
 
 	if len(filtered) != 3 {
@@ -88,7 +94,7 @@ func TestLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint1:40"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint1", Port: 40}},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint1:40", nil)
@@ -106,7 +112,11 @@ func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
@@ -125,7 +135,11 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
@@ -137,7 +151,10 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	// Then update the configuration with one fewer endpoints, make sure
 	// we start in the beginning again
 	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints: []string{"endpoint:8", "endpoint:9"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 8},
+			{IP: "endpoint", Port: 9},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
@@ -146,7 +163,7 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[0], nil)
 	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], nil)
 	// Clear endpoints
-	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}}
+	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}}
 	loadBalancer.OnUpdate(endpoints)
 
 	endpoint, err = loadBalancer.NextEndpoint("foo", nil)
@@ -164,11 +181,18 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	endpoints := make([]api.Endpoints, 2)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	endpoints[1] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
-		Endpoints:  []string{"endpoint:4", "endpoint:5"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 4},
+			{IP: "endpoint", Port: 5},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledFooEndpoints := loadBalancer.endpointsMap["foo"]
@@ -211,7 +235,7 @@ func TestStickyLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint", Port: 1}},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1", client1)
@@ -234,7 +258,11 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpoints(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
@@ -262,7 +290,11 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsStickyNone(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
@@ -293,7 +325,11 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
@@ -308,7 +344,10 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
@@ -325,7 +364,11 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:4"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 4},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
@@ -351,7 +394,11 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints := loadBalancer.endpointsMap["foo"]
@@ -365,7 +412,10 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	// Then update the configuration with one fewer endpoints, make sure
 	// we start in the beginning again
 	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints: []string{"endpoint:4", "endpoint:5"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 4},
+			{IP: "endpoint", Port: 5},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledEndpoints = loadBalancer.endpointsMap["foo"]
@@ -376,7 +426,7 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	expectEndpoint(t, loadBalancer, "foo", shuffledEndpoints[1], client2)
 
 	// Clear endpoints
-	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}}
+	endpoints[0] = api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}}
 	loadBalancer.OnUpdate(endpoints)
 
 	endpoint, err = loadBalancer.NextEndpoint("foo", nil)
@@ -398,12 +448,19 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	endpoints := make([]api.Endpoints, 2)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 1},
+			{IP: "endpoint", Port: 2},
+			{IP: "endpoint", Port: 3},
+		},
 	}
 	loadBalancer.NewService("bar", api.AffinityTypeClientIP, 0)
 	endpoints[1] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
-		Endpoints:  []string{"endpoint:4", "endpoint:5"},
+		Endpoints: []api.Endpoint{
+			{IP: "endpoint", Port: 5},
+			{IP: "endpoint", Port: 5},
+		},
 	}
 	loadBalancer.OnUpdate(endpoints)
 	shuffledFooEndpoints := loadBalancer.endpointsMap["foo"]

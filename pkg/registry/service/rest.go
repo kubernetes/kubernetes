@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -217,16 +218,17 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
-	e, err := rs.registry.GetEndpoints(ctx, id)
+	eps, err := rs.registry.GetEndpoints(ctx, id)
 	if err != nil {
 		return "", err
 	}
-	if len(e.Endpoints) == 0 {
+	if len(eps.Endpoints) == 0 {
 		return "", fmt.Errorf("no endpoints available for %v", id)
 	}
 	// We leave off the scheme ('http://') because we have no idea what sort of server
 	// is listening at this endpoint.
-	return e.Endpoints[rand.Intn(len(e.Endpoints))], nil
+	ep := &eps.Endpoints[rand.Intn(len(eps.Endpoints))]
+	return net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)), nil
 }
 
 func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service) error {

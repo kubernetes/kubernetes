@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"text/template"
@@ -263,9 +265,14 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 	return nil
 }
 
-func stringList(list []string) string {
-	if len(list) == 0 {
+func formatEndpoints(endpoints []api.Endpoint) string {
+	if len(endpoints) == 0 {
 		return "<empty>"
+	}
+	list := []string{}
+	for i := range endpoints {
+		ep := &endpoints[i]
+		list = append(list, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
 	}
 	return strings.Join(list, ",")
 }
@@ -368,7 +375,7 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 }
 
 func printEndpoints(endpoint *api.Endpoints, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoint.Name, stringList(endpoint.Endpoints))
+	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoint.Name, formatEndpoints(endpoint.Endpoints))
 	return err
 }
 

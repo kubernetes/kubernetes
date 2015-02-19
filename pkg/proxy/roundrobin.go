@@ -149,23 +149,18 @@ func (lb *LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (string
 	return endpoint, nil
 }
 
-func isValidEndpoint(spec string) bool {
-	_, port, err := net.SplitHostPort(spec)
-	if err != nil {
-		return false
-	}
-	value, err := strconv.Atoi(port)
-	if err != nil {
-		return false
-	}
-	return value > 0
+func isValidEndpoint(ep *api.Endpoint) bool {
+	return ep.IP != "" && ep.Port > 0
 }
 
-func filterValidEndpoints(endpoints []string) []string {
+func filterValidEndpoints(endpoints []api.Endpoint) []string {
+	// Convert Endpoint objects into strings for easier use later.  Ignore
+	// the protocol field - we'll get that from the Service objects.
 	var result []string
-	for _, spec := range endpoints {
-		if isValidEndpoint(spec) {
-			result = append(result, spec)
+	for i := range endpoints {
+		ep := &endpoints[i]
+		if isValidEndpoint(ep) {
+			result = append(result, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
 		}
 	}
 	return result

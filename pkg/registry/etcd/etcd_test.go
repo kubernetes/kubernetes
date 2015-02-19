@@ -598,7 +598,7 @@ func TestEtcdListEndpoints(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Protocol: "TCP", Endpoints: []string{"127.0.0.1:8345"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Protocol: "TCP", Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 8345}}}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar"}, Protocol: "TCP"}),
@@ -626,7 +626,7 @@ func TestEtcdGetEndpoints(t *testing.T) {
 	endpoints := &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Protocol:   "TCP",
-		Endpoints:  []string{"127.0.0.1:34855"},
+		Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 34855}},
 	}
 
 	key, _ := makeServiceEndpointsKey(ctx, "foo")
@@ -650,7 +650,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	endpoints := api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Protocol:   "TCP",
-		Endpoints:  []string{"baz", "bar"},
+		Endpoints:  []api.Endpoint{{IP: "baz"}, {IP: "bar"}},
 	}
 
 	key, _ := makeServiceEndpointsKey(ctx, "foo")
