@@ -95,7 +95,7 @@ function validate() {
 
       template_string="{{(index .currentState.info \"${CONTROLLER_NAME}\").image}}"
       current_image=$($KUBECTL get pods "$id" -o template --template="${template_string}") || true
-      if [[ "$current_image" != "${DOCKER_HUB_USER}/update-demo:${container_image_version}" ]]; then
+      if [[ "$current_image" != "kubernetes/update-demo:${container_image_version}" ]]; then
         echo "  ${id} is created but running wrong image"
         continue
       fi
