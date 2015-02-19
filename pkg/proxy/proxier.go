@@ -576,7 +576,7 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, false)
 	for _, publicIP := range info.publicIP {
-		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, false)...)
+		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, info.rewrite)...)
 	}
 	if len(el) == 0 {
 		glog.Infof("Closed iptables portals for service %q", service)
