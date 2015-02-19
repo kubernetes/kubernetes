@@ -294,13 +294,29 @@ func (dr *DockerRuntime) Version() ([]string, error) {
 }
 
 // CreateExec implements ContainerRuntime.CreateExec.
-func (dr *DockerRuntime) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
-	return dr.docker.CreateExec(opts)
+func (dr *DockerRuntime) CreateExec(opts container.CreateExecOptions) (*container.Exec, error) {
+	exec, err := dr.docker.CreateExec(docker.CreateExecOptions{
+		AttachStdin:  opts.AttachStdin,
+		AttachStdout: opts.AttachStdout,
+		AttachStderr: opts.AttachStderr,
+		Tty:          opts.Tty,
+		Cmd:          opts.Cmd,
+		Container:    opts.Container,
+	})
+	return &container.Exec{ID: exec.ID}, err
 }
 
 // StartExec implements ContainerRuntime.StartExec.
-func (dr *DockerRuntime) StartExec(id string, opts docker.StartExecOptions) error {
-	return dr.docker.StartExec(id, opts)
+func (dr *DockerRuntime) StartExec(id string, opts container.StartExecOptions) error {
+	dockerOpts := docker.StartExecOptions{
+		Detach:       opts.Detach,
+		Tty:          opts.Tty,
+		InputStream:  opts.InputStream,
+		OutputStream: opts.OutputStream,
+		ErrorStream:  opts.ErrorStream,
+		RawTerminal:  opts.RawTerminal,
+	}
+	return dr.docker.StartExec(id, dockerOpts)
 }
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
@@ -410,7 +426,7 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	if !useNativeExec {
 		return d.runInContainerUsingNsinit(containerID, cmd)
 	}
-	createOpts := docker.CreateExecOptions{
+	createOpts := container.CreateExecOptions{
 		Container:    containerID,
 		Cmd:          cmd,
 		AttachStdin:  false,
@@ -424,7 +440,7 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	}
 	var buf bytes.Buffer
 	wrBuf := bufio.NewWriter(&buf)
-	startOpts := docker.StartExecOptions{
+	startOpts := container.StartExecOptions{
 		Detach:       false,
 		Tty:          false,
 		OutputStream: wrBuf,

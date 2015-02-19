@@ -16,13 +16,11 @@ limitations under the License.
 
 package container
 
-import "github.com/fsouza/go-dockerclient"
-
 // Runtime is the abstract interface for container runtime.
 type Runtime interface {
-	ListContainers(options ListContainersOptions) ([]*Container, error)
+	ListContainers(opts ListContainersOptions) ([]*Container, error)
 	InspectContainer(id string) (*Container, error)
-	CreateContainer(options CreateContainerOptions) (*Container, error)
+	CreateContainer(opts CreateContainerOptions) (*Container, error)
 	StartContainer(id string, hostConfig *HostConfig) error
 	StopContainer(id string, timeout uint) error
 	RemoveContainer(opts RemoveContainerOptions) error
@@ -32,6 +30,6 @@ type Runtime interface {
 	RemoveImage(image string) error
 	Logs(opts LogsOptions) error
 	Version() ([]string, error)
-	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
-	StartExec(string, docker.StartExecOptions) error
+	CreateExec(opts CreateExecOptions) (*Exec, error)
+	StartExec(string, StartExecOptions) error
 }

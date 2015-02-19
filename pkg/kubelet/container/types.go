@@ -142,3 +142,32 @@ type LogsOptions struct {
 	Tail         string    `json:"tail,omitempty"`
 	RawTerminal  bool      `json:"rawTerminal,omitempty"`
 }
+
+// CreateExecOptions specify parameters to the CreateExec function.
+type CreateExecOptions struct {
+	AttachStdin  bool     `json:"attachStdin,omitempty"`
+	AttachStdout bool     `json:"attachStdout,omitempty"`
+	AttachStderr bool     `json:"attachStderr,omitempty"`
+	Tty          bool     `json:"tty,omitempty"`
+	Cmd          []string `json:"cmd,omitempty"`
+	Container    string   `json:"container,omitempty"`
+}
+
+// Exec represents an exec object.
+type Exec struct {
+	ID string `json:"id,omitempty"`
+}
+
+// StartExecOptions specify parameters to StartExec function.
+type StartExecOptions struct {
+	Detach bool `json:"detach,omitempty"`
+
+	Tty bool `json:"tty,omitempty"`
+
+	InputStream  io.Reader `json:"-"`
+	OutputStream io.Writer `json:"-"`
+	ErrorStream  io.Writer `json:"-"`
+
+	// Use raw terminal? Usually true when the container contains a TTY.
+	RawTerminal bool `json:"-"`
+}
