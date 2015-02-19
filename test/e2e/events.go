@@ -64,7 +64,7 @@ var _ = Describe("Events", func() {
 					{
 						Name:  "p",
 						Image: "kubernetes/serve_hostname",
-						Ports: []api.Port{{ContainerPort: 80, HostPort: 8080}},
+						Ports: []api.Port{{ContainerPort: 80}},
 					},
 				},
 			},
