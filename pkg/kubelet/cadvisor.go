@@ -47,7 +47,7 @@ type cadvisorInterface interface {
 // container. The container's absolute path refers to its hierarchy in the
 // cgroup file system. e.g. The root container, which represents the whole
 // machine, has path "/"; all docker containers have path "/docker/<docker id>"
-func (kl *Kubelet) statsFromContainerPath(cc cadvisorInterface, containerPath string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func statsFromContainerPath(cc cadvisorInterface, containerPath string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
 	cinfo, err := cc.ContainerInfo(containerPath, req)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (kl *Kubelet) statsFromContainerPath(cc cadvisorInterface, containerPath st
 
 // statsFromDockerContainer takes a Docker container's ID and returns the stats for the
 // container.
-func (kl *Kubelet) statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
 	cinfo, err := cc.DockerContainer(containerId, req)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, container
 		return nil, ErrContainerNotFound
 	}
 
-	ci, err := kl.statsFromDockerContainer(cc, dockerContainer.ID, req)
+	ci, err := statsFromDockerContainer(cc, dockerContainer.ID, req)
 	if err != nil {
 		return nil, ErrCadvisorApiFailure
 	}
@@ -96,7 +96,7 @@ func (kl *Kubelet) GetRootInfo(req *cadvisor.ContainerInfoRequest) (*cadvisor.Co
 	if cc == nil {
 		return nil, fmt.Errorf("no cadvisor connection")
 	}
-	return kl.statsFromContainerPath(cc, "/", req)
+	return statsFromContainerPath(cc, "/", req)
 }
 
 func (kl *Kubelet) GetMachineInfo() (*cadvisor.MachineInfo, error) {
