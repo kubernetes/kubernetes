@@ -172,13 +172,13 @@ type IDMapping struct {
 
 // IDMappingRange specifies a mapping between container IDs and node IDs
 type IDMappingRange struct {
-	// ContainerID is the starting container ID
+	// ContainerID is the starting container UID or GID
 	ContainerID int
 
-	// HostID is the starting host ID
+	// HostID is the starting host UID or GID
 	HostID int
 	
-	// Length is the length of the ID range
+	// Length is the length of the UID/GID range
 	Length int
 }
 
