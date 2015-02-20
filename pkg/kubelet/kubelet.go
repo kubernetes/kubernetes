@@ -405,7 +405,7 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 	}
 	uidToIDMap := map[string][]string{}
 	for _, container := range containers {
-		_, uid, name, _ := dockertools.ParseDockerName(container.Names[0])
+		_, uid, name, _ := dockertools.ParseDockerName(container.Name)
 		uidName := string(uid) + "." + name
 		uidToIDMap[uidName] = append(uidToIDMap[uidName], container.ID)
 	}
@@ -660,7 +660,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, ctnr *api.Container, podVolum
 
 	opts := container.CreateContainerOptions{
 		Name:         dockertools.BuildDockerName(pod.UID, GetPodFullName(pod), ctnr),
-		Cmd:          ctnr.Command,
+		Command:      ctnr.Command,
 		Env:          envVariables,
 		ExposedPorts: exposedPorts,
 		Hostname:     pod.Name,
@@ -713,7 +713,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, ctnr *api.Container, podVolum
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
-		IpcMode:      ipcMode,
+		IPCMode:      ipcMode,
 		Privileged:   privileged,
 		CapAdd:       capAdd,
 		CapDrop:      capDrop,
@@ -888,7 +888,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 
 // Kill a docker container
 func (kl *Kubelet) killContainer(dockerContainer *container.Container) error {
-	return kl.killContainerByID(dockerContainer.ID, dockerContainer.Names[0])
+	return kl.killContainerByID(dockerContainer.ID, dockerContainer.Name)
 }
 
 func (kl *Kubelet) killContainerByID(ID, name string) error {
@@ -955,7 +955,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 	// Set OOM score of POD container to lower than those of the other
 	// containers in the pod. This ensures that it is killed only as a last
 	// resort.
-	containerInfo, err := kl.dockerClient.InspectContainer(string(id))
+	containerInfo, err := kl.containerRuntime.InspectContainer(string(id))
 	if err != nil {
 		return "", err
 	}
@@ -1210,7 +1210,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	// Kill any containers in this pod which were not identified above (guards against duplicates).
 	for id, container := range dockerContainers {
-		curPodFullName, curUUID, _, _ := dockertools.ParseDockerName(container.Names[0])
+		curPodFullName, curUUID, _, _ := dockertools.ParseDockerName(container.Name)
 		if curPodFullName == podFullName && curUUID == uid {
 			// Don't kill containers we want to keep or those we already killed.
 			_, keep := containersToKeep[id]
@@ -1339,7 +1339,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	killed := []string{}
 	for ix := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
-		podFullName, uid, containerName, _ := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
+		podFullName, uid, containerName, _ := dockertools.ParseDockerName(dockerContainers[ix].Name)
 		if _, found := desiredPods[uid]; found {
 			// syncPod() will handle this one.
 			continue
@@ -1701,7 +1701,7 @@ func (kl *Kubelet) ExecInContainer(podFullName string, uid types.UID, container 
 	if kl.runner == nil {
 		return fmt.Errorf("no runner specified.")
 	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.containerRuntime, false)
 	if err != nil {
 		return err
 	}
@@ -1718,7 +1718,7 @@ func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, s
 	if kl.runner == nil {
 		return fmt.Errorf("no runner specified.")
 	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.containerRuntime, false)
 	if err != nil {
 		return err
 	}

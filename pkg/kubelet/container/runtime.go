@@ -24,7 +24,7 @@ type Runtime interface {
 	StartContainer(id string, hostConfig *HostConfig) error
 	StopContainer(id string, timeout uint) error
 	RemoveContainer(opts RemoveContainerOptions) error
-	InspectImage(image string) (*Image, error)
+	InspectImage(imageName string) (*Image, error)
 	ListImages(opts ListImagesOptions) ([]*Image, error)
 	PullImage(opts PullImageOptions) error
 	RemoveImage(image string) error

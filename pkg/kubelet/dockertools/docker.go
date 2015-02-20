@@ -54,7 +54,7 @@ type DockerInterface interface {
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
 	RemoveContainer(opts docker.RemoveContainerOptions) error
-	InspectImage(image string) (*docker.Image, error)
+	InspectImage(imageName string) (*docker.Image, error)
 	ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	RemoveImage(image string) error
@@ -88,7 +88,6 @@ func ConvertAPIContainer(dc *docker.APIContainers) *container.Container {
 		Status:     dc.Status,
 		SizeRw:     dc.SizeRw,
 		SizeRootFs: dc.SizeRootFs,
-		Names:      dc.Names,
 	}
 
 	// Copy Name.
@@ -117,38 +116,35 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 		return nil
 	}
 
-	var networkSettings *container.NetworkSettings
-	var image string
-	var state = container.State{
-		Running:    dc.State.Running,
-		Paused:     dc.State.Paused,
-		OOMKilled:  dc.State.OOMKilled,
-		Pid:        dc.State.Pid,
-		ExitCode:   dc.State.ExitCode,
-		Error:      dc.State.Error,
-		StartedAt:  dc.State.StartedAt,
-		FinishedAt: dc.State.FinishedAt,
+	c := &container.Container{
+		ID:      dc.ID,
+		Name:    dc.Name,
+		ImageID: dc.Image,
+		Created: dc.Created,
+		Volumes: dc.Volumes,
+		State: container.State{
+			Running:    dc.State.Running,
+			Paused:     dc.State.Paused,
+			OOMKilled:  dc.State.OOMKilled,
+			Pid:        dc.State.Pid,
+			ExitCode:   dc.State.ExitCode,
+			Error:      dc.State.Error,
+			StartedAt:  dc.State.StartedAt,
+			FinishedAt: dc.State.FinishedAt,
+		},
 	}
+
 	if dc.NetworkSettings != nil {
-		networkSettings = &container.NetworkSettings{
+		c.NetworkSettings = &container.NetworkSettings{
 			IPAddress: dc.NetworkSettings.IPAddress,
 		}
 	}
 	if dc.Config != nil {
-		image = dc.Config.Image
+		c.Image = dc.Config.Image
+		c.Hostname = dc.Config.Hostname
+		c.Env = dc.Config.Env
 	}
-
-	return &container.Container{
-		ID:              dc.ID,
-		Name:            dc.Name,
-		Names:           []string{dc.Name},
-		Image:           image,
-		ImageID:         dc.Image,
-		Created:         dc.Created,
-		State:           state,
-		NetworkSettings: networkSettings,
-		Volumes:         dc.Volumes,
-	}
+	return c
 }
 
 // ListContainers implements container.Runtime.ListContainers.
@@ -178,7 +174,7 @@ func (dr *DockerRuntime) CreateContainer(opts container.CreateContainerOptions) 
 	dockerOptions := docker.CreateContainerOptions{
 		Name: opts.Name,
 		Config: &docker.Config{
-			Cmd:          opts.Cmd,
+			Cmd:          opts.Command,
 			Env:          opts.Env,
 			ExposedPorts: exposedPorts,
 			Hostname:     opts.Hostname,
@@ -198,7 +194,7 @@ func (dr *DockerRuntime) StartContainer(id string, hc *container.HostConfig) err
 	dockerHostConfig := &docker.HostConfig{
 		Binds:       hc.Binds,
 		NetworkMode: hc.NetworkMode,
-		IpcMode:     hc.IpcMode,
+		IpcMode:     hc.IPCMode,
 		Privileged:  hc.Privileged,
 		CapAdd:      hc.CapAdd,
 		CapDrop:     hc.CapDrop,
@@ -232,8 +228,8 @@ func (dr *DockerRuntime) RemoveContainer(opts container.RemoveContainerOptions) 
 }
 
 // InspectImage implements container.Runtime.InspectImage.
-func (dr *DockerRuntime) InspectImage(image string) (*container.Image, error) {
-	img, err := dr.docker.InspectImage(image)
+func (dr *DockerRuntime) InspectImage(imageName string) (*container.Image, error) {
+	img, err := dr.docker.InspectImage(imageName)
 	if err != nil {
 		if err == docker.ErrNoSuchImage {
 			return nil, container.ErrNoSuchImage
@@ -299,8 +295,8 @@ func (dr *DockerRuntime) CreateExec(opts container.CreateExecOptions) (*containe
 		AttachStdin:  opts.AttachStdin,
 		AttachStdout: opts.AttachStdout,
 		AttachStderr: opts.AttachStderr,
-		Tty:          opts.Tty,
-		Cmd:          opts.Cmd,
+		Tty:          opts.TTY,
+		Cmd:          opts.Command,
 		Container:    opts.Container,
 	})
 	return &container.Exec{ID: exec.ID}, err
@@ -310,7 +306,7 @@ func (dr *DockerRuntime) CreateExec(opts container.CreateExecOptions) (*containe
 func (dr *DockerRuntime) StartExec(id string, opts container.StartExecOptions) error {
 	dockerOpts := docker.StartExecOptions{
 		Detach:       opts.Detach,
-		Tty:          opts.Tty,
+		Tty:          opts.TTY,
 		InputStream:  opts.InputStream,
 		OutputStream: opts.OutputStream,
 		ErrorStream:  opts.ErrorStream,
@@ -428,11 +424,11 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	}
 	createOpts := container.CreateExecOptions{
 		Container:    containerID,
-		Cmd:          cmd,
+		Command:      cmd,
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
-		Tty:          false,
+		TTY:          false,
 	}
 	execObj, err := d.client.CreateExec(createOpts)
 	if err != nil {
@@ -442,7 +438,7 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	wrBuf := bufio.NewWriter(&buf)
 	startOpts := container.StartExecOptions{
 		Detach:       false,
-		Tty:          false,
+		TTY:          false,
 		OutputStream: wrBuf,
 		ErrorStream:  wrBuf,
 		RawTerminal:  false,
@@ -475,8 +471,8 @@ func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd [
 
 	// TODO what if the container doesn't have `env`???
 	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
-	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
-	args = append(args, container.Config.Env...)
+	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Hostname))
+	args = append(args, container.Env...)
 	args = append(args, cmd...)
 	glog.Infof("ARGS %#v", args)
 	command := exec.Command("nsenter", args...)
@@ -625,8 +621,8 @@ func (p throttledDockerPuller) Pull(image string) error {
 	return fmt.Errorf("pull QPS exceeded.")
 }
 
-func (p dockerPuller) IsImagePresent(image string) (bool, error) {
-	_, err := p.client.InspectImage(image)
+func (p dockerPuller) IsImagePresent(imageName string) (bool, error) {
+	_, err := p.client.InspectImage(imageName)
 	if err == nil {
 		return true, nil
 	}
@@ -657,11 +653,8 @@ type DockerContainers map[DockerID]*container.Container
 
 func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, containerName string) (*container.Container, bool, uint64) {
 	for _, dockerContainer := range c {
-		if len(dockerContainer.Names) == 0 {
-			continue
-		}
 		// TODO(proppy): build the docker container name and do a map lookup instead?
-		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Name)
 		if dockerManifestID == podFullName &&
 			(uid == "" || dockerUUID == uid) &&
 			dockerContainerName == containerName {
@@ -676,10 +669,7 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 	containers := make(map[string]*container.Container)
 
 	for _, dockerContainer := range c {
-		if len(dockerContainer.Names) == 0 {
-			continue
-		}
-		dockerManifestID, _, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
+		dockerManifestID, _, dockerContainerName, _ := ParseDockerName(dockerContainer.Name)
 		if dockerManifestID == podFullName {
 			containers[dockerContainerName] = dockerContainer
 		}
@@ -696,15 +686,12 @@ func GetKubeletDockerContainers(client container.Runtime, allContainers bool) (D
 		return nil, err
 	}
 	for _, container := range containers {
-		if len(container.Names) == 0 {
-			continue
-		}
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
 		// TODO(dchen1107): Remove the old separator "--" by end of Oct
-		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") &&
-			!strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
-			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
+		if !strings.HasPrefix(container.Name, "/"+containerNamePrefix+"_") &&
+			!strings.HasPrefix(container.Name, "/"+containerNamePrefix+"--") {
+			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Name)
 			continue
 		}
 		result[DockerID(container.ID)] = container
@@ -721,10 +708,7 @@ func GetRecentDockerContainersWithNameAndUUID(client container.Runtime, podFullN
 		return nil, err
 	}
 	for _, dockerContainer := range containers {
-		if len(dockerContainer.Names) == 0 {
-			continue
-		}
-		dockerPodName, dockerUUID, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
+		dockerPodName, dockerUUID, dockerContainerName, _ := ParseDockerName(dockerContainer.Name)
 		if dockerPodName != podFullName {
 			continue
 		}
@@ -862,10 +846,7 @@ func GetDockerPodInfo(client container.Runtime, manifest api.PodSpec, podFullNam
 	}
 
 	for _, value := range containers {
-		if len(value.Names) == 0 {
-			continue
-		}
-		dockerManifestID, dockerUUID, dockerContainerName, _ := ParseDockerName(value.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, _ := ParseDockerName(value.Name)
 		if dockerManifestID != podFullName {
 			continue
 		}

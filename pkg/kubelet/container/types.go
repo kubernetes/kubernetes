@@ -32,7 +32,6 @@ var (
 type Container struct {
 	ID              string            `json:"id"`
 	Name            string            `json:"name,omitempty"`
-	Names           []string          `json:"names,omitempty"`
 	Image           string            `json:"image,omitempty"`
 	ImageID         string            `json:"imageID`
 	Command         string            `json:"command,omitempty"`
@@ -44,6 +43,8 @@ type Container struct {
 	SizeRw          int64             `json:"sizeRw,omitempty"`
 	SizeRootFs      int64             `json:"sizeRootFs,omitempty"`
 	Volumes         map[string]string `json:"volumes,omitempty"`
+	Hostname        string            `json:"hostname,omitempty"`
+	Env             []string          `json:"env,omitempty"`
 }
 
 // Port is a type that represents a port mapping.
@@ -81,7 +82,7 @@ type HostConfig struct {
 	DNS          []string                 `json:"dns,omitempty"`
 	DNSSearch    []string                 `json:"dnsSearch,omitempty"`
 	NetworkMode  string                   `json:"networkMode,omitempty"`
-	IpcMode      string                   `json:"ipcMode,omitempty"`
+	IPCMode      string                   `json:"ipcMode,omitempty"`
 }
 
 // PortBinding represents the host/container port mapping.
@@ -103,7 +104,7 @@ type ListContainersOptions struct {
 // CreateContainerOptions specify parameters to the CreateContainer function.
 type CreateContainerOptions struct {
 	Name         string              `json:"name,omitempty"`
-	Cmd          []string            `json:"cmd,omitempty"`
+	Command      []string            `json:"cmd,omitempty"`
 	Env          []string            `json:"env,omitempty"`
 	ExposedPorts map[string]struct{} `json:"exposedPorts,omitempty"`
 	Hostname     string              `json:"hostname,omitempty"`
@@ -148,8 +149,8 @@ type CreateExecOptions struct {
 	AttachStdin  bool     `json:"attachStdin,omitempty"`
 	AttachStdout bool     `json:"attachStdout,omitempty"`
 	AttachStderr bool     `json:"attachStderr,omitempty"`
-	Tty          bool     `json:"tty,omitempty"`
-	Cmd          []string `json:"cmd,omitempty"`
+	TTY          bool     `json:"tty,omitempty"`
+	Command      []string `json:"command,omitempty"`
 	Container    string   `json:"container,omitempty"`
 }
 
@@ -162,7 +163,7 @@ type Exec struct {
 type StartExecOptions struct {
 	Detach bool `json:"detach,omitempty"`
 
-	Tty bool `json:"tty,omitempty"`
+	TTY bool `json:"tty,omitempty"`
 
 	InputStream  io.Reader `json:"-"`
 	OutputStream io.Writer `json:"-"`

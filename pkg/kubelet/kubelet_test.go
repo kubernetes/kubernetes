@@ -858,23 +858,23 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.test_12345678_1111"},
-			ID:    "1234",
+			Name: "/k8s_foo_bar.new.test_12345678_1111",
+			ID:   "1234",
 		},
 		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_bar.new.test_12345678_2222"},
-			ID:    "9876",
+			Name: "/k8s_POD_bar.new.test_12345678_2222",
+			ID:   "9876",
 		},
 		"4567": &container.Container{
 			// Duplicate for the same container.
-			Names: []string{"/k8s_foo_bar.new.test_12345678_3333"},
-			ID:    "4567",
+			Name: "/k8s_foo_bar.new.test_12345678_3333",
+			ID:   "4567",
 		},
 		"2304": &container.Container{
 			// Container for another pod, untouched.
-			Names: []string{"/k8s_baz_fiz.new.test_6_42"},
-			ID:    "2304",
+			Name: "/k8s_baz_fiz.new.test_6_42",
+			ID:   "2304",
 		},
 	}
 	bound := api.BoundPod{
@@ -908,13 +908,13 @@ func TestSyncPodBadHash(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar.1234_foo.new.test_12345678_42"},
-			ID:    "1234",
+			Name: "/k8s_bar.1234_foo.new.test_12345678_42",
+			ID:   "1234",
 		},
 		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
-			ID:    "9876",
+			Name: "/k8s_POD_foo.new.test_12345678_42",
+			ID:   "9876",
 		},
 	}
 	bound := api.BoundPod{
@@ -956,13 +956,13 @@ func TestSyncPodUnhealthy(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar_foo.new.test_12345678_42"},
-			ID:    "1234",
+			Name: "/k8s_bar_foo.new.test_12345678_42",
+			ID:   "1234",
 		},
 		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
-			ID:    "9876",
+			Name: "/k8s_POD_foo.new.test_12345678_42",
+			ID:   "9876",
 		},
 	}
 	bound := api.BoundPod{
@@ -1709,8 +1709,8 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
-			ID:    "9876",
+			Name: "/k8s_POD_foo.new.test_12345678_42",
+			ID:   "9876",
 		},
 	}
 	bound := api.BoundPod{
