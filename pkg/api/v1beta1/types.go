@@ -158,7 +158,7 @@ type GitRepo struct {
 // Adapts a Secret into a VolumeSource
 type SecretSource struct {
 	// Reference to a Secret
-	Target ObjectReference `json:"target"`
+	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 
 // Port represents a network port in a single container
@@ -434,6 +434,7 @@ type ContainerStatus struct {
 	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
 }
 
+// PodConditionKind is a valid value for PodCondition.Kind
 type PodConditionKind string
 
 // These are valid conditions of pod.
@@ -445,8 +446,10 @@ const (
 
 // TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
 type PodCondition struct {
-	Kind   PodConditionKind `json:"kind" description:"kind of the condition, currently only Ready"`
-	Status ConditionStatus  `json:"status" description:"status of the condition, one of Full, None, Unknown"`
+	// Kind is the kind of the condition
+	Kind PodConditionKind `json:"kind" description:"kind of the condition, currently only Ready"`
+	// Status is the status of the condition
+	Status ConditionStatus `json:"status" description:"status of the condition, one of Full, None, Unknown"`
 }
 
 // PodInfo contains one entry for every container with available info.
@@ -710,17 +713,18 @@ type Namespace struct {
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize namespaces"`
 
 	// Spec defines the behavior of the Namespace.
-	Spec NamespaceSpec `json:"spec,omitempty"`
+	Spec NamespaceSpec `json:"spec,omitempty" description:"spec defines the behavior of the Namespace"`
 
 	// Status describes the current status of a Namespace
-	Status NamespaceStatus `json:"status,omitempty"`
+	Status NamespaceStatus `json:"status,omitempty" description:"status describes the current status of a Namespace"`
 }
 
 // NamespaceList is a list of Namespaces.
 type NamespaceList struct {
 	TypeMeta `json:",inline"`
 
-	Items []Namespace `json:"items"`
+	// Items is the list of Namespace objects in the list
+	Items []Namespace `json:"items"  description:"items is the list of Namespace objects in the list"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
@@ -1017,17 +1021,17 @@ const (
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind
 type LimitRangeItem struct {
 	// Type of resource that this limit applies to
-	Type LimitType `json:"type,omitempty"`
+	Type LimitType `json:"type,omitempty" description:"type of resource that this limit applies to"`
 	// Max usage constraints on this kind by resource name
-	Max ResourceList `json:"max,omitempty"`
+	Max ResourceList `json:"max,omitempty" description:"max usage constraints on this kind by resource name"`
 	// Min usage constraints on this kind by resource name
-	Min ResourceList `json:"min,omitempty"`
+	Min ResourceList `json:"min,omitempty" description:"min usage constraints on this kind by resource name"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind
 type LimitRangeSpec struct {
 	// Limits is the list of LimitRangeItem objects that are enforced
-	Limits []LimitRangeItem `json:"limits"`
+	Limits []LimitRangeItem `json:"limits" description:"limits is the list of LimitRangeItem objects that are enforced"`
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
@@ -1035,7 +1039,7 @@ type LimitRange struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the limits enforced
-	Spec LimitRangeSpec `json:"spec,omitempty"`
+	Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced"`
 }
 
 // LimitRangeList is a list of LimitRange items.
@@ -1043,7 +1047,7 @@ type LimitRangeList struct {
 	TypeMeta `json:",inline"`
 
 	// Items is a list of LimitRange objects
-	Items []LimitRange `json:"items"`
+	Items []LimitRange `json:"items" description:"items is a list of LimitRange objects"`
 }
 
 // The following identify resource constants for Kubernetes object types
@@ -1061,15 +1065,15 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
-	Hard ResourceList `json:"hard,omitempty"`
+	Hard ResourceList `json:"hard,omitempty" description:"hard is the set of desired hard limits for each named resource"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource
-	Hard ResourceList `json:"hard,omitempty"`
+	Hard ResourceList `json:"hard,omitempty" description:"hard is the set of enforced hard limits for each named resource"`
 	// Used is the current observed total usage of the resource in the namespace
-	Used ResourceList `json:"used,omitempty"`
+	Used ResourceList `json:"used,omitempty" description:"used is the current observed total usage of the resource in the namespace"`
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -1077,10 +1081,10 @@ type ResourceQuota struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the desired quota
-	Spec ResourceQuotaSpec `json:"spec,omitempty"`
+	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota"`
 
 	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty"`
+	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage"`
 }
 
 // ResourceQuotaUsage captures system observed quota status per namespace
@@ -1089,7 +1093,7 @@ type ResourceQuotaUsage struct {
 	TypeMeta `json:",inline"`
 
 	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty"`
+	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage"`
 }
 
 // ResourceQuotaList is a list of ResourceQuota items
@@ -1097,7 +1101,7 @@ type ResourceQuotaList struct {
 	TypeMeta `json:",inline"`
 
 	// Items is a list of ResourceQuota objects
-	Items []ResourceQuota `json:"items"`
+	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects"`
 }
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
@@ -1107,10 +1111,10 @@ type Secret struct {
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
 	// The serialized form of the secret data is a base64 encoded string.
-	Data map[string][]byte `json:"data,omitempty"`
+	Data map[string][]byte `json:"data,omitempty" description:"data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"`
 
 	// Used to facilitate programatic handling of secret data.
-	Type SecretType `json:"type,omitempty"`
+	Type SecretType `json:"type,omitempty" description:"type facilitates programmatic handling of secret data"`
 }
 
 const MaxSecretSize = 1 * 1024 * 1024
@@ -1124,5 +1128,5 @@ const (
 type SecretList struct {
 	TypeMeta `json:",inline"`
 
-	Items []Secret `json:"items"`
+	Items []Secret `json:"items" description:"items is a list of secret objects"`
 }
