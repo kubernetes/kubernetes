@@ -29,14 +29,11 @@ import (
 var (
 	authConfig = flag.String("auth_config", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.")
 	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
-	gceProject = flag.String("gce_project", "", "The GCE project being used, if applicable")
-	gceZone    = flag.String("gce_zone", "", "GCE zone being used, if applicable")
+	reportDir  = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	host       = flag.String("host", "", "The host to connect to")
-	masterName = flag.String("kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 	provider   = flag.String("provider", "", "The name of the Kubernetes provider")
 	orderseed  = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
-	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
-	reportDir  = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	times      = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	testList   util.StringList
 )
@@ -56,10 +53,5 @@ func main() {
 		glog.Error("Invalid --times (negative or no testing requested)!")
 		os.Exit(1)
 	}
-	gceConfig := &e2e.GCEConfig{
-		ProjectID:  *gceProject,
-		Zone:       *gceZone,
-		MasterName: *masterName,
-	}
-	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, gceConfig, *orderseed, *times, *reportDir, testList)
+	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, *orderseed, *times, *reportDir, testList)
 }
