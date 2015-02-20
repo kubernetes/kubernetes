@@ -352,6 +352,34 @@ func convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *D
 	return nil
 }
 
+func convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.DownwardAPIVolumeFile, out *DownwardAPIVolumeFile, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.DownwardAPIVolumeFile))(in)
+	}
+	out.Path = in.Path
+	if err := convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *api.DownwardAPIVolumeSource, out *DownwardAPIVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.DownwardAPIVolumeSource))(in)
+	}
+	if in.Items != nil {
+		out.Items = make([]DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func convert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource(in *api.EmptyDirVolumeSource, out *EmptyDirVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.EmptyDirVolumeSource))(in)
@@ -2363,6 +2391,14 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	} else {
 		out.Cinder = nil
 	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(DownwardAPIVolumeSource)
+		if err := convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in.DownwardAPI, out.DownwardAPI, s); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -2688,6 +2724,34 @@ func convert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *api.D
 		*out.GracePeriodSeconds = *in.GracePeriodSeconds
 	} else {
 		out.GracePeriodSeconds = nil
+	}
+	return nil
+}
+
+func convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DownwardAPIVolumeFile))(in)
+	}
+	out.Path = in.Path
+	if err := convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(&in.FieldRef, &out.FieldRef, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in *DownwardAPIVolumeSource, out *api.DownwardAPIVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DownwardAPIVolumeSource))(in)
+	}
+	if in.Items != nil {
+		out.Items = make([]api.DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -4703,6 +4767,14 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 	} else {
 		out.Cinder = nil
 	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(api.DownwardAPIVolumeSource)
+		if err := convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in.DownwardAPI, out.DownwardAPI, s); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -4723,6 +4795,8 @@ func init() {
 		convert_api_ContainerStatus_To_v1_ContainerStatus,
 		convert_api_Container_To_v1_Container,
 		convert_api_DeleteOptions_To_v1_DeleteOptions,
+		convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
+		convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource,
 		convert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource,
 		convert_api_EndpointAddress_To_v1_EndpointAddress,
 		convert_api_EndpointPort_To_v1_EndpointPort,
@@ -4838,6 +4912,8 @@ func init() {
 		convert_v1_ContainerStatus_To_api_ContainerStatus,
 		convert_v1_Container_To_api_Container,
 		convert_v1_DeleteOptions_To_api_DeleteOptions,
+		convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
+		convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource,
 		convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource,
 		convert_v1_EndpointAddress_To_api_EndpointAddress,
 		convert_v1_EndpointPort_To_api_EndpointPort,

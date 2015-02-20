@@ -457,6 +457,32 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host1", Path: "path", ReadOnly: false}}},
 		{Name: "rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "bar", FSType: "ext4"}}},
 		{Name: "cinder", VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{"29ea5088-4f60-4757-962e-dba678767887", "ext4", false}}},
+		{Name: "downwardapi", VolumeSource: api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{
+			{Path: "labels", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}},
+			{Path: "annotations", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.annotations"}},
+			{Path: "namespace", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.namespace"}},
+			{Path: "name", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.name"}},
+			{Path: "path/withslash/andslash", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}},
+			{Path: "path/./withdot", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}},
+			{Path: "path/with..dot", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}},
+			{Path: "second-level-dirent-can-have/..dot", FieldRef: api.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels"}},
+		}}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -472,21 +498,52 @@ func TestValidateVolumes(t *testing.T) {
 	emptyPath := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host", Path: "", ReadOnly: false}}
 	emptyMon := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{}, RBDImage: "bar", FSType: "ext4"}}
 	emptyImage := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "", FSType: "ext4"}}
+	emptyPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "",
+		FieldRef: api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
+	}}
+	absolutePathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "/absolutepath",
+		FieldRef: api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
+	}}
+	dotDotInPath := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "../../passwd",
+		FieldRef: api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
+	}}
+	dotDotPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badFileName",
+		FieldRef: api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
+	}}
+	dotDotFirstLevelDirent := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badDirName/goodFileName",
+		FieldRef: api.ObjectFieldSelector{
+			APIVersion: "v1",
+			FieldPath:  "metadata.labels"}}},
+	}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T errors.ValidationErrorType
 		F string
+		D string
 	}{
-		"zero-length name":     {[]api.Volume{{Name: "", VolumeSource: emptyVS}}, errors.ValidationErrorTypeRequired, "[0].name"},
-		"name > 63 characters": {[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not a DNS label": {[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not unique":      {[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
-		"empty portal":         {[]api.Volume{{Name: "badportal", VolumeSource: emptyPortal}}, errors.ValidationErrorTypeRequired, "[0].source.iscsi.targetPortal"},
-		"empty iqn":            {[]api.Volume{{Name: "badiqn", VolumeSource: emptyIQN}}, errors.ValidationErrorTypeRequired, "[0].source.iscsi.iqn"},
-		"empty hosts":          {[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.endpoints"},
-		"empty path":           {[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.path"},
-		"empty mon":            {[]api.Volume{{Name: "badmon", VolumeSource: emptyMon}}, errors.ValidationErrorTypeRequired, "[0].source.rbd.monitors"},
-		"empty image":          {[]api.Volume{{Name: "badimage", VolumeSource: emptyImage}}, errors.ValidationErrorTypeRequired, "[0].source.rbd.image"},
+		"zero-length name":            {[]api.Volume{{Name: "", VolumeSource: emptyVS}}, errors.ValidationErrorTypeRequired, "[0].name", ""},
+		"name > 63 characters":        {[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name", DNS1123LabelErrorMsg},
+		"name not a DNS label":        {[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name", DNS1123LabelErrorMsg},
+		"name not unique":             {[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}}, errors.ValidationErrorTypeDuplicate, "[1].name", ""},
+		"empty portal":                {[]api.Volume{{Name: "badportal", VolumeSource: emptyPortal}}, errors.ValidationErrorTypeRequired, "[0].source.iscsi.targetPortal", ""},
+		"empty iqn":                   {[]api.Volume{{Name: "badiqn", VolumeSource: emptyIQN}}, errors.ValidationErrorTypeRequired, "[0].source.iscsi.iqn", ""},
+		"empty hosts":                 {[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.endpoints", ""},
+		"empty path":                  {[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.path", ""},
+		"empty mon":                   {[]api.Volume{{Name: "badmon", VolumeSource: emptyMon}}, errors.ValidationErrorTypeRequired, "[0].source.rbd.monitors", ""},
+		"empty image":                 {[]api.Volume{{Name: "badimage", VolumeSource: emptyImage}}, errors.ValidationErrorTypeRequired, "[0].source.rbd.image", ""},
+		"empty metatada path":         {[]api.Volume{{Name: "emptyname", VolumeSource: emptyPathName}}, errors.ValidationErrorTypeRequired, "[0].source.downwardApi.path", ""},
+		"absolute path":               {[]api.Volume{{Name: "absolutepath", VolumeSource: absolutePathName}}, errors.ValidationErrorTypeForbidden, "[0].source.downwardApi.path", ""},
+		"dot dot path":                {[]api.Volume{{Name: "dotdotpath", VolumeSource: dotDotInPath}}, errors.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not contain \"..\"."},
+		"dot dot file name":           {[]api.Volume{{Name: "dotdotfilename", VolumeSource: dotDotPathName}}, errors.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
+		"dot dot first level dirent ": {[]api.Volume{{Name: "dotdotdirfilename", VolumeSource: dotDotFirstLevelDirent}}, errors.ValidationErrorTypeInvalid, "[0].source.downwardApi.path", "must not start with \"..\"."},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
@@ -502,8 +559,8 @@ func TestValidateVolumes(t *testing.T) {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
 			detail := errs[i].(*errors.ValidationError).Detail
-			if detail != "" && detail != DNS1123LabelErrorMsg {
-				t.Errorf("%s: expected error detail either empty or %s, got %s", k, DNS1123LabelErrorMsg, detail)
+			if detail != v.D {
+				t.Errorf("%s: expected error detail \"%s\", got \"%s\"", k, v.D, detail)
 			}
 		}
 	}
@@ -653,6 +710,32 @@ func TestValidateEnv(t *testing.T) {
 				},
 			}},
 			expectedError: "[0].valueFrom.fieldRef.fieldPath: invalid value 'metadata.whoops', Details: error converting fieldPath",
+		},
+		{
+			name: "invalid fieldPath labels",
+			envs: []api.EnvVar{{
+				Name: "labels",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.labels",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.labels', Details: supported values: metadata.name, metadata.namespace, status.podIP",
+		},
+		{
+			name: "invalid fieldPath annotations",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.annotations",
+						APIVersion: "v1",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'metadata.annotations', Details: supported values: metadata.name, metadata.namespace, status.podIP",
 		},
 		{
 			name: "unsupported fieldPath",
