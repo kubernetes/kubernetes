@@ -133,6 +133,11 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 	preamble(out, name, short, long)
 	printOptions(out, command)
 
+	if len(command.Example) > 0 {
+		fmt.Fprintf(out, "# EXAMPLE\n")
+		fmt.Fprintf(out, "```\n%s\n```\n", command.Example)
+	}
+
 	if len(command.Commands()) > 0 || len(parent) > 0 {
 		fmt.Fprintf(out, "# SEE ALSO\n")
 		if len(parent) > 0 {

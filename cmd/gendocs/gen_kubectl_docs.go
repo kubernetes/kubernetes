@@ -31,9 +31,6 @@ import (
 func printOptions(out *bytes.Buffer, command *cobra.Command, name string) {
 	flags := command.NonInheritedFlags()
 	flags.SetOutput(out)
-	if command.Runnable() {
-		fmt.Fprintf(out, "%s\n\n", command.UseLine())
-	}
 	if flags.HasFlags() {
 		fmt.Fprintf(out, "### Options\n\n```\n")
 		flags.PrintDefaults()
@@ -68,7 +65,16 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 	fmt.Fprintf(out, "## %s\n\n", name)
 	fmt.Fprintf(out, "%s\n\n", short)
 	fmt.Fprintf(out, "### Synopsis\n\n")
-	fmt.Fprintf(out, "%s\n\n", long)
+	fmt.Fprintf(out, "```\n%s\n```\n\n", long)
+
+	if command.Runnable() {
+		fmt.Fprintf(out, "%s\n\n", command.UseLine())
+	}
+
+	if len(command.Example) > 0 {
+		fmt.Fprintf(out, "### Examples\n\n")
+		fmt.Fprintf(out, "```\n%s\n```\n\n", command.Example)
+	}
 
 	printOptions(out, command, name)
 
