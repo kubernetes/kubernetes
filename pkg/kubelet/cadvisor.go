@@ -27,13 +27,13 @@ import (
 
 var (
 	// ErrNoKubeletContainers returned when there are not containers managed by the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
-	ErrNoKubeletContainers = errors.New("No containers managed by kubelet")
+	ErrNoKubeletContainers = errors.New("no containers managed by kubelet")
 
 	// ErrContainerNotFound returned when a container in the given pod with the given container name was not found, amongst those managed by the kubelet.
-	ErrContainerNotFound = errors.New("No matching container")
+	ErrContainerNotFound = errors.New("no matching container")
 
 	// ErrCadvisorApiFailure returned when cadvisor couldn't retrieve stats for the given container, either because it isn't running or it was confused by the request
-	ErrCadvisorApiFailure = errors.New("Failed to retrieve cadvisor stats")
+	ErrCadvisorApiFailure = errors.New("failed to retrieve cadvisor stats")
 )
 
 // cadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
