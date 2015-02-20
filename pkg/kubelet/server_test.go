@@ -569,17 +569,6 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 		return 100 * time.Millisecond
 	}
 
-	idleSuccess := make(chan struct{})
-
-	fw.fakeKubelet.execFunc = func(podFullName string, uid types.UID, containerName string, cmd []string, in io.Reader, out, stderr io.WriteCloser, tty bool) error {
-		select {
-		case <-idleSuccess:
-		case <-time.After(150 * time.Millisecond):
-			t.Fatalf("execFunc timed out waiting for idle timeout")
-		}
-		return nil
-	}
-
 	podNamespace := "other"
 	podName := "foo"
 	expectedContainerName := "baz"
@@ -605,19 +594,14 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	defer conn.Close()
 
 	h := http.Header{}
-	h.Set("type", "input")
+	h.Set(api.StreamType, api.StreamTypeError)
 	stream, err := conn.CreateStream(h)
 	if err != nil {
 		t.Fatalf("error creating input stream: %v", err)
 	}
 	defer stream.Reset()
 
-	select {
-	case <-conn.CloseChan():
-		close(idleSuccess)
-	case <-time.After(150 * time.Millisecond):
-		t.Fatalf("Timed out waiting for connection closure due to idle timeout")
-	}
+	<-conn.CloseChan()
 }
 
 func TestServeExecInContainer(t *testing.T) {
@@ -698,11 +682,7 @@ func TestServeExecInContainer(t *testing.T) {
 					t.Fatalf("%d:, error writing to stdout: %v", i, err)
 				}
 				out.Close()
-				select {
-				case <-clientStdoutReadDone:
-				case <-time.After(10 * time.Millisecond):
-					t.Fatalf("%d: timed out waiting for client to read stdout", i)
-				}
+				<-clientStdoutReadDone
 			} else if out != nil {
 				t.Fatalf("%d: stdout: expected nil: %#v", i, out)
 			}
@@ -720,11 +700,7 @@ func TestServeExecInContainer(t *testing.T) {
 					t.Fatalf("%d:, error writing to stderr: %v", i, err)
 				}
 				stderr.Close()
-				select {
-				case <-clientStderrReadDone:
-				case <-time.After(10 * time.Millisecond):
-					t.Fatalf("%d: timed out waiting for client to read stderr", i)
-				}
+				<-clientStderrReadDone
 			} else if stderr != nil {
 				t.Fatalf("%d: stderr: expected nil: %#v", i, stderr)
 			}
@@ -858,11 +834,7 @@ func TestServeExecInContainer(t *testing.T) {
 			}
 		}
 
-		select {
-		case <-execFuncDone:
-		case <-time.After(10 * time.Millisecond):
-			t.Fatalf("%d: timed out waiting for execFunc to complete", i)
-		}
+		<-execFuncDone
 	}
 }
 
@@ -871,17 +843,6 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 		return 100 * time.Millisecond
-	}
-
-	idleSuccess := make(chan struct{})
-
-	fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
-		select {
-		case <-idleSuccess:
-		case <-time.After(150 * time.Millisecond):
-			t.Fatalf("execFunc timed out waiting for idle timeout")
-		}
-		return nil
 	}
 
 	podNamespace := "other"
@@ -907,12 +868,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	}
 	defer conn.Close()
 
-	select {
-	case <-conn.CloseChan():
-		close(idleSuccess)
-	case <-time.After(150 * time.Millisecond):
-		t.Fatalf("Timed out waiting for connection closure due to idle timeout")
-	}
+	<-conn.CloseChan()
 }
 
 func TestServePortForward(t *testing.T) {
@@ -1054,10 +1010,6 @@ func TestServePortForward(t *testing.T) {
 			}
 		}
 
-		select {
-		case <-portForwardFuncDone:
-		case <-time.After(100 * time.Millisecond):
-			t.Fatalf("%d: timed out waiting for portForwardFuncDone", i)
-		}
+		<-portForwardFuncDone
 	}
 }

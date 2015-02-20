@@ -261,11 +261,7 @@ func TestForwardPorts(t *testing.T) {
 		go func() {
 			doneChan <- pf.ForwardPorts()
 		}()
-		select {
-		case <-pf.Ready:
-		case <-time.After(500 * time.Millisecond):
-			t.Fatalf("%d: timed out waiting for listeners", i)
-		}
+		<-pf.Ready
 
 		conn := testCase.Upgrader.conn
 
@@ -301,13 +297,9 @@ func TestForwardPorts(t *testing.T) {
 		close(stopChan)
 
 		// wait for r.ForwardPorts to actually return
-		select {
-		case err := <-doneChan:
-			if err != nil {
-				t.Fatalf("%d: unexpected error: %s", err)
-			}
-		case <-time.After(200 * time.Millisecond):
-			t.Fatalf("%d: timeout waiting for ForwardPorts to finish")
+		err = <-doneChan
+		if err != nil {
+			t.Fatalf("%d: unexpected error: %s", err)
 		}
 
 		if e, a := len(testCase.Send), len(conn.streams); e != a {
