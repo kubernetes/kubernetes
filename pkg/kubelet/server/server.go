@@ -165,9 +165,7 @@ func (s *KubeletServer) Run(_ []string) error {
 	//
 	// TODO(erictune): convert all cloud provider scripts and Google Container Engine to
 	// use only --api_servers, then delete --etcd_servers flag and the resulting dead code.
-	if len(s.APIServerList) == 0 {
-		glog.Fatalf("--api_server is required.")
-	} else if len(s.EtcdServerList) >0 {
+	if len(s.EtcdServerList) > 0 && len(s.APIServerList) > 0 {
 		glog.Infof("Both --etcd_servers and --api_servers are set.  Not using etcd source.")
 		s.EtcdServerList = util.StringList{}
 	}
