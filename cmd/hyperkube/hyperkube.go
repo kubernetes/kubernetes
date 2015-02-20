@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
@@ -175,8 +176,10 @@ func (hk *HyperKube) Run(args []string) error {
 
 // RunToExit will run the hyperkube and then call os.Exit with an appropriate exit code.
 func (hk *HyperKube) RunToExit(args []string) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	err := hk.Run(args)
 	if err != nil {
+		fmt.Fprint(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 	os.Exit(0)
