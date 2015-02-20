@@ -4,6 +4,7 @@ Sets a user entry in .kubeconfig
 
 ### Synopsis
 
+```
 Sets a user entry in .kubeconfig
 
   Specifying a name that already exists will merge new fields on top of existing
@@ -23,6 +24,7 @@ Sets a user entry in .kubeconfig
 
   Bearer token and basic auth are mutually exclusive.
 
+```
 
 kubectl config set-credentials name [--auth-path=authfile] [--client-certificate=certfile] [--client-key=keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
 

@@ -4,10 +4,12 @@ SUPERCEDED: Set and view the current Kubernetes namespace
 
 ### Synopsis
 
+```
 SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
 namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
 
+```
 
 kubectl namespace [<namespace>]
 
