@@ -568,7 +568,10 @@ type Service struct {
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	TypeMeta  `json:",inline"`
+	TypeMeta `json:",inline"`
+	// Optional: The IP protocol for these endpoints. Supports "TCP" and
+	// "UDP".  Defaults to "TCP".
+	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"`
 	Endpoints []string `json:"endpoints,omitempty" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
 }
 

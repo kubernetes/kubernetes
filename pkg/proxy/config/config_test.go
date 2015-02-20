@@ -218,11 +218,11 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint1", "endpoint2"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint1"}, {IP: "endpoint2"}},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
-		Endpoints:  []string{"endpoint3", "endpoint4"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint3"}, {IP: "endpoint4"}},
 	})
 	handler.Wait(2)
 	handler2.Wait(2)
@@ -244,11 +244,11 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint1", "endpoint2"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint1"}, {IP: "endpoint2"}},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
-		Endpoints:  []string{"endpoint3", "endpoint4"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint3"}, {IP: "endpoint4"}},
 	})
 	handler.Wait(2)
 	handler2.Wait(2)
@@ -262,7 +262,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	// Add one more
 	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foobar"},
-		Endpoints:  []string{"endpoint5", "endpoint6"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint5"}, {IP: "endpoint6"}},
 	})
 	handler.Wait(1)
 	handler2.Wait(1)
@@ -274,7 +274,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	// Update the "foo" service with new endpoints
 	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Endpoints:  []string{"endpoint77"},
+		Endpoints:  []api.Endpoint{{IP: "endpoint7"}},
 	})
 	handler.Wait(1)
 	handler2.Wait(1)

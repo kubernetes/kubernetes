@@ -102,3 +102,13 @@ func TestSetDefaultSecret(t *testing.T) {
 		t.Errorf("Expected secret type %v, got %v", current.SecretTypeOpaque, s2.Type)
 	}
 }
+
+func TestSetDefaulEndpointsProtocol(t *testing.T) {
+	in := &current.Endpoints{}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*current.Endpoints)
+
+	if out.Protocol != current.ProtocolTCP {
+		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
+	}
+}
