@@ -686,7 +686,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 				// TODO: Clean up the previouly created dir? return the error?
 				glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
 			} else {
-				defer fs.Close()
+				fs.Close() // Close immediately; we're just doing a `touch` here
 				b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
 				binds = append(binds, b)
 			}
