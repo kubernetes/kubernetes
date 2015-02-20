@@ -76,7 +76,7 @@ var _ = Describe("Services", func() {
 					{
 						Name: "results",
 						Source: api.VolumeSource{
-							EmptyDir: &api.EmptyDir{},
+							EmptyDir: &api.EmptyDirVolumeSource{},
 						},
 					},
 				},

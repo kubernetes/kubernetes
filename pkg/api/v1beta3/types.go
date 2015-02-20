@@ -189,24 +189,24 @@ type VolumeSource struct {
 	// to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
 	// mount host directories as read/write.
-	HostPath *HostPath `json:"hostPath"`
+	HostPath *HostPathVolumeSource `json:"hostPath"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
-	EmptyDir *EmptyDir `json:"emptyDir"`
+	EmptyDir *EmptyDirVolumeSource `json:"emptyDir"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDisk `json:"gcePersistentDisk"`
+	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
-	GitRepo *GitRepo `json:"gitRepo"`
+	GitRepo *GitRepoVolumeSource `json:"gitRepo"`
 	// Secret represents a secret that should populate this volume.
-	Secret *SecretSource `json:"secret"`
+	Secret *SecretVolumeSource `json:"secret"`
 }
 
-// HostPath represents bare host directory volume.
-type HostPath struct {
+// HostPathVolumeSource represents bare host directory volume.
+type HostPathVolumeSource struct {
 	Path string `json:"path"`
 }
 
-type EmptyDir struct{}
+type EmptyDirVolumeSource struct{}
 
 // Protocol defines network protocols supported for things like conatiner ports.
 type Protocol string
@@ -218,12 +218,12 @@ const (
 	ProtocolUDP Protocol = "UDP"
 )
 
-// GCEPersistentDisk represents a Persistent Disk resource in Google Compute Engine.
+// GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
-type GCEPersistentDisk struct {
+type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName"`
 	// Required: Filesystem type to mount.
@@ -240,16 +240,16 @@ type GCEPersistentDisk struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// GitRepo represents a volume that is pulled from git when the pod is created.
-type GitRepo struct {
+// GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.
+type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository"`
 	// Commit hash, this is optional
 	Revision string `json:"revision"`
 }
 
-// Adapts a Secret into a VolumeSource
-type SecretSource struct {
+// SecretVolumeSource adapts a Secret into a VolumeSource
+type SecretVolumeSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }

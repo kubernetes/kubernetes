@@ -255,7 +255,7 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if source.HostPath != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateHostPath(source.HostPath).Prefix("hostPath")...)
+		allErrs = append(allErrs, validateHostPathVolumeSource(source.HostPath).Prefix("hostPath")...)
 	}
 	if source.EmptyDir != nil {
 		numVolumes++
@@ -263,15 +263,15 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 	}
 	if source.GitRepo != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateGitRepo(source.GitRepo).Prefix("gitRepo")...)
+		allErrs = append(allErrs, validateGitRepoVolumeSource(source.GitRepo).Prefix("gitRepo")...)
 	}
 	if source.GCEPersistentDisk != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk).Prefix("persistentDisk")...)
+		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
 	if source.Secret != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateSecretSource(source.Secret).Prefix("secret")...)
+		allErrs = append(allErrs, validateSecretVolumeSource(source.Secret).Prefix("secret")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
@@ -279,7 +279,7 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateHostPath(hostDir *api.HostPath) errs.ValidationErrorList {
+func validateHostPathVolumeSource(hostDir *api.HostPathVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if hostDir.Path == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("path", hostDir.Path))
@@ -287,7 +287,7 @@ func validateHostPath(hostDir *api.HostPath) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateGitRepo(gitRepo *api.GitRepo) errs.ValidationErrorList {
+func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if gitRepo.Repository == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("repository", gitRepo.Repository))
@@ -295,7 +295,7 @@ func validateGitRepo(gitRepo *api.GitRepo) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateGCEPersistentDisk(PD *api.GCEPersistentDisk) errs.ValidationErrorList {
+func validateGCEPersistentDiskVolumeSource(PD *api.GCEPersistentDiskVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if PD.PDName == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("pdName", PD.PDName))
@@ -309,7 +309,7 @@ func validateGCEPersistentDisk(PD *api.GCEPersistentDisk) errs.ValidationErrorLi
 	return allErrs
 }
 
-func validateSecretSource(secretSource *api.SecretSource) errs.ValidationErrorList {
+func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if secretSource.Target.Name == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("target.name", ""))

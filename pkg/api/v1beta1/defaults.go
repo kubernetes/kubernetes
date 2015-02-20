@@ -28,7 +28,7 @@ func init() {
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.Source) {
 				obj.Source = VolumeSource{
-					EmptyDir: &EmptyDir{},
+					EmptyDir: &EmptyDirVolumeSource{},
 				}
 			}
 		},

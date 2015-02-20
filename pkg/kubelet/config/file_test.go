@@ -47,7 +47,7 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) 
 			{
 				Name: "host-dir",
 				Source: v1beta1.VolumeSource{
-					HostDir: &v1beta1.HostPath{"/dir/path"},
+					HostDir: &v1beta1.HostPathVolumeSource{"/dir/path"},
 				},
 			},
 		},
@@ -68,7 +68,7 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) 
 				{
 					Name: "host-dir",
 					Source: api.VolumeSource{
-						HostPath: &api.HostPath{"/dir/path"},
+						HostPath: &api.HostPathVolumeSource{"/dir/path"},
 					},
 				},
 			},

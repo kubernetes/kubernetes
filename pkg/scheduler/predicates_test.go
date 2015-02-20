@@ -277,7 +277,7 @@ func TestDiskConflicts(t *testing.T) {
 		Volumes: []api.Volume{
 			{
 				Source: api.VolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDisk{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 						PDName: "foo",
 					},
 				},
@@ -288,7 +288,7 @@ func TestDiskConflicts(t *testing.T) {
 		Volumes: []api.Volume{
 			{
 				Source: api.VolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDisk{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 						PDName: "bar",
 					},
 				},
