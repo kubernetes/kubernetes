@@ -46,35 +46,36 @@ const defaultRootDir = "/var/lib/kubelet"
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
-	Config                  string
-	SyncFrequency           time.Duration
-	FileCheckFrequency      time.Duration
-	HTTPCheckFrequency      time.Duration
-	ManifestURL             string
-	EnableServer            bool
-	Address                 util.IP
-	Port                    uint
-	HostnameOverride        string
-	PodInfraContainerImage  string
-	DockerEndpoint          string
-	EtcdServerList          util.StringList
-	EtcdConfigFile          string
-	RootDirectory           string
-	AllowPrivileged         bool
-	RegistryPullQPS         float64
-	RegistryBurst           int
-	RunOnce                 bool
-	EnableDebuggingHandlers bool
-	MinimumGCAge            time.Duration
-	MaxContainerCount       int
-	AuthPath                string
-	CAdvisorPort            uint
-	OOMScoreAdj             int
-	APIServerList           util.StringList
-	ClusterDomain           string
-	MasterServiceNamespace  string
-	ClusterDNS              util.IP
-	ReallyCrashForTesting   bool
+	Config                         string
+	SyncFrequency                  time.Duration
+	FileCheckFrequency             time.Duration
+	HTTPCheckFrequency             time.Duration
+	ManifestURL                    string
+	EnableServer                   bool
+	Address                        util.IP
+	Port                           uint
+	HostnameOverride               string
+	PodInfraContainerImage         string
+	DockerEndpoint                 string
+	EtcdServerList                 util.StringList
+	EtcdConfigFile                 string
+	RootDirectory                  string
+	AllowPrivileged                bool
+	RegistryPullQPS                float64
+	RegistryBurst                  int
+	RunOnce                        bool
+	EnableDebuggingHandlers        bool
+	MinimumGCAge                   time.Duration
+	MaxContainerCount              int
+	AuthPath                       string
+	CAdvisorPort                   uint
+	OOMScoreAdj                    int
+	APIServerList                  util.StringList
+	ClusterDomain                  string
+	MasterServiceNamespace         string
+	ClusterDNS                     util.IP
+	ReallyCrashForTesting          bool
+	StreamingConnectionIdleTimeout time.Duration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -149,6 +150,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.ClusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, crash with panics more often.")
+	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -184,32 +186,33 @@ func (s *KubeletServer) Run(_ []string) error {
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
 
 	kcfg := KubeletConfig{
-		Address:                 s.Address,
-		AllowPrivileged:         s.AllowPrivileged,
-		HostnameOverride:        s.HostnameOverride,
-		RootDirectory:           s.RootDirectory,
-		ConfigFile:              s.Config,
-		ManifestURL:             s.ManifestURL,
-		FileCheckFrequency:      s.FileCheckFrequency,
-		HTTPCheckFrequency:      s.HTTPCheckFrequency,
-		PodInfraContainerImage:  s.PodInfraContainerImage,
-		SyncFrequency:           s.SyncFrequency,
-		RegistryPullQPS:         s.RegistryPullQPS,
-		RegistryBurst:           s.RegistryBurst,
-		MinimumGCAge:            s.MinimumGCAge,
-		MaxContainerCount:       s.MaxContainerCount,
-		ClusterDomain:           s.ClusterDomain,
-		ClusterDNS:              s.ClusterDNS,
-		Runonce:                 s.RunOnce,
-		Port:                    s.Port,
-		CAdvisorPort:            s.CAdvisorPort,
-		EnableServer:            s.EnableServer,
-		EnableDebuggingHandlers: s.EnableDebuggingHandlers,
-		DockerClient:            dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		KubeClient:              client,
-		EtcdClient:              kubelet.EtcdClientOrDie(s.EtcdServerList, s.EtcdConfigFile),
-		MasterServiceNamespace:  s.MasterServiceNamespace,
-		VolumePlugins:           ProbeVolumePlugins(),
+		Address:                        s.Address,
+		AllowPrivileged:                s.AllowPrivileged,
+		HostnameOverride:               s.HostnameOverride,
+		RootDirectory:                  s.RootDirectory,
+		ConfigFile:                     s.Config,
+		ManifestURL:                    s.ManifestURL,
+		FileCheckFrequency:             s.FileCheckFrequency,
+		HTTPCheckFrequency:             s.HTTPCheckFrequency,
+		PodInfraContainerImage:         s.PodInfraContainerImage,
+		SyncFrequency:                  s.SyncFrequency,
+		RegistryPullQPS:                s.RegistryPullQPS,
+		RegistryBurst:                  s.RegistryBurst,
+		MinimumGCAge:                   s.MinimumGCAge,
+		MaxContainerCount:              s.MaxContainerCount,
+		ClusterDomain:                  s.ClusterDomain,
+		ClusterDNS:                     s.ClusterDNS,
+		Runonce:                        s.RunOnce,
+		Port:                           s.Port,
+		CAdvisorPort:                   s.CAdvisorPort,
+		EnableServer:                   s.EnableServer,
+		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
+		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		KubeClient:                     client,
+		EtcdClient:                     kubelet.EtcdClientOrDie(s.EtcdServerList, s.EtcdConfigFile),
+		MasterServiceNamespace:         s.MasterServiceNamespace,
+		VolumePlugins:                  ProbeVolumePlugins(),
+		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 	}
 
 	RunKubelet(&kcfg)
@@ -368,33 +371,34 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
 type KubeletConfig struct {
-	EtcdClient              tools.EtcdClient
-	KubeClient              *client.Client
-	DockerClient            dockertools.DockerInterface
-	CAdvisorPort            uint
-	Address                 util.IP
-	AllowPrivileged         bool
-	HostnameOverride        string
-	RootDirectory           string
-	ConfigFile              string
-	ManifestURL             string
-	FileCheckFrequency      time.Duration
-	HTTPCheckFrequency      time.Duration
-	Hostname                string
-	PodInfraContainerImage  string
-	SyncFrequency           time.Duration
-	RegistryPullQPS         float64
-	RegistryBurst           int
-	MinimumGCAge            time.Duration
-	MaxContainerCount       int
-	ClusterDomain           string
-	ClusterDNS              util.IP
-	EnableServer            bool
-	EnableDebuggingHandlers bool
-	Port                    uint
-	Runonce                 bool
-	MasterServiceNamespace  string
-	VolumePlugins           []volume.Plugin
+	EtcdClient                     tools.EtcdClient
+	KubeClient                     *client.Client
+	DockerClient                   dockertools.DockerInterface
+	CAdvisorPort                   uint
+	Address                        util.IP
+	AllowPrivileged                bool
+	HostnameOverride               string
+	RootDirectory                  string
+	ConfigFile                     string
+	ManifestURL                    string
+	FileCheckFrequency             time.Duration
+	HTTPCheckFrequency             time.Duration
+	Hostname                       string
+	PodInfraContainerImage         string
+	SyncFrequency                  time.Duration
+	RegistryPullQPS                float64
+	RegistryBurst                  int
+	MinimumGCAge                   time.Duration
+	MaxContainerCount              int
+	ClusterDomain                  string
+	ClusterDNS                     util.IP
+	EnableServer                   bool
+	EnableDebuggingHandlers        bool
+	Port                           uint
+	Runonce                        bool
+	MasterServiceNamespace         string
+	VolumePlugins                  []volume.Plugin
+	StreamingConnectionIdleTimeout time.Duration
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -417,7 +421,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
-		kc.VolumePlugins)
+		kc.VolumePlugins,
+		kc.StreamingConnectionIdleTimeout)
 
 	if err != nil {
 		return nil, err

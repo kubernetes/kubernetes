@@ -1,0 +1,52 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Eric Paris" "Jan 2015"  ""
+
+
+.SH NAME
+.PP
+kubectl exec \- Execute a command in a container.
+
+
+.SH SYNOPSIS
+.PP
+\fBkubectl exec\fP [OPTIONS]
+
+
+.SH DESCRIPTION
+.PP
+Execute a command in a container.
+Examples:
+  $ kubectl exec \-p 123456\-7890 \-c ruby\-container date
+  <returns output from running 'date' in ruby-container from pod 123456-7890>
+
+.PP
+$ kubectl exec \-p 123456\-7890 \-c ruby\-container \-i \-t \-\- bash \-il
+  <switches to raw terminal mode, sends stdin to 'bash' in ruby\-container from
+   pod 123456\-780 and sends stdout/stderr from 'bash' back to the client
+
+
+.SH OPTIONS
+.PP
+\fB\-c\fP, \fB\-\-container\fP=""
+    Container name
+
+.PP
+\fB\-p\fP, \fB\-\-pod\fP=""
+    Pod name
+
+.PP
+\fB\-i\fP, \fB\-\-stdin\fP=false
+    Pass stdin to the container
+
+.PP
+\fB\-t\fP, \fB\-\-tty\fP=false
+    Stdin is a TTY
+
+
+.SH SEE ALSO
+.PP
+\fBkubectl(1)\fP,
+
+
+.SH HISTORY
+.PP
+January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based on the kubernetes source material, but hopefully they have been automatically generated since!

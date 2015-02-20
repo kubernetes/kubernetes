@@ -86,7 +86,8 @@ func NewMainKubelet(
 	clusterDomain string,
 	clusterDNS net.IP,
 	masterServiceNamespace string,
-	volumePlugins []volume.Plugin) (*Kubelet, error) {
+	volumePlugins []volume.Plugin,
+	streamingConnectionIdleTimeout time.Duration) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -104,28 +105,29 @@ func NewMainKubelet(
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
 	klet := &Kubelet{
-		hostname:               hostname,
-		dockerClient:           dockerClient,
-		etcdClient:             etcdClient,
-		kubeClient:             kubeClient,
-		rootDirectory:          rootDirectory,
-		resyncInterval:         resyncInterval,
-		podInfraContainerImage: podInfraContainerImage,
-		podWorkers:             newPodWorkers(),
-		dockerIDToRef:          map[dockertools.DockerID]*api.ObjectReference{},
-		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
-		httpClient:             &http.Client{},
-		pullQPS:                pullQPS,
-		pullBurst:              pullBurst,
-		minimumGCAge:           minimumGCAge,
-		maxContainerCount:      maxContainerCount,
-		sourceReady:            sourceReady,
-		clusterDomain:          clusterDomain,
-		clusterDNS:             clusterDNS,
-		serviceLister:          serviceLister,
-		masterServiceNamespace: masterServiceNamespace,
-		prober:                 newProbeHolder(),
-		readiness:              newReadinessStates(),
+		hostname:                       hostname,
+		dockerClient:                   dockerClient,
+		etcdClient:                     etcdClient,
+		kubeClient:                     kubeClient,
+		rootDirectory:                  rootDirectory,
+		resyncInterval:                 resyncInterval,
+		podInfraContainerImage:         podInfraContainerImage,
+		podWorkers:                     newPodWorkers(),
+		dockerIDToRef:                  map[dockertools.DockerID]*api.ObjectReference{},
+		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
+		httpClient:                     &http.Client{},
+		pullQPS:                        pullQPS,
+		pullBurst:                      pullBurst,
+		minimumGCAge:                   minimumGCAge,
+		maxContainerCount:              maxContainerCount,
+		sourceReady:                    sourceReady,
+		clusterDomain:                  clusterDomain,
+		clusterDNS:                     clusterDNS,
+		serviceLister:                  serviceLister,
+		masterServiceNamespace:         masterServiceNamespace,
+		prober:                         newProbeHolder(),
+		readiness:                      newReadinessStates(),
+		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 	}
 
 	if err := klet.setupDataDirs(); err != nil {
@@ -207,6 +209,10 @@ type Kubelet struct {
 	prober probeHolder
 	// container readiness state holder
 	readiness *readinessStates
+
+	// how long to keep idle streaming command execution/port forwarding
+	// connections open before terminating them
+	streamingConnectionIdleTimeout time.Duration
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1686,6 +1692,40 @@ func (kl *Kubelet) RunInContainer(podFullName string, uid types.UID, container s
 	return kl.runner.RunInContainer(dockerContainer.ID, cmd)
 }
 
+// ExecInContainer executes a command in a container, connecting the supplied
+// stdin/stdout/stderr to the command's IO streams.
+func (kl *Kubelet) ExecInContainer(podFullName string, uid types.UID, container string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	if kl.runner == nil {
+		return fmt.Errorf("no runner specified.")
+	}
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	if err != nil {
+		return err
+	}
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, container)
+	if !found {
+		return fmt.Errorf("container not found (%q)", container)
+	}
+	return kl.runner.ExecInContainer(dockerContainer.ID, cmd, stdin, stdout, stderr, tty)
+}
+
+// PortForward connects to the pod's port and copies data between the port
+// and the stream.
+func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+	if kl.runner == nil {
+		return fmt.Errorf("no runner specified.")
+	}
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	if err != nil {
+		return err
+	}
+	podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName)
+	if !found {
+		return fmt.Errorf("Unable to find pod infra container for pod %s, uid %v", podFullName, uid)
+	}
+	return kl.runner.PortForward(podInfraContainer.ID, port, stream)
+}
+
 // BirthCry sends an event that the kubelet has started up.
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
@@ -1698,4 +1738,8 @@ func (kl *Kubelet) BirthCry() {
 		Namespace: api.NamespaceDefault,
 	}
 	record.Eventf(ref, "starting", "Starting kubelet.")
+}
+
+func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
+	return kl.streamingConnectionIdleTimeout
 }

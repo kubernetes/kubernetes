@@ -99,6 +99,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 				http.StatusConflict,
 				http.StatusNotFound,
 				errors.StatusUnprocessableEntity,
+				http.StatusSwitchingProtocols,
 			),
 		).Log()
 

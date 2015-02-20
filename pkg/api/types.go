@@ -1349,3 +1349,32 @@ type SecretList struct {
 
 	Items []Secret `json:"items"`
 }
+
+// These constants are for remote command execution and port forwarding and are
+// used by both the client side and server side components.
+//
+// This is probably not the ideal place for them, but it didn't seem worth it
+// to create pkg/exec and pkg/portforward just to contain a single file with
+// constants in it.  Suggestions for more appropriate alternatives are
+// definitely welcome!
+const (
+	// Enable stdin for remote command execution
+	ExecStdinParam = "input"
+	// Enable stdout for remote command execution
+	ExecStdoutParam = "output"
+	// Enable stderr for remote command execution
+	ExecStderrParam = "error"
+	// Enable TTY for remote command execution
+	ExecTTYParam = "tty"
+	// Command to run for remote command execution
+	ExecCommandParamm = "command"
+
+	StreamType       = "streamType"
+	StreamTypeStdin  = "stdin"
+	StreamTypeStdout = "stdout"
+	StreamTypeStderr = "stderr"
+	StreamTypeData   = "data"
+	StreamTypeError  = "error"
+
+	PortHeader = "port"
+)
