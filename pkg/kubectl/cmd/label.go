@@ -29,28 +29,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "label [--overwrite] <resource> <name> <key-1>=<val-1> ... <key-n>=<val-n> [--resource-version=<version>]",
-		Short: "Update the labels on a resource",
-		Long: `Update the labels on a resource.
+const (
+	label_long = `Update the labels on a resource.
 
 If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
+If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`
+	label_example = `// Update pod 'foo' with the label 'unhealthy' and the value 'true'.
+$ kubectl label pods foo unhealthy=true
 
-Examples:
-  // Update pod 'foo' with the label 'unhealthy' and the value 'true'.
-  $ kubectl label pods foo unhealthy=true
+// Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
+$ kubectl label --overwrite pods foo status=unhealthy
 
-  // Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
-  $ kubectl label --overwrite pods foo status=unhealthy
-  
-  // Update pod 'foo' only if the resource is unchanged from version 1.
-  $ kubectl label pods foo status=unhealthy --resource-version=1
-  
-  // Update pod 'foo' by removing a label named 'bar' if it exists.
-  // Does not require the --overwrite flag.
-  $ kubectl label pods foo bar-`,
+// Update pod 'foo' only if the resource is unchanged from version 1.
+$ kubectl label pods foo status=unhealthy --resource-version=1
+
+// Update pod 'foo' by removing a label named 'bar' if it exists.
+// Does not require the --overwrite flag.
+$ kubectl label pods foo bar-`
+)
+
+func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "label [--overwrite] <resource> <name> <key-1>=<val-1> ... <key-n>=<val-n> [--resource-version=<version>]",
+		Short:   "Update the labels on a resource",
+		Long:    label_long,
+		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 2 {
 				usageError(cmd, "<resource> <name> is required")

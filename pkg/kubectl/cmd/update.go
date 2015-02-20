@@ -26,27 +26,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	update_long = `Update a resource by filename or stdin.
+
+JSON and YAML formats are accepted.`
+	update_example = `// Update a pod using the data in pod.json.
+$ kubectl update -f pod.json
+
+// Update a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl update -f -
+
+// Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
+$ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'`
+)
+
 func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 	flags := &struct {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:   "update -f filename",
-		Short: "Update a resource by filename or stdin.",
-		Long: `Update a resource by filename or stdin.
-
-JSON and YAML formats are accepted.
-
-Examples:
-
-    // Update a pod using the data in pod.json.
-    $ kubectl update -f pod.json
-
-    // Update a pod based on the JSON passed into stdin.
-    $ cat pod.json | kubectl update -f -
-
-    // Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
-    $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'`,
+		Use:     "update -f filename",
+		Short:   "Update a resource by filename or stdin.",
+		Long:    update_long,
+		Example: update_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
 			checkErr(err)

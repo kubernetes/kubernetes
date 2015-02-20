@@ -26,26 +26,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	run_long = `Create and run a particular image, possibly replicated.
+Creates a replication controller to manage the created container(s).`
+	run_example = `// Starts a single instance of nginx.
+$ kubectl run-container nginx --image=dockerfile/nginx
+
+// Starts a replicated instance of nginx.
+$ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
+
+// Dry run. Print the corresponding API objects without creating them.
+$ kubectl run-container nginx --image=dockerfile/nginx --dry-run
+
+// Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
+$ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`
+)
+
 func (f *Factory) NewCmdRunContainer(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>]",
-		Short: "Run a particular image on the cluster.",
-		Long: `Create and run a particular image, possibly replicated.
-Creates a replication controller to manage the created container(s).
-
-Examples:
-
-    // Starts a single instance of nginx.
-    $ kubectl run-container nginx --image=dockerfile/nginx
-
-    // Starts a replicated instance of nginx.
-    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
-
-    // Dry run. Print the corresponding API objects without creating them.
-    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
-  
-    // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
-    $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`,
+		Use:     "run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>]",
+		Short:   "Run a particular image on the cluster.",
+		Long:    run_long,
+		Example: run_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				usageError(cmd, "<name> is required for run-container")
