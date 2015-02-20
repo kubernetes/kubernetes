@@ -180,7 +180,7 @@ for version in "${kube_api_versions[@]}"; do
           }
       }
 __EOF__
-  kubectl update service service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}" 
+  kubectl update service service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}"
   kubectl get service service-${version}-test -o json | kubectl update -f -
   kubectl get services "${kube_flags[@]}"
   kubectl get services "service-${version}-test" "${kube_flags[@]}"
@@ -191,6 +191,13 @@ __EOF__
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   kubectl get replicationcontrollers "${kube_flags[@]}"
   kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
+  #resize with current-replicas and replicas
+  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*2 desired'
+  #resize with (wrong) current-replicas and replicas
+  [ !  $(resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}") ]
+  #resize replicas-only
+  kubectl resize  --replicas=3 replicationcontrollers frontend-controller "${kube_flags[@]}"
   kubectl delete rc frontend-controller "${kube_flags[@]}"
 
   kube::log::status "Testing kubectl(${version}:nodes)"
