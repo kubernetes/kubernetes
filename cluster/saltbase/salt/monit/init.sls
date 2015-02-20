@@ -4,6 +4,7 @@ monit:
   pkg:
     - installed
 
+{% if "kubernetes-master" in grains.get('roles', []) %}
 /etc/monit/conf.d/etcd:
   file:
     - managed
@@ -11,6 +12,25 @@ monit:
     - user: root
     - group: root
     - mode: 644
+{% endif %}
+
+/etc/monit/conf.d/docker:
+  file:
+    - managed
+    - source: salt://monit/docker
+    - user: root
+    - group: root
+    - mode: 644
+
+{% if "kubernetes-pool" in grains.get('roles', []) %}
+/etc/monit/conf.d/kubelet:
+  file:
+    - managed
+    - source: salt://monit/kubelet
+    - user: root
+    - group: root
+    - mode: 644
+{% endif %}
 
 monit-service:
   service:
@@ -18,6 +38,6 @@ monit-service:
     - name: monit 
     - watch:
       - pkg: monit 
-      - file: /etc/monit/conf.d/etcd
+      - file: /etc/monit/conf.d/*
 
 {% endif %}
