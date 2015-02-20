@@ -23,40 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
-func TestGetDeviceName(t *testing.T) {
-	tests := []struct {
-		deviceName    string
-		canonicalName string
-		expectedName  string
-		expectError   bool
-	}{
-		{
-			deviceName:    "/dev/google-sd0-part0",
-			canonicalName: "/dev/google/sd0P1",
-			expectedName:  "sd0",
-		},
-		{
-			canonicalName: "0123456",
-			expectError:   true,
-		},
-	}
-	for _, test := range tests {
-		name, err := getDeviceName(test.deviceName, test.canonicalName)
-		if test.expectError {
-			if err == nil {
-				t.Error("unexpected non-error")
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if name != test.expectedName {
-			t.Errorf("expected: %s, got %s", test.expectedName, name)
-		}
-	}
-}
-
 func TestSafeFormatAndMount(t *testing.T) {
 	tests := []struct {
 		fstype       string

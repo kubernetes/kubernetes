@@ -128,9 +128,9 @@ func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(pd *gcePersistentDisk) error
+	AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(pd *gcePersistentDisk, devicePath string) error
+	DetachDisk(pd *gcePersistentDisk) error
 }
 
 // gcePersistentDisk volumes are disk resources provided by Google Compute Engine
@@ -157,7 +157,7 @@ type gcePersistentDisk struct {
 }
 
 func detachDiskLogError(pd *gcePersistentDisk) {
-	err := pd.manager.DetachDisk(pd, "/dev/disk/by-id/google-"+pd.pdName)
+	err := pd.manager.DetachDisk(pd)
 	if err != nil {
 		glog.Warningf("Failed to detach disk: %v (%v)", pd, err)
 	}
@@ -179,7 +179,8 @@ func (pd *gcePersistentDisk) SetUp() error {
 		return nil
 	}
 
-	if err := pd.manager.AttachDisk(pd); err != nil {
+	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+	if err := pd.manager.AttachAndMountDisk(pd, globalPDPath); err != nil {
 		return err
 	}
 
@@ -196,7 +197,6 @@ func (pd *gcePersistentDisk) SetUp() error {
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
 	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
 	if err != nil {
 		mountpoint, mntErr := isMountPoint(pd.GetPath())
@@ -229,7 +229,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	return nil
 }
 
-func makeGlobalPDName(host volume.Host, devName string, readOnly bool) string {
+func makeGlobalPDName(host volume.Host, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }
 
@@ -252,18 +252,20 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return os.Remove(pd.GetPath())
 	}
 
-	devicePath, refCount, err := getMountRefCount(pd.mounter, pd.GetPath())
+	refs, err := getMountRefs(pd.mounter, pd.GetPath())
 	if err != nil {
 		return err
 	}
+	// Unmount the bind-mount inside this pod
 	if err := pd.mounter.Unmount(pd.GetPath(), 0); err != nil {
 		return err
 	}
-	refCount--
-	// If refCount is 1, then all bind mounts have been removed, and the
+	// If len(refs) is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
-	if refCount == 1 {
-		if err := pd.manager.DetachDisk(pd, devicePath); err != nil {
+	if len(refs) == 1 {
+		// pd.pdName is not initially set for volume-cleaners, so set it here.
+		pd.pdName = path.Base(refs[0])
+		if err := pd.manager.DetachDisk(pd); err != nil {
 			return err
 		}
 	}
