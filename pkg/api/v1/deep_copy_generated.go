@@ -326,6 +326,28 @@ func deepCopy_v1_DeleteOptions(in DeleteOptions, out *DeleteOptions, c *conversi
 	return nil
 }
 
+func deepCopy_v1_DownwardAPIVolumeFile(in DownwardAPIVolumeFile, out *DownwardAPIVolumeFile, c *conversion.Cloner) error {
+	out.Path = in.Path
+	if err := deepCopy_v1_ObjectFieldSelector(in.FieldRef, &out.FieldRef, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_DownwardAPIVolumeSource(in DownwardAPIVolumeSource, out *DownwardAPIVolumeSource, c *conversion.Cloner) error {
+	if in.Items != nil {
+		out.Items = make([]DownwardAPIVolumeFile, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_DownwardAPIVolumeFile(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func deepCopy_v1_EmptyDirVolumeSource(in EmptyDirVolumeSource, out *EmptyDirVolumeSource, c *conversion.Cloner) error {
 	out.Medium = in.Medium
 	return nil
@@ -2138,6 +2160,14 @@ func deepCopy_v1_VolumeSource(in VolumeSource, out *VolumeSource, c *conversion.
 	} else {
 		out.Cinder = nil
 	}
+	if in.DownwardAPI != nil {
+		out.DownwardAPI = new(DownwardAPIVolumeSource)
+		if err := deepCopy_v1_DownwardAPIVolumeSource(*in.DownwardAPI, out.DownwardAPI, c); err != nil {
+			return err
+		}
+	} else {
+		out.DownwardAPI = nil
+	}
 	return nil
 }
 
@@ -2187,6 +2217,8 @@ func init() {
 		deepCopy_v1_ContainerStateWaiting,
 		deepCopy_v1_ContainerStatus,
 		deepCopy_v1_DeleteOptions,
+		deepCopy_v1_DownwardAPIVolumeFile,
+		deepCopy_v1_DownwardAPIVolumeSource,
 		deepCopy_v1_EmptyDirVolumeSource,
 		deepCopy_v1_EndpointAddress,
 		deepCopy_v1_EndpointPort,
