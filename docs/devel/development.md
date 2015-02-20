@@ -133,10 +133,27 @@ ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
 ```
 
 ## Coverage
+
+Currently, collecting coverage is only supported for the Go unit tests.
+
+To run all unit tests and generate an HTML coverage report, run the following:
+
 ```
 cd kubernetes
-godep go tool cover -html=target/c.out
+KUBE_COVER=y hack/test-go.sh
 ```
+
+At the end of the run, an the HTML report will be generated with the path printed to stdout.
+
+To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
+```
+cd kubernetes
+KUBE_COVER=y hack/test-go.sh pkg/kubectl
+```
+
+Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
+
+Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/GoogleCloudPlatform/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls.
 
 ## Integration tests
 
