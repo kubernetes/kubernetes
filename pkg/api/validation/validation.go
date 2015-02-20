@@ -116,6 +116,28 @@ func ValidateNamespaceName(name string, prefix bool) (bool, string) {
 	return nameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateLimitRangeName can be used to check whether the given limit range name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateLimitRangeName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateResourceQuotaName can be used to check whether the given
+// resource quota name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateResourceQuotaName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateSecretName can be used to check whether the given secret name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateSecretName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -815,16 +837,8 @@ func validateResourceName(value string, field string) errs.ValidationErrorList {
 // ValidateLimitRange tests if required fields in the LimitRange are set.
 func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(limitRange.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", limitRange.Name))
-	} else if !util.IsDNSSubdomain(limitRange.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", limitRange.Name, dnsSubdomainErrorMsg))
-	}
-	if len(limitRange.Namespace) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("namespace", limitRange.Namespace))
-	} else if !util.IsDNSSubdomain(limitRange.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", limitRange.Namespace, dnsSubdomainErrorMsg))
-	}
+	allErrs = append(allErrs, ValidateObjectMeta(&limitRange.ObjectMeta, true, ValidateLimitRangeName).Prefix("metadata")...)
+
 	// ensure resource names are properly qualified per docs/resources.md
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
@@ -841,21 +855,12 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 // ValidateSecret tests if required fields in the Secret are set.
 func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(secret.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", secret.Name))
-	} else if !util.IsDNSSubdomain(secret.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", secret.Name, ""))
-	}
-	if len(secret.Namespace) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("namespace", secret.Namespace))
-	} else if !util.IsDNSSubdomain(secret.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", secret.Namespace, ""))
-	}
+	allErrs = append(allErrs, ValidateObjectMeta(&secret.ObjectMeta, true, ValidateSecretName).Prefix("metadata")...)
 
 	totalSize := 0
 	for key, value := range secret.Data {
 		if !util.IsDNSSubdomain(key) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%v]", key), key, cIdentifierErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, cIdentifierErrorMsg))
 		}
 
 		totalSize += len(value)
@@ -893,16 +898,8 @@ func validateResourceRequirements(container *api.Container) errs.ValidationError
 // ValidateResourceQuota tests if required fields in the ResourceQuota are set.
 func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if len(resourceQuota.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", resourceQuota.Name))
-	} else if !util.IsDNSSubdomain(resourceQuota.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", resourceQuota.Name, dnsSubdomainErrorMsg))
-	}
-	if len(resourceQuota.Namespace) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("namespace", resourceQuota.Namespace))
-	} else if !util.IsDNSSubdomain(resourceQuota.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", resourceQuota.Namespace, dnsSubdomainErrorMsg))
-	}
+	allErrs = append(allErrs, ValidateObjectMeta(&resourceQuota.ObjectMeta, true, ValidateResourceQuotaName).Prefix("metadata")...)
+
 	for k := range resourceQuota.Spec.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(resourceQuota.TypeMeta.Kind))...)
 	}

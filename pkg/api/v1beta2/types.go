@@ -1128,7 +1128,7 @@ const MaxSecretSize = 1 * 1024 * 1024
 type SecretType string
 
 const (
-	SecretTypeOpaque SecretType = "opaque" // Default; arbitrary user-defined data
+	SecretTypeOpaque SecretType = "Opaque" // Default; arbitrary user-defined data
 )
 
 type SecretList struct {
