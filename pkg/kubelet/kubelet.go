@@ -961,6 +961,10 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 		return "", err
 	}
 
+	// Ensure the PID actually exists, else we'll move ourselves.
+	if containerInfo.State.Pid == 0 {
+		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
+	}
 	return id, util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 }
 
