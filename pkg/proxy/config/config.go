@@ -262,7 +262,8 @@ func (s *serviceStore) MergedState() interface{} {
 // watchForUpdates invokes bcaster.Notify() with the latest version of an object
 // when changes occur.
 func watchForUpdates(bcaster *config.Broadcaster, accessor config.Accessor, updates <-chan struct{}) {
-	for _ = range updates {
+	for true {
+		<-updates
 		bcaster.Notify(accessor.MergedState())
 	}
 }
