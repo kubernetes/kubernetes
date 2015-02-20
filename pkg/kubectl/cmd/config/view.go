@@ -26,6 +26,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -51,14 +53,20 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			options.complete()
 
-			printer, _, err := cmdutil.PrinterForCommand(cmd)
+			printer, generic, err := cmdutil.PrinterForCommand(cmd)
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
+			if generic {
+				version := cmdutil.OutputVersion(cmd, latest.Version)
+				printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+			}
+
 			config, err := options.loadConfig()
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
+
 			err = printer.PrintObj(config, out)
 			if err != nil {
 				glog.FatalDepth(1, err)
