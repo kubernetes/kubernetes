@@ -53,15 +53,23 @@ func fmtHTML(in string) string {
 }
 
 func TestProxyTransport(t *testing.T) {
+	apiRequestInfo := APIRequestInfo{
+		APIVersion: "v1beta1",
+		Namespace:  "default",
+	}
 	testTransport := &proxyTransport{
 		proxyScheme:      "http",
 		proxyHost:        "foo.com",
+		proxyPrefix:      "/proxy/",
 		proxyPathPrepend: "/proxy/minion/minion1:10250",
+		apiRequestInfo:   apiRequestInfo,
 	}
 	testTransport2 := &proxyTransport{
 		proxyScheme:      "https",
 		proxyHost:        "foo.com",
+		proxyPrefix:      "/proxy/",
 		proxyPathPrepend: "/proxy/minion/minion1:8080",
+		apiRequestInfo:   apiRequestInfo,
 	}
 	type Item struct {
 		input        string
@@ -160,6 +168,14 @@ func TestProxyTransport(t *testing.T) {
 			redirectWant: "http://example.com/redirected/target/",
 			forwardedURI: "/proxy/minion/minion1:10250/redirect",
 		},
+		"proxy prefix": {
+			input:        `<pre><a href="/proxy/services/xyz/kubelet.log">kubelet.log</a></pre>`,
+			sourceURL:    "http://myminion.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<pre><a href="/proxy/services/xyz/kubelet.log">kubelet.log</a></pre>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
+		},
 	}
 
 	testItem := func(name string, item *Item) {
@@ -177,6 +193,15 @@ func TestProxyTransport(t *testing.T) {
 			}
 			if got, want := r.Header.Get("X-Forwarded-Proto"), item.transport.proxyScheme; got != want {
 				t.Errorf("%v: X-Forwarded-Proto = %q, want %q", name, got, want)
+			}
+			if got, want := r.Header.Get("X-Kubernetes-Proxy-Prefix"), "/proxy/"; got != want {
+				t.Errorf("%v: X-Kubernetes-Proxy-Prefix = %q, want %q", name, got, want)
+			}
+			if got, want := r.Header.Get("X-Kubernetes-Proxy-Namespace"), apiRequestInfo.Namespace; got != want {
+				t.Errorf("%v: X-Kubernetes-Proxy-Namespace = %q, want %q", name, got, want)
+			}
+			if got, want := r.Header.Get("X-Kubernetes-Proxy-Api-Version"), apiRequestInfo.APIVersion; got != want {
+				t.Errorf("%v: X-Kubernetes-Proxy-Api-Version = %q, want %q", name, got, want)
 			}
 
 			// Send response.

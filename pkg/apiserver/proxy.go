@@ -180,7 +180,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxy.Transport = &proxyTransport{
 		proxyScheme:      req.URL.Scheme,
 		proxyHost:        req.URL.Host,
+		proxyPrefix:      r.prefix,
 		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, resource, id),
+		apiRequestInfo:   requestInfo,
 	}
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
@@ -189,7 +191,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 type proxyTransport struct {
 	proxyScheme      string
 	proxyHost        string
+	proxyPrefix      string
 	proxyPathPrepend string
+	apiRequestInfo   APIRequestInfo
 }
 
 func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -197,6 +201,10 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("X-Forwarded-Uri", t.proxyPathPrepend+req.URL.Path)
 	req.Header.Set("X-Forwarded-Host", t.proxyHost)
 	req.Header.Set("X-Forwarded-Proto", t.proxyScheme)
+	// Add Kubernetes-specific headers.
+	req.Header.Set("X-Kubernetes-Proxy-Prefix", t.proxyPrefix)
+	req.Header.Set("X-Kubernetes-Proxy-Namespace", t.apiRequestInfo.Namespace)
+	req.Header.Set("X-Kubernetes-Proxy-Api-Version", t.apiRequestInfo.APIVersion)
 
 	resp, err := http.DefaultTransport.RoundTrip(req)
 
@@ -227,6 +235,11 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // to the same host as sourceURL, which is the page on which the target URL
 // occurred. If any error occurs (e.g. parsing), it returns targetURL.
 func (t *proxyTransport) rewriteURL(targetURL string, sourceURL *url.URL) string {
+	if t.proxyPrefix != "" && strings.HasPrefix(targetURL, t.proxyPrefix) {
+		// The destination server used our X-Kubernetes-Proxy-Prefix header to write
+		// a URL that already goes through the proxy, perhaps to another resource.
+		return targetURL
+	}
 	url, err := url.Parse(targetURL)
 	if err != nil {
 		return targetURL
