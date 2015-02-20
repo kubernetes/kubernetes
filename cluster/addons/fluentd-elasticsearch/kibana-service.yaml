@@ -5,6 +5,7 @@ containerPort: kibana-port
 port: 5601
 labels:
   name: kibana-logging
+  kubernetes.io/cluster-service: "true"
 selector:
   name: kibana-logging
 createExternalLoadBalancer: true
