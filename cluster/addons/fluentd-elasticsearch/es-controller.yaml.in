@@ -27,6 +27,7 @@ desiredState:
               emptyDir: {}
     labels:
       name: elasticsearch-logging
+      kubernetes.io/cluster-service: "true"
 labels:
   name: elasticsearch-logging
- 
+  kubernetes.io/cluster-service: "true"

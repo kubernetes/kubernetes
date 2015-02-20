@@ -18,5 +18,7 @@ desiredState:
                 containerPort: 80
     labels:
       name: kibana-logging
+      kubernetes.io/cluster-service: "true"
 labels:
   name: kibana-logging
+  kubernetes.io/cluster-service: "true"
