@@ -37,7 +37,6 @@ type testContextType struct {
 	host       string
 	repoRoot   string
 	provider   string
-	gceConfig  GCEConfig
 }
 
 var testContext testContextType

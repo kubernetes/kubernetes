@@ -32,12 +32,6 @@ import (
 
 type testResult bool
 
-type GCEConfig struct {
-	ProjectID  string
-	Zone       string
-	MasterName string
-}
-
 func init() {
 	// Turn on verbose by default to get spec names
 	config.DefaultReporterConfig.Verbose = true
@@ -53,8 +47,8 @@ func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
-func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
-	testContext = testContextType{authConfig, certDir, host, repoRoot, provider, *gceConfig}
+func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed int64, times int, reportDir string, testList []string) {
+	testContext = testContextType{authConfig, certDir, host, repoRoot, provider}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
