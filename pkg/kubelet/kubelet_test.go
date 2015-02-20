@@ -437,7 +437,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	}
 	kubelet.drainWorkers()
 	verifyCalls(t, fakeDocker, []string{
-		"list", "create", "start", "list", "inspect_container", "inspect_image", "list", "create", "start"})
+		"list", "create", "start", "inspect_container", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
@@ -497,7 +497,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "create", "start", "list", "inspect_container", "inspect_image", "list", "create", "start"})
+		"list", "create", "start", "inspect_container", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 
@@ -547,7 +547,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "create", "start", "list", "inspect_container", "inspect_image", "list", "create", "start"})
+		"list", "create", "start", "inspect_container", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	fakeDocker.Lock()
 
@@ -563,7 +563,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	fakeDocker.Unlock()
 }
 
-func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
+func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -604,7 +604,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 	fakeDocker.Unlock()
 }
 
-func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
+func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	fakeHttp := fakeHTTP{}
 	kubelet.httpClient = &fakeHttp
@@ -661,7 +661,7 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 	}
 }
 
-func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
+func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -692,7 +692,7 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "stop", "create", "start", "list", "list", "inspect_container", "inspect_image", "list", "create", "start"})
+		"list", "stop", "create", "start", "inspect_container", "list", "list", "inspect_container", "inspect_image", "list", "create", "start"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.

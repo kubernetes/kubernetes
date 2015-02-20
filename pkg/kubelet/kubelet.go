@@ -56,6 +56,10 @@ const minShares = 2
 const sharesPerCPU = 1024
 const milliCPUToCPU = 1000
 
+// The oom_score_adj of the POD infrastructure container. The default is 0, so
+// any value below that makes it *less* likely to get OOM killed.
+const podOomScoreAdj = -100
+
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
 	SyncPods([]api.BoundPod) error
@@ -938,7 +942,20 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 	if ref != nil {
 		record.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
-	return kl.runContainer(pod, container, nil, "", "")
+	id, err := kl.runContainer(pod, container, nil, "", "")
+	if err != nil {
+		return "", err
+	}
+
+	// Set OOM score of POD container to lower than those of the other
+	// containers in the pod. This ensures that it is killed only as a last
+	// resort.
+	containerInfo, err := kl.dockerClient.InspectContainer(string(id))
+	if err != nil {
+		return "", err
+	}
+
+	return id, util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 }
 
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
