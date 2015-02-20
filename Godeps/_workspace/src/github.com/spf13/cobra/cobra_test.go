@@ -467,7 +467,15 @@ func TestRootHelp(t *testing.T) {
 		t.Errorf("--help shouldn't trigger an error, Got: \n %s", x.Output)
 	}
 
+	if strings.Contains(x.Output, cmdEcho.Use) {
+		t.Errorf("--help shouldn't display subcommand's usage, Got: \n %s", x.Output)
+	}
+
 	x = fullSetupTest("echo --help")
+
+	if strings.Contains(x.Output, cmdTimes.Use) {
+		t.Errorf("--help shouldn't display subsubcommand's usage, Got: \n %s", x.Output)
+	}
 
 	checkResultContains(t, x, "Available Commands:")
 	checkResultContains(t, x, "for more information about a command")
