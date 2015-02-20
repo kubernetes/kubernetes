@@ -25,6 +25,7 @@ base:
 {% else %}
     - sdn
 {% endif %}
+    - monit
 
   'roles:kubernetes-master':
     - match: grain
