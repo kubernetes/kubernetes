@@ -11,6 +11,7 @@ desiredState:
     k8s-app: kube-dns
   podTemplate:
     labels:
+      name: kube-dns
       k8s-app: kube-dns
       kubernetes.io/cluster-service: "true"
     desiredState:

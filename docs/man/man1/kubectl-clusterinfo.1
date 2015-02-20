@@ -3,24 +3,20 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl clusterinfo \- Display cluster info
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl clusterinfo\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
-
-.PP
-Find more information at 
-\[la]https://github.com/GoogleCloudPlatform/kubernetes\[ra].
+Display addresses of the master and services with label kubernetes.io/cluster\-service=true
 
 
-.SH OPTIONS
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -128,7 +124,7 @@ Find more information at
 
 .SH SEE ALSO
 .PP
-\fBkubectl\-version(1)\fP, \fBkubectl\-clusterinfo(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-update(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-log(1)\fP, \fBkubectl\-rollingupdate(1)\fP, \fBkubectl\-resize(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-run\-container(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-label(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY
