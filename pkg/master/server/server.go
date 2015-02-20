@@ -246,6 +246,7 @@ func (s *APIServer) Run(_ []string) error {
 		PortalNet:              &n,
 		EnableLogsSupport:      s.EnableLogsSupport,
 		EnableUISupport:        true,
+		EnableOAuthSupport:     true,
 		EnableSwaggerSupport:   true,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,

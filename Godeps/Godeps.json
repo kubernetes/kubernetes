@@ -45,6 +45,14 @@
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
 		},
 		{
+			"ImportPath": "github.com/RangelReale/osin",
+			"Rev": "1f4e9754a8931fbd9834ab11592f358418efc9ff"
+		},
+		{
+			"ImportPath": "github.com/RangelReale/osincli",
+			"Rev": "23618ea0fc3faa3f43954ce8ff48e31f5c784212"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v0.2.0-rc1-120-g23142f6",
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
@@ -167,6 +175,18 @@
 		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "a8662172a384296ff59d28f837e151643c662985"
+		},
+		{
+			"ImportPath": "github.com/gorilla/securecookie",
+			"Rev": "1b0c7f6e9ab3d7f500fd7d50c7ad835ff428139b"
+		},
+		{
+			"ImportPath": "github.com/gorilla/sessions",
+			"Rev": "aa5e036e6c44aec69a32eb41097001978b29ad31"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/aws",

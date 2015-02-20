@@ -43,6 +43,12 @@ type Password interface {
 	AuthenticatePassword(user, password string) (user.Info, bool, error)
 }
 
+// Assertion checks an assertion and returns information about the user and true if
+// successful, false if not successful, or an error if the assertion could not be checked
+type Assertion interface {
+	AuthenticateAssertion(assertionType, data string) (user.Info, bool, error)
+}
+
 // TokenFunc is a function that implements the Token interface.
 type TokenFunc func(token string) (user.Info, bool, error)
 
@@ -65,4 +71,12 @@ type PasswordFunc func(user, password string) (user.Info, bool, error)
 // AuthenticatePassword implements authenticator.Password.
 func (f PasswordFunc) AuthenticatePassword(user, password string) (user.Info, bool, error) {
 	return f(user, password)
+}
+
+// AssertionFunc is a function that implements the Assertion interface.
+type AssertionFunc func(assertionType, data string) (user.Info, bool, error)
+
+// AuthenticateAssertion implements authenticator.Assertion.
+func (f AssertionFunc) AuthenticateAssertion(assertionType, data string) (user.Info, bool, error) {
+	return f(assertionType, data)
 }
