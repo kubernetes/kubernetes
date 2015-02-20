@@ -121,7 +121,10 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 		Name:       id, // For testing purpose, we set name to id
 		Config:     &docker.Config{Image: "testimage"},
 		HostConfig: hostConfig,
-		State:      docker.State{Running: true},
+		State: docker.State{
+			Running: true,
+			Pid:     42,
+		},
 	}
 	return f.Err
 }
