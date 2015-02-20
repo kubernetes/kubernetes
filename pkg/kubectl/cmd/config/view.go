@@ -41,13 +41,12 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "view",
 		Short: "displays merged .kubeconfig settings or a specified .kubeconfig file.",
-		Long: `displays merged .kubeconfig settings or a specified .kubeconfig file.
-Examples:
-  // Show merged .kubeconfig settings.
-  $ kubectl config view
+		Long:  "displays merged .kubeconfig settings or a specified .kubeconfig file.",
+		Example: `// Show merged .kubeconfig settings.
+$ kubectl config view
 
-  // Show only local ./.kubeconfig settings
-  $ kubectl config view --local`,
+// Show only local ./.kubeconfig settings
+$ kubectl config view --local`,
 		Run: func(cmd *cobra.Command, args []string) {
 			options.complete()
 

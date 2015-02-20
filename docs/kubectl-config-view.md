@@ -4,15 +4,21 @@ displays merged .kubeconfig settings or a specified .kubeconfig file.
 
 ### Synopsis
 
+```
 displays merged .kubeconfig settings or a specified .kubeconfig file.
-Examples:
-  // Show merged .kubeconfig settings.
-  $ kubectl config view
-
-  // Show only local ./.kubeconfig settings
-  $ kubectl config view --local
+```
 
 kubectl config view
+
+### Examples
+
+```
+// Show merged .kubeconfig settings.
+$ kubectl config view
+
+// Show only local ./.kubeconfig settings
+$ kubectl config view --local
+```
 
 ### Options
 

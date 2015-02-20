@@ -16,28 +16,6 @@ kubectl run\-container \- Run a particular image on the cluster.
 Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).
 
-.PP
-Examples:
-
-.PP
-.RS
-
-.nf
-// Starts a single instance of nginx.
-$ kubectl run\-container nginx \-\-image=dockerfile/nginx
-
-// Starts a replicated instance of nginx.
-$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-replicas=5
-
-// Dry run. Print the corresponding API objects without creating them.
-$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-dry\-run
-
-// Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
-$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-overrides='\{ "apiVersion": "v1beta1", "desiredState": \{ ... \} \}'
-
-.fi
-.RE
-
 
 .SH OPTIONS
 .PP
@@ -84,6 +62,133 @@ $ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-overrides='\{ "api
 \fB\-t\fP, \fB\-\-template\fP=""
     Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-version\fP=""
+    The API version to use when talking to the server
+
+.PP
+\fB\-a\fP, \fB\-\-auth\-path\fP=""
+    Path to the auth info file. If missing, prompt the user. Only used if using https.
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for kubectl
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    Path to the kubeconfig file to use for CLI requests.
+
+.PP
+\fB\-\-log\_backtrace\_at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\_dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\_flush\_frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-validate\fP=false
+    If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+// Starts a single instance of nginx.
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx
+
+// Starts a replicated instance of nginx.
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-replicas=5
+
+// Dry run. Print the corresponding API objects without creating them.
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-dry\-run
+
+// Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
+$ kubectl run\-container nginx \-\-image=dockerfile/nginx \-\-overrides='\{ "apiVersion": "v1beta1", "desiredState": \{ ... \} \}'
+
+.fi
+.RE
 
 
 .SH SEE ALSO

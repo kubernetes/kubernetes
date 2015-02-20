@@ -25,28 +25,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	stop_long = `Gracefully shut down a resource by id or filename.
+
+Attempts to shut down and delete a resource that supports graceful termination.
+If the resource is resizable it will be resized to 0 before deletion.`
+	stop_example = `// Shut down foo.
+$ kubectl stop replicationcontroller foo
+
+// Shut down the service defined in service.json
+$ kubectl stop -f service.json
+
+// Shut down all resources in the path/to/resources directory
+$ kubectl stop -f path/to/resources`
+)
+
 func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 	flags := &struct {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:   "stop (<resource> <id>|-f filename)",
-		Short: "Gracefully shut down a resource by id or filename.",
-		Long: `Gracefully shut down a resource by id or filename.
-
-Attempts to shut down and delete a resource that supports graceful termination.
-If the resource is resizable it will be resized to 0 before deletion.
-
-Examples:
-
-    // Shut down foo.
-    $ kubectl stop replicationcontroller foo
-
-    // Shut down the service defined in service.json
-    $ kubectl stop -f service.json
-
-    // Shut down all resources in the path/to/resources directory
-    $ kubectl stop -f path/to/resources`,
+		Use:     "stop (<resource> <id>|-f filename)",
+		Short:   "Gracefully shut down a resource by id or filename.",
+		Long:    stop_long,
+		Example: stop_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			checkErr(err)

@@ -4,17 +4,21 @@ Print the logs for a container in a pod.
 
 ### Synopsis
 
+```
 Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
-
-Examples:
-
-    // Returns snapshot of ruby-container logs from pod 123456-7890.
-    $ kubectl log 123456-7890 ruby-container
-
-    // Starts streaming of ruby-container logs from pod 123456-7890.
-    $ kubectl log -f 123456-7890 ruby-container
+```
 
 kubectl log [-f] <pod> [<container>]
+
+### Examples
+
+```
+// Returns snapshot of ruby-container logs from pod 123456-7890.
+$ kubectl log 123456-7890 ruby-container
+
+// Starts streaming of ruby-container logs from pod 123456-7890.
+$ kubectl log -f 123456-7890 ruby-container
+```
 
 ### Options
 

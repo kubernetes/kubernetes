@@ -4,16 +4,21 @@ Execute a command in a container.
 
 ### Synopsis
 
+```
 Execute a command in a container.
-Examples:
-  $ kubectl exec -p 123456-7890 -c ruby-container date
-  <returns output from running 'date' in ruby-container from pod 123456-7890>
-
-  $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il
-  <switches to raw terminal mode, sends stdin to 'bash' in ruby-container from
-   pod 123456-780 and sends stdout/stderr from 'bash' back to the client
+```
 
 kubectl exec -p <pod> -c <container> -- <command> [<args...>]
+
+### Examples
+
+```
+// get output from running 'date' in ruby-container from pod 123456-7890
+$ kubectl exec -p 123456-7890 -c ruby-container date
+
+//switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-780 and sends stdout/stderr from 'bash' back to the client
+$ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il
+```
 
 ### Options
 

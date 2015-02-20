@@ -4,22 +4,26 @@ Set a new size for a Replication Controller.
 
 ### Synopsis
 
+```
 Set a new size for a Replication Controller.
 
 Resize also allows users to specify one or more preconditions for the resize action.
 If --current-replicas or --resource-version is specified, it is validated before the
 resize is attempted, and it is guaranteed that the precondition holds true when the
 resize is sent to the server.
-
-Examples:
-
-    // Resize replication controller named 'foo' to 3.
-    $ kubectl resize --replicas=3 replicationcontrollers foo
-
-    // If the replication controller named foo's current size is 2, resize foo to 3.
-    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
+```
 
 kubectl resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>
+
+### Examples
+
+```
+// Resize replication controller named 'foo' to 3.
+$ kubectl resize --replicas=3 replicationcontrollers foo
+
+// If the replication controller named foo's current size is 2, resize foo to 3.
+$ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
+```
 
 ### Options
 

@@ -20,22 +20,122 @@ Sets a cluster entry in .kubeconfig
         only sets the certificate\-authority field on the e2e cluster entry without touching other values.
 
 
-.SH OPTIONS
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
 .PP
 \fB\-\-api\-version\fP=""
-    api\-version for the cluster entry in .kubeconfig
+    The API version to use when talking to the server
+
+.PP
+\fB\-a\fP, \fB\-\-auth\-path\fP=""
+    Path to the auth info file. If missing, prompt the user. Only used if using https.
 
 .PP
 \fB\-\-certificate\-authority\fP=""
-    certificate\-authority for the cluster entry in .kubeconfig
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-client\-certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-client\-key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-cluster\fP=""
+    The name of the kubeconfig cluster to use
+
+.PP
+\fB\-\-context\fP=""
+    The name of the kubeconfig context to use
+
+.PP
+\fB\-\-envvar\fP=false
+    use the .kubeconfig from $KUBECONFIG
+
+.PP
+\fB\-\-global\fP=false
+    use the .kubeconfig from /home/username
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for config
 
 .PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
-    insecure\-skip\-tls\-verify for the cluster entry in .kubeconfig
+    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
 .PP
-\fB\-\-server\fP=""
-    server for the cluster entry in .kubeconfig
+\fB\-\-kubeconfig\fP=""
+    use a particular .kubeconfig file
+
+.PP
+\fB\-\-local\fP=false
+    use the .kubeconfig in the current directory
+
+.PP
+\fB\-\-log\_backtrace\_at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\_dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\_flush\_frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-match\-server\-version\fP=false
+    Require server version to match client version
+
+.PP
+\fB\-\-namespace\fP=""
+    If present, the namespace scope for this CLI request.
+
+.PP
+\fB\-\-password\fP=""
+    Password for basic authentication to the API server.
+
+.PP
+\fB\-s\fP, \fB\-\-server\fP=""
+    The address and port of the Kubernetes API server
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-token\fP=""
+    Bearer token for authentication to the API server.
+
+.PP
+\fB\-\-user\fP=""
+    The name of the kubeconfig user to use
+
+.PP
+\fB\-\-username\fP=""
+    Username for basic authentication to the API server.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-validate\fP=false
+    If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
 
 
 .SH SEE ALSO

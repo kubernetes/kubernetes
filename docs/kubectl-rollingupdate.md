@@ -4,21 +4,25 @@ Perform a rolling update of the given ReplicationController.
 
 ### Synopsis
 
+```
 Perform a rolling update of the given ReplicationController.
 
 Replaces the specified controller with new controller, updating one pod at a time to use the
 new PodTemplate. The new-controller.json must specify the same namespace as the
 existing controller and overwrite at least one (common) label in its replicaSelector.
-
-Examples:
-
-    // Update pods of frontend-v1 using new controller data in frontend-v2.json.
-    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
-
-    // Update pods of frontend-v1 using JSON data passed into stdin.
-    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
+```
 
 kubectl rollingupdate <old-controller-name> -f <new-controller.json>
+
+### Examples
+
+```
+// Update pods of frontend-v1 using new controller data in frontend-v2.json.
+$ kubectl rollingupdate frontend-v1 -f frontend-v2.json
+
+// Update pods of frontend-v1 using JSON data passed into stdin.
+$ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
+```
 
 ### Options
 

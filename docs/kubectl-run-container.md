@@ -4,24 +4,28 @@ Run a particular image on the cluster.
 
 ### Synopsis
 
+```
 Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).
-
-Examples:
-
-    // Starts a single instance of nginx.
-    $ kubectl run-container nginx --image=dockerfile/nginx
-
-    // Starts a replicated instance of nginx.
-    $ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
-
-    // Dry run. Print the corresponding API objects without creating them.
-    $ kubectl run-container nginx --image=dockerfile/nginx --dry-run
-  
-    // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
-    $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
+```
 
 kubectl run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>]
+
+### Examples
+
+```
+// Starts a single instance of nginx.
+$ kubectl run-container nginx --image=dockerfile/nginx
+
+// Starts a replicated instance of nginx.
+$ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
+
+// Dry run. Print the corresponding API objects without creating them.
+$ kubectl run-container nginx --image=dockerfile/nginx --dry-run
+
+// Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
+$ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'
+```
 
 ### Options
 

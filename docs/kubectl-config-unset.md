@@ -4,10 +4,12 @@ Unsets an individual value in a .kubeconfig file
 
 ### Synopsis
 
+```
 Unsets an individual value in a .kubeconfig file
 
 		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 		
+```
 
 kubectl config unset property-name
 

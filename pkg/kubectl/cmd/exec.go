@@ -30,6 +30,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	exec_example = `// get output from running 'date' in ruby-container from pod 123456-7890
+$ kubectl exec -p 123456-7890 -c ruby-container date
+
+//switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-780 and sends stdout/stderr from 'bash' back to the client
+$ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il`
+)
+
 func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	flags := &struct {
 		pod       string
@@ -39,16 +47,10 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 	}{}
 
 	cmd := &cobra.Command{
-		Use:   "exec -p <pod> -c <container> -- <command> [<args...>]",
-		Short: "Execute a command in a container.",
-		Long: `Execute a command in a container.
-Examples:
-  $ kubectl exec -p 123456-7890 -c ruby-container date
-  <returns output from running 'date' in ruby-container from pod 123456-7890>
-
-  $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il
-  <switches to raw terminal mode, sends stdin to 'bash' in ruby-container from
-   pod 123456-780 and sends stdout/stderr from 'bash' back to the client`,
+		Use:     "exec -p <pod> -c <container> -- <command> [<args...>]",
+		Short:   "Execute a command in a container.",
+		Long:    "Execute a command in a container.",
+		Example: exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(flags.pod) == 0 {
 				usageError(cmd, "<pod> is required for exec")

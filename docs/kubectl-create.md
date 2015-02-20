@@ -4,19 +4,23 @@ Create a resource by filename or stdin
 
 ### Synopsis
 
+```
 Create a resource by filename or stdin.
 
 JSON and YAML formats are accepted.
-
-Examples:
-
-    // Create a pod using the data in pod.json.
-    $ kubectl create -f pod.json
-
-    // Create a pod based on the JSON passed into stdin.
-    $ cat pod.json | kubectl create -f -
+```
 
 kubectl create -f filename
+
+### Examples
+
+```
+// Create a pod using the data in pod.json.
+$ kubectl create -f pod.json
+
+// Create a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl create -f -
+```
 
 ### Options
 

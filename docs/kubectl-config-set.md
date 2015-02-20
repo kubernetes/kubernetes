@@ -4,12 +4,14 @@ Sets an individual value in a .kubeconfig file
 
 ### Synopsis
 
+```
 Sets an individual value in a .kubeconfig file
 
 		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 		property-value is the new value you wish to set.
 
 		
+```
 
 kubectl config set property-name property-value
 

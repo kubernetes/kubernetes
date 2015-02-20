@@ -26,24 +26,26 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+const (
+	create_long = `Create a resource by filename or stdin.
+
+JSON and YAML formats are accepted.`
+	create_example = `// Create a pod using the data in pod.json.
+$ kubectl create -f pod.json
+
+// Create a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl create -f -`
+)
+
 func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 	flags := &struct {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:   "create -f filename",
-		Short: "Create a resource by filename or stdin",
-		Long: `Create a resource by filename or stdin.
-
-JSON and YAML formats are accepted.
-
-Examples:
-
-    // Create a pod using the data in pod.json.
-    $ kubectl create -f pod.json
-
-    // Create a pod based on the JSON passed into stdin.
-    $ cat pod.json | kubectl create -f -`,
+		Use:     "create -f filename",
+		Short:   "Create a resource by filename or stdin",
+		Long:    create_long,
+		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
 			checkErr(err)

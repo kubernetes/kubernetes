@@ -24,19 +24,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	log_example = `// Returns snapshot of ruby-container logs from pod 123456-7890.
+$ kubectl log 123456-7890 ruby-container
+
+// Starts streaming of ruby-container logs from pod 123456-7890.
+$ kubectl log -f 123456-7890 ruby-container`
+)
+
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log [-f] <pod> [<container>]",
-		Short: "Print the logs for a container in a pod.",
-		Long: `Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
-
-Examples:
-
-    // Returns snapshot of ruby-container logs from pod 123456-7890.
-    $ kubectl log 123456-7890 ruby-container
-
-    // Starts streaming of ruby-container logs from pod 123456-7890.
-    $ kubectl log -f 123456-7890 ruby-container`,
+		Use:     "log [-f] <pod> [<container>]",
+		Short:   "Print the logs for a container in a pod.",
+		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
+		Example: log_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				usageError(cmd, "<pod> is required for log")

@@ -26,6 +26,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	portforward_example = `$ kubectl port-forward -p mypod 5000 6000
+<listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod>
+
+$ kubectl port-forward -p mypod 8888:5000
+<listens on port 8888 locally, forwarding to 5000 in the pod>
+
+$ kubectl port-forward -p mypod :5000
+<listens on a random port locally, forwarding to 5000 in the pod>
+
+$ kubectl port-forward -p mypod 0:5000
+<listens on a random port locally, forwarding to 5000 in the pod> `
+)
+
 func (f *Factory) NewCmdPortForward() *cobra.Command {
 	flags := &struct {
 		pod       string
@@ -33,23 +47,10 @@ func (f *Factory) NewCmdPortForward() *cobra.Command {
 	}{}
 
 	cmd := &cobra.Command{
-		Use:   "port-forward -p <pod> [<local port>:]<remote port> [<port>...]",
-		Short: "Forward 1 or more local ports to a pod.",
-		Long: `Forward 1 or more local ports to a pod.
-Examples:
-  $ kubectl port-forward -p mypod 5000 6000
-  <listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000
-   and 6000 in the pod>
-
-	$ kubectl port-forward -p mypod 8888:5000
-	<listens on port 8888 locally, forwarding to 5000 in the pod>
-
-	$ kubectl port-forward -p mypod :5000
-	<listens on a random port locally, forwarding to 5000 in the pod>
-
-	$ kubectl port-forward -p mypod 0:5000
-	<listens on a random port locally, forwarding to 5000 in the pod>
-   `,
+		Use:     "port-forward -p <pod> [<local port>:]<remote port> [<port>...]",
+		Short:   "Forward 1 or more local ports to a pod.",
+		Long:    "Forward 1 or more local ports to a pod.",
+		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(flags.pod) == 0 {
 				usageError(cmd, "<pod> is required for exec")
