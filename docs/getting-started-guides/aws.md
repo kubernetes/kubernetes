@@ -17,7 +17,7 @@
 ##### b) Alternate Option: Install from source at head
 1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
 2. ```cd kubernetes; make release```
-3. ```export PATH=$PATH:$PWD/_output/local/bin/<os>/<platform>```
+3. ```export PATH=$PATH:$PWD/_output/release-stage/full/kubernetes/platforms/<os>/<platform>```
 
 #### Turn up the cluster
 ```
