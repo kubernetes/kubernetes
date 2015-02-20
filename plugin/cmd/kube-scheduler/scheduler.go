@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"runtime"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
@@ -25,6 +27,7 @@ import (
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := app.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
