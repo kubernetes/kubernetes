@@ -25,6 +25,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -45,7 +47,7 @@ $ kubectl config view
 $ kubectl config view --local
 
 // Get the password for the e2e user
-$ kubectl config view -o template --template='{{ index . "users" "e2e" "password" }}'`
+$ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
 
 func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
@@ -63,10 +65,14 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
+			version := cmdutil.OutputVersion(cmd, latest.Version)
+			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+
 			config, err := options.loadConfig()
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
+
 			err = printer.PrintObj(config, out)
 			if err != nil {
 				glog.FatalDepth(1, err)
