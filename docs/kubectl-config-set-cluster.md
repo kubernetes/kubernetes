@@ -13,15 +13,6 @@ Sets a cluster entry in .kubeconfig
 
 kubectl config set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]
 
-### Options
-
-```
-      --api-version=: api-version for the cluster entry in .kubeconfig
-      --certificate-authority=: certificate-authority for the cluster entry in .kubeconfig
-      --insecure-skip-tls-verify=false: insecure-skip-tls-verify for the cluster entry in .kubeconfig
-      --server=: server for the cluster entry in .kubeconfig
-```
-
 ### Options inherrited from parent commands
 
 ```

@@ -13,14 +13,6 @@ Sets a context entry in .kubeconfig
 
 kubectl config set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]
 
-### Options
-
-```
-      --cluster=: cluster for the context entry in .kubeconfig
-      --namespace=: namespace for the context entry in .kubeconfig
-      --user=: user for the context entry in .kubeconfig
-```
-
 ### Options inherrited from parent commands
 
 ```
