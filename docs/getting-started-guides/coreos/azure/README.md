@@ -1,24 +1,20 @@
----
-published: false
-title: Weaving Kubernetes on Azure
-tags: azure, coreos, kubernetes, usecase, guide, redis, php, cloud, provisioning
----
+# Kubernetes on Azure with CoreOS and [Weave](http://weave.works)
 
 ## Introduction
 
-In this tutorial we will demonstrate how to deploy a Kubernetes cluster to Azure cloud. Weave makes networking of containers simple and secure, in a transparent, yet robust way. The focus of this tutorial is provide an out-of-the-box production-ready implementation with dedicated Kubernetes master and etcd nodes. It will also show how to scale the cluster with ease.
+In this guide I will demonstrate how to deploy a Kubernetes cluster to Azure cloud. You will be using CoreOS with Weave, which implements simple and secure networking, in a transparent, yet robust way. The purpose of this guide is to provide an out-of-the-box implementation that can ultimately be taken into production with little change. It will demonstrate how to provision a dedicated Kubernetes master and etcd nodes, and show how to scale the cluster with ease.
 
 ## Let's go!
-To get started, you need to checkout the code:
 
+To get started, you need to checkout the code:
 ```
-git clone https://github.com/errordeveloper/weave-demos
-cd weave-demos/coreos-azure
+git clone https://github.com/GoogleCloudPlatform/kubernetes
+cd kubernetes/docs/getting-started-guides/coreos/azure/
 ```
 
 You will need to have [Node.js installed](http://nodejs.org/download/) on you machine. If you have previously used Azure CLI, you should have it already.
 
-You first need to install some of the dependencies with
+First, you need to install some of the dependencies with
 
 ```
 npm install
@@ -31,9 +27,9 @@ Now, all you need to do is:
 ./create-kubernetes-cluster.js
 ```
 
-This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes, Kubernetes master and 2 minions. The `kube-00` VM will be the master, your work loads are only to be deployed on the minion nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. Later we will show how to add more bigger VMs.
+This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes, Kubernetes master and 2 minions. The `kube-00` VM will be the master, your work loads are only to be deployed on the minion nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
 
-![VMs in Azure](https://www.dropbox.com/s/logk4mot2gnlxgn/Screenshot%202015-02-15%2015.54.45.png?dl=1)
+![VMs in Azure](initial_cluster.png)
 
 Once the creation of Azure VMs has finished, you should see the following:
 
@@ -91,7 +87,7 @@ redis-master                           10.2.1.4      master          dockerfile/
 
 ## Scaling
 
-Two single-core minions are certainly not enough for a production system of today, and, as you can see we have one _unassigned_ pod. Let's resize the cluster by adding a couple of bigger nodes.
+Two single-core minions are certainly not enough for a production system of today, and, as you can see, there is one _unassigned_ pod. Let's resize the cluster by adding a couple of bigger nodes.
 
 You will need to open another terminal window on your machine and go to the same working directory (e.g. `~/Workspace/weave-demos/coreos-azure`).
 
@@ -127,7 +123,7 @@ kube-03             environment=production   Ready
 kube-04             environment=production   Ready
 ```
 
-We can see that two more minions joined happily. Let's resize the number of Guestbook instances we have.
+You can see that two more minions joined happily. Let's resize the number of Guestbook instances now.
 
 First, double-check how many replication controllers there are:
 
@@ -137,14 +133,14 @@ CONTROLLER             CONTAINER(S)   IMAGE(S)                                 S
 frontendController     php-redis      kubernetes/example-guestbook-php-redis   name=frontend     3
 redisSlaveController   slave          brendanburns/redis-slave                 name=redisslave   2
 ```
-As we have 4 minions, let's resize proportionally:
+As there are 4 minions, let's resize proportionally:
 ```
 core@kube-00 ~ $ kubectl resize --replicas=4 rc redisSlaveController
 resized
 core@kube-00 ~ $ kubectl resize --replicas=4 rc frontendController
 resized
 ```
-Check what we have now:
+Check what you have now:
 ```
 kubectl get rc
 CONTROLLER             CONTAINER(S)   IMAGE(S)                                 SELECTOR          REPLICAS
@@ -152,7 +148,7 @@ frontendController     php-redis      kubernetes/example-guestbook-php-redis   n
 redisSlaveController   slave          brendanburns/redis-slave                 name=redisslave   4
 ```
 
-You now will have more instances of front-end Guestbook apps and Redis slaves; and, if we look up all pods labled `name=frontend`, we should see one running on each node.
+You now will have more instances of front-end Guestbook apps and Redis slaves; and, if you look up all pods labled `name=frontend`, you should see one running on each node.
 
 ```
 core@kube-00 ~/guestbook-example $ kubectl get pods -l name=frontend
@@ -165,18 +161,26 @@ ae59fa80-b679-11e4-b6f6-000d3a20a034   10.2.4.5          php-redis     kubernete
 
 ## Exposing the app to the outside world
 
-To makes sure the app is working, we should load it in the browser. For accessing the Guesbook service from the outside world, I had to create an Azure endpoint like shown on the picture below.
+To makes sure the app is working, you probably want to load it in the browser. For accessing the Guesbook service from the outside world, an Azure endpoint needs to be created like shown on the picture below.
 
-![VMs in Azure](https://www.dropbox.com/s/a7gglyamb9pltqn/Screenshot%202015-02-15%2016.02.32.png?dl=1)
+![Creating an endpoint](external_access.png)
 
-I was then able to access it from anywhere via the Azure virtual IP for `kube-01`, i.e. `http://104.40.211.194:8000/`.
+You then should be able to access it from anywhere via the Azure virtual IP for `kube-01`, i.e. `http://104.40.211.194:8000/` as per screenshot.
 
-## Destructing the VMs
+## Next steps
 
-To delete the cluster run this:
+You now have a full-blow cluster running in Azure, congrats!
+
+You should probably try deploy other [example apps](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples) or write your own ;)
+
+## Tear down...
+
+If you don't wish care about the Azure bill, you can tear down the cluster. It's easy to redeploy it, as you can see.
+
 ```
 ./destroy-cluster.js ./output/kubernetes_8f984af944f572_deployment.yml 
 ```
 
-Make sure to use the latest state file, as after resizing there is a new one. By the way, with the scripts shown, you can deploy multiple clusters, if you like :)
+> Note: make sure to use the _latest state file_, as after resizing there is a new one.
 
+By the way, with the scripts shown, you can deploy multiple clusters, if you like :)
