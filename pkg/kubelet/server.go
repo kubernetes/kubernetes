@@ -38,7 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/golang/glog"
-	"github.com/google/cadvisor/info"
+	cadvisor_api "github.com/google/cadvisor/info"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -64,10 +64,12 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisor_api.ContainerInfoRequest) (*cadvisor_api.ContainerInfo, error)
+	GetStatsForPod(uid types.UID, namespace string, detailed bool, numStats int) (*api.PodStats, error)
+	GetStatsForAllPods(detailed bool, numStats int) ([]*api.PodStats, error)
+	GetRootInfo(req *cadvisor_api.ContainerInfoRequest) (*cadvisor_api.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
-	GetMachineInfo() (*info.MachineInfo, error)
+	GetMachineInfo() (*cadvisor_api.MachineInfo, error)
 	GetBoundPods() ([]api.BoundPod, error)
 	GetPodByName(namespace, name string) (*api.BoundPod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
@@ -97,6 +99,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.mux.HandleFunc("/healthz", s.handleHealthz)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
+	s.mux.HandleFunc("/podStats", s.handlePodStats)
 	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
@@ -281,6 +284,46 @@ func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versi
 	}
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
+}
+
+// handlePodStats handles stats requests for a Pod.
+func (s *Server) handlePodStats(w http.ResponseWriter, req *http.Request) {
+	u, err := url.ParseRequestURI(req.RequestURI)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	// Report stats for all the pods in the system.
+	allPods := u.Query().Get("allPods")
+	podUID := types.UID(u.Query().Get("UID"))
+	podNamespace := u.Query().Get("podNamespace")
+	detailed := false
+	if strings.ToLower(u.Query().Get("detailed")) == "true" {
+		detailed = true
+	}
+	numStats, err := strconv.Atoi(u.Query().Get("numStats"))
+	if err != nil {
+		s.error(w, fmt.Errorf("failed to parse query Value numStats %q", err))
+		return
+	}
+
+	var data interface{}
+	if strings.ToLower(allPods) == "true" {
+		data, err = s.host.GetStatsForAllPods(detailed, numStats)
+	} else {
+		data, err = s.host.GetStatsForPod(podUID, podNamespace, detailed, numStats)
+	}
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	output, err := json.Marshal(data)
+	if err != nil {
+		s.error(w, fmt.Errorf("failed to marshal podStats - %q", err))
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-type", "application/json")
+	w.Write(output)
 }
 
 // handleStats handles stats requests against the Kubelet.
@@ -595,11 +638,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // serveStats implements stats logic.
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// /stats/<podfullname>/<containerName> or /stats/<namespace>/<podfullname>/<uid>/<containerName>
+	// /stats/<podfullname>/<containerName> (Backwards compatibility) or
+	// /stats/<namespace>/<podfullname>/<uid>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
-	var stats *info.ContainerInfo
+	var stats *cadvisor_api.ContainerInfo
 	var err error
-	var query info.ContainerInfoRequest
+	var query cadvisor_api.ContainerInfoRequest
 	err = json.NewDecoder(req.Body).Decode(&query)
 	if err != nil && err != io.EOF {
 		s.error(w, err)
@@ -609,12 +653,10 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	case 1:
 		// Machine stats
 		stats, err = s.host.GetRootInfo(&query)
-	case 2:
-		// pod stats
-		// TODO(monnand) Implement this
-		err = errors.New("pod level status currently unimplemented")
 	case 3:
+		// /stats/<podfullname>/<containerName>
 		// Backward compatibility without uid information, does not support namespace
+		// TODO: Remove this. Are there any existing users?
 		pod, ok := s.host.GetPodByName(api.NamespaceDefault, components[1])
 		if !ok {
 			http.Error(w, "Pod does not exist", http.StatusNotFound)

@@ -47,6 +47,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	cadvisor_api "github.com/google/cadvisor/info"
 )
 
 const defaultChanSize = 1024
@@ -1536,6 +1537,18 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
 	return nil, false
 }
 
+// getPodByUID returns the pod that matches 'namespace' and 'uid', nil if no pod matches.
+func (kl *Kubelet) getPodByUID(namespace string, uid types.UID) *api.BoundPod {
+	for i := range kl.pods {
+		pod := &kl.pods[i]
+		if pod.Namespace == namespace && pod.UID == uid {
+			return pod
+		}
+	}
+
+	return nil
+}
+
 // getPhase returns the phase of a pod given its container info.
 func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 	running := 0
@@ -1746,4 +1759,39 @@ func (kl *Kubelet) BirthCry() {
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return kl.streamingConnectionIdleTimeout
+}
+
+// Returns pod stats for a specific pod identifiable by 'uid' and 'namespace'.
+func (kl *Kubelet) GetStatsForPod(uid types.UID, namespace string, detailed bool, numStats int) (*api.PodStats, error) {
+	pod := kl.getPodByUID(namespace, uid)
+	if pod != nil {
+		return nil, fmt.Errorf("pod with uid %q and namespace %q not found", uid, namespace)
+	}
+	podFullName := GetPodFullName(pod)
+	result := &api.PodStats{}
+	for _, container := range pod.Spec.Containers {
+		containerInfo, err := kl.GetContainerInfo(podFullName, uid, container.Name, &cadvisor_api.ContainerInfoRequest{NumStats: numStats})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get stats for container %q in pod %q - %v", container.Name, pod.Name, err)
+		}
+		resourceStats := api.ResourceStats{Detailed: containerInfo}
+
+		result.Containers = append(result.Containers, resourceStats)
+	}
+
+	return result, nil
+}
+
+// Returns pod stats for all pods that exist on the node, error otherwise.
+func (kl *Kubelet) GetStatsForAllPods(detailed bool, numStats int) ([]*api.PodStats, error) {
+	result := []*api.PodStats{}
+	for _, pod := range kl.pods {
+		podStats, err := kl.GetStatsForPod(pod.UID, pod.Namespace, detailed, numStats)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, podStats)
+	}
+
+	return result, nil
 }
