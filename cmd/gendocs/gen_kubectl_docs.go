@@ -26,42 +26,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
-func mergeFlags(old, newFlags *pflag.FlagSet) *pflag.FlagSet {
-	newFlags.VisitAll(func(f *pflag.Flag) {
-		if old.Lookup(f.Name) == nil {
-			old.AddFlag(f)
-		}
-	})
-	return old
-}
-
-func parentFlags(c *cobra.Command) *pflag.FlagSet {
-	if !c.HasParent() {
-		return pflag.NewFlagSet("empty", pflag.ExitOnError)
-	}
-	return mergeFlags(c.Parent().PersistentFlags(), parentFlags(c.Parent()))
-}
-
-func myFlags(c *cobra.Command) *pflag.FlagSet {
-	myFlags := c.Flags()
-	parentFlags := parentFlags(c)
-
-	if c.HasPersistentFlags() {
-		c.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-			if c.Flags().Lookup(f.Name) == nil &&
-				parentFlags.Lookup(f.Name) == nil {
-				myFlags.AddFlag(f)
-			}
-		})
-	}
-	return myFlags
-}
-
 func printOptions(out *bytes.Buffer, command *cobra.Command, name string) {
-	flags := myFlags(command)
+	flags := command.NonInheritedFlags()
 	flags.SetOutput(out)
 	if command.Runnable() {
 		fmt.Fprintf(out, "%s\n\n", command.UseLine())
@@ -72,7 +40,7 @@ func printOptions(out *bytes.Buffer, command *cobra.Command, name string) {
 		fmt.Fprintf(out, "```\n\n")
 	}
 
-	parentFlags := parentFlags(command)
+	parentFlags := command.InheritedFlags()
 	parentFlags.SetOutput(out)
 	if parentFlags.HasFlags() {
 		fmt.Fprintf(out, "### Options inherrited from parent commands\n\n```\n")

@@ -26,17 +26,6 @@ Sets a user entry in .kubeconfig
 
 kubectl config set-credentials name [--auth-path=authfile] [--client-certificate=certfile] [--client-key=keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
 
-### Options
-
-```
-      --auth-path=: auth-path for the user entry in .kubeconfig
-      --client-certificate=: client-certificate for the user entry in .kubeconfig
-      --client-key=: client-key for the user entry in .kubeconfig
-      --password=: password for the user entry in .kubeconfig
-      --token=: token for the user entry in .kubeconfig
-      --username=: username for the user entry in .kubeconfig
-```
-
 ### Options inherrited from parent commands
 
 ```
