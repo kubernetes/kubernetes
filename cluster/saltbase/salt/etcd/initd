@@ -18,7 +18,7 @@ NAME=etcd
 DAEMON=/usr/local/bin/$NAME
 # DAEMON_ARGS="-peer-addr $HOSTNAME:7001 -name $HOSTNAME"
 host_ip=$(hostname -i)
-DAEMON_ARGS="-addr ${host_ip}:4001 -bind-addr ${host_ip}:4001 -data-dir /var/etcd/data -initial-advertise-peer-urls http://${HOSTNAME}:2380 -name ${HOSTNAME} -initial-cluster ${HOSTNAME}=http://${HOSTNAME}:2380"
+DAEMON_ARGS="-addr ${host_ip}:4001 -bind-addr 0.0.0.0:4001 -data-dir /var/etcd/data -initial-advertise-peer-urls http://${HOSTNAME}:2380 -name ${HOSTNAME} -initial-cluster ${HOSTNAME}=http://${HOSTNAME}:2380"
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
