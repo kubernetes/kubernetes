@@ -77,6 +77,9 @@ locations=(
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
+PROJECT=""
+ZONE=""
+KUBE_MASTER=""
 if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
   # When we are using vagrant it has hard coded auth.  We repeat that here so that
   # we don't clobber auth that might be used for a publicly facing cluster.
@@ -106,5 +109,8 @@ fi
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
+  --gce_project="${PROJECT}" \
+  --gce_zone="${ZONE}" \
+  --kube_master="${KUBE_MASTER}" \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@:-}"
