@@ -43,8 +43,8 @@ type cadvisorInterface interface {
 	MachineInfo() (*cadvisor.MachineInfo, error)
 }
 
-// This method takes a container's absolute path and returns the stats for the
-// container.  The container's absolute path refers to its hierarchy in the
+// statsFromContainerPath takes a container's absolute path and returns the stats for the
+// container. The container's absolute path refers to its hierarchy in the
 // cgroup file system. e.g. The root container, which represents the whole
 // machine, has path "/"; all docker containers have path "/docker/<docker id>"
 func (kl *Kubelet) statsFromContainerPath(cc cadvisorInterface, containerPath string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
@@ -55,7 +55,7 @@ func (kl *Kubelet) statsFromContainerPath(cc cadvisorInterface, containerPath st
 	return cinfo, nil
 }
 
-// This method takes a Docker container's ID and returns the stats for the
+// statsFromDockerContainer takes a Docker container's ID and returns the stats for the
 // container.
 func (kl *Kubelet) statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
 	cinfo, err := cc.DockerContainer(containerId, req)
