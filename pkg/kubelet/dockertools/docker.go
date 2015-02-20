@@ -96,17 +96,6 @@ func ConvertAPIContainer(dc *docker.APIContainers) *container.Container {
 	} else {
 		c.Name = dc.Names[0]
 	}
-
-	// Copy ports field too.
-	c.Ports = make([]container.Port, len(dc.Ports))
-	for i, p := range dc.Ports {
-		c.Ports[i] = container.Port{
-			PrivatePort: p.PrivatePort,
-			PublicPort:  p.PublicPort,
-			Type:        p.Type,
-			IP:          p.IP,
-		}
-	}
 	return c
 }
 
@@ -149,10 +138,10 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 
 // ListContainers implements container.Runtime.ListContainers.
 func (dr *DockerRuntime) ListContainers(options container.ListContainersOptions) ([]*container.Container, error) {
-	var containers []*container.Container
 	dc, err := dr.docker.ListContainers(docker.ListContainersOptions{All: options.All})
-	for _, c := range dc {
-		containers = append(containers, ConvertAPIContainer(&c))
+	containers := make([]*container.Container, len(dc))
+	for i, c := range dc {
+		containers[i] = ConvertAPIContainer(&c)
 	}
 	return containers, err
 }
@@ -244,12 +233,12 @@ func (dr *DockerRuntime) InspectImage(imageName string) (*container.Image, error
 
 // ListImage implements container.Runtime.ListImage.
 func (dr *DockerRuntime) ListImages(opts container.ListImagesOptions) ([]*container.Image, error) {
-	var imgs []*container.Image
 	dockerImages, err := dr.docker.ListImages(docker.ListImagesOptions{All: opts.All})
+	imgs := make([]*container.Image, len(dockerImages))
 	for i := range dockerImages {
-		imgs = append(imgs, &container.Image{
+		imgs[i] = &container.Image{
 			ID: dockerImages[i].ID,
-		})
+		}
 	}
 	return imgs, err
 }

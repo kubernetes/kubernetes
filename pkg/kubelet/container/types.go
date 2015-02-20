@@ -39,20 +39,11 @@ type Container struct {
 	State           State             `json:"state,omitempty"`
 	Status          string            `json:"status,omitempty"`
 	NetworkSettings *NetworkSettings  `json:"networkSettings`
-	Ports           []Port            `json:"ports,omitempty"`
 	SizeRw          int64             `json:"sizeRw,omitempty"`
 	SizeRootFs      int64             `json:"sizeRootFs,omitempty"`
 	Volumes         map[string]string `json:"volumes,omitempty"`
 	Hostname        string            `json:"hostname,omitempty"`
 	Env             []string          `json:"env,omitempty"`
-}
-
-// Port is a type that represents a port mapping.
-type Port struct {
-	PrivatePort int64  `json:"privatePort,omitempty"`
-	PublicPort  int64  `json:"publicPort,omitempty"`
-	Type        string `json:"type,omitempty"`
-	IP          string `json:"ip,omitempty"`
 }
 
 // State represents the state of a container.
