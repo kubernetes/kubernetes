@@ -89,7 +89,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 
 // Run runs the specified ProxyServer.  This should never exit.
 func (s *ProxyServer) Run(_ []string) error {
-	if err := util.ApplyOomScoreAdj(s.OOMScoreAdj); err != nil {
+	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
 	}
 

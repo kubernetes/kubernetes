@@ -170,7 +170,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		s.EtcdServerList = util.StringList{}
 	}
 
-	if err := util.ApplyOomScoreAdj(s.OOMScoreAdj); err != nil {
+	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
 	}
 
