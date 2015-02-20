@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -81,32 +82,19 @@ func TLSConfigFor(config *Config) (*tls.Config, error) {
 	if hasCA && config.Insecure {
 		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
 	}
+	if err := LoadTLSFiles(config); err != nil {
+		return nil, err
+	}
 	var tlsConfig *tls.Config
 	switch {
 	case hasCert:
-		certData, err := dataFromSliceOrFile(config.CertData, config.CertFile)
-		if err != nil {
-			return nil, err
-		}
-		keyData, err := dataFromSliceOrFile(config.KeyData, config.KeyFile)
-		if err != nil {
-			return nil, err
-		}
-		caData, err := dataFromSliceOrFile(config.CAData, config.CAFile)
-		if err != nil {
-			return nil, err
-		}
-		cfg, err := NewClientCertTLSConfig(certData, keyData, caData)
+		cfg, err := NewClientCertTLSConfig(config.CertData, config.KeyData, config.CAData)
 		if err != nil {
 			return nil, err
 		}
 		tlsConfig = cfg
 	case hasCA:
-		caData, err := dataFromSliceOrFile(config.CAData, config.CAFile)
-		if err != nil {
-			return nil, err
-		}
-		cfg, err := NewTLSConfig(caData)
+		cfg, err := NewTLSConfig(config.CAData)
 		if err != nil {
 			return nil, err
 		}
@@ -116,6 +104,45 @@ func TLSConfigFor(config *Config) (*tls.Config, error) {
 	}
 
 	return tlsConfig, nil
+}
+
+// LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
+// KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
+// either populated or were empty to start.
+func LoadTLSFiles(config *Config) error {
+	certData, err := dataFromSliceOrFile(config.CertData, config.CertFile)
+	if err != nil {
+		return err
+	}
+	config.CertData = certData
+	keyData, err := dataFromSliceOrFile(config.KeyData, config.KeyFile)
+	if err != nil {
+		return err
+	}
+	config.KeyData = keyData
+	caData, err := dataFromSliceOrFile(config.CAData, config.CAFile)
+	if err != nil {
+		return err
+	}
+	config.CAData = caData
+
+	return nil
+}
+
+// dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
+// or an error if an error occurred reading the file
+func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
+	if len(data) > 0 {
+		return data, nil
+	}
+	if len(file) > 0 {
+		fileData, err := ioutil.ReadFile(file)
+		if err != nil {
+			return []byte{}, err
+		}
+		return fileData, nil
+	}
+	return nil, nil
 }
 
 func NewClientCertTLSConfig(certData, keyData, caData []byte) (*tls.Config, error) {
