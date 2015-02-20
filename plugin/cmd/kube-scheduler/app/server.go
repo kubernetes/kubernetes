@@ -18,8 +18,11 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -30,6 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	latestschedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
@@ -42,6 +47,7 @@ type SchedulerServer struct {
 	Address           util.IP
 	ClientConfig      client.Config
 	AlgorithmProvider string
+	PolicyConfigFile  string
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -60,6 +66,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.AlgorithmProvider, "algorithm_provider", s.AlgorithmProvider, "The scheduling algorithm provider to use")
+	fs.StringVar(&s.PolicyConfigFile, "policy_config_file", s.PolicyConfigFile, "File with scheduler policy configuration")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -78,6 +85,7 @@ func (s *SchedulerServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}
+
 	sched := scheduler.New(config)
 	sched.Run()
 
@@ -85,10 +93,29 @@ func (s *SchedulerServer) Run(_ []string) error {
 }
 
 func (s *SchedulerServer) createConfig(configFactory *factory.ConfigFactory) (*scheduler.Config, error) {
+	var policy schedulerapi.Policy
+	var configData []byte
+
+	if _, err := os.Stat(s.PolicyConfigFile); err == nil {
+		configData, err = ioutil.ReadFile(s.PolicyConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to read policy config: %v", err)
+		}
+		//err = json.Unmarshal(configData, &policy)
+		err = latestschedulerapi.Codec.DecodeInto(configData, &policy)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid configuration: %v", err)
+		}
+
+		return configFactory.CreateFromConfig(policy)
+	}
+
+	// if the config file isn't provided, use the specified (or default) provider
 	// check of algorithm provider is registered and fail fast
 	_, err := factory.GetAlgorithmProvider(s.AlgorithmProvider)
 	if err != nil {
 		return nil, err
 	}
+
 	return configFactory.CreateFromProvider(s.AlgorithmProvider)
 }

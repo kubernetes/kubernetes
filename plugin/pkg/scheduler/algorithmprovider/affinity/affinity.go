@@ -37,9 +37,9 @@ func affinityPredicates() util.StringSet {
 		"PodFitsResources",
 		"NoDiskConflict",
 		// Ensures that all pods within the same service are hosted on minions within the same region as defined by the "region" label
-		factory.RegisterFitPredicate("ServiceAffinity", algorithm.NewServiceAffinityPredicate(factory.PodLister, factory.ServiceLister, factory.MinionLister, []string{"region"})),
+		factory.RegisterFitPredicate("RegionAffinity", algorithm.NewServiceAffinityPredicate(factory.PodLister, factory.ServiceLister, factory.MinionLister, []string{"region"})),
 		// Fit is defined based on the presence of the "region" label on a minion, regardless of value.
-		factory.RegisterFitPredicate("NodeLabelPredicate", algorithm.NewNodeLabelPredicate(factory.MinionLister, []string{"region"}, true)),
+		factory.RegisterFitPredicate("RegionRequired", algorithm.NewNodeLabelPredicate(factory.MinionLister, []string{"region"}, true)),
 	)
 }
 
@@ -48,8 +48,8 @@ func affinityPriorities() util.StringSet {
 		"LeastRequestedPriority",
 		"ServiceSpreadingPriority",
 		// spreads pods belonging to the same service across minions in different zones
-		factory.RegisterPriorityFunction("ZoneSpreadingPriority", algorithm.NewServiceAntiAffinityPriority(factory.ServiceLister, "zone"), 2),
+		factory.RegisterPriorityFunction("ZoneSpread", algorithm.NewServiceAntiAffinityPriority(factory.ServiceLister, "zone"), 2),
 		// Prioritize nodes based on the presence of the "zone" label on a minion, regardless of value.
-		factory.RegisterPriorityFunction("NodeLabelPriority", algorithm.NewNodeLabelPriority("zone", true), 1),
+		factory.RegisterPriorityFunction("ZonePreferred", algorithm.NewNodeLabelPriority("zone", true), 1),
 	)
 }

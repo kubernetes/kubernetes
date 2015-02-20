@@ -30,6 +30,7 @@ import (
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
 )
@@ -78,6 +79,25 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 	}
 
 	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
+}
+
+// CreateFromConfig creates a scheduler from the configuration file
+func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
+	glog.V(2).Infof("creating scheduler from configuration: %v", policy)
+
+	predicateKeys := util.NewStringSet()
+	for _, predicate := range policy.Predicates {
+		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
+		predicateKeys.Insert(RegisterCustomPredicate(predicate))
+	}
+
+	priorityKeys := util.NewStringSet()
+	for _, priority := range policy.Priorities {
+		glog.V(2).Infof("Registering priority: %s", priority.Name)
+		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+	}
+
+	return f.CreateFromKeys(predicateKeys, priorityKeys)
 }
 
 // CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.

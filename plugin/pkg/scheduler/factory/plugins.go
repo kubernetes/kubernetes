@@ -23,6 +23,7 @@ import (
 
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
 )
@@ -55,6 +56,33 @@ func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string 
 	return name
 }
 
+// RegisterCustomPredicate registers a custom fit predicate with the algorithm registry.
+// Returns the name, with which the predicate was registered.
+func RegisterCustomPredicate(policy schedulerapi.PredicatePolicy) string {
+	var predicate algorithm.FitPredicate
+	var ok bool
+
+	validatePredicateOrDie(policy)
+
+	// generate the predicate function, if a custom type is requested
+	if policy.Argument != nil {
+		if policy.Argument.ServiceAffinity != nil {
+			predicate = algorithm.NewServiceAffinityPredicate(PodLister, ServiceLister, MinionLister, policy.Argument.ServiceAffinity.Labels)
+		} else if policy.Argument.LabelsPresence != nil {
+			predicate = algorithm.NewNodeLabelPredicate(MinionLister, policy.Argument.LabelsPresence.Labels, policy.Argument.LabelsPresence.Presence)
+		}
+		// check to see if a pre-defined predicate is requested
+	} else if predicate, ok = fitPredicateMap[policy.Name]; ok {
+		glog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
+	}
+
+	if predicate == nil {
+		glog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
+	}
+
+	return RegisterFitPredicate(policy.Name, predicate)
+}
+
 // IsFitPredicateRegistered check is useful for testing providers.
 func IsFitPredicateRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
@@ -63,7 +91,7 @@ func IsFitPredicateRegistered(name string) bool {
 	return ok
 }
 
-// RegisterFitPredicate registers a priority function with the algorithm registry. Returns the name,
+// RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
 	schedulerFactoryMutex.Lock()
@@ -71,6 +99,32 @@ func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, 
 	validateAlgorithmNameOrDie(name)
 	priorityFunctionMap[name] = algorithm.PriorityConfig{Function: function, Weight: weight}
 	return name
+}
+
+// RegisterCustomPriority registers a custom priority function with the algorithm registry.
+// Returns the name, with which the priority function was registered.
+func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
+	var priority algorithm.PriorityFunction
+
+	validatePriorityOrDie(policy)
+
+	// generate the priority function, if a custom priority is requested
+	if policy.Argument != nil {
+		if policy.Argument.ServiceAntiAffinity != nil {
+			priority = algorithm.NewServiceAntiAffinityPriority(ServiceLister, policy.Argument.ServiceAntiAffinity.Label)
+		} else if policy.Argument.LabelPreference != nil {
+			priority = algorithm.NewNodeLabelPriority(policy.Argument.LabelPreference.Label, policy.Argument.LabelPreference.Presence)
+		}
+	} else if priorityConfig, ok := priorityFunctionMap[policy.Name]; ok {
+		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
+		priority = priorityConfig.Function
+	}
+
+	if priority == nil {
+		glog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
+	}
+
+	return RegisterPriorityFunction(policy.Name, priority, policy.Weight)
 }
 
 // IsPriorityFunctionRegistered check is useful for testing providers.
@@ -91,6 +145,7 @@ func SetPriorityFunctionWeight(name string, weight int) {
 		return
 	}
 	config.Weight = weight
+	priorityFunctionMap[name] = config
 }
 
 // RegisterAlgorithmProvider registers a new algorithm provider with the algorithm registry. This should
@@ -155,5 +210,35 @@ var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")
 func validateAlgorithmNameOrDie(name string) {
 	if !validName.MatchString(name) {
 		glog.Fatalf("algorithm name %v does not match the name validation regexp \"%v\".", name, validName)
+	}
+}
+
+func validatePredicateOrDie(predicate schedulerapi.PredicatePolicy) {
+	if predicate.Argument != nil {
+		numArgs := 0
+		if predicate.Argument.ServiceAffinity != nil {
+			numArgs++
+		}
+		if predicate.Argument.LabelsPresence != nil {
+			numArgs++
+		}
+		if numArgs != 1 {
+			glog.Fatalf("Exactly 1 predicate argument is required")
+		}
+	}
+}
+
+func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
+	if priority.Argument != nil {
+		numArgs := 0
+		if priority.Argument.ServiceAntiAffinity != nil {
+			numArgs++
+		}
+		if priority.Argument.LabelPreference != nil {
+			numArgs++
+		}
+		if numArgs != 1 {
+			glog.Fatalf("Exactly 1 priority argument is required")
+		}
 	}
 }
