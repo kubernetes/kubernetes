@@ -100,18 +100,18 @@ func printFlags(out *bytes.Buffer, flags *pflag.FlagSet) {
 }
 
 func printOptions(out *bytes.Buffer, command *cobra.Command) {
-	var flags *pflag.FlagSet
-	if command.HasFlags() {
-		flags = command.Flags()
-	} else if !command.HasParent() && command.HasPersistentFlags() {
-		flags = command.PersistentFlags()
+	flags := command.NonInheritedFlags()
+	if flags.HasFlags() {
+		fmt.Fprintf(out, "# OPTIONS\n")
+		printFlags(out, flags)
+		fmt.Fprintf(out, "\n")
 	}
-	if flags == nil {
-		return
+	flags = command.InheritedFlags()
+	if flags.HasFlags() {
+		fmt.Fprintf(out, "# OPTIONS INHERITED FROM PARENT COMMANDS\n")
+		printFlags(out, flags)
+		fmt.Fprintf(out, "\n")
 	}
-	fmt.Fprintf(out, "# OPTIONS\n")
-	printFlags(out, flags)
-	fmt.Fprintf(out, "\n")
 }
 
 func genMarkdown(command *cobra.Command, parent, docsDir string) {
