@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package server does all of the work necessary to create a Kubernetes
+// Package app does all of the work necessary to create a Kubernetes
 // APIServer by binding together the API, master and APIServer infrastructure.
 // It can be configured and called directly or via the hyperkube framework.
-package server
+package app
 
 import (
 	"crypto/tls"
@@ -33,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -100,22 +99,6 @@ func NewAPIServer() *APIServer {
 	}
 
 	return &s
-}
-
-// NewHyperkubeServer creates a new hyperkube Server object that includes the
-// description and flags.
-func NewHyperkubeServer() *hyperkube.Server {
-	s := NewAPIServer()
-
-	hks := hyperkube.Server{
-		SimpleUsage: "apiserver",
-		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
-		Run: func(_ *hyperkube.Server, args []string) error {
-			return s.Run(args)
-		},
-	}
-	s.AddFlags(hks.Flags())
-	return &hks
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet

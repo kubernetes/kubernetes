@@ -19,13 +19,13 @@ package main
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/server"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
 
 	"github.com/spf13/pflag"
 )
 
 func main() {
-	s := server.NewSchedulerServer()
+	s := app.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()

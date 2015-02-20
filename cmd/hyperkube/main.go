@@ -14,33 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// A binary that can morph into all of the other kubernetes binaries. You can
+// also soft-link to it busybox style.
 package main
 
 import (
-	"fmt"
 	"os"
-	"runtime"
-
-	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
-
-	"github.com/spf13/pflag"
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewProxyServer()
-	s.AddFlags(pflag.CommandLine)
-
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
-
-	verflag.PrintAndExitIfRequested()
-
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
-		fmt.Fprint(os.Stderr, err.Error)
-		os.Exit(1)
+	hk := HyperKube{
+		Name: "hyperkube",
+		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
 	}
+
+	hk.AddServer(NewKubeAPIServer())
+	hk.AddServer(NewKubeControllerManager())
+	hk.AddServer(NewScheduler())
+	hk.AddServer(NewKubelet())
+	hk.AddServer(NewKubeProxy())
+
+	hk.RunToExit(os.Args)
 }

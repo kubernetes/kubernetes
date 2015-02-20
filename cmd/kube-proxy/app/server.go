@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package server does all of the work necessary to configure and run a
-// Kubernetes proxy process.
-package server
+// Package app does all of the work necessary to configure and run a
+// Kubernetes app process.
+package app
 
 import (
 	"net"
@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/hyperkube"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -56,25 +55,6 @@ func NewProxyServer() *ProxyServer {
 		HealthzPort: 10249,
 		OOMScoreAdj: -899,
 	}
-}
-
-// NewHyperkubeServer creates a new hyperkube Server object that includes the
-// description and flags.
-func NewHyperkubeServer() *hyperkube.Server {
-	s := NewProxyServer()
-
-	hks := hyperkube.Server{
-		SimpleUsage: "proxy",
-		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
-services and forwarding it to the appropriate pods.  It generally runs on
-nodes next to the Kubelet and proxies traffic from local pods to remote pods.
-It is also used when handling incoming external traffic.`,
-		Run: func(_ *hyperkube.Server, args []string) error {
-			return s.Run(args)
-		},
-	}
-	s.AddFlags(hks.Flags())
-	return &hks
 }
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
