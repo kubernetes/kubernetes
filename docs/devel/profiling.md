@@ -31,4 +31,4 @@ to get 30 sec. CPU profile.
 
 ## Contention profiling
 
-To enable contetion profiling you need to add line ```rt.SetBlockProfileRate(1)``` to ones added before (```rt``` stands for ```runtime``` in ```master.go```). This enables 'debug/pprof/block' subpage, which can be used as an input go to ```go tool pprof```.
+To enable contetion profiling you need to add line ```rt.SetBlockProfileRate(1)``` in addition to ```m.mux.HandleFunc(...)``` added before (```rt``` stands for ```runtime``` in ```master.go```). This enables 'debug/pprof/block' subpage, which can be used as an input to ```go tool pprof```.
