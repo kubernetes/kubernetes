@@ -831,17 +831,6 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// Get is a convenience function, which returns a 0 quantity if the
-// resource list is nil, empty, or lacks a value for the requested resource.
-// Treat as read only!
-func (rl ResourceList) Get(name ResourceName) *resource.Quantity {
-	if rl == nil {
-		return &resource.Quantity{}
-	}
-	q := rl[name]
-	return &q
-}
-
 // Node is a worker node in Kubernetenes
 // The name of the node according to etcd is in ObjectMeta.Name.
 type Node struct {
