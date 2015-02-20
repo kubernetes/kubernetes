@@ -49,6 +49,8 @@ installguides:
     url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos.md
   - label: vSphere
     url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/vsphere.md
+  - label: Amazon Web Services
+    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/aws.md
 
 firstapp:
     label: Run Now
