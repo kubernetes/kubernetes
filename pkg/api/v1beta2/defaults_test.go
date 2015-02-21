@@ -103,8 +103,18 @@ func TestSetDefaultSecret(t *testing.T) {
 	}
 }
 
-func TestSetDefaulEndpointsProtocol(t *testing.T) {
+func TestSetDefaulEndpointsProtocolEmpty(t *testing.T) {
 	in := &current.Endpoints{}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*current.Endpoints)
+
+	if out.Protocol != "" {
+		t.Errorf("Expected protocol \"\", got %s", out.Protocol)
+	}
+}
+
+func TestSetDefaulEndpointsProtocol(t *testing.T) {
+	in := &current.Endpoints{Endpoints: []string{"1.2.3.4:5678"}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*current.Endpoints)
 

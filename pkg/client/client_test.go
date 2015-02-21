@@ -616,7 +616,9 @@ func TestListEndpooints(t *testing.T) {
 					{
 						ObjectMeta: api.ObjectMeta{Name: "endpoint-1"},
 						Endpoints: []api.Endpoint{
-							{IP: "10.245.1.2", Port: 8080}, {IP: "10.245.1.3", Port: 8080}},
+							{IP: "10.245.1.2", Ports: []api.EndpointPort{{Port: 8080}}},
+							{IP: "10.245.1.3", Ports: []api.EndpointPort{{Port: 8080}}},
+						},
 					},
 				},
 			},

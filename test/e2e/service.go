@@ -250,8 +250,11 @@ var _ = Describe("Services", func() {
 func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEndpoints []string, endpoints *api.Endpoints) {
 	ips := util.StringSet{}
 	for _, ep := range endpoints.Endpoints {
-		if ep.Port != expectedPort {
-			Fail(fmt.Sprintf("invalid port, expected %d, got %d", expectedPort, ep.Port))
+		if len(ep.Ports) == 0 {
+			Fail(fmt.Sprintf("invalid endpoint, no ports"))
+		}
+		if ep.Ports[0].Port != expectedPort {
+			Fail(fmt.Sprintf("invalid port, expected %d, got %d", expectedPort, ep.Ports[0].Port))
 		}
 		ips.Insert(ep.IP)
 	}
