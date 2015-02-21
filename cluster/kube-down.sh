@@ -24,11 +24,29 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+# Delete services which use external load balancer.
+function teardown-external-services() {
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local template='{{ range .items }}{{ .id }}{{ " " }}{{ .createExternalLoadBalancer }}{{ "\n" }}{{ end }}'
+  local oldifs="${IFS}"
+  IFS=$'\n'
+  for service in $("${kubectl}" get se -o template --template="${template}"); do
+    local id=$(echo $service | cut -f 1 -d " ")
+    local external=$(echo "${service}" | cut -f 2 -d " ")
+    if [ "${external}" = "true" ]
+    then
+      "${kubectl}" delete service "${id}"
+    fi
+  done
+  IFS="${oldifs}"
+}
+
 echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
 teardown-monitoring-firewall
 teardown-logging-firewall
+teardown-external-services
 
 kube-down
 
