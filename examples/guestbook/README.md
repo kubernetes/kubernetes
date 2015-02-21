@@ -383,3 +383,74 @@ kubectl delete -f examples/guestbook/redis-slave-service.json
 kubectl delete pod redis-master # This is the only pod that requires manual removal.
 ```
 
+### Troubleshooting
+
+the Guestbook example can fail for a variety of reasons, which makes it an effective test.  Lets test the web app simply using *curl*, so we can see whats going on.
+
+Before we proceed, what are some setup idiosyncracies that might cause the app to fail (or, appear to fail, when merely you have a *cold start* issue.
+
+- running kubernetes from HEAD, in which case, there may be subtle bugs in the kubernetes core component interactions.
+- running kubernetes with security turned on, in such a way that containers are restricted from doing their job.
+- starting the kubernetes and not allowing enough time for all services and pods to come online, before doing testing.
+
+
+
+To post a message (Note that this call *overwrites* the messages field), so it will be reset to just one entry.
+
+```
+curl "localhost:8000/index.php?cmd=set&key=messages&value=jay_sais_hi"
+```
+
+And, to get messages afterwards...
+
+```
+curl "localhost:8000/index.php?cmd=get&key=messages"
+```
+
+1) When the *Web page hasn't come up yet*:
+
+When you go to localhost:8000, you might not see the page at all.  Testing it with curl...
+```shell
+   ==> default: curl: (56) Recv failure: Connection reset by peer
+```
+
+This means the web frontend isn't up yet.  Wait a while, possibly about 2 minutes or more, depending on your set up. Also, run a *watch* on docker ps, to see if containers are cycling on and off or not starting.
+
+```watch 
+$> watch -n 1 docker ps
+```
+
+If you run this on a node to which the frontend is assigned, you will eventually see the frontend container turns on.  At that point, this basic error will likely go away.
+
+2) *When Redis can't connect to master*:
+
+```shell
+<b>Fatal error</b>:  Uncaught exception 'Predis\Connection\ConnectionException' with message 'php_network_getaddresses: getaddrinfo failed: Name or service not known [tcp://:0]' in /vendor/predis/predis/lib/Predis/Connection/AbstractConnection.php:141
+```
+
+The fix: Make sure that environmental variables are being set correctly.  In particular, the PHP containers need to be started with the environment variables for the redis master (i.e. REDIS_MASTER_SERVICE_HOST and REDIS_MASTER_PORT).  
+
+3) *Temporarily, while waiting for the app to come up* , you might see a few of these:
+
+```shell
+==> default: <br />
+==> default: <b>Fatal error</b>:  Uncaught exception 'Predis\Connection\ConnectionException' with message 'Error while reading line from the server [tcp://10.254.168.69:6379]' in /vendor/predis/predis/lib/Predis/Connection/AbstractConnection.php:141
+```
+
+The fix, just go get some coffee.  When you come back, there is a good chance the service endpoint will eventually be up.  If not, make sure its running and that the redis master / slave docker logs show something like this.
+
+```shell
+$> docker logs 26af6bd5ac12
+...
+[9] 20 Feb 23:47:51.015 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+[9] 20 Feb 23:47:51.015 * The server is now ready to accept connections on port 6379
+[9] 20 Feb 23:47:52.005 * Connecting to MASTER 10.254.168.69:6379
+[9] 20 Feb 23:47:52.005 * MASTER <-> SLAVE sync started
+```
+
+4) *When security issues cause redis writes to fail* you may have to run *docker logs* on the redis containers:
+
+```shell
+==> default: <b>Fatal error</b>:  Uncaught exception 'Predis\ServerException' with message 'MISCONF Redis is configured to save RDB snapshots, but is currently not able to persist on disk. Commands that may modify the data set are disabled. Please check Redis logs for details about the error.' in /vendor/predis/predis/lib/Predis/Client.php:282" 
+```
+The fix is to setup SE Linux properly (don't just turn it off).  Remember that you can also rebuild this entire app from scratch, using the dockerfiles, and modify while redeploying.  Reach out on the mailing list if you need help doing so!
