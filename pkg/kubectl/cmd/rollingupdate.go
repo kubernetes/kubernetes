@@ -68,6 +68,7 @@ func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 			cmdApiVersion := clientConfig.Version
 
 			mapper, typer := f.Object(cmd)
+			// TODO: use resource.Builder instead
 			mapping, namespace, newName, data := util.ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
 			if mapping.Kind != "ReplicationController" {
 				usageError(cmd, "%s does not specify a valid ReplicationController", filename)
@@ -79,6 +80,7 @@ func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			checkErr(err)
+			// TODO: use resource.Builder instead
 			err = util.CompareNamespace(cmdNamespace, namespace)
 			checkErr(err)
 

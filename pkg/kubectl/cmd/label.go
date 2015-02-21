@@ -66,6 +66,7 @@ func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
 			checkErr(err)
 
 			mapper, _ := f.Object(cmd)
+			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, res, mapper, cmdNamespace)
 			client, err := f.RESTClient(cmd, mapping)
 			checkErr(err)
