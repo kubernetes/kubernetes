@@ -34,9 +34,26 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 done
 
 # Let the minion know who its master is
+# Recover the salt-minion if the salt-master network changes
+## auth_timeout - how long we want to wait for a time out
+## auth_tries - how many times we will retry before restarting salt-minion
+## auth_safemode - if our cert is rejected, we will restart salt minion
+## ping_interval - restart the minion if we cannot ping the master after 1 minute
+## random_reauth_delay - wait 0-3 seconds when reauthenticating
+## recon_default - how long to wait before reconnecting
+## recon_max - how long you will wait upper bound
+## state_aggregrate - try to do a single yum command to install all referenced packages where possible at once, should improve startup times
+##
 mkdir -p /etc/salt/minion.d
 cat <<EOF >/etc/salt/minion.d/master.conf
 master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+auth_timeout: 10
+auth_tries: 2
+auth_safemode: True
+ping_interval: 1
+random_reauth_delay: 3
+state_aggregrate:
+  - pkg
 EOF
 
 cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
