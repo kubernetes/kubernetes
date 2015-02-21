@@ -34,20 +34,22 @@ kube::test::find_dirs() {
           -o -wholename './target' \
           -o -wholename '*/third_party/*' \
           -o -wholename '*/Godeps/*' \
-	  -o -wholename '*/contrib/podex/*' \
+          -o -wholename '*/contrib/podex/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
 }
 
-kube::test::find_pkgs() {
-  kube::test::find_dirs | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
-}
-
 # -covermode=atomic becomes default with -race in Go >=1.3
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 120s}
-KUBE_COVER=${KUBE_COVER:-} # use KUBE_COVER="-cover -covermode=atomic" for full coverage
+KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
+KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
+# How many 'go test' instances to run simultaneously when running tests in
+# coverage mode.
+KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
+# Set to the goveralls binary path to report coverage results to Coveralls.io.
+KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -102,8 +104,13 @@ for arg; do
     testcases+=("${arg}")
   fi
 done
+if [[ ${#testcases[@]} -eq 0 ]]; then
+  testcases=($(kube::test::find_dirs))
+fi
 set -- "${testcases[@]+${testcases[@]}}"
 
+# TODO: this should probably be refactored to avoid code duplication with the
+# coverage version.
 if [[ $iterations -gt 1 ]]; then
   if [[ $# -eq 0 ]]; then
     set -- $(kube::test::find_dirs)
@@ -135,33 +142,53 @@ if [[ $iterations -gt 1 ]]; then
   fi
 fi
 
-if [[ -n "${1-}" ]]; then
-  cover_report_dir=""
-  if [[ -n "${KUBE_COVER}" ]]; then
-    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
-    kube::log::status "Saving coverage output in '${cover_report_dir}'"
-  fi
-
-  for arg; do
-    trap 'exit 1' SIGINT
-    pkg=${KUBE_GO_PACKAGE}/${arg}
-
-    cover_params=()
-    if [[ -n "${KUBE_COVER}" ]]; then
-      mkdir -p "${cover_report_dir}/${arg}"
-      cover_params=(${KUBE_COVER} -coverprofile="${cover_report_dir}/${arg}/coverage.out")
-    fi
-
-    go test "${goflags[@]:+${goflags[@]}}" \
-        ${KUBE_RACE} \
-        ${KUBE_TIMEOUT} \
-        "${cover_params[@]+${cover_params[@]}}" \
-        "${pkg}"
-  done
+# If we're not collecting coverage, run all requested tests with one 'go test'
+# command, which is much faster.
+if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
+  kube::log::status "Running unit tests without code coverage"
+  go test "${goflags[@]:+${goflags[@]}}" \
+    ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}"
   exit 0
 fi
 
-kube::test::find_pkgs | xargs go test "${goflags[@]:+${goflags[@]}}" \
-    ${KUBE_RACE} \
-    ${KUBE_TIMEOUT} \
-    ${KUBE_COVER}
+# Create coverage report directories.
+cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+cover_profile="coverage.out"  # Name for each individual coverage profile
+kube::log::status "Saving coverage output in '${cover_report_dir}'"
+mkdir -p "${@+${@/#/${cover_report_dir}/}}"
+
+# Run all specified tests, collecting coverage results. Go currently doesn't
+# support collecting coverage across multiple packages at once, so we must issue
+# separate 'go test' commands for each package and then combine at the end.
+# To speed things up considerably, we can at least use xargs -P to run multiple
+# 'go test' commands at once.
+printf "%s\n" "${@}" | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
+    go test "${goflags[@]:+${goflags[@]}}" \
+        ${KUBE_RACE} \
+        ${KUBE_TIMEOUT} \
+        -cover -covermode="${KUBE_COVERMODE}" \
+        -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
+        "${cover_params[@]+${cover_params[@]}}" \
+        "${KUBE_GO_PACKAGE}/{}"
+
+combined_cover_profile="${cover_report_dir}/combined-coverage.out"
+{
+  # The combined coverage profile needs to start with a line indicating which
+  # coverage mode was used (set, count, or atomic). This line is included in
+  # each of the coverage profiles generated when running 'go test -cover', but
+  # we strip these lines out when combining so that there's only one.
+  echo "mode: ${KUBE_COVERMODE}"
+
+  # Include all coverage reach data in the combined profile, but exclude the
+  # 'mode' lines, as there should be only one.
+  find "${cover_report_dir}" -name "${cover_profile}" |
+    xargs -r grep -h -v "^mode:" || true
+} >"${combined_cover_profile}"
+
+coverage_html_file="${cover_report_dir}/combined-coverage.html"
+go tool cover -html="${combined_cover_profile}" -o="${coverage_html_file}"
+kube::log::status "Combined coverage report: ${coverage_html_file}"
+
+if [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
+  ${KUBE_GOVERALLS_BIN} -coverprofile="${combined_cover_profile}" || true
+fi
