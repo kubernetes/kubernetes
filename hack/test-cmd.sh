@@ -151,9 +151,26 @@ for version in "${kube_api_versions[@]}"; do
   kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
   [ ! $(kubectl delete pods "${kube_flags[@]}" ) ]
   kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
-  [ ! $(delete pods --all pods -l name=redis-master) ]   # not --all and label selector together
+  [ ! $(delete pods --all pods -l name=redis-master "${kube_flags[@]}" ) ]   # not --all and label selector together
   kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
   howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 0 ]
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 1 ]
+
+  #testing pods and label command command
+  kubectl label pods redis-master new-name=new-redis-master "${kube_flags[@]}"
+  kubectl delete pods -lnew-name=new-redis-master "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 0 ]
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 1 ]
+  ! $(kubectl label pods redis-master name=redis-super-sayan "${kube_flags[@]}" )
+  kubectl label --overwrite pods redis-master name=redis-super-sayan "${kube_flags[@]}"
+  kubectl delete pods -lname=redis-super-sayan "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -lname=redis-super-sayan -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   [ "$howmanypods" -eq 0 ]
 
   # make calls in another namespace
