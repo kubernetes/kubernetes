@@ -9,13 +9,12 @@ A _pod_ (as in a pod of whales or pea pod) corresponds to a colocated group of a
 The context of the pod can be defined as the conjunction of several Linux namespaces:
 - PID namespace (applications within the pod can see each other's processes)
 - network namespace (applications within the pod have access to the same IP and port space)
-- mount namespace (applications within the pod can share mounted volumes)
 - IPC namespace (applications within the pod can use SystemV IPC or POSIX message queues to communicate)
 - UTS namespace (applications within the pod share a hostname)
 
-Additionally, a pod may define top-level cgroup isolations which form an outer bound to any individual isolation applied to constituent applications.
+Applications within a pod also have access to shared volumes, which are defined at the pod level and made available in each application's filesystem. Additionally, a pod may define top-level cgroup isolations which form an outer bound to any individual isolation applied to constituent applications.
 
-In terms of [Docker](https://www.docker.com/) constructs, a pod consists of a colocated group of Docker containers with shared [volumes](volumes.md) (which emulate the shared mount namespace). IPC and PID namespace sharing are not yet implemented with Docker.
+In terms of [Docker](https://www.docker.com/) constructs, a pod consists of a colocated group of Docker containers with shared [volumes](volumes.md). PID namespace sharing is not yet implemented with Docker.
 
 Like individual application containers, pods are considered to be relatively ephemeral rather than durable entities. As discussed in [life of a pod](pod-states.md), pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced (see [replication controller](replication-controller.md) for more details). (In the future, a higher-level API may support pod migration.)
 
@@ -25,9 +24,9 @@ Like individual application containers, pods are considered to be relatively eph
 
 Pods facilitate data sharing and communication among their constituents.
 
-The applications in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname is set to the pod's Name for the containers within the pod. [More details on networking](networking.md).
+The applications in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname is set to the pod's Name for the application containers within the pod. [More details on networking](networking.md).
 
-In addition to defining the application containers that run in the pod, the mount namespace allows the pod to provide a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the applications within the pod.
+In addition to defining the application containers that run in the pod, the pod specifies a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the applications within the pod.
 
 ### Management
 
