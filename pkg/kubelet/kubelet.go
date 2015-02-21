@@ -157,7 +157,8 @@ type Kubelet struct {
 	podInfraContainerImage string
 	podWorkers             *podWorkers
 	resyncInterval         time.Duration
-	pods                   []api.BoundPod
+	pods                   []api.BoundPod // guarded by podsMutex
+	podsMutex              sync.RWMutex
 	sourceReady            SourceReadyFn
 
 	// Needed to report events for containers belonging to deleted/modified pods.
@@ -1078,7 +1079,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		return err
 	}
 
-	podStatus, err := kl.GetPodStatus(podFullName, uid)
+	podStatus, err := kl.getPodStatusNoLock(podFullName, uid)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 	}
@@ -1304,6 +1305,8 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
+	kl.podsMutex.Lock()
+	defer kl.podsMutex.Unlock()
 	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
 	desiredContainers := make(map[podContainer]empty)
@@ -1459,6 +1462,8 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 }
 
 func (kl *Kubelet) updatePods(u PodUpdate) {
+	kl.podsMutex.Lock()
+	defer kl.podsMutex.Unlock()
 	switch u.Op {
 	case SET:
 		glog.V(3).Infof("SET: Containers changed")
@@ -1521,12 +1526,16 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 
 // GetBoundPods returns all pods bound to the kubelet and their spec
 func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
+	kl.podsMutex.RLock()
+	defer kl.podsMutex.RUnlock()
 	return kl.pods, nil
 }
 
-// GetPodFullName provides the first pod that matches namespace and name, or false
+// GetPodByName provides the first pod that matches namespace and name, or false
 // if no such pod can be found.
 func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
+	kl.podsMutex.RLock()
+	defer kl.podsMutex.RUnlock()
 	for i := range kl.pods {
 		pod := &kl.pods[i]
 		if pod.Namespace == namespace && pod.Name == name {
@@ -1534,6 +1543,28 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
 		}
 	}
 	return nil, false
+}
+
+// GetPodFullName provides the first pod that matches podFullName, or false
+// if no such pod can be found. This method locks podsMutex.
+func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.BoundPod, bool) {
+	kl.podsMutex.RLock()
+	defer kl.podsMutex.RUnlock()
+	return kl.getPodByFullNameNoLock(podFullName)
+}
+
+// getPodFullNameNoLock is a no-locking version of GetPodsByFullName.
+func (kl *Kubelet) getPodByFullNameNoLock(podFullName string) (*api.BoundPod, bool) {
+	found := false
+	var result *api.BoundPod
+	for _, pod := range kl.pods {
+		if GetPodFullName(&pod) == podFullName {
+			result = &pod
+			found = true
+			break
+		}
+	}
+	return result, found
 }
 
 // getPhase returns the phase of a pod given its container info.
@@ -1623,22 +1654,31 @@ func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodConditio
 	return ready
 }
 
-// GetPodStatus returns information from Docker about the containers in a pod
+// GetPodStatus returns information from Docker about the containers in a pod. It locks
+// podsMutex.
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
 	var spec api.PodSpec
-	var podStatus api.PodStatus
-	found := false
-	for _, pod := range kl.pods {
-		if GetPodFullName(&pod) == podFullName {
-			spec = pod.Spec
-			found = true
-			break
-		}
-	}
+	pod, found := kl.GetPodByFullName(podFullName)
 	if !found {
-		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
+		return api.PodStatus{}, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
 	}
+	spec = pod.Spec
+	return kl.getPodStatusInternal(podFullName, spec, uid)
+}
 
+// No-locking version of GetPodStatus
+func (kl *Kubelet) getPodStatusNoLock(podFullName string, uid types.UID) (api.PodStatus, error) {
+	var spec api.PodSpec
+	pod, found := kl.getPodByFullNameNoLock(podFullName)
+	if !found {
+		return api.PodStatus{}, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
+	}
+	spec = pod.Spec
+	return kl.getPodStatusInternal(podFullName, spec, uid)
+}
+
+func (kl *Kubelet) getPodStatusInternal(podFullName string, spec api.PodSpec, uid types.UID) (api.PodStatus, error) {
+	var podStatus api.PodStatus
 	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
 
 	if err != nil {
