@@ -268,8 +268,14 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
+		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
+		if len(service.Spec.PublicIPs) > 0 {
+			list := strings.Join(service.Spec.PublicIPs, ", ")
+			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
+		}
 		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
 		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints.Endpoints))
+		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
 			describeEvents(events, out)
 		}
