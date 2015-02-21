@@ -81,13 +81,11 @@ func ConvertAPIContainer(dc *docker.APIContainers) *container.Container {
 	}
 
 	c := &container.Container{
-		ID:         dc.ID,
-		Image:      dc.Image,
-		Command:    dc.Command,
-		Created:    time.Unix(dc.Created, 0),
-		Status:     dc.Status,
-		SizeRw:     dc.SizeRw,
-		SizeRootFs: dc.SizeRootFs,
+		ID:    dc.ID,
+		Image: dc.Image,
+		State: container.State{
+			CreatedAt: time.Unix(dc.Created, 0),
+		},
 	}
 
 	// Copy Name.
@@ -109,7 +107,6 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 		ID:      dc.ID,
 		Name:    dc.Name,
 		ImageID: dc.Image,
-		Created: dc.Created,
 		Volumes: dc.Volumes,
 		State: container.State{
 			Running:    dc.State.Running,
@@ -118,6 +115,7 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 			Pid:        dc.State.Pid,
 			ExitCode:   dc.State.ExitCode,
 			Error:      dc.State.Error,
+			CreatedAt:  dc.Created,
 			StartedAt:  dc.State.StartedAt,
 			FinishedAt: dc.State.FinishedAt,
 		},

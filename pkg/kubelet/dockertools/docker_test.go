@@ -459,9 +459,7 @@ func TestConvertAPIContainer(t *testing.T) {
 	test := &docker.APIContainers{
 		ID:         "fooID",
 		Image:      "fooImage",
-		Command:    "fooCommand",
 		Created:    now,
-		Status:     "fooStatus",
 		SizeRw:     8080,
 		SizeRootFs: 7070,
 		Names:      []string{"fooName0"},
@@ -481,20 +479,8 @@ func TestConvertAPIContainer(t *testing.T) {
 	if result.Image != test.Image {
 		t.Errorf("expected: %v, saw: %v", test.Image, result.Image)
 	}
-	if result.Command != test.Command {
-		t.Errorf("expected: %v, saw: %v", test.Command, result.Command)
-	}
-	if result.Created != time.Unix(test.Created, 0) {
-		t.Errorf("expected: %v, saw: %v", time.Unix(test.Created, 0), result.Created)
-	}
-	if result.Status != test.Status {
-		t.Errorf("expected: %v, saw: %v", test.Status, result.Status)
-	}
-	if result.SizeRw != test.SizeRw {
-		t.Errorf("expected: %v, saw: %v", test.SizeRw, result.SizeRw)
-	}
-	if result.SizeRootFs != test.SizeRootFs {
-		t.Errorf("expected: %v, saw: %v", test.SizeRootFs, result.SizeRootFs)
+	if result.State.CreatedAt != time.Unix(test.Created, 0) {
+		t.Errorf("expected: %v, saw: %v", time.Unix(test.Created, 0), result.State.CreatedAt)
 	}
 	test.Names = nil
 	result = ConvertAPIContainer(test)
@@ -569,9 +555,6 @@ func TestConvertContainer(t *testing.T) {
 	if result.Image != test.Config.Image {
 		t.Errorf("expected: %v, saw: %v", test.Config.Image, result.Image)
 	}
-	if result.Created != test.Created {
-		t.Errorf("expected: %v, saw: %v", test.Created, result.Created)
-	}
 	if !reflect.DeepEqual(result.Volumes, test.Volumes) {
 		t.Errorf("expected: %v, saw: %v", test.Volumes, result.Volumes)
 	}
@@ -592,6 +575,9 @@ func TestConvertContainer(t *testing.T) {
 	}
 	if result.State.Error != test.State.Error {
 		t.Errorf("expected: %v, saw: %v", test.State.Error, result.State.Error)
+	}
+	if result.State.CreatedAt != test.Created {
+		t.Errorf("expected: %v, saw: %v", test.Created, result.State.CreatedAt)
 	}
 	if result.State.StartedAt != test.State.StartedAt {
 		t.Errorf("expected: %v, saw: %v", test.State.StartedAt, result.State.StartedAt)

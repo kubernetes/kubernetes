@@ -31,20 +31,26 @@ var (
 
 // Container represents a container.
 type Container struct {
-	ID              string            `json:"id"`
-	Name            string            `json:"name,omitempty"`
-	Image           string            `json:"image,omitempty"`
-	ImageID         string            `json:"imageID`
-	Command         string            `json:"command,omitempty"`
-	Created         time.Time         `json:"created,omitempty"`
-	State           State             `json:"state,omitempty"`
-	Status          string            `json:"status,omitempty"`
-	NetworkSettings *NetworkSettings  `json:"networkSettings`
-	SizeRw          int64             `json:"sizeRw,omitempty"`
-	SizeRootFs      int64             `json:"sizeRootFs,omitempty"`
-	Volumes         map[string]string `json:"volumes,omitempty"`
-	Hostname        string            `json:"hostname,omitempty"`
-	Env             []string          `json:"env,omitempty"`
+	// The id of the container.
+	ID string `json:"id"`
+	// The name of the container.
+	Name string `json:"name,omitempty"`
+	// The host name of the container.
+	Hostname string `json:"hostname,omitempty"`
+	// The name of the container's image.
+	Image string `json:"image,omitempty"`
+	// The id of the container's image.
+	ImageID string `json:"image,omitempty"`
+	// The State of the container, including when
+	// the container is created/started.
+	State State `json:"state,omitempty"`
+	// The network settings of the container, including
+	// the ip of the container and its port bindings.
+	NetworkSettings *NetworkSettings `json:"networkSettings`
+	// The volumes binded to the container.
+	Volumes map[string]string `json:"volumes,omitempty"`
+	// The environment variables of the container.
+	Env []string `json:"env,omitempty"`
 }
 
 // State represents the state of a container.
@@ -55,27 +61,39 @@ type State struct {
 	Pid        int       `json:"pid,omitempty"`
 	ExitCode   int       `json:"exitCode,omitempty"`
 	Error      string    `json:"error,omitempty"`
+	CreatedAt  time.Time `json:"created,omitempty"`
 	StartedAt  time.Time `json:"startedAt,omitempty"`
 	FinishedAt time.Time `json:"finishedAt,omitempty"`
 }
 
 // NetworkSettings contains network-related information about a container.
 type NetworkSettings struct {
-	IPAddress    string                 `json:"ipAddress,omitempty"`
+	// The ip address of the container.
+	IPAddress string `json:"ipAddress,omitempty"`
+	// The port bindings of the container.
 	PortBindings map[Port][]PortBinding `json:"portBindings,omitempty"`
 }
 
 // HostConfig contains the container options related to starting a container on a given host.
 type HostConfig struct {
-	Binds        []string               `json:"binds,omitempty"`
-	CapAdd       []string               `json:"capAdd,omitempty"`
-	CapDrop      []string               `json:"capDrop,omitempty"`
-	Privileged   bool                   `json:"privileged,omitempty"`
+	// The bindings of the volumes.
+	Binds []string `json:"binds,omitempty"`
+	// The Linux capabilities added to the container.
+	CapAdd []string `json:"capAdd,omitempty"`
+	// The Linux capabilities dropped from the container.
+	CapDrop []string `json:"capDrop,omitempty"`
+	// If give extended privileges to the container.
+	Privileged bool `json:"privileged,omitempty"`
+	// The port bindings of the container.
 	PortBindings map[Port][]PortBinding `json:"portBindings,omitempty"`
-	DNS          []string               `json:"dns,omitempty"`
-	DNSSearch    []string               `json:"dnsSearch,omitempty"`
-	NetworkMode  string                 `json:"networkMode,omitempty"`
-	IPCMode      string                 `json:"ipcMode,omitempty"`
+	// The custom DNS servers.
+	DNS []string `json:"dns,omitempty"`
+	// The custom DNS search domains.
+	DNSSearch []string `json:"dnsSearch,omitempty"`
+	// The network mode for the container.
+	NetworkMode string `json:"networkMode,omitempty"`
+	// The ipc mode for the container.
+	IPCMode string `json:"ipcMode,omitempty"`
 }
 
 // Port represents the port number and the protocol, in the form <number>/<protocol>. For example: 80/tcp.

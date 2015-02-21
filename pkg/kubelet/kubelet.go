@@ -358,7 +358,7 @@ type ByCreated []*container.Container
 
 func (a ByCreated) Len() int           { return len(a) }
 func (a ByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByCreated) Less(i, j int) bool { return a[i].Created.After(a[j].Created) }
+func (a ByCreated) Less(i, j int) bool { return a[i].State.CreatedAt.After(a[j].State.CreatedAt) }
 
 // TODO: these removals are racy, we should make dockerclient threadsafe across List/Inspect transactions.
 func (kl *Kubelet) purgeOldest(ids []string) error {
