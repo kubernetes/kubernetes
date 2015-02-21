@@ -19,6 +19,7 @@ package container
 import (
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -60,20 +61,38 @@ type State struct {
 
 // NetworkSettings contains network-related information about a container.
 type NetworkSettings struct {
-	IPAddress string `json:"ipAddress,omitempty"`
+	IPAddress    string                 `json:"ipAddress,omitempty"`
+	PortBindings map[Port][]PortBinding `json:"portBindings,omitempty"`
 }
 
 // HostConfig contains the container options related to starting a container on a given host.
 type HostConfig struct {
-	Binds        []string                 `json:"binds,omitempty"`
-	CapAdd       []string                 `json:"capAdd,omitempty"`
-	CapDrop      []string                 `json:"capDrop,omitempty"`
-	Privileged   bool                     `json:"privileged,omitempty"`
-	PortBindings map[string][]PortBinding `json:"portBindings,omitempty"`
-	DNS          []string                 `json:"dns,omitempty"`
-	DNSSearch    []string                 `json:"dnsSearch,omitempty"`
-	NetworkMode  string                   `json:"networkMode,omitempty"`
-	IPCMode      string                   `json:"ipcMode,omitempty"`
+	Binds        []string               `json:"binds,omitempty"`
+	CapAdd       []string               `json:"capAdd,omitempty"`
+	CapDrop      []string               `json:"capDrop,omitempty"`
+	Privileged   bool                   `json:"privileged,omitempty"`
+	PortBindings map[Port][]PortBinding `json:"portBindings,omitempty"`
+	DNS          []string               `json:"dns,omitempty"`
+	DNSSearch    []string               `json:"dnsSearch,omitempty"`
+	NetworkMode  string                 `json:"networkMode,omitempty"`
+	IPCMode      string                 `json:"ipcMode,omitempty"`
+}
+
+// Port represents the port number and the protocol, in the form <number>/<protocol>. For example: 80/tcp.
+type Port string
+
+// Port returns the number of the port.
+func (p Port) Port() string {
+	return strings.Split(string(p), "/")[0]
+}
+
+// Proto returns the name of the protocol.
+func (p Port) Proto() string {
+	parts := strings.Split(string(p), "/")
+	if len(parts) == 1 {
+		return "tcp"
+	}
+	return parts[1]
 }
 
 // PortBinding represents the host/container port mapping.
@@ -94,15 +113,15 @@ type ListContainersOptions struct {
 
 // CreateContainerOptions specify parameters to the CreateContainer function.
 type CreateContainerOptions struct {
-	Name         string              `json:"name,omitempty"`
-	Command      []string            `json:"cmd,omitempty"`
-	Env          []string            `json:"env,omitempty"`
-	ExposedPorts map[string]struct{} `json:"exposedPorts,omitempty"`
-	Hostname     string              `json:"hostname,omitempty"`
-	Image        string              `json:"image,omitempty"`
-	Memory       int64               `json:"memory,omitempty"`
-	CPUShares    int64               `json:"cpuShares,omitempty"`
-	WorkingDir   string              `json:"workingDir,omitempty`
+	Name         string            `json:"name,omitempty"`
+	Command      []string          `json:"cmd,omitempty"`
+	Env          []string          `json:"env,omitempty"`
+	ExposedPorts map[Port]struct{} `json:"exposedPorts,omitempty"`
+	Hostname     string            `json:"hostname,omitempty"`
+	Image        string            `json:"image,omitempty"`
+	Memory       int64             `json:"memory,omitempty"`
+	CPUShares    int64             `json:"cpuShares,omitempty"`
+	WorkingDir   string            `json:"workingDir,omitempty`
 }
 
 // RemoveContainerOptions specify parameters to the RemoveContainer funcion.

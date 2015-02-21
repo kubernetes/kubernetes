@@ -125,7 +125,8 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 
 	if dc.NetworkSettings != nil {
 		c.NetworkSettings = &container.NetworkSettings{
-			IPAddress: dc.NetworkSettings.IPAddress,
+			IPAddress:    dc.NetworkSettings.IPAddress,
+			PortBindings: convertPortBindings(dc.NetworkSettings.Ports),
 		}
 	}
 	if dc.Config != nil {
@@ -133,7 +134,28 @@ func ConvertContainer(dc *docker.Container) *container.Container {
 		c.Hostname = dc.Config.Hostname
 		c.Env = dc.Config.Env
 	}
+
 	return c
+}
+
+// convertPortBindings converts map[docker.Port][]docker.PortBinding to
+// map[container.Port][]container.PortBinding.
+func convertPortBindings(bindings map[docker.Port][]docker.PortBinding) map[container.Port][]container.PortBinding {
+	// Iterate over each exposed ports.
+	result := make(map[container.Port][]container.PortBinding)
+	for dockerPort, hostIPPorts := range bindings {
+		port := container.Port(dockerPort)
+
+		// Add all host IP ports that mapped to this port.
+		result[port] = make([]container.PortBinding, len(hostIPPorts))
+		for i := range hostIPPorts {
+			result[port][i] = container.PortBinding{
+				HostIP:   hostIPPorts[i].HostIP,
+				HostPort: hostIPPorts[i].HostPort,
+			}
+		}
+	}
+	return result
 }
 
 // ListContainers implements container.Runtime.ListContainers.

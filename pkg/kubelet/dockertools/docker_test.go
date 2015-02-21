@@ -21,9 +21,11 @@ import (
 	"hash/adler32"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -450,4 +452,176 @@ func TestGetRunningContainers(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestConvertAPIContainer(t *testing.T) {
+	now := time.Now().Unix()
+	test := &docker.APIContainers{
+		ID:         "fooID",
+		Image:      "fooImage",
+		Command:    "fooCommand",
+		Created:    now,
+		Status:     "fooStatus",
+		SizeRw:     8080,
+		SizeRootFs: 7070,
+		Names:      []string{"fooName0"},
+	}
+
+	result := ConvertAPIContainer(nil)
+	if result != nil {
+		t.Errorf("expected: nil, saw: %v", result)
+	}
+	result = ConvertAPIContainer(test)
+	if result.ID != test.ID {
+		t.Errorf("expected: %v, saw: %v", test.ID, result.ID)
+	}
+	if result.Name != test.Names[0] {
+		t.Errorf("expected: %v, saw: %v", test.Names[0], result.Name)
+	}
+	if result.Image != test.Image {
+		t.Errorf("expected: %v, saw: %v", test.Image, result.Image)
+	}
+	if result.Command != test.Command {
+		t.Errorf("expected: %v, saw: %v", test.Command, result.Command)
+	}
+	if result.Created != time.Unix(test.Created, 0) {
+		t.Errorf("expected: %v, saw: %v", time.Unix(test.Created, 0), result.Created)
+	}
+	if result.Status != test.Status {
+		t.Errorf("expected: %v, saw: %v", test.Status, result.Status)
+	}
+	if result.SizeRw != test.SizeRw {
+		t.Errorf("expected: %v, saw: %v", test.SizeRw, result.SizeRw)
+	}
+	if result.SizeRootFs != test.SizeRootFs {
+		t.Errorf("expected: %v, saw: %v", test.SizeRootFs, result.SizeRootFs)
+	}
+	test.Names = nil
+	result = ConvertAPIContainer(test)
+	if result.Name != "" {
+		t.Errorf("expected: \"\", saw: %v", result.Name)
+	}
+}
+
+func TestConvertContainer(t *testing.T) {
+	now := time.Now()
+	test := &docker.Container{
+		ID:    "fooID",
+		Name:  "fooName",
+		Image: "fooImageID", // docker.Container.Image is actually an ID.
+		Config: &docker.Config{
+			Image:    "fooImage",
+			Hostname: "fooHostname",
+			Env:      []string{"fooEnv0", "fooEnv1"},
+		},
+		Created: now,
+		Volumes: map[string]string{
+			"fooVolumes": "1111",
+			"barVolumes": "2222",
+		},
+		State: docker.State{
+			Running:    false,
+			Paused:     false,
+			OOMKilled:  true,
+			Pid:        42,
+			ExitCode:   42,
+			Error:      "fooError",
+			StartedAt:  now,
+			FinishedAt: now,
+		},
+		NetworkSettings: &docker.NetworkSettings{
+			IPAddress: "fooIPAddress",
+			Ports: map[docker.Port][]docker.PortBinding{
+				"tcp/80": {
+					{
+						HostIP:   "fooHostIP",
+						HostPort: "fooHostPort",
+					},
+				},
+				"udp/887": {
+					{
+						HostIP:   "barHostIP",
+						HostPort: "barHostPort",
+					},
+					{
+						HostIP:   "fooHostIP",
+						HostPort: "fooBarPort",
+					},
+				},
+			},
+		},
+	}
+	result := ConvertContainer(nil)
+	if result != nil {
+		t.Errorf("expected: nil, saw: %v", result)
+	}
+	result = ConvertContainer(test)
+	if result.ID != test.ID {
+		t.Errorf("expected: %v, saw: %v", test.ID, result.ID)
+	}
+	if result.Name != test.Name {
+		t.Errorf("expected: %v, saw: %v", test.Name, result.Name)
+	}
+	// docker.Container.Image is actually an ID.
+	if result.ImageID != test.Image {
+		t.Errorf("expected: %v, saw: %v", test.Image, result.ImageID)
+	}
+	if result.Image != test.Config.Image {
+		t.Errorf("expected: %v, saw: %v", test.Config.Image, result.Image)
+	}
+	if result.Created != test.Created {
+		t.Errorf("expected: %v, saw: %v", test.Created, result.Created)
+	}
+	if !reflect.DeepEqual(result.Volumes, test.Volumes) {
+		t.Errorf("expected: %v, saw: %v", test.Volumes, result.Volumes)
+	}
+	if result.State.Running != test.State.Running {
+		t.Errorf("expected: %v, saw: %v", test.State.Running, result.State.Running)
+	}
+	if result.State.Paused != test.State.Paused {
+		t.Errorf("expected: %v, saw: %v", test.State.Paused, result.State.Paused)
+	}
+	if result.State.OOMKilled != test.State.OOMKilled {
+		t.Errorf("expected: %v, saw: %v", test.State.OOMKilled, result.State.OOMKilled)
+	}
+	if result.State.Pid != test.State.Pid {
+		t.Errorf("expected: %v, saw: %v", test.State.Pid, result.State.Pid)
+	}
+	if result.State.ExitCode != test.State.ExitCode {
+		t.Errorf("expected: %v, saw: %v", test.State.ExitCode, result.State.ExitCode)
+	}
+	if result.State.Error != test.State.Error {
+		t.Errorf("expected: %v, saw: %v", test.State.Error, result.State.Error)
+	}
+	if result.State.StartedAt != test.State.StartedAt {
+		t.Errorf("expected: %v, saw: %v", test.State.StartedAt, result.State.StartedAt)
+	}
+	if result.State.FinishedAt != test.State.FinishedAt {
+		t.Errorf("expected: %v, saw: %v", test.State.FinishedAt, result.State.FinishedAt)
+	}
+	if result.NetworkSettings.IPAddress != test.NetworkSettings.IPAddress {
+		t.Errorf("expected: %v, saw: %v", test.NetworkSettings.IPAddress, result.NetworkSettings.IPAddress)
+	}
+	expect := map[container.Port][]container.PortBinding{
+		"tcp/80": {
+			{
+				HostIP:   "fooHostIP",
+				HostPort: "fooHostPort",
+			},
+		},
+		"udp/887": {
+			{
+				HostIP:   "barHostIP",
+				HostPort: "barHostPort",
+			},
+			{
+				HostIP:   "fooHostIP",
+				HostPort: "fooBarPort",
+			},
+		},
+	}
+	if !reflect.DeepEqual(result.NetworkSettings.PortBindings, expect) {
+		t.Errorf("expected: %v, saw: %v", result.NetworkSettings.IPAddress, result.NetworkSettings.IPAddress)
+	}
+
 }

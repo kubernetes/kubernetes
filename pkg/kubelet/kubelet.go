@@ -497,9 +497,9 @@ func makeBinds(pod *api.BoundPod, container *api.Container, podVolumes volumeMap
 	}
 	return binds
 }
-func makePortsAndBindings(ctnr *api.Container) (map[string]struct{}, map[string][]container.PortBinding) {
-	exposedPorts := map[string]struct{}{}
-	portBindings := map[string][]container.PortBinding{}
+func makePortsAndBindings(ctnr *api.Container) (map[container.Port]struct{}, map[container.Port][]container.PortBinding) {
+	exposedPorts := map[container.Port]struct{}{}
+	portBindings := map[container.Port][]container.PortBinding{}
 	for _, port := range ctnr.Ports {
 		exteriorPort := port.HostPort
 		if exteriorPort == 0 {
@@ -520,8 +520,8 @@ func makePortsAndBindings(ctnr *api.Container) (map[string]struct{}, map[string]
 			protocol = "/tcp"
 		}
 		dockerPort := strconv.Itoa(interiorPort) + protocol
-		exposedPorts[dockerPort] = struct{}{}
-		portBindings[dockerPort] = []container.PortBinding{
+		exposedPorts[container.Port(dockerPort)] = struct{}{}
+		portBindings[container.Port(dockerPort)] = []container.PortBinding{
 			{
 				HostPort: strconv.Itoa(exteriorPort),
 				HostIP:   port.HostIP,
