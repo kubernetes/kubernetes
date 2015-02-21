@@ -89,13 +89,10 @@ func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 			checkErr(err)
 			newRc := obj.(*api.ReplicationController)
 
-			if len(namespace) == 0 {
-				namespace = api.NamespaceDefault
-			}
-			updater := kubectl.NewRollingUpdater(namespace, client)
+			updater := kubectl.NewRollingUpdater(cmdNamespace, client)
 
 			// fetch rc
-			oldRc, err := client.ReplicationControllers(namespace).Get(oldName)
+			oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
 			checkErr(err)
 
 			var hasLabel bool
