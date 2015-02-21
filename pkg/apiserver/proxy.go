@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
 	"github.com/golang/glog"
 	"golang.org/x/net/html"
 )
@@ -184,7 +185,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
 	if strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) && len(req.Header.Get(httpstream.HeaderUpgrade)) > 0 {
 		//TODO support TLS? Doesn't look like proxyTransport does anything special ...
-		dialAddr := util.CanonicalAddr(destURL)
+		dialAddr := netutil.CanonicalAddr(destURL)
 		backendConn, err := net.Dial("tcp", dialAddr)
 		if err != nil {
 			status := errToAPIStatus(err)

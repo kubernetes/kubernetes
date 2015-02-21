@@ -25,8 +25,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -55,7 +55,7 @@ func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
 
 // dial dials the host specified by req, using TLS if appropriate.
 func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
-	dialAddr := util.CanonicalAddr(req.URL)
+	dialAddr := netutil.CanonicalAddr(req.URL)
 
 	if req.URL.Scheme == "http" {
 		return net.Dial("tcp", dialAddr)
