@@ -105,6 +105,11 @@ func (c *RESTClient) Put() *Request {
 	return c.Verb("PUT")
 }
 
+// Patch begins a PATCH request. Short for c.Verb("Patch").
+func (c *RESTClient) Patch() *Request {
+	return c.Verb("PATCH")
+}
+
 // Get begins a GET request. Short for c.Verb("GET").
 func (c *RESTClient) Get() *Request {
 	return c.Verb("GET")

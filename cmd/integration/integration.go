@@ -465,6 +465,81 @@ func runAtomicPutTest(c *client.Client) {
 	glog.Info("Atomic PUTs work.")
 }
 
+func runPatchTest(c *client.Client) {
+	name := "patchservice"
+	resource := "services"
+	var svc api.Service
+	err := c.Post().Resource(resource).Body(
+		&api.Service{
+			TypeMeta: api.TypeMeta{
+				APIVersion: latest.Version,
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": name,
+				},
+			},
+			Spec: api.ServiceSpec{
+				Port: 12345,
+				// This is here because validation requires it.
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+				Protocol:        "TCP",
+				SessionAffinity: "None",
+			},
+		},
+	).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed creating patchservice: %v", err)
+	}
+	if len(svc.Labels) != 1 {
+		glog.Fatalf("Original length does not equal one")
+	}
+
+	// add label
+	_, err = c.Patch().Resource(resource).Name(name).Body([]byte("{\"labels\":{\"foo\":\"bar\"}}")).Do().Get()
+	if err != nil {
+		glog.Fatalf("Failed updating patchservice: %v", err)
+	}
+	err = c.Get().Resource(resource).Name(name).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed getting patchservice: %v", err)
+	}
+	if len(svc.Labels) != 2 || svc.Labels["foo"] != "bar" {
+		glog.Fatalf("Failed updating patchservice, labels are: %v", svc.Labels)
+	}
+
+	// remove one label
+	_, err = c.Patch().Resource(resource).Name(name).Body([]byte("{\"labels\":{\"name\":null}}")).Do().Get()
+	if err != nil {
+		glog.Fatalf("Failed updating patchservice: %v", err)
+	}
+	err = c.Get().Resource(resource).Name(name).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed getting patchservice: %v", err)
+	}
+	if len(svc.Labels) != 1 || svc.Labels["foo"] != "bar" {
+		glog.Fatalf("Failed updating patchservice, labels are: %v", svc.Labels)
+	}
+
+	// remove all labels
+	_, err = c.Patch().Resource(resource).Name(name).Body([]byte("{\"labels\":null}")).Do().Get()
+	if err != nil {
+		glog.Fatalf("Failed updating patchservice: %v", err)
+	}
+	err = c.Get().Resource(resource).Name(name).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed getting patchservice: %v", err)
+	}
+	if svc.Labels != nil {
+		glog.Fatalf("Failed remove all labels from patchservice: %v", svc.Labels)
+	}
+
+	glog.Info("PATCHs work.")
+}
+
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
 	var svcList api.ServiceList
@@ -665,6 +740,7 @@ func main() {
 	testFuncs := []testFunc{
 		runReplicationControllerTest,
 		runAtomicPutTest,
+		runPatchTest,
 		runServiceTest,
 		runAPIVersionsTest,
 		runMasterServiceTest,

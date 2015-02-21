@@ -202,12 +202,12 @@ func getTestRequests() []struct {
 		{"PUT", "/api/v1beta1/pods/a" + timeoutFlag, aPod, code200},
 		{"GET", "/api/v1beta1/pods", "", code200},
 		{"GET", "/api/v1beta1/pods/a", "", code200},
+		{"PATCH", "/api/v1beta1/pods/a", "{%v}", code200},
 		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"PATCH", "/api/v1beta1/pods/a", "", code405},
 		{"OPTIONS", "/api/v1beta1/pods", "", code405},
 		{"OPTIONS", "/api/v1beta1/pods/a", "", code405},
 		{"HEAD", "/api/v1beta1/pods", "", code405},

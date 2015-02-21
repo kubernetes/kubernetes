@@ -173,7 +173,8 @@ func handleInternal(storage map[string]RESTStorage, admissionControl admission.I
 type Simple struct {
 	api.TypeMeta   `json:",inline"`
 	api.ObjectMeta `json:"metadata"`
-	Other          string `json:"other,omitempty"`
+	Other          string            `json:"other,omitempty"`
+	Labels         map[string]string `json:"labels,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
@@ -822,6 +823,70 @@ func TestDeleteMissing(t *testing.T) {
 	}
 
 	if response.StatusCode != http.StatusNotFound {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
+func TestPatch(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	ID := "id"
+	item := &Simple{
+		ObjectMeta: api.ObjectMeta{
+			Name:      ID,
+			Namespace: "", // update should allow the client to send an empty namespace
+		},
+		Other: "bar",
+	}
+	simpleStorage := SimpleRESTStorage{item: *item}
+	storage["simple"] = &simpleStorage
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/api/version/simple/" + ID + "?namespace=default",
+		name:        ID,
+		namespace:   api.NamespaceDefault,
+	}
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest("PATCH", server.URL+"/api/version/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	_, err = client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if simpleStorage.updated == nil || simpleStorage.updated.Labels["foo"] != "bar" {
+		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
+	}
+	if !selfLinker.called {
+		t.Errorf("Never set self link")
+	}
+}
+
+func TestPatchRequiresMatchingName(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	ID := "id"
+	item := &Simple{
+		ObjectMeta: api.ObjectMeta{
+			Name:      ID,
+			Namespace: "", // update should allow the client to send an empty namespace
+		},
+		Other: "bar",
+	}
+	simpleStorage := SimpleRESTStorage{item: *item}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest("PATCH", server.URL+"/api/version/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusBadRequest {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
