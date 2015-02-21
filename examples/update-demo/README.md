@@ -39,8 +39,8 @@ $ gcloud compute firewall-rules create \
 You can use bash job control to run this in the background.  This can sometimes spew to the output so you could also run it in a different terminal.
 
 ```
-$ ./cluster/kubectl.sh proxy --www=local/ &
-+ ./cluster/kubectl.sh proxy --www=local/
+$ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/ &
++ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
