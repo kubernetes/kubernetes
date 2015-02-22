@@ -21,6 +21,8 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+trap 'exit 1' SIGINT
+
 kube::golang::setup_env
 
 kube::test::find_dirs() {
@@ -34,7 +36,7 @@ kube::test::find_dirs() {
           -o -wholename './target' \
           -o -wholename '*/third_party/*' \
           -o -wholename '*/Godeps/*' \
-	  -o -wholename '*/contrib/podex/*' \
+          -o -wholename '*/contrib/podex/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
@@ -92,6 +94,12 @@ shift $((OPTIND - 1))
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${KUBE_GOFLAGS:-})"
 
+if [[ -n "${1-}" ]]; then
+  test_dirs=$@
+else
+  test_dirs=$(kube::test::find_dirs)
+fi
+
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
 for arg; do
@@ -112,7 +120,6 @@ if [[ $iterations -gt 1 ]]; then
   kube::log::status "Running ${iterations} times"
   fails=0
   for arg; do
-    trap 'exit 1' SIGINT
     pkg=${KUBE_GO_PACKAGE}/${arg}
     kube::log::status "${pkg}"
     # keep going, even if there are failures
@@ -148,38 +155,33 @@ if [[ -n "${KUBE_COVER}" ]]; then
   # each of the coverage profiles generated when running 'go test -cover', but
   # we strip these lines out when combining so that there's only one.
   echo "mode: ${KUBE_COVERMODE}" >${combined_cover_profile}
-fi
 
-if [[ -n "${1-}" ]]; then
-  test_dirs=$@
-else
-  test_dirs=$(kube::test::find_dirs)
-fi
+  # Run all specified tests, optionally collecting coverage if KUBE_COVER is set.
+  for arg in ${test_dirs}; do
+    pkg=${KUBE_GO_PACKAGE}/${arg}
 
-# Run all specified tests, optionally collecting coverage if KUBE_COVER is set.
-for arg in ${test_dirs}; do
-  trap 'exit 1' SIGINT
-  pkg=${KUBE_GO_PACKAGE}/${arg}
-
-  cover_params=()
-  cover_profile=""
-  if [[ -n "${KUBE_COVER}" ]]; then
     cover_profile=${cover_report_dir}/${arg}/coverage.out
     mkdir -p "${cover_report_dir}/${arg}"
     cover_params=(-cover -covermode="${KUBE_COVERMODE}" -coverprofile="${cover_profile}")
-  fi
 
+    go test "${goflags[@]:+${goflags[@]}}" \
+        ${KUBE_RACE} \
+        ${KUBE_TIMEOUT} \
+        "${cover_params[@]+${cover_params[@]}}" \
+        "${pkg}"
+    if [[ -f "${cover_profile}" ]]; then
+      # Include all coverage reach data in the combined profile, but exclude the
+      # 'mode' lines, as there should be only one.
+      grep -h -v "^mode:" ${cover_profile} >>${combined_cover_profile} || true
+    fi
+  done
+else
+  dirs=(${test_dirs})
   go test "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} \
       ${KUBE_TIMEOUT} \
-      "${cover_params[@]+${cover_params[@]}}" \
-      "${pkg}"
-  if [[ -f "${cover_profile}" ]]; then
-    # Include all coverage reach data in the combined profile, but exclude the
-    # 'mode' lines, as there should be only one.
-    grep -h -v "^mode:" ${cover_profile} >>${combined_cover_profile} || true
-  fi
-done
+      $(printf "${KUBE_GO_PACKAGE}/%s " "${dirs[@]:+${dirs[@]}}")
+fi
 
 if [[ -f ${combined_cover_profile} ]]; then
   coverage_html_file="${cover_report_dir}/combined-coverage.html"
