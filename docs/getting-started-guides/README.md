@@ -3,7 +3,7 @@ IaaS Provider  | Config. Mgmt | OS     | Docs                                   
 GCE            | Saltstack    | Debian | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.9.2 by @satnam6502
 Vagrant        | Saltstack    | Fedora | [docs](../../docs/getting-started-guides/vagrant.md)   | Project                      |
 Vagrant        | custom       | Fedora | [docs](../../docs/getting-started-guides/fedora/fedora_manual_config.md) | Project    | Uses K8s v0.5-8
-Vagrant        | Ansible      | Fedora | [docs](../../docs/getting-started-guides/fedora/fedora_ansible.md)       | Project    | Uses K8s v0.5-8
+Vagrant        | Ansible      | Fedora | [docs](../../docs/getting-started-guides/fedora/fedora_ansible_config.md)       | Project    | Uses K8s v0.5-8
 GKE            |              |        | [docs](https://cloud.google.com/container-engine)      | Commercial                   | Uses K8s version 0.9.2
 AWS            | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community                    | Uses K8s version 0.10.1
 GCE            | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) | Uses K8s version 0.10.1
