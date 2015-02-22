@@ -454,7 +454,7 @@ function kube-up {
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/format-and-mount-pd.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/mount-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
@@ -547,6 +547,16 @@ function kube-up {
   wait-for-jobs
 
   detect-master
+
+  # Reserve the master's IP so that it can later be transferred to another VM
+  # without disrupting the kubelets. IPs are associated with regions, not zones,
+  # so extract the region name, which is the same as the zone but with the final
+  # dash and characters trailing the dash removed.
+  local REGION=${ZONE%-*}
+  gcloud compute addresses create "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --addresses "${KUBE_MASTER_IP}" \
+    --region "${REGION}"
 
   echo "Waiting for cluster initialization."
   echo
@@ -726,6 +736,14 @@ function kube-down {
       "${routes[@]::10}" || true
     routes=( "${routes[@]:10}" )
   done
+
+  # Delete the master's reserved IP
+  local REGION=${ZONE%-*}
+  gcloud compute addresses delete \
+    --project "${PROJECT}" \
+    --region "${REGION}" \
+    --quiet \
+    "${MASTER_NAME}-ip" || true
 
 }
 
