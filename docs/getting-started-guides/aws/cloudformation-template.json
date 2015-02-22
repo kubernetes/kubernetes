@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Kubernetes 0.11.1 on EC2",
+  "Description": "Kubernetes 0.11.0 on EC2",
   "Mappings": {
       "RegionMap": {
           "eu-central-1": {"AMI": "ami-488ebe55"},
