@@ -157,8 +157,8 @@ type Kubelet struct {
 	podInfraContainerImage string
 	podWorkers             *podWorkers
 	resyncInterval         time.Duration
-	pods                   []api.BoundPod // guarded by podsMutex
 	podsMutex              sync.RWMutex
+	pods                   []api.BoundPod // guarded by podsMutex
 	sourceReady            SourceReadyFn
 
 	// Needed to report events for containers belonging to deleted/modified pods.
@@ -1528,43 +1528,41 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
 	kl.podsMutex.RLock()
 	defer kl.podsMutex.RUnlock()
-	return kl.pods, nil
+	result := make([]api.BoundPod, len(kl.pods))
+	copy(result, kl.pods)
+	return result, nil
 }
 
 // GetPodByName provides the first pod that matches namespace and name, or false
 // if no such pod can be found.
-func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
+func (kl *Kubelet) GetPodByName(namespace, name string) (api.BoundPod, bool) {
 	kl.podsMutex.RLock()
 	defer kl.podsMutex.RUnlock()
 	for i := range kl.pods {
-		pod := &kl.pods[i]
+		pod := kl.pods[i]
 		if pod.Namespace == namespace && pod.Name == name {
 			return pod, true
 		}
 	}
-	return nil, false
+	return api.BoundPod{}, false
 }
 
 // GetPodFullName provides the first pod that matches podFullName, or false
 // if no such pod can be found. This method locks podsMutex.
-func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.BoundPod, bool) {
+func (kl *Kubelet) GetPodByFullName(podFullName string) (api.BoundPod, bool) {
 	kl.podsMutex.RLock()
 	defer kl.podsMutex.RUnlock()
 	return kl.getPodByFullNameNoLock(podFullName)
 }
 
 // getPodFullNameNoLock is a no-locking version of GetPodsByFullName.
-func (kl *Kubelet) getPodByFullNameNoLock(podFullName string) (*api.BoundPod, bool) {
-	found := false
-	var result *api.BoundPod
+func (kl *Kubelet) getPodByFullNameNoLock(podFullName string) (api.BoundPod, bool) {
 	for _, pod := range kl.pods {
 		if GetPodFullName(&pod) == podFullName {
-			result = &pod
-			found = true
-			break
+			return pod, true
 		}
 	}
-	return result, found
+	return api.BoundPod{}, false
 }
 
 // getPhase returns the phase of a pod given its container info.
