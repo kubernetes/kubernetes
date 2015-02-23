@@ -37,7 +37,9 @@ base:
     - monit
     - nginx
     - kube-client-tools
+{% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
+{% endif %}
     - kube-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn

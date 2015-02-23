@@ -39,6 +39,11 @@ grep -q kbr0 /etc/sysconfig/docker || {
   # Stop docker before making these updates
   systemctl stop docker
 
+  # Install openvswitch
+  yum install -y openvswitch
+  systemctl enable openvswitch
+  systemctl start openvswitch
+
   # create new docker bridge
   ip link set dev ${DOCKER_BRIDGE} down || true
   brctl delbr ${DOCKER_BRIDGE} || true
@@ -85,6 +90,7 @@ grep -q kbr0 /etc/sysconfig/docker || {
   echo "OPTIONS='-b=kbr0 --selinux-enabled ${DOCKER_OPTS}'" >/etc/sysconfig/docker
   systemctl daemon-reload
   systemctl start docker
+
 }
 EOF
 
