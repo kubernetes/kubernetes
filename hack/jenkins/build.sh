@@ -47,9 +47,7 @@ docker images -q | xargs -r docker rmi
 # Build
 go run ./hack/e2e.go -v --build
 
-[[ ${KUBE_SKIP_PUSH_GCS} =~ ^[yY]$ ]] || {
-    # Push to GCS
-    ./build/push-ci-build.sh
-}
+# Push to GCS
+./build/push-ci-build.sh
 
 sha256sum _output/release-tars/kubernetes*.tar.gz
