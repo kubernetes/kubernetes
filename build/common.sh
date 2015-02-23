@@ -678,7 +678,11 @@ function kube::release::create_tarball() {
   # Find gnu tar if it is available
   local tar=tar
   if which gtar &>/dev/null; then
-    tar=gtar
+      tar=gtar
+  else
+      if which gnutar &>/dev/null; then
+	  tar=gnutar
+      fi
   fi
 
   local tar_cmd=("$tar" "czf" "${tarfile}" "-C" "${stagingdir}" "kubernetes")
