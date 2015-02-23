@@ -903,7 +903,7 @@ type Node struct {
 	Status NodeStatus `json:"status,omitempty"`
 }
 
-// NodeList is a list of minions.
+// NodeList is a list of nodes.
 type NodeList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`

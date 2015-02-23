@@ -76,7 +76,7 @@ func NewCMServer() *CMServer {
 		NodeMilliCPU:            1000,
 		NodeMemory:              resource.MustParse("3Gi"),
 		SyncNodeList:            true,
-		SyncNodeStatus:          true,
+		SyncNodeStatus:          false,
 		KubeletConfig: client.KubeletConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: false,
