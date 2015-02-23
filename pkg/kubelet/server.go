@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -110,6 +111,7 @@ func (s *Server) InstallDebuggingHandlers() {
 
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
+	s.mux.Handle("/metrics", prometheus.Handler())
 }
 
 // error serializes an error object into an HTTP response.
