@@ -165,11 +165,6 @@ type Kubelet struct {
 	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
 	refLock       sync.RWMutex
 
-	// Tracks active pulls.  Needed to protect image garbage collection
-	// See: https://github.com/docker/docker/issues/8926 for details
-	// TODO: Remove this when (if?) that issue is fixed.
-	pullLock sync.RWMutex
-
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
 	// Optional, defaults to simple Docker implementation
@@ -969,8 +964,6 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 }
 
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
-	kl.pullLock.RLock()
-	defer kl.pullLock.RUnlock()
 	if err := kl.dockerPuller.Pull(img); err != nil {
 		if ref != nil {
 			record.Eventf(ref, "failed", "Failed to pull image %q", img)
