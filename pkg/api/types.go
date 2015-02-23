@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	cadvisor_api "github.com/google/cadvisor/info"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -1380,3 +1381,15 @@ const (
 
 	PortHeader = "port"
 )
+
+// ResourceStats represents compute resource usage metrics associated with a pod or a container.
+type ResourceStats struct {
+	// Detailed instantaneous metrics.
+	Detailed *cadvisor_api.ContainerInfo `json:"detailed,omitempty"`
+}
+
+// PodStats represents compute resource usage metrics for all the containers in the Pod.
+type PodStats struct {
+	Containers []ResourceStats `json:"containers,omitempty"`
+}
+

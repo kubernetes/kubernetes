@@ -47,10 +47,12 @@ type fakeKubelet struct {
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	dockerVersionFunc                  func() ([]uint, error)
+	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
-	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 	streamingConnectionIdleTimeoutFunc func() time.Duration
+	getStatsForPodFunc                 func(uid types.UID, namespace string, detailed bool, numStats int) (*api.PodStats, error)
+	getStatsForAllPodsFunc             func(detailed bool, numStats int) ([]*api.PodStats, error)
 }
 
 func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
@@ -103,6 +105,14 @@ func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, stre
 
 func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return fk.streamingConnectionIdleTimeoutFunc()
+}
+
+func (fk *fakeKubelet) GetStatsForPod(uid types.UID, namespace string, detailed bool, numStats int) (*api.PodStats, error) {
+	return fk.getStatsForPodFunc(uid, namespace, detailed, numStats)
+}
+
+func (fk *fakeKubelet) GetStatsForAllPods(detailed bool, numStats int) ([]*api.PodStats, error) {
+	return fk.getStatsForAllPodsFunc(detailed, numStats)
 }
 
 type serverTestFramework struct {
