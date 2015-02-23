@@ -26,10 +26,26 @@ baseurl=http://cbs.centos.org/repos/virt7-testing/x86_64/os/
 gpgcheck=0
 ```
 
-
 * Install kubernetes on all hosts - centos-{master,minion}.  This will also pull in etcd, docker, and cadvisor.
 
 ```
+yum -y install --enablerepo=virt7-testing kubernetes
+```
+
+* Note * Using etcd-0.4.6-7 (This is temperory update in documentation)
+
+If you do not get etcd-0.4.6-7 installed with virt7-testing repo,
+
+In the current virt7-testing repo, the etcd package is updated which causes service failure. To avoid this,
+
+```
+yum erase etcd
+```
+
+It will uninstall the current available etcd package
+
+```
+yum install http://cbs.centos.org/kojifiles/packages/etcd/0.4.6/7.el7.centos/x86_64/etcd-0.4.6-7.el7.centos.x86_64.rpm
 yum -y install --enablerepo=virt7-testing kubernetes
 ```
 
