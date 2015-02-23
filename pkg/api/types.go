@@ -239,8 +239,8 @@ type SecretSource struct {
 	Target ObjectReference `json:"target"`
 }
 
-// Port represents a network port in a single container
-type Port struct {
+// ContainerPort represents a network port in a single container
+type ContainerPort struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
@@ -346,9 +346,9 @@ type Container struct {
 	// Optional: Defaults to whatever is defined in the image.
 	Command []string `json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir string   `json:"workingDir,omitempty"`
-	Ports      []Port   `json:"ports,omitempty"`
-	Env        []EnvVar `json:"env,omitempty"`
+	WorkingDir string          `json:"workingDir,omitempty"`
+	Ports      []ContainerPort `json:"ports,omitempty"`
+	Env        []EnvVar        `json:"env,omitempty"`
 	// Compute resource requirements.
 	Resources      ResourceRequirements `json:"resources,omitempty"`
 	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty"`
@@ -750,9 +750,6 @@ type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Optional: The IP protocol for these endpoints. Supports "TCP" and
-	// "UDP".  Defaults to "TCP".
-	Protocol  Protocol   `json:"protocol,omitempty"`
 	Endpoints []Endpoint `json:"endpoints,omitempty"`
 }
 
@@ -762,8 +759,21 @@ type Endpoint struct {
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string `json:"ip"`
 
-	// Required: The destination port to access.
-	Port int `json:"port"`
+	// The ports exposed on this IP.
+	Ports []EndpointPort
+}
+
+type EndpointPort struct {
+	// Optional if only one port is defined in this Endpoint.
+	// The name of this port within the larger service/endpoint structure.
+	// This must be a DNS_LABEL.
+	Name string
+
+	// The IP protocol for this port.  Supports "TCP" and "UDP".
+	Protocol Protocol
+
+	// The destination port to access.
+	Port int
 }
 
 // EndpointsList is a list of endpoints.

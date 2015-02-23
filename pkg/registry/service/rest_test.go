@@ -370,7 +370,7 @@ func TestServiceRegistryGet(t *testing.T) {
 func TestServiceRegistryResourceLocation(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	registry := registrytest.NewServiceRegistry()
-	registry.Endpoints = api.Endpoints{Endpoints: []api.Endpoint{{IP: "foo", Port: 80}}}
+	registry.Endpoints = api.Endpoints{Endpoints: []api.Endpoint{{IP: "foo", Ports: []api.EndpointPort{{Port: 80}}}}}
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))

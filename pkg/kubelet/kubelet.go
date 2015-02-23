@@ -917,7 +917,7 @@ const (
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
 func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.DockerID, error) {
-	var ports []api.Port
+	var ports []api.ContainerPort
 	// Docker only exports ports from the pod infra container.  Let's
 	// collect all of the relevant ports and export them.
 	for _, container := range pod.Spec.Containers {
@@ -1411,7 +1411,7 @@ func updateBoundPods(changed []api.BoundPod, current []api.BoundPod) []api.Bound
 func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	filtered := []api.BoundPod{}
 	ports := map[int]bool{}
-	extract := func(p *api.Port) int { return p.HostPort }
+	extract := func(p *api.ContainerPort) int { return p.HostPort }
 	for i := range pods {
 		pod := &pods[i]
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {

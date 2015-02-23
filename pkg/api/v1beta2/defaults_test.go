@@ -73,7 +73,7 @@ func TestSetDefaulPodSpec(t *testing.T) {
 func TestSetDefaultContainer(t *testing.T) {
 	bp := &current.BoundPod{}
 	bp.Spec.Containers = []current.Container{{}}
-	bp.Spec.Containers[0].Ports = []current.Port{{}}
+	bp.Spec.Containers[0].Ports = []current.ContainerPort{{}}
 
 	obj2 := roundTrip(t, runtime.Object(bp))
 	bp2 := obj2.(*current.BoundPod)
@@ -103,8 +103,18 @@ func TestSetDefaultSecret(t *testing.T) {
 	}
 }
 
-func TestSetDefaulEndpointsProtocol(t *testing.T) {
+func TestSetDefaulEndpointsProtocolEmpty(t *testing.T) {
 	in := &current.Endpoints{}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*current.Endpoints)
+
+	if out.Protocol != "" {
+		t.Errorf("Expected protocol \"\", got %s", out.Protocol)
+	}
+}
+
+func TestSetDefaulEndpointsProtocol(t *testing.T) {
+	in := &current.Endpoints{Endpoints: []string{"1.2.3.4:5678"}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*current.Endpoints)
 

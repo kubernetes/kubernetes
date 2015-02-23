@@ -32,7 +32,7 @@ import (
 
 func TestFindPortByName(t *testing.T) {
 	container := api.Container{
-		Ports: []api.Port{
+		Ports: []api.ContainerPort{
 			{
 				Name:     "foo",
 				HostPort: 8080,
@@ -71,7 +71,7 @@ func TestGetURLParts(t *testing.T) {
 	for _, test := range testCases {
 		state := api.PodStatus{PodIP: "127.0.0.1"}
 		container := api.Container{
-			Ports: []api.Port{{Name: "found", HostPort: 93}},
+			Ports: []api.ContainerPort{{Name: "found", HostPort: 93}},
 			LivenessProbe: &api.Probe{
 				Handler: api.Handler{
 					HTTPGet: test.probe,
@@ -114,7 +114,7 @@ func TestGetTCPAddrParts(t *testing.T) {
 	for _, test := range testCases {
 		host := "1.2.3.4"
 		container := api.Container{
-			Ports: []api.Port{{Name: "found", HostPort: 93}},
+			Ports: []api.ContainerPort{{Name: "found", HostPort: 93}},
 			LivenessProbe: &api.Probe{
 				Handler: api.Handler{
 					TCPSocket: test.probe,
