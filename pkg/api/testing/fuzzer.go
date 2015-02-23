@@ -181,7 +181,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(vs *api.VolumeSource, c fuzz.Continue) {
 			// Exactly one of the fields should be set.
 			//FIXME: the fuzz can still end up nil.  What if fuzz allowed me to say that?
-			fuzzOneOf(c, &vs.HostPath, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.GitRepo)
+			fuzzOneOf(c, &vs.HostPath, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.GitRepo, &vs.Secret)
 		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
@@ -235,6 +235,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.Fuzz(&s.ObjectMeta)
 
 			s.Type = api.SecretTypeOpaque
+			c.Fuzz(&s.Data)
 		},
 		func(ep *api.Endpoint, c fuzz.Continue) {
 			// TODO: If our API used a particular type for IP fields we could just catch that here.

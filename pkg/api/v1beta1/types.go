@@ -95,24 +95,24 @@ type VolumeSource struct {
 	// things that are allowed to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and
 	// who can/can not mount host directories as read/write.
-	HostDir *HostPath `json:"hostDir" description:"pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"`
+	HostDir *HostPathVolumeSource `json:"hostDir" description:"pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
-	EmptyDir *EmptyDir `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
+	EmptyDir *EmptyDirVolumeSource `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
+	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
-	GitRepo *GitRepo `json:"gitRepo" description:"git repository at a particular revision"`
+	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret represents a secret to populate the volume with
-	Secret *SecretSource `json:"secret" description:"secret to populate volume with"`
+	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume with"`
 }
 
-// HostPath represents bare host directory volume.
-type HostPath struct {
+// HostPathVolumeSource represents bare host directory volume.
+type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
-type EmptyDir struct{}
+type EmptyDirVolumeSource struct{}
 
 // Protocol defines network protocols supported for things like conatiner ports.
 type Protocol string
@@ -124,12 +124,12 @@ const (
 	ProtocolUDP Protocol = "UDP"
 )
 
-// GCEPersistentDisk represents a Persistent Disk resource in Google Compute Engine.
+// GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
-type GCEPersistentDisk struct {
+type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName" description:"unique name of the PD resource in GCE"`
 	// Required: Filesystem type to mount.
@@ -147,16 +147,16 @@ type GCEPersistentDisk struct {
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
 }
 
-// GitRepo represents a volume that is pulled from git when the pod is created.
-type GitRepo struct {
+// GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.
+type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository" description:"repository URL"`
 	// Commit hash, this is optional
 	Revision string `json:"revision" description:"commit hash for the specified revision"`
 }
 
-// Adapts a Secret into a VolumeSource
-type SecretSource struct {
+// SecretVolumeSource adapts a Secret into a VolumeSource
+type SecretVolumeSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
@@ -1115,7 +1115,8 @@ type Secret struct {
 	TypeMeta `json:",inline"`
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
-	// The serialized form of the secret data is a base64 encoded string.
+	// The serialized form of the secret data is a base64 encoded string,
+	// representing the arbitrary (possibly non-string) data value here.
 	Data map[string][]byte `json:"data,omitempty" description:"data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"`
 
 	// Used to facilitate programatic handling of secret data.
@@ -1127,7 +1128,7 @@ const MaxSecretSize = 1 * 1024 * 1024
 type SecretType string
 
 const (
-	SecretTypeOpaque SecretType = "opaque" // Default; arbitrary user-defined data
+	SecretTypeOpaque SecretType = "Opaque" // Default; arbitrary user-defined data
 )
 
 type SecretList struct {

@@ -273,7 +273,8 @@ type Secret struct {
     ObjectMeta
 
     // Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
-    // The serialized form of the secret data is a base64 encoded string.
+    // The serialized form of the secret data is a base64 encoded string,
+    // representing the arbitrary (possibly non-string) data value here.
     Data map[string][]byte `json:"data,omitempty"`
 
     // Used to facilitate programatic handling of secret data.
@@ -283,9 +284,9 @@ type Secret struct {
 type SecretType string
 
 const (
-    SecretTypeOpaque              SecretType = "opaque"           // Opaque (arbitrary data; default)
-    SecretTypeKubernetesAuthToken SecretType = "kubernetes-auth"  // Kubernetes auth token
-    SecretTypeDockerRegistryAuth  SecretType = "docker-reg-auth"  // Docker registry auth
+    SecretTypeOpaque              SecretType = "Opaque"              // Opaque (arbitrary data; default)
+    SecretTypeKubernetesAuthToken SecretType = "KubernetesAuth"      // Kubernetes auth token
+    SecretTypeDockerRegistryAuth  SecretType = "DockerRegistryAuth"  // Docker registry auth
     // FUTURE: other type values
 )
 
@@ -398,8 +399,9 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 }
 ```
 
-**Note:** The values of secret data are encoded as base64-encoded strings.  Newlines are not
-valid within these strings and must be omitted.
+**Note:** The serialized JSON and YAML values of secret data are encoded as
+base64 strings.  Newlines are not valid within these strings and must be
+omitted.
 
 Now we can create a pod which references the secret with the ssh key and consumes it in a volume:
 

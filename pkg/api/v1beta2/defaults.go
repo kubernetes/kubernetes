@@ -30,7 +30,7 @@ func init() {
 			if util.AllPtrFieldsNil(&obj.Source) {
 				glog.Errorf("Defaulting volume source for %v", obj)
 				obj.Source = VolumeSource{
-					EmptyDir: &EmptyDir{},
+					EmptyDir: &EmptyDirVolumeSource{},
 				}
 			}
 		},

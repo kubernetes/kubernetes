@@ -89,11 +89,11 @@ func TestMerge(t *testing.T) {
 					Volumes: []api.Volume{
 						{
 							Name:   "v1",
-							Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}},
+							Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 						{
 							Name:   "v2",
-							Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}},
+							Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 					},
 					RestartPolicy: api.RestartPolicy{
