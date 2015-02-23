@@ -782,10 +782,6 @@ type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Optional: The IP protocol for these endpoints. Supports "TCP" and
-	// "UDP".  Defaults to "TCP".
-	Protocol Protocol `json:"protocol,omitempty"`
-
 	Endpoints []Endpoint `json:"endpoints,omitempty"`
 }
 
@@ -794,6 +790,20 @@ type Endpoint struct {
 	// Required: The IP of this endpoint.
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string `json:"ip"`
+
+	// The ports exposed on this IP.
+	Ports []EndpointPort `json:"ports,omitempty"`
+}
+
+type EndpointPort struct {
+	// Optional if only one port is defined in this Endpoint, otherwise required.
+	// The name of this port within the larger service/endpoint structure.
+	// This must be a DNS_LABEL.
+	Name string `json:"name,omitempty"`
+
+	// Optional: The IP protocol for this port.  Supports "TCP" and "UDP".
+	// Defaults to "TCP".
+	Protocol Protocol `json:"protocol,omitempty"`
 
 	// Required: The destination port to access.
 	Port int `json:"port"`

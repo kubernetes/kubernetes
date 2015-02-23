@@ -24,6 +24,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -238,7 +240,13 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(ep *api.Endpoint, c fuzz.Continue) {
 			// TODO: If our API used a particular type for IP fields we could just catch that here.
 			ep.IP = fmt.Sprintf("%d.%d.%d.%d", c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256))
-			ep.Port = c.Rand.Intn(65536)
+			// TODO: Once we drop single-port APIs, make this fuzz
+			// multiple ports and fuzz port.name.  This will force
+			// a compile error when those APIs are deleted.
+			_ = v1beta1.Dependency
+			_ = v1beta2.Dependency
+			ep.Ports = []api.EndpointPort{{Name: "", Port: c.Rand.Intn(65536)}}
+			c.Fuzz(&ep.Ports[0].Protocol)
 		},
 	)
 	return f

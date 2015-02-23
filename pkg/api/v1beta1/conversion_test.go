@@ -390,41 +390,35 @@ func TestEndpointsConversion(t *testing.T) {
 	}{
 		{
 			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
-					ID: "empty",
-				},
-				Protocol:  current.ProtocolTCP,
+				Protocol:  "",
 				Endpoints: []string{},
 			},
 			expected: newer.Endpoints{
-				Protocol:  newer.ProtocolTCP,
 				Endpoints: []newer.Endpoint{},
 			},
 		},
 		{
 			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
-					ID: "one",
-				},
 				Protocol:  current.ProtocolTCP,
 				Endpoints: []string{"1.2.3.4:88"},
 			},
 			expected: newer.Endpoints{
-				Protocol:  newer.ProtocolTCP,
-				Endpoints: []newer.Endpoint{{IP: "1.2.3.4", Port: 88}},
+				Endpoints: []newer.Endpoint{
+					{IP: "1.2.3.4", Ports: []newer.EndpointPort{{Protocol: newer.ProtocolTCP, Port: 88}}},
+				},
 			},
 		},
 		{
 			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
-					ID: "several",
-				},
 				Protocol:  current.ProtocolUDP,
-				Endpoints: []string{"1.2.3.4:88", "1.2.3.4:89", "1.2.3.4:90"},
+				Endpoints: []string{"1.2.3.4:88", "1.2.3.4:89", "1.2.3.5:88"}, // It's not invalid to re-use the same IP.
 			},
 			expected: newer.Endpoints{
-				Protocol:  newer.ProtocolUDP,
-				Endpoints: []newer.Endpoint{{IP: "1.2.3.4", Port: 88}, {IP: "1.2.3.4", Port: 89}, {IP: "1.2.3.4", Port: 90}},
+				Endpoints: []newer.Endpoint{
+					{IP: "1.2.3.4", Ports: []newer.EndpointPort{{Protocol: newer.ProtocolUDP, Port: 88}}},
+					{IP: "1.2.3.4", Ports: []newer.EndpointPort{{Protocol: newer.ProtocolUDP, Port: 89}}},
+					{IP: "1.2.3.5", Ports: []newer.EndpointPort{{Protocol: newer.ProtocolUDP, Port: 88}}},
+				},
 			},
 		},
 	}
@@ -436,7 +430,7 @@ func TestEndpointsConversion(t *testing.T) {
 			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
 			continue
 		}
-		if got.Protocol != tc.expected.Protocol || !newer.Semantic.DeepEqual(got.Endpoints, tc.expected.Endpoints) {
+		if !newer.Semantic.DeepEqual(got.Endpoints, tc.expected.Endpoints) {
 			t.Errorf("[Case: %d] Expected %v, got %v", i, tc.expected, got)
 		}
 
