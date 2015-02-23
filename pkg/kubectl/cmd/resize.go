@@ -55,6 +55,7 @@ func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 			checkErr(err)
 
 			mapper, _ := f.Object(cmd)
+			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			resizer, err := f.Resizer(cmd, mapping)

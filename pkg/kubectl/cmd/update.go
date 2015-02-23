@@ -110,6 +110,7 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string
 	checkErr(err)
 
 	mapper, _ := f.Object(cmd)
+	// TODO: use resource.Builder instead
 	mapping, namespace, name := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	client, err := f.RESTClient(cmd, mapping)
 	checkErr(err)

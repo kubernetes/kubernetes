@@ -37,6 +37,7 @@ given resource.`,
 			checkErr(err)
 
 			mapper, _ := f.Object(cmd)
+			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			describer, err := f.Describer(cmd, mapping)
