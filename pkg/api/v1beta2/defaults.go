@@ -34,7 +34,7 @@ func init() {
 				}
 			}
 		},
-		func(obj *ContainerPort) {
+		func(obj *Port) {
 			if obj.Protocol == "" {
 				obj.Protocol = ProtocolTCP
 			}
@@ -88,7 +88,7 @@ func init() {
 			}
 		},
 		func(obj *Endpoints) {
-			if obj.Protocol == "" && len(obj.Endpoints) > 0 {
+			if obj.Protocol == "" {
 				obj.Protocol = "TCP"
 			}
 		},

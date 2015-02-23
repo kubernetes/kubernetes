@@ -84,7 +84,7 @@ func TestGenerate(t *testing.T) {
 								{
 									Name:  "foo",
 									Image: "someimage",
-									Ports: []api.ContainerPort{
+									Ports: []api.Port{
 										{
 											ContainerPort: 80,
 										},

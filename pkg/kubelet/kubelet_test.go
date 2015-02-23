@@ -1136,7 +1136,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 
 func TestMakePortsAndBindings(t *testing.T) {
 	container := api.Container{
-		Ports: []api.ContainerPort{
+		Ports: []api.Port{
 			{
 				ContainerPort: 80,
 				HostPort:      8080,
@@ -1200,12 +1200,12 @@ func TestMakePortsAndBindings(t *testing.T) {
 
 func TestCheckHostPortConflicts(t *testing.T) {
 	successCaseAll := []api.BoundPod{
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 82}}}}}},
 	}
 	successCaseNew := api.BoundPod{
-		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}},
+		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 83}}}}},
 	}
 	expected := append(successCaseAll, successCaseNew)
 	if actual := filterHostPortConflicts(expected); !reflect.DeepEqual(actual, expected) {
@@ -1213,12 +1213,12 @@ func TestCheckHostPortConflicts(t *testing.T) {
 	}
 
 	failureCaseAll := []api.BoundPod{
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 82}}}}}},
 	}
 	failureCaseNew := api.BoundPod{
-		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
+		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}},
 	}
 	if actual := filterHostPortConflicts(append(failureCaseAll, failureCaseNew)); !reflect.DeepEqual(failureCaseAll, actual) {
 		t.Errorf("Expected %#v, Got %#v", expected, actual)

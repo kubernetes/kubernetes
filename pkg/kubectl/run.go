@@ -82,7 +82,7 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 
 		// Don't include the port if it was not specified.
 		if port > 0 {
-			controller.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{
+			controller.Spec.Template.Spec.Containers[0].Ports = []api.Port{
 				{
 					ContainerPort: port,
 				},

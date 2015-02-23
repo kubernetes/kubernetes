@@ -254,8 +254,8 @@ type SecretVolumeSource struct {
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 
-// ContainerPort represents a network port in a single container.
-type ContainerPort struct {
+// Port represents a network port in a single container.
+type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
@@ -367,7 +367,7 @@ type Container struct {
 	Command []string `json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
 	WorkingDir     string               `json:"workingDir,omitempty"`
-	Ports          []ContainerPort      `json:"ports,omitempty"`
+	Ports          []Port               `json:"ports,omitempty"`
 	Env            []EnvVar             `json:"env,omitempty"`
 	Resources      ResourceRequirements `json:"resources,omitempty" description:"Compute Resources required by this container"`
 	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty"`
@@ -782,6 +782,10 @@ type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
+	// Optional: The IP protocol for these endpoints. Supports "TCP" and
+	// "UDP".  Defaults to "TCP".
+	Protocol Protocol `json:"protocol,omitempty"`
+
 	Endpoints []Endpoint `json:"endpoints,omitempty"`
 }
 
@@ -790,20 +794,6 @@ type Endpoint struct {
 	// Required: The IP of this endpoint.
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string `json:"ip"`
-
-	// The ports exposed on this IP.
-	Ports []EndpointPort `json:"ports,omitempty"`
-}
-
-type EndpointPort struct {
-	// Optional if only one port is defined in this Endpoint, otherwise required.
-	// The name of this port within the larger service/endpoint structure.
-	// This must be a DNS_LABEL.
-	Name string `json:"name,omitempty"`
-
-	// Optional: The IP protocol for this port.  Supports "TCP" and "UDP".
-	// Defaults to "TCP".
-	Protocol Protocol `json:"protocol,omitempty"`
 
 	// Required: The destination port to access.
 	Port int `json:"port"`

@@ -69,8 +69,7 @@ type tcpProxySocket struct {
 
 func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
 	for _, retryTimeout := range endpointDialTimeout {
-		// TODO: support multiple service ports
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, "", srcAddr)
+		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			return nil, err
@@ -384,8 +383,7 @@ func (proxier *Proxier) ensurePortals() {
 func (proxier *Proxier) cleanupStaleStickySessions() {
 	for name, info := range proxier.serviceMap {
 		if info.sessionAffinityType != api.AffinityTypeNone {
-			// TODO: support multiple service ports
-			proxier.loadBalancer.CleanupStaleStickySessions(name, "")
+			proxier.loadBalancer.CleanupStaleStickySessions(name)
 		}
 	}
 }
@@ -501,8 +499,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		if err != nil {
 			glog.Errorf("Failed to open portal for %q: %v", service.Name, err)
 		}
-		// TODO: support multiple service ports
-		proxier.loadBalancer.NewService(service.Name, "", info.sessionAffinityType, info.stickyMaxAgeMinutes)
+		proxier.loadBalancer.NewService(service.Name, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 	}
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
