@@ -71,18 +71,16 @@ var _ = Describe("Events", func() {
 		}
 
 		By("submitting the pod to kubernetes")
-		_, err := podClient.Create(pod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
-		}
 		defer func() {
 			By("deleting the pod")
-			defer GinkgoRecover()
 			podClient.Delete(pod.Name)
 		}()
+		if _, err := podClient.Create(pod); err != nil {
+			Failf("Failed to create pod: %v", err)
+		}
 
 		By("waiting for the pod to start running")
-		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		err := waitForPodRunning(c, pod.Name, 300*time.Second)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying the pod is in kubernetes")
@@ -92,7 +90,7 @@ var _ = Describe("Events", func() {
 		By("retrieving the pod")
 		podWithUid, err := podClient.Get(pod.Name)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to get pod: %v", err))
+			Failf("Failed to get pod: %v", err)
 		}
 		fmt.Printf("%+v\n", podWithUid)
 
@@ -108,7 +106,7 @@ var _ = Describe("Events", func() {
 			}.AsSelector(),
 		)
 		if err != nil {
-			Fail(fmt.Sprintf("Error while listing events:", err))
+			Failf("Error while listing events: %v", err)
 		}
 		Expect(len(events.Items)).ToNot(BeZero(), "scheduler events from running pod")
 		fmt.Println("Saw scheduler event for our pod.")
@@ -125,7 +123,7 @@ var _ = Describe("Events", func() {
 			}.AsSelector(),
 		)
 		if err != nil {
-			Fail(fmt.Sprintf("Error while listing events:", err))
+			Failf("Error while listing events: %v", err)
 		}
 		Expect(len(events.Items)).ToNot(BeZero(), "kubelet events from running pod")
 		fmt.Println("Saw kubelet event for our pod.")
