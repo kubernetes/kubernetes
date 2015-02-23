@@ -85,9 +85,11 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 // indeed a shortcut. Otherwise, will return resource unmodified.
 func expandResourceShortcut(resource string) string {
 	shortForms := map[string]string{
-		"po":     "pods",
-		"rc":     "replicationcontrollers",
+		"po": "pods",
+		"rc": "replicationcontrollers",
+		// DEPRECATED: will be removed before 1.0
 		"se":     "services",
+		"svc":    "services",
 		"mi":     "minions",
 		"ev":     "events",
 		"limits": "limitRanges",
