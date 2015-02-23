@@ -173,7 +173,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 				{
 					Name: "testpd",
 					Source: api.VolumeSource{
-						GCEPersistentDisk: &api.GCEPersistentDisk{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 							PDName:   diskName,
 							FSType:   "ext4",
 							ReadOnly: readOnly,
