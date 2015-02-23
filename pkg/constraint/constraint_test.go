@@ -26,7 +26,7 @@ import (
 func containerWithHostPorts(ports ...int) api.Container {
 	c := api.Container{}
 	for _, p := range ports {
-		c.Ports = append(c.Ports, api.ContainerPort{HostPort: p})
+		c.Ports = append(c.Ports, api.Port{HostPort: p})
 	}
 	return c
 }

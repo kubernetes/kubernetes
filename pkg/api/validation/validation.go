@@ -325,7 +325,7 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 
 var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
-func validatePorts(ports []api.ContainerPort) errs.ValidationErrorList {
+func validatePorts(ports []api.Port) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	allNames := util.StringSet{}
@@ -410,7 +410,7 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 
 // AccumulateUniquePorts runs an extraction function on each Port of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool, extract func(*api.ContainerPort) int) errs.ValidationErrorList {
+func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool, extract func(*api.Port) int) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	for ci, ctr := range containers {
@@ -435,7 +435,7 @@ func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool,
 // a slice of containers.
 func checkHostPortConflicts(containers []api.Container) errs.ValidationErrorList {
 	allPorts := map[int]bool{}
-	return AccumulateUniquePorts(containers, allPorts, func(p *api.ContainerPort) int { return p.HostPort })
+	return AccumulateUniquePorts(containers, allPorts, func(p *api.Port) int { return p.HostPort })
 }
 
 func validateExecAction(exec *api.ExecAction) errs.ValidationErrorList {

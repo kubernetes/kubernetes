@@ -109,7 +109,7 @@ var _ = Describe("Networking", func() {
 								Name:    "webserver",
 								Image:   "kubernetes/nettest:latest",
 								Command: []string{"-service=" + name},
-								Ports:   []api.ContainerPort{{ContainerPort: 8080}},
+								Ports:   []api.Port{{ContainerPort: 8080}},
 							},
 						},
 					},

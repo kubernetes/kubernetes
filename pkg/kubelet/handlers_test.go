@@ -38,7 +38,7 @@ func TestResolvePortString(t *testing.T) {
 	expected := 80
 	name := "foo"
 	container := &api.Container{
-		Ports: []api.ContainerPort{
+		Ports: []api.Port{
 			{Name: name, ContainerPort: expected},
 		},
 	}
@@ -55,7 +55,7 @@ func TestResolvePortStringUnknown(t *testing.T) {
 	expected := 80
 	name := "foo"
 	container := &api.Container{
-		Ports: []api.ContainerPort{
+		Ports: []api.Port{
 			{Name: "bar", ContainerPort: expected},
 		},
 	}

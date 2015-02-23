@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"text/template"
@@ -268,11 +270,10 @@ func formatEndpoints(endpoints []api.Endpoint) string {
 		return "<none>"
 	}
 	list := []string{}
-	//FIXME: What do we want to print, now that endpoints are more complex?
-	//for i := range endpoints {
-	//	ep := &endpoints[i]
-	//	list = append(list, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
-	//}
+	for i := range endpoints {
+		ep := &endpoints[i]
+		list = append(list, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
+	}
 	return strings.Join(list, ",")
 }
 

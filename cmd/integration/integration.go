@@ -538,7 +538,7 @@ func runServiceTest(client *client.Client) {
 				{
 					Name:  "c1",
 					Image: "foo",
-					Ports: []api.ContainerPort{
+					Ports: []api.Port{
 						{ContainerPort: 1234},
 					},
 					ImagePullPolicy: "PullIfNotPresent",
