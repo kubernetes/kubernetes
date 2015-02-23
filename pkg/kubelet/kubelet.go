@@ -378,7 +378,13 @@ func (kl *Kubelet) purgeOldest(ids []string) error {
 	}
 	dockerData = dockerData[kl.maxContainerCount:]
 	for _, data := range dockerData {
-		if err := kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: data.ID}); err != nil {
+		// Don't allow a pull during a remove since those can race.
+		err := func() error {
+			kl.pullLock.Lock()
+			defer kl.pullLock.Unlock()
+			return kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: data.ID})
+		}()
+		if err != nil {
 			return err
 		}
 	}
