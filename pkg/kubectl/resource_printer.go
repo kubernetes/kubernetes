@@ -267,7 +267,7 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 
 func formatEndpoints(endpoints []api.Endpoint) string {
 	if len(endpoints) == 0 {
-		return "<empty>"
+		return "<none>"
 	}
 	list := []string{}
 	for i := range endpoints {
