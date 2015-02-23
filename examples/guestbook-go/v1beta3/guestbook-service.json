@@ -11,7 +11,6 @@
         "port": 3000,
         "containerPort": "http-server",
         "protocol": "TCP",
-        "createExternalLoadBalancer": true,
         "selector": {
             "name": "guestbook"
         }
