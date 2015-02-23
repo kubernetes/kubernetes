@@ -1079,12 +1079,16 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Protocol, &out.Protocol, 0); err != nil {
-				return err
-			}
 			for i := range in.Endpoints {
 				ep := &in.Endpoints[i]
-				out.Endpoints = append(out.Endpoints, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
+				// newer.Endpoints.Endpoints[i].Ports is an array - take the first one.
+				if len(ep.Ports) > 0 {
+					port := &ep.Ports[0]
+					if err := s.Convert(&port.Protocol, &out.Protocol, 0); err != nil {
+						return err
+					}
+					out.Endpoints = append(out.Endpoints, net.JoinHostPort(ep.IP, strconv.Itoa(port.Port)))
+				}
 			}
 			return nil
 		},
@@ -1095,22 +1099,20 @@ func init() {
 			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Protocol, &out.Protocol, 0); err != nil {
-				return err
-			}
 			for i := range in.Endpoints {
-				out.Endpoints = append(out.Endpoints, newer.Endpoint{})
-				ep := &out.Endpoints[i]
 				host, port, err := net.SplitHostPort(in.Endpoints[i])
 				if err != nil {
 					return err
 				}
-				ep.IP = host
 				pn, err := strconv.Atoi(port)
 				if err != nil {
 					return err
 				}
-				ep.Port = pn
+				epp := newer.EndpointPort{Port: pn}
+				if err := s.Convert(&in.Protocol, &epp.Protocol, 0); err != nil {
+					return err
+				}
+				out.Endpoints = append(out.Endpoints, newer.Endpoint{IP: host, Ports: []newer.EndpointPort{epp}})
 			}
 			return nil
 		},

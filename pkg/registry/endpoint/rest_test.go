@@ -27,10 +27,20 @@ import (
 )
 
 func TestGetEndpoints(t *testing.T) {
+	expected := []api.Endpoint{
+		{IP: "127.0.0.1", Ports: []api.EndpointPort{
+			{Name: "p", Port: 9000, Protocol: api.ProtocolTCP},
+			{Name: "q", Port: 9000, Protocol: api.ProtocolUDP},
+		}},
+		{IP: "127.0.0.2", Ports: []api.EndpointPort{
+			{Name: "p", Port: 8000, Protocol: api.ProtocolTCP},
+			{Name: "q", Port: 8000, Protocol: api.ProtocolUDP},
+		}},
+	}
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 9000}},
+			Endpoints:  expected,
 		},
 	}
 	storage := NewREST(registry)
@@ -39,7 +49,7 @@ func TestGetEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual([]api.Endpoint{{IP: "127.0.0.1", Port: 9000}}, obj.(*api.Endpoints).Endpoints) {
+	if !reflect.DeepEqual(expected, obj.(*api.Endpoints).Endpoints) {
 		t.Errorf("unexpected endpoints: %#v", obj)
 	}
 }

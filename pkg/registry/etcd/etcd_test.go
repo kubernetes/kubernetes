@@ -24,6 +24,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
@@ -598,10 +600,10 @@ func TestEtcdListEndpoints(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Protocol: "TCP", Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 8345}}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Name: "p", Port: 8345, Protocol: api.ProtocolTCP}}}}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar"}, Protocol: "TCP"}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -625,8 +627,7 @@ func TestEtcdGetEndpoints(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Protocol:   "TCP",
-		Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 34855}},
+		Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: 34855, Protocol: api.ProtocolTCP}}}},
 	}
 
 	key, _ := makeServiceEndpointsKey(ctx, "foo")
@@ -647,10 +648,19 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	registry := NewTestEtcdRegistry(fakeClient)
+
+	// TODO: Once we drop single-port APIs, make this test use the
+	// multi-port features. This will force a compile error when those APIs
+	// are deleted.
+	_ = v1beta1.Dependency
+	_ = v1beta2.Dependency
+
 	endpoints := api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Protocol:   "TCP",
-		Endpoints:  []api.Endpoint{{IP: "baz"}, {IP: "bar"}},
+		Endpoints: []api.Endpoint{
+			{IP: "baz", Ports: []api.EndpointPort{{Port: 1, Protocol: api.ProtocolTCP}}},
+			{IP: "bar", Ports: []api.EndpointPort{{Port: 2, Protocol: api.ProtocolTCP}}},
+		},
 	}
 
 	key, _ := makeServiceEndpointsKey(ctx, "foo")

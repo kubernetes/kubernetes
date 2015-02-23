@@ -93,7 +93,11 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				continue
 			}
 
-			endpoints = append(endpoints, api.Endpoint{IP: pod.Status.PodIP, Port: port})
+			// TODO: Add multiple-ports to Service and expose them here.
+			endpoints = append(endpoints, api.Endpoint{
+				IP:    pod.Status.PodIP,
+				Ports: []api.EndpointPort{{Name: "", Protocol: service.Spec.Protocol, Port: port}},
+			})
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
@@ -102,7 +106,6 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
-					Protocol: service.Spec.Protocol,
 				}
 			} else {
 				glog.Errorf("Error getting endpoints: %v", err)
@@ -118,7 +121,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsEqual(currentEndpoints, endpoints) {
+			if endpointsEqual(currentEndpoints, endpoints) {
 				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
@@ -132,12 +135,27 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	return resultErr
 }
 
+// TODO: It would be nice if we had a util function that reflectively compared
+// two slices for order-insensitive equivalence.
+func portsEqual(lhs, rhs []api.EndpointPort) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for i := range lhs {
+		if lhs[i] != rhs[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func containsEndpoint(haystack *api.Endpoints, needle *api.Endpoint) bool {
 	if haystack == nil || needle == nil {
 		return false
 	}
 	for ix := range haystack.Endpoints {
-		if haystack.Endpoints[ix] == *needle {
+		haystackEP := &haystack.Endpoints[ix]
+		if haystackEP.IP == needle.IP && portsEqual(haystackEP.Ports, needle.Ports) {
 			return true
 		}
 	}

@@ -105,12 +105,26 @@ func TestSetDefaultSecret(t *testing.T) {
 }
 
 func TestSetDefaulEndpointsProtocol(t *testing.T) {
-	in := &current.Endpoints{}
+	in := &current.Endpoints{
+		Endpoints: []current.Endpoint{
+			{IP: "1.2.3.4", Ports: []current.EndpointPort{
+				{Protocol: "TCP"},
+				{Protocol: "UDP"},
+				{Protocol: ""},
+			}},
+		},
+	}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*current.Endpoints)
 
-	if out.Protocol != current.ProtocolTCP {
-		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
+	if out.Endpoints[0].Ports[0].Protocol != current.ProtocolTCP {
+		t.Errorf("Expected protocol[0] %s, got %s", current.ProtocolTCP, out.Endpoints[0].Ports[0].Protocol)
+	}
+	if out.Endpoints[0].Ports[1].Protocol != current.ProtocolUDP {
+		t.Errorf("Expected protocol[1] %s, got %s", current.ProtocolTCP, out.Endpoints[0].Ports[1].Protocol)
+	}
+	if out.Endpoints[0].Ports[2].Protocol != current.ProtocolTCP {
+		t.Errorf("Expected protocol[2] %s, got %s", current.ProtocolTCP, out.Endpoints[0].Ports[2].Protocol)
 	}
 }
 

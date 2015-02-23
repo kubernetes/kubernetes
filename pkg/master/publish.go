@@ -128,25 +128,35 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 func (m *Master) ensureEndpointsContain(serviceName string, ip net.IP, port int) error {
 	ctx := api.NewDefaultContext()
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
-	if err != nil || e.Protocol != api.ProtocolTCP {
+	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:      serviceName,
 				Namespace: api.NamespaceDefault,
 			},
-			Protocol: api.ProtocolTCP,
 		}
 	}
 	found := false
+FindEndpointLoop:
 	for i := range e.Endpoints {
 		ep := &e.Endpoints[i]
-		if ep.IP == ip.String() && ep.Port == port {
-			found = true
-			break
+		if ep.IP == ip.String() {
+			for j := range ep.Ports {
+				epp := &ep.Ports[j]
+				if epp.Protocol == api.ProtocolTCP && epp.Port == port {
+					found = true
+					break FindEndpointLoop
+				}
+			}
 		}
 	}
 	if !found {
-		e.Endpoints = append(e.Endpoints, api.Endpoint{IP: ip.String(), Port: port})
+		e.Endpoints = append(e.Endpoints, api.Endpoint{
+			IP: ip.String(),
+			Ports: []api.EndpointPort{
+				{Protocol: api.ProtocolTCP, Port: port},
+			},
+		})
 	}
 	if len(e.Endpoints) > m.masterCount {
 		// We append to the end and remove from the beginning, so this should
