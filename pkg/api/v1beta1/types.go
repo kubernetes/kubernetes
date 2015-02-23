@@ -608,7 +608,7 @@ type Endpoints struct {
 	// Optional: The IP protocol for these endpoints. Supports "TCP" and
 	// "UDP".  Defaults to "TCP".
 	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"`
-	Endpoints []string `json:"endpoints,omitempty" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
+	Endpoints []string `json:"endpoints" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
 }
 
 // EndpointsList is a list of endpoints.
