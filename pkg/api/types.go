@@ -778,6 +778,9 @@ type EndpointsList struct {
 type NodeSpec struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `json:"capacity,omitempty"`
+	// PodCIDR represents the pod IP range assigned to the node
+	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
+	PodCIDR string `json:"cidr,omitempty"`
 }
 
 // NodeStatus is information about the current status of a node.
@@ -844,7 +847,7 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// Node is a worker node in Kubernetenes
+// Node is a worker node in Kubernetes
 // The name of the node according to etcd is in ObjectMeta.Name.
 type Node struct {
 	TypeMeta   `json:",inline"`

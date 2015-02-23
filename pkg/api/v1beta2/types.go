@@ -646,6 +646,8 @@ type Minion struct {
 	TypeMeta `json:",inline"`
 	// Queried from cloud provider, if available.
 	HostIP string `json:"hostIP,omitempty" description:"IP address of the node"`
+	// Pod IP range assigned to the node
+	PodCIDR string `json:"cidr,omitempty" description:"IP range assigned to the node"`
 	// Resources available on the node
 	NodeResources NodeResources `json:"resources,omitempty" description:"characterization of node resources"`
 	// Status describes the current status of a node
