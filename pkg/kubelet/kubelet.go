@@ -49,8 +49,6 @@ import (
 	"github.com/golang/glog"
 )
 
-const defaultChanSize = 1024
-
 // taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 const minShares = 2
 const sharesPerCPU = 1024
