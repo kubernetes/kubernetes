@@ -14,7 +14,6 @@
         },
         "template": {
             "metadata": {
-                "name": "redis-slave",
                 "labels": {
                     "name": "redis-slave"
                 }

@@ -14,7 +14,6 @@
         },
         "template": {
             "metadata": {
-                "name": "redis-master",
                 "labels": {
                     "name": "redis-master"
                 }
