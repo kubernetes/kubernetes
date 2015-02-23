@@ -28,7 +28,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/merge"
+
+	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -167,7 +168,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	patched, err := merge.MergeJSON(target, []byte(fragment))
+	patched, err := jsonpatch.MergePatch(target, []byte(fragment))
 	if err != nil {
 		return nil, err
 	}
