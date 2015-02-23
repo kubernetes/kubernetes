@@ -171,7 +171,7 @@ func TestControllerParsing(t *testing.T) {
 					Containers: []api.Container{
 						{
 							Image: "dockerfile/nginx",
-							Ports: []api.Port{
+							Ports: []api.ContainerPort{
 								{
 									ContainerPort: 80,
 									HostPort:      8080,
