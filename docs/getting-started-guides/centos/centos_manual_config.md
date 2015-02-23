@@ -155,8 +155,8 @@ done
 
 ```
 kubectl get minions
-NAME                LABELS
-centos-minion          <none>
+NAME                   LABELS            STATUS
+centos-minion          <none>            Ready
 ```
 
 **The cluster should be running! Launch a test pod.**
