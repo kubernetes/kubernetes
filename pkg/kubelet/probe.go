@@ -162,7 +162,8 @@ func newReadinessStates() *readinessStates {
 }
 
 type readinessStates struct {
-	sync.Mutex
+	// guards states
+	sync.RWMutex
 	states map[string]bool
 }
 
@@ -174,8 +175,8 @@ func (r *readinessStates) IsReady(c api.ContainerStatus) bool {
 }
 
 func (r *readinessStates) get(key string) bool {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	state, found := r.states[key]
 	return state && found
 }
