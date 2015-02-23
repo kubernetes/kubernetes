@@ -53,8 +53,13 @@ type fakeKubelet struct {
 	streamingConnectionIdleTimeoutFunc func() time.Duration
 }
 
-func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
-	return fk.podByNameFunc(namespace, name)
+func (fk *fakeKubelet) GetPodByName(namespace, name string) (api.BoundPod, bool) {
+	pod, success := fk.podByNameFunc(namespace, name)
+	if success {
+		return *pod, success
+	} else {
+		return api.BoundPod{}, success
+	}
 }
 
 func (fk *fakeKubelet) GetPodStatus(name string, uid types.UID) (api.PodStatus, error) {
