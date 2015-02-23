@@ -433,6 +433,13 @@ function kube-up {
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
 
+  # We have to make sure the disk is created before creating the master VM, so
+  # run this in the foreground.
+  gcloud compute disks create "${MASTER_NAME}-pd" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --size "10GB"
+
   (
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
@@ -454,27 +461,11 @@ function kube-up {
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/format-and-mount-pd.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/mount-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
-
-  # Report logging choice (if any).
-  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
-    echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
-    # For logging to GCP we need to enable some minion scopes.
-    if [[ "${LOGGING_DESTINATION-}" == "gcp" ]]; then
-      MINION_SCOPES+=('https://www.googleapis.com/auth/logging.write')
-    fi
-  fi
-
-  # We have to make sure the disk is created before creating the master VM, so
-  # run this in the foreground.
-  gcloud compute disks create "${MASTER_NAME}-pd" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --size "10GB"
 
   gcloud compute instances create "${MASTER_NAME}" \
     --project "${PROJECT}" \
@@ -490,6 +481,15 @@ function kube-up {
 
   # Create a single firewall rule for all minions.
   create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
+
+  # Report logging choice (if any).
+  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
+    echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
+    # For logging to GCP we need to enable some minion scopes.
+    if [[ "${LOGGING_DESTINATION-}" == "gcp" ]]; then
+      MINION_SCOPES+=('https://www.googleapis.com/auth/logging.write')
+    fi
+  fi
 
   # Wait for last batch of jobs.
   wait-for-jobs
@@ -547,6 +547,16 @@ function kube-up {
   wait-for-jobs
 
   detect-master
+
+  # Reserve the master's IP so that it can later be transferred to another VM
+  # without disrupting the kubelets. IPs are associated with regions, not zones,
+  # so extract the region name, which is the same as the zone but with the final
+  # dash and characters trailing the dash removed.
+  local REGION=${ZONE%-*}
+  gcloud compute addresses create "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --addresses "${KUBE_MASTER_IP}" \
+    --region "${REGION}"
 
   echo "Waiting for cluster initialization."
   echo
@@ -727,6 +737,14 @@ function kube-down {
     routes=( "${routes[@]:10}" )
   done
 
+  # Delete the master's reserved IP
+  local REGION=${ZONE%-*}
+  gcloud compute addresses delete \
+    --project "${PROJECT}" \
+    --region "${REGION}" \
+    --quiet \
+    "${MASTER_NAME}-ip" || true
+
 }
 
 # Update a kubernetes cluster with latest source
@@ -737,29 +755,76 @@ function kube-push {
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
   upload-server-tars
+  ensure-temp-dir
 
+  # We want to save the IP and data disk from the existing master, kill the
+  # master, then bring up a new master with the same IP and data disk. The IP
+  # should already be saved as a static IP from when we created, so we just need
+  # to safely unmount and detach the disk.
+  gcloud compute ssh \
+    --project "${PROJECT}" \
+    --zone "$ZONE" \
+    "${KUBE_MASTER}" \
+    --command "sudo service etcd stop; sudo umount /dev/disk/by-id/google-master-pd"
+
+  gcloud compute instances detach-disk "${MASTER_NAME}" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --disk "${MASTER_NAME}-pd"
+
+  gcloud compute instances delete \
+    --project "${PROJECT}" \
+    --quiet \
+    --delete-disks boot \
+    --zone "${ZONE}" \
+    "${MASTER_NAME}" || true
+
+  # Create a new master with mostly the same startup script as for the kube-up
+  # case, but without the dynamically created salt files and its paramters.
   (
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
+    echo "readonly MASTER_NAME='${MASTER_NAME}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/mount-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
-    echo "echo Executing configuration"
-    echo "sudo salt '*' mine.update"
-    echo "sudo salt --force-color '*' state.highstate"
-  ) | gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "$KUBE_MASTER" --command "sudo bash"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
+  ) > "${KUBE_TEMP}/master-start.sh"
 
+  gcloud compute instances create "${MASTER_NAME}" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --machine-type "${MASTER_SIZE}" \
+    --image-project="${IMAGE_PROJECT}" \
+    --image "${IMAGE}" \
+    --tags "${MASTER_TAG}" \
+    --network "${NETWORK}" \
+    --address "${MASTER_NAME}-ip" \
+    --scopes "storage-ro" "compute-rw" \
+    --metadata-from-file "startup-script=${KUBE_TEMP}/master-start.sh" \
+    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no &
+  wait-for-jobs
+
+  detect-master
   get-password
 
+  echo "Waiting for master initialization."
   echo
-  echo "Kubernetes cluster is running.  The master is running at:"
+  echo "  This will continually check to see if the API for kubernetes is reachable."
+  echo "  This might loop forever if there was some uncaught error during start"
+  echo "  up."
   echo
-  echo "  https://${KUBE_MASTER_IP}"
-  echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
-  echo
+
+  until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
+          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+      printf "."
+      sleep 2
+  done
+
+  echo "Kubernetes cluster updated."
 
 }
 
