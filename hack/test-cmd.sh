@@ -23,6 +23,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/test.sh"
 
 function cleanup()
 {
@@ -130,71 +131,245 @@ for version in "${kube_api_versions[@]}"; do
   # passing no arguments to create is an error
   ! kubectl create
 
+  ###########################
+  # POD creation / deletion #
+  ###########################
+
   kube::log::status "Testing kubectl(${version}:pods)"
-  kubectl get pods "${kube_flags[@]}"
+
+  ### Create POD valid-pod from JSON
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  kubectl get pods "${kube_flags[@]}"
-  kubectl get pod valid-pod "${kube_flags[@]}"
-  [ "$(kubectl get pod valid-pod -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "valid-pod" ]
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  kube::test::get_object_assert 'pod valid-pod' '{{.id}}' 'valid-pod'
+
+  ### Dump current valid-pod POD
   output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta1 "${kube_flags[@]}")
+
+  ### Delete POD valid-pod by id
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  before="$(kubectl get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  # Post-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create POD valid-pod from dumped YAML
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   echo "${output_pod}" | kubectl create -f - "${kube_flags[@]}"
-  after="$(kubectl get pods -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$((${after} - ${before}))" -eq 1 ]
-  kubectl get pods -o yaml --output-version=v1beta1 "${kube_flags[@]}" | grep -q "id: valid-pod"
-  kubectl describe pod valid-pod "${kube_flags[@]}" | grep -q 'Name:.*valid-pod'
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Delete POD valid-pod from JSON
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
   kubectl delete -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  
+  # Post-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create POD redis-master from JSON
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
+  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Delete POD valid-pod with label
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert 'pods -l name=valid-pod' '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
   kubectl delete pods -l name=valid-pod "${kube_flags[@]}"
-  [ ! $(kubectl get pods "${kube_flags[@]}" -lname=valid-pod | grep -q 'valid-pod') ]
+  # Post-condition: no POD is running
+  kube::test::get_object_assert 'pods -l name=valid-pod' '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create POD valid-pod from JSON
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  kubectl get pods "${kube_flags[@]}" -lname=valid-pod | grep -q 'valid-pod'
-  [ ! $(kubectl delete pods "${kube_flags[@]}" ) ]
-  kubectl get pods "${kube_flags[@]}" -lname=valid-pod | grep -q 'valid-pod'
-  [ ! $(kubectl delete pods --all pods -l name=valid-pod "${kube_flags[@]}" ) ]   # not --all and label selector together
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Delete PODs with no parameter mustn't kill everything
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
+  ! kubectl delete pods "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Delete PODs with --all and a label selector is not permitted
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
+  ! kubectl delete --all pods -l name=valid-pod "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Delete all PODs
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
   kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
+  # Post-condition: no POD is running
+  kube::test::get_object_assert 'pods -l name=valid-pod' '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create two PODs
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
   kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
-  kubectl get pods valid-pod redis-proxy "${kube_flags[@]}"
+  # Post-condition: valid-pod and redis-proxy PODs are running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'redis-proxy:valid-pod:'
+
+  ### Delete multiple PODs at once
+  # Pre-condition: valid-pod and redis-proxy PODs are running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'redis-proxy:valid-pod:'
+  # Command
   kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" # delete multiple pods at once
-  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$howmanypods" -eq 0 ]
+  # Post-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create two PODs
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
   kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod and redis-proxy PODs are running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'redis-proxy:valid-pod:'
+
+  ### Stop multiple PODs at once
+  # Pre-condition: valid-pod and redis-proxy PODs are running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'redis-proxy:valid-pod:'
+  # Command
   kubectl stop pods valid-pod redis-proxy "${kube_flags[@]}" # stop multiple pods at once
-  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$howmanypods" -eq 0 ]
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$howmanypods" -eq 1 ]
+  # Post-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
 
-  #testing pods and label command command
+  ### Create valid-pod POD
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
+  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Label the valid-pod POD
+  # Pre-condition: valid-pod is not labelled
+  kube::test::get_object_assert 'pod valid-pod' '{{range.labels}}{{.}}:{{end}}' 'valid-pod:'
+  # Command
   kubectl label pods valid-pod new-name=new-valid-pod "${kube_flags[@]}"
-  kubectl delete pods -lnew-name=new-valid-pod "${kube_flags[@]}"
-  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$howmanypods" -eq 0 ]
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$howmanypods" -eq 1 ]
-  ! $(kubectl label pods valid-pod name=valid-pod-super-sayan "${kube_flags[@]}" )
-  kubectl label --overwrite pods valid-pod name=valid-pod-super-sayan "${kube_flags[@]}"
-  kubectl delete pods -lname=valid-pod-super-sayan "${kube_flags[@]}"
-  howmanypods="$(kubectl get pods  -lname=valid-pod-super-sayan -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$howmanypods" -eq 0 ]
+  # Post-conditon: valid-pod is labelled
+  kube::test::get_object_assert 'pod valid-pod' '{{range.labels}}{{.}}:{{end}}' 'valid-pod:new-valid-pod:'
 
-  # make calls in another namespace
+  ### Delete POD by label
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
+  kubectl delete pods -lnew-name=new-valid-pod "${kube_flags[@]}"
+  # Post-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create valid-pod POD
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
+  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Overwriting an existing label is not permitted
+  # Pre-condition: name is valid-pod
+  kube::test::get_object_assert 'pod valid-pod' '{{.labels.name}}' 'valid-pod'
+  # Command
+  ! kubectl label pods valid-pod name=valid-pod-super-sayan "${kube_flags[@]}"
+  # Post-condition: name is still valid-pod
+  kube::test::get_object_assert 'pod valid-pod' '{{.labels.name}}' 'valid-pod'
+
+  ### --overwrite must be used to overwrite existing label
+  # Pre-condition: name is valid-pod
+  kube::test::get_object_assert 'pod valid-pod' '{{.labels.name}}' 'valid-pod'
+  # Command
+  kubectl label --overwrite pods valid-pod name=valid-pod-super-sayan "${kube_flags[@]}"
+  # Post-condition: name is valid-pod-super-sayan
+  kube::test::get_object_assert 'pod valid-pod' '{{.labels.name}}' 'valid-pod-super-sayan'
+
+  ### Delete POD by label
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
+  kubectl delete pods -lname=valid-pod-super-sayan "${kube_flags[@]}"
+  # Post-condition: no POD is running
+  kube::test::get_object_assert pods '{{range.items}}{{.id}}:{{end}}' ''
+
+
+  ##############
+  # Namespaces #
+  ##############
+
+  ### Create POD valid-pod in specific namespace
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert 'pods --namespace=other' '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   kubectl create "${kube_flags[@]}" --namespace=other -f examples/limitrange/valid-pod.json
-  kubectl get "${kube_flags[@]}" pod --namespace=other valid-pod
+  # Post-condition: valid-pod POD is running
+  kube::test::get_object_assert 'pods --namespace=other' '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+
+  ### Delete POD valid-pod in specific namespace
+  # Pre-condition: valid-pod POD is running
+  kube::test::get_object_assert 'pods --namespace=other' '{{range.items}}{{.id}}:{{end}}' 'valid-pod:'
+  # Command
   kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod
+  # Post-condition: no POD is running
+  kube::test::get_object_assert 'pods --namespace=other' '{{range.items}}{{.id}}:{{end}}' ''
+
+
+  ############
+  # Services #
+  ############
 
   kube::log::status "Testing kubectl(${version}:services)"
-  kubectl get services "${kube_flags[@]}"
+
+  ### Create redis-master service from JSON
+  # Pre-condition: Only the default kubernetes services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:'
+  # Command
   kubectl create -f examples/guestbook/redis-master-service.json "${kube_flags[@]}"
-  kubectl get services "${kube_flags[@]}"
+  # Post-condition: redis-master service is running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:'
+
+  ### Dump current redis-master service
   output_service=$(kubectl get service redis-master -o json --output-version=v1beta3 "${kube_flags[@]}")
+
+  ### Delete redis-master-service by id
+  # Pre-condition: redis-master service is running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:'
+  # Command
   kubectl delete service redis-master "${kube_flags[@]}"
+  # Post-condition: Only the default kubernetes services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:'
+
+  ### Create redis-master-service from dumped JSON
+  # Pre-condition: Only the default kubernetes services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:'
+  # Command
   echo "${output_service}" | kubectl create -f - "${kube_flags[@]}"
+  # Post-condition: redis-master service is running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:'
+
+  ### Create redis-master-${version}-test service
+  # Pre-condition: redis-master-service service is running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:'
+  # Command
   kubectl create -f - "${kube_flags[@]}" << __EOF__
       {
           "kind": "Service",
@@ -207,50 +382,137 @@ for version in "${kube_api_versions[@]}"; do
           }
       }
 __EOF__
+  # Post-condition:redis-master-service service is running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:service-.*-test:'
+
+  ### Update selector of service-${version}-test
+  # Pre-condition: selector.version == old
+  kube::test::get_object_assert "service service-${version}-test" "{{range.selector}}{{.}}{{end}}" 'old'
+  # Command
   kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}"
+  # Post-condition: selector.version == ${version}
+  # This test works only in v1beta1 and v1beta2
+  # https://github.com/GoogleCloudPlatform/kubernetes/issues/4771
+  if [[ "$version" != "" ]] && [[ "$version" != "v1beta3" ]]; then
+      kube::test::get_object_assert "service service-${version}-test" "{{range.selector}}{{.}}{{end}}" "${version}"
+  fi
+
+  ### Identity
   kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl update "${kube_flags[@]}" -f -
-  kubectl get services "${kube_flags[@]}"
-  kubectl get services "service-${version}-test" "${kube_flags[@]}"
+
+  ### Delete services by id
+  # Pre-condition: redis-master-service service is running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:service-.*-test:'
+  # Command
   kubectl delete service redis-master "${kube_flags[@]}"
-  servicesbefore="$(kubectl get services  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  kubectl delete service "service-${version}-test" "${kube_flags[@]}"
+  # Post-condition: Only the default kubernetes services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:'
+
+  ### Create two services
+  # Pre-condition: Only the default kubernetes services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:'
+  # Command
   kubectl create -f examples/guestbook/redis-master-service.json "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-service.json "${kube_flags[@]}"
+  # Post-condition: redis-master and redis-slave services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:redisslave:'
+
+  ### Delete multiple services at once
+  # Pre-condition: redis-master and redis-slave services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:redisslave:'
+  # Command
   kubectl delete services redis-master redisslave "${kube_flags[@]}" # delete multiple services at once
-  servicesafter="$(kubectl get services  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$((${servicesafter} - ${servicesbefore}))" -eq 0 ]
+  # Post-condition: Only the default kubernetes services are running
+  kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:'
+
+
+  ###########################
+  # Replication controllers #
+  ###########################
 
   kube::log::status "Testing kubectl(${version}:replicationcontrollers)"
-  kubectl get replicationcontrollers "${kube_flags[@]}"
+
+  ### Create replication controller frontend from JSON
+  # Pre-condition: no replication controller is running
+  kube::test::get_object_assert rc "{{range.items}}{{.id}}:{{end}}" ''
+  # Command
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
-  kubectl get replicationcontrollers "${kube_flags[@]}"
-  kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
-  #resize with current-replicas and replicas
+  # Post-condition: frontend replication controller is running
+  kube::test::get_object_assert rc "{{range.items}}{{.id}}:{{end}}" 'frontend-controller:'
+
+  ### Resize replication controller frontend with current-replicas and replicas
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend-controller' '{{.desiredState.replicas}}' '3'
+  # Command
   kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
-  kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*2 desired'
-  #resize with (wrong) current-replicas and replicas
-  [ !  $(resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}") ]
-  #resize replicas-only
+  # Post-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend-controller' '{{.desiredState.replicas}}' '2'
+
+  ### Resize replication controller frontend with (wrong) current-replicas and replicas
+  # Pre-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend-controller' '{{.desiredState.replicas}}' '2'
+  # Command
+  ! kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  # Post-condition: nothing changed
+  kube::test::get_object_assert 'rc frontend-controller' '{{.desiredState.replicas}}' '2'
+
+  ### Resize replication controller frontend with replicas only
+  # Pre-condition: 2 replicas
+  kube::test::get_object_assert 'rc frontend-controller' '{{.desiredState.replicas}}' '2'
+  # Command
   kubectl resize  --replicas=3 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  # Post-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend-controller' '{{.desiredState.replicas}}' '3'
+
+  ### Delete replication controller with id
+  # Pre-condition: frontend replication controller is running
+  kube::test::get_object_assert rc '{{range.items}}{{.id}}:{{end}}' 'frontend-controller:'
+  # Command
   kubectl delete rc frontend-controller "${kube_flags[@]}"
-  rcsbefore="$(kubectl get replicationcontrollers  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  # Post-condition: no replication controller is running
+  kube::test::get_object_assert rc '{{range.items}}{{.id}}:{{end}}' ''
+
+  ### Create two replication controllers
+  # Pre-condition: no replication controller is running
+  kube::test::get_object_assert rc '{{range.items}}{{.id}}:{{end}}' ''
+  # Command
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.json "${kube_flags[@]}"
+  # Post-condition: frontend and redis-slave
+  kube::test::get_object_assert rc '{{range.items}}{{.id}}:{{end}}' 'frontend-controller:redis-slave-controller:'
+
+  ### Delete multiple controllers at once
+  # Pre-condition: frontend and redis-slave
+  kube::test::get_object_assert rc '{{range.items}}{{.id}}:{{end}}' 'frontend-controller:redis-slave-controller:'
+  # Command
   kubectl delete rc frontend-controller redis-slave-controller "${kube_flags[@]}" # delete multiple controllers at once
-  rcsafter="$(kubectl get replicationcontrollers  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
-  [ "$((${rcsafter} - ${rcsbefore}))" -eq 0 ]
+  # Post-condition: no replication controller is running
+  kube::test::get_object_assert rc '{{range.items}}{{.id}}:{{end}}' ''
+
+
+  #########
+  # Nodes #
+  #########
 
   kube::log::status "Testing kubectl(${version}:nodes)"
-  kubectl get nodes "${kube_flags[@]}"
-  kubectl describe nodes 127.0.0.1 "${kube_flags[@]}"
+
+  kube::test::get_object_assert nodes '{{range.items}}{{.id}}:{{end}}' '127.0.0.1:'
+
+  ###########
+  # Minions #
+  ###########
 
   if [[ "${version}" != "v1beta3" ]]; then
     kube::log::status "Testing kubectl(${version}:minions)"
-    kubectl get minions "${kube_flags[@]}"
-    kubectl get minions 127.0.0.1 "${kube_flags[@]}"
-    kubectl get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' "${kube_flags[@]}"
+
+    kube::test::get_object_assert minions '{{range.items}}{{.id}}:{{end}}' '127.0.0.1:'
+
     # TODO: I should be a MinionList instead of List
-    [ "$(kubectl get minions -t $'{{ .kind }}' "${kube_flags[@]}")" == "List" ]
+    kube::test::get_object_assert minions '{{.kind}}' 'List'
   fi
+
+  kube::test::clear_all
 done
 
 kube::log::status "TEST PASSED"
