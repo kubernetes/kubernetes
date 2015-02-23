@@ -289,6 +289,18 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
+	var pods []api.Pod
+	allPods, err := d.Pods(namespace).List(labels.Everything())
+	if err != nil {
+		return "", err
+	}
+	for _, pod := range allPods.Items {
+		if pod.Status.Host != name {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+
 	events, _ := d.Events(namespace).Search(minion)
 
 	return tabbedString(func(out io.Writer) error {
@@ -305,6 +317,13 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 					c.Message)
 			}
 		}
+		fmt.Fprintf(out, "Pods:\t(%d in total)\n", len(pods))
+		for _, pod := range pods {
+			if pod.Status.Host != name {
+				continue
+			}
+			fmt.Fprintf(out, "  %s\n", pod.Name)
+		}
 		if events != nil {
 			describeEvents(events, out)
 		}
@@ -318,9 +337,9 @@ func describeEvents(el *api.EventList, w io.Writer) {
 		return
 	}
 	sort.Sort(SortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\nFirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tReason\tMessage\n")
+	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tReason\tMessage\n")
 	for _, e := range el.Items {
-		fmt.Fprintf(w, "%s\t%s\t%d\t%v\t%v\t%v\t%v\n",
+		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\n",
 			e.FirstTimestamp.Time.Format(time.RFC1123Z),
 			e.LastTimestamp.Time.Format(time.RFC1123Z),
 			e.Count,

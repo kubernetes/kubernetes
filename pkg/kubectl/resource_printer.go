@@ -221,7 +221,7 @@ var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABE
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
-var minionColumns = []string{"NAME", "LABELS", "STATUS"}
+var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME"}
@@ -238,8 +238,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(endpointColumns, printEndpoints)
-	h.Handler(minionColumns, printMinion)
-	h.Handler(minionColumns, printMinionList)
+	h.Handler(nodeColumns, printNode)
+	h.Handler(nodeColumns, printNodeList)
 	h.Handler(statusColumns, printStatus)
 	h.Handler(eventColumns, printEvent)
 	h.Handler(eventColumns, printEventList)
@@ -408,11 +408,11 @@ func printSecretList(list *api.SecretList, w io.Writer) error {
 	return nil
 }
 
-func printMinion(minion *api.Node, w io.Writer) error {
+func printNode(node *api.Node, w io.Writer) error {
 	conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionKind{api.NodeReady, api.NodeReachable}
-	for i := range minion.Status.Conditions {
-		cond := minion.Status.Conditions[i]
+	for i := range node.Status.Conditions {
+		cond := node.Status.Conditions[i]
 		conditionMap[cond.Kind] = &cond
 	}
 	var status []string
@@ -428,13 +428,13 @@ func printMinion(minion *api.Node, w io.Writer) error {
 	if len(status) == 0 {
 		status = append(status, "Unknown")
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", minion.Name, formatLabels(minion.Labels), strings.Join(status, ","))
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", node.Name, formatLabels(node.Labels), strings.Join(status, ","))
 	return err
 }
 
-func printMinionList(list *api.NodeList, w io.Writer) error {
-	for _, minion := range list.Items {
-		if err := printMinion(&minion, w); err != nil {
+func printNodeList(list *api.NodeList, w io.Writer) error {
+	for _, node := range list.Items {
+		if err := printNode(&node, w); err != nil {
 			return err
 		}
 	}
