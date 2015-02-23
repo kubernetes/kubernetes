@@ -62,7 +62,7 @@ The kube-controller-manager has several options.
 **--master**=""
 	The address of the Kubernetes API server.
 
-**--node_sync_peroid**=10s
+**--node_sync_period**=10s
     The period for syncing nodes from cloudprovider.
 
 **--port**=10252
