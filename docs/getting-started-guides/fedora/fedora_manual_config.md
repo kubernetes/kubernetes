@@ -128,8 +128,8 @@ done
 
 ```
 kubectl get minions
-NAME                LABELS
-fed-minion          <none>
+NAME                LABELS              STATUS
+fed-minion          <none>              Ready
 ```
 
 **The cluster should be running! Launch a test pod.**
