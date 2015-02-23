@@ -20,17 +20,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
-// Examines /proc/mounts to find the source device of the PD resource and the
-// number of references to that device. Returns both the full device path under
-// the /dev tree and the number of references.
-func getMountRefCount(mounter mount.Interface, mountPath string) (string, int, error) {
-	// TODO(jonesdl) This can be split up into two procedures, finding the device path
-	// and finding the number of references. The parsing could also be separated and another
-	// utility could determine if a path is an active mount point.
-
+// Examines /proc/mounts to find all other references to the device referenced
+// by mountPath.
+func getMountRefs(mounter mount.Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
 	if err != nil {
-		return "", -1, err
+		return nil, err
 	}
 
 	// Find the device name.
@@ -42,12 +37,12 @@ func getMountRefCount(mounter mount.Interface, mountPath string) (string, int, e
 		}
 	}
 
-	// Find the number of references to the device.
-	refCount := 0
+	// Find all references to the device.
+	var refs []string
 	for i := range mps {
-		if mps[i].Device == deviceName {
-			refCount++
+		if mps[i].Device == deviceName && mps[i].Path != mountPath {
+			refs = append(refs, mps[i].Path)
 		}
 	}
-	return deviceName, refCount, nil
+	return refs, nil
 }

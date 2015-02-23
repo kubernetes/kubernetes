@@ -23,7 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -46,8 +45,8 @@ type fakePDManager struct{}
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachDisk(pd *gcePersistentDisk) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
+func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
+	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -55,27 +54,13 @@ func (fake *fakePDManager) AttachDisk(pd *gcePersistentDisk) error {
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk, devicePath string) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
+func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
+	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-type fakeMounter struct{}
-
-func (fake *fakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	return nil
-}
-
-func (fake *fakeMounter) Unmount(target string, flags int) error {
-	return nil
-}
-
-func (fake *fakeMounter) List() ([]mount.MountPoint, error) {
-	return []mount.MountPoint{}, nil
 }
 
 func TestPlugin(t *testing.T) {
