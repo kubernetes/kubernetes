@@ -1,38 +1,37 @@
 {
-    "kind": "ReplicationController",
-    "apiVersion": "v1beta3",
-    "metadata": {
-        "name": "redis-slave",
-        "labels": {
-            "name": "redis-slave"
-        }
-    },
-    "spec": {
-        "replicas": 2,
-        "selector": {
-            "name": "redis-slave"
-        },
-        "template": {
-            "metadata": {
-                "labels": {
-                    "name": "redis-slave"
-                }
-            },
-            "spec": {
-                "containers": [
-                    {
-                        "name": "slave",
-                        "image": "brendanburns/redis-slave",
-                        "ports": [
-                            {
-                                "containerPort": 6379,
-				"protocol": "TCP"
-                            }
-                        ]
-                    }
-                ]
+   "kind":"ReplicationController",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"redis-slave",
+      "labels":{
+         "name":"redis-slave"
+      }
+   },
+   "spec":{
+      "replicas":2,
+      "selector":{
+         "name":"redis-slave"
+      },
+      "template":{
+         "metadata":{
+            "labels":{
+               "name":"redis-slave"
             }
-        }
-    }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "name":"slave",
+                  "image":"brendanburns/redis-slave",
+                  "ports":[
+                     {
+                        "containerPort":6379,
+                        "protocol":"TCP"
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   }
 }
-

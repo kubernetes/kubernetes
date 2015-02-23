@@ -1,16 +1,18 @@
 {
-  "kind": "Service",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "frontend",
-    "labels": {"name": "frontend"},
-  },
-  "spec": {
-    "port": 80,
-    "containerPort": 80,
-    "protocol": "TCP",
-    "selector": {
-      "name": "frontend"
-    }
-  }
+   "kind":"Service",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"frontend",
+      "labels":{
+         "name":"frontend"
+      }
+   },
+   "spec":{
+      "port":80,
+      "containerPort":80,
+      "protocol":"TCP",
+      "selector":{
+         "name":"frontend"
+      }
+   }
 }

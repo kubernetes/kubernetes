@@ -1,20 +1,20 @@
 {
-    "kind": "Service",
-    "apiVersion": "v1beta3",
-    "metadata": {
-        "name": "redis-master",
-        "labels": {
-            "name": "redis",
-            "role": "master"
-        }
-    },
-    "spec": {
-        "port": 6379,
-        "containerPort": "redis-server",
-        "protocol": "TCP",
-        "selector": {
-            "name": "redis",
-            "role": "master"
-        }
-    }
+   "kind":"Service",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"redis-master",
+      "labels":{
+         "name":"redis",
+         "role":"master"
+      }
+   },
+   "spec":{
+      "port":6379,
+      "containerPort":"redis-server",
+      "protocol":"TCP",
+      "selector":{
+         "name":"redis",
+         "role":"master"
+      }
+   }
 }
