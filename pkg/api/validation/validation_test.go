@@ -211,7 +211,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}},
 		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
 		{Name: "secret", Source: api.VolumeSource{Secret: &api.SecretVolumeSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
-		{Name: "iscsidisk", Source: api.VolumeSource{ISCSIDisk: &api.ISCSIDisk{"127.0.0.1", "iqn.2015-02.example.com:test"}}},
+		{Name: "iscsidisk", Source: api.VolumeSource{ISCSIDisk: &api.ISCSIDiskVolumeSource{"127.0.0.1", "iqn.2015-02.example.com:test", 1, "ext4", false}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {

@@ -24,14 +24,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/gce_pd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
-
-func makeGlobalPDName(host volume.Host, portal string, iqn string, lun string) string {
-	return path.Join(host.GetPluginDir(ISCSIDiskPluginName), "iscsi", portal, iqn, "lun", lun)
-}
 
 func probeDevicePath(devicePath string, maxRetries int) bool {
 	numTries := 0
@@ -52,9 +46,19 @@ func probeDevicePath(devicePath string, maxRetries int) bool {
 	return false
 }
 
+func makePDNameInternal(host volume.Host, portal string, iqn string, lun string) string {
+	return path.Join(host.GetPluginDir(ISCSIDiskPluginName), "iscsi", portal, iqn, "lun", lun)
+}
+
 type ISCSIDiskUtil struct{}
 
-func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
+func (util *ISCSIDiskUtil) MakeGlobalPDName(disk interface{}) string {
+	iscsi := disk.(iscsiDisk)
+	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
+}
+
+func (util *ISCSIDiskUtil) AttachDisk(disk interface{}) error {
+	iscsi := disk.(iscsiDisk)
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi", iscsi.iqn, "lun", iscsi.lun}, "-")
 	exist := probeDevicePath(devicePath, 1)
 	if exist == false {
@@ -78,8 +82,8 @@ func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
 		}
 	}
 	// mount it
-	globalPDPath := makeGlobalPDName(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
-	mountpoint, err := gce_pd.IsMountPoint(globalPDPath)
+	globalPDPath := iscsi.manager.MakeGlobalPDName(iscsi)
+	mountpoint, err := volume.IsMountPoint(globalPDPath)
 	if mountpoint {
 		glog.Infof("iscsiPersistentDisk: %s already mounted", globalPDPath)
 		return nil
@@ -99,8 +103,9 @@ func (util *ISCSIDiskUtil) AttachDisk(iscsi *iscsiDisk) error {
 	return err
 }
 
-func (util *ISCSIDiskUtil) DetachDisk(iscsi *iscsiDisk, devicePath string) error {
-	globalPDPath, refCount, err := GetMountFromDevicePath(iscsi.mounter, devicePath)
+func (util *ISCSIDiskUtil) DetachDisk(disk interface{}, devicePath string) error {
+	iscsi := disk.(iscsiDisk)
+	globalPDPath, refCount, err := volume.GetMountFromDevicePath(iscsi.mounter, devicePath)
 	if refCount > 1 {
 		glog.Errorf("iSCSIPersistentDisk detach disk: mount %s is used %d times", globalPDPath, refCount)
 		return errors.New("path busy")
@@ -113,7 +118,7 @@ func (util *ISCSIDiskUtil) DetachDisk(iscsi *iscsiDisk, devicePath string) error
 
 	// if the iscsi portal is no longer used, logout the target
 	prefix := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi"}, "-")
-	refCount, err = GetDeviceRefCount(iscsi.mounter, prefix)
+	refCount, err = volume.GetDeviceRefCount(iscsi.mounter, prefix)
 	//glog.Infof("iSCSIPersistentDisk: log out target: dev %s ref %d error %v", prefix, refCount, err)
 	if err == nil && refCount == 0 {
 		glog.Infof("iSCSIPersistentDisk: log out target %s", iscsi.portal)
@@ -124,45 +129,4 @@ func (util *ISCSIDiskUtil) DetachDisk(iscsi *iscsiDisk, devicePath string) error
 		}
 	}
 	return nil
-}
-
-// given a device path, find its reference count from /proc/mounts
-// mostly borrowed from gce-pd
-// export it so other block volume plugin can use it.
-func GetDeviceRefCount(mounter mount.Interface, deviceName string) (int, error) {
-	mps, err := mounter.List()
-	if err != nil {
-		return -1, err
-	}
-
-	// Find the number of references to the device.
-	refCount := 0
-	for i := range mps {
-		if strings.HasPrefix(mps[i].Device, deviceName) {
-			refCount++
-		}
-	}
-	return refCount, nil
-}
-
-// given a device path, find the mount on that device from /proc/mounts
-// mostly borrowed from gce-pd
-// export it so other block volume plugin can use it.
-func GetMountFromDevicePath(mounter mount.Interface, deviceName string) (string, int, error) {
-	// mostly borrowed from gce-pd
-	// export it so other block volume plugin can use it.
-	mps, err := mounter.List()
-	if err != nil {
-		return "", -1, err
-	}
-	mnt := ""
-	// Find the number of references to the device.
-	refCount := 0
-	for i := range mps {
-		if mps[i].Device == deviceName {
-			mnt = mps[i].Path
-			refCount++
-		}
-	}
-	return mnt, refCount, nil
 }

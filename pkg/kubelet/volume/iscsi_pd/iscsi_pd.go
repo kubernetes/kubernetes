@@ -18,13 +18,11 @@ package iscsi_pd
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/gce_pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
@@ -51,30 +49,6 @@ const (
 	ISCSIDiskPluginName       = "kubernetes.io/iscsi-pd"
 	ISCSIDiskPluginLegacyName = "iscsi-pd"
 )
-
-// Abstract interface to PD operations.
-type pdManager interface {
-	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(iscsi *iscsiDisk) error
-	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(iscsi *iscsiDisk, devicePath string) error
-}
-
-type iscsiDisk struct {
-	volName    string
-	podUID     types.UID
-	portal     string
-	iqn        string
-	readOnly   bool
-	lun        string
-	fsType     string
-	plugin     *ISCSIDiskPlugin
-	legacyMode bool
-	mounter    mount.Interface
-	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager pdManager
-	exec    exec.Interface
-}
 
 func (plugin *ISCSIDiskPlugin) Init(host volume.Host) {
 	plugin.host = host
@@ -104,7 +78,7 @@ func (plugin *ISCSIDiskPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (v
 	return plugin.newBuilderInternal(spec, podUID, &ISCSIDiskUtil{}, mount.New(), exec.New())
 }
 
-func (plugin *ISCSIDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+func (plugin *ISCSIDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager disk.PDManager, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
@@ -137,7 +111,7 @@ func (plugin *ISCSIDiskPlugin) NewCleaner(volName string, podUID types.UID) (vol
 	return plugin.newCleanerInternal(volName, podUID, &ISCSIDiskUtil{}, mount.New(), exec.New())
 }
 
-func (plugin *ISCSIDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface, exe exec.Interface) (volume.Cleaner, error) {
+func (plugin *ISCSIDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager disk.PDManager, mounter mount.Interface, exe exec.Interface) (volume.Cleaner, error) {
 	legacy := false
 	if plugin.legacyMode {
 		legacy = true
@@ -157,6 +131,22 @@ func (plugin *ISCSIDiskPlugin) newCleanerInternal(volName string, podUID types.U
 	}, nil
 }
 
+type iscsiDisk struct {
+	volName    string
+	podUID     types.UID
+	portal     string
+	iqn        string
+	readOnly   bool
+	lun        string
+	fsType     string
+	plugin     *ISCSIDiskPlugin
+	legacyMode bool
+	mounter    mount.Interface
+	// Utility interface that provides API calls to the provider to attach/detach disks.
+	manager disk.PDManager
+	exec    exec.Interface
+}
+
 func (iscsi *iscsiDisk) GetPath() string {
 	name := ISCSIDiskPluginName
 	if iscsi.legacyMode {
@@ -171,35 +161,12 @@ func (iscsi *iscsiDisk) SetUp() error {
 		return fmt.Errorf("legacy mode: can not create new instances")
 	}
 
-	globalPDPath := makeGlobalPDName(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
-	// TODO: handle failed mounts here.
-	mountpoint, err := gce_pd.IsMountPoint(iscsi.GetPath())
-
-	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("iscsiPersistentDisk: cannot validate mountpoint")
-		return err
-	}
-	if mountpoint {
-		return nil
-	}
-
-	if err := iscsi.manager.AttachDisk(iscsi); err != nil {
-		glog.Errorf("iSCSIPersistentDisk: failed to attach disk")
-		return err
-	}
-
-	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	flags := uintptr(0)
-	volPath := iscsi.GetPath()
-	if err := os.MkdirAll(volPath, 0750); err != nil {
-		return err
-	}
-	err = iscsi.mounter.Mount(globalPDPath, iscsi.GetPath(), "", mount.FlagBind|flags, "")
+	err := disk.CommonPDSetUp(iscsi.manager, *iscsi, iscsi.GetPath(), iscsi.mounter)
 	if err != nil {
-		glog.Errorf("iSCSIPersistentDisk: failed to bind mount")
+		glog.Errorf("iSCSIPersistentDisk: failed to setup")
 		return err
 	}
-
+	globalPDPath := iscsi.manager.MakeGlobalPDName(*iscsi)
 	// make mountpoint rw/ro work as expected
 	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
 	if iscsi.readOnly {
@@ -213,37 +180,7 @@ func (iscsi *iscsiDisk) SetUp() error {
 }
 
 func (iscsi *iscsiDisk) TearDown() error {
-	//glog.Infof("iSCSIPersistentDisk: iscsi path %s", iscsi.GetPath())
-	mountpoint, err := gce_pd.IsMountPoint(iscsi.GetPath())
-	if err != nil {
-		glog.Errorf("iSCSIPersistentDisk: cannot validate mountpoint %s", iscsi.GetPath())
-		return err
-	}
-	if !mountpoint {
-		return nil
-	}
-
-	refs, err := gce_pd.GetMountRefs(iscsi.mounter, iscsi.GetPath())
-	if err != nil {
-		glog.Errorf("iSCSIPersistentDisk: failed to get reference count %s", iscsi.GetPath())
-		return err
-	}
-	if err := iscsi.mounter.Unmount(iscsi.GetPath(), 0); err != nil {
-		glog.Errorf("iSCSIPersistentDisk: failed to umount %s", iscsi.GetPath())
-		return err
-	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		// pd.pdName is not initially set for volume-cleaners, so set it here.
-		devicePath := path.Base(refs[0])
-		if err := iscsi.manager.DetachDisk(iscsi, devicePath); err != nil {
-			glog.Errorf("iSCSIPersistentDisk: failed to detach disk from %s", devicePath)
-			return err
-		}
-	}
-	return nil
-
+	return disk.CommonPDTearDown(iscsi.manager, *iscsi, iscsi.GetPath(), iscsi.mounter)
 }
 
 func (iscsi *iscsiDisk) execCommand(command string, args []string) ([]byte, error) {
