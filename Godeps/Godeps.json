@@ -117,6 +117,10 @@
 			"Rev": "692a50017a7049b26cf7ea4ccfc0d8c77369a793"
 		},
 		{
+			"ImportPath": "github.com/evanphx/json-patch",
+			"Rev": "7dd4489c2eb6073e5a9d7746c3274c5b5f0387df"
+		},
+		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
 			"Rev": "d19717788084716e4adff0515be6289aa04bec46"
 		},
@@ -156,13 +160,13 @@
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
 		},
 		{
-			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
-			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
-		},
-		{
 			"ImportPath": "github.com/kr/pty",
 			"Comment": "release.r56-25-g05017fc",
 			"Rev": "05017fcccf23c823bfdea560dcc958a136e54fb7"
+		},
+		{
+			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
+			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
