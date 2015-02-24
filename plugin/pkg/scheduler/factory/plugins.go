@@ -120,17 +120,17 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(names util.StringSet) ([]algorithm.FitPredicate, error) {
+func getFitPredicateFunctions(names util.StringSet) (map[string]algorithm.FitPredicate, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	predicates := []algorithm.FitPredicate{}
+	predicates := map[string]algorithm.FitPredicate{}
 	for _, name := range names.List() {
 		function, ok := fitPredicateMap[name]
 		if !ok {
 			return nil, fmt.Errorf("Invalid predicate name %q specified - no corresponding function found", name)
 		}
-		predicates = append(predicates, function)
+		predicates[name] = function
 	}
 	return predicates, nil
 }
