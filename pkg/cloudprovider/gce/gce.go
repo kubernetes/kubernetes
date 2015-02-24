@@ -174,7 +174,11 @@ func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinit
 		Instances:       instances,
 		SessionAffinity: string(affinityType),
 	}
-	_, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
+	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
+	if err != nil {
+		return "", err
+	}
+	err = gce.waitForRegionOp(op, region)
 	if err != nil {
 		return "", err
 	}
@@ -186,7 +190,7 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 	pollOp := op
 	for pollOp.Status != "DONE" {
 		var err error
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second)
 		pollOp, err = gce.service.RegionOperations.Get(gce.projectID, region, op.Name).Do()
 		if err != nil {
 			return err
@@ -254,17 +258,34 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 		Instances: refs,
 	}
 
-	_, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, req).Do()
+	op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, req).Do()
+	gce.waitForRegionOp(op, region)
+	if err != nil {
+		return err
+	}
 	return err
 }
 
 // DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
 func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
-	_, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
+	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
 	if err != nil {
+		glog.Warningln("Failed to delete Forwarding Rules %s: got error %s. Trying to delete Target Pool", name, err.Error())
 		return err
+	} else {
+		err = gce.waitForRegionOp(op, region)
+		if err != nil {
+			glog.Warningln("Failed waiting for Forwarding Rule %s to be deleted: got error %s. Trying to delete Target Pool", name, err.Error())
+		}
 	}
-	_, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
+	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
+	if err != nil {
+		glog.Warningln("Failed to delete Target Pool %s, got error %s.", name, err.Error())
+	}
+	err = gce.waitForRegionOp(op, region)
+	if err != nil {
+		glog.Warningln("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
+	}
 	return err
 }
 
