@@ -141,7 +141,7 @@ func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, roo
 		admit:   admissionControl,
 		context: contextMapper,
 		mapper:  mapper,
-		info:    &APIRequestInfoResolver{util.NewStringSet(root), latest.RESTMapper},
+		info:    &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(root, "/")), latest.RESTMapper},
 	}
 }
 

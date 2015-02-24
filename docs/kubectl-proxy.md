@@ -4,7 +4,9 @@ Run a proxy to the Kubernetes API server
 
 ### Synopsis
 
+```
 Run a proxy to the Kubernetes API server.
+```
 
 kubectl proxy
 

@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -41,7 +42,6 @@ import (
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	kubeletServer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -211,13 +211,13 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// Kubelet (localhost)
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.")
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	kubeletServer.SimpleRunKubelet(cl, nil, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins())
+	kubeletapp.SimpleRunKubelet(cl, nil, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins())
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	kubeletServer.SimpleRunKubelet(cl, nil, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins())
+	kubeletapp.SimpleRunKubelet(cl, nil, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins())
 
 	return apiServer.URL
 }

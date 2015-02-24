@@ -4,7 +4,9 @@ Sets the current-context in a .kubeconfig file
 
 ### Synopsis
 
+```
 Sets the current-context in a .kubeconfig file
+```
 
 kubectl config use-context context-name
 

@@ -25,7 +25,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	cmd := cmd.NewFactory(nil).NewKubectlCommand(os.Stdout)
+	cmd := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}

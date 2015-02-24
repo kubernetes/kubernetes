@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -66,26 +65,6 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	return false
 }
 
-// Returns nil if the flag wasn't set.
-func GetFlagBoolPtr(cmd *cobra.Command, flag string) *bool {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	// Check if flag was not set at all.
-	if !f.Changed && f.DefValue == f.Value.String() {
-		return nil
-	}
-	var ret bool
-	// Caseless compare.
-	if strings.ToLower(f.Value.String()) == "true" {
-		ret = true
-	} else {
-		ret = false
-	}
-	return &ret
-}
-
 // Assumes the flag has a default value.
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	f := cmd.Flags().Lookup(flag)
@@ -107,33 +86,6 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	v, err := time.ParseDuration(f.Value.String())
 	checkErr(err)
 	return v
-}
-
-// Returns the first non-empty string out of the ones provided. If all
-// strings are empty, returns an empty string.
-func FirstNonEmptyString(args ...string) string {
-	for _, s := range args {
-		if len(s) > 0 {
-			return s
-		}
-	}
-	return ""
-}
-
-// Return a list of file names of a certain type within a given directory.
-// TODO: replace with resource.Builder
-func GetFilesFromDir(directory string, fileType string) []string {
-	files := []string{}
-
-	err := filepath.Walk(directory, func(path string, f os.FileInfo, err error) error {
-		if filepath.Ext(path) == fileType {
-			files = append(files, path)
-		}
-		return err
-	})
-
-	checkErr(err)
-	return files
 }
 
 // ReadConfigData reads the bytes from the specified filesytem or network

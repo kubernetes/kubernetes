@@ -23,7 +23,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
@@ -32,7 +32,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := server.NewAPIServer()
+	s := app.NewAPIServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()

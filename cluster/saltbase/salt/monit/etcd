@@ -3,7 +3,6 @@ group etcd
 start program = "/etc/init.d/etcd start"
 stop program = "/etc/init.d/etcd stop"
 if failed
-  host kubernetes-master
   port 4001
   protocol http
   request "/v2/keys/"

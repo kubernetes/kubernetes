@@ -26,53 +26,18 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
-func mergeFlags(old, newFlags *pflag.FlagSet) *pflag.FlagSet {
-	newFlags.VisitAll(func(f *pflag.Flag) {
-		if old.Lookup(f.Name) == nil {
-			old.AddFlag(f)
-		}
-	})
-	return old
-}
-
-func parentFlags(c *cobra.Command) *pflag.FlagSet {
-	if !c.HasParent() {
-		return pflag.NewFlagSet("empty", pflag.ExitOnError)
-	}
-	return mergeFlags(c.Parent().PersistentFlags(), parentFlags(c.Parent()))
-}
-
-func myFlags(c *cobra.Command) *pflag.FlagSet {
-	myFlags := c.Flags()
-	parentFlags := parentFlags(c)
-
-	if c.HasPersistentFlags() {
-		c.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-			if c.Flags().Lookup(f.Name) == nil &&
-				parentFlags.Lookup(f.Name) == nil {
-				myFlags.AddFlag(f)
-			}
-		})
-	}
-	return myFlags
-}
-
 func printOptions(out *bytes.Buffer, command *cobra.Command, name string) {
-	flags := myFlags(command)
+	flags := command.NonInheritedFlags()
 	flags.SetOutput(out)
-	if command.Runnable() {
-		fmt.Fprintf(out, "%s\n\n", command.UseLine())
-	}
 	if flags.HasFlags() {
 		fmt.Fprintf(out, "### Options\n\n```\n")
 		flags.PrintDefaults()
 		fmt.Fprintf(out, "```\n\n")
 	}
 
-	parentFlags := parentFlags(command)
+	parentFlags := command.InheritedFlags()
 	parentFlags.SetOutput(out)
 	if parentFlags.HasFlags() {
 		fmt.Fprintf(out, "### Options inherrited from parent commands\n\n```\n")
@@ -100,7 +65,16 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 	fmt.Fprintf(out, "## %s\n\n", name)
 	fmt.Fprintf(out, "%s\n\n", short)
 	fmt.Fprintf(out, "### Synopsis\n\n")
-	fmt.Fprintf(out, "%s\n\n", long)
+	fmt.Fprintf(out, "```\n%s\n```\n\n", long)
+
+	if command.Runnable() {
+		fmt.Fprintf(out, "%s\n\n", command.UseLine())
+	}
+
+	if len(command.Example) > 0 {
+		fmt.Fprintf(out, "### Examples\n\n")
+		fmt.Fprintf(out, "```\n%s\n```\n\n", command.Example)
+	}
 
 	printOptions(out, command, name)
 
@@ -164,7 +138,8 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewFactory(nil).NewKubectlCommand(ioutil.Discard)
+	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
+	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
 	genMarkdown(kubectl, "", docsDir)
 	for _, c := range kubectl.Commands() {
 		genMarkdown(c, "kubectl", docsDir)

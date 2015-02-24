@@ -27,28 +27,27 @@ import (
 )
 
 const (
-	updatePeriod = "1m0s"
-	timeout      = "5m0s"
-	pollInterval = "3s"
+	updatePeriod       = "1m0s"
+	timeout            = "5m0s"
+	pollInterval       = "3s"
+	rollingupdate_long = `Perform a rolling update of the given ReplicationController.
+
+Replaces the specified controller with new controller, updating one pod at a time to use the
+new PodTemplate. The new-controller.json must specify the same namespace as the
+existing controller and overwrite at least one (common) label in its replicaSelector.`
+	rollingupdate_example = `// Update pods of frontend-v1 using new controller data in frontend-v2.json.
+$ kubectl rollingupdate frontend-v1 -f frontend-v2.json
+
+// Update pods of frontend-v1 using JSON data passed into stdin.
+$ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -`
 )
 
 func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rollingupdate <old-controller-name> -f <new-controller.json>",
-		Short: "Perform a rolling update of the given ReplicationController.",
-		Long: `Perform a rolling update of the given ReplicationController.
-
-Replaces the specified controller with new controller, updating one pod at a time to use the
-new PodTemplate. The new-controller.json must specify the same namespace as the
-existing controller and overwrite at least one (common) label in its replicaSelector.
-
-Examples:
-
-    // Update pods of frontend-v1 using new controller data in frontend-v2.json.
-    $ kubectl rollingupdate frontend-v1 -f frontend-v2.json
-
-    // Update pods of frontend-v1 using JSON data passed into stdin.
-    $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -`,
+		Use:     "rollingupdate <old-controller-name> -f <new-controller.json>",
+		Short:   "Perform a rolling update of the given ReplicationController.",
+		Long:    rollingupdate_long,
+		Example: rollingupdate_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			filename := util.GetFlagString(cmd, "filename")
 			if len(filename) == 0 {
@@ -69,6 +68,7 @@ Examples:
 			cmdApiVersion := clientConfig.Version
 
 			mapper, typer := f.Object(cmd)
+			// TODO: use resource.Builder instead
 			mapping, namespace, newName, data := util.ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
 			if mapping.Kind != "ReplicationController" {
 				usageError(cmd, "%s does not specify a valid ReplicationController", filename)
@@ -80,6 +80,7 @@ Examples:
 
 			cmdNamespace, err := f.DefaultNamespace(cmd)
 			checkErr(err)
+			// TODO: use resource.Builder instead
 			err = util.CompareNamespace(cmdNamespace, namespace)
 			checkErr(err)
 
@@ -90,13 +91,10 @@ Examples:
 			checkErr(err)
 			newRc := obj.(*api.ReplicationController)
 
-			if len(namespace) == 0 {
-				namespace = api.NamespaceDefault
-			}
-			updater := kubectl.NewRollingUpdater(namespace, client)
+			updater := kubectl.NewRollingUpdater(cmdNamespace, client)
 
 			// fetch rc
-			oldRc, err := client.ReplicationControllers(namespace).Get(oldName)
+			oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
 			checkErr(err)
 
 			var hasLabel bool

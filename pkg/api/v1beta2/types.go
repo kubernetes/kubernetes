@@ -64,29 +64,29 @@ type VolumeSource struct {
 	// things that are allowed to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and
 	// who can/can not mount host directories as read/write.
-	HostDir *HostPath `json:"hostDir" description:"pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"`
+	HostDir *HostPathVolumeSource `json:"hostDir" description:"pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
-	EmptyDir *EmptyDir `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
+	EmptyDir *EmptyDirVolumeSource `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
 	// A persistent disk that is mounted to the
 	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDisk `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
+	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
-	GitRepo *GitRepo `json:"gitRepo" description:"git repository at a particular revision"`
+	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret is a secret to populate the volume with
-	Secret *SecretSource `json:"secret" description:"secret to populate volume"`
+	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume"`
 }
 
-// HostPath represents bare host directory volume.
-type HostPath struct {
+// HostPathVolumeSource represents bare host directory volume.
+type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
-type EmptyDir struct{}
+type EmptyDirVolumeSource struct{}
 
-// Adapts a Secret into a VolumeSource
-type SecretSource struct {
+// SecretVolumeSource adapts a Secret into a VolumeSource
+type SecretVolumeSource struct {
 	// Reference to a Secret
-	Target ObjectReference `json:"target"`
+	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 
 // Protocol defines network protocols supported for things like conatiner ports.
@@ -114,12 +114,12 @@ type Port struct {
 	HostIP string `json:"hostIP,omitempty" description:"host IP to bind the port to"`
 }
 
-// GCEPersistentDisk represents a Persistent Disk resource in Google Compute Engine.
+// GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
-type GCEPersistentDisk struct {
+type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName" description:"unique name of the PD resource in GCE"`
 	// Required: Filesystem type to mount.
@@ -137,8 +137,8 @@ type GCEPersistentDisk struct {
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
 }
 
-// GitRepo represents a volume that is pulled from git when the pod is created.
-type GitRepo struct {
+// GitRepoVolumeSource represents a volume that is pulled from git when the pod is created.
+type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string `json:"repository" description:"repository URL"`
 	// Commit hash, this is optional
@@ -398,6 +398,7 @@ type ContainerStatus struct {
 	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
 }
 
+// PodConditionKind is a valid value for PodCondition.Kind
 type PodConditionKind string
 
 // These are valid conditions of pod.
@@ -409,8 +410,10 @@ const (
 
 // TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
 type PodCondition struct {
-	Kind   PodConditionKind `json:"kind" description:"kind of the condition, currently only Ready"`
-	Status ConditionStatus  `json:"status" description:"status of the condition, one of Full, None, Unknown"`
+	// Kind is the kind of the condition
+	Kind PodConditionKind `json:"kind" description:"kind of the condition, currently only Ready"`
+	// Status is the status of the condition
+	Status ConditionStatus `json:"status" description:"status of the condition, one of Full, None, Unknown"`
 }
 
 // PodInfo contains one entry for every container with available info.
@@ -565,8 +568,11 @@ type Service struct {
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	TypeMeta  `json:",inline"`
-	Endpoints []string `json:"endpoints,omitempty" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
+	TypeMeta `json:",inline"`
+	// Optional: The IP protocol for these endpoints. Supports "TCP" and
+	// "UDP".  Defaults to "TCP".
+	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"`
+	Endpoints []string `json:"endpoints" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
 }
 
 // EndpointsList is a list of endpoints.
@@ -640,6 +646,8 @@ type Minion struct {
 	TypeMeta `json:",inline"`
 	// Queried from cloud provider, if available.
 	HostIP string `json:"hostIP,omitempty" description:"IP address of the node"`
+	// Pod IP range assigned to the node
+	PodCIDR string `json:"cidr,omitempty" description:"IP range assigned to the node"`
 	// Resources available on the node
 	NodeResources NodeResources `json:"resources,omitempty" description:"characterization of node resources"`
 	// Status describes the current status of a node
@@ -671,17 +679,18 @@ type Namespace struct {
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize namespaces"`
 
 	// Spec defines the behavior of the Namespace.
-	Spec NamespaceSpec `json:"spec,omitempty"`
+	Spec NamespaceSpec `json:"spec,omitempty" description:"spec defines the behavior of the Namespace"`
 
 	// Status describes the current status of a Namespace
-	Status NamespaceStatus `json:"status,omitempty"`
+	Status NamespaceStatus `json:"status,omitempty" description:"status describes the current status of a Namespace"`
 }
 
 // NamespaceList is a list of Namespaces.
 type NamespaceList struct {
 	TypeMeta `json:",inline"`
 
-	Items []Namespace `json:"items"`
+	// Items is the list of Namespace objects in the list
+	Items []Namespace `json:"items"  description:"items is the list of Namespace objects in the list"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
@@ -1020,17 +1029,17 @@ const (
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind
 type LimitRangeItem struct {
 	// Type of resource that this limit applies to
-	Type LimitType `json:"type,omitempty"`
+	Type LimitType `json:"type,omitempty" description:"type of resource that this limit applies to"`
 	// Max usage constraints on this kind by resource name
-	Max ResourceList `json:"max,omitempty"`
+	Max ResourceList `json:"max,omitempty" description:"max usage constraints on this kind by resource name"`
 	// Min usage constraints on this kind by resource name
-	Min ResourceList `json:"min,omitempty"`
+	Min ResourceList `json:"min,omitempty" description:"min usage constraints on this kind by resource name"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind
 type LimitRangeSpec struct {
 	// Limits is the list of LimitRangeItem objects that are enforced
-	Limits []LimitRangeItem `json:"limits"`
+	Limits []LimitRangeItem `json:"limits" description:"limits is the list of LimitRangeItem objects that are enforced"`
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
@@ -1038,7 +1047,7 @@ type LimitRange struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the limits enforced
-	Spec LimitRangeSpec `json:"spec,omitempty"`
+	Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced"`
 }
 
 // LimitRangeList is a list of LimitRange items.
@@ -1046,7 +1055,7 @@ type LimitRangeList struct {
 	TypeMeta `json:",inline"`
 
 	// Items is a list of LimitRange objects
-	Items []LimitRange `json:"items"`
+	Items []LimitRange `json:"items" description:"items is a list of LimitRange objects"`
 }
 
 // The following identify resource constants for Kubernetes object types
@@ -1064,15 +1073,15 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource
-	Hard ResourceList `json:"hard,omitempty"`
+	Hard ResourceList `json:"hard,omitempty" description:"hard is the set of desired hard limits for each named resource"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource
-	Hard ResourceList `json:"hard,omitempty"`
+	Hard ResourceList `json:"hard,omitempty" description:"hard is the set of enforced hard limits for each named resource"`
 	// Used is the current observed total usage of the resource in the namespace
-	Used ResourceList `json:"used,omitempty"`
+	Used ResourceList `json:"used,omitempty" description:"used is the current observed total usage of the resource in the namespace"`
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -1080,10 +1089,10 @@ type ResourceQuota struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the desired quota
-	Spec ResourceQuotaSpec `json:"spec,omitempty"`
+	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota"`
 
 	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty"`
+	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage"`
 }
 
 // ResourceQuotaUsage captures system observed quota status per namespace
@@ -1092,7 +1101,7 @@ type ResourceQuotaUsage struct {
 	TypeMeta `json:",inline"`
 
 	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty"`
+	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage"`
 }
 
 // ResourceQuotaList is a list of ResourceQuota items
@@ -1100,7 +1109,7 @@ type ResourceQuotaList struct {
 	TypeMeta `json:",inline"`
 
 	// Items is a list of ResourceQuota objects
-	Items []ResourceQuota `json:"items"`
+	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects"`
 }
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
@@ -1109,11 +1118,12 @@ type Secret struct {
 	TypeMeta `json:",inline"`
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
-	Data map[string][]byte `json:"data,omitempty"`
+	// The serialized form of the secret data is a base64 encoded string,
+	// representing the arbitrary (possibly non-string) data value here.
+	Data map[string][]byte `json:"data,omitempty" description:"data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"`
 
 	// Used to facilitate programatic handling of secret data.
-	// The serialized form of the secret data is a base64 encoded string.
-	Type SecretType `json:"type,omitempty"`
+	Type SecretType `json:"type,omitempty" description:"type facilitates programmatic handling of secret data"`
 }
 
 const MaxSecretSize = 1 * 1024 * 1024
@@ -1121,11 +1131,11 @@ const MaxSecretSize = 1 * 1024 * 1024
 type SecretType string
 
 const (
-	SecretTypeOpaque SecretType = "opaque" // Default; arbitrary user-defined data
+	SecretTypeOpaque SecretType = "Opaque" // Default; arbitrary user-defined data
 )
 
 type SecretList struct {
 	TypeMeta `json:",inline"`
 
-	Items []Secret `json:"items"`
+	Items []Secret `json:"items" description:"items is a list of secret objects"`
 }

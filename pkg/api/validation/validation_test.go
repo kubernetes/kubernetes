@@ -147,13 +147,13 @@ func TestValidateAnnotations(t *testing.T) {
 
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
-		{Name: "abc", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path1"}}},
-		{Name: "123", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path2"}}},
-		{Name: "abc-123", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/path3"}}},
-		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
-		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
-		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepo{"my-repo", "hashstring"}}},
-		{Name: "secret", Source: api.VolumeSource{Secret: &api.SecretSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
+		{Name: "abc", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path1"}}},
+		{Name: "123", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path2"}}},
+		{Name: "abc-123", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path3"}}},
+		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}},
+		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
+		{Name: "secret", Source: api.VolumeSource{Secret: &api.SecretVolumeSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -162,7 +162,7 @@ func TestValidateVolumes(t *testing.T) {
 	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret") {
 		t.Errorf("wrong names result: %v", names)
 	}
-	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDir{}}
+	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T errors.ValidationErrorType
@@ -573,8 +573,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol1"}}},
-				{Name: "vol2", Source: api.VolumeSource{HostPath: &api.HostPath{"/mnt/vol2"}}}},
+			Volumes: []api.Volume{{Name: "vol1", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol1"}}},
+				{Name: "vol2", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol2"}}}},
 			Containers: []api.Container{
 				{
 					Name:       "abc",
@@ -624,7 +624,7 @@ func TestValidateManifest(t *testing.T) {
 		"invalid volume name": {
 			Version:       "v1beta1",
 			ID:            "abc",
-			Volumes:       []api.Volume{{Name: "vol.1", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}},
+			Volumes:       []api.Volume{{Name: "vol.1", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -647,14 +647,14 @@ func TestValidateManifest(t *testing.T) {
 func TestValidatePodSpec(t *testing.T) {
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
-			Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}},
+			Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate all fields.
 			Volumes: []api.Volume{
-				{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+				{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -703,7 +703,7 @@ func TestValidatePod(t *testing.T) {
 		{ // Basic fields.
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
-				Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}},
+				Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
@@ -713,7 +713,7 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
-					{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+					{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -1005,7 +1005,7 @@ func TestValidateBoundPods(t *testing.T) {
 		{ // Basic fields.
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
-				Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}}},
+				Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
@@ -1015,7 +1015,7 @@ func TestValidateBoundPods(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
-					{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+					{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -1477,7 +1477,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
-				Volumes:       []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
+				Volumes:       []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
 			},
 		},
 	}
@@ -1635,7 +1635,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				Volumes:       []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
+				Volumes:       []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -2302,8 +2302,7 @@ func TestValidateLimitRange(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "name" &&
-				field != "namespace" {
+			if field != "metadata.name" && field != "metadata.namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 			if detail != v.D {
@@ -2370,8 +2369,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "name" &&
-				field != "namespace" {
+			if field != "metadata.name" && field != "metadata.namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 			if detail != v.D {

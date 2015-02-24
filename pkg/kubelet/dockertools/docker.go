@@ -198,6 +198,127 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	return buf.Bytes(), <-errChan
 }
 
+// ExecInContainer uses nsenter to run the command inside the container identified by containerID.
+//
+// TODO:
+//  - match cgroups of container
+//  - should we support `docker exec`?
+//  - should we support nsenter in a container, running with elevated privs and --pid=host?
+func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	container, err := d.client.InspectContainer(containerId)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container)
+	}
+
+	containerPid := container.State.Pid
+
+	// TODO what if the container doesn't have `env`???
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
+	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
+	args = append(args, container.Config.Env...)
+	args = append(args, cmd...)
+	glog.Infof("ARGS %#v", args)
+	command := exec.Command("nsenter", args...)
+	// TODO use exec.LookPath
+	if tty {
+		p, err := StartPty(command)
+		if err != nil {
+			return err
+		}
+		defer p.Close()
+
+		// make sure to close the stdout stream
+		defer stdout.Close()
+
+		if stdin != nil {
+			go io.Copy(p, stdin)
+		}
+
+		if stdout != nil {
+			go io.Copy(stdout, p)
+		}
+
+		return command.Wait()
+	} else {
+		cp := func(dst io.WriteCloser, src io.Reader, closeDst bool) {
+			defer func() {
+				if closeDst {
+					dst.Close()
+				}
+			}()
+			io.Copy(dst, src)
+		}
+		if stdin != nil {
+			inPipe, err := command.StdinPipe()
+			if err != nil {
+				return err
+			}
+			go func() {
+				cp(inPipe, stdin, false)
+				inPipe.Close()
+			}()
+		}
+
+		if stdout != nil {
+			outPipe, err := command.StdoutPipe()
+			if err != nil {
+				return err
+			}
+			go cp(stdout, outPipe, true)
+		}
+
+		if stderr != nil {
+			errPipe, err := command.StderrPipe()
+			if err != nil {
+				return err
+			}
+			go cp(stderr, errPipe, true)
+		}
+
+		return command.Run()
+	}
+}
+
+// PortForward executes socat in the pod's network namespace and copies
+// data between stream (representing the user's local connection on their
+// computer) and the specified port in the container.
+//
+// TODO:
+//  - match cgroups of container
+//  - should we support nsenter + socat on the host? (current impl)
+//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
+func (d *dockerContainerCommandRunner) PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+	container, err := d.client.InspectContainer(podInfraContainerID)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container)
+	}
+
+	containerPid := container.State.Pid
+	// TODO use exec.LookPath for socat / what if the host doesn't have it???
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+	// TODO use exec.LookPath
+	command := exec.Command("nsenter", args...)
+	in, err := command.StdinPipe()
+	if err != nil {
+		return err
+	}
+	out, err := command.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	go io.Copy(in, stream)
+	go io.Copy(stream, out)
+	return command.Run()
+}
+
 // NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
 // inside a container.
 func NewDockerContainerCommandRunner(client DockerInterface) ContainerCommandRunner {
@@ -690,4 +811,6 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
 	GetDockerServerVersion() ([]uint, error)
+	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error
 }

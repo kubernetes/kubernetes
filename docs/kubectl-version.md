@@ -4,7 +4,9 @@ Print the client and server version information.
 
 ### Synopsis
 
+```
 Print the client and server version information.
+```
 
 kubectl version
 

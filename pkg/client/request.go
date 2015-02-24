@@ -18,6 +18,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 	"github.com/golang/glog"
@@ -277,7 +279,7 @@ func (r *Request) setParam(paramName, value string) *Request {
 	if r.params == nil {
 		r.params = make(url.Values)
 	}
-	r.params[paramName] = []string{value}
+	r.params[paramName] = append(r.params[paramName], value)
 	return r
 }
 
@@ -347,8 +349,10 @@ func (r *Request) finalURL() string {
 	finalURL.Path = p
 
 	query := url.Values{}
-	for key, value := range r.params {
-		query[key] = value
+	for key, values := range r.params {
+		for _, value := range values {
+			query.Add(key, value)
+		}
 	}
 
 	if r.namespaceSet && r.namespaceInQuery {
@@ -434,6 +438,41 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
+// Upgrade upgrades the request so that it supports multiplexed bidirectional
+// streams. The current implementation uses SPDY, but this could be replaced
+// with HTTP/2 once it's available, or something else.
+func (r *Request) Upgrade(config *Config, newRoundTripperFunc func(*tls.Config) httpstream.UpgradeRoundTripper) (httpstream.Connection, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	upgradeRoundTripper := newRoundTripperFunc(tlsConfig)
+	wrapper, err := HTTPWrappersForConfig(config, upgradeRoundTripper)
+	if err != nil {
+		return nil, err
+	}
+
+	r.client = &http.Client{Transport: wrapper}
+
+	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating request: %s", err)
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Error sending request: %s", err)
+	}
+	defer resp.Body.Close()
+
+	return upgradeRoundTripper.NewConnection(resp)
+}
+
 // Do formats and executes the request. Returns a Result object for easy response
 // processing.
 //
@@ -513,6 +552,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) ([]b
 	}
 
 	switch {
+	case resp.StatusCode == http.StatusSwitchingProtocols:
+		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
 			var err error = &UnexpectedStatusError{

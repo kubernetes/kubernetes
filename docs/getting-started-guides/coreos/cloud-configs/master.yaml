@@ -79,7 +79,6 @@ coreos:
         After=etcd.service
         After=network-online.target
         Before=flannel.service
-        Before=setup-network-environment.service
 
         [Service]
         ExecStartPre=/usr/bin/chmod +x /opt/bin/waiter.sh

@@ -82,7 +82,7 @@ var _ = Describe("Secrets", func() {
 					{
 						Name: volumeName,
 						Source: api.VolumeSource{
-							Secret: &api.SecretSource{
+							Secret: &api.SecretVolumeSource{
 								Target: api.ObjectReference{
 									Kind:      "Secret",
 									Namespace: ns,

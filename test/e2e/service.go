@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -77,7 +76,7 @@ var _ = Describe("Services", func() {
 					{
 						Name: "results",
 						Source: api.VolumeSource{
-							EmptyDir: &api.EmptyDir{},
+							EmptyDir: &api.EmptyDirVolumeSource{},
 						},
 					},
 				},
@@ -207,7 +206,7 @@ var _ = Describe("Services", func() {
 		}
 		_, err := c.Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
-		expectedPort := "80"
+		expectedPort := 80
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, []string{})
 
@@ -248,17 +247,13 @@ var _ = Describe("Services", func() {
 	}, 120.0)
 })
 
-func validateIPsOrFail(c *client.Client, ns, expectedPort string, expectedEndpoints []string, endpoints *api.Endpoints) {
+func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEndpoints []string, endpoints *api.Endpoints) {
 	ips := util.StringSet{}
-	for _, spec := range endpoints.Endpoints {
-		host, port, err := net.SplitHostPort(spec)
-		if err != nil {
-			Fail(fmt.Sprintf("invalid endpoint spec: %s (%v)", spec, err))
+	for _, ep := range endpoints.Endpoints {
+		if ep.Port != expectedPort {
+			Fail(fmt.Sprintf("invalid port, expected %d, got %d", expectedPort, ep.Port))
 		}
-		if port != expectedPort {
-			Fail(fmt.Sprintf("invalid port, expected %s, got %s", expectedPort, port))
-		}
-		ips.Insert(host)
+		ips.Insert(ep.IP)
 	}
 
 	for _, name := range expectedEndpoints {
@@ -272,7 +267,7 @@ func validateIPsOrFail(c *client.Client, ns, expectedPort string, expectedEndpoi
 	}
 }
 
-func validateEndpointsOrFail(c *client.Client, ns, serviceName, expectedPort string, expectedEndpoints []string) {
+func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedPort int, expectedEndpoints []string) {
 	for {
 		endpoints, err := c.Endpoints(ns).Get(serviceName)
 		if err == nil {

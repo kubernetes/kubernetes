@@ -163,7 +163,7 @@ function verify-cluster {
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
-      minions=$("${KUBE_ROOT}/cluster/kubectl.sh --kubeconfig=${HOME}/.kubernetes_vagrant_kubeconfig" get minions -o template -t '{{range.items}}{{.id}}:{{end}}')
+      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t '{{range.items}}{{.id}}:{{end}}')
       count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
         printf "."
         sleep 2
@@ -214,6 +214,7 @@ EOF
 apiVersion: v1
 clusters:
 - cluster:
+    certificate-authority: ${HOME}/$ca_cert
     server: https://${MASTER_IP}:443
   name: vagrant
 contexts:

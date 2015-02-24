@@ -151,9 +151,35 @@ for version in "${kube_api_versions[@]}"; do
   kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
   [ ! $(kubectl delete pods "${kube_flags[@]}" ) ]
   kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
-  [ ! $(delete pods --all pods -l name=redis-master) ]   # not --all and label selector together
+  [ ! $(delete pods --all pods -l name=redis-master "${kube_flags[@]}" ) ]   # not --all and label selector together
   kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
+  kubectl get pods redis-master redis-proxy "${kube_flags[@]}"
+  kubectl delete pods redis-master redis-proxy # delete multiple pods at once
   howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 0 ]
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
+  kubectl stop pods redis-master redis-proxy # stop multiple pods at once
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 0 ]
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 1 ]
+
+  #testing pods and label command command
+  kubectl label pods redis-master new-name=new-redis-master "${kube_flags[@]}"
+  kubectl delete pods -lnew-name=new-redis-master "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 0 ]
+  kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$howmanypods" -eq 1 ]
+  ! $(kubectl label pods redis-master name=redis-super-sayan "${kube_flags[@]}" )
+  kubectl label --overwrite pods redis-master name=redis-super-sayan "${kube_flags[@]}"
+  kubectl delete pods -lname=redis-super-sayan "${kube_flags[@]}"
+  howmanypods="$(kubectl get pods  -lname=redis-super-sayan -o template -t "{{ len .items }}" "${kube_flags[@]}")"
   [ "$howmanypods" -eq 0 ]
 
   # make calls in another namespace
@@ -180,18 +206,37 @@ for version in "${kube_api_versions[@]}"; do
           }
       }
 __EOF__
-  kubectl update service service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}" 
+  kubectl update service service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}"
   kubectl get service service-${version}-test -o json | kubectl update -f -
   kubectl get services "${kube_flags[@]}"
   kubectl get services "service-${version}-test" "${kube_flags[@]}"
   kubectl delete service frontend "${kube_flags[@]}"
+  servicesbefore="$(kubectl get services  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  kubectl create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-slave-service.json "${kube_flags[@]}"
+  kubectl delete services frontend redisslave # delete multiple services at once
+  servicesafter="$(kubectl get services  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$((${servicesafter} - ${servicesbefore}))" -eq 0 ]
 
   kube::log::status "Testing kubectl(${version}:replicationcontrollers)"
   kubectl get replicationcontrollers "${kube_flags[@]}"
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   kubectl get replicationcontrollers "${kube_flags[@]}"
   kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
+  #resize with current-replicas and replicas
+  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  kubectl describe replicationcontroller frontend-controller "${kube_flags[@]}" | grep -q 'Replicas:.*2 desired'
+  #resize with (wrong) current-replicas and replicas
+  [ !  $(resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}") ]
+  #resize replicas-only
+  kubectl resize  --replicas=3 replicationcontrollers frontend-controller "${kube_flags[@]}"
   kubectl delete rc frontend-controller "${kube_flags[@]}"
+  rcsbefore="$(kubectl get replicationcontrollers  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-slave-controller.json "${kube_flags[@]}"
+  kubectl delete rc frontend-controller redis-slave-controller "${kube_flags[@]}" # delete multiple controllers at once
+  rcsafter="$(kubectl get replicationcontrollers  -o template -t "{{ len .items }}" "${kube_flags[@]}")"
+  [ "$((${rcsafter} - ${rcsbefore}))" -eq 0 ]
 
   kube::log::status "Testing kubectl(${version}:nodes)"
   kubectl get nodes "${kube_flags[@]}"

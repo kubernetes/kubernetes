@@ -230,6 +230,17 @@ func TestLabelFunc(t *testing.T) {
 				},
 			},
 		},
+		{
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{},
+			},
+			labels: map[string]string{"a": "b"},
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		out, err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)

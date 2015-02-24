@@ -62,7 +62,8 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewFactory(nil).NewKubectlCommand(ioutil.Discard)
+	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
+	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
 	genMarkdown(kubectl, "", docsDir)
 	for _, c := range kubectl.Commands() {
 		genMarkdown(c, "kubectl", docsDir)
@@ -99,18 +100,18 @@ func printFlags(out *bytes.Buffer, flags *pflag.FlagSet) {
 }
 
 func printOptions(out *bytes.Buffer, command *cobra.Command) {
-	var flags *pflag.FlagSet
-	if command.HasFlags() {
-		flags = command.Flags()
-	} else if !command.HasParent() && command.HasPersistentFlags() {
-		flags = command.PersistentFlags()
+	flags := command.NonInheritedFlags()
+	if flags.HasFlags() {
+		fmt.Fprintf(out, "# OPTIONS\n")
+		printFlags(out, flags)
+		fmt.Fprintf(out, "\n")
 	}
-	if flags == nil {
-		return
+	flags = command.InheritedFlags()
+	if flags.HasFlags() {
+		fmt.Fprintf(out, "# OPTIONS INHERITED FROM PARENT COMMANDS\n")
+		printFlags(out, flags)
+		fmt.Fprintf(out, "\n")
 	}
-	fmt.Fprintf(out, "# OPTIONS\n")
-	printFlags(out, flags)
-	fmt.Fprintf(out, "\n")
 }
 
 func genMarkdown(command *cobra.Command, parent, docsDir string) {
@@ -131,6 +132,11 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 
 	preamble(out, name, short, long)
 	printOptions(out, command)
+
+	if len(command.Example) > 0 {
+		fmt.Fprintf(out, "# EXAMPLE\n")
+		fmt.Fprintf(out, "```\n%s\n```\n", command.Example)
+	}
 
 	if len(command.Commands()) > 0 || len(parent) > 0 {
 		fmt.Fprintf(out, "# SEE ALSO\n")

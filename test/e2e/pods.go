@@ -124,16 +124,14 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("submitting the pod to kubernetes")
+		// We call defer here in case there is a problem with
+		// the test so we can ensure that we clean up after
+		// ourselves
+		defer podClient.Delete(pod.Name)
 		_, err := podClient.Create(pod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
-		defer func() {
-			// We call defer here in case there is a problem with
-			// the test so we can ensure that we clean up after
-			// ourselves
-			podClient.Delete(pod.Name)
-		}()
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -183,14 +181,14 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("submitting the pod to kubernetes")
-		_, err := podClient.Create(pod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
-		}
 		defer func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name)
 		}()
+		_, err := podClient.Create(pod)
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+		}
 
 		By("waiting for the pod to start running")
 		expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
@@ -243,13 +241,11 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
+		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
 		_, err := c.Pods(api.NamespaceDefault).Create(serverPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
 		}
-		defer func() {
-			c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
-		}()
 		expectNoError(waitForPodRunning(c, serverPod.Name, 300*time.Second))
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
@@ -275,13 +271,11 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
+		defer c.Services(api.NamespaceDefault).Delete(svc.Name)
 		_, err = c.Services(api.NamespaceDefault).Create(svc)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create service: %v", err))
 		}
-		defer func() {
-			c.Services(api.NamespaceDefault).Delete(svc.Name)
-		}()
 
 		// TODO: we don't have a way to wait for a service to be "running".  // If this proves flaky, then we will need to retry the clientPod or insert a sleep.
 
@@ -305,13 +299,11 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
+		defer c.Pods(api.NamespaceDefault).Delete(clientPod.Name)
 		_, err = c.Pods(api.NamespaceDefault).Create(clientPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
-		defer func() {
-			c.Pods(api.NamespaceDefault).Delete(clientPod.Name)
-		}()
 
 		// Wait for client pod to complete.
 		expectNoError(waitForPodRunning(c, clientPod.Name, 60*time.Second))
@@ -415,4 +407,178 @@ var _ = Describe("Pods", func() {
 			},
 		})
 	})
+
+	// The following tests for remote command execution and port forwarding are
+	// commented out because the GCE environment does not currently have nsenter
+	// in the kubelet's PATH, nor does it have socat installed. Once we figure
+	// out the best way to have nsenter and socat available in GCE (and hopefully
+	// all providers), we can enable these tests.
+	/*
+		It("should support remote command execution", func() {
+			clientConfig, err := loadConfig()
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to create client config: %v", err))
+			}
+
+			podClient := c.Pods(api.NamespaceDefault)
+
+			By("creating the pod")
+			name := "pod-exec-" + string(util.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: name,
+					Labels: map[string]string{
+						"name": "foo",
+						"time": value,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "nginx",
+							Image: "dockerfile/nginx",
+						},
+					},
+				},
+			}
+
+			By("submitting the pod to kubernetes")
+			_, err = podClient.Create(pod)
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to create pod: %v", err))
+			}
+			defer func() {
+				// We call defer here in case there is a problem with
+				// the test so we can ensure that we clean up after
+				// ourselves
+				podClient.Delete(pod.Name)
+			}()
+
+			By("waiting for the pod to start running")
+			expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
+
+			By("verifying the pod is in kubernetes")
+			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+			}
+			Expect(len(pods.Items)).To(Equal(1))
+
+			pod = &pods.Items[0]
+			By(fmt.Sprintf("executing command on host %s pod %s in container %s",
+				pod.Status.Host, pod.Name, pod.Spec.Containers[0].Name))
+			req := c.Get().
+				Prefix("proxy").
+				Resource("minions").
+				Name(pod.Status.Host).
+				Suffix("exec", api.NamespaceDefault, pod.Name, pod.Spec.Containers[0].Name)
+
+			out := &bytes.Buffer{}
+			e := remotecommand.New(req, clientConfig, []string{"whoami"}, nil, out, nil, false)
+			err = e.Execute()
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to execute command on host %s pod %s in container %s: %v",
+					pod.Status.Host, pod.Name, pod.Spec.Containers[0].Name, err))
+			}
+			if e, a := "root\n", out.String(); e != a {
+				Fail(fmt.Sprintf("exec: whoami: expected '%s', got '%s'", e, a))
+			}
+		})
+
+		It("should support port forwarding", func() {
+			clientConfig, err := loadConfig()
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to create client config: %v", err))
+			}
+
+			podClient := c.Pods(api.NamespaceDefault)
+
+			By("creating the pod")
+			name := "pod-portforward-" + string(util.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: name,
+					Labels: map[string]string{
+						"name": "foo",
+						"time": value,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "nginx",
+							Image: "dockerfile/nginx",
+							Ports: []api.Port{{ContainerPort: 80}},
+						},
+					},
+				},
+			}
+
+			By("submitting the pod to kubernetes")
+			_, err = podClient.Create(pod)
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to create pod: %v", err))
+			}
+			defer func() {
+				// We call defer here in case there is a problem with
+				// the test so we can ensure that we clean up after
+				// ourselves
+				podClient.Delete(pod.Name)
+			}()
+
+			By("waiting for the pod to start running")
+			expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
+
+			By("verifying the pod is in kubernetes")
+			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+			if err != nil {
+				Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+			}
+			Expect(len(pods.Items)).To(Equal(1))
+
+			pod = &pods.Items[0]
+			By(fmt.Sprintf("initiating port forwarding to host %s pod %s in container %s",
+				pod.Status.Host, pod.Name, pod.Spec.Containers[0].Name))
+
+			req := c.Get().
+				Prefix("proxy").
+				Resource("minions").
+				Name(pod.Status.Host).
+				Suffix("portForward", api.NamespaceDefault, pod.Name)
+
+			stopChan := make(chan struct{})
+			pf, err := portforward.New(req, clientConfig, []string{"5678:80"}, stopChan)
+			if err != nil {
+				Fail(fmt.Sprintf("Error creating port forwarder: %s", err))
+			}
+
+			errorChan := make(chan error)
+			go func() {
+				errorChan <- pf.ForwardPorts()
+			}()
+
+			// wait for listeners to start
+			<-pf.Ready
+
+			resp, err := http.Get("http://localhost:5678/")
+			if err != nil {
+				Fail(fmt.Sprintf("Error with http get to localhost:5678: %s", err))
+			}
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				Fail(fmt.Sprintf("Error reading response body: %s", err))
+			}
+
+			titleRegex := regexp.MustCompile("<title>(.+)</title>")
+			matches := titleRegex.FindStringSubmatch(string(body))
+			if len(matches) != 2 {
+				Fail("Unable to locate page title in response HTML")
+			}
+			if e, a := "Welcome to nginx on Debian!", matches[1]; e != a {
+				Fail(fmt.Sprintf("<title>: expected '%s', got '%s'", e, a))
+			}
+		})
+	*/
 })

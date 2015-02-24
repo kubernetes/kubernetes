@@ -433,6 +433,13 @@ function kube-up {
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
 
+  # We have to make sure the disk is created before creating the master VM, so
+  # run this in the foreground.
+  gcloud compute disks create "${MASTER_NAME}-pd" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --size "10GB"
+
   (
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
@@ -454,27 +461,11 @@ function kube-up {
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/format-and-mount-pd.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/mount-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
-
-  # Report logging choice (if any).
-  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
-    echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
-    # For logging to GCP we need to enable some minion scopes.
-    if [[ "${LOGGING_DESTINATION-}" == "gcp" ]]; then
-      MINION_SCOPES+=('https://www.googleapis.com/auth/logging.write')
-    fi
-  fi
-
-  # We have to make sure the disk is created before creating the master VM, so
-  # run this in the foreground.
-  gcloud compute disks create "${MASTER_NAME}-pd" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --size "10GB"
 
   gcloud compute instances create "${MASTER_NAME}" \
     --project "${PROJECT}" \
@@ -490,6 +481,15 @@ function kube-up {
 
   # Create a single firewall rule for all minions.
   create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
+
+  # Report logging choice (if any).
+  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
+    echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
+    # For logging to GCP we need to enable some minion scopes.
+    if [[ "${LOGGING_DESTINATION-}" == "gcp" ]]; then
+      MINION_SCOPES+=('https://www.googleapis.com/auth/logging.write')
+    fi
+  fi
 
   # Wait for last batch of jobs.
   wait-for-jobs
@@ -547,6 +547,16 @@ function kube-up {
   wait-for-jobs
 
   detect-master
+
+  # Reserve the master's IP so that it can later be transferred to another VM
+  # without disrupting the kubelets. IPs are associated with regions, not zones,
+  # so extract the region name, which is the same as the zone but with the final
+  # dash and characters trailing the dash removed.
+  local REGION=${ZONE%-*}
+  gcloud compute addresses create "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --addresses "${KUBE_MASTER_IP}" \
+    --region "${REGION}"
 
   echo "Waiting for cluster initialization."
   echo
@@ -726,6 +736,14 @@ function kube-down {
       "${routes[@]::10}" || true
     routes=( "${routes[@]:10}" )
   done
+
+  # Delete the master's reserved IP
+  local REGION=${ZONE%-*}
+  gcloud compute addresses delete \
+    --project "${PROJECT}" \
+    --region "${REGION}" \
+    --quiet \
+    "${MASTER_NAME}-ip" || true
 
 }
 
@@ -911,6 +929,10 @@ function teardown-logging-firewall {
 
   detect-project
   gcloud compute firewall-rules delete -q "${INSTANCE_PREFIX}-fluentd-elasticsearch-logging" --project "${PROJECT}" || true
+  # Also delete the logging services which will remove the associated forwarding rules (TCP load balancers).
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" delete services elasticsearch-logging || true
+  "${kubectl}" delete services kibana-logging || true
 }
 
 # Perform preparations required to run e2e tests

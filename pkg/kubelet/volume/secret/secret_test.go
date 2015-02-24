@@ -50,7 +50,7 @@ func TestCanSupport(t *testing.T) {
 	if plugin.Name() != secretPluginName {
 		t.Errorf("Wrong name: %s", plugin.Name())
 	}
-	if !plugin.CanSupport(&api.Volume{Source: api.VolumeSource{Secret: &api.SecretSource{Target: api.ObjectReference{}}}}) {
+	if !plugin.CanSupport(&api.Volume{Source: api.VolumeSource{Secret: &api.SecretVolumeSource{Target: api.ObjectReference{}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -66,7 +66,7 @@ func TestPlugin(t *testing.T) {
 	volumeSpec := &api.Volume{
 		Name: testVolumeName,
 		Source: api.VolumeSource{
-			Secret: &api.SecretSource{
+			Secret: &api.SecretVolumeSource{
 				Target: api.ObjectReference{
 					Namespace: testNamespace,
 					Name:      testName,

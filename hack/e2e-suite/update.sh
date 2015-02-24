@@ -16,6 +16,9 @@
 
 # Launches an nginx container and verifies it can be reached. Assumes that
 # we're being called by hack/e2e-test.sh (we use some env vars it sets up).
+
+# TODO: remove this once test/e2e/kubectl.go is green in jenkins
+
 set -o errexit
 set -o nounset
 set -o pipefail

@@ -25,24 +25,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>",
-		Short: "Set a new size for a Replication Controller.",
-		Long: `Set a new size for a Replication Controller.
+const (
+	resize_long = `Set a new size for a Replication Controller.
 
 Resize also allows users to specify one or more preconditions for the resize action.
 If --current-replicas or --resource-version is specified, it is validated before the
 resize is attempted, and it is guaranteed that the precondition holds true when the
-resize is sent to the server.
+resize is sent to the server.`
+	resize_example = `// Resize replication controller named 'foo' to 3.
+$ kubectl resize --replicas=3 replicationcontrollers foo
 
-Examples:
+// If the replication controller named foo's current size is 2, resize foo to 3.
+$ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`
+)
 
-    // Resize replication controller named 'foo' to 3.
-    $ kubectl resize --replicas=3 replicationcontrollers foo
-
-    // If the replication controller named foo's current size is 2, resize foo to 3.
-    $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`,
+func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>",
+		Short:   "Set a new size for a Replication Controller.",
+		Long:    resize_long,
+		Example: resize_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			count := util.GetFlagInt(cmd, "replicas")
 			if len(args) != 2 || count < 0 {
@@ -53,6 +55,7 @@ Examples:
 			checkErr(err)
 
 			mapper, _ := f.Object(cmd)
+			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			resizer, err := f.Resizer(cmd, mapping)

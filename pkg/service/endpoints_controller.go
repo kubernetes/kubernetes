@@ -18,8 +18,6 @@ package service
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -64,7 +62,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			resultErr = err
 			continue
 		}
-		endpoints := []string{}
+		endpoints := []api.Endpoint{}
 
 		for _, pod := range pods.Items {
 			port, err := findPort(&pod, service.Spec.ContainerPort)
@@ -89,7 +87,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				continue
 			}
 
-			endpoints = append(endpoints, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(port)))
+			endpoints = append(endpoints, api.Endpoint{IP: pod.Status.PodIP, Port: port})
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
@@ -98,6 +96,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
+					Protocol: service.Spec.Protocol,
 				}
 			} else {
 				glog.Errorf("Error getting endpoints: %v", err)
@@ -113,8 +112,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsEqual(currentEndpoints, endpoints) {
+				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
@@ -127,24 +126,24 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	return resultErr
 }
 
-func containsEndpoint(endpoints *api.Endpoints, endpoint string) bool {
-	if endpoints == nil {
+func containsEndpoint(haystack *api.Endpoints, needle *api.Endpoint) bool {
+	if haystack == nil || needle == nil {
 		return false
 	}
-	for ix := range endpoints.Endpoints {
-		if endpoints.Endpoints[ix] == endpoint {
+	for ix := range haystack.Endpoints {
+		if haystack.Endpoints[ix] == *needle {
 			return true
 		}
 	}
 	return false
 }
 
-func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
-	if len(e.Endpoints) != len(endpoints) {
+func endpointsEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
+	if len(eps.Endpoints) != len(endpoints) {
 		return false
 	}
-	for _, endpoint := range endpoints {
-		if !containsEndpoint(e, endpoint) {
+	for i := range endpoints {
+		if !containsEndpoint(eps, &endpoints[i]) {
 			return false
 		}
 	}

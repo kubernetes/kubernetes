@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/websocket"
 )
 
 func parseURLOrDie(inURL string) *url.URL {
@@ -325,5 +326,47 @@ func TestProxy(t *testing.T) {
 				t.Errorf("%v - expected %v, got %v. url: %#v", item.method, e, a, req.URL)
 			}
 		}
+	}
+}
+
+func TestProxyUpgrade(t *testing.T) {
+	backendServer := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		body := make([]byte, 5)
+		ws.Read(body)
+		ws.Write([]byte("hello " + string(body)))
+	}))
+	defer backendServer.Close()
+
+	simpleStorage := &SimpleRESTStorage{
+		errors:                    map[string]error{},
+		resourceLocation:          backendServer.URL,
+		expectedResourceNamespace: "myns",
+	}
+
+	namespaceHandler := Handle(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, namespaceMapper)
+
+	server := httptest.NewServer(namespaceHandler)
+	defer server.Close()
+
+	ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/prefix/version/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
+	if err != nil {
+		t.Fatalf("websocket dial err: %s", err)
+	}
+	defer ws.Close()
+
+	if _, err := ws.Write([]byte("world")); err != nil {
+		t.Fatalf("write err: %s", err)
+	}
+
+	response := make([]byte, 20)
+	n, err := ws.Read(response)
+	if err != nil {
+		t.Fatalf("read err: %s", err)
+	}
+	if e, a := "hello world", string(response[0:n]); e != a {
+		t.Fatalf("expected '%#v', got '%#v'", e, a)
 	}
 }

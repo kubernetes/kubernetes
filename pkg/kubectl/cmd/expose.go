@@ -26,22 +26,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer]",
-		Short: "Take a replicated application and expose it as Kubernetes Service",
-		Long: `Take a replicated application and expose it as Kubernetes Service.
+const (
+	expose_long = `Take a replicated application and expose it as Kubernetes Service.
 		
 Looks up a ReplicationController by name, and uses the selector for that replication controller
-as the selector for a new Service on the specified port.
+as the selector for a new Service on the specified port.`
 
-Examples:
+	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+$ kubectl expose nginx --port=80 --container-port=8000
 
-    // Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-    $ kubectl expose nginx --port=80 --container-port=8000
+// Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
+$ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`
+)
 
-    // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-    $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`,
+func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer]",
+		Short:   "Take a replicated application and expose it as Kubernetes Service",
+		Long:    expose_long,
+		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) != 1 {
 				usageError(cmd, "<name> is required for expose")

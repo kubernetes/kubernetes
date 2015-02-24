@@ -97,6 +97,8 @@ A pod runs in a *security context* under a *service account* that is defined by 
 * Secret distribution via files https://github.com/GoogleCloudPlatform/kubernetes/pull/2030
 * Docker secrets https://github.com/docker/docker/pull/6697
 * Docker vault https://github.com/docker/docker/issues/10310
+* Service Accounts: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/service_accounts.md
+* Secret volumes https://github.com/GoogleCloudPlatform/kubernetes/4126
 
 ## Specific Design Points
 

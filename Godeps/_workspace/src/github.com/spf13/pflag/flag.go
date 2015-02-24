@@ -543,6 +543,11 @@ func (f *FlagSet) parseArgs(args []string) (err error) {
 
 		if s[1] == '-' {
 			args, err = f.parseLongArg(s, args)
+
+			if len(s) == 2 {
+				// stop parsing after --
+				break
+			}
 		} else {
 			args, err = f.parseShortArg(s, args)
 		}

@@ -10,7 +10,7 @@ A new resource, **ResourceQuota**, is introduced to enumerate hard resource limi
 
 A new resource, **ResourceQuotaUsage**, is introduced to support atomic updates of a **ResourceQuota** status.
 
-```
+```go
 // The following identify resource constants for Kubernetes object types
 const (
   // Pods, number
@@ -139,14 +139,15 @@ $ kubectl namespace myspace
 $ kubectl create -f examples/resourcequota/resource-quota.json
 $ kubectl get quota
 NAME
-myquota
-$ kubectl describe quota myquota
-Name: myquota
-Resource  Used  Hard
---------  ----  ----
-cpu 100m  20
-memory  0 1.5Gb
-pods  1 10
-replicationControllers  1 10
-services  2 3
+quota
+$ kubectl describe quota quota
+Name:                   quota
+Resource                Used    Hard
+--------                ----    ----
+cpu                     0m      20
+memory                  0       1Gi
+pods                    5       10
+replicationcontrollers  5       20
+resourcequotas          1       1
+services                3       5
 ```

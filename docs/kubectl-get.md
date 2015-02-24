@@ -4,6 +4,7 @@ Display one or many resources
 
 ### Synopsis
 
+```
 Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
@@ -11,25 +12,28 @@ Possible resources include pods (po), replication controllers (rc), services
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).
-
-Examples:
-
-    // List all pods in ps output format.
-    $ kubectl get pods
-
-    // List a single replication controller with specified ID in ps output format.
-    $ kubectl get replicationController 1234-56-7890-234234-456456
-
-    // List a single pod in JSON output format.
-    $ kubectl get -o json pod 1234-56-7890-234234-456456
-
-    // Return only the status value of the specified pod.
-    $ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
-
-    // List all replication controllers and services together in ps output format.
-    $ kubectl get rc,services
+```
 
 kubectl get [(-o|--output=)json|yaml|template|...] <resource> [<id>]
+
+### Examples
+
+```
+// List all pods in ps output format.
+$ kubectl get pods
+
+// List a single replication controller with specified ID in ps output format.
+$ kubectl get replicationController 1234-56-7890-234234-456456
+
+// List a single pod in JSON output format.
+$ kubectl get -o json pod 1234-56-7890-234234-456456
+
+// Return only the status value of the specified pod.
+$ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
+
+// List all replication controllers and services together in ps output format.
+$ kubectl get rc,services
+```
 
 ### Options
 

@@ -30,5 +30,5 @@ get:
 	${KUBECTL} get services
 
 net:	
-	gcloud compute forwarding-rules describe elasticsearch-logging
-	gcloud compute forwarding-rules describe kibana-logging
+	${KUBECTL} get services elasticsearch-logging -o json
+	${KUBECTL} get services kibana-logging -o json

@@ -46,8 +46,7 @@ func NewCmdConfigSetContext(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 	Specifying a name that already exists will merge new fields on top of existing values for those fields.
 	e.g. 
 		kubectl config set-context gce --user=cluster-admin
-		only sets the user field on the gce context entry without touching other values.
-		`,
+		only sets the user field on the gce context entry without touching other values.`,
 
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {

@@ -26,12 +26,15 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type viewOptions struct {
 	pathOptions *pathOptions
-	merge       bool
+	merge       util.BoolFlag
 }
 
 func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
@@ -40,22 +43,29 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "view",
 		Short: "displays merged .kubeconfig settings or a specified .kubeconfig file.",
-		Long: `displays merged .kubeconfig settings or a specified .kubeconfig file.
-Examples:
-  // Show merged .kubeconfig settings.
-  $ kubectl config view
+		Long:  "displays merged .kubeconfig settings or a specified .kubeconfig file.",
+		Example: `// Show merged .kubeconfig settings.
+$ kubectl config view
 
-  // Show only local ./.kubeconfig settings
-  $ kubectl config view --local`,
+// Show only local ./.kubeconfig settings
+$ kubectl config view --local`,
 		Run: func(cmd *cobra.Command, args []string) {
-			printer, _, err := util.PrinterForCommand(cmd)
+			options.complete()
+
+			printer, generic, err := cmdutil.PrinterForCommand(cmd)
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
+			if generic {
+				version := cmdutil.OutputVersion(cmd, latest.Version)
+				printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+			}
+
 			config, err := options.loadConfig()
 			if err != nil {
 				glog.FatalDepth(1, err)
 			}
+
 			err = printer.PrintObj(config, out)
 			if err != nil {
 				glog.FatalDepth(1, err)
@@ -63,11 +73,24 @@ Examples:
 		},
 	}
 
-	util.AddPrinterFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	// Default to yaml
 	cmd.Flags().Set("output", "yaml")
-	cmd.Flags().BoolVar(&options.merge, "merge", true, "merge together the full hierarchy of .kubeconfig files")
+
+	options.merge.Default(true)
+	cmd.Flags().Var(&options.merge, "merge", "merge together the full hierarchy of .kubeconfig files")
 	return cmd
+}
+
+func (o *viewOptions) complete() bool {
+	// if --kubeconfig, --global, or --local is specified, then merging doesn't make sense since you're declaring precise intent
+	if (len(o.pathOptions.specifiedFile) > 0) || o.pathOptions.global || o.pathOptions.local {
+		if !o.merge.Provided() {
+			o.merge.Set("false")
+		}
+	}
+
+	return true
 }
 
 func (o viewOptions) loadConfig() (*clientcmdapi.Config, error) {
@@ -87,7 +110,7 @@ func (o viewOptions) validate() error {
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
 func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, string, error) {
 	switch {
-	case o.merge:
+	case o.merge.Value():
 		loadingRules := clientcmd.NewClientConfigLoadingRules()
 		loadingRules.EnvVarPath = os.Getenv("KUBECONFIG")
 		loadingRules.CommandLinePath = o.pathOptions.specifiedFile

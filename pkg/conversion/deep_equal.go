@@ -355,7 +355,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 }
 
 // DeepDerivative is similar to DeepEqual except that unset fields in a1 are
-// ignored (not compared). This allows we to focus on the fields that matter to
+// ignored (not compared). This allows us to focus on the fields that matter to
 // the semantic comparison.
 //
 // The unset fields include a nil pointer and an empty string.

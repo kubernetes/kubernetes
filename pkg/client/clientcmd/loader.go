@@ -183,7 +183,12 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 // Load takes a byte slice and deserializes the contents into Config object.
 // Encapsulates deserialization without assuming the source is a file.
 func Load(data []byte) (*clientcmdapi.Config, error) {
-	config := &clientcmdapi.Config{}
+	config := clientcmdapi.NewConfig()
+	// if there's no data in a file, return the default object instead of failing (DecodeInto reject empty input)
+	if len(data) == 0 {
+		return config, nil
+	}
+
 	if err := clientcmdlatest.Codec.DecodeInto(data, config); err != nil {
 		return nil, err
 	}

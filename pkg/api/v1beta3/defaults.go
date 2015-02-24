@@ -28,7 +28,7 @@ func init() {
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.Source) {
 				obj.Source = VolumeSource{
-					EmptyDir: &EmptyDir{},
+					EmptyDir: &EmptyDirVolumeSource{},
 				}
 			}
 		},
@@ -78,6 +78,11 @@ func init() {
 		func(obj *Secret) {
 			if obj.Type == "" {
 				obj.Type = SecretTypeOpaque
+			}
+		},
+		func(obj *Endpoints) {
+			if obj.Protocol == "" {
+				obj.Protocol = "TCP"
 			}
 		},
 	)

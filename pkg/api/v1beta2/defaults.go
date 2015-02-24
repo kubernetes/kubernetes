@@ -30,7 +30,7 @@ func init() {
 			if util.AllPtrFieldsNil(&obj.Source) {
 				glog.Errorf("Defaulting volume source for %v", obj)
 				obj.Source = VolumeSource{
-					EmptyDir: &EmptyDir{},
+					EmptyDir: &EmptyDirVolumeSource{},
 				}
 			}
 		},
@@ -85,6 +85,11 @@ func init() {
 		func(obj *Secret) {
 			if obj.Type == "" {
 				obj.Type = SecretTypeOpaque
+			}
+		},
+		func(obj *Endpoints) {
+			if obj.Protocol == "" {
+				obj.Protocol = "TCP"
 			}
 		},
 	)

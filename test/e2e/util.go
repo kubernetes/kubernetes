@@ -120,8 +120,8 @@ func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor
 	return fmt.Errorf("Gave up waiting for pod %q status to be success or failure after %d seconds", podName, trySecs)
 }
 
-func loadClient() (*client.Client, error) {
-	config := client.Config{
+func loadConfig() (*client.Config, error) {
+	config := &client.Config{
 		Host: testContext.host,
 	}
 	info, err := clientauth.LoadFromFile(testContext.authConfig)
@@ -135,11 +135,16 @@ func loadClient() (*client.Client, error) {
 		info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
 		info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
 	}
-	config, err = info.MergeWithConfig(config)
+	mergedConfig, err := info.MergeWithConfig(*config)
+	return &mergedConfig, err
+}
+
+func loadClient() (*client.Client, error) {
+	config, err := loadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
-	c, err := client.New(&config)
+	c, err := client.New(config)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
