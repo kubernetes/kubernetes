@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -134,6 +135,61 @@ func NewNodeController(
 	}
 }
 
+// Generates num pod CIDRs that could be assigned to nodes.
+func generateCIDRs(num int) util.StringSet {
+	res := util.NewStringSet()
+	for i := 0; i < num; i++ {
+		// TODO: Make the CIDRs configurable.
+		res.Insert(fmt.Sprintf("10.244.%v.0/24", i))
+	}
+	return res
+}
+
+// For each node from newNodes, finds its current spec in registeredNodes.
+// If it is not there, it gets a new valid CIDR assigned.
+func reconcilePodCIDRs(newNodes, registeredNodes *api.NodeList) *api.NodeList {
+	registeredCIDRs := make(map[string]string)
+	availableCIDRs := generateCIDRs(len(newNodes.Items) + len(registeredNodes.Items))
+	for _, node := range registeredNodes.Items {
+		registeredCIDRs[node.Name] = node.Spec.PodCIDR
+		availableCIDRs.Delete(node.Spec.PodCIDR)
+	}
+	for i, node := range newNodes.Items {
+		podCIDR, registered := registeredCIDRs[node.Name]
+		if !registered {
+			podCIDR, _ = availableCIDRs.PopAny()
+		}
+		newNodes.Items[i].Spec.PodCIDR = podCIDR
+	}
+	return newNodes
+}
+
+func (nc *NodeController) configureNodeCIDR(node *api.Node) {
+	instances, ok := nc.cloud.Instances()
+	if !ok {
+		glog.Errorf("Error configuring node %s: CloudProvider does not support Instances()", node.Name)
+		return
+	}
+	err := instances.Configure(node.Name, &node.Spec)
+	if err != nil {
+		glog.Errorf("Error configuring node %s: %s", node.Name, err)
+		// The newly assigned CIDR was not properly configured, so don't save it in the API server.
+		node.Spec.PodCIDR = ""
+	}
+}
+
+func (nc *NodeController) unassignNodeCIDR(nodeName string) {
+	instances, ok := nc.cloud.Instances()
+	if !ok {
+		glog.Errorf("Error deconfiguring node %s: CloudProvider does not support Instances()", nodeName)
+		return
+	}
+	err := instances.Release(nodeName)
+	if err != nil {
+		glog.Errorf("Error deconfiguring node %s: %s", nodeName, err)
+	}
+}
+
 // Run creates initial node list and start syncing instances from cloudprovider, if any.
 // It also starts syncing or monitoring cluster node status.
 // 1. registerNodes() is called only once to register all initial nodes (from cloudprovider
@@ -163,6 +219,9 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList bool) {
 
 	if nodes, err = nc.populateAddresses(nodes); err != nil {
 		glog.Errorf("Error getting nodes ips: %v", err)
+	}
+	if nc.isRunningCloudProvider() {
+		reconcilePodCIDRs(nodes, &api.NodeList{})
 	}
 	if err := nc.registerNodes(nodes, nc.registerRetryCount, period); err != nil {
 		glog.Errorf("Error registering node list %+v: %v", nodes, err)
@@ -194,21 +253,30 @@ func (nc *NodeController) registerNodes(nodes *api.NodeList, retryCount int, ret
 	registered := util.NewStringSet()
 	nodes = nc.canonicalizeName(nodes)
 	for i := 0; i < retryCount; i++ {
-		for _, node := range nodes.Items {
-			if registered.Has(node.Name) {
-				continue
-			}
-			_, err := nc.kubeClient.Nodes().Create(&node)
-			if err == nil || apierrors.IsAlreadyExists(err) {
-				registered.Insert(node.Name)
-				glog.Infof("Registered node in registry: %s", node.Name)
-			} else {
-				glog.Errorf("Error registering node %s, retrying: %s", node.Name, err)
-			}
-			if registered.Len() == len(nodes.Items) {
-				glog.Infof("Successfully registered all nodes")
-				return nil
-			}
+		var wg sync.WaitGroup
+		wg.Add(len(nodes.Items))
+		for i := range nodes.Items {
+			go func(node *api.Node) {
+				defer wg.Done()
+				if registered.Has(node.Name) {
+					return
+				}
+				if nc.isRunningCloudProvider() {
+					nc.configureNodeCIDR(node)
+				}
+				_, err := nc.kubeClient.Nodes().Create(node)
+				if err == nil || apierrors.IsAlreadyExists(err) {
+					registered.Insert(node.Name)
+					glog.Infof("Registered node in registry: %s", node.Name)
+				} else {
+					glog.Errorf("Error registering node %s, retrying: %s", node.Name, err)
+				}
+			}(&nodes.Items[i])
+		}
+		wg.Wait()
+		if registered.Len() == len(nodes.Items) {
+			glog.Infof("Successfully registered all nodes")
+			return nil
 		}
 		time.Sleep(retryInterval)
 	}
@@ -234,39 +302,51 @@ func (nc *NodeController) syncCloudNodes() error {
 		node := nodes.Items[i]
 		nodeMap[node.Name] = &node
 	}
-
+	reconcilePodCIDRs(matches, nodes)
+	var wg sync.WaitGroup
+	wg.Add(len(matches.Items))
 	// Create nodes which have been created in cloud, but not in kubernetes cluster
 	// Skip nodes if we hit an error while trying to get their addresses.
-	for _, node := range matches.Items {
-		if _, ok := nodeMap[node.Name]; !ok {
-			glog.V(3).Infof("Querying addresses for new node: %s", node.Name)
-			nodeList := &api.NodeList{}
-			nodeList.Items = []api.Node{node}
-			_, err = nc.populateAddresses(nodeList)
-			if err != nil {
-				glog.Errorf("Error fetching addresses for new node %s: %v", node.Name, err)
-				continue
+	for i := range matches.Items {
+		go func(node *api.Node) {
+			defer wg.Done()
+			if _, ok := nodeMap[node.Name]; !ok {
+				glog.V(3).Infof("Querying addresses for new node: %s", node.Name)
+				nodeList := &api.NodeList{}
+				nodeList.Items = []api.Node{*node}
+				_, err = nc.populateAddresses(nodeList)
+				if err != nil {
+					glog.Errorf("Error fetching addresses for new node %s: %v", node.Name, err)
+					return
+				}
+				node.Status.Addresses = nodeList.Items[0].Status.Addresses
+				nc.configureNodeCIDR(node)
+				glog.Infof("Create node in registry: %s", node.Name)
+				_, err = nc.kubeClient.Nodes().Create(node)
+				if err != nil {
+					glog.Errorf("Create node %s error: %v", node.Name, err)
+				}
 			}
-			node.Status.Addresses = nodeList.Items[0].Status.Addresses
-
-			glog.Infof("Create node in registry: %s", node.Name)
-			_, err = nc.kubeClient.Nodes().Create(&node)
-			if err != nil {
-				glog.Errorf("Create node %s error: %v", node.Name, err)
-			}
-		}
-		delete(nodeMap, node.Name)
+			delete(nodeMap, node.Name)
+		}(&matches.Items[i])
 	}
+	wg.Wait()
 
+	wg.Add(len(nodeMap))
 	// Delete nodes which have been deleted from cloud, but not from kubernetes cluster.
 	for nodeID := range nodeMap {
-		glog.Infof("Delete node from registry: %s", nodeID)
-		err = nc.kubeClient.Nodes().Delete(nodeID)
-		if err != nil {
-			glog.Errorf("Delete node %s error: %v", nodeID, err)
-		}
-		nc.deletePods(nodeID)
+		go func(nodeID string) {
+			defer wg.Done()
+			nc.unassignNodeCIDR(nodeID)
+			glog.Infof("Delete node from registry: %s", nodeID)
+			err = nc.kubeClient.Nodes().Delete(nodeID)
+			if err != nil {
+				glog.Errorf("Delete node %s error: %v", nodeID, err)
+			}
+			nc.deletePods(nodeID)
+		}(nodeID)
 	}
+	wg.Wait()
 
 	return nil
 }
