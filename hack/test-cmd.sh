@@ -376,26 +376,18 @@ for version in "${kube_api_versions[@]}"; do
           "apiVersion": "v1beta1",
           "id": "service-${version}-test",
           "port": 80,
-          "protocol": "TCP",
-          "selector": {
-              "version": "old"
-          }
+          "protocol": "TCP"
       }
 __EOF__
   # Post-condition:redis-master-service service is running
   kube::test::get_object_assert services '{{range.items}}{{.id}}:{{end}}' 'kubernetes:kubernetes-ro:redis-master:service-.*-test:'
 
-  ### Update selector of service-${version}-test
-  # Pre-condition: selector.version == old
-  kube::test::get_object_assert "service service-${version}-test" "{{range.selector}}{{.}}{{end}}" 'old'
   # Command
-  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"selector\":{\"version\":\"${version}\"},\"apiVersion\":\"${version}\"}"
+  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"selector\":{\"my\":\"test-label\"},\"apiVersion\":\"v1beta1\"}"
   # Post-condition: selector.version == ${version}
   # This test works only in v1beta1 and v1beta2
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/4771
-  if [[ "$version" != "" ]] && [[ "$version" != "v1beta3" ]]; then
-      kube::test::get_object_assert "service service-${version}-test" "{{range.selector}}{{.}}{{end}}" "${version}"
-  fi
+  kube::test::get_object_assert "service service-${version}-test" "{{range.selector}}{{.}}{{end}}" "test-label"
 
   ### Identity
   kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl update "${kube_flags[@]}" -f -
