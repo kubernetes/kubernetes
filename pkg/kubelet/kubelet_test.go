@@ -3127,5 +3127,69 @@ func TestFilterHostPortConflicts(t *testing.T) {
 	if filteredPods[0].Name != "oldpod" {
 		t.Fatalf("Expected pod %#v. Got pod %#v", pods[1], filteredPods[0])
 	}
+}
 
+func TestValidatePodStatus(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+	testCases := []struct {
+		podPhase api.PodPhase
+		success  bool
+	}{
+		{api.PodRunning, true},
+		{api.PodSucceeded, true},
+		{api.PodFailed, true},
+		{api.PodPending, false},
+		{api.PodUnknown, false},
+	}
+
+	for i, tc := range testCases {
+		err := kubelet.validatePodPhase(&api.PodStatus{Phase: tc.podPhase})
+		if tc.success {
+			if err != nil {
+				t.Errorf("[case %d]: unexpected failure - %v", i, err)
+			}
+		} else if err == nil {
+			t.Errorf("[case %d]: unexpected success", i)
+		}
+	}
+}
+
+func TestValidateContainerStatus(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+	containerName := "x"
+	testCases := []struct {
+		podInfo api.PodInfo
+		success bool
+	}{
+		{
+			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Running: &api.ContainerStateRunning{}}}},
+			success: true,
+		},
+		{
+			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Termination: &api.ContainerStateTerminated{}}}},
+			success: true,
+		},
+		{
+			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}}},
+			success: false,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := kubelet.validateContainerStatus(&api.PodStatus{
+			Info: tc.podInfo,
+		}, containerName)
+		if tc.success {
+			if err != nil {
+				t.Errorf("[case %d]: unexpected failure - %v", i, err)
+			}
+		} else if err == nil {
+			t.Errorf("[case %d]: unexpected success", i)
+		}
+	}
+	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+		Info: testCases[0].podInfo,
+	}, "blah"); err == nil {
+		t.Errorf("expected error with invalid container name")
+	}
 }

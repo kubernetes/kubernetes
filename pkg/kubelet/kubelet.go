@@ -1545,6 +1545,26 @@ func (kl *Kubelet) GetDockerVersion() ([]uint, error) {
 	return dockerRunner.GetDockerServerVersion()
 }
 
+func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
+	switch podStatus.Phase {
+	case api.PodRunning, api.PodSucceeded, api.PodFailed:
+		return nil
+	}
+	return fmt.Errorf("pod is not in 'Running', 'Succeeded' or 'Failed' state - State: %q", podStatus.Phase)
+}
+
+func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerName string) (dockerID string, err error) {
+	for cName, cStatus := range podStatus.Info {
+		if containerName == cName {
+			if cStatus.State.Waiting != nil {
+				return "", fmt.Errorf("container %q is in waiting state.", containerName)
+			}
+			return strings.Replace(podStatus.Info[containerName].ContainerID, dockertools.DockerPrefix, "", 1), nil
+		}
+	}
+	return "", fmt.Errorf("container %q not found in pod", containerName)
+}
+
 // GetKubeletContainerLogs returns logs from the container
 // The second parameter of GetPodStatus and FindPodContainer methods represents pod UUID, which is allowed to be blank
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
@@ -1558,27 +1578,14 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 			return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
 		}
 	}
-	switch podStatus.Phase {
-	case api.PodRunning, api.PodSucceeded, api.PodFailed:
-		break
-	default:
-		return fmt.Errorf("pod %q is not in 'Running', 'Succeeded' or 'Failed' state - State: %q", podFullName, podStatus.Phase)
-	}
-	exists := false
-	dockerContainerID := ""
-	for cName, cStatus := range podStatus.Info {
-		if containerName == cName {
-			exists = true
-			if !cStatus.Ready {
-				return fmt.Errorf("container %q is not ready.", containerName)
-			}
-			dockerContainerID = strings.Replace(podStatus.Info[containerName].ContainerID, dockertools.DockerPrefix, "", 1)
-		}
-	}
-	if !exists {
-		return fmt.Errorf("container %q not found in pod %q", containerName, podFullName)
-	}
 
+	if err := kl.validatePodPhase(&podStatus); err != nil {
+		return err
+	}
+	dockerContainerID, err := kl.validateContainerStatus(&podStatus, containerName)
+	if err != nil {
+		return err
+	}
 	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainerID, tail, follow, stdout, stderr)
 }
 
