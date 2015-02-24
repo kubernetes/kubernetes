@@ -44,6 +44,7 @@ type Fake struct {
 	EventsList         api.EventList
 	LimitRangesList    api.LimitRangeList
 	ResourceQuotasList api.ResourceQuotaList
+	ResourceQuotaUsage api.ResourceQuotaUsage
 	NamespacesList     api.NamespaceList
 	SecretList         api.SecretList
 	Secret             api.Secret
