@@ -533,7 +533,7 @@ func TestHealthCheckNode(t *testing.T) {
 			},
 			expectedConditions: []api.NodeCondition{
 				{
-					Kind:   api.NodeReady,
+					Type:   api.NodeReady,
 					Status: api.ConditionFull,
 					Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 				},
@@ -547,7 +547,7 @@ func TestHealthCheckNode(t *testing.T) {
 			},
 			expectedConditions: []api.NodeCondition{
 				{
-					Kind:   api.NodeReady,
+					Type:   api.NodeReady,
 					Status: api.ConditionNone,
 					Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 				},
@@ -561,7 +561,7 @@ func TestHealthCheckNode(t *testing.T) {
 			},
 			expectedConditions: []api.NodeCondition{
 				{
-					Kind:   api.NodeReady,
+					Type:   api.NodeReady,
 					Status: api.ConditionUnknown,
 					Reason: "Node health check error: Error",
 				},
@@ -638,7 +638,7 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Kind:               api.NodeReady,
+									Type:               api.NodeReady,
 									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -664,7 +664,7 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Kind:               api.NodeReady,
+									Type:               api.NodeReady,
 									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -725,7 +725,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Kind:               api.NodeReady,
+									Type:               api.NodeReady,
 									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -755,7 +755,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Kind:               api.NodeReady,
+									Type:               api.NodeReady,
 									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -784,7 +784,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Kind:   api.NodeReady,
+									Type:   api.NodeReady,
 									Status: api.ConditionNone,
 									Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 									// Here, last transition time is Now(). In node controller, the new condition's probe time is
@@ -816,7 +816,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Kind:   api.NodeReady,
+									Type:   api.NodeReady,
 									Status: api.ConditionNone,
 									Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 									// Here, last transition time is in the past, and in node controller, the
@@ -881,7 +881,7 @@ func TestSyncNodeStatus(t *testing.T) {
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
 							{
-								Kind:   api.NodeReady,
+								Type:   api.NodeReady,
 								Status: api.ConditionFull,
 								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 							},
@@ -894,7 +894,7 @@ func TestSyncNodeStatus(t *testing.T) {
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
 							{
-								Kind:   api.NodeReady,
+								Type:   api.NodeReady,
 								Status: api.ConditionFull,
 								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 							},

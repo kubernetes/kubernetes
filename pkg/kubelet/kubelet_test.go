@@ -2742,11 +2742,11 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 
 func TestGetPodReadyCondition(t *testing.T) {
 	ready := []api.PodCondition{{
-		Kind:   api.PodReady,
+		Type:   api.PodReady,
 		Status: api.ConditionFull,
 	}}
 	unready := []api.PodCondition{{
-		Kind:   api.PodReady,
+		Type:   api.PodReady,
 		Status: api.ConditionNone,
 	}}
 	tests := []struct {

@@ -179,10 +179,10 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 		ListMeta: allNodes.ListMeta,
 	}
 	for _, node := range allNodes.Items {
-		conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
+		conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 		for i := range node.Status.Conditions {
 			cond := node.Status.Conditions[i]
-			conditionMap[cond.Kind] = &cond
+			conditionMap[cond.Type] = &cond
 		}
 		if condition, ok := conditionMap[api.NodeReady]; ok {
 			if condition.Status == api.ConditionFull {

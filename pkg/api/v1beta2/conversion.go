@@ -1073,6 +1073,132 @@ func init() {
 			}
 			return nil
 		},
+
+		func(in *newer.NodeCondition, out *NodeCondition, s conversion.Scope) error {
+			if err := s.Convert(&in.Type, &out.Kind, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Reason, &out.Reason, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Message, &out.Message, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *NodeCondition, out *newer.NodeCondition, s conversion.Scope) error {
+			if err := s.Convert(&in.Kind, &out.Type, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Reason, &out.Reason, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Message, &out.Message, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.NodeConditionType, out *NodeConditionKind, s conversion.Scope) error {
+			switch *in {
+			case newer.NodeReachable:
+				*out = NodeReachable
+				break
+			case newer.NodeReady:
+				*out = NodeReady
+				break
+			case "":
+				*out = ""
+			default:
+				*out = NodeConditionKind(*in)
+				break
+			}
+
+			return nil
+		},
+		func(in *NodeConditionKind, out *newer.NodeConditionType, s conversion.Scope) error {
+			switch *in {
+			case NodeReachable:
+				*out = newer.NodeReachable
+				break
+			case NodeReady:
+				*out = newer.NodeReady
+				break
+			case "":
+				*out = ""
+			default:
+				*out = newer.NodeConditionType(*in)
+				break
+			}
+
+			return nil
+		},
+
+		func(in *newer.PodCondition, out *PodCondition, s conversion.Scope) error {
+			if err := s.Convert(&in.Type, &out.Kind, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PodCondition, out *newer.PodCondition, s conversion.Scope) error {
+			if err := s.Convert(&in.Kind, &out.Type, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.PodConditionType, out *PodConditionKind, s conversion.Scope) error {
+			switch *in {
+			case newer.PodReady:
+				*out = PodReady
+				break
+			case "":
+				*out = ""
+			default:
+				*out = PodConditionKind(*in)
+				break
+			}
+
+			return nil
+		},
+		func(in *PodConditionKind, out *newer.PodConditionType, s conversion.Scope) error {
+			switch *in {
+			case PodReady:
+				*out = newer.PodReady
+				break
+			case "":
+				*out = ""
+			default:
+				*out = newer.PodConditionType(*in)
+				break
+			}
+
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
