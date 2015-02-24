@@ -153,29 +153,8 @@ while true; do
     echo
 
 	case $option in
-	    [2] )
-        	read -p "IP address of this machine > " myIP
-            echo
-            etcdName=${mm[$myIP]}
-            inList $etcdName $myIP 
-            configEtcd $etcdName $myIP $cluster
-            # set MINION IPs in kube-controller-manager
-            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager  
-	        cpMaster
-	        break
-	        ;;
-	    [3] )     
-        	read -p "IP address of this machine > " myIP
-            echo           
-            etcdName=${mm[$myIP]}
-            inList $etcdName $myIP 
-            configEtcd $etcdName $myIP $cluster
-            # set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
-	        cpMinion
-	        break
-	        ;;
 	    [1] )
+            # as both master and minion
         	read -p "IP address of this machine > " myIP
             echo 
             etcdName=${mm[$myIP]}
@@ -192,6 +171,30 @@ while true; do
 	        cpMinion
 	        break
 	        ;;
+        [2] )
+            # as master
+        	read -p "IP address of this machine > " myIP
+            echo
+            etcdName=${mm[$myIP]}
+            inList $etcdName $myIP 
+            configEtcd $etcdName $myIP $cluster
+            # set MINION IPs in kube-controller-manager
+            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager  
+	        cpMaster
+	        break
+            ;;
+        [3] )     
+            # as minion
+        	read -p "IP address of this machine > " myIP
+            echo           
+            etcdName=${mm[$myIP]}
+            inList $etcdName $myIP 
+            configEtcd $etcdName $myIP $cluster
+            # set MINION IP in default_scripts/kubelet
+            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
+	        cpMinion
+	        break
+	        ;;    
 	    * )
 	        echo "Please choose 1 or 2 or 3."
 	        ;;

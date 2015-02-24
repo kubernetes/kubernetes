@@ -14,6 +14,7 @@ AWS            | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guide
 Vmware         | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) |
 Azure          | Saltstack    | Ubuntu | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     |
 Bare-metal     | custom       | Ubuntu | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
+Bare-metal     | custom       | Ubuntu Cluster | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | community (@resouer @WIZARD-CXY) | use k8s version 0.10.1
 Local          |              |        | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     |
 Ovirt          |              |        | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
 Rackspace      | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
