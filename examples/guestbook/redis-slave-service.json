@@ -5,9 +5,9 @@
   "port": 6379,
   "containerPort": 6379,
   "labels": {
-    "name": "redisslave"
+    "name": "redis-slave"
   },
   "selector": {
-    "name": "redisslave"
+    "name": "redis-slave"
   }
 }
