@@ -238,6 +238,7 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(endpointColumns, printEndpoints)
+	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
 	h.Handler(nodeColumns, printNodeList)
 	h.Handler(statusColumns, printStatus)
@@ -377,6 +378,15 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 func printEndpoints(endpoint *api.Endpoints, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoint.Name, formatEndpoints(endpoint.Endpoints))
 	return err
+}
+
+func printEndpointsList(list *api.EndpointsList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printEndpoints(&item, w); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func printNamespace(item *api.Namespace, w io.Writer) error {
