@@ -199,9 +199,9 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Port:          80,
-				Selector:      labels,
-				ContainerPort: util.NewIntOrStringFromInt(80),
+				Port:           80,
+				Selector:       labels,
+				PodServicePort: util.NewIntOrStringFromInt(80),
 			},
 		}
 		_, err := c.Services(ns).Create(service)

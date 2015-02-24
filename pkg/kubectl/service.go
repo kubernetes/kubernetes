@@ -70,12 +70,12 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	containerPort, found := params["container-port"]
 	if found && len(containerPort) > 0 {
 		if cPort, err := strconv.Atoi(containerPort); err != nil {
-			service.Spec.ContainerPort = util.NewIntOrStringFromString(containerPort)
+			service.Spec.PodServicePort = util.NewIntOrStringFromString(containerPort)
 		} else {
-			service.Spec.ContainerPort = util.NewIntOrStringFromInt(cPort)
+			service.Spec.PodServicePort = util.NewIntOrStringFromInt(cPort)
 		}
 	} else {
-		service.Spec.ContainerPort = util.NewIntOrStringFromInt(port)
+		service.Spec.PodServicePort = util.NewIntOrStringFromInt(port)
 	}
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.CreateExternalLoadBalancer = true
