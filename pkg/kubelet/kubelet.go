@@ -1121,7 +1121,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				} else {
 					record.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
 				}
-				glog.Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, live)
+				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
 				podChanged = true
 				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
@@ -1158,10 +1158,9 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 					continue
 				}
 			}
-
 		}
 
-		glog.V(3).Infof("Container with name %s doesn't exist, creating %#v", dockerContainerName)
+		glog.V(3).Infof("Container with name %s doesn't exist, creating", dockerContainerName)
 		ref, err := containerRef(pod, &container)
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
