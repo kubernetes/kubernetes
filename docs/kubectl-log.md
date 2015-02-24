@@ -24,6 +24,7 @@ $ kubectl log -f 123456-7890 ruby-container
 
 ```
   -f, --follow=false: Specify if the logs should be streamed.
+      --interactive=true: If true, prompt the user for input when required. Default true.
 ```
 
 ### Options inherrited from parent commands
