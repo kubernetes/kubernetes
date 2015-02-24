@@ -39,9 +39,8 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against pods.
-func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingREST) {
+func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingREST, *StatusREST) {
 	prefix := "/registry/pods"
-	bindings := &podLifecycle{h}
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
 		NewListFunc: func() runtime.Object { return &api.PodList{} },
@@ -56,17 +55,20 @@ func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingRE
 		},
 		EndpointName: "pods",
 
-		CreateStrategy: pod.Strategy,
-
-		UpdateStrategy: pod.Strategy,
-		AfterUpdate:    bindings.AfterUpdate,
-
-		ReturnDeletedObject: true,
-		AfterDelete:         bindings.AfterDelete,
-
 		Helper: h,
 	}
-	return &REST{store: store}, &BindingREST{store: store, factory: factory}
+	statusStore := *store
+
+	bindings := &podLifecycle{h}
+	store.CreateStrategy = pod.Strategy
+	store.UpdateStrategy = pod.Strategy
+	store.AfterUpdate = bindings.AfterUpdate
+	store.ReturnDeletedObject = true
+	store.AfterDelete = bindings.AfterDelete
+
+	statusStore.UpdateStrategy = pod.StatusStrategy
+
+	return &REST{store: store}, &BindingREST{store: store, factory: factory}, &StatusREST{store: &statusStore}
 }
 
 // WithPodStatus returns a rest object that decorates returned responses with extra
@@ -249,4 +251,18 @@ func (h *podLifecycle) AfterDelete(obj runtime.Object) error {
 		pods.Items = newPods
 		return pods, nil
 	})
+}
+
+// StatusREST implements the REST endpoint for changing the status of a pod.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

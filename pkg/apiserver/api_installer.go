@@ -88,7 +88,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	codec := a.group.codec
 	admit := a.group.admit
 	context := a.group.context
-	resource := path
+
+	var resource, subresource string
+	switch parts := strings.Split(path, "/"); len(parts) {
+	case 2:
+		resource, subresource = parts[0], parts[1]
+	case 1:
+		resource = parts[0]
+	default:
+		return fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
+	}
 
 	object := storage.New()
 	// TODO: add scheme to APIInstaller rather than using api.Scheme
@@ -143,14 +152,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 
 	// Get the list of actions for the given scope.
 	if scope.Name() != meta.RESTScopeNameNamespace {
-		itemPath := path + "/{name}"
+		itemPath := resource + "/{name}"
+		if len(subresource) > 0 {
+			itemPath = itemPath + "/" + subresource
+		}
 		nameParams := append(params, nameParam)
 		namer := rootScopeNaming{scope, a.group.linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		actions = appendIf(actions, action{"LIST", path, params, namer}, isLister)
-		actions = appendIf(actions, action{"POST", path, params, namer}, isCreater)
-		actions = appendIf(actions, action{"WATCHLIST", "/watch/" + path, params, namer}, allowWatchList)
+		actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
+		actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
+		actions = appendIf(actions, action{"WATCHLIST", "/watch/" + resource, params, namer}, allowWatchList)
 
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
@@ -165,10 +177,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		if scope.ParamPath() {
 			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 			namespaceParam := ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
-			namespacedPath := scope.ParamName() + "/{" + scope.ParamName() + "}/" + path
+			namespacedPath := scope.ParamName() + "/{" + scope.ParamName() + "}/" + resource
 			namespaceParams := []*restful.Parameter{namespaceParam}
 
 			itemPath := namespacedPath + "/{name}"
+			if len(subresource) > 0 {
+				itemPath = itemPath + "/" + subresource
+			}
 			nameParams := append(namespaceParams, nameParam)
 			namer := scopeNaming{scope, a.group.linker, gpath.Join(a.prefix, itemPath), false}
 
@@ -186,8 +201,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 
 			// list across namespace.
 			namer = scopeNaming{scope, a.group.linker, gpath.Join(a.prefix, itemPath), true}
-			actions = appendIf(actions, action{"LIST", path, params, namer}, isLister)
-			actions = appendIf(actions, action{"WATCHLIST", "/watch/" + path, params, namer}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
+			actions = appendIf(actions, action{"WATCHLIST", "/watch/" + resource, params, namer}, allowWatchList)
 
 		} else {
 			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -195,13 +210,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			namespaceParam := ws.QueryParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
 			namespaceParams := []*restful.Parameter{namespaceParam}
 
-			itemPath := path + "/{name}"
+			itemPath := resource + "/{name}"
+			if len(subresource) > 0 {
+				itemPath = itemPath + "/" + subresource
+			}
 			nameParams := append(namespaceParams, nameParam)
 			namer := legacyScopeNaming{scope, a.group.linker, gpath.Join(a.prefix, itemPath)}
 
-			actions = appendIf(actions, action{"LIST", path, namespaceParams, namer}, isLister)
-			actions = appendIf(actions, action{"POST", path, namespaceParams, namer}, isCreater)
-			actions = appendIf(actions, action{"WATCHLIST", "/watch/" + path, namespaceParams, namer}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resource, namespaceParams, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resource, namespaceParams, namer}, isCreater)
+			actions = appendIf(actions, action{"WATCHLIST", "/watch/" + resource, namespaceParams, namer}, allowWatchList)
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)

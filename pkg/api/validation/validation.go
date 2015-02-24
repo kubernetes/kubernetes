@@ -647,6 +647,23 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 	return allErrs
 }
 
+// ValidatePodStatusUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
+// that cannot be changed.
+func ValidatePodStatusUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPod.ObjectMeta, &newPod.ObjectMeta).Prefix("metadata")...)
+
+	// TODO: allow change when bindings are properly decoupled from pods
+	if newPod.Status.Host != oldPod.Status.Host {
+		allErrs = append(allErrs, errs.NewFieldInvalid("status.host", newPod.Status.Host, "pod host cannot be changed directly"))
+	}
+
+	newPod.Spec = oldPod.Spec
+
+	return allErrs
+}
+
 var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClientIP), string(api.AffinityTypeNone))
 
 // ValidateService tests if required fields in the service are set.

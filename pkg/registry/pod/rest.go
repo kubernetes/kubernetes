@@ -71,6 +71,17 @@ func (podStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErro
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
+type podStatusStrategy struct {
+	podStrategy
+}
+
+var StatusStrategy = podStatusStrategy{Strategy}
+
+func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	// TODO: merge valid fields after update
+	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
+}
+
 // PodStatusGetter is an interface used by Pods to fetch and retrieve status info.
 type PodStatusGetter interface {
 	GetPodStatus(namespace, name string) (*api.PodStatus, error)
