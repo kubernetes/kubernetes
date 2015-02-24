@@ -159,3 +159,13 @@ func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	f.addCall("get-node-resources")
 	return f.NodeResources, f.Err
 }
+
+func (f *FakeCloud) Configure(name string, spec *api.NodeSpec) error {
+	f.addCall("configure")
+	return f.Err
+}
+
+func (f *FakeCloud) Release(name string) error {
+	f.addCall("release")
+	return f.Err
+}

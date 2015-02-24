@@ -973,3 +973,11 @@ func (aws *AWSCloud) DeleteVolume(volumeName string) error {
 	}
 	return awsDisk.delete()
 }
+
+func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
+	return nil
+}
+
+func (v *AWSCloud) Release(name string) error {
+	return nil
+}

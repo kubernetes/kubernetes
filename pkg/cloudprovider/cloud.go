@@ -80,6 +80,10 @@ type Instances interface {
 	List(filter string) ([]string, error)
 	// GetNodeResources gets the resources for a particular node
 	GetNodeResources(name string) (*api.NodeResources, error)
+	// Configure the specified instance using the spec
+	Configure(name string, spec *api.NodeSpec) error
+	// Delete all the configuration related to the instance, including other cloud resources
+	Release(name string) error
 }
 
 // Zone represents the location of a particular machine.
