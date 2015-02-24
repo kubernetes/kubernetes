@@ -1087,7 +1087,6 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 	}
 
-	podChanged := false
 	for _, container := range pod.Spec.Containers {
 		expectedHash := dockertools.HashContainer(&container)
 		dockerContainerName := dockertools.BuildDockerName(uid, podFullName, &container)
@@ -1096,8 +1095,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
 			// look for changes in the container.
-			containerChanged := hash != 0 && hash != expectedHash
-			if !containerChanged {
+			podChanged := hash != 0 && hash != expectedHash
+			if !podChanged {
 				// TODO: This should probably be separated out into a separate goroutine.
 				// If the container's liveness probe is unsuccessful, set readiness to false. If liveness is succesful, do a readiness check and set
 				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
@@ -1129,7 +1128,6 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				}
 				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
-				podChanged = true
 				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
 			if err := kl.killContainer(dockerContainer); err != nil {
@@ -1137,6 +1135,16 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				continue
 			}
 			killedContainers[containerID] = empty{}
+
+			if podChanged {
+				// Also kill associated pod infra container if the pod changed.
+				if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+					if err := kl.killContainer(podInfraContainer); err != nil {
+						glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
+						continue
+					}
+				}
+			}
 		}
 
 		// Check RestartPolicy for container
@@ -1196,20 +1204,6 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			continue
 		}
 		containersToKeep[containerID] = empty{}
-	}
-
-	if podChanged {
-		// Also kill associated pod infra container if the pod changed.
-		if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
-			if err := kl.killContainer(podInfraContainer); err != nil {
-				glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
-			}
-		}
-		podInfraContainerID, err = kl.createPodInfraContainer(pod)
-		if err != nil {
-			glog.Errorf("Failed to recreate pod infra container: %v for pod %q", err, podFullName)
-		}
-		containersToKeep[podInfraContainerID] = empty{}
 	}
 
 	// Kill any containers in this pod which were not identified above (guards against duplicates).
