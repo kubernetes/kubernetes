@@ -1599,11 +1599,11 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 // getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
 func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodCondition {
 	ready := []api.PodCondition{{
-		Kind:   api.PodReady,
+		Type:   api.PodReady,
 		Status: api.ConditionFull,
 	}}
 	unready := []api.PodCondition{{
-		Kind:   api.PodReady,
+		Type:   api.PodReady,
 		Status: api.ConditionNone,
 	}}
 	if info == nil {

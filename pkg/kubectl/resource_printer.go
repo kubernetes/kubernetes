@@ -409,19 +409,19 @@ func printSecretList(list *api.SecretList, w io.Writer) error {
 }
 
 func printNode(node *api.Node, w io.Writer) error {
-	conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
-	NodeAllConditions := []api.NodeConditionKind{api.NodeReady, api.NodeReachable}
+	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
+	NodeAllConditions := []api.NodeConditionType{api.NodeReady, api.NodeReachable}
 	for i := range node.Status.Conditions {
 		cond := node.Status.Conditions[i]
-		conditionMap[cond.Kind] = &cond
+		conditionMap[cond.Type] = &cond
 	}
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
 			if condition.Status == api.ConditionFull {
-				status = append(status, string(condition.Kind))
+				status = append(status, string(condition.Type))
 			} else {
-				status = append(status, "Not"+string(condition.Kind))
+				status = append(status, "Not"+string(condition.Type))
 			}
 		}
 	}

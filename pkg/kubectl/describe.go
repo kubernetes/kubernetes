@@ -194,10 +194,10 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", getReplicationControllersForLabels(rc, labels.Set(pod.Labels)))
 		if len(pod.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Kind\tStatus\n")
+			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
 				fmt.Fprintf(out, "  %v \t%v \n",
-					c.Kind,
+					c.Type,
 					c.Status)
 			}
 		}
@@ -312,10 +312,10 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", minion.Name)
 		if len(minion.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Kind\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
+			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
 			for _, c := range minion.Status.Conditions {
 				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Kind,
+					c.Type,
 					c.Status,
 					c.LastProbeTime.Time.Format(time.RFC1123Z),
 					c.LastTransitionTime.Time.Format(time.RFC1123Z),

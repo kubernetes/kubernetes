@@ -304,21 +304,21 @@ func (s *NodeController) checkNodeReady(node *api.Node) *api.NodeCondition {
 	case err != nil:
 		glog.V(2).Infof("NodeController: node %s health check error: %v", node.Name, err)
 		return &api.NodeCondition{
-			Kind:          api.NodeReady,
+			Type:          api.NodeReady,
 			Status:        api.ConditionUnknown,
 			Reason:        fmt.Sprintf("Node health check error: %v", err),
 			LastProbeTime: util.Now(),
 		}
 	case status == probe.Failure:
 		return &api.NodeCondition{
-			Kind:          api.NodeReady,
+			Type:          api.NodeReady,
 			Status:        api.ConditionNone,
 			Reason:        fmt.Sprintf("Node health check failed: kubelet /healthz endpoint returns not ok"),
 			LastProbeTime: util.Now(),
 		}
 	default:
 		return &api.NodeCondition{
-			Kind:          api.NodeReady,
+			Type:          api.NodeReady,
 			Status:        api.ConditionFull,
 			Reason:        fmt.Sprintf("Node health check succeeded: kubelet /healthz endpoint returns ok"),
 			LastProbeTime: util.Now(),
@@ -405,10 +405,10 @@ func (s *NodeController) canonicalizeName(nodes *api.NodeList) *api.NodeList {
 }
 
 // getCondition returns a condition object for the specific condition
-// kind, nil if the condition is not set.
-func (s *NodeController) getCondition(node *api.Node, kind api.NodeConditionKind) *api.NodeCondition {
+// type, nil if the condition is not set.
+func (s *NodeController) getCondition(node *api.Node, conditionType api.NodeConditionType) *api.NodeCondition {
 	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Kind == kind {
+		if node.Status.Conditions[i].Type == conditionType {
 			return &node.Status.Conditions[i]
 		}
 	}
