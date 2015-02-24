@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	etcderrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -843,6 +844,33 @@ func TestEtcdCreate(t *testing.T) {
 	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &boundPods)
 	if len(boundPods.Items) != 1 || boundPods.Items[0].Name != "foo" {
 		t.Errorf("Unexpected boundPod list: %#v", boundPods)
+	}
+}
+
+func TestEtcdCreateBindingNoPod(t *testing.T) {
+	registry, bindingRegistry, fakeClient, _ := newStorage(t)
+	ctx := api.NewDefaultContext()
+	fakeClient.TestIndex = true
+
+	key, _ := registry.store.KeyFunc(ctx, "foo")
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: nil,
+		},
+		E: tools.EtcdErrorNotFound,
+	}
+	// Assume that a pod has undergone the following:
+	// - Create (apiserver)
+	// - Schedule (scheduler)
+	// - Delete (apiserver)
+	_, err := bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine", ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}})
+	if !errors.IsNotFound(etcderrors.InterpretGetError(err, "Pod", "foo")) {
+		t.Fatalf("Unexpected error returned: %#v", err)
+	}
+
+	_, err = registry.Get(ctx, "foo")
+	if !errors.IsNotFound(etcderrors.InterpretGetError(err, "Pod", "foo")) {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 }
 
