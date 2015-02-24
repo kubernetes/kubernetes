@@ -182,64 +182,73 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
-	if strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) && len(req.Header.Get(httpstream.HeaderUpgrade)) > 0 {
-		//TODO support TLS? Doesn't look like proxyTransport does anything special ...
-		dialAddr := netutil.CanonicalAddr(destURL)
-		backendConn, err := net.Dial("tcp", dialAddr)
-		if err != nil {
-			status := errToAPIStatus(err)
-			writeJSON(status.Code, r.codec, status, w)
-			return
-		}
-		defer backendConn.Close()
-
-		// TODO should we use _ (a bufio.ReadWriter) instead of requestHijackedConn
-		// when copying between the client and the backend? Docker doesn't when they
-		// hijack, just for reference...
-		requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
-		if err != nil {
-			status := errToAPIStatus(err)
-			writeJSON(status.Code, r.codec, status, w)
-			return
-		}
-		defer requestHijackedConn.Close()
-
-		if err = newReq.Write(backendConn); err != nil {
-			status := errToAPIStatus(err)
-			writeJSON(status.Code, r.codec, status, w)
-			return
-		}
-
-		done := make(chan struct{}, 2)
-
-		go func() {
-			_, err := io.Copy(backendConn, requestHijackedConn)
-			if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-				glog.Errorf("Error proxying data from client to backend: %v", err)
-			}
-			done <- struct{}{}
-		}()
-
-		go func() {
-			_, err := io.Copy(requestHijackedConn, backendConn)
-			if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-				glog.Errorf("Error proxying data from backend to client: %v", err)
-			}
-			done <- struct{}{}
-		}()
-
-		<-done
-	} else {
-		proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: destURL.Host})
-		proxy.Transport = &proxyTransport{
-			proxyScheme:      req.URL.Scheme,
-			proxyHost:        req.URL.Host,
-			proxyPathPrepend: path.Join(r.prefix, "ns", namespace, resource, id),
-		}
-		proxy.FlushInterval = 200 * time.Millisecond
-		proxy.ServeHTTP(w, newReq)
+	if r.tryUpgrade(w, req, newReq, destURL) {
+		return
 	}
+
+	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: destURL.Host})
+	proxy.Transport = &proxyTransport{
+		proxyScheme:      req.URL.Scheme,
+		proxyHost:        req.URL.Host,
+		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, resource, id),
+	}
+	proxy.FlushInterval = 200 * time.Millisecond
+	proxy.ServeHTTP(w, newReq)
+}
+
+// tryUpgrade returns true if the request was handled.
+func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, destURL *url.URL) bool {
+	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
+	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || len(req.Header.Get(httpstream.HeaderUpgrade)) == 0 {
+		return false
+	}
+	//TODO support TLS? Doesn't look like proxyTransport does anything special ...
+	dialAddr := netutil.CanonicalAddr(destURL)
+	backendConn, err := net.Dial("tcp", dialAddr)
+	if err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		return true
+	}
+	defer backendConn.Close()
+
+	// TODO should we use _ (a bufio.ReadWriter) instead of requestHijackedConn
+	// when copying between the client and the backend? Docker doesn't when they
+	// hijack, just for reference...
+	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		return true
+	}
+	defer requestHijackedConn.Close()
+
+	if err = newReq.Write(backendConn); err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		return true
+	}
+
+	done := make(chan struct{}, 2)
+
+	go func() {
+		_, err := io.Copy(backendConn, requestHijackedConn)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			glog.Errorf("Error proxying data from client to backend: %v", err)
+		}
+		done <- struct{}{}
+	}()
+
+	go func() {
+		_, err := io.Copy(requestHijackedConn, backendConn)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			glog.Errorf("Error proxying data from backend to client: %v", err)
+		}
+		done <- struct{}{}
+	}()
+
+	<-done
+	return true
 }
 
 type proxyTransport struct {
