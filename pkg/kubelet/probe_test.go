@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -230,7 +231,8 @@ func TestProbeContainer(t *testing.T) {
 			kl = makeTestKubelet(test.expectedResult, nil)
 		}
 
-		result, err := kl.probeContainer(test.p, "", types.UID(""), api.PodStatus{}, api.Container{}, dc, test.defaultResult)
+		container := dockertools.ConvertAPIContainer(dc)
+		result, err := kl.probeContainer(test.p, "", types.UID(""), api.PodStatus{}, api.Container{}, container, test.defaultResult)
 		if test.expectError && err == nil {
 			t.Error("Expected error but did no error was returned.")
 		}

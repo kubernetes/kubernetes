@@ -53,7 +53,7 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 // runOnce runs a given set of pods and returns their status.
 func (kl *Kubelet) runOnce(pods []api.BoundPod) (results []RunPodResult, err error) {
 	if kl.dockerPuller == nil {
-		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
+		kl.dockerPuller = dockertools.NewDockerPuller(kl.containerRuntime, kl.pullQPS, kl.pullBurst)
 	}
 	pods = filterHostPortConflicts(pods)
 
@@ -91,7 +91,7 @@ func (kl *Kubelet) runPod(pod api.BoundPod) error {
 	delay := RunOnceRetryDelay
 	retry := 0
 	for {
-		dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+		dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.containerRuntime, false)
 		if err != nil {
 			return fmt.Errorf("failed to get kubelet docker containers: %v", err)
 		}
@@ -126,7 +126,7 @@ func (kl *Kubelet) isPodRunning(pod api.BoundPod, dockerContainers dockertools.D
 			glog.Infof("container %q not found", container.Name)
 			return false, nil
 		}
-		inspectResult, err := kl.dockerClient.InspectContainer(dockerContainer.ID)
+		inspectResult, err := kl.containerRuntime.InspectContainer(dockerContainer.ID)
 		if err != nil {
 			glog.Infof("failed to inspect container %q: %v", container.Name, err)
 			return false, err

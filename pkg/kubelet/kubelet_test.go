@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
@@ -54,7 +55,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient) {
 	}
 
 	kubelet := &Kubelet{}
-	kubelet.dockerClient = fakeDocker
+	kubelet.containerRuntime = dockertools.NewDockerRuntime(fakeDocker)
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -296,8 +297,9 @@ func TestKillContainerWithError(t *testing.T) {
 	for _, c := range fakeDocker.ContainerList {
 		kubelet.readiness.set(c.ID, true)
 	}
-	kubelet.dockerClient = fakeDocker
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	kubelet.containerRuntime = dockertools.NewDockerRuntime(fakeDocker)
+	container := dockertools.ConvertAPIContainer(&fakeDocker.ContainerList[0])
+	err := kubelet.killContainer(container)
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -332,7 +334,8 @@ func TestKillContainer(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	container := dockertools.ConvertAPIContainer(&fakeDocker.ContainerList[0])
+	err := kubelet.killContainer(container)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -853,25 +856,25 @@ func TestSyncPodsDeletes(t *testing.T) {
 func TestSyncPodDeletesDuplicate(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
-		"1234": &docker.APIContainers{
+		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.test_12345678_1111"},
-			ID:    "1234",
+			Name: "/k8s_foo_bar.new.test_12345678_1111",
+			ID:   "1234",
 		},
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_bar.new.test_12345678_2222"},
-			ID:    "9876",
+			Name: "/k8s_POD_bar.new.test_12345678_2222",
+			ID:   "9876",
 		},
-		"4567": &docker.APIContainers{
+		"4567": &container.Container{
 			// Duplicate for the same container.
-			Names: []string{"/k8s_foo_bar.new.test_12345678_3333"},
-			ID:    "4567",
+			Name: "/k8s_foo_bar.new.test_12345678_3333",
+			ID:   "4567",
 		},
-		"2304": &docker.APIContainers{
+		"2304": &container.Container{
 			// Container for another pod, untouched.
-			Names: []string{"/k8s_baz_fiz.new.test_6_42"},
-			ID:    "2304",
+			Name: "/k8s_baz_fiz.new.test_6_42",
+			ID:   "2304",
 		},
 	}
 	bound := api.BoundPod{
@@ -903,15 +906,15 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 func TestSyncPodBadHash(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
-		"1234": &docker.APIContainers{
+		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar.1234_foo.new.test_12345678_42"},
-			ID:    "1234",
+			Name: "/k8s_bar.1234_foo.new.test_12345678_42",
+			ID:   "1234",
 		},
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
-			ID:    "9876",
+			Name: "/k8s_POD_foo.new.test_12345678_42",
+			ID:   "9876",
 		},
 	}
 	bound := api.BoundPod{
@@ -951,15 +954,15 @@ func TestSyncPodBadHash(t *testing.T) {
 func TestSyncPodUnhealthy(t *testing.T) {
 	kubelet, fakeDocker := newTestKubelet(t)
 	dockerContainers := dockertools.DockerContainers{
-		"1234": &docker.APIContainers{
+		"1234": &container.Container{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar_foo.new.test_12345678_42"},
-			ID:    "1234",
+			Name: "/k8s_bar_foo.new.test_12345678_42",
+			ID:   "1234",
 		},
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
-			ID:    "9876",
+			Name: "/k8s_POD_foo.new.test_12345678_42",
+			ID:   "9876",
 		},
 	}
 	bound := api.BoundPod{
@@ -1135,7 +1138,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 }
 
 func TestMakePortsAndBindings(t *testing.T) {
-	container := api.Container{
+	ctnr := api.Container{
 		Ports: []api.Port{
 			{
 				ContainerPort: 80,
@@ -1159,36 +1162,36 @@ func TestMakePortsAndBindings(t *testing.T) {
 			},
 		},
 	}
-	exposedPorts, bindings := makePortsAndBindings(&container)
-	if len(container.Ports) != len(exposedPorts) ||
-		len(container.Ports) != len(bindings) {
-		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
+	exposedPorts, bindings := makePortsAndBindings(&ctnr)
+	if len(ctnr.Ports) != len(exposedPorts) ||
+		len(ctnr.Ports) != len(bindings) {
+		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", ctnr, exposedPorts, bindings)
 	}
 	for key, value := range bindings {
 		switch value[0].HostPort {
 		case "8080":
-			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
+			if !reflect.DeepEqual(container.Port("80/tcp"), key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "127.0.0.1" {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		case "443":
-			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
+			if !reflect.DeepEqual(container.Port("443/tcp"), key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "" {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		case "444":
-			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
+			if !reflect.DeepEqual(container.Port("444/udp"), key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "" {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		case "445":
-			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
+			if !reflect.DeepEqual(container.Port("445/tcp"), key) {
 				t.Errorf("Unexpected docker port: %#v", key)
 			}
 			if value[0].HostIP != "" {
@@ -1343,10 +1346,10 @@ func TestGetRootInfo(t *testing.T) {
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
-		dockerClient:   &fakeDocker,
-		dockerPuller:   &dockertools.FakeDockerPuller{},
-		cadvisorClient: mockCadvisor,
-		podWorkers:     newPodWorkers(),
+		containerRuntime: dockertools.NewDockerRuntime(&fakeDocker),
+		dockerPuller:     &dockertools.FakeDockerPuller{},
+		cadvisorClient:   mockCadvisor,
+		podWorkers:       newPodWorkers(),
 	}
 
 	// If the container name is an empty string, then it means the root container.
@@ -1428,7 +1431,7 @@ func TestGetContainerInfoWhenDockerToolsFailed(t *testing.T) {
 	kubelet, _ := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
 	expectedErr := fmt.Errorf("List containers error")
-	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: expectedErr}
+	kubelet.containerRuntime = dockertools.NewDockerRuntime(&errorTestingDockerClient{listContainersError: expectedErr})
 
 	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if err == nil {
@@ -1448,7 +1451,7 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 	kubelet, _ := newTestKubelet(t)
 	kubelet.cadvisorClient = mockCadvisor
 
-	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil}
+	kubelet.containerRuntime = dockertools.NewDockerRuntime(&errorTestingDockerClient{listContainersError: nil})
 	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if err == nil {
 		t.Errorf("Expected error from cadvisor client, got none")
@@ -1474,7 +1477,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 		},
 	}
 
-	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil, containerList: containerList}
+	kubelet.containerRuntime = dockertools.NewDockerRuntime(&errorTestingDockerClient{listContainersError: nil, containerList: containerList})
 	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if err == nil {
 		t.Errorf("Expected error from cadvisor client, got none")
@@ -1704,10 +1707,10 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		err: fmt.Errorf("test error"),
 	}
 	dockerContainers := dockertools.DockerContainers{
-		"9876": &docker.APIContainers{
+		"9876": &container.Container{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
-			ID:    "9876",
+			Name: "/k8s_POD_foo.new.test_12345678_42",
+			ID:   "9876",
 		},
 	}
 	bound := api.BoundPod{
