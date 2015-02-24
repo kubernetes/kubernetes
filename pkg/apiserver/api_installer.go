@@ -59,7 +59,6 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	watchHandler := (&WatchHandler{
 		storage: a.group.storage,
 		codec:   a.group.codec,
-		prefix:  a.group.prefix,
 		linker:  a.group.linker,
 		info:    a.group.info,
 	})
@@ -274,7 +273,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "WATCH": // Watch a resource.
-			route := ws.GET(action.Path).To(restfulStripPrefix(a.prefix+"/watch", watchHandler)).
+			route := ws.GET(action.Path).To(routeFunction(watchHandler)).
 				Filter(m).
 				Doc("watch a particular " + kind).
 				Operation("watch" + kind).
@@ -282,7 +281,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "WATCHLIST": // Watch all resources of a kind.
-			route := ws.GET(action.Path).To(restfulStripPrefix(a.prefix+"/watch", watchHandler)).
+			route := ws.GET(action.Path).To(routeFunction(watchHandler)).
 				Filter(m).
 				Doc("watch a list of " + kind).
 				Operation("watch" + kind + "list").
@@ -290,7 +289,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "REDIRECT": // Get the redirect URL for a resource.
-			route := ws.GET(action.Path).To(restfulStripPrefix(a.prefix+"/redirect", redirectHandler)).
+			route := ws.GET(action.Path).To(routeFunction(redirectHandler)).
 				Filter(m).
 				Doc("redirect GET request to " + kind).
 				Operation("redirect" + kind).
@@ -542,15 +541,15 @@ func appendIf(actions []action, a action, shouldAppend bool) []action {
 	return actions
 }
 
-// Returns a restful RouteFunction that calls the given handler after stripping prefix from the request path.
-func restfulStripPrefix(prefix string, handler http.Handler) restful.RouteFunction {
+// Wraps a http.Handler function inside a restful.RouteFunction
+func routeFunction(handler http.Handler) restful.RouteFunction {
 	return func(restReq *restful.Request, restResp *restful.Response) {
-		http.StripPrefix(prefix, handler).ServeHTTP(restResp.ResponseWriter, restReq.Request)
+		handler.ServeHTTP(restResp.ResponseWriter, restReq.Request)
 	}
 }
 
 func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource string, params []*restful.Parameter) {
-	proxyRoute := ws.Method(method).Path(path).To(restfulStripPrefix(prefix+"/proxy", proxyHandler)).
+	proxyRoute := ws.Method(method).Path(path).To(routeFunction(proxyHandler)).
 		Filter(monitorFilter("PROXY", resource)).
 		Doc("proxy " + method + " requests to " + kind).
 		Operation("proxy" + method + kind).
