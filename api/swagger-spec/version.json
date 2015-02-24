@@ -1,7 +1,7 @@
 {
   "swaggerVersion": "1.2",
   "apiVersion": "",
-  "basePath": "127.0.0.1:8050",
+  "basePath": "127.0.0.1:6443",
   "resourcePath": "/version",
   "apis": [
    {

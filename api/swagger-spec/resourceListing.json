@@ -15,7 +15,7 @@
    },
    {
     "path": "/api",
-    "description": "get available api versions"
+    "description": "get available API versions"
    },
    {
     "path": "/version",
