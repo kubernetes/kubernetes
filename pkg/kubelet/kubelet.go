@@ -1195,15 +1195,14 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	if podChanged {
 		// Also kill associated pod infra container if the pod changed.
 		if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+			podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
+			glog.V(1).Infof("Pod changed, kill pod infra container %q: %v", podInfraContainerID, err)
 			if err := kl.killContainer(podInfraContainer); err != nil {
-				glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
+				glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainerID, err)
+			} else {
+				killedContainers[podInfraContainerID] = empty{}
 			}
 		}
-		podInfraContainerID, err = kl.createPodInfraContainer(pod)
-		if err != nil {
-			glog.Errorf("Failed to recreate pod infra container: %v for pod %q", err, podFullName)
-		}
-		containersToKeep[podInfraContainerID] = empty{}
 	}
 
 	// Kill any containers in this pod which were not identified above (guards against duplicates).
