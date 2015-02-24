@@ -190,7 +190,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxy.Transport = &proxyTransport{
 		proxyScheme:      req.URL.Scheme,
 		proxyHost:        req.URL.Host,
-		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, resource, id),
+		proxyPathPrepend: requestInfo.URLPath(),
 	}
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
