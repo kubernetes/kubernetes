@@ -709,6 +709,118 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 	}
 }
 
+func TestEvictTimeoutedPods(t *testing.T) {
+	table := []struct {
+		fakeNodeHandler      *FakeNodeHandler
+		expectedRequestCount int
+		expectedActions      []client.FakeAction
+	}{
+		// Node created long time ago, with no status.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Fake: client.Fake{
+					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
+				},
+			},
+			expectedRequestCount: 1, // List
+			expectedActions:      []client.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
+		},
+		// Node created recently, with no status.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: util.Now(),
+						},
+					},
+				},
+				Fake: client.Fake{
+					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
+				},
+			},
+			expectedRequestCount: 1, // List
+			expectedActions:      nil,
+		},
+		// Node created long time ago, with status updated long time ago.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:          api.NodeReady,
+									Status:        api.ConditionFull,
+									LastProbeTime: util.Date(2013, 1, 1, 0, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Fake: client.Fake{
+					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
+				},
+			},
+			expectedRequestCount: 1, // List
+			expectedActions:      []client.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
+		},
+		// Node created long time ago, with status updated recently.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:          api.NodeReady,
+									Status:        api.ConditionFull,
+									LastProbeTime: util.Now(),
+								},
+							},
+						},
+					},
+				},
+				Fake: client.Fake{
+					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
+				},
+			},
+			expectedRequestCount: 1, // List
+			expectedActions:      nil,
+		},
+	}
+
+	for _, item := range table {
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10, 5*time.Minute)
+		if err := nodeController.EvictTimeoutedPods(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.expectedRequestCount != item.fakeNodeHandler.RequestCount {
+			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+		}
+		if !reflect.DeepEqual(item.expectedActions, item.fakeNodeHandler.Actions) {
+			t.Errorf("actions differs, expected %+v, got %+v", item.expectedActions, item.fakeNodeHandler.Actions)
+		}
+	}
+}
+
 func TestSyncNodeStatusDeletePods(t *testing.T) {
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
