@@ -716,6 +716,8 @@ type ServiceSpec struct {
 	// not be changed by updates.
 	PortalIP string `json:"portalIP,omitempty"`
 
+	Rewrite bool `json:"rewrite,omitempty" description:"Does the load balancer rewrite packets or pass them through"`
+
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
 	// PublicIPs are used by external load balancers.

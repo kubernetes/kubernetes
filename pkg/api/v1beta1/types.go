@@ -556,6 +556,14 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
+// LoadBalancerInfo defines whether the LoadBalancer is rewriting or
+// pass through
+type LoadBalancerInfo struct {
+	DestIP   string `json:"destIP,omitempty" description:"External IP of the Load Balancer"`
+	SourceIP string `json:"sourceIP,omitempty" description:"Source IP of the Load Balancer"`
+	Rewrite  bool   `json:"rewrite,omitempty" description:"Does the LB rewrite packets"`
+}
+
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
@@ -596,6 +604,8 @@ type Service struct {
 
 	// DEPRECATED: has no implementation.
 	ProxyPort int `json:"proxyPort,omitempty" description:"if non-zero, a pre-allocated host port used for this service by the proxy on each node; assigned by the master and ignored on input"`
+
+	Rewrite bool `json:"rewrite,omitempty" description:"Does the load balancer rewrite packets or pass them through"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`

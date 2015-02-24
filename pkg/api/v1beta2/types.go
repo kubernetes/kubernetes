@@ -520,6 +520,14 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
+// LoadBalancerInfo defines whether the LoadBalancer is rewriting or
+// pass through
+type LoadBalancerInfo struct {
+	DestIP   string `json:"destIP,omitempty" description:"External IP of the Load Balancer"`
+	SourceIP string `json:"sourceIP,omitempty" description:"Source IP of the Load Balancer"`
+	Rewrite  bool   `json:"rewrite,omitempty" description:"Does the LB rewrite packets"`
+}
+
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
@@ -547,6 +555,8 @@ type Service struct {
 
 	// PublicIPs are used by external load balancers.
 	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs from which to select the address for the external load balancer"`
+
+	Rewrite bool `json:"rewrite,omitempty" description:"Does the load balancer rewrite packets or pass them through"`
 
 	// ContainerPort is the name or number of the port on the container to direct traffic to.
 	// This is useful if the containers the service points to have multiple open ports.

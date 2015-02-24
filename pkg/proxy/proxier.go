@@ -44,6 +44,7 @@ type serviceInfo struct {
 	publicIP            []string
 	sessionAffinityType api.AffinityType
 	stickyMaxAgeMinutes int
+	rewrite             bool
 }
 
 // How long we wait for a connection to a backend in seconds
@@ -490,6 +491,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info.portalIP = serviceIP
 		info.portalPort = service.Spec.Port
 		info.publicIP = service.Spec.PublicIPs
+		info.rewrite = service.Spec.Rewrite
 		info.sessionAffinityType = service.Spec.SessionAffinity
 		// TODO: paramaterize this in the types api file as an attribute of sticky session.   For now it's hardcoded to 3 hours.
 		info.stickyMaxAgeMinutes = 180
@@ -531,12 +533,13 @@ func ipsEqual(lhs, rhs []string) bool {
 }
 
 func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
-	err := proxier.openOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+	err := proxier.openOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, false)
 	if err != nil {
 		return err
 	}
 	for _, publicIP := range info.publicIP {
-		err = proxier.openOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		glog.V(1).Infof("LB for %v: Rewrite is %v, IP is %v", service, info.rewrite, publicIP)
+		err = proxier.openOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, info.rewrite)
 		if err != nil {
 			return err
 		}
@@ -544,9 +547,9 @@ func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
 	return nil
 }
 
-func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string) error {
+func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string, rewrite bool) error {
 	// Handle traffic from containers.
-	args := proxier.iptablesContainerPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name)
+	args := proxier.iptablesContainerPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name, rewrite)
 	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesContainerPortalChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesContainerPortalChain, name)
@@ -557,7 +560,7 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 	}
 
 	// Handle traffic from the host.
-	args = proxier.iptablesHostPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name)
+	args = proxier.iptablesHostPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name, rewrite)
 	existed, err = proxier.iptables.EnsureRule(iptables.TableNAT, iptablesHostPortalChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostPortalChain, name)
@@ -571,9 +574,9 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 
 func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
-	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, false)
 	for _, publicIP := range info.publicIP {
-		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service, info.rewrite)...)
 	}
 	if len(el) == 0 {
 		glog.Infof("Closed iptables portals for service %q", service)
@@ -583,18 +586,18 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 	return errors.NewAggregate(el)
 }
 
-func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string) []error {
+func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name string, rewrite bool) []error {
 	el := []error{}
 
 	// Handle traffic from containers.
-	args := proxier.iptablesContainerPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name)
+	args := proxier.iptablesContainerPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name, rewrite)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPortalChain, args...); err != nil {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPortalChain, name)
 		el = append(el, err)
 	}
 
 	// Handle traffic from the host.
-	args = proxier.iptablesHostPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name)
+	args = proxier.iptablesHostPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name, rewrite)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPortalChain, args...); err != nil {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPortalChain, name)
 		el = append(el, err)
@@ -661,8 +664,16 @@ var localhostIPv4 = net.ParseIP("127.0.0.1")
 var zeroIPv6 = net.ParseIP("::0")
 var localhostIPv6 = net.ParseIP("::1")
 
+func getDestinationFlag(rewrite bool) string {
+	if rewrite {
+		return "-s"
+	} else {
+		return "-d"
+	}
+}
+
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
-func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, service string) []string {
+func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, service string, rewrite bool) []string {
 	// This list needs to include all fields as they are eventually spit out
 	// by iptables-save.  This is because some systems do not support the
 	// 'iptables -C' arg, and so fall back on parsing iptables-save output.
@@ -676,15 +687,15 @@ func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol
 		"--comment", service,
 		"-p", strings.ToLower(string(protocol)),
 		"-m", strings.ToLower(string(protocol)),
-		"-d", fmt.Sprintf("%s/32", destIP.String()),
+		getDestinationFlag(rewrite), fmt.Sprintf("%s/32", destIP.String()),
 		"--dport", fmt.Sprintf("%d", destPort),
 	}
 	return args
 }
 
 // Build a slice of iptables args for a from-container portal rule.
-func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
-	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service)
+func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string, rewrite bool) []string {
+	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service, rewrite)
 
 	// This is tricky.
 	//
@@ -730,8 +741,8 @@ func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int,
 }
 
 // Build a slice of iptables args for a from-host portal rule.
-func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
-	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service)
+func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string, rewrite bool) []string {
+	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service, rewrite)
 
 	// This is tricky.
 	//
