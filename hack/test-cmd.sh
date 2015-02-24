@@ -151,7 +151,7 @@ for version in "${kube_api_versions[@]}"; do
   kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
   [ ! $(kubectl delete pods "${kube_flags[@]}" ) ]
   kubectl get pods "${kube_flags[@]}" -lname=redis-master | grep -q 'redis-master'
-  [ ! $(delete pods --all pods -l name=redis-master "${kube_flags[@]}" ) ]   # not --all and label selector together
+  [ ! $(kubectl delete pods --all pods -l name=redis-master "${kube_flags[@]}" ) ]   # not --all and label selector together
   kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
   kubectl create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
   kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
