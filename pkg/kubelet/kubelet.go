@@ -128,10 +128,16 @@ func NewMainKubelet(
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 	}
 
-	if err := klet.setupDataDirs(); err != nil {
+	dockerCache, err := dockertools.NewDockerCache(dockerClient)
+	if err != nil {
 		return nil, err
 	}
-	if err := klet.volumePluginMgr.InitPlugins(volumePlugins, &volumeHost{klet}); err != nil {
+	klet.dockerCache = dockerCache
+
+	if err = klet.setupDataDirs(); err != nil {
+		return nil, err
+	}
+	if err = klet.volumePluginMgr.InitPlugins(volumePlugins, &volumeHost{klet}); err != nil {
 		return nil, err
 	}
 
@@ -150,6 +156,7 @@ type serviceLister interface {
 type Kubelet struct {
 	hostname               string
 	dockerClient           dockertools.DockerInterface
+	dockerCache            dockertools.DockerCache
 	kubeClient             *client.Client
 	rootDirectory          string
 	podInfraContainerImage string
@@ -1300,7 +1307,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	desiredContainers := make(map[podContainer]empty)
 	desiredPods := make(map[types.UID]empty)
 
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	dockerContainers, err := kl.dockerCache.RunningContainers()
 	if err != nil {
 		glog.Errorf("Error listing containers: %#v", dockerContainers)
 		return err

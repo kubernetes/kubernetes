@@ -232,3 +232,17 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 	}
 	return false, nil
 }
+
+type FakeDockerCache struct {
+	client DockerInterface
+}
+
+func NewFakeDockerCache(client DockerInterface) DockerCache {
+	return &FakeDockerCache{
+		client: client,
+	}
+}
+
+func (f *FakeDockerCache) RunningContainers() (DockerContainers, error) {
+	return GetKubeletDockerContainers(f.client, false)
+}

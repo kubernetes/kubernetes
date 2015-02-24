@@ -55,6 +55,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient) {
 
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
+	kubelet.dockerCache = dockertools.NewFakeDockerCache(fakeDocker)
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
