@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -45,6 +46,36 @@ type configCommandTest struct {
 	startingConfig  clientcmdapi.Config
 	expectedConfig  clientcmdapi.Config
 	expectedOutputs []string
+}
+
+func ExampleView() {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:           []string{"view"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	output := test.run(nil)
+	fmt.Printf("%v", output)
+	// Output:
+	// apiVersion: v1
+	// clusters:
+	// - cluster:
+	//     server: http://cow.org:8080
+	//   name: cow-cluster
+	// contexts:
+	// - context:
+	//     cluster: cow-cluster
+	//     user: red-user
+	//   name: federal-context
+	// current-context: ""
+	// kind: Config
+	// preferences: {}
+	// users:
+	// - name: red-user
+	//   user:
+	//     token: red-token
 }
 
 func TestSetCurrentContext(t *testing.T) {
@@ -540,7 +571,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config) (strin
 	return buf.String(), *config
 }
 
-func (test configCommandTest) run(t *testing.T) {
+func (test configCommandTest) run(t *testing.T) string {
 	out, actualConfig := testConfigCommand(test.args, test.startingConfig)
 
 	testSetNilMapsToEmpties(reflect.ValueOf(&test.expectedConfig))
@@ -556,6 +587,8 @@ func (test configCommandTest) run(t *testing.T) {
 			t.Errorf("expected '%s' in output, got '%s'", expectedOutput, out)
 		}
 	}
+
+	return out
 }
 func testSetNilMapsToEmpties(curr reflect.Value) {
 	actualCurrValue := curr
