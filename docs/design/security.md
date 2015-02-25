@@ -38,7 +38,7 @@ Automated process users fall into the following categories:
   * write pod specs.
   * making some of their own images, and using some "community" docker images
   * know which pods need to talk to which other pods
-  * decide which pods should be share files with other pods, and which should not.
+  * decide which pods should share files with other pods, and which should not.
   * reason about application level security, such as containing the effects of a local-file-read exploit in a webserver pod.
   * do not often reason about operating system or organizational security.
   * are not necessarily comfortable reasoning about the security properties of a system at the level of detail of Linux Capabilities, SELinux, AppArmor, etc.
@@ -66,11 +66,11 @@ A pod runs in a *security context* under a *service account* that is defined by 
 1. The API should authenticate and authorize user actions [authn and authz](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/access.md)
 2. All infrastructure components (kubelets, kube-proxies, controllers, scheduler) should have an infrastructure user that they can authenticate with and be authorized to perform only the functions they require against the API.
 3. Most infrastructure components should use the API as a way of exchanging data and changing the system, and only the API should have access to the underlying data store (etcd)
-4. When containers run on the cluster and need to talk to other containers or the API server, they should be identified and authorized clearly as an autonomous process via a [service account](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297)
+4. When containers run on the cluster and need to talk to other containers or the API server, they should be identified and authorized clearly as an autonomous process via a [service account](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/service_accounts.md)
    1.  If the user who started a long-lived process is removed from access to the cluster, the process should be able to continue without interruption
    2.  If the user who started processes are removed from the cluster, administrators may wish to terminate their processes in bulk
-   3.  When containers run with a service account, the user that created / triggered the service account behavior must be associated to the container's action
-5. When container processes runs on the cluster, they should run in a [security context](https://github.com/GoogleCloudPlatform/kubernetes/pull/3910) that isolates those processes via Linux user security, user namespaces, and permissions.
+   3.  When containers run with a service account, the user that created / triggered the service account behavior must be associated with the container's action
+5. When container processes run on the cluster, they should run in a [security context](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/security_context.md) that isolates those processes via Linux user security, user namespaces, and permissions.
    1.  Administrators should be able to configure the cluster to automatically confine all container processes as a non-root, randomly assigned UID
    2.  Administrators should be able to ensure that container processes within the same namespace are all assigned the same unix user UID
    3.  Administrators should be able to limit which developers and project administrators have access to higher privilege actions
@@ -79,7 +79,7 @@ A pod runs in a *security context* under a *service account* that is defined by 
    6.  Developers may need to ensure their images work within higher security requirements specified by administrators
    7.  When available, Linux kernel user namespaces can be used to ensure 5.2 and 5.4 are met.
    8.  When application developers want to share filesytem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
-6. Developers should be able to define [secrets](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297) that are automatically added to the containers when pods are run
+6. Developers should be able to define [secrets](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md) that are automatically added to the containers when pods are run
    1.  Secrets are files injected into the container whose values should not be displayed within a pod. Examples:
        1. An SSH private key for git cloning remote data
        2. A client certificate for accessing a remote system
@@ -87,7 +87,7 @@ A pod runs in a *security context* under a *service account* that is defined by 
        4. A .kubeconfig file with embedded cert / token data for accessing the Kubernetes master
        5. A .dockercfg file for pulling images from a protected registry
    2.  Developers should be able to define the pod spec so that a secret lands in a specific location
-   3.  Project administrators should be able to limit developers within a namespace from viewing or modify secrets (anyone who can launch an arbitrary pod can view secrets)
+   3.  Project administrators should be able to limit developers within a namespace from viewing or modifying secrets (anyone who can launch an arbitrary pod can view secrets)
    4.  Secrets are generally not copied from one namespace to another when a developer's application definitions are copied
 
 
