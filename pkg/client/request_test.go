@@ -142,7 +142,7 @@ func TestRequestSetTwiceError(t *testing.T) {
 }
 
 func TestRequestParseSelectorParam(t *testing.T) {
-	r := (&Request{}).ParseSelectorParam("foo", "a")
+	r := (&Request{}).ParseSelectorParam("foo", "a=")
 	if r.err == nil || r.params != nil {
 		t.Errorf("should have set err and left params nil: %#v", r)
 	}

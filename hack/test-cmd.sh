@@ -194,11 +194,11 @@ for version in "${kube_api_versions[@]}"; do
 
   ### Delete POD valid-pod with label
   # Pre-condition: valid-pod POD is running
-  kube::test::get_object_assert 'pods -l name=valid-pod' "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
+  kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{.$id_field}}:{{end}}' 'valid-pod:'
   # Command
-  kubectl delete pods -l name=valid-pod "${kube_flags[@]}"
+  kubectl delete pods -l'name in (valid-pod)' "${kube_flags[@]}"
   # Post-condition: no POD is running
-  kube::test::get_object_assert 'pods -l name=valid-pod' "{{range.items}}{{.$id_field}}:{{end}}" ''
+  kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{.$id_field}}:{{end}}' ''
 
   ### Create POD valid-pod from JSON
   # Pre-condition: no POD is running
@@ -220,7 +220,7 @@ for version in "${kube_api_versions[@]}"; do
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  ! kubectl delete --all pods -l name=valid-pod "${kube_flags[@]}"
+  ! kubectl delete --all pods -l'name in (valid-pod)' "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
 
@@ -230,7 +230,7 @@ for version in "${kube_api_versions[@]}"; do
   # Command
   kubectl delete --all pods "${kube_flags[@]}" # --all remove all the pods
   # Post-condition: no POD is running
-  kube::test::get_object_assert 'pods -l name=valid-pod' "{{range.items}}{{.$id_field}}:{{end}}" ''
+  kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{.$id_field}}:{{end}}' ''
 
   ### Create two PODs
   # Pre-condition: no POD is running
@@ -318,7 +318,7 @@ for version in "${kube_api_versions[@]}"; do
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -lname=valid-pod-super-sayan "${kube_flags[@]}"
+  kubectl delete pods -l'name in (valid-pod-super-sayan)' "${kube_flags[@]}"
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" ''
 

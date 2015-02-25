@@ -193,7 +193,7 @@ func NewRequirement(key string, op Operator, vals util.StringSet) (*Requirement,
 	switch op {
 	case InOperator, NotInOperator:
 		if len(vals) == 0 {
-			return nil, fmt.Errorf("for In,NotIn operators, values set can't be empty")
+			return nil, fmt.Errorf("for 'in', 'notin' operators, values set can't be empty")
 		}
 	case EqualsOperator, DoubleEqualsOperator, NotEqualsOperator:
 		if len(vals) != 1 {
@@ -336,31 +336,30 @@ func (lsel LabelSelector) String() string {
 type Token int
 
 const (
-	ERROR Token = iota
-	EOS         // end of string
-	CPAR
-	COMMA
-	EEQUAL
-	EQUAL
-	IDENTIFIER
-	IN
-	NEQUAL
-	NOTIN
-	OPAR
-	OR
+	ErrorToken Token = iota
+	EndOfStringToken
+	ClosedParToken
+	CommaToken
+	DoubleEqualsToken
+	EqualsToken
+	IdentifierToken // to represent keys and values
+	InToken
+	NotEqualsToken
+	NotInToken
+	OpenParToken
 )
 
 // string2token contains the mapping between lexer Token and token literal
-// (except IDENTIFIER, EOS and ERROR since it makes no sense)
+// (except IdentifierToken, EndOfStringToken and ErrorToken since it makes no sense)
 var string2token = map[string]Token{
-	")":     CPAR,
-	",":     COMMA,
-	"==":    EEQUAL,
-	"=":     EQUAL,
-	"in":    IN,
-	"!=":    NEQUAL,
-	"notin": NOTIN,
-	"(":     OPAR,
+	")":     ClosedParToken,
+	",":     CommaToken,
+	"==":    DoubleEqualsToken,
+	"=":     EqualsToken,
+	"in":    InToken,
+	"!=":    NotEqualsToken,
+	"notin": NotInToken,
+	"(":     OpenParToken,
 }
 
 // The item produced by the lexer. It contains the Token and the literal.
@@ -383,11 +382,12 @@ func isSpecialSymbol(ch byte) bool {
 	return false
 }
 
-// Lexer struct
+// Lexer represents the Lexer struct for label selector.
+// It contains necessary informationt to tokenize the input string
 type Lexer struct {
-	// s stores the string to be lexed
+	// s stores the string to be tokenized
 	s string
-	// pos is the position currently lexed
+	// pos is the position currently tokenized
 	pos int
 }
 
@@ -402,21 +402,23 @@ func (l *Lexer) read() (b byte) {
 	return b
 }
 
-// no return simply unread
+// unread 'undoes' the last read character
 func (l *Lexer) unread() {
 	l.pos--
 }
 
-// func return a literal token (for example IN) and or an identifier.
+// scanIdOrKeyword scans string to recognize literal token (for example 'in') or an identifier.
 func (l *Lexer) scanIdOrKeyword() (tok Token, lit string) {
 	var buffer []byte
+IdentifierLoop:
 	for {
-		if ch := l.read(); ch == 0 { // end of string found
-			break
-		} else if isSpecialSymbol(ch) || isWhitespace(ch) {
-			l.unread() // stop scanning and unread
-			break
-		} else {
+		switch ch := l.read(); {
+		case ch == 0:
+			break IdentifierLoop
+		case isSpecialSymbol(ch) || isWhitespace(ch):
+			l.unread()
+			break IdentifierLoop
+		default:
 			buffer = append(buffer, ch)
 		}
 	}
@@ -424,64 +426,75 @@ func (l *Lexer) scanIdOrKeyword() (tok Token, lit string) {
 	if val, ok := string2token[s]; ok { // is a literal token?
 		return val, s
 	}
-	return IDENTIFIER, s // otherwise is an identifier
+	return IdentifierToken, s // otherwise is an identifier
 }
 
-// scan string starting with specail symbol. At the moment this special symbols
-// identify not literal operators
+// scanSpecialSymbol scans string starting with special symbol.
+// special symbol identify non literal operators. "!=", "==", "="
 func (l *Lexer) scanSpecialSymbol() (Token, string) {
 	lastScannedItem := ScannedItem{}
 	var buffer []byte
+SpecialSymbolLoop:
 	for {
-		if ch := l.read(); ch == 0 {
-			break
-		} else if isSpecialSymbol(ch) {
+		switch ch := l.read(); {
+		case ch == 0:
+			break SpecialSymbolLoop
+		case isSpecialSymbol(ch):
 			buffer = append(buffer, ch)
 			if token, ok := string2token[string(buffer)]; ok {
 				lastScannedItem = ScannedItem{tok: token, literal: string(buffer)}
 			} else if lastScannedItem.tok != 0 {
 				l.unread()
-				break
+				break SpecialSymbolLoop
 			}
-		} else { // in any other cases (identifer or whitespace) stop
+		default:
 			l.unread()
-			break
+			break SpecialSymbolLoop
 		}
 	}
 	if lastScannedItem.tok == 0 {
-		return ERROR, fmt.Sprintf("error expected keyword found '%s'", buffer)
-	} else {
-		return lastScannedItem.tok, lastScannedItem.literal
+		return ErrorToken, fmt.Sprintf("error expected: keyword found '%s'", buffer)
 	}
+	return lastScannedItem.tok, lastScannedItem.literal
 }
 
-// func Lex return Token and the literal (meaningfull only in case of IDENTIFIER)
-func (l *Lexer) Lex() (tok Token, lit string) {
-	ch := l.read()
-	for { // consume spaces until no more spaces
+// skipWhiteSpaces consumes all blank characters
+// returning the first non blank character
+func (l *Lexer) skipWhiteSpaces(ch byte) byte {
+	for {
 		if !isWhitespace(ch) {
-			break
+			return ch
 		}
 		ch = l.read()
 	}
-	if ch == 0 { // end of the string?
-		return EOS, ""
-	} else if isSpecialSymbol(ch) {
+}
+
+// Lex returns a pair of Token and the literal
+// literal is meaningfull only for IdentifierToken token
+func (l *Lexer) Lex() (tok Token, lit string) {
+	switch ch := l.skipWhiteSpaces(l.read()); {
+	case ch == 0:
+		return EndOfStringToken, ""
+	case isSpecialSymbol(ch):
 		l.unread()
-		return l.scanSpecialSymbol() // can be an operator
-	} else {
+		return l.scanSpecialSymbol()
+	default:
 		l.unread()
 		return l.scanIdOrKeyword()
 	}
 }
 
-// Parser data structure contains the label selector parser data and algos
+// Parser data structure contains the label selector parser data strucutre
 type Parser struct {
 	l            *Lexer
 	scannedItems []ScannedItem
 	position     int
 }
 
+// Parser context represents context during parsing:
+// some literal for example 'in' and 'notin' can be
+// recognized as operator for example 'x in (a)' but
+// it can be recognized as value for example 'value in (in)'
 type ParserContext int
 
 const (
@@ -494,40 +507,40 @@ func (p *Parser) lookahead(context ParserContext) (Token, string) {
 	tok, lit := p.scannedItems[p.position].tok, p.scannedItems[p.position].literal
 	if context == Values {
 		switch tok {
-		case IN, NOTIN:
-			tok = IDENTIFIER
+		case InToken, NotInToken:
+			tok = IdentifierToken
 		}
 	}
 	return tok, lit
 }
 
-// return current token and string. Increments the the position
+// consume returns current token and string. Increments the the position
 func (p *Parser) consume(context ParserContext) (Token, string) {
 	p.position++
 	tok, lit := p.scannedItems[p.position-1].tok, p.scannedItems[p.position-1].literal
 	if context == Values {
 		switch tok {
-		case IN, NOTIN:
-			tok = IDENTIFIER
+		case InToken, NotInToken:
+			tok = IdentifierToken
 		}
 	}
 	return tok, lit
 }
 
-// scan method scan all the input string and storin <token, literal> pairs in
-// scanned items slice.
-// The Parser can now lookahead and consume the tokens
+// scan runs through the input string and stores the ScannedItem in an array
+// Parser can now lookahead and consume the tokens
 func (p *Parser) scan() {
 	for {
 		token, literal := p.l.Lex()
 		p.scannedItems = append(p.scannedItems, ScannedItem{token, literal})
-		if token == EOS {
+		if token == EndOfStringToken {
 			break
 		}
 	}
 }
 
-// the entry function to parse list of requirements
+// parse runs the left recursive descending algorithm
+// on input string. It returns a list of Requirement objects.
 func (p *Parser) parse() ([]Requirement, error) {
 	p.scan() // init scannedItems
 
@@ -535,34 +548,33 @@ func (p *Parser) parse() ([]Requirement, error) {
 	for {
 		tok, lit := p.lookahead(Values)
 		switch tok {
-		case IDENTIFIER:
+		case IdentifierToken:
 			r, err := p.parseRequirement()
 			if err != nil {
-				return nil, fmt.Errorf("Error: ", err)
+				return nil, fmt.Errorf("unable to parse requiremnt: ", err)
 			}
 			requirements = append(requirements, *r)
 			t, l := p.consume(Values)
 			switch t {
-			case EOS:
+			case EndOfStringToken:
 				return requirements, nil
-			case COMMA:
+			case CommaToken:
 				t2, l2 := p.lookahead(Values)
-				if t2 != IDENTIFIER {
-					return nil, fmt.Errorf("Expected identifier after comma, found '%s'", l2)
+				if t2 != IdentifierToken {
+					return nil, fmt.Errorf("found '%s', expected: identifier after ','", l2)
 				}
 			default:
-				return nil, fmt.Errorf("Bad value '%s', expetected comma or 'end of string'", l)
+				return nil, fmt.Errorf("found '%s', expected: ',' or 'end of string'", l)
 			}
-		case EOS:
+		case EndOfStringToken:
 			return requirements, nil
 		default:
-			return nil, fmt.Errorf("Bad value %s. Expected identifier or 'end of string'", lit)
+			return nil, fmt.Errorf("found '%s', expected: identifier or 'end of string'", lit)
 		}
 	}
 	return requirements, nil
 }
 
-// parse a Requirement data structure
 func (p *Parser) parseRequirement() (*Requirement, error) {
 	key, operator, err := p.parseKeyAndInferOperator()
 	if err != nil {
@@ -590,17 +602,19 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 }
 
 // parseKeyAndInferOperator parse literals.
+// in case of no operator 'in, notin, ==, =, !=' are found
+// the 'exists' operattor is inferred
 func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
 	tok, literal := p.consume(Values)
-	if tok != IDENTIFIER {
-		err := fmt.Errorf("Found '%s' instead of expected IDENTIFIER", literal)
+	if tok != IdentifierToken {
+		err := fmt.Errorf("found '%s', expected: identifier", literal)
 		return "", "", err
 	}
 	if err := validateLabelKey(literal); err != nil {
 		return "", "", err
 	}
 	var operator Operator
-	if t, _ := p.lookahead(Values); t == EOS || t == COMMA {
+	if t, _ := p.lookahead(Values); t == EndOfStringToken || t == CommaToken {
 		operator = ExistsOperator
 	}
 	return literal, operator, nil
@@ -611,94 +625,94 @@ func (p *Parser) parseKeyAndInferOperator() (string, Operator, error) {
 func (p *Parser) parseOperator() (op Operator, err error) {
 	tok, lit := p.consume(KeyAndOperator)
 	switch tok {
-	case IN:
+	case InToken:
 		op = InOperator
-	case EQUAL:
+	case EqualsToken:
 		op = EqualsOperator
-	case EEQUAL:
+	case DoubleEqualsToken:
 		op = DoubleEqualsOperator
-	case NOTIN:
+	case NotInToken:
 		op = NotInOperator
-	case NEQUAL:
+	case NotEqualsToken:
 		op = NotEqualsOperator
 	default:
-		return "", fmt.Errorf("Expected '=', '!=', '==', 'in', notin', found %s", lit)
+		return "", fmt.Errorf("found '%s', expected: '=', '!=', '==', 'in', notin'", lit)
 	}
 	return op, nil
 }
 
-// parse values parse the values for set based matching (x,y,z)
+// parseValues parses the values for set based matching (x,y,z)
 func (p *Parser) parseValues() (util.StringSet, error) {
 	tok, lit := p.consume(Values)
-	if tok != OPAR {
-		return nil, fmt.Errorf("Found '%s' expected '('", lit)
+	if tok != OpenParToken {
+		return nil, fmt.Errorf("found '%s' expected: '('", lit)
 	}
 	tok, lit = p.lookahead(Values)
 	switch tok {
-	case IDENTIFIER, COMMA:
+	case IdentifierToken, CommaToken:
 		s, err := p.parseIdentifiersList() // handles general cases
 		if err != nil {
 			return s, err
 		}
-		if tok, _ = p.consume(Values); tok != CPAR {
-			return nil, fmt.Errorf("Expected a ')', found '%s'", lit)
+		if tok, _ = p.consume(Values); tok != ClosedParToken {
+			return nil, fmt.Errorf("found '%s', expected: ')'", lit)
 		}
 		return s, nil
-	case CPAR: // handles "()"
+	case ClosedParToken: // handles "()"
 		p.consume(Values)
 		return util.NewStringSet(""), nil
 	default:
-		return nil, fmt.Errorf("Expected ')' or ',' or identifier. Found '%s'", lit)
+		return nil, fmt.Errorf("found '%s', expected: ',', ')' or identifier", lit)
 	}
 	return util.NewStringSet(), nil
 }
 
-// parseIdentifiersList parse a (possibly empty) list of
+// parseIdentifiersList parses a (possibly empty) list of
 // of comma separated (possibly empty) identifiers
 func (p *Parser) parseIdentifiersList() (util.StringSet, error) {
 	s := util.NewStringSet()
 	for {
 		tok, lit := p.consume(Values)
 		switch tok {
-		case IDENTIFIER:
+		case IdentifierToken:
 			s.Insert(lit)
 			tok2, lit2 := p.lookahead(Values)
 			switch tok2 {
-			case COMMA:
+			case CommaToken:
 				continue
-			case CPAR:
+			case ClosedParToken:
 				return s, nil
 			default:
-				return nil, fmt.Errorf("Found '%s', expected ',' or ')'", lit2)
+				return nil, fmt.Errorf("found '%s', expected: ',' or ')'", lit2)
 			}
-		case COMMA: // handled here since we can have "(,"
+		case CommaToken: // handled here since we can have "(,"
 			if s.Len() == 0 {
 				s.Insert("") // to handle (,
 			}
 			tok2, _ := p.lookahead(Values)
-			if tok2 == CPAR {
+			if tok2 == ClosedParToken {
 				s.Insert("") // to handle ,)  Double "" removed by StringSet
 				return s, nil
 			}
-			if tok2 == COMMA {
+			if tok2 == CommaToken {
 				p.consume(Values)
 				s.Insert("") // to handle ,, Double "" removed by StringSet
 			}
 		default: // it can be operator
-			return s, fmt.Errorf("Found '%s', expected ',', or identifier", lit)
+			return s, fmt.Errorf("found '%s', expected: ',', or identifier", lit)
 		}
 	}
 }
 
-// parse the only value for exact match style
+// parseExactValue parses the only value for exact match style
 func (p *Parser) parseExactValue() (util.StringSet, error) {
 	s := util.NewStringSet()
-	if tok, lit := p.consume(Values); tok == IDENTIFIER {
+	tok, lit := p.consume(Values)
+	if tok == IdentifierToken {
 		s.Insert(lit)
-	} else {
-		return nil, fmt.Errorf("Found '%s', expected identifier", lit)
+		return s, nil
 	}
-	return s, nil
+	return nil, fmt.Errorf("found '%s', expected: identifier", lit)
 }
 
 // Parse takes a string representing a selector and returns a selector
