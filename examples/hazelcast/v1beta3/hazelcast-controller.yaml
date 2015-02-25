@@ -14,7 +14,9 @@ spec:
         name: hazelcast
     spec: 
       containers: 
-        - cpu: 1000
+        - resources:
+            limits:
+              cpu: 1000m
           image: pires/hazelcast-k8s
           name: hazelcast
           ports: 
