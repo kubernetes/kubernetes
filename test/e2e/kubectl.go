@@ -188,5 +188,6 @@ func runKubectl(args ...string) string {
 		return ""
 	}
 	Logf(stdout.String())
-	return stdout.String()
+	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
+	return strings.TrimSpace(stdout.String())
 }
