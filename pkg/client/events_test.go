@@ -62,9 +62,13 @@ func TestEventCreate(t *testing.T) {
 	}
 	timeStamp := util.Now()
 	event := &api.Event{
-		//namespace: namespace{"default"},
+		ObjectMeta: api.ObjectMeta{
+			Namespace: api.NamespaceDefault,
+		},
 		InvolvedObject: *objReference,
-		Timestamp:      timeStamp,
+		FirstTimestamp: timeStamp,
+		LastTimestamp:  timeStamp,
+		Count:          1,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -78,7 +82,7 @@ func TestEventCreate(t *testing.T) {
 	response, err := c.Setup().Events("").Create(event)
 
 	if err != nil {
-		t.Errorf("%#v should be nil.", err)
+		t.Fatalf("%v should be nil.", err)
 	}
 
 	if e, a := *objReference, response.InvolvedObject; !reflect.DeepEqual(e, a) {
@@ -97,8 +101,13 @@ func TestEventGet(t *testing.T) {
 	}
 	timeStamp := util.Now()
 	event := &api.Event{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "other",
+		},
 		InvolvedObject: *objReference,
-		Timestamp:      timeStamp,
+		FirstTimestamp: timeStamp,
+		LastTimestamp:  timeStamp,
+		Count:          1,
 	}
 	c := &testClient{
 		Request: testRequest{
@@ -112,7 +121,7 @@ func TestEventGet(t *testing.T) {
 	response, err := c.Setup().Events("").Get("1")
 
 	if err != nil {
-		t.Errorf("%#v should be nil.", err)
+		t.Fatalf("%v should be nil.", err)
 	}
 
 	if e, r := event.InvolvedObject, response.InvolvedObject; !reflect.DeepEqual(e, r) {
@@ -135,7 +144,9 @@ func TestEventList(t *testing.T) {
 		Items: []api.Event{
 			{
 				InvolvedObject: *objReference,
-				Timestamp:      timeStamp,
+				FirstTimestamp: timeStamp,
+				LastTimestamp:  timeStamp,
+				Count:          1,
 			},
 		},
 	}

@@ -32,7 +32,8 @@ get-password
 detect-master > /dev/null
 detect-minions > /dev/null
 
-MINIONS_FILE=/tmp/minions
+MINIONS_FILE=/tmp/minions-$$
+trap 'rm -rf "${MINIONS_FILE}"' EXIT
 # Make several attempts to deal with slow cluster birth.
 attempt=0
 while true; do
@@ -43,6 +44,7 @@ while true; do
   else
     if (( attempt > 5 )); then
       echo -e "${color_red}Detected ${found} nodes out of ${NUM_MINIONS}. Your cluster may not be working. ${color_norm}"
+      cat -n "${MINIONS_FILE}"
       exit 2
     fi
     attempt=$((attempt+1))
@@ -50,6 +52,7 @@ while true; do
   fi
 done
 echo "Found ${found} nodes."
+cat -n "${MINIONS_FILE}"
 
 # On vSphere, use minion IPs as their names
 if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]]; then
@@ -61,6 +64,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     count=$(grep -c "${MINION_NAMES[$i]}" "${MINIONS_FILE}") || :
     if [[ "${count}" == "0" ]]; then
       echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
+      cat -n "${MINIONS_FILE}"
       exit 1
     fi
 

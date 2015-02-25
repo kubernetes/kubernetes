@@ -25,24 +25,32 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/google/cadvisor/info"
 )
 
 type fakeKubelet struct {
-	podByNameFunc     func(namespace, name string) (*api.BoundPod, bool)
-	statusFunc        func(name string) (api.PodStatus, error)
-	containerInfoFunc func(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	machineInfoFunc   func() (*info.MachineInfo, error)
-	boundPodsFunc     func() ([]api.BoundPod, error)
-	logFunc           func(w http.ResponseWriter, req *http.Request)
-	runFunc           func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	containerLogsFunc func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
+	podByNameFunc                      func(namespace, name string) (*api.BoundPod, bool)
+	statusFunc                         func(name string) (api.PodStatus, error)
+	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	rootInfoFunc                       func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	machineInfoFunc                    func() (*info.MachineInfo, error)
+	boundPodsFunc                      func() ([]api.BoundPod, error)
+	logFunc                            func(w http.ResponseWriter, req *http.Request)
+	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
+	dockerVersionFunc                  func() ([]uint, error)
+	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
+	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
+	streamingConnectionIdleTimeoutFunc func() time.Duration
 }
 
 func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
@@ -59,6 +67,10 @@ func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, conta
 
 func (fk *fakeKubelet) GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	return fk.rootInfoFunc(req)
+}
+
+func (fk *fakeKubelet) GetDockerVersion() ([]uint, error) {
+	return fk.dockerVersionFunc()
 }
 
 func (fk *fakeKubelet) GetMachineInfo() (*info.MachineInfo, error) {
@@ -79,6 +91,18 @@ func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail 
 
 func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uid, containerName, cmd)
+}
+
+func (fk *fakeKubelet) ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+	return fk.execFunc(name, uid, container, cmd, in, out, err, tty)
+}
+
+func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+	return fk.portForwardFunc(name, uid, port, stream)
+}
+
+func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
+	return fk.streamingConnectionIdleTimeoutFunc()
 }
 
 type serverTestFramework struct {
@@ -214,6 +238,25 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
 		t.Errorf("received wrong data: %#v", receivedInfo)
 	}
+}
+
+func TestContainerNotFound(t *testing.T) {
+	fw := newServerTest()
+	podID := "somepod"
+	expectedNamespace := "custom"
+	expectedContainerName := "slowstartcontainer"
+	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
+	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+		return nil, ErrContainerNotFound
+	}
+	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, expectedUid, expectedContainerName))
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Received status %d expecting %d", resp.StatusCode, http.StatusNotFound)
+	}
+	defer resp.Body.Close()
 }
 
 func TestRootInfo(t *testing.T) {
@@ -375,15 +418,51 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 }
 
-func TestContainerLogs(t *testing.T) {
+// TODO: fix me when pod level stats get implemented
+func TestPodsInfo(t *testing.T) {
 	fw := newServerTest()
-	output := "foo bar"
-	podNamespace := "other"
-	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
-	expectedContainerName := "baz"
-	expectedTail := ""
-	expectedFollow := false
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/stats/goodpod")
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		// copying the response body did not work
+		t.Fatalf("Cannot copy resp: %#v", err)
+	}
+	result := string(body)
+	if !strings.Contains(result, "pod level status currently unimplemented") {
+		t.Errorf("expected body contains %s, got %d", "pod level status currently unimplemented", result)
+	}
+}
+
+func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*api.BoundPod, bool) {
+		return &api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: namespace,
+				Name:      pod,
+				Annotations: map[string]string{
+					ConfigSourceAnnotationKey: "etcd",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: container,
+					},
+				},
+			},
+		}, true
+	}
+}
+
+func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodName, expectedContainerName, expectedTail string, expectedFollow bool, output string) {
 	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
@@ -397,8 +476,22 @@ func TestContainerLogs(t *testing.T) {
 		if follow != expectedFollow {
 			t.Errorf("expected %t, got %t", expectedFollow, follow)
 		}
+		io.WriteString(stdout, output)
 		return nil
 	}
+}
+
+func TestContainerLogs(t *testing.T) {
+	fw := newServerTest()
+	output := "foo bar"
+	podNamespace := "other"
+	podName := "foo"
+	expectedPodName := podName + ".other.etcd"
+	expectedContainerName := "baz"
+	expectedTail := ""
+	expectedFollow := false
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName)
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
@@ -410,7 +503,7 @@ func TestContainerLogs(t *testing.T) {
 		t.Errorf("Error reading container logs: %v", err)
 	}
 	result := string(body)
-	if result != string(body) {
+	if result != output {
 		t.Errorf("Expected: '%v', got: '%v'", output, result)
 	}
 }
@@ -424,21 +517,8 @@ func TestContainerLogsWithTail(t *testing.T) {
 	expectedContainerName := "baz"
 	expectedTail := "5"
 	expectedFollow := false
-	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
-		if podFullName != expectedPodName {
-			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
-		}
-		if containerName != expectedContainerName {
-			t.Errorf("expected %s, got %s", expectedContainerName, containerName)
-		}
-		if tail != expectedTail {
-			t.Errorf("expected %s, got %s", expectedTail, tail)
-		}
-		if follow != expectedFollow {
-			t.Errorf("expected %t, got %t", expectedFollow, follow)
-		}
-		return nil
-	}
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=5")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
@@ -450,7 +530,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 		t.Errorf("Error reading container logs: %v", err)
 	}
 	result := string(body)
-	if result != string(body) {
+	if result != output {
 		t.Errorf("Expected: '%v', got: '%v'", output, result)
 	}
 }
@@ -464,21 +544,8 @@ func TestContainerLogsWithFollow(t *testing.T) {
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := true
-	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
-		if podFullName != expectedPodName {
-			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
-		}
-		if containerName != expectedContainerName {
-			t.Errorf("expected %s, got %s", expectedContainerName, containerName)
-		}
-		if tail != expectedTail {
-			t.Errorf("expected %s, got %s", expectedTail, tail)
-		}
-		if follow != expectedFollow {
-			t.Errorf("expected %t, got %t", expectedFollow, follow)
-		}
-		return nil
-	}
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?follow=1")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
@@ -490,7 +557,459 @@ func TestContainerLogsWithFollow(t *testing.T) {
 		t.Errorf("Error reading container logs: %v", err)
 	}
 	result := string(body)
-	if result != string(body) {
+	if result != output {
 		t.Errorf("Expected: '%v', got: '%v'", output, result)
+	}
+}
+
+func TestServeExecInContainerIdleTimeout(t *testing.T) {
+	fw := newServerTest()
+
+	fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
+		return 100 * time.Millisecond
+	}
+
+	podNamespace := "other"
+	podName := "foo"
+	expectedContainerName := "baz"
+
+	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
+
+	upgradeRoundTripper := spdy.NewRoundTripper(nil)
+	c := &http.Client{Transport: upgradeRoundTripper}
+
+	resp, err := c.Get(url)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	conn, err := upgradeRoundTripper.NewConnection(resp)
+	if err != nil {
+		t.Fatalf("Unexpected error creating streaming connection: %s", err)
+	}
+	if conn == nil {
+		t.Fatal("Unexpected nil connection")
+	}
+	defer conn.Close()
+
+	h := http.Header{}
+	h.Set(api.StreamType, api.StreamTypeError)
+	stream, err := conn.CreateStream(h)
+	if err != nil {
+		t.Fatalf("error creating input stream: %v", err)
+	}
+	defer stream.Reset()
+
+	<-conn.CloseChan()
+}
+
+func TestServeExecInContainer(t *testing.T) {
+	tests := []struct {
+		stdin              bool
+		stdout             bool
+		stderr             bool
+		tty                bool
+		responseStatusCode int
+		uid                bool
+	}{
+		{responseStatusCode: http.StatusBadRequest},
+		{stdin: true, responseStatusCode: http.StatusSwitchingProtocols},
+		{stdout: true, responseStatusCode: http.StatusSwitchingProtocols},
+		{stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+		{stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+		{stdout: true, stderr: true, tty: true, responseStatusCode: http.StatusSwitchingProtocols},
+		{stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+	}
+
+	for i, test := range tests {
+		fw := newServerTest()
+
+		fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
+			return 0
+		}
+
+		podNamespace := "other"
+		podName := "foo"
+		expectedPodName := podName + "." + podNamespace + ".etcd"
+		expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
+		expectedContainerName := "baz"
+		expectedCommand := "ls -a"
+		expectedStdin := "stdin"
+		expectedStdout := "stdout"
+		expectedStderr := "stderr"
+		execFuncDone := make(chan struct{})
+		clientStdoutReadDone := make(chan struct{})
+		clientStderrReadDone := make(chan struct{})
+
+		fw.fakeKubelet.execFunc = func(podFullName string, uid types.UID, containerName string, cmd []string, in io.Reader, out, stderr io.WriteCloser, tty bool) error {
+			defer close(execFuncDone)
+			if podFullName != expectedPodName {
+				t.Fatalf("%d: podFullName: expected %s, got %s", i, expectedPodName, podFullName)
+			}
+			if test.uid && string(uid) != expectedUid {
+				t.Fatalf("%d: uid: expected %v, got %v", i, expectedUid, uid)
+			}
+			if containerName != expectedContainerName {
+				t.Fatalf("%d: containerName: expected %s, got %s", i, expectedContainerName, containerName)
+			}
+			if strings.Join(cmd, " ") != expectedCommand {
+				t.Fatalf("%d: cmd: expected: %s, got %v", i, expectedCommand, cmd)
+			}
+
+			if test.stdin {
+				if in == nil {
+					t.Fatalf("%d: stdin: expected non-nil", i)
+				}
+				b := make([]byte, 10)
+				n, err := in.Read(b)
+				if err != nil {
+					t.Fatalf("%d: error reading from stdin: %v", i, err)
+				}
+				if e, a := expectedStdin, string(b[0:n]); e != a {
+					t.Fatalf("%d: stdin: expected to read %v, got %v", i, e, a)
+				}
+			} else if in != nil {
+				t.Fatalf("%d: stdin: expected nil: %#v", i, in)
+			}
+
+			if test.stdout {
+				if out == nil {
+					t.Fatalf("%d: stdout: expected non-nil", i)
+				}
+				_, err := out.Write([]byte(expectedStdout))
+				if err != nil {
+					t.Fatalf("%d:, error writing to stdout: %v", i, err)
+				}
+				out.Close()
+				<-clientStdoutReadDone
+			} else if out != nil {
+				t.Fatalf("%d: stdout: expected nil: %#v", i, out)
+			}
+
+			if tty {
+				if stderr != nil {
+					t.Fatalf("%d: tty set but received non-nil stderr: %v", i, stderr)
+				}
+			} else if test.stderr {
+				if stderr == nil {
+					t.Fatalf("%d: stderr: expected non-nil", i)
+				}
+				_, err := stderr.Write([]byte(expectedStderr))
+				if err != nil {
+					t.Fatalf("%d:, error writing to stderr: %v", i, err)
+				}
+				stderr.Close()
+				<-clientStderrReadDone
+			} else if stderr != nil {
+				t.Fatalf("%d: stderr: expected nil: %#v", i, stderr)
+			}
+
+			return nil
+		}
+
+		var url string
+		if test.uid {
+			url = fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedUid + "/" + expectedContainerName + "?command=ls&command=-a"
+		} else {
+			url = fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?command=ls&command=-a"
+		}
+		if test.stdin {
+			url += "&" + api.ExecStdinParam + "=1"
+		}
+		if test.stdout {
+			url += "&" + api.ExecStdoutParam + "=1"
+		}
+		if test.stderr && !test.tty {
+			url += "&" + api.ExecStderrParam + "=1"
+		}
+		if test.tty {
+			url += "&" + api.ExecTTYParam + "=1"
+		}
+
+		var (
+			resp                *http.Response
+			err                 error
+			upgradeRoundTripper httpstream.UpgradeRoundTripper
+			c                   *http.Client
+		)
+
+		if test.responseStatusCode != http.StatusSwitchingProtocols {
+			c = &http.Client{}
+		} else {
+			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			c = &http.Client{Transport: upgradeRoundTripper}
+		}
+
+		resp, err = c.Get(url)
+		if err != nil {
+			t.Fatalf("%d: Got error GETing: %v", i, err)
+		}
+		defer resp.Body.Close()
+
+		_, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("%d: Error reading response body: %v", i, err)
+		}
+
+		if e, a := test.responseStatusCode, resp.StatusCode; e != a {
+			t.Fatalf("%d: response status: expected %v, got %v", e, a)
+		}
+
+		if test.responseStatusCode != http.StatusSwitchingProtocols {
+			continue
+		}
+
+		conn, err := upgradeRoundTripper.NewConnection(resp)
+		if err != nil {
+			t.Fatalf("Unexpected error creating streaming connection: %s", err)
+		}
+		if conn == nil {
+			t.Fatalf("%d: unexpected nil conn", i)
+		}
+		defer conn.Close()
+
+		h := http.Header{}
+		h.Set(api.StreamType, api.StreamTypeError)
+		errorStream, err := conn.CreateStream(h)
+		if err != nil {
+			t.Fatalf("%d: error creating error stream: %v", i, err)
+		}
+		defer errorStream.Reset()
+
+		if test.stdin {
+			h.Set(api.StreamType, api.StreamTypeStdin)
+			stream, err := conn.CreateStream(h)
+			if err != nil {
+				t.Fatalf("%d: error creating stdin stream: %v", i, err)
+			}
+			defer stream.Reset()
+			_, err = stream.Write([]byte(expectedStdin))
+			if err != nil {
+				t.Fatalf("%d: error writing to stdin stream: %v", i, err)
+			}
+		}
+
+		var stdoutStream httpstream.Stream
+		if test.stdout {
+			h.Set(api.StreamType, api.StreamTypeStdout)
+			stdoutStream, err = conn.CreateStream(h)
+			if err != nil {
+				t.Fatalf("%d: error creating stdout stream: %v", i, err)
+			}
+			defer stdoutStream.Reset()
+		}
+
+		var stderrStream httpstream.Stream
+		if test.stderr && !test.tty {
+			h.Set(api.StreamType, api.StreamTypeStderr)
+			stderrStream, err = conn.CreateStream(h)
+			if err != nil {
+				t.Fatalf("%d: error creating stderr stream: %v", i, err)
+			}
+			defer stderrStream.Reset()
+		}
+
+		if test.stdout {
+			output := make([]byte, 10)
+			n, err := stdoutStream.Read(output)
+			close(clientStdoutReadDone)
+			if err != nil {
+				t.Fatalf("%d: error reading from stdout stream: %v", i, err)
+			}
+			if e, a := expectedStdout, string(output[0:n]); e != a {
+				t.Fatalf("%d: stdout: expected '%v', got '%v'", i, e, a)
+			}
+		}
+
+		if test.stderr && !test.tty {
+			output := make([]byte, 10)
+			n, err := stderrStream.Read(output)
+			close(clientStderrReadDone)
+			if err != nil {
+				t.Fatalf("%d: error reading from stderr stream: %v", i, err)
+			}
+			if e, a := expectedStderr, string(output[0:n]); e != a {
+				t.Fatalf("%d: stderr: expected '%v', got '%v'", i, e, a)
+			}
+		}
+
+		<-execFuncDone
+	}
+}
+
+func TestServePortForwardIdleTimeout(t *testing.T) {
+	fw := newServerTest()
+
+	fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
+		return 100 * time.Millisecond
+	}
+
+	podNamespace := "other"
+	podName := "foo"
+
+	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
+
+	upgradeRoundTripper := spdy.NewRoundTripper(nil)
+	c := &http.Client{Transport: upgradeRoundTripper}
+
+	resp, err := c.Get(url)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	conn, err := upgradeRoundTripper.NewConnection(resp)
+	if err != nil {
+		t.Fatalf("Unexpected error creating streaming connection: %s", err)
+	}
+	if conn == nil {
+		t.Fatal("Unexpected nil connection")
+	}
+	defer conn.Close()
+
+	<-conn.CloseChan()
+}
+
+func TestServePortForward(t *testing.T) {
+	tests := []struct {
+		port          string
+		uid           bool
+		clientData    string
+		containerData string
+		shouldError   bool
+	}{
+		{port: "", shouldError: true},
+		{port: "abc", shouldError: true},
+		{port: "-1", shouldError: true},
+		{port: "65536", shouldError: true},
+		{port: "0", shouldError: true},
+		{port: "1", shouldError: false},
+		{port: "8000", shouldError: false},
+		{port: "8000", clientData: "client data", containerData: "container data", shouldError: false},
+		{port: "65535", shouldError: false},
+		{port: "65535", uid: true, shouldError: false},
+	}
+
+	podNamespace := "other"
+	podName := "foo"
+	expectedPodName := podName + "." + podNamespace + ".etcd"
+	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
+
+	for i, test := range tests {
+		fw := newServerTest()
+
+		fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
+			return 0
+		}
+
+		portForwardFuncDone := make(chan struct{})
+
+		fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+			defer close(portForwardFuncDone)
+
+			if e, a := expectedPodName, name; e != a {
+				t.Fatalf("%d: pod name: expected '%v', got '%v'", i, e, a)
+			}
+
+			if e, a := expectedUid, uid; test.uid && e != string(a) {
+				t.Fatalf("%d: uid: expected '%v', got '%v'", i, e, a)
+			}
+
+			p, err := strconv.ParseUint(test.port, 10, 16)
+			if err != nil {
+				t.Fatalf("%d: error parsing port string '%s': %v", i, port, err)
+			}
+			if e, a := uint16(p), port; e != a {
+				t.Fatalf("%d: port: expected '%v', got '%v'", i, e, a)
+			}
+
+			if test.clientData != "" {
+				fromClient := make([]byte, 32)
+				n, err := stream.Read(fromClient)
+				if err != nil {
+					t.Fatalf("%d: error reading client data: %v", i, err)
+				}
+				if e, a := test.clientData, string(fromClient[0:n]); e != a {
+					t.Fatalf("%d: client data: expected to receive '%v', got '%v'", i, e, a)
+				}
+			}
+
+			if test.containerData != "" {
+				_, err := stream.Write([]byte(test.containerData))
+				if err != nil {
+					t.Fatalf("%d: error writing container data: %v", i, err)
+				}
+			}
+
+			return nil
+		}
+
+		var url string
+		if test.uid {
+			url = fmt.Sprintf("%s/portForward/%s/%s/%s", fw.testHTTPServer.URL, podNamespace, podName, expectedUid)
+		} else {
+			url = fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
+		}
+
+		upgradeRoundTripper := spdy.NewRoundTripper(nil)
+		c := &http.Client{Transport: upgradeRoundTripper}
+
+		resp, err := c.Get(url)
+		if err != nil {
+			t.Fatalf("%d: Got error GETing: %v", i, err)
+		}
+		defer resp.Body.Close()
+
+		conn, err := upgradeRoundTripper.NewConnection(resp)
+		if err != nil {
+			t.Fatalf("Unexpected error creating streaming connection: %s", err)
+		}
+		if conn == nil {
+			t.Fatal("%d: Unexpected nil connection", i)
+		}
+		defer conn.Close()
+
+		headers := http.Header{}
+		headers.Set("streamType", "error")
+		headers.Set("port", test.port)
+		errorStream, err := conn.CreateStream(headers)
+		_ = errorStream
+		haveErr := err != nil
+		if e, a := test.shouldError, haveErr; e != a {
+			t.Fatalf("%d: create stream: expected err=%t, got %t: %v", i, e, a, err)
+		}
+
+		if test.shouldError {
+			continue
+		}
+
+		headers.Set("streamType", "data")
+		headers.Set("port", test.port)
+		dataStream, err := conn.CreateStream(headers)
+		haveErr = err != nil
+		if e, a := test.shouldError, haveErr; e != a {
+			t.Fatalf("%d: create stream: expected err=%t, got %t: %v", i, e, a, err)
+		}
+
+		if test.clientData != "" {
+			_, err := dataStream.Write([]byte(test.clientData))
+			if err != nil {
+				t.Fatalf("%d: unexpected error writing client data: %v", i, err)
+			}
+		}
+
+		if test.containerData != "" {
+			fromContainer := make([]byte, 32)
+			n, err := dataStream.Read(fromContainer)
+			if err != nil {
+				t.Fatalf("%d: unexpected error reading container data: %v", i, err)
+			}
+			if e, a := test.containerData, string(fromContainer[0:n]); e != a {
+				t.Fatalf("%d: expected to receive '%v' from container, got '%v'", i, e, a)
+			}
+		}
+
+		<-portForwardFuncDone
 	}
 }

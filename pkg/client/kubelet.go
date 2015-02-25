@@ -41,7 +41,7 @@ type KubeletClient interface {
 
 // KubeletHealthchecker is an interface for healthchecking kubelets
 type KubeletHealthChecker interface {
-	HealthCheck(host string) (probe.Status, error)
+	HealthCheck(host string) (probe.Result, error)
 }
 
 // PodInfoGetter is an interface for things that can get information about a pod's containers.
@@ -59,41 +59,25 @@ type HTTPKubeletClient struct {
 	EnableHttps bool
 }
 
+// TODO: this structure is questionable, it should be using client.Config and overriding defaults.
 func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	transport := http.DefaultTransport
-	hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
-	hasCert := len(config.CertFile) > 0 || len(config.CertData) > 0
-	if hasCert {
-		var (
-			certData, keyData, caData []byte
-			err                       error
-		)
-		if certData, err = dataFromSliceOrFile(config.CertData, config.CertFile); err != nil {
-			return nil, err
-		}
-		if keyData, err = dataFromSliceOrFile(config.KeyData, config.KeyFile); err != nil {
-			return nil, err
-		}
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
-			return nil, err
-		}
-	} else if hasCA {
-		var (
-			caData []byte
-			err    error
-		)
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewTLSTransport(caData); err != nil {
-			return nil, err
+
+	tlsConfig, err := TLSConfigFor(&Config{
+		TLSClientConfig: config.TLSClientConfig,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if tlsConfig != nil {
+		transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
 		}
 	}
 
-	c := &http.Client{Transport: transport}
+	c := &http.Client{
+		Transport: transport,
+	}
 	return &HTTPKubeletClient{
 		Client:      c,
 		Port:        config.Port,
@@ -135,6 +119,9 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	if response.StatusCode == http.StatusNotFound {
 		return status, ErrPodInfoNotAvailable
 	}
+	if response.StatusCode >= 300 || response.StatusCode < 200 {
+		return status, fmt.Errorf("kubelet %q server responded with HTTP error code %d for pod %s/%s", host, response.StatusCode, podNamespace, podID)
+	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return status, err
@@ -147,7 +134,7 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	return status, nil
 }
 
-func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Status, error) {
+func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return httprobe.DoHTTPProbe(fmt.Sprintf("%s/healthz", c.url(host)), c.Client)
 }
 
@@ -161,6 +148,6 @@ func (c FakeKubeletClient) GetPodStatus(host, podNamespace string, podID string)
 	return api.PodStatusResult{}, errors.New("Not Implemented")
 }
 
-func (c FakeKubeletClient) HealthCheck(host string) (probe.Status, error) {
+func (c FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return probe.Unknown, errors.New("Not Implemented")
 }

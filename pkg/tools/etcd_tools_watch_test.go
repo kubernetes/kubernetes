@@ -18,7 +18,6 @@ package tools
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -123,7 +122,7 @@ func TestWatchInterpretations(t *testing.T) {
 				if e, a := item.expectType, event.Type; e != a {
 					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
 				}
-				if e, a := item.expectObject, event.Object; !reflect.DeepEqual(e, a) {
+				if e, a := item.expectObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
 					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
 				}
 			}
@@ -250,7 +249,7 @@ func TestWatch(t *testing.T) {
 	if e, a := watch.Added, event.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
-	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 
@@ -281,7 +280,7 @@ func TestWatchEtcdState(t *testing.T) {
 	codec := latest.Codec
 	type T struct {
 		Type      watch.EventType
-		Endpoints []string
+		Endpoints []api.Endpoint
 	}
 	testCases := map[string]struct {
 		Initial   map[string]EtcdResponseWithError
@@ -295,7 +294,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 					},
 				},
 			},
@@ -309,12 +308,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -322,7 +321,7 @@ func TestWatchEtcdState(t *testing.T) {
 			},
 			From: 1,
 			Expected: []*T{
-				{watch.Modified, []string{"127.0.0.1:9000"}},
+				{watch.Modified, []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}},
 			},
 		},
 		"from initial state": {
@@ -331,7 +330,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -344,12 +343,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []api.Endpoint{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -357,7 +356,7 @@ func TestWatchEtcdState(t *testing.T) {
 			},
 			Expected: []*T{
 				{watch.Added, nil},
-				{watch.Modified, []string{"127.0.0.1:9000"}},
+				{watch.Modified, []api.Endpoint{{IP: "127.0.0.1", Port: 9000}}},
 			},
 		},
 	}
@@ -381,7 +380,7 @@ func TestWatchEtcdState(t *testing.T) {
 				t.Errorf("%s: expected type %v, got %v", k, e, a)
 				break
 			}
-			if e, a := testCase.Expected[i].Endpoints, event.Object.(*api.Endpoints).Endpoints; !reflect.DeepEqual(e, a) {
+			if e, a := testCase.Expected[i].Endpoints, event.Object.(*api.Endpoints).Endpoints; !api.Semantic.DeepDerivative(e, a) {
 				t.Errorf("%s: expected type %v, got %v", k, e, a)
 				break
 			}
@@ -456,7 +455,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			t.Errorf("%s: expected pod with resource version %v, Got %#v", k, testCase.ExpectedVersion, actualPod)
 		}
 		pod.ResourceVersion = testCase.ExpectedVersion
-		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+		if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%s: expected %v, got %v", k, e, a)
 		}
 		watching.Stop()
@@ -515,7 +514,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
 		}
 		pod.ResourceVersion = "1"
-		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+		if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}

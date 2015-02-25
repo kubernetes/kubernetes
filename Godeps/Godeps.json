@@ -15,6 +15,11 @@
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
 		},
 		{
+			"ImportPath": "code.google.com/p/go.net/spdy",
+			"Comment": "null-240",
+			"Rev": "937a34c9de13c766c814510f76bca091dee06028"
+		},
+		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
 			"Comment": "release-96",
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
@@ -30,6 +35,11 @@
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
+			"ImportPath": "code.google.com/p/goprotobuf/proto",
+			"Comment": "go.r60-163",
+			"Rev": "9352842ae63ee1d7e74e074ce7bb10370c4b6b9e"
+		},
+		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -38,6 +48,11 @@
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v0.2.0-rc1-120-g23142f6",
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
+		},
+		{
+			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
+			"Comment": "v1.0.2-5-g2831f11",
+			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -74,6 +89,11 @@
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/term",
+			"Comment": "v1.4.1-108-g364720b",
+			"Rev": "364720b5e7e725cdc466171de873eefdb8609a33"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/units",
 			"Comment": "v1.4.1-108-g364720b",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
@@ -82,6 +102,10 @@
 			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
 			"Comment": "v1.4.1-108-g364720b",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
+			"ImportPath": "github.com/docker/spdystream",
+			"Rev": "29e1da2890f60336f98d0b3bf28b05070aa2ee4d"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
@@ -98,11 +122,15 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "3bc1590d16074751993dd3b1a76e7a8d1a916a11"
+			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
+		},
+		{
+			"ImportPath": "github.com/golang/groupcache/lru",
+			"Rev": "604ed5785183e59ae2789449d89e73f3a2a77987"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
@@ -126,6 +154,15 @@
 			"ImportPath": "github.com/imdario/mergo",
 			"Comment": "0.1.3-8-g6633656",
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
+		},
+		{
+			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
+			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
+		},
+		{
+			"ImportPath": "github.com/kr/pty",
+			"Comment": "release.r56-25-g05017fc",
+			"Rev": "05017fcccf23c823bfdea560dcc958a136e54fb7"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
@@ -154,18 +191,57 @@
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
 		},
 		{
+			"ImportPath": "github.com/prometheus/client_golang/_vendor/goautoneg",
+			"Comment": "0.1.0-11-gc70db11",
+			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/_vendor/perks/quantile",
+			"Comment": "0.1.0-11-gc70db11",
+			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/model",
+			"Comment": "0.1.0-11-gc70db11",
+			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus",
+			"Comment": "0.1.0-11-gc70db11",
+			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_golang/text",
+			"Comment": "0.1.0-11-gc70db11",
+			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+		},
+		{
+			"ImportPath": "github.com/prometheus/client_model/go",
+			"Comment": "model-0.0.2-10-gbc9454c",
+			"Rev": "bc9454ca562dc050e060ea61a1c0e562a189850f"
+		},
+		{
+			"ImportPath": "github.com/prometheus/procfs",
+			"Rev": "92faa308558161acab0ada1db048e9996ecec160"
+		},
+		{
 			"ImportPath": "github.com/racker/perigee",
 			"Comment": "v0.0.0-18-g0c00cb0",
 			"Rev": "0c00cb0a026b71034ebc8205263c77dad3577db5"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
-			"Comment": "v1.0.0",
-			"Rev": "da56de6a59e53fdd61be1b5d9b87df34c47ac420"
+			"Comment": "v1.0.0-336-g2a6e319",
+			"Rev": "2a6e3190447abe5d000f951595ead1cf98df72d8"
 		},
 		{
-			"ImportPath": "github.com/skratchdot/open-golang/open",
-			"Rev": "ba570a111973b539baf23c918213059543b5bb6e"
+			"ImportPath": "github.com/russross/blackfriday",
+			"Comment": "v1.2-42-g77efab5",
+			"Rev": "77efab57b2f74dd3f9051c79752b2e8995c8b789"
+		},
+		{
+			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
+			"Rev": "9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962"
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
@@ -174,11 +250,11 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "e1e66f7b4e667751cf530ddb6e72b79d6eeb0235"
+			"Rev": "f8e1ec56bdd7494d309c69681267859a6bfb7549"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "f82776d6cc998e3c026baef7b24409ff49fe5c8d"
+			"Rev": "370c3171201099fa6b466db45c8a032cbce33d8d"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",

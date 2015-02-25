@@ -22,10 +22,10 @@ import (
 
 	"github.com/imdario/mergo"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
@@ -140,6 +140,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	// configClusterInfo holds the information identify the server provided by .kubeconfig
 	configClientConfig := &client.Config{}
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
+	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
 	mergo.Merge(mergedConfig, configClientConfig)
 
@@ -169,9 +170,15 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
 	}
-	if len(configAuthInfo.ClientCertificate) > 0 {
+	if len(configAuthInfo.ClientCertificate) > 0 || len(configAuthInfo.ClientCertificateData) > 0 {
 		mergedConfig.CertFile = configAuthInfo.ClientCertificate
+		mergedConfig.CertData = configAuthInfo.ClientCertificateData
 		mergedConfig.KeyFile = configAuthInfo.ClientKey
+		mergedConfig.KeyData = configAuthInfo.ClientKeyData
+	}
+	if len(configAuthInfo.Username) > 0 || len(configAuthInfo.Password) > 0 {
+		mergedConfig.Username = configAuthInfo.Username
+		mergedConfig.Password = configAuthInfo.Password
 	}
 
 	// if there isn't sufficient information to authenticate the user to the server, merge in ~/.kubernetes_auth.
@@ -228,7 +235,7 @@ func makeServerIdentificationConfig(info clientauth.Info) client.Config {
 
 func canIdentifyUser(config client.Config) bool {
 	return len(config.Username) > 0 ||
-		len(config.CertFile) > 0 ||
+		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||
 		len(config.BearerToken) > 0
 
 }
@@ -241,25 +248,10 @@ func (config DirectClientConfig) Namespace() (string, error) {
 
 	configContext := config.getContext()
 
-	if len(configContext.Namespace) != 0 {
-		return configContext.Namespace, nil
+	if len(configContext.Namespace) == 0 {
+		return api.NamespaceDefault, nil
 	}
-
-	if len(configContext.NamespacePath) != 0 {
-		nsInfo, err := kubectl.LoadNamespaceInfo(configContext.NamespacePath)
-		if err != nil {
-			return "", err
-		}
-
-		return nsInfo.Namespace, nil
-	}
-
-	// if nothing was specified, try the default file
-	nsInfo, err := kubectl.LoadNamespaceInfo(os.Getenv("HOME") + "/.kubernetes_ns")
-	if err != nil {
-		return "", err
-	}
-	return nsInfo.Namespace, nil
+	return configContext.Namespace, nil
 }
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,

@@ -39,8 +39,6 @@ func init() {
 		&MinionList{},
 		&Binding{},
 		&Status{},
-		&ServerOp{},
-		&ServerOpList{},
 		&Event{},
 		&EventList{},
 		&ContainerManifest{},
@@ -53,12 +51,14 @@ func init() {
 		&ResourceQuota{},
 		&ResourceQuotaList{},
 		&ResourceQuotaUsage{},
+		&Namespace{},
+		&NamespaceList{},
+		&Secret{},
+		&SecretList{},
 	)
 	// Future names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
 	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
-	api.Scheme.AddKnownTypeWithName("v1beta2", "Operation", &ServerOp{})
-	api.Scheme.AddKnownTypeWithName("v1beta2", "OperationList", &ServerOpList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
@@ -74,8 +74,6 @@ func (*Minion) IsAnAPIObject()                    {}
 func (*MinionList) IsAnAPIObject()                {}
 func (*Binding) IsAnAPIObject()                   {}
 func (*Status) IsAnAPIObject()                    {}
-func (*ServerOp) IsAnAPIObject()                  {}
-func (*ServerOpList) IsAnAPIObject()              {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
 func (*ContainerManifest) IsAnAPIObject()         {}
@@ -88,3 +86,7 @@ func (*LimitRangeList) IsAnAPIObject()            {}
 func (*ResourceQuota) IsAnAPIObject()             {}
 func (*ResourceQuotaList) IsAnAPIObject()         {}
 func (*ResourceQuotaUsage) IsAnAPIObject()        {}
+func (*Namespace) IsAnAPIObject()                 {}
+func (*NamespaceList) IsAnAPIObject()             {}
+func (*Secret) IsAnAPIObject()                    {}
+func (*SecretList) IsAnAPIObject()                {}

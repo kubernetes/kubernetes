@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,8 @@ given resource.`,
 			checkErr(err)
 
 			mapper, _ := f.Object(cmd)
-			mapping, namespace, name := ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+			// TODO: use resource.Builder instead
+			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			describer, err := f.Describer(cmd, mapping)
 			checkErr(err)

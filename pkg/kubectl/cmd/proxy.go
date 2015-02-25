@@ -18,8 +18,10 @@ package cmd
 
 import (
 	"io"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -30,18 +32,30 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 		Short: "Run a proxy to the Kubernetes API server",
 		Long:  `Run a proxy to the Kubernetes API server.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			port := GetFlagInt(cmd, "port")
+			port := util.GetFlagInt(cmd, "port")
 			glog.Infof("Starting to serve on localhost:%d", port)
 
 			clientConfig, err := f.ClientConfig(cmd)
 			checkErr(err)
 
-			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), clientConfig)
+			staticPrefix := util.GetFlagString(cmd, "www-prefix")
+			if !strings.HasSuffix(staticPrefix, "/") {
+				staticPrefix += "/"
+			}
+
+			apiProxyPrefix := util.GetFlagString(cmd, "api-prefix")
+			if !strings.HasSuffix(apiProxyPrefix, "/") {
+				apiProxyPrefix += "/"
+			}
+			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+
 			checkErr(err)
 			glog.Fatal(server.Serve(port))
 		},
 	}
-	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the prefix /static")
-	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy")
+	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
+	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
+	cmd.Flags().StringP("api-prefix", "", "/api/", "Prefix to serve the proxied API under.")
+	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
 	return cmd
 }

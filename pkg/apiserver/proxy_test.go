@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/websocket"
 )
 
 func parseURLOrDie(inURL string) *url.URL {
@@ -63,20 +64,31 @@ func TestProxyTransport(t *testing.T) {
 		proxyHost:        "foo.com",
 		proxyPathPrepend: "/proxy/minion/minion1:8080",
 	}
-
-	table := map[string]struct {
+	type Item struct {
 		input        string
 		sourceURL    string
 		transport    *proxyTransport
 		output       string
 		contentType  string
 		forwardedURI string
-	}{
+		redirect     string
+		redirectWant string
+	}
+
+	table := map[string]Item{
 		"normal": {
 			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
+		},
+		"trailing slash": {
+			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log/">google.log</a></pre>`,
+			sourceURL:    "http://myminion.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log/">google.log</a></pre>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
@@ -84,7 +96,7 @@ func TestProxyTransport(t *testing.T) {
 			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
 			contentType:  "text/html; charset=utf-8",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
@@ -100,7 +112,7 @@ func TestProxyTransport(t *testing.T) {
 			input:        `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
 			sourceURL:    "http://myminion.com/whatever/apt/somelog.log",
 			transport:    testTransport2,
-			output:       `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a>`,
+			output:       `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/google.log">google.log</a>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:8080/whatever/apt/somelog.log",
 		},
@@ -128,9 +140,30 @@ func TestProxyTransport(t *testing.T) {
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/any/path/",
 		},
+		"redirect rel": {
+			sourceURL:    "http://myminion.com/redirect",
+			transport:    testTransport,
+			redirect:     "/redirected/target/",
+			redirectWant: "http://foo.com/proxy/minion/minion1:10250/redirected/target/",
+			forwardedURI: "/proxy/minion/minion1:10250/redirect",
+		},
+		"redirect abs same host": {
+			sourceURL:    "http://myminion.com/redirect",
+			transport:    testTransport,
+			redirect:     "http://myminion.com/redirected/target/",
+			redirectWant: "http://foo.com/proxy/minion/minion1:10250/redirected/target/",
+			forwardedURI: "/proxy/minion/minion1:10250/redirect",
+		},
+		"redirect abs other host": {
+			sourceURL:    "http://myminion.com/redirect",
+			transport:    testTransport,
+			redirect:     "http://example.com/redirected/target/",
+			redirectWant: "http://example.com/redirected/target/",
+			forwardedURI: "/proxy/minion/minion1:10250/redirect",
+		},
 	}
 
-	for name, item := range table {
+	testItem := func(name string, item *Item) {
 		// Canonicalize the html so we can diff.
 		item.input = fmtHTML(item.input)
 		item.output = fmtHTML(item.output)
@@ -148,34 +181,51 @@ func TestProxyTransport(t *testing.T) {
 			}
 
 			// Send response.
+			if item.redirect != "" {
+				http.Redirect(w, r, item.redirect, http.StatusMovedPermanently)
+				return
+			}
 			w.Header().Set("Content-Type", item.contentType)
 			fmt.Fprint(w, item.input)
 		}))
+		defer server.Close()
+
 		// Replace source URL with our test server address.
 		sourceURL := parseURLOrDie(item.sourceURL)
 		serverURL := parseURLOrDie(server.URL)
 		item.input = strings.Replace(item.input, sourceURL.Host, serverURL.Host, -1)
+		item.redirect = strings.Replace(item.redirect, sourceURL.Host, serverURL.Host, -1)
 		sourceURL.Host = serverURL.Host
 
 		req, err := http.NewRequest("GET", sourceURL.String(), nil)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
-			continue
+			return
 		}
 		resp, err := item.transport.RoundTrip(req)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
-			continue
+			return
+		}
+		if item.redirect != "" {
+			// Check that redirect URLs get rewritten properly.
+			if got, want := resp.Header.Get("Location"), item.redirectWant; got != want {
+				t.Errorf("%v: Location header = %q, want %q", name, got, want)
+			}
+			return
 		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
-			continue
+			return
 		}
 		if e, a := item.output, string(body); e != a {
 			t.Errorf("%v: expected %v, but got %v", name, e, a)
 		}
-		server.Close()
+	}
+
+	for name, item := range table {
+		testItem(name, &item)
 	}
 }
 
@@ -195,6 +245,7 @@ func TestProxy(t *testing.T) {
 		{"DELETE", "/some/dir/id", "", "ok", "text/css", "default"},
 		{"GET", "/some/dir/id", "", "answer", "text/css", "other"},
 		{"GET", "/trailing/slash/", "", "answer", "text/css", "default"},
+		{"GET", "/", "", "answer", "text/css", "default"},
 	}
 
 	for _, item := range table {
@@ -228,18 +279,30 @@ func TestProxy(t *testing.T) {
 			resourceLocation:          proxyServer.URL,
 			expectedResourceNamespace: item.reqNamespace,
 		}
-		handler := Handle(map[string]RESTStorage{
+
+		namespaceHandler := Handle(map[string]RESTStorage{
 			"foo": simpleStorage,
-		}, codec, "/prefix", "version", selfLinker, admissionControl)
-		server := httptest.NewServer(handler)
-		defer server.Close()
+		}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, namespaceMapper)
+		namespaceServer := httptest.NewServer(namespaceHandler)
+		defer namespaceServer.Close()
+		legacyNamespaceHandler := Handle(map[string]RESTStorage{
+			"foo": simpleStorage,
+		}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, legacyNamespaceMapper)
+		legacyNamespaceServer := httptest.NewServer(legacyNamespaceHandler)
+		defer legacyNamespaceServer.Close()
 
 		// test each supported URL pattern for finding the redirection resource in the proxy in a particular namespace
-		proxyTestPatterns := []string{
-			"/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace,
-			"/prefix/version/proxy/ns/" + item.reqNamespace + "/foo/id" + item.path,
+		serverPatterns := []struct {
+			server           *httptest.Server
+			proxyTestPattern string
+		}{
+			{namespaceServer, "/prefix/version/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
+			{legacyNamespaceServer, "/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
-		for _, proxyTestPattern := range proxyTestPatterns {
+
+		for _, serverPattern := range serverPatterns {
+			server := serverPattern.server
+			proxyTestPattern := serverPattern.proxyTestPattern
 			req, err := http.NewRequest(
 				item.method,
 				server.URL+proxyTestPattern,
@@ -260,8 +323,50 @@ func TestProxy(t *testing.T) {
 			}
 			resp.Body.Close()
 			if e, a := item.respBody, string(gotResp); e != a {
-				t.Errorf("%v - expected %v, got %v", item.method, e, a)
+				t.Errorf("%v - expected %v, got %v. url: %#v", item.method, e, a, req.URL)
 			}
 		}
+	}
+}
+
+func TestProxyUpgrade(t *testing.T) {
+	backendServer := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		body := make([]byte, 5)
+		ws.Read(body)
+		ws.Write([]byte("hello " + string(body)))
+	}))
+	defer backendServer.Close()
+
+	simpleStorage := &SimpleRESTStorage{
+		errors:                    map[string]error{},
+		resourceLocation:          backendServer.URL,
+		expectedResourceNamespace: "myns",
+	}
+
+	namespaceHandler := Handle(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, namespaceMapper)
+
+	server := httptest.NewServer(namespaceHandler)
+	defer server.Close()
+
+	ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/prefix/version/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
+	if err != nil {
+		t.Fatalf("websocket dial err: %s", err)
+	}
+	defer ws.Close()
+
+	if _, err := ws.Write([]byte("world")); err != nil {
+		t.Fatalf("write err: %s", err)
+	}
+
+	response := make([]byte, 20)
+	n, err := ws.Read(response)
+	if err != nil {
+		t.Fatalf("read err: %s", err)
+	}
+	if e, a := "hello world", string(response[0:n]); e != a {
+		t.Fatalf("expected '%#v', got '%#v'", e, a)
 	}
 }

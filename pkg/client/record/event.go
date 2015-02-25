@@ -41,6 +41,7 @@ var sleepDuration = 10 * time.Second
 // pkg/client's REST client.
 type EventRecorder interface {
 	Create(event *api.Event) (*api.Event, error)
+	Update(event *api.Event) (*api.Event, error)
 }
 
 // StartRecording starts sending events to recorder. Call once while initializing
@@ -58,9 +59,18 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 		event = &eventCopy
 		event.Source = source
 
+		previousEvent := getEvent(event)
+		updateExistingEvent := previousEvent.Count > 0
+		if updateExistingEvent {
+			event.Count = previousEvent.Count + 1
+			event.FirstTimestamp = previousEvent.FirstTimestamp
+			event.Name = previousEvent.Name
+			event.ResourceVersion = previousEvent.ResourceVersion
+		}
+
 		tries := 0
 		for {
-			if recordEvent(recorder, event) {
+			if recordEvent(recorder, event, updateExistingEvent) {
 				break
 			}
 			tries++
@@ -81,11 +91,21 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 
 // recordEvent attempts to write event to recorder. It returns true if the event
 // was successfully recorded or discarded, false if it should be retried.
-func recordEvent(recorder EventRecorder, event *api.Event) bool {
-	_, err := recorder.Create(event)
+// If updateExistingEvent is false, it creates a new event, otherwise it updates
+// existing event.
+func recordEvent(recorder EventRecorder, event *api.Event, updateExistingEvent bool) bool {
+	var newEvent *api.Event
+	var err error
+	if updateExistingEvent {
+		newEvent, err = recorder.Update(event)
+	} else {
+		newEvent, err = recorder.Create(event)
+	}
 	if err == nil {
+		addOrUpdateEvent(newEvent)
 		return true
 	}
+
 	// If we can't contact the server, then hold everything while we keep trying.
 	// Otherwise, something about the event is malformed and we should abandon it.
 	giveUp := false
@@ -170,7 +190,9 @@ func Event(object runtime.Object, reason, message string) {
 		InvolvedObject: *ref,
 		Reason:         reason,
 		Message:        message,
-		Timestamp:      t,
+		FirstTimestamp: t,
+		LastTimestamp:  t,
+		Count:          1,
 	}
 
 	events.Action(watch.Added, e)

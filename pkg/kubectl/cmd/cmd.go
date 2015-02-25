@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/config"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -143,7 +144,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return kubectl.ReaperFor(mapping.Kind, client)
 		},
 		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
-			if GetFlagBool(cmd, "validate") {
+			if cmdutil.GetFlagBool(cmd, "validate") {
 				client, err := clients.ClientForVersion("")
 				if err != nil {
 					return nil, err
@@ -182,7 +183,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func (f *Factory) NewKubectlCommand(out io.Writer) *cobra.Command {
+func (f *Factory) NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -210,10 +211,72 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdRollingUpdate(out))
 	cmds.AddCommand(f.NewCmdResize(out))
 
+	cmds.AddCommand(f.NewCmdExec(in, out, err))
+	cmds.AddCommand(f.NewCmdPortForward())
+
 	cmds.AddCommand(f.NewCmdRunContainer(out))
 	cmds.AddCommand(f.NewCmdStop(out))
+	cmds.AddCommand(f.NewCmdExposeService(out))
+
+	cmds.AddCommand(f.NewCmdLabel(out))
 
 	return cmds
+}
+
+// PrintObject prints an api object given command line flags to modify the output format
+func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
+	mapper, _ := f.Object(cmd)
+	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	if err != nil {
+		return err
+	}
+
+	mapping, err := mapper.RESTMapping(kind)
+	if err != nil {
+		return err
+	}
+
+	printer, err := f.PrinterForMapping(cmd, mapping)
+	if err != nil {
+		return err
+	}
+	return printer.PrintObj(obj, out)
+}
+
+// PrinterForMapping returns a printer suitable for displaying the provided resource type.
+// Requires that printer flags have been added to cmd (see AddPrinterFlags).
+func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.ResourcePrinter, error) {
+	printer, ok, err := cmdutil.PrinterForCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		clientConfig, err := f.ClientConfig(cmd)
+		checkErr(err)
+		defaultVersion := clientConfig.Version
+
+		version := cmdutil.OutputVersion(cmd, defaultVersion)
+		if len(version) == 0 {
+			version = mapping.APIVersion
+		}
+		if len(version) == 0 {
+			return nil, fmt.Errorf("you must specify an output-version when using this output format")
+		}
+		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version)
+	} else {
+		printer, err = f.Printer(cmd, mapping, cmdutil.GetFlagBool(cmd, "no-headers"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return printer, nil
+}
+
+// ClientMapperForCommand returns a ClientMapper for the given command and factory.
+func (f *Factory) ClientMapperForCommand(cmd *cobra.Command) resource.ClientMapper {
+	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+		return f.RESTClient(cmd, mapping)
+	})
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
@@ -265,16 +328,9 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	return clientConfig
 }
 
-// ClientMapperForCommand returns a ClientMapper for the given command and factory.
-func ClientMapperForCommand(cmd *cobra.Command, f *Factory) resource.ClientMapper {
-	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-		return f.RESTClient(cmd, mapping)
-	})
-}
-
 func checkErr(err error) {
 	if err != nil {
-		glog.FatalDepth(1, err)
+		glog.FatalDepth(1, err.Error())
 	}
 }
 
@@ -329,17 +385,19 @@ func (c *clientCache) ClientConfigForVersion(version string) (*client.Config, er
 			return nil, err
 		}
 		c.defaultConfig = config
-
 		if c.matchVersion {
 			if err := client.MatchesServerVersion(config); err != nil {
 				return nil, err
 			}
 		}
 	}
-
 	// TODO: have a better config copy method
 	config := *c.defaultConfig
+	if len(version) != 0 {
+		config.Version = version
+	}
 	client.SetKubernetesDefaults(&config)
+
 	return &config, nil
 }
 

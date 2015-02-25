@@ -42,19 +42,19 @@ func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority
 	totalMemory := int64(0)
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			totalMilliCPU += container.CPU.MilliValue()
-			totalMemory += container.Memory.Value()
+			totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
+			totalMemory += container.Resources.Limits.Memory().Value()
 		}
 	}
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, minions.
 	for _, container := range pod.Spec.Containers {
-		totalMilliCPU += container.CPU.MilliValue()
-		totalMemory += container.Memory.Value()
+		totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
+		totalMemory += container.Resources.Limits.Memory().Value()
 	}
 
-	capacityMilliCPU := node.Spec.Capacity.Get(api.ResourceCPU).MilliValue()
-	capacityMemory := node.Spec.Capacity.Get(api.ResourceMemory).Value()
+	capacityMilliCPU := node.Spec.Capacity.Cpu().MilliValue()
+	capacityMemory := node.Spec.Capacity.Memory().Value()
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)

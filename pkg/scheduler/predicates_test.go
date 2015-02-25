@@ -46,8 +46,8 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 func makeResources(milliCPU int64, memory int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
+			"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			"memory": *resource.NewQuantity(memory, resource.BinarySI),
 		},
 	}
 }
@@ -56,8 +56,12 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 	containers := []api.Container{}
 	for _, req := range usage {
 		containers = append(containers, api.Container{
-			Memory: *resource.NewQuantity(req.memory, resource.BinarySI),
-			CPU:    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
+			Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{
+					"cpu":    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
+					"memory": *resource.NewQuantity(req.memory, resource.BinarySI),
+				},
+			},
 		})
 	}
 	return api.Pod{
@@ -273,7 +277,7 @@ func TestDiskConflicts(t *testing.T) {
 		Volumes: []api.Volume{
 			{
 				Source: api.VolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDisk{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 						PDName: "foo",
 					},
 				},
@@ -284,7 +288,7 @@ func TestDiskConflicts(t *testing.T) {
 		Volumes: []api.Volume{
 			{
 				Source: api.VolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDisk{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 						PDName: "bar",
 					},
 				},

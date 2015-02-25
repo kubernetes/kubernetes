@@ -61,7 +61,7 @@ func TestValidNamespace(t *testing.T) {
 	}
 
 	ctx = api.NewContext()
-	ns := api.Namespace(ctx)
+	ns := api.NamespaceValue(ctx)
 	if ns != "" {
 		t.Errorf("Expected the empty string")
 	}

@@ -17,7 +17,9 @@ limitations under the License.
 package httplog
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"net/http"
 	"runtime"
 	"time"
@@ -46,6 +48,10 @@ type logger interface {
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
+//
+// TODO now that we're using go-restful, we shouldn't need to be wrapping
+// the http.ResponseWriter. We can recover panics from go-restful, and
+// the logging value is questionable.
 type respLogger struct {
 	status      int
 	statusStack string
@@ -68,7 +74,7 @@ func (passthroughLogger) Addf(format string, data ...interface{}) {
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
-	return status < http.StatusOK || status >= http.StatusBadRequest
+	return (status < http.StatusOK || status >= http.StatusBadRequest) && status != http.StatusSwitchingProtocols
 }
 
 // NewLogged turns a normal response writer into a logged response writer.
@@ -185,4 +191,9 @@ func (rl *respLogger) WriteHeader(status int) {
 		rl.statusStack = ""
 	}
 	rl.w.WriteHeader(status)
+}
+
+// Hijack implements http.Hijacker.
+func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return rl.w.(http.Hijacker).Hijack()
 }

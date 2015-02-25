@@ -77,7 +77,7 @@ func TestRESTCreate(t *testing.T) {
 		c, err := rest.Create(item.ctx, item.event)
 		if !item.valid {
 			if err == nil {
-				ctxNS := api.Namespace(item.ctx)
+				ctxNS := api.NamespaceValue(item.ctx)
 				t.Errorf("unexpected non-error for %v (%v, %v)", item.event.Name, ctxNS, item.event.Namespace)
 			}
 			continue
@@ -89,7 +89,7 @@ func TestRESTCreate(t *testing.T) {
 		if !api.HasObjectMetaSystemFieldValues(&item.event.ObjectMeta) {
 			t.Errorf("storage did not populate object meta field values")
 		}
-		if e, a := item.event, (<-c).Object; !reflect.DeepEqual(e, a) {
+		if e, a := item.event, c; !reflect.DeepEqual(e, a) {
 			t.Errorf("diff: %s", util.ObjectDiff(e, a))
 		}
 		// Ensure we implement the interface
@@ -97,19 +97,47 @@ func TestRESTCreate(t *testing.T) {
 	}
 }
 
+func TestRESTUpdate(t *testing.T) {
+	_, rest := NewTestREST()
+	eventA := testEvent("foo")
+	_, err := rest.Create(api.NewDefaultContext(), eventA)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	got, err := rest.Get(api.NewDefaultContext(), eventA.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := eventA, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
+	}
+	eventB := testEvent("bar")
+	_, _, err = rest.Update(api.NewDefaultContext(), eventB)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	got2, err := rest.Get(api.NewDefaultContext(), eventB.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := eventB, got2; !reflect.DeepEqual(e, a) {
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
+	}
+
+}
+
 func TestRESTDelete(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := testEvent("foo")
-	c, err := rest.Create(api.NewDefaultContext(), eventA)
+	_, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	<-c
-	c, err = rest.Delete(api.NewDefaultContext(), eventA.Name)
+	c, err := rest.Delete(api.NewDefaultContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	if stat := (<-c).Object.(*api.Status); stat.Status != api.StatusSuccess {
+	if stat := c.(*api.Status); stat.Status != api.StatusSuccess {
 		t.Errorf("unexpected status: %v", stat)
 	}
 }
@@ -117,11 +145,10 @@ func TestRESTDelete(t *testing.T) {
 func TestRESTGet(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := testEvent("foo")
-	c, err := rest.Create(api.NewDefaultContext(), eventA)
+	_, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	<-c
 	got, err := rest.Get(api.NewDefaultContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)

@@ -56,7 +56,7 @@ func NewCmdConfigSetCluster(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 
 			err := options.run()
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Fprintf(out, "%v\n", err)
 			}
 		},
 	}
@@ -109,9 +109,19 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 	}
 	if o.insecureSkipTLSVerify.Provided() {
 		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()
+		// Specifying insecure mode clears any certificate authority
+		if modifiedCluster.InsecureSkipTLSVerify {
+			modifiedCluster.CertificateAuthority = ""
+			modifiedCluster.CertificateAuthorityData = nil
+		}
 	}
 	if o.certificateAuthority.Provided() {
 		modifiedCluster.CertificateAuthority = o.certificateAuthority.Value()
+		// Specifying a certificate authority file clears certificate authority data and insecure mode
+		if modifiedCluster.CertificateAuthority != "" {
+			modifiedCluster.CertificateAuthorityData = nil
+			modifiedCluster.InsecureSkipTLSVerify = false
+		}
 	}
 
 	return modifiedCluster
@@ -131,6 +141,9 @@ func (o *createClusterOptions) complete(cmd *cobra.Command) bool {
 func (o createClusterOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("You must specify a non-empty cluster name")
+	}
+	if o.insecureSkipTLSVerify.Value() && o.certificateAuthority.Value() != "" {
+		return errors.New("You cannot specify a certificate authority and insecure mode at the same time")
 	}
 
 	return nil

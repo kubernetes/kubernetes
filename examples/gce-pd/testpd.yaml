@@ -13,7 +13,7 @@ desiredState:
       - name: testpd
         source:
           persistentDisk:
-            # This GCE PD must already exist and be formatted ext4
+            # This GCE PD must already exist.
             pdName: "%insert_pd_name_here%"
             fsType: ext4
 id: testpd

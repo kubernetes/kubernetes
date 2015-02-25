@@ -104,8 +104,9 @@ type RawExtension struct {
 
 // Unknown allows api objects with unknown types to be passed-through. This can be used
 // to deal with the API objects from a plug-in. Unknown objects still have functioning
-// TypeMeta features-- kind, version, resourceVersion, etc.
-// TODO: Not implemented yet!
+// TypeMeta features-- kind, version, etc.
+// TODO: Make this object have easy access to field based accessors and settors for
+// metadata and field mutatation.
 type Unknown struct {
 	TypeMeta `json:",inline"`
 	// RawJSON will hold the complete JSON of the object which couldn't be matched

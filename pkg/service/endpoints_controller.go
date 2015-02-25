@@ -18,8 +18,6 @@ package service
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -30,7 +28,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// EndpointController manages service endpoints.
+// EndpointController manages selector-based service endpoints.
 type EndpointController struct {
 	client *client.Client
 }
@@ -42,7 +40,7 @@ func NewEndpointController(client *client.Client) *EndpointController {
 	}
 }
 
-// SyncServiceEndpoints syncs service endpoints.
+// SyncServiceEndpoints syncs endpoints for services with selectors.
 func (e *EndpointController) SyncServiceEndpoints() error {
 	services, err := e.client.Services(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
@@ -52,7 +50,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	var resultErr error
 	for _, service := range services.Items {
 		if service.Spec.Selector == nil {
-			// services without a selector receive no endpoints.  The last endpoint will be used.
+			// services without a selector receive no endpoints from this controller;
+			// these services will receive the endpoints that are created out-of-band via the REST API.
 			continue
 		}
 
@@ -63,7 +62,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			resultErr = err
 			continue
 		}
-		endpoints := []string{}
+		endpoints := []api.Endpoint{}
 
 		for _, pod := range pods.Items {
 			port, err := findPort(&pod, service.Spec.ContainerPort)
@@ -75,7 +74,20 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
-			endpoints = append(endpoints, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(port)))
+
+			inService := false
+			for _, c := range pod.Status.Conditions {
+				if c.Type == api.PodReady && c.Status == api.ConditionFull {
+					inService = true
+					break
+				}
+			}
+			if !inService {
+				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+				continue
+			}
+
+			endpoints = append(endpoints, api.Endpoint{IP: pod.Status.PodIP, Port: port})
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
@@ -84,6 +96,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
+					Protocol: service.Spec.Protocol,
 				}
 			} else {
 				glog.Errorf("Error getting endpoints: %v", err)
@@ -99,8 +112,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsEqual(currentEndpoints, endpoints) {
+				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
@@ -113,24 +126,24 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	return resultErr
 }
 
-func containsEndpoint(endpoints *api.Endpoints, endpoint string) bool {
-	if endpoints == nil {
+func containsEndpoint(haystack *api.Endpoints, needle *api.Endpoint) bool {
+	if haystack == nil || needle == nil {
 		return false
 	}
-	for ix := range endpoints.Endpoints {
-		if endpoints.Endpoints[ix] == endpoint {
+	for ix := range haystack.Endpoints {
+		if haystack.Endpoints[ix] == *needle {
 			return true
 		}
 	}
 	return false
 }
 
-func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
-	if len(e.Endpoints) != len(endpoints) {
+func endpointsEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
+	if len(eps.Endpoints) != len(endpoints) {
 		return false
 	}
-	for _, endpoint := range endpoints {
-		if !containsEndpoint(e, endpoint) {
+	for i := range endpoints {
+		if !containsEndpoint(eps, &endpoints[i]) {
 			return false
 		}
 	}

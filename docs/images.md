@@ -6,7 +6,12 @@ You create your Docker image and push it to a registry before referring to it in
 The `image` property of a container supports the same syntax as the `docker` command does, including private registries and tags.
 
 ## Using a Private Registry
-Keys for private registries are stored in a `.dockercfg` file.  Create a config file by running `docker login <registry>.<domain>` and then copying the resulting `.dockercfg` file to the kubelet working dir.
+
+### Google Container Registry
+Kubernetes has native support for the [Google Container Regisry](https://cloud.google.com/tools/container-registry/), when running on Google Compute Engine.  If you are running your cluster on Google Compute Engine or Google Container Engine, simply use the full image name (e.g. gcr.io/my_project/image:tag) and the kubelet will automatically authenticate and pull down your private image.
+
+### Other Private Registries
+Docker stores keys for private registries in a `.dockercfg` file.  Create a config file by running `docker login <registry>.<domain>` and then copying the resulting `.dockercfg` file to the kubelet working dir.
 The kubelet working dir varies by cloud provider.  It is `/` on GCE and `/home/core` on CoreOS.  You can determine the working dir by running this command:
 `sudo ls -ld /proc/$(pidof kubelet)/cwd` on a kNode.
 

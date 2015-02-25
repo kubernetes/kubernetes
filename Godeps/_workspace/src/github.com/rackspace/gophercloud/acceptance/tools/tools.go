@@ -1,10 +1,11 @@
-// +build acceptance
+// +build acceptance common
 
 package tools
 
 import (
 	"crypto/rand"
 	"errors"
+	mrand "math/rand"
 	"os"
 	"time"
 
@@ -70,6 +71,12 @@ func RandomString(prefix string, n int) string {
 		bytes[i] = alphanum[b%byte(len(alphanum))]
 	}
 	return prefix + string(bytes)
+}
+
+// RandomInt will return a random integer between a specified range.
+func RandomInt(min, max int) int {
+	mrand.Seed(time.Now().Unix())
+	return mrand.Intn(max-min) + min
 }
 
 // Elide returns the first bit of its input string with a suffix of "..." if it's longer than

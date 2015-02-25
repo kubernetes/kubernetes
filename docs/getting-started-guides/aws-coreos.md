@@ -10,11 +10,11 @@ The example below creates an elastic Kubernetes cluster with 3 worker nodes and 
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config)
 * Cross container networking with [flannel](https://github.com/coreos/flannel#flannel)
 * Auto worker registration with [kube-register](https://github.com/kelseyhightower/kube-register#kube-register)
-* Kubernetes v0.9.1 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.9.1)
+* Kubernetes v0.10.1 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.10.1)
 
 ## Prerequisites
 
-* [kubecfg CLI](aws/kubecfg.md)
+* [kubectl CLI](aws/kubectl.md)
 * [aws CLI](http://aws.amazon.com/cli)
 * [CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel)
 
@@ -42,7 +42,7 @@ aws cloudformation describe-stack-events --stack-name kubernetes
 aws cloudformation describe-stacks --stack-name kubernetes
 ```
 
-[Skip to kubecfg client configuration](#configure-the-kubecfg-ssh-tunnel)
+[Skip to kubectl client configuration](#configure-the-kubectl-ssh-tunnel)
 
 ### Manually
 
@@ -121,9 +121,9 @@ aws ec2 run-instances --count 1 --image-id <ami_image_id> --key-name <keypair> \
 --user-data file://node.yaml
 ```
 
-### Configure the kubecfg SSH tunnel
+### Configure the kubectl SSH tunnel
 
-This command enables secure communication between the kubecfg client and the Kubernetes API.
+This command enables secure communication between the kubectl client and the Kubernetes API.
 
 ```
 ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
@@ -134,7 +134,7 @@ ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 Once the worker instances have fully booted, they will be automatically registered with the Kubernetes API server by the kube-register service running on the master node. It may take a few mins.
 
 ```
-kubecfg list minions
+kubectl get nodes
 ```
 
 ## Starting a simple pod
@@ -167,16 +167,16 @@ Create a pod manifest: `pod.json`
 }
 ```
 
-### Create the pod using the kubecfg command line tool
+### Create the pod using the kubectl command line tool
 
 ```
-kubecfg -c pod.json create pods
+kubectl create -f pod.json
 ```
 
 ### Testing
 
 ```
-kubecfg list pods
+kubectl get pods
 ```
 
 > Record the **Host** of the pod, which should be the private IP address.
@@ -208,5 +208,5 @@ Visit the public IP address in your browser to view the running pod.
 ### Delete the pod
 
 ```
-kubecfg delete pods/hello
+kubectl delete pods hello
 ```

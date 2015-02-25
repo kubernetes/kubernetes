@@ -6,6 +6,8 @@ Documentation=https://github.com/coreos/etcd
 Type=simple
 EnvironmentFile=/etc/default/etcd
 ExecStart=/usr/local/bin/etcd $DAEMON_ARGS
+Restart=always
+RestartSec=30
 
 [Install]
 WantedBy=multi-user.target

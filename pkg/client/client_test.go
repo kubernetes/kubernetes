@@ -96,7 +96,7 @@ func (c *testClient) Setup() *testClient {
 func (c *testClient) Validate(t *testing.T, received runtime.Object, err error) {
 	c.ValidateCommon(t, err)
 
-	if c.Response.Body != nil && !api.Semantic.DeepEqual(c.Response.Body, received) {
+	if c.Response.Body != nil && !api.Semantic.DeepDerivative(c.Response.Body, received) {
 		t.Errorf("bad response for request %#v: expected %#v, got %#v", c.Request, c.Response.Body, received)
 	}
 }
@@ -615,7 +615,8 @@ func TestListEndpooints(t *testing.T) {
 				Items: []api.Endpoints{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "endpoint-1"},
-						Endpoints:  []string{"10.245.1.2:8080", "10.245.1.3:8080"},
+						Endpoints: []api.Endpoint{
+							{IP: "10.245.1.2", Port: 8080}, {IP: "10.245.1.3", Port: 8080}},
 					},
 				},
 			},

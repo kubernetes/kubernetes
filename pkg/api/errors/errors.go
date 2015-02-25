@@ -29,6 +29,12 @@ import (
 const (
 	StatusUnprocessableEntity = 422
 	StatusTooManyRequests     = 429
+	// HTTP recommendations are for servers to define 5xx error codes
+	// for scenarios not covered by behavior. In this case, ServerTimeout
+	// is an indication that a transient server error has occured and the
+	// client *should* retry, with an optional Retry-After header to specify
+	// the back off window.
+	StatusServerTimeout = 504
 )
 
 // StatusError is an error intended for consumption by a REST API server; it can also be
@@ -154,14 +160,10 @@ func NewInvalid(kind, name string, errs ValidationErrorList) error {
 // NewBadRequest creates an error that indicates that the request is invalid and can not be processed.
 func NewBadRequest(reason string) error {
 	return &StatusError{api.Status{
-		Status: api.StatusFailure,
-		Code:   http.StatusBadRequest,
-		Reason: api.StatusReasonBadRequest,
-		Details: &api.StatusDetails{
-			Causes: []api.StatusCause{
-				{Message: reason},
-			},
-		},
+		Status:  api.StatusFailure,
+		Code:    http.StatusBadRequest,
+		Reason:  api.StatusReasonBadRequest,
+		Message: reason,
 	}}
 }
 
@@ -178,6 +180,21 @@ func NewMethodNotSupported(kind, action string) error {
 	}}
 }
 
+// NewServerTimeout returns an error indicating the requested action could not be completed due to a
+// transient error, and the client should try again.
+func NewServerTimeout(kind, operation string) error {
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusInternalServerError,
+		Reason: api.StatusReasonServerTimeout,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   operation,
+		},
+		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, kind),
+	}}
+}
+
 // NewInternalError returns an error indicating the item is invalid and cannot be processed.
 func NewInternalError(err error) error {
 	return &StatusError{api.Status{
@@ -188,6 +205,17 @@ func NewInternalError(err error) error {
 			Causes: []api.StatusCause{{Message: err.Error()}},
 		},
 		Message: fmt.Sprintf("Internal error occurred: %v", err),
+	}}
+}
+
+// NewTimeoutError returns an error indicating that a timeout occurred before the request
+// could be completed.  Clients may retry, but the operation may still complete.
+func NewTimeoutError(message string) error {
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    StatusServerTimeout,
+		Reason:  api.StatusReasonTimeout,
+		Message: fmt.Sprintf("Timeout: %s", message),
 	}}
 }
 
@@ -220,6 +248,18 @@ func IsMethodNotSupported(err error) bool {
 // IsBadRequest determines if err is an error which indicates that the request is invalid.
 func IsBadRequest(err error) bool {
 	return reasonForError(err) == api.StatusReasonBadRequest
+}
+
+// IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
+// be completed as requested.
+func IsForbidden(err error) bool {
+	return reasonForError(err) == api.StatusReasonForbidden
+}
+
+// IsServerTimeout determines if err is an error which indicates that the request needs to be retried
+// by the client.
+func IsServerTimeout(err error) bool {
+	return reasonForError(err) == api.StatusReasonServerTimeout
 }
 
 func reasonForError(err error) api.StatusReason {

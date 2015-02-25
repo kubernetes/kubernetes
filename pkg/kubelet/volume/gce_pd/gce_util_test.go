@@ -17,39 +17,68 @@ limitations under the License.
 package gce_pd
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
-func TestGetDeviceName(t *testing.T) {
+func TestSafeFormatAndMount(t *testing.T) {
 	tests := []struct {
-		deviceName    string
-		canonicalName string
-		expectedName  string
-		expectError   bool
+		fstype       string
+		expectedArgs []string
+		err          error
 	}{
 		{
-			deviceName:    "/dev/google-sd0-part0",
-			canonicalName: "/dev/google/sd0P1",
-			expectedName:  "sd0",
+			fstype:       "ext4",
+			expectedArgs: []string{"/dev/foo", "/mnt/bar"},
 		},
 		{
-			canonicalName: "0123456",
-			expectError:   true,
+			fstype:       "vfat",
+			expectedArgs: []string{"-m", "mkfs.vfat", "/dev/foo", "/mnt/bar"},
+		},
+		{
+			err: fmt.Errorf("test error"),
 		},
 	}
 	for _, test := range tests {
-		name, err := getDeviceName(test.deviceName, test.canonicalName)
-		if test.expectError {
-			if err == nil {
-				t.Error("unexpected non-error")
-			}
-			continue
+
+		var cmdOut string
+		var argsOut []string
+		fake := exec.FakeExec{
+			CommandScript: []exec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd {
+					cmdOut = cmd
+					argsOut = args
+					fake := exec.FakeCmd{
+						CombinedOutputScript: []exec.FakeCombinedOutputAction{
+							func() ([]byte, error) { return []byte{}, test.err },
+						},
+					}
+					return exec.InitFakeCmd(&fake, cmd, args...)
+				},
+			},
 		}
-		if err != nil {
+
+		mounter := gceSafeFormatAndMount{
+			runner: &fake,
+		}
+
+		err := mounter.Mount("/dev/foo", "/mnt/bar", test.fstype, 0, "")
+		if test.err == nil && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if name != test.expectedName {
-			t.Errorf("expected: %s, got %s", test.expectedName, name)
+		if test.err != nil {
+			if err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			return
+		}
+		if cmdOut != "/usr/share/google/safe_format_and_mount" {
+			t.Errorf("unexpected command: %s", cmdOut)
+		}
+		if len(argsOut) != len(test.expectedArgs) {
+			t.Errorf("unexpected args: %v, expected: %v", argsOut, test.expectedArgs)
 		}
 	}
 }

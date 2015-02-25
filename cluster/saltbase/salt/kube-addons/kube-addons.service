@@ -3,7 +3,7 @@ Description=Kubernetes Addon Object Manager
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
-ExecStart=/usr/lib/systemd/scripts/kube-addons start
+ExecStart=/etc/kubernetes/kube-addons.sh
 
 [Install]
 WantedBy=multi-user.target

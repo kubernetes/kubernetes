@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestServiceEmptySelector(t *testing.T) {
@@ -143,6 +145,139 @@ func TestPullPolicyConversion(t *testing.T) {
 		}
 		if e, a := item.versioned, got; e != a {
 			t.Errorf("Expected: %q, got %q", e, a)
+		}
+	}
+}
+
+func getResourceRequirements(cpu, memory resource.Quantity) current.ResourceRequirements {
+	res := current.ResourceRequirements{}
+	res.Limits = current.ResourceList{}
+	if cpu.Value() > 0 {
+		res.Limits[current.ResourceCPU] = util.NewIntOrStringFromInt(int(cpu.Value()))
+	}
+	if memory.Value() > 0 {
+		res.Limits[current.ResourceMemory] = util.NewIntOrStringFromInt(int(memory.Value()))
+	}
+
+	return res
+}
+
+func TestContainerConversion(t *testing.T) {
+	cpuLimit := resource.MustParse("10")
+	memoryLimit := resource.MustParse("10M")
+	null := resource.Quantity{}
+	testCases := []current.Container{
+		{
+			Name:      "container",
+			Resources: getResourceRequirements(cpuLimit, memoryLimit),
+		},
+		{
+			Name:      "container",
+			CPU:       int(cpuLimit.MilliValue()),
+			Resources: getResourceRequirements(null, memoryLimit),
+		},
+		{
+			Name:      "container",
+			Memory:    memoryLimit.Value(),
+			Resources: getResourceRequirements(cpuLimit, null),
+		},
+		{
+			Name:   "container",
+			CPU:    int(cpuLimit.MilliValue()),
+			Memory: memoryLimit.Value(),
+		},
+		{
+			Name:      "container",
+			Memory:    memoryLimit.Value(),
+			Resources: getResourceRequirements(cpuLimit, resource.MustParse("100M")),
+		},
+		{
+			Name:      "container",
+			CPU:       int(cpuLimit.MilliValue()),
+			Resources: getResourceRequirements(resource.MustParse("500"), memoryLimit),
+		},
+	}
+
+	for i, tc := range testCases {
+		got := newer.Container{}
+		if err := newer.Scheme.Convert(&tc, &got); err != nil {
+			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
+			continue
+		}
+		if cpu := got.Resources.Limits.Cpu(); cpu.Value() != cpuLimit.Value() {
+			t.Errorf("[Case: %d] Expected cpu: %v, got: %v", i, cpuLimit, *cpu)
+		}
+		if memory := got.Resources.Limits.Memory(); memory.Value() != memoryLimit.Value() {
+			t.Errorf("[Case: %d] Expected memory: %v, got: %v", i, memoryLimit, *memory)
+		}
+	}
+}
+
+func TestEndpointsConversion(t *testing.T) {
+	testCases := []struct {
+		given    current.Endpoints
+		expected newer.Endpoints
+	}{
+		{
+			given: current.Endpoints{
+				TypeMeta: current.TypeMeta{
+					ID: "empty",
+				},
+				Protocol:  current.ProtocolTCP,
+				Endpoints: []string{},
+			},
+			expected: newer.Endpoints{
+				Protocol:  newer.ProtocolTCP,
+				Endpoints: []newer.Endpoint{},
+			},
+		},
+		{
+			given: current.Endpoints{
+				TypeMeta: current.TypeMeta{
+					ID: "one",
+				},
+				Protocol:  current.ProtocolTCP,
+				Endpoints: []string{"1.2.3.4:88"},
+			},
+			expected: newer.Endpoints{
+				Protocol:  newer.ProtocolTCP,
+				Endpoints: []newer.Endpoint{{IP: "1.2.3.4", Port: 88}},
+			},
+		},
+		{
+			given: current.Endpoints{
+				TypeMeta: current.TypeMeta{
+					ID: "several",
+				},
+				Protocol:  current.ProtocolUDP,
+				Endpoints: []string{"1.2.3.4:88", "1.2.3.4:89", "1.2.3.4:90"},
+			},
+			expected: newer.Endpoints{
+				Protocol:  newer.ProtocolUDP,
+				Endpoints: []newer.Endpoint{{IP: "1.2.3.4", Port: 88}, {IP: "1.2.3.4", Port: 89}, {IP: "1.2.3.4", Port: 90}},
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		// Convert versioned -> internal.
+		got := newer.Endpoints{}
+		if err := newer.Scheme.Convert(&tc.given, &got); err != nil {
+			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
+			continue
+		}
+		if got.Protocol != tc.expected.Protocol || !newer.Semantic.DeepEqual(got.Endpoints, tc.expected.Endpoints) {
+			t.Errorf("[Case: %d] Expected %v, got %v", i, tc.expected, got)
+		}
+
+		// Convert internal -> versioned.
+		got2 := current.Endpoints{}
+		if err := newer.Scheme.Convert(&got, &got2); err != nil {
+			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
+			continue
+		}
+		if got2.Protocol != tc.given.Protocol || !newer.Semantic.DeepEqual(got2.Endpoints, tc.given.Endpoints) {
+			t.Errorf("[Case: %d] Expected %v, got %v", i, tc.given, got2)
 		}
 	}
 }

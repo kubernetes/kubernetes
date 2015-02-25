@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -34,7 +35,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
 	"github.com/golang/glog"
 	"golang.org/x/net/html"
 )
@@ -75,20 +78,37 @@ var tagsToAttrs = map[string]util.StringSet{
 // ProxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type ProxyHandler struct {
-	prefix  string
-	storage map[string]RESTStorage
-	codec   runtime.Codec
+	prefix                 string
+	storage                map[string]RESTStorage
+	codec                  runtime.Codec
+	context                api.RequestContextMapper
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	namespace, kind, parts, err := KindAndNamespace(req)
+	var verb string
+	var apiResource string
+	var httpCode int
+	reqStart := time.Now()
+	defer monitor("proxy", verb, apiResource, httpCode, reqStart)
+
+	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	verb = requestInfo.Verb
+	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
+
+	ctx, ok := r.context.Get(req)
+	if !ok {
+		ctx = api.NewContext()
+	}
+	ctx = api.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 	id := parts[1]
@@ -103,17 +123,19 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			rest = rest + "/"
 		}
 	}
-	storage, ok := r.storage[kind]
+	storage, ok := r.storage[resource]
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' has no storage object", kind)
+		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
+	apiResource = resource
 
 	redirector, ok := storage.(Redirector)
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' is not a redirector", kind)
-		errorJSON(errors.NewMethodNotSupported(kind, "proxy"), r.codec, w)
+		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
+		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
 		return
 	}
 
@@ -122,11 +144,13 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
 		return
 	}
 	if location == "" {
 		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned ''", id)
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 
@@ -134,6 +158,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
 		return
 	}
 	if destURL.Scheme == "" {
@@ -148,18 +173,82 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
 		notFound(w, req)
+		httpCode = status.Code
 		return
 	}
+	httpCode = http.StatusOK
 	newReq.Header = req.Header
+
+	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
+	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
+	// That proxy needs to be modified to support multiple backends, not just 1.
+	if r.tryUpgrade(w, req, newReq, destURL) {
+		return
+	}
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: destURL.Host})
 	proxy.Transport = &proxyTransport{
 		proxyScheme:      req.URL.Scheme,
 		proxyHost:        req.URL.Host,
-		proxyPathPrepend: path.Join(r.prefix, "ns", namespace, kind, id),
+		proxyPathPrepend: requestInfo.URLPath(),
 	}
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
+}
+
+// tryUpgrade returns true if the request was handled.
+func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, destURL *url.URL) bool {
+	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
+	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || len(req.Header.Get(httpstream.HeaderUpgrade)) == 0 {
+		return false
+	}
+	//TODO support TLS? Doesn't look like proxyTransport does anything special ...
+	dialAddr := netutil.CanonicalAddr(destURL)
+	backendConn, err := net.Dial("tcp", dialAddr)
+	if err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		return true
+	}
+	defer backendConn.Close()
+
+	// TODO should we use _ (a bufio.ReadWriter) instead of requestHijackedConn
+	// when copying between the client and the backend? Docker doesn't when they
+	// hijack, just for reference...
+	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		return true
+	}
+	defer requestHijackedConn.Close()
+
+	if err = newReq.Write(backendConn); err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		return true
+	}
+
+	done := make(chan struct{}, 2)
+
+	go func() {
+		_, err := io.Copy(backendConn, requestHijackedConn)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			glog.Errorf("Error proxying data from client to backend: %v", err)
+		}
+		done <- struct{}{}
+	}()
+
+	go func() {
+		_, err := io.Copy(requestHijackedConn, backendConn)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			glog.Errorf("Error proxying data from backend to client: %v", err)
+		}
+		done <- struct{}{}
+	}()
+
+	<-done
+	return true
 }
 
 type proxyTransport struct {
@@ -185,6 +274,10 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, nil
 	}
 
+	if redirect := resp.Header.Get("Location"); redirect != "" {
+		resp.Header.Set("Location", t.rewriteURL(redirect, req.URL))
+	}
+
 	cType := resp.Header.Get("Content-Type")
 	cType = strings.TrimSpace(strings.SplitN(cType, ";", 2)[0])
 	if cType != "text/html" {
@@ -193,6 +286,38 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	return t.fixLinks(req, resp)
+}
+
+// rewriteURL rewrites a single URL to go through the proxy, if the URL refers
+// to the same host as sourceURL, which is the page on which the target URL
+// occurred. If any error occurs (e.g. parsing), it returns targetURL.
+func (t *proxyTransport) rewriteURL(targetURL string, sourceURL *url.URL) string {
+	url, err := url.Parse(targetURL)
+	if err != nil {
+		return targetURL
+	}
+	if url.Host != "" && url.Host != sourceURL.Host {
+		return targetURL
+	}
+
+	url.Scheme = t.proxyScheme
+	url.Host = t.proxyHost
+	origPath := url.Path
+
+	if strings.HasPrefix(url.Path, "/") {
+		// The path is rooted at the host. Just add proxy prepend.
+		url.Path = path.Join(t.proxyPathPrepend, url.Path)
+	} else {
+		// The path is relative to sourceURL.
+		url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path)
+	}
+
+	if strings.HasSuffix(origPath, "/") {
+		// Add back the trailing slash, which was stripped by path.Join().
+		url.Path += "/"
+	}
+
+	return url.String()
 }
 
 // updateURLs checks and updates any of n's attributes that are listed in tagsToAttrs.
@@ -212,22 +337,7 @@ func (t *proxyTransport) updateURLs(n *html.Node, sourceURL *url.URL) {
 		if !attrs.Has(attr.Key) {
 			continue
 		}
-		url, err := url.Parse(attr.Val)
-		if err != nil {
-			continue
-		}
-		// Is this URL relative?
-		if url.Host == "" {
-			url.Scheme = t.proxyScheme
-			url.Host = t.proxyHost
-			url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path, "/")
-			n.Attr[i].Val = url.String()
-		} else if url.Host == sourceURL.Host {
-			url.Scheme = t.proxyScheme
-			url.Host = t.proxyHost
-			url.Path = path.Join(t.proxyPathPrepend, url.Path)
-			n.Attr[i].Val = url.String()
-		}
+		n.Attr[i].Val = t.rewriteURL(attr.Val, sourceURL)
 	}
 }
 

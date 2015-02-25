@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/google/gofuzz"
 )
@@ -148,6 +149,27 @@ func TestSetList(t *testing.T) {
 	for i := range list {
 		if e, a := list[i].(*api.Pod).Name, pl.Items[i].Name; e != a {
 			t.Fatalf("Expected %v, got %v", e, a)
+		}
+	}
+}
+
+func TestSetListToRuntimeObjectArray(t *testing.T) {
+	pl := &api.List{}
+	list := []runtime.Object{
+		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
+		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "3"}},
+	}
+	err := runtime.SetList(pl, list)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := len(list), len(pl.Items); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+	for i := range list {
+		if e, a := list[i], pl.Items[i]; e != a {
+			t.Fatalf("%d: unmatched: %s", i, util.ObjectDiff(e, a))
 		}
 	}
 }

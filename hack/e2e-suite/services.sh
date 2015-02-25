@@ -21,13 +21,17 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  echo "WARNING: Skipping services.sh for ${KUBERNETES_PROVIDER}.  See https://github.com/GoogleCloudPlatform/kubernetes/issues/3655"
-  exit 0
-fi
+: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBE_CONFIG_FILE:="config-test.sh"}
+
+export KUBECTL KUBE_CONFIG_FILE
+
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+prepare-e2e
 
 function error() {
   echo "$@" >&2
@@ -55,7 +59,6 @@ function join() {
 svcs_to_clean=()
 function do_teardown() {
   local svc
-  return
   for svc in "${svcs_to_clean[@]:+${svcs_to_clean[@]}}"; do
     stop_service "${svc}"
   done
@@ -87,7 +90,7 @@ function start_service() {
                           "containers": [
                               {
                                   "name": "$1",
-                                  "image": "kubernetes/serve_hostname",
+                                  "image": "kubernetes/serve_hostname:1.1",
                                   "ports": [
                                       {
                                           "containerPort": 9376,
@@ -135,9 +138,8 @@ __EOF__
 #   $1: service name
 function stop_service() {
   echo "Stopping service '$1'"
-  ${KUBECFG} stop "$1" || true
-  ${KUBECFG} delete "/replicationControllers/$1" || true
-  ${KUBECFG} delete "/services/$1" || true
+  ${KUBECTL} stop rc "$1" || true
+  ${KUBECTL} delete services "$1" || true
 }
 
 # Args:
@@ -145,12 +147,12 @@ function stop_service() {
 #   $2: expected pod count
 function query_pods() {
   # This fails very occasionally, so retry a bit.
-  pods_unsorted=()
+  local pods_unsorted=()
   local i
   for i in $(seq 1 10); do
-    pods_unsorted=($(${KUBECFG} \
-        '-template={{range.items}}{{.id}} {{end}}' \
-        -l name="$1" list pods))
+    pods_unsorted=($(${KUBECTL} get pods -o template \
+        '--template={{range.items}}{{.id}} {{end}}' \
+        -l name="$1"))
     found="${#pods_unsorted[*]}"
     if [[ "${found}" == "$2" ]]; then
       break
@@ -183,7 +185,7 @@ function wait_for_pods() {
     echo "Waiting for ${pods_needed} pods to become 'running'"
     pods_needed="$2"
     for id in ${pods_sorted}; do
-      status=$(${KUBECFG} -template '{{.currentState.status}}' get "pods/${id}")
+      status=$(${KUBECTL} get pods "${id}" -o template --template='{{.currentState.status}}')
       if [[ "${status}" == "Running" ]]; then
         pods_needed=$((pods_needed-1))
       fi
@@ -258,7 +260,7 @@ function verify_from_container() {
           for i in $(seq -s' ' 1 $4); do
             ok=false
             for j in $(seq -s' ' 1 10); do
-              if wget -q -T 1 -O - http://$2:$3; then
+              if wget -q -T 5 -O - http://$2:$3; then
                 echo
                 ok=true
                 break
@@ -281,7 +283,7 @@ function verify_from_container() {
   fi
 }
 
-trap "do_teardown" EXIT
+trap do_teardown EXIT
 
 # Get node IP addresses and pick one as our test point.
 detect-minions
@@ -289,13 +291,13 @@ test_node="${MINION_NAMES[0]}"
 master="${MASTER_NAME}"
 
 # Launch some pods and services.
-svc1_name="service1"
+svc1_name="service-${RANDOM}"
 svc1_port=80
 svc1_count=3
 svc1_publics="192.168.1.1 192.168.1.2"
 start_service "${svc1_name}" "${svc1_port}" "${svc1_count}" "${svc1_publics}"
 
-svc2_name="service2"
+svc2_name="service-${RANDOM}"
 svc2_port=80
 svc2_count=3
 start_service "${svc2_name}" "${svc2_port}" "${svc2_count}"
@@ -309,9 +311,9 @@ svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
 # Get the portal IPs.
-svc1_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc1_name}")
+svc1_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc1_name}")
 test -n "${svc1_ip}" || error "Service1 IP is blank"
-svc2_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc2_name}")
+svc2_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc2_name}")
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
   error "Portal IPs conflict: ${svc1_ip}"
@@ -381,7 +383,7 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
 # Get the portal IP.
-svc3_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc3_name}")
+svc3_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc3_name}")
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 
 echo "Verifying the portals from the host"
@@ -412,7 +414,7 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 echo "Test 6: Restart the master, make sure portals come back."
 echo "Restarting the master"
-ssh-to-node "${master}" "sudo /etc/init.d/kube-apiserver restart"
+restart-apiserver "${master}"
 sleep 5
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
@@ -437,7 +439,7 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
 # Get the portal IP.
-svc4_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc4_name}")
+svc4_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc4_name}")
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
   error "Portal IPs conflict: ${svc4_ip}"

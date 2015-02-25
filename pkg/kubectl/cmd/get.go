@@ -23,43 +23,50 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/spf13/cobra"
 )
 
-// NewCmdGet creates a command object for the generic "get" action, which
-// retrieves one or more resources from a server.
-func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get [(-o|--output=)json|yaml|...] <resource> [<id>]",
-		Short: "Display one or many resources",
-		Long: `Display one or many resources.
+const (
+	get_long = `Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
 (se), minions (mi), or events (ev).
 
-If you specify a Go template, you can use any fields defined for the API version
-you are connecting to the server with.
+By specifying the output as 'template' and providing a Go template as the value
+of the --template flag, you can filter the attributes of the fetched resource(s).`
+	get_example = `// List all pods in ps output format.
+$ kubectl get pods
 
-Examples:
-  $ kubectl get pods
-  <list all pods in ps output format>
+// List a single replication controller with specified ID in ps output format.
+$ kubectl get replicationController 1234-56-7890-234234-456456
 
-  $ kubectl get replicationController 1234-56-7890-234234-456456
-  <list single replication controller in ps output format>
+// List a single pod in JSON output format.
+$ kubectl get -o json pod 1234-56-7890-234234-456456
 
-  $ kubectl get -o json pod 1234-56-7890-234234-456456
-  <list single pod in json output format>
+// Return only the status value of the specified pod.
+$ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
 
-  $ kubectl get rc,services
-  <list replication controllers and services together in ps output format>`,
+// List all replication controllers and services together in ps output format.
+$ kubectl get rc,services`
+)
+
+// NewCmdGet creates a command object for the generic "get" action, which
+// retrieves one or more resources from a server.
+func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "get [(-o|--output=)json|yaml|template|...] <resource> [<id>]",
+		Short:   "Display one or many resources",
+		Long:    get_long,
+		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			RunGet(f, out, cmd, args)
 		},
 	}
-	AddPrinterFlags(cmd)
+	util.AddPrinterFlags(cmd)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
@@ -70,26 +77,27 @@ Examples:
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
 // TODO: return an error instead of using glog.Fatal and checkErr
 func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
-	selector := GetFlagString(cmd, "selector")
+	selector := util.GetFlagString(cmd, "selector")
 	mapper, typer := f.Object(cmd)
 
 	cmdNamespace, err := f.DefaultNamespace(cmd)
 	checkErr(err)
 
 	// handle watch separately since we cannot watch multiple resource types
-	isWatch, isWatchOnly := GetFlagBool(cmd, "watch"), GetFlagBool(cmd, "watch-only")
+	isWatch, isWatchOnly := util.GetFlagBool(cmd, "watch"), util.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			SelectorParam(selector).
-			ResourceTypeOrNameArgs(args...).
+			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Do()
+		checkErr(r.Err())
 
 		mapping, err := r.ResourceMapping()
 		checkErr(err)
 
-		printer, err := PrinterForMapping(f, cmd, mapping)
+		printer, err := f.PrinterForMapping(cmd, mapping)
 		checkErr(err)
 
 		obj, err := r.Object()
@@ -115,12 +123,12 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		return
 	}
 
-	b := resource.NewBuilder(mapper, typer, ClientMapperForCommand(cmd, f)).
+	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
-		ResourceTypeOrNameArgs(args...).
+		ResourceTypeOrNameArgs(true, args...).
 		Latest()
-	printer, generic, err := PrinterForCommand(cmd)
+	printer, generic, err := util.PrinterForCommand(cmd)
 	checkErr(err)
 
 	if generic {
@@ -129,7 +137,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		defaultVersion := clientConfig.Version
 
 		// the outermost object will be converted to the output-version
-		version := outputVersion(cmd, defaultVersion)
+		version := util.OutputVersion(cmd, defaultVersion)
 		if len(version) == 0 {
 			// TODO: add a new ResourceBuilder mode for Object() that attempts to ensure the objects
 			// are in the appropriate version if one exists (and if not, use the best effort).
@@ -149,7 +157,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 
 	// use the default printer for each object
 	err = b.Do().Visit(func(r *resource.Info) error {
-		printer, err := PrinterForMapping(f, cmd, r.Mapping)
+		printer, err := f.PrinterForMapping(cmd, r.Mapping)
 		if err != nil {
 			return err
 		}

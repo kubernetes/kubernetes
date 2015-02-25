@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 )
@@ -84,14 +86,21 @@ type ValidationError struct {
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
-	s := spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
-	if v.Detail != "" {
+	var s string
+	switch v.Type {
+	case ValidationErrorTypeRequired:
+		s = spew.Sprintf("%s: %s", v.Field, v.Type)
+	default:
+		s = spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
+	}
+	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
 	}
 	return s
 }
 
 // NewFieldRequired returns a *ValidationError indicating "value required"
+// TODO: remove "value"
 func NewFieldRequired(field string, value interface{}) *ValidationError {
 	return &ValidationError{ValidationErrorTypeRequired, field, value, ""}
 }
@@ -147,4 +156,38 @@ func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 // Returns the list for convenience.
 func (list ValidationErrorList) PrefixIndex(index int) ValidationErrorList {
 	return list.Prefix(fmt.Sprintf("[%d]", index))
+}
+
+// NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
+// if the provided error is a ValidationError and has the provided ValidationErrorType.
+func NewValidationErrorTypeMatcher(t ValidationErrorType) errors.Matcher {
+	return func(err error) bool {
+		if e, ok := err.(*ValidationError); ok {
+			return e.Type == t
+		}
+		return false
+	}
+}
+
+// NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
+// if the provided error is a ValidationError and has a field with the provided
+// prefix.
+func NewValidationErrorFieldPrefixMatcher(prefix string) errors.Matcher {
+	return func(err error) bool {
+		if e, ok := err.(*ValidationError); ok {
+			return strings.HasPrefix(e.Field, prefix)
+		}
+		return false
+	}
+}
+
+// Filter removes items from the ValidationErrorList that match the provided fns.
+func (list ValidationErrorList) Filter(fns ...errors.Matcher) ValidationErrorList {
+	err := errors.FilterOut(errors.NewAggregate(list), fns...)
+	if err == nil {
+		return nil
+	}
+	// FilterOut that takes an Aggregate returns an Aggregate
+	agg := err.(errors.Aggregate)
+	return ValidationErrorList(agg.Errors())
 }

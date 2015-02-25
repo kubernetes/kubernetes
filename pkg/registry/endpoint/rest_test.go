@@ -30,7 +30,7 @@ func TestGetEndpoints(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Endpoints:  []string{"127.0.0.1:9000"},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 9000}},
 		},
 	}
 	storage := NewREST(registry)
@@ -39,7 +39,7 @@ func TestGetEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual([]string{"127.0.0.1:9000"}, obj.(*api.Endpoints).Endpoints) {
+	if !reflect.DeepEqual([]api.Endpoint{{IP: "127.0.0.1", Port: 9000}}, obj.(*api.Endpoints).Endpoints) {
 		t.Errorf("unexpected endpoints: %#v", obj)
 	}
 }

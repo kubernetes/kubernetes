@@ -31,7 +31,7 @@ func TestRedirect(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionControl)
+	}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -84,7 +84,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionControl)
+	}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, namespaceMapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -107,7 +107,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 	for _, item := range table {
 		simpleStorage.errors["resourceLocation"] = item.err
 		simpleStorage.resourceLocation = item.id
-		resp, err := client.Get(server.URL + "/prefix/version/redirect/ns/other/foo/" + item.id)
+		resp, err := client.Get(server.URL + "/prefix/version/redirect/namespaces/other/foo/" + item.id)
 		if resp == nil {
 			t.Fatalf("Unexpected nil resp")
 		}

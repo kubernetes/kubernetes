@@ -1,4 +1,5 @@
 apiVersion: v1beta1
+kind: Pod
 id: storage
 desiredState:
   manifest:

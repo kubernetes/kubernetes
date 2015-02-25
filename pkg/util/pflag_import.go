@@ -80,7 +80,9 @@ func (v *flagValueWrapper) IsBoolFlag() bool {
 // Imports a 'flag.Flag' into a 'pflag.FlagSet'.  The "short" option is unset
 // and the type is inferred using reflection.
 func AddFlagToPFlagSet(f *flag.Flag, fs *pflag.FlagSet) {
-	fs.Var(wrapFlagValue(f.Value), f.Name, f.Usage)
+	if fs.Lookup(f.Name) == nil {
+		fs.Var(wrapFlagValue(f.Value), f.Name, f.Usage)
+	}
 }
 
 // Adds all of the flags in a 'flag.FlagSet' package flags to a 'pflag.FlagSet'.

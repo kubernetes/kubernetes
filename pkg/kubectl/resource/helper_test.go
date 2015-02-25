@@ -75,6 +75,10 @@ func TestHelperDelete(t *testing.T) {
 					return false
 				}
 				parts := splitPath(req.URL.Path)
+				if len(parts) < 3 {
+					t.Errorf("expected URL path to have 3 parts: %s", req.URL.Path)
+					return false
+				}
 				if parts[1] != "bar" {
 					t.Errorf("url doesn't contain namespace: %#v", req)
 					return false
@@ -94,7 +98,8 @@ func TestHelperDelete(t *testing.T) {
 			Err:   test.HttpErr,
 		}
 		modifier := &Helper{
-			RESTClient: client,
+			RESTClient:      client,
+			NamespaceScoped: true,
 		}
 		err := modifier.Delete("bar", "foo")
 		if (err != nil) != test.Err {
@@ -162,11 +167,17 @@ func TestHelperCreate(t *testing.T) {
 			Req:          expectPost,
 		},
 		{
-			Modify:       true,
-			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
-			Req:          expectPost,
+			Modify: true,
+			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			ExpectObject: &api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			Resp: &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
+			Req:  expectPost,
 		},
 	}
 	for i, test := range tests {
@@ -179,15 +190,16 @@ func TestHelperCreate(t *testing.T) {
 			client.Client = test.RespFunc
 		}
 		modifier := &Helper{
-			RESTClient: client,
-			Codec:      testapi.Codec(),
-			Versioner:  testapi.MetadataAccessor(),
+			RESTClient:      client,
+			Codec:           testapi.Codec(),
+			Versioner:       testapi.MetadataAccessor(),
+			NamespaceScoped: true,
 		}
 		data := []byte{}
 		if test.Object != nil {
 			data = []byte(runtime.EncodeOrDie(testapi.Codec(), test.Object))
 		}
-		err := modifier.Create("bar", test.Modify, data)
+		_, err := modifier.Create("bar", test.Modify, data)
 		if (err != nil) != test.Err {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}
@@ -261,7 +273,8 @@ func TestHelperGet(t *testing.T) {
 			Err:   test.HttpErr,
 		}
 		modifier := &Helper{
-			RESTClient: client,
+			RESTClient:      client,
+			NamespaceScoped: true,
 		}
 		obj, err := modifier.Get("bar", "foo")
 		if (err != nil) != test.Err {
@@ -312,7 +325,7 @@ func TestHelperList(t *testing.T) {
 					t.Errorf("unexpected method: %#v", req)
 					return false
 				}
-				if req.URL.Path != "/ns/bar" {
+				if req.URL.Path != "/namespaces/bar" {
 					t.Errorf("url doesn't contain name: %#v", req.URL)
 					return false
 				}
@@ -331,7 +344,8 @@ func TestHelperList(t *testing.T) {
 			Err:   test.HttpErr,
 		}
 		modifier := &Helper{
-			RESTClient: client,
+			RESTClient:      client,
+			NamespaceScoped: true,
 		}
 		obj, err := modifier.List("bar", labels.SelectorFromSet(labels.Set{"foo": "baz"}))
 		if (err != nil) != test.Err {
@@ -400,9 +414,14 @@ func TestHelperUpdate(t *testing.T) {
 			Req: expectPut,
 		},
 		{
-			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-
+			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			ExpectObject: &api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
 			Overwrite: true,
 			RespFunc: func(req *http.Request) (*http.Response, error) {
 				if req.Method == "PUT" {
@@ -429,15 +448,16 @@ func TestHelperUpdate(t *testing.T) {
 			client.Client = test.RespFunc
 		}
 		modifier := &Helper{
-			RESTClient: client,
-			Codec:      testapi.Codec(),
-			Versioner:  testapi.MetadataAccessor(),
+			RESTClient:      client,
+			Codec:           testapi.Codec(),
+			Versioner:       testapi.MetadataAccessor(),
+			NamespaceScoped: true,
 		}
 		data := []byte{}
 		if test.Object != nil {
 			data = []byte(runtime.EncodeOrDie(testapi.Codec(), test.Object))
 		}
-		err := modifier.Update("bar", "foo", test.Overwrite, data)
+		_, err := modifier.Update("bar", "foo", test.Overwrite, data)
 		if (err != nil) != test.Err {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Err, err)
 		}

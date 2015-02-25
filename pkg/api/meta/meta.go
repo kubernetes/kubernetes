@@ -373,36 +373,12 @@ func (a genericAccessor) SetAnnotations(annotations map[string]string) {
 	*a.annotations = annotations
 }
 
-// fieldPtr puts the address of fieldName, which must be a member of v,
-// into dest, which must be an address of a variable to which this field's
-// address can be assigned.
-func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
-	field := v.FieldByName(fieldName)
-	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
-	}
-	v, err := conversion.EnforcePtr(dest)
-	if err != nil {
-		return err
-	}
-	field = field.Addr()
-	if field.Type().AssignableTo(v.Type()) {
-		v.Set(field)
-		return nil
-	}
-	if field.Type().ConvertibleTo(v.Type()) {
-		v.Set(field.Convert(v.Type()))
-		return nil
-	}
-	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
-}
-
 // extractFromTypeMeta extracts pointers to version and kind fields from an object
 func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
-	if err := fieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
+	if err := runtime.FieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "Kind", &a.kind); err != nil {
+	if err := runtime.FieldPtr(v, "Kind", &a.kind); err != nil {
 		return err
 	}
 	return nil
@@ -410,25 +386,25 @@ func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 
 // extractFromObjectMeta extracts pointers to metadata fields from an object
 func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
-	if err := fieldPtr(v, "Namespace", &a.namespace); err != nil {
+	if err := runtime.FieldPtr(v, "Namespace", &a.namespace); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "Name", &a.name); err != nil {
+	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "UID", &a.uid); err != nil {
+	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
+	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "SelfLink", &a.selfLink); err != nil {
+	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "Labels", &a.labels); err != nil {
+	if err := runtime.FieldPtr(v, "Labels", &a.labels); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "Annotations", &a.annotations); err != nil {
+	if err := runtime.FieldPtr(v, "Annotations", &a.annotations); err != nil {
 		return err
 	}
 	return nil
@@ -436,10 +412,10 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 
 // extractFromObjectMeta extracts pointers to metadata fields from a list object
 func extractFromListMeta(v reflect.Value, a *genericAccessor) error {
-	if err := fieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
+	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
 		return err
 	}
-	if err := fieldPtr(v, "SelfLink", &a.selfLink); err != nil {
+	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
 		return err
 	}
 	return nil

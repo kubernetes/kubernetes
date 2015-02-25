@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -87,9 +88,17 @@ func testData() (*api.PodList, *api.ServiceList) {
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 		},
 	}
@@ -157,7 +166,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 
 func TestPathBuilder(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master.json")
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json")
 
 	test := &testVisitor{}
 	singular := false
@@ -168,15 +177,46 @@ func TestPathBuilder(t *testing.T) {
 	}
 
 	info := test.Infos[0]
-	if info.Name != "redis-master" || info.Namespace != "" || info.Object == nil {
+	if info.Name != "redis-master-controller" || info.Namespace != "" || info.Object == nil {
+		t.Errorf("unexpected info: %#v", info)
+	}
+}
+
+func TestNodeBuilder(t *testing.T) {
+	node := &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: "node1", Namespace: "should-not-have", ResourceVersion: "10"},
+		Spec: api.NodeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("1000m"),
+				api.ResourceMemory: resource.MustParse("1Mi"),
+			},
+		},
+	}
+	r, w := io.Pipe()
+	go func() {
+		defer w.Close()
+		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, node)))
+	}()
+
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").Stream(r, "STDIN")
+
+	test := &testVisitor{}
+
+	err := b.Do().Visit(test.Handle)
+	if err != nil || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+	}
+	info := test.Infos[0]
+	if info.Name != "node1" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master.json").
-		FilenameParam("../../../examples/guestbook/redis-master.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -188,7 +228,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}
 
 	info := test.Infos[1]
-	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
+	if info.Name != "redis-master-controller" || info.Namespace != "test" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -208,7 +248,7 @@ func TestDirectoryBuilder(t *testing.T) {
 
 	found := false
 	for _, info := range test.Infos {
-		if info.Name == "redis-master" && info.Namespace == "test" && info.Object != nil {
+		if info.Name == "redis-master-controller" && info.Namespace == "test" && info.Object != nil {
 			found = true
 		}
 	}
@@ -264,7 +304,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
 	})).
 		NamespaceParam("test")
 
@@ -275,7 +315,7 @@ func TestResourceByName(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 
-	b.ResourceTypeOrNameArgs("pods", "foo")
+	b.ResourceTypeOrNameArgs(true, "pods", "foo")
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
 	if err != nil || !singular || len(test.Infos) != 1 {
@@ -297,11 +337,11 @@ func TestResourceByName(t *testing.T) {
 func TestResourceByNameAndEmptySelector(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
 	})).
 		NamespaceParam("test").
 		SelectorParam("").
-		ResourceTypeOrNameArgs("pods", "foo")
+		ResourceTypeOrNameArgs(true, "pods", "foo")
 
 	singular := false
 	infos, err := b.Do().IntoSingular(&singular).Infos()
@@ -324,8 +364,8 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
-		"/ns/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
+		"/namespaces/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
@@ -338,13 +378,13 @@ func TestSelector(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 
-	b.ResourceTypeOrNameArgs("pods,service")
+	b.ResourceTypeOrNameArgs(true, "pods,service")
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 
@@ -368,7 +408,7 @@ func TestSingleResourceType(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		SelectorParam("a=b").
 		SingleResourceType().
-		ResourceTypeOrNameArgs("pods,services")
+		ResourceTypeOrNameArgs(true, "pods,services")
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
@@ -387,7 +427,7 @@ func TestStream(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -404,7 +444,7 @@ func TestYAMLStream(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -426,7 +466,7 @@ func TestMultipleObject(t *testing.T) {
 			&svc.Items[0],
 		},
 	}
-	if !reflect.DeepEqual(expected, obj) {
+	if !api.Semantic.DeepDerivative(expected, obj) {
 		t.Errorf("unexpected visited objects: %#v", obj)
 	}
 }
@@ -434,7 +474,7 @@ func TestMultipleObject(t *testing.T) {
 func TestSingularObject(t *testing.T) {
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
 		Flatten().
 		Do().Object()
 
@@ -442,23 +482,23 @@ func TestSingularObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	pod, ok := obj.(*api.Pod)
+	rc, ok := obj.(*api.ReplicationController)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
-	if pod.Name != "redis-master" || pod.Namespace != "test" {
-		t.Errorf("unexpected pod: %#v", pod)
+	if rc.Name != "redis-master-controller" || rc.Namespace != "test" {
+		t.Errorf("unexpected controller: %#v", rc)
 	}
 }
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/pods?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
-		ResourceTypeOrNameArgs("pods").
+		ResourceTypeOrNameArgs(true, "pods").
 		Flatten()
 
 	obj, err := b.Do().Object()
@@ -486,12 +526,12 @@ func TestListObject(t *testing.T) {
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
-		"/ns/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
+		"/namespaces/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
-		ResourceTypeOrNameArgs("pods,services").
+		ResourceTypeOrNameArgs(true, "pods,services").
 		Flatten().
 		Do().Object()
 
@@ -510,16 +550,16 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	pods, _ := testData()
+	_, svc := testData()
 	w, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/watch/ns/test/pods/redis-master?resourceVersion=10": watchBody(watch.Event{
+		"/watch/namespaces/test/services/redis-master?resourceVersion=12": watchBody(watch.Event{
 			Type:   watch.Added,
-			Object: &pods.Items[0],
+			Object: &svc.Items[0],
 		}),
 	})).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master.json").Flatten().
-		Do().Watch("10")
+		FilenameParam("../../../examples/guestbook/redis-master-service.json").Flatten().
+		Do().Watch("12")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -532,12 +572,12 @@ func TestWatch(t *testing.T) {
 		if obj.Type != watch.Added {
 			t.Fatalf("unexpected watch event", obj)
 		}
-		pod, ok := obj.Object.(*api.Pod)
+		service, ok := obj.Object.(*api.Service)
 		if !ok {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
-		if pod.Name != "foo" || pod.ResourceVersion != "10" {
-			t.Errorf("unexpected pod: %#v", pod)
+		if service.Name != "baz" || service.ResourceVersion != "12" {
+			t.Errorf("unexpected service: %#v", service)
 		}
 	}
 }
@@ -545,8 +585,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master.json").Flatten().
-		FilenameParam("../../../examples/guestbook/redis-master.json").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").Flatten().
 		Do().Watch("")
 
 	if err == nil {
@@ -567,9 +607,9 @@ func TestLatest(t *testing.T) {
 	}
 
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/ns/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, newPod),
-		"/ns/test/pods/bar":     runtime.EncodeOrDie(latest.Codec, newPod2),
-		"/ns/test/services/baz": runtime.EncodeOrDie(latest.Codec, newSvc),
+		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, newPod),
+		"/namespaces/test/pods/bar":     runtime.EncodeOrDie(latest.Codec, newPod2),
+		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, newSvc),
 	})).
 		NamespaceParam("other").Stream(r, "STDIN").Flatten().Latest()
 
@@ -580,7 +620,7 @@ func TestLatest(t *testing.T) {
 	if err != nil || singular || len(test.Infos) != 3 {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
-	if !reflect.DeepEqual([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }
@@ -614,7 +654,7 @@ func TestIgnoreStreamErrors(t *testing.T) {
 		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
 	}
 
-	if !reflect.DeepEqual([]runtime.Object{&pods.Items[0], &svc.Items[0]}, test.Objects()) {
+	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &svc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
 	}
 }

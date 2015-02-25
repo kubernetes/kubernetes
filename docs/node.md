@@ -110,9 +110,11 @@ any binary; therefore, to
 join Kubernetes cluster, you as an admin need to make sure proper services are
 running in the node. In the future, we plan to automatically provision some node
 services. In case of no cloud provider, Node Controller simply registers all
-machines from `-machines` flag, any futher interactions need to be done manually
-by using `kubectl`. If you are paranoid, leave `-machines` empty and create all
+machines from `--machines` flag, any futher interactions need to be done manually
+by using `kubectl`. If you are paranoid, leave `--machines` empty and create all
 machines from `kubectl` one by one - the two approaches are equivalent.
+Optionally you can skip cluster-wide node synchronization with
+'--sync_nodes=false' and can use REST api/kubectl cli to add/remove nodes.
 
 Node life-cycle management in the Node Controller is still under development, it
 is supposed to manage the Node Status Specification defined above.

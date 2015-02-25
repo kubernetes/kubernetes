@@ -31,27 +31,27 @@ Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. 
 ### Installing godep
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
 
-1. Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
+1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
 source control system).  Use ```apt-get install mercurial``` or ```yum install mercurial``` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
 directly from mercurial.
-2. Create a new GOPATH for your tools and install godep:
+
+2) Create a new GOPATH for your tools and install godep:
 ```
 export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
 go get github.com/tools/godep
 ```
 
-3. Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
+3) Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
 ```
 export GOPATH=$HOME/go-tools
 export PATH=$PATH:$GOPATH/bin
 ```
 
 ### Using godep
-Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace. Here is the recommended way to set up your system. There are other ways that may work, but this is the easiest one I know of.
+Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
-1. Devote a directory to this endeavor:
-
+1) Devote a directory to this endeavor:
 ```
 export KPATH=$HOME/code/kubernetes
 mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
@@ -60,8 +60,7 @@ git clone https://path/to/your/fork .
 # Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
 ```
 
-2. Set up your GOPATH.
-
+2) Set up your GOPATH.
 ```
 # Option A: this will let your builds see packages that exist elsewhere on your system.
 export GOPATH=$KPATH:$GOPATH
@@ -70,25 +69,30 @@ export GOPATH=$KPATH
 # Option B is recommended if you're going to mess with the dependencies.
 ```
 
-3. Populate your new $GOPATH.
-
+3) Populate your new GOPATH.
 ```
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
 godep restore
 ```
 
-4. To add a dependency, you can do ```go get path/to/dependency``` as usual.
-
-5. To package up a dependency, do
-
+4) Next, you can either add a new dependency or update an existing one.
 ```
+# To add a new dependency, do:
 cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+go get path/to/dependency
+# Change code in Kubernetes to use the dependency.
 godep save ./...
-# Sanity check that your Godeps.json file is ok by re-restoring:
-godep restore
+
+# To update an existing dependency, do:
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+go get -u path/to/dependency
+# Change code in Kubernetes accordingly if necessary.
+godep update path/to/dependency
 ```
 
-I (lavalamp) have sometimes found it expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: ```godep restore```
+
+It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
 
 Please send dependency updates in separate commits within your PR, for easier reviewing.
 
@@ -129,14 +133,31 @@ ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
 ```
 
 ## Coverage
+
+Currently, collecting coverage is only supported for the Go unit tests.
+
+To run all unit tests and generate an HTML coverage report, run the following:
+
 ```
 cd kubernetes
-godep go tool cover -html=target/c.out
+KUBE_COVER=y hack/test-go.sh
 ```
+
+At the end of the run, an the HTML report will be generated with the path printed to stdout.
+
+To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
+```
+cd kubernetes
+KUBE_COVER=y hack/test-go.sh pkg/kubectl
+```
+
+Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
+
+Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/GoogleCloudPlatform/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls.
 
 ## Integration tests
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
 ```
 cd kubernetes
 hack/test-integration.sh
@@ -180,8 +201,11 @@ go run hack/e2e.go --pushup
 # Run all tests
 go run hack/e2e.go --test
 
-# Run tests matching a glob.
-go run hack/e2e.go --tests=...
+# Run tests matching the regex "Pods.*env"
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+
+# Alternately, if you have the e2e cluster up and no desire to see the event stream, you can run ginkgo-e2e.sh directly:
+hack/ginkgo-e2e.sh --ginkgo.focus=Pods.*env
 ```
 
 ### Combining flags
@@ -203,26 +227,6 @@ go run e2e.go -ctl='delete pod foobar'
 ## Testing out flaky tests
 [Instructions here](flaky-tests.md)
 
-## Add/Update dependencies
-
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. To add or update a package, please follow the instructions on [godep's document](https://github.com/tools/godep).
-
-To add a new package ``foo/bar``:
-
-- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
-- Run ``godep restore`` to make sure you have all dependancies pulled.
-- Download foo/bar into the first directory in GOPATH: ``go get foo/bar``.
-- Change code in kubernetes to use ``foo/bar``.
-- Run ``godep save ./...`` under kubernetes' root directory.
-
-To update a package ``foo/bar``:
-
-- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
-- Run ``godep restore`` to make sure you have all dependancies pulled.
-- Update the package with ``go get -u foo/bar``.
-- Change code in kubernetes accordingly if necessary.
-- Run ``godep update foo/bar`` under kubernetes' root directory.
-
 ## Keeping your development fork in sync
 
 One time after cloning your forked repo:
@@ -243,4 +247,3 @@ git rebase upstream/master
 ```
 hack/run-gendocs.sh
 ```
-

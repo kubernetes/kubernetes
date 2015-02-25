@@ -69,6 +69,13 @@ function create-provision-scripts {
     echo "MASTER_IP='${MASTER_IP}'"
     echo "MINION_NAMES=(${MINION_NAMES[@]})"
     echo "MINION_IPS=(${MINION_IPS[@]})"
+    echo "NODE_IP='${MASTER_IP}'"
+    echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
+    echo "CONTAINER_NETMASK='${MASTER_CONTAINER_NETMASK}'"
+    echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
+    echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
+    echo "MINION_CONTAINER_NETMASKS='${MINION_CONTAINER_NETMASKS[@]}'"
+    echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
     echo "PORTAL_NET='${PORTAL_NET}'"
     echo "MASTER_USER='${MASTER_USER}'"
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
@@ -78,7 +85,10 @@ function create-provision-scripts {
     echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
     echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "DNS_DOMAIN='${DNS_DOMAIN:-}'"
+    echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
+    echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -90,8 +100,11 @@ function create-provision-scripts {
       echo "MINION_IPS=(${MINION_IPS[@]})"
       echo "MINION_IP='${MINION_IPS[$i]}'"
       echo "MINION_ID='$i'"
-      echo "MINION_CONTAINER_ADDR='${MINION_CONTAINER_ADDRS[$i]}'"
-      echo "MINION_CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
+      echo "NODE_IP='${MINION_IPS[$i]}'"
+      echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
+      echo "CONTAINER_ADDR='${MINION_CONTAINER_ADDRS[$i]}'"
+      echo "CONTAINER_NETMASK='${MINION_CONTAINER_NETMASKS[$i]}'"
+      echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
@@ -197,6 +210,28 @@ function kube-up {
 }
 EOF
 
+   cat <<EOF >"${HOME}/.kubernetes_vagrant_kubeconfig"
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: ${HOME}/$ca_cert
+    server: https://${MASTER_IP}:443
+  name: vagrant
+contexts:
+- context:
+    cluster: vagrant
+    namespace: default
+    user: vagrant
+  name: vagrant
+current-context: "vagrant"
+kind: Config
+preferences: {}
+users:
+- name: vagrant
+  user:
+    auth-path: ${HOME}/.kubernetes_vagrant_auth
+EOF
+
    chmod 0600 ~/.kubernetes_vagrant_auth "${HOME}/${kube_cert}" \
      "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
   )
@@ -256,6 +291,10 @@ function find-vagrant-name-by-ip {
 # Find the vagrant machien name based on the host name of the minion
 function find-vagrant-name-by-minion-name {
   local ip="$1"
+  if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
+    echo "master"
+    return $?
+  fi
   local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
 
   [[ $ip =~ $ip_pattern ]] || {
@@ -279,12 +318,17 @@ function ssh-to-node {
     return 1
   }
 
-  vagrant ssh "${machine}" -c "${cmd}" | grep -v "Connection to.*closed"
+  vagrant ssh "${machine}" -c "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
 function restart-kube-proxy {
   ssh-to-node "$1" "sudo systemctl restart kube-proxy"
+}
+
+# Restart the apiserver
+function restart-apiserver {
+  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
 }
 
 function setup-monitoring-firewall {

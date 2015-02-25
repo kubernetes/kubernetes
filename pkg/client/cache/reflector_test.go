@@ -37,7 +37,7 @@ func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
 }
 
 func TestReflector_watchHandlerError(t *testing.T) {
-	s := NewStore()
+	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
 	fw := watch.NewFake()
 	go func() {
@@ -51,11 +51,11 @@ func TestReflector_watchHandlerError(t *testing.T) {
 }
 
 func TestReflector_watchHandler(t *testing.T) {
-	s := NewStore()
+	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
 	fw := watch.NewFake()
-	s.Add("foo", &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
-	s.Add("bar", &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})
+	s.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	s.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})
 	go func() {
 		fw.Add(&api.Service{ObjectMeta: api.ObjectMeta{Name: "rejected"}})
 		fw.Delete(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -69,26 +69,29 @@ func TestReflector_watchHandler(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 
+	mkPod := func(id string, rv string) *api.Pod {
+		return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, ResourceVersion: rv}}
+	}
+
 	table := []struct {
-		ID     string
-		RV     string
+		Pod    *api.Pod
 		exists bool
 	}{
-		{"foo", "", false},
-		{"rejected", "", false},
-		{"bar", "55", true},
-		{"baz", "32", true},
+		{mkPod("foo", ""), false},
+		{mkPod("rejected", ""), false},
+		{mkPod("bar", "55"), true},
+		{mkPod("baz", "32"), true},
 	}
 	for _, item := range table {
-		obj, exists := s.Get(item.ID)
+		obj, exists, _ := s.Get(item.Pod)
 		if e, a := item.exists, exists; e != a {
-			t.Errorf("%v: expected %v, got %v", item.ID, e, a)
+			t.Errorf("%v: expected %v, got %v", item.Pod, e, a)
 		}
 		if !exists {
 			continue
 		}
-		if e, a := item.RV, obj.(*api.Pod).ResourceVersion; e != a {
-			t.Errorf("%v: expected %v, got %v", item.ID, e, a)
+		if e, a := item.Pod.ResourceVersion, obj.(*api.Pod).ResourceVersion; e != a {
+			t.Errorf("%v: expected %v, got %v", item.Pod, e, a)
 		}
 	}
 
@@ -121,7 +124,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
-	s := NewFIFO()
+	s := NewFIFO(MetaNamespaceKeyFunc)
 	r := NewReflector(lw, &api.Pod{}, s)
 	go r.listAndWatch()
 
@@ -200,7 +203,7 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 		},
 	}
 
-	s := NewFIFO()
+	s := NewFIFO(MetaNamespaceKeyFunc)
 	for line, item := range table {
 		if item.list != nil {
 			// Test that the list is what currently exists in the store.

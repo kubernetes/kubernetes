@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/davecgh/go-spew/spew"
@@ -46,6 +47,10 @@ func (vh *volumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volum
 
 func (vh *volumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return vh.kubelet.getPodPluginDir(podUID, pluginName)
+}
+
+func (vh *volumeHost) GetKubeClient() client.Interface {
+	return vh.kubelet.kubeClient
 }
 
 func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *api.Volume, podUID types.UID) volume.Builder {

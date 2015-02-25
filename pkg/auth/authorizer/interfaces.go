@@ -40,7 +40,7 @@ type Attributes interface {
 	GetNamespace() string
 
 	// The kind of object, if a request is for a REST object.
-	GetKind() string
+	GetResource() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -55,7 +55,7 @@ type AttributesRecord struct {
 	User      user.Info
 	ReadOnly  bool
 	Namespace string
-	Kind      string
+	Resource  string
 }
 
 func (a AttributesRecord) GetUserName() string {
@@ -74,6 +74,6 @@ func (a AttributesRecord) GetNamespace() string {
 	return a.Namespace
 }
 
-func (a AttributesRecord) GetKind() string {
-	return a.Kind
+func (a AttributesRecord) GetResource() string {
+	return a.Resource
 }

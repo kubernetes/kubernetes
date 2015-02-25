@@ -17,23 +17,53 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
+	"os"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	libutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
 )
 
+const (
+	log_example = `// Returns snapshot of ruby-container logs from pod 123456-7890.
+$ kubectl log 123456-7890 ruby-container
+
+// Starts streaming of ruby-container logs from pod 123456-7890.
+$ kubectl log -f 123456-7890 ruby-container`
+)
+
+func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
+	fmt.Fprintf(out, "Please select a container:\n")
+	options := libutil.StringSet{}
+	for ix := range pod.Spec.Containers {
+		fmt.Fprintf(out, "[%d] %s\n", ix+1, pod.Spec.Containers[ix].Name)
+		options.Insert(pod.Spec.Containers[ix].Name)
+	}
+	for {
+		var input string
+		fmt.Fprintf(out, "> ")
+		fmt.Fscanln(in, &input)
+		if options.Has(input) {
+			return input
+		}
+		ix, err := strconv.Atoi(input)
+		if err == nil && ix > 0 && ix <= len(pod.Spec.Containers) {
+			return pod.Spec.Containers[ix-1].Name
+		}
+		fmt.Fprintf(out, "Invalid input: %s", input)
+	}
+}
+
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "log [-f] <pod> [<container>]",
-		Short: "Print the logs for a container in a pod.",
-		Long: `Print the logs for a container in a pod. If the pod has only one container, the container name is optional
-Examples:
-  $ kubectl log 123456-7890 ruby-container
-  <returns snapshot of ruby-container logs from pod 123456-7890>
-
-  $ kubectl log -f 123456-7890 ruby-container
-  <starts streaming of ruby-container logs from pod 123456-7890>`,
+		Use:     "log [-f] <pod> [<container>]",
+		Short:   "Print the logs for a container in a pod.",
+		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
+		Example: log_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				usageError(cmd, "<pod> is required for log")
@@ -56,17 +86,21 @@ Examples:
 			var container string
 			if len(args) == 1 {
 				if len(pod.Spec.Containers) != 1 {
-					usageError(cmd, "<container> is required for pods with multiple containers")
+					if !util.GetFlagBool(cmd, "interactive") {
+						usageError(cmd, "<container> is required for pods with multiple containers")
+					} else {
+						container = selectContainer(pod, os.Stdin, out)
+					}
+				} else {
+					// Get logs for the only container in the pod
+					container = pod.Spec.Containers[0].Name
 				}
-
-				// Get logs for the only container in the pod
-				container = pod.Spec.Containers[0].Name
 			} else {
 				container = args[1]
 			}
 
 			follow := false
-			if GetFlagBool(cmd, "follow") {
+			if util.GetFlagBool(cmd, "follow") {
 				follow = true
 			}
 
@@ -85,5 +119,6 @@ Examples:
 		},
 	}
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
+	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
 	return cmd
 }

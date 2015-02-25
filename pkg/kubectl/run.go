@@ -18,11 +18,9 @@ package kubectl
 
 import (
 	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/golang/glog"
 )
 
 type BasicReplicationController struct{}
@@ -33,6 +31,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"replicas", true},
 		{"image", true},
+		{"port", false},
 	}
 }
 
@@ -74,23 +73,21 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 			},
 		},
 	}
-	return &controller, nil
-}
 
-// TODO: extract this to a common location.
-func ParseLabels(labelString string) map[string]string {
-	if len(labelString) == 0 {
-		return nil
-	}
-	labels := map[string]string{}
-	labelSpecs := strings.Split(labelString, ",")
-	for ix := range labelSpecs {
-		labelSpec := strings.Split(labelSpecs[ix], "=")
-		if len(labelSpec) != 2 {
-			glog.Errorf("unexpected label spec: %s", labelSpecs[ix])
-			continue
+	if len(params["port"]) > 0 {
+		port, err := strconv.Atoi(params["port"])
+		if err != nil {
+			return nil, err
 		}
-		labels[labelSpec[0]] = labelSpec[1]
+
+		// Don't include the port if it was not specified.
+		if port > 0 {
+			controller.Spec.Template.Spec.Containers[0].Ports = []api.Port{
+				{
+					ContainerPort: port,
+				},
+			}
+		}
 	}
-	return labels
+	return &controller, nil
 }

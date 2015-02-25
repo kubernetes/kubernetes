@@ -15,17 +15,20 @@
 # limitations under the License.
 
 # TODO: this isn't quite piped into all the right places...
-ZONE=us-west-2
+ZONE=${KUBE_AWS_ZONE:-us-west-2}
 MASTER_SIZE=t2.micro
 MINION_SIZE=t2.micro
-NUM_MINIONS=4
+NUM_MINIONS=${NUM_MINIONS:-4}
 
 # This is the ubuntu 14.04 image for us-west-2 + ebs
 # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
 # This will need to be updated from time to time as amis are deprecated
 IMAGE=ami-39501209
-INSTANCE_PREFIX=kubernetes
-AWS_SSH_KEY=$HOME/.ssh/kube_aws_rsa
+INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
+AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
+IAM_PROFILE="kubernetes"
+
+LOG="/dev/null"
 
 MASTER_NAME="ip-172-20-0-9.$ZONE.compute.internal"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
@@ -36,16 +39,26 @@ MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 
-# Optional: Install node logging
-ENABLE_NODE_LOGGING=false
-LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+
+# When set to true, Docker Cache is enabled by default as part of the cluster bring up.
+ENABLE_DOCKER_REGISTRY_CACHE=true
+
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
+
+# Optional: When set to true, heapster will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
+LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING=false
+ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
-IAM_PROFILE="kubernetes"
-LOG="/dev/null"
+# Don't require https for registries in our local RFC1918 network
+EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true

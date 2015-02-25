@@ -188,7 +188,7 @@ func Update(c *gophercloud.ServiceClient, networkID string, opts UpdateOptsBuild
 	}
 
 	// Send request to API
-	_, res.Err = perigee.Request("PUT", getURL(c, networkID), perigee.Options{
+	_, res.Err = perigee.Request("PUT", updateURL(c, networkID), perigee.Options{
 		MoreHeaders: c.AuthenticatedHeaders(),
 		ReqBody:     &reqBody,
 		Results:     &res.Body,

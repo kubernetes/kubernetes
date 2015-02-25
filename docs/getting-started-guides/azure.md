@@ -34,21 +34,26 @@ can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
 ### Running a container (simple version)
 
-The `cluster/kubecfg.sh` command below spins up two containers, running [Nginx](http://nginx.org/en/) and with port 80 mapped to 8080:
+Once you have your instances up and running, the `hack/build-go.sh` script sets up
+your Go workspace and builds the Go components.
 
-```
-cd kubernetes
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+The `kubectl.sh` line below spins up two containers running
+[Nginx](http://nginx.org/en/) running on port 80:
+
+```bash
+cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
-```
-cluster/kubecfg.sh stop myNginx
+
+```bash
+cluster/kubectl.sh stop rc my-nginx
 ```
 
 To delete the containers:
-```
-cluster/kubecfg.sh rm myNginx
+
+```bash
+cluster/kubectl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)

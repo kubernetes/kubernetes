@@ -16,10 +16,6 @@ limitations under the License.
 
 package cache
 
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-)
-
 // UndeltaStore listens to incremental updates and sends complete state on every change.
 // It implements the Store interface so that it can receive a stream of mirrored objects
 // from Reflector.  Whenever it receives any complete (Store.Replace) or incremental change
@@ -46,36 +42,48 @@ var _ Store = &UndeltaStore{}
 // 4               Store.List() -> [a,b]
 // 5                                         Store.List() -> [a,b]
 
-func (u *UndeltaStore) Add(id string, obj interface{}) {
-	u.ActualStore.Add(id, obj)
+func (u *UndeltaStore) Add(obj interface{}) error {
+	if err := u.ActualStore.Add(obj); err != nil {
+		return err
+	}
 	u.PushFunc(u.ActualStore.List())
+	return nil
 }
-func (u *UndeltaStore) Update(id string, obj interface{}) {
-	u.ActualStore.Update(id, obj)
+func (u *UndeltaStore) Update(obj interface{}) error {
+	if err := u.ActualStore.Update(obj); err != nil {
+		return err
+	}
 	u.PushFunc(u.ActualStore.List())
+	return nil
 }
-func (u *UndeltaStore) Delete(id string) {
-	u.ActualStore.Delete(id)
+func (u *UndeltaStore) Delete(obj interface{}) error {
+	if err := u.ActualStore.Delete(obj); err != nil {
+		return err
+	}
 	u.PushFunc(u.ActualStore.List())
+	return nil
 }
 func (u *UndeltaStore) List() []interface{} {
 	return u.ActualStore.List()
 }
-func (u *UndeltaStore) ContainedIDs() util.StringSet {
-	return u.ActualStore.ContainedIDs()
+func (u *UndeltaStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	return u.ActualStore.Get(obj)
 }
-func (u *UndeltaStore) Get(id string) (item interface{}, exists bool) {
-	return u.ActualStore.Get(id)
+func (u *UndeltaStore) GetByKey(key string) (item interface{}, exists bool, err error) {
+	return u.ActualStore.GetByKey(key)
 }
-func (u *UndeltaStore) Replace(idToObj map[string]interface{}) {
-	u.ActualStore.Replace(idToObj)
+func (u *UndeltaStore) Replace(list []interface{}) error {
+	if err := u.ActualStore.Replace(list); err != nil {
+		return err
+	}
 	u.PushFunc(u.ActualStore.List())
+	return nil
 }
 
 // NewUndeltaStore returns an UndeltaStore implemented with a Store.
-func NewUndeltaStore(pushFunc func([]interface{})) *UndeltaStore {
+func NewUndeltaStore(pushFunc func([]interface{}), keyFunc KeyFunc) *UndeltaStore {
 	return &UndeltaStore{
-		ActualStore: NewStore(),
+		ActualStore: NewStore(keyFunc),
 		PushFunc:    pushFunc,
 	}
 }

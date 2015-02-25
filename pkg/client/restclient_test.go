@@ -65,49 +65,6 @@ func TestSetsCodec(t *testing.T) {
 	}
 }
 
-func TestSetDefaults(t *testing.T) {
-	testCases := []struct {
-		Config Config
-		After  Config
-		Err    bool
-	}{
-		{
-			Config{},
-			Config{
-				Prefix:         "/api",
-				Version:        latest.Version,
-				Codec:          latest.Codec,
-				LegacyBehavior: (latest.Version == "v1beta1" || latest.Version == "v1beta2"),
-			},
-			false,
-		},
-		{
-			Config{
-				Version: "not_an_api",
-			},
-			Config{},
-			true,
-		},
-	}
-	for _, testCase := range testCases {
-		val := &testCase.Config
-		err := SetKubernetesDefaults(val)
-		switch {
-		case err == nil && testCase.Err:
-			t.Errorf("expected error but was nil")
-			continue
-		case err != nil && !testCase.Err:
-			t.Errorf("unexpected error %v", err)
-			continue
-		case err != nil:
-			continue
-		}
-		if !reflect.DeepEqual(*val, testCase.After) {
-			t.Errorf("unexpected result object: %#v", val)
-		}
-	}
-}
-
 func TestRESTClientRequires(t *testing.T) {
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "", Codec: testapi.Codec()}); err == nil {
 		t.Errorf("unexpected non-error")
@@ -157,10 +114,10 @@ func TestValidatesHostParameter(t *testing.T) {
 }
 
 func TestDoRequestBearer(t *testing.T) {
-	status := &api.Status{Status: api.StatusWorking}
+	status := &api.Status{Status: api.StatusFailure}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
-		StatusCode:   202,
+		StatusCode:   400,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
@@ -187,11 +144,11 @@ func TestDoRequestBearer(t *testing.T) {
 	}
 }
 
-func TestDoRequestAccepted(t *testing.T) {
-	status := &api.Status{Status: api.StatusWorking}
+func TestDoRequestWithoutPassword(t *testing.T) {
+	status := &api.Status{Status: api.StatusFailure}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
-		StatusCode:   202,
+		StatusCode:   400,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
@@ -228,11 +185,11 @@ func TestDoRequestAccepted(t *testing.T) {
 	fakeHandler.ValidateRequest(t, "/"+testapi.Version()+"/test", "GET", nil)
 }
 
-func TestDoRequestAcceptedSuccess(t *testing.T) {
+func TestDoRequestSuccess(t *testing.T) {
 	status := &api.Status{Status: api.StatusSuccess}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
-		StatusCode:   202,
+		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
@@ -338,11 +295,4 @@ func TestDoRequestCreated(t *testing.T) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
 	fakeHandler.ValidateRequest(t, "/"+testapi.Version()+"/test", "GET", nil)
-}
-
-func TestDefaultPoll(t *testing.T) {
-	c := &RESTClient{PollPeriod: 0}
-	if req, ok := c.DefaultPoll("test"); req != nil || ok {
-		t.Errorf("expected nil request and not poll")
-	}
 }

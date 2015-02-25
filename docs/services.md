@@ -3,7 +3,7 @@
 ## Overview
 
 Kubernetes [`Pods`](pods.md) are ephemeral.  They can come and go over time, especially when
-driven by things like [ReplicationControllers](replication-controller.md).
+driven by things like [`ReplicationControllers`](replication-controller.md).
 While each `pod` gets its own IP address, those IP addresses can not be relied
 upon to be stable over time.  This leads to a problem: if some set of `pods`
 (let's call them backends) provides functionality to other `pods` (let's call
@@ -28,8 +28,8 @@ enables this decoupling.
 
 ## Defining a service
 
-A `service` in Kubernetes is a REST object, similar to a `pod`.  Like a `pod` a
-`service` definitions can be POSTed to the apiserver to create a new instance.
+A `service` in Kubernetes is a REST object, similar to a `pod`.  Like a `pod`, a
+`service` definition can be POSTed to the apiserver to create a new instance.
 For example, suppose you have a set of `pods` that each expose port 9376 and
 carry a label "app=MyApp".
 
@@ -121,7 +121,7 @@ terms of the portal IP and port.  We will be adding DNS support for
 `services`, too.
 
 As an example, consider the image processing application described above.
-when the backend `services` is created, the Kubernetes master assigns a portal
+When the backend `service` is created, the Kubernetes master assigns a portal
 IP address, for example 10.0.0.1.  Assuming the `service` port is 1234, the
 portal is 10.0.0.1:1234.  The master stores that information, which is then
 observed by all of the `service proxy` instances in the cluster.  When a proxy
@@ -141,18 +141,18 @@ being aware of which `pods` they are accessing.
 ![Services detailed diagram](services_detail.png)
 
 ## External Services
-For some parts of your application (e.g. your frontend) you want to expose a service on an external (publically visible) IP address.
+For some parts of your application (e.g. frontend) you want to expose a service on an external (publically visible) IP address.
 
-If you want your service to be exposed on an external IP address, you can optionally supply a list of "publicIPs"
-which the service should respond to.  These IP address will be combined with the Service's port and will also be 
-mapped to the set of pods selected by the service.  You are then responsible for ensuring that traffic to that 
-external IP address gets sent to one or more kubernetes worker nodes. An IPTables rules on each host that maps
+If you want your service to be exposed on an external IP address, you can optionally supply a list of `publicIPs`
+which the `service` should respond to.  These IP address will be combined with the `service`'s port and will also be 
+mapped to the set of `pods` selected by the `service`.  You are then responsible for ensuring that traffic to that 
+external IP address gets sent to one or more Kubernetes worker nodes. An IPTables rules on each host that maps
 packets from the specified public IP address to the service proxy in the same manner as internal service IP
 addresses.
 
 On cloud providers which support external load balancers, there is a simpler way to achieve the same thing.  On such
 providers (e.g. GCE) you can leave ```publicIPs``` empty, and instead you can set the 
-```createExternalLoadBalancer``` flag on the service.  This sets up a cloud provider specific load balancer
+```createExternalLoadBalancer``` flag on the service.  This sets up a cloud-provider-specific load balancer
 (assuming that it is supported by your cloud provider) and populates the Public IP field with the appropriate value.
 
 ## Shortcomings

@@ -183,7 +183,10 @@ func TestServicesFromZeroError(t *testing.T) {
 }
 
 func TestEndpoints(t *testing.T) {
-	endpoint := api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}, Endpoints: []string{"127.0.0.1:9000"}}
+	endpoint := api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
+		Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 9000}},
+	}
 
 	fakeWatch := watch.NewFake()
 	fakeClient := &client.Fake{Watch: fakeWatch}
@@ -230,7 +233,10 @@ func TestEndpoints(t *testing.T) {
 }
 
 func TestEndpointsFromZero(t *testing.T) {
-	endpoint := api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}, Endpoints: []string{"127.0.0.1:9000"}}
+	endpoint := api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
+		Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 9000}},
+	}
 
 	fakeWatch := watch.NewFake()
 	fakeWatch.Stop()

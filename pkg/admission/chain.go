@@ -23,7 +23,8 @@ import (
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface
 
-// New returns an admission.Interface that will enforce admission control decisions
+// NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
+// the given plugins.
 func NewFromPlugins(client client.Interface, pluginNames []string, configFilePath string) Interface {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
@@ -36,7 +37,7 @@ func NewFromPlugins(client client.Interface, pluginNames []string, configFilePat
 }
 
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Admit(a Attributes) (err error) {
+func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 	for _, handler := range admissionHandler {
 		err := handler.Admit(a)
 		if err != nil {

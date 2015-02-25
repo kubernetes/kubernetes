@@ -23,29 +23,35 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+
+: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBE_CONFIG_FILE:="config-test.sh"}
+
+export KUBECTL KUBE_CONFIG_FILE
+
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+prepare-e2e
 
 GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
+echo "WARNING: this test is a no op that only attempts to launch guestbook resources."
 # Launch the guestbook example
-$KUBECFG -c "${GUESTBOOK}/redis-master.json" create /pods
-$KUBECFG -c "${GUESTBOOK}/redis-master-service.json" create /services
-$KUBECFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
+${KUBECTL} create -f "${GUESTBOOK}"
 
-sleep 5
+sleep 15
 
-POD_LIST_1=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
+POD_LIST_1=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
 echo "Pods running: ${POD_LIST_1}"
 
-$KUBECFG stop redisSlaveController
-# Needed until issue #103 gets fixed
-sleep 25
-$KUBECFG rm redisSlaveController
-$KUBECFG delete services/redis-master
-$KUBECFG delete pods/redis-master
+# TODO make this an actual test. Open up a firewall and use curl to post and
+# read a message via the frontend
 
-POD_LIST_2=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' list pods)
+${KUBECTL} stop -f "${GUESTBOOK}"
+
+POD_LIST_2=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
 echo "Pods running after shutdown: ${POD_LIST_2}"
 
 exit 0

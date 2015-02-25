@@ -42,3 +42,5 @@ network_closure.sh
 
 # also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+
+.tags*

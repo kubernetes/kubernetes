@@ -47,7 +47,7 @@ func (resourceDefaults) Admit(a admission.Attributes) (err error) {
 	}
 
 	// we only care about pods
-	if a.GetKind() != "pods" {
+	if a.GetResource() != "pods" {
 		return nil
 	}
 
@@ -55,11 +55,14 @@ func (resourceDefaults) Admit(a admission.Attributes) (err error) {
 	obj := a.GetObject()
 	pod := obj.(*api.Pod)
 	for index := range pod.Spec.Containers {
-		if pod.Spec.Containers[index].Memory.Value() == 0 {
-			pod.Spec.Containers[index].Memory = resource.MustParse(defaultMemory)
+		if pod.Spec.Containers[index].Resources.Limits == nil {
+			pod.Spec.Containers[index].Resources.Limits = api.ResourceList{}
 		}
-		if pod.Spec.Containers[index].CPU.Value() == 0 {
-			pod.Spec.Containers[index].CPU = resource.MustParse(defaultCPU)
+		if pod.Spec.Containers[index].Resources.Limits.Memory().Value() == 0 {
+			pod.Spec.Containers[index].Resources.Limits[api.ResourceMemory] = resource.MustParse(defaultMemory)
+		}
+		if pod.Spec.Containers[index].Resources.Limits.Cpu().Value() == 0 {
+			pod.Spec.Containers[index].Resources.Limits[api.ResourceCPU] = resource.MustParse(defaultCPU)
 		}
 	}
 	return nil

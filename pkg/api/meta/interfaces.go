@@ -94,6 +94,30 @@ type MetadataAccessor interface {
 	runtime.ResourceVersioner
 }
 
+type RESTScopeName string
+
+const (
+	RESTScopeNameNamespace RESTScopeName = "namespace"
+	RESTScopeNameRoot      RESTScopeName = "root"
+)
+
+// RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
+// TODO After we deprecate v1beta1 and v1beta2, we can look a supporting removing the flexibility of supporting
+// either a query or path param, and instead just support path param
+type RESTScope interface {
+	// Name of the scope
+	Name() RESTScopeName
+	// ParamName is the optional name of the parameter that should be inserted in the resource url
+	// If empty, no param will be inserted
+	ParamName() string
+	// ParamPath is a boolean that controls how the parameter is manifested in resource paths
+	// If true, this parameter is encoded in path (i.e. /{paramName}/{paramValue})
+	// If false, this parameter is encoded in query (i.e. ?{paramName}={paramValue})
+	ParamPath() bool
+	// ParamDescription is the optional description to use to document the parameter in api documentation
+	ParamDescription() string
+}
+
 // RESTMapping contains the information needed to deal with objects of a specific
 // resource and kind in a RESTful manner.
 type RESTMapping struct {
@@ -103,6 +127,9 @@ type RESTMapping struct {
 	// for convenience for passing around a consistent mapping.
 	APIVersion string
 	Kind       string
+
+	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
+	Scope RESTScope
 
 	runtime.Codec
 	runtime.ObjectConvertor

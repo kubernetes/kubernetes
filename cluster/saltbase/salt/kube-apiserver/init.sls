@@ -39,7 +39,7 @@
 {% endif %}
 
 {% if grains.cloud is defined %}
-{% if grains.cloud == 'gce' or grains.cloud == 'vagrant' %}
+{% if grains.cloud in ['aws', 'gce', 'vagrant'] %}
 # TODO: generate and distribute tokens on other cloud providers.
 /srv/kubernetes/known_tokens.csv:
   file.managed:

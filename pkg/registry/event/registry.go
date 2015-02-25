@@ -18,7 +18,6 @@ package event
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -28,17 +27,6 @@ import (
 // registry implements custom changes to generic.Etcd.
 type registry struct {
 	*etcdgeneric.Etcd
-	ttl uint64
-}
-
-// Create stores the object with a ttl, so that events don't stay in the system forever.
-func (r registry) Create(ctx api.Context, id string, obj runtime.Object) error {
-	key, err := r.Etcd.KeyFunc(ctx, id)
-	if err != nil {
-		return err
-	}
-	err = r.Etcd.Helper.CreateObj(key, obj, r.ttl)
-	return etcderr.InterpretCreateError(err, r.Etcd.EndpointName, id)
 }
 
 // NewEtcdRegistry returns a registry which will store Events in the given
@@ -55,8 +43,10 @@ func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
 				return etcdgeneric.NamespaceKeyFunc(ctx, "/registry/events", id)
 			},
+			TTLFunc: func(runtime.Object, bool) (uint64, error) {
+				return ttl, nil
+			},
 			Helper: h,
 		},
-		ttl: ttl,
 	}
 }

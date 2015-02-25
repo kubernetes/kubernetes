@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
@@ -41,7 +42,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
@@ -49,9 +49,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -65,24 +68,30 @@ import (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Client                 *client.Client
-	Cloud                  cloudprovider.Interface
-	EtcdHelper             tools.EtcdHelper
-	HealthCheckMinions     bool
-	EventTTL               time.Duration
-	MinionRegexp           string
-	KubeletClient          client.KubeletClient
-	PortalNet              *net.IPNet
-	EnableLogsSupport      bool
-	EnableUISupport        bool
-	EnableSwaggerSupport   bool
-	EnableV1Beta3          bool
+	Client            *client.Client
+	Cloud             cloudprovider.Interface
+	EtcdHelper        tools.EtcdHelper
+	EventTTL          time.Duration
+	MinionRegexp      string
+	KubeletClient     client.KubeletClient
+	PortalNet         *net.IPNet
+	EnableLogsSupport bool
+	EnableUISupport   bool
+	// allow downstream consumers to disable swagger
+	EnableSwaggerSupport bool
+	// allow v1beta3 to be conditionally enabled
+	EnableV1Beta3 bool
+	// allow downstream consumers to disable the index route
+	EnableIndex            bool
 	APIPrefix              string
 	CorsAllowedOriginList  util.StringList
 	Authenticator          authenticator.Request
 	Authorizer             authorizer.Authorizer
 	AdmissionControl       admission.Interface
 	MasterServiceNamespace string
+
+	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
+	RequestContextMapper api.RequestContextMapper
 
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
@@ -95,28 +104,23 @@ type Config struct {
 	// Defaults to 7080 if not set.
 	ReadOnlyPort int
 	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 443 if not set.
+	// Defaults to 6443 if not set.
 	ReadWritePort int
 
-	// If empty, the first result from net.InterfaceAddrs will be used.
-	PublicAddress string
+	// If nil, the first result from net.InterfaceAddrs will be used.
+	PublicAddress net.IP
+
+	// Control the interval that pod, node IP, and node heath status caches
+	// expire.
+	CacheTimeout time.Duration
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	podRegistry           pod.Registry
-	controllerRegistry    controller.Registry
-	serviceRegistry       service.Registry
-	endpointRegistry      endpoint.Registry
-	minionRegistry        minion.Registry
-	bindingRegistry       binding.Registry
-	eventRegistry         generic.Registry
-	limitRangeRegistry    generic.Registry
-	resourceQuotaRegistry resourcequota.Registry
-	storage               map[string]apiserver.RESTStorage
-	client                *client.Client
-	portalNet             *net.IPNet
+	client       *client.Client
+	portalNet    *net.IPNet
+	cacheTimeout time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -132,11 +136,27 @@ type Master struct {
 	admissionControl      admission.Interface
 	masterCount           int
 	v1beta3               bool
-	nodeIPCache           IPGetter
+	requestContextMapper  api.RequestContextMapper
 
-	readOnlyServer  string
-	readWriteServer string
-	masterServices  *util.Runner
+	publicIP             net.IP
+	publicReadOnlyPort   int
+	publicReadWritePort  int
+	serviceReadOnlyIP    net.IP
+	serviceReadOnlyPort  int
+	serviceReadWriteIP   net.IP
+	serviceReadWritePort int
+	masterServices       *util.Runner
+
+	// storage contains the RESTful endpoints exposed by this master
+	storage map[string]apiserver.RESTStorage
+
+	// registries are internal client APIs for accessing the storage layer
+	// TODO: define the internal typed interface in a way that clients can
+	// also be replaced
+	nodeRegistry      minion.Registry
+	namespaceRegistry generic.Registry
+	serviceRegistry   service.Registry
+	endpointRegistry  endpoint.Registry
 
 	// "Outputs"
 	Handler         http.Handler
@@ -175,9 +195,12 @@ func setDefaults(c *Config) {
 		c.ReadOnlyPort = 7080
 	}
 	if c.ReadWritePort == 0 {
-		c.ReadWritePort = 443
+		c.ReadWritePort = 6443
 	}
-	for c.PublicAddress == "" {
+	if c.CacheTimeout == 0 {
+		c.CacheTimeout = 5 * time.Second
+	}
+	for c.PublicAddress == nil {
 		// Find and use the first non-loopback address.
 		// TODO: potentially it'd be useful to skip the docker interface if it
 		// somehow is first in the list.
@@ -197,7 +220,7 @@ func setDefaults(c *Config) {
 				continue
 			}
 			found = true
-			c.PublicAddress = ip.String()
+			c.PublicAddress = ip
 			glog.Infof("Will report %v as public IP address.", ip)
 			break
 		}
@@ -206,6 +229,9 @@ func setDefaults(c *Config) {
 				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", addrs)
 			time.Sleep(5 * time.Second)
 		}
+	}
+	if c.RequestContextMapper == nil {
+		c.RequestContextMapper = api.NewRequestContextMapper()
 	}
 }
 
@@ -235,26 +261,22 @@ func setDefaults(c *Config) {
 //   any unhandled paths to "Handler".
 func New(c *Config) *Master {
 	setDefaults(c)
-	minionRegistry := makeMinionRegistry(c)
-	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
-	boundPodFactory := &pod.BasicBoundPodFactory{
-		ServiceRegistry:        serviceRegistry,
-		MasterServiceNamespace: c.MasterServiceNamespace,
-	}
 	if c.KubeletClient == nil {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
 
+	// Select the first two valid IPs from portalNet to use as the master service portalIPs
+	serviceReadOnlyIP, err := service.GetIndexedIP(c.PortalNet, 1)
+	if err != nil {
+		glog.Fatalf("Failed to generate service read-only IP for master service: %v", err)
+	}
+	serviceReadWriteIP, err := service.GetIndexedIP(c.PortalNet, 2)
+	if err != nil {
+		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
+	}
+	glog.Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
+
 	m := &Master{
-		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
-		serviceRegistry:       serviceRegistry,
-		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
-		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
-		minionRegistry:        minionRegistry,
-		limitRangeRegistry:    limitrange.NewEtcdRegistry(c.EtcdHelper),
-		resourceQuotaRegistry: resourcequota.NewEtcdRegistry(c.EtcdHelper),
 		client:                c.Client,
 		portalNet:             c.PortalNet,
 		rootWebService:        new(restful.WebService),
@@ -267,11 +289,20 @@ func New(c *Config) *Master {
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
 		v1beta3:               c.EnableV1Beta3,
-		nodeIPCache:           NewIPCache(c.Cloud, util.RealClock{}, 30*time.Second),
+		requestContextMapper:  c.RequestContextMapper,
 
-		masterCount:     c.MasterCount,
-		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
-		readWriteServer: net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
+		cacheTimeout: c.CacheTimeout,
+
+		masterCount:         c.MasterCount,
+		publicIP:            c.PublicAddress,
+		publicReadOnlyPort:  c.ReadOnlyPort,
+		publicReadWritePort: c.ReadWritePort,
+		serviceReadOnlyIP:   serviceReadOnlyIP,
+		// TODO: serviceReadOnlyPort should be passed in as an argument, it may not always be 80
+		serviceReadOnlyPort: 80,
+		serviceReadWriteIP:  serviceReadWriteIP,
+		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
+		serviceReadWritePort: 443,
 	}
 
 	if c.RestfulContainer != nil {
@@ -282,6 +313,8 @@ func New(c *Config) *Master {
 		m.mux = mux
 		m.handlerContainer = NewHandlerContainer(mux)
 	}
+	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
+	m.handlerContainer.Router(restful.CurlyRouter{})
 	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
 
 	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
@@ -330,59 +363,68 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 }
 
-func makeMinionRegistry(c *Config) minion.Registry {
-	var minionRegistry minion.Registry = etcd.NewRegistry(c.EtcdHelper, nil)
-	// TODO: plumb in nodeIPCache here
-	if c.HealthCheckMinions {
-		minionRegistry = minion.NewHealthyRegistry(minionRegistry, c.KubeletClient, util.RealClock{}, 20*time.Second)
-	}
-	return minionRegistry
-}
-
 // init initializes master.
 func (m *Master) init(c *Config) {
-	var userContexts = handlers.NewUserRequestContext()
-	var authenticator = c.Authenticator
 
-	nodeRESTStorage := minion.NewREST(m.minionRegistry)
+	boundPodFactory := &pod.BasicBoundPodFactory{}
+	podStorage, bindingStorage := podetcd.NewREST(c.EtcdHelper, boundPodFactory)
+	podRegistry := pod.NewRegistry(podStorage)
+
+	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
+	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
+	resourceQuotaRegistry := resourcequota.NewEtcdRegistry(c.EtcdHelper)
+	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
+	m.namespaceRegistry = namespace.NewEtcdRegistry(c.EtcdHelper)
+
+	// TODO: split me up into distinct storage registries
+	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry)
+
+	m.serviceRegistry = registry
+	m.endpointRegistry = registry
+	m.nodeRegistry = registry
+
+	nodeStorage := minion.NewREST(m.nodeRegistry)
+	// TODO: unify the storage -> registry and storage -> client patterns
+	nodeStorageClient := RESTStorageToNodes(nodeStorage)
 	podCache := NewPodCache(
-		m.nodeIPCache,
 		c.KubeletClient,
-		RESTStorageToNodes(nodeRESTStorage).Nodes(),
-		m.podRegistry,
+		nodeStorageClient.Nodes(),
+		podRegistry,
 	)
-	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
+	go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
+	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
+
+	// TODO: refactor podCache to sit on top of podStorage via status calls
+	podStorage = podStorage.WithPodStatus(podCache)
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods": pod.NewREST(&pod.RESTConfig{
-			PodCache: podCache,
-			Registry: m.podRegistry,
-		}),
-		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
+		"pods":     podStorage,
+		"bindings": bindingStorage,
+
+		"replicationControllers": controller.NewREST(registry, podRegistry),
+		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
-		"minions":                nodeRESTStorage,
-		"nodes":                  nodeRESTStorage,
-		"events":                 event.NewREST(m.eventRegistry),
+		"minions":                nodeStorage,
+		"nodes":                  nodeStorage,
+		"events":                 event.NewREST(eventRegistry),
 
-		// TODO: should appear only in scheduler API group.
-		"bindings": binding.NewREST(m.bindingRegistry),
-
-		"limitRanges":         limitrange.NewREST(m.limitRangeRegistry),
-		"resourceQuotas":      resourcequota.NewREST(m.resourceQuotaRegistry),
-		"resourceQuotaUsages": resourcequotausage.NewREST(m.resourceQuotaRegistry),
+		"limitRanges":         limitrange.NewREST(limitRangeRegistry),
+		"resourceQuotas":      resourcequota.NewREST(resourceQuotaRegistry),
+		"resourceQuotaUsages": resourcequotausage.NewREST(resourceQuotaRegistry),
+		"namespaces":          namespace.NewREST(m.namespaceRegistry),
+		"secrets":             secret.NewREST(secretRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta1"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta1: %v", err)
 	}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta2"); err != nil {
+	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
 	if c.EnableV1Beta3 {
-		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, m.muxHelper, c.APIPrefix, "v1beta3"); err != nil {
+		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
@@ -393,7 +435,10 @@ func (m *Master) init(c *Config) {
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
+	// Allow master to be embedded in contexts which already have something registered at the root
+	if c.EnableIndex {
+		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
+	}
 
 	// TODO: use go-restful
 	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
@@ -423,12 +468,16 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts)
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
-	if authenticator != nil {
-		handler = handlers.NewRequestAuthenticator(userContexts, authenticator, handlers.Unauthorized, handler)
+	if c.Authenticator != nil {
+		authenticatedHandler, err := handlers.NewRequestAuthenticator(m.requestContextMapper, c.Authenticator, handlers.Unauthorized, handler)
+		if err != nil {
+			glog.Fatalf("Could not initialize authenticator: %v", err)
+		}
+		handler = authenticatedHandler
 	}
 
 	// Install root web services
@@ -439,6 +488,19 @@ func (m *Master) init(c *Config) {
 
 	if m.enableSwaggerSupport {
 		m.InstallSwaggerAPI()
+	}
+
+	// After all wrapping is done, put a context filter around both handlers
+	if handler, err := api.NewRequestContextFilter(m.requestContextMapper, m.Handler); err != nil {
+		glog.Fatalf("Could not initialize request context filter: %v", err)
+	} else {
+		m.Handler = handler
+	}
+
+	if handler, err := api.NewRequestContextFilter(m.requestContextMapper, m.InsecureHandler); err != nil {
+		glog.Fatalf("Could not initialize request context filter: %v", err)
+	} else {
+		m.InsecureHandler = handler
 	}
 
 	// TODO: Attempt clean shutdown?
@@ -452,7 +514,7 @@ func (m *Master) init(c *Config) {
 func (m *Master) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
-		WebServicesUrl: m.readWriteServer,
+		WebServicesUrl: net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadWritePort)),
 		WebServices:    m.handlerContainer.RegisteredWebServices(),
 		// TODO: Parameterize the path?
 		ApiPath:         "/swaggerapi/",
@@ -489,7 +551,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		}
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
 	}
-	nodes, err := m.minionRegistry.ListMinions(api.NewDefaultContext())
+	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext())
 	if err != nil {
 		glog.Errorf("Failed to list minions: %v", err)
 	}
@@ -500,25 +562,25 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 }
 
 // api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, api.RequestContextMapper, meta.RESTMapper) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta1.Codec, "/api/v1beta1", latest.SelfLinker, m.admissionControl
+	return storage, v1beta1.Codec, "api", "/api/v1beta1", latest.SelfLinker, m.admissionControl, m.requestContextMapper, latest.RESTMapper
 }
 
 // api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, api.RequestContextMapper, meta.RESTMapper) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker, m.admissionControl
+	return storage, v1beta2.Codec, "api", "/api/v1beta2", latest.SelfLinker, m.admissionControl, m.requestContextMapper, latest.RESTMapper
 }
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker, admission.Interface) {
+func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, api.RequestContextMapper, meta.RESTMapper) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		if k == "minions" {
@@ -526,5 +588,5 @@ func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec,
 		}
 		storage[strings.ToLower(k)] = v
 	}
-	return storage, v1beta3.Codec, "/api/v1beta3", latest.SelfLinker, m.admissionControl
+	return storage, v1beta3.Codec, "api", "/api/v1beta3", latest.SelfLinker, m.admissionControl, m.requestContextMapper, latest.RESTMapper
 }

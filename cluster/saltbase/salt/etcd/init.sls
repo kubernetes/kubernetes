@@ -10,10 +10,10 @@
 #    shasum <tar>
 # 6. Update this file with new tar version and new hash
 
-{% set etcd_version="v0.4.6" %}
+{% set etcd_version="v2.0.0" %}
 {% set etcd_tar_url="https://storage.googleapis.com/kubernetes-release/etcd/etcd-%s-linux-amd64.tar.gz"
   | format(etcd_version)  %}
-{% set etcd_tar_hash="sha1=5db514e30b9f340eda00671230d5136855ae14d7" %}
+{% set etcd_tar_hash="sha1=b3cd41d1748bf882a58a98c9585fd5849b943811" %}
 
 etcd-tar:
   archive:
@@ -24,7 +24,9 @@ etcd-tar:
     - source_hash: {{ etcd_tar_hash }}
     - archive_format: tar
     - if_missing: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
+{% if grains['saltversioninfo'] <= (2014, 7, 0, 0) %}
     - tar_options: xz
+{% endif %}
   file.directory:
     - name: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
     - user: root
@@ -82,6 +84,15 @@ etcd:
       - user: etcd
       - group: etcd
 
+/var/etcd/data:
+  file.directory:
+    - user: etcd
+    - group: etcd
+    - dir_mode: 700
+    - require:
+      - user: etcd
+      - group: etcd
+
 {% if grains['os_family'] == 'RedHat' %}
 
 /etc/default/etcd:
@@ -123,6 +134,7 @@ etcd-service:
       - file: etcd-symlink
     - require:
       - file: /var/etcd
+      - file: /var/etcd/data
       - user: etcd
       - group: etcd
 

@@ -47,14 +47,17 @@ type AuthOverrideFlags struct {
 	ClientCertificate string
 	ClientKey         string
 	Token             string
+	Username          string
+	Password          string
 }
 
 // ContextOverrideFlags holds the flag names to be used for binding command line flags for Cluster objects
 type ContextOverrideFlags struct {
-	ClusterName   string
-	AuthInfoName  string
-	Namespace     string
-	NamespacePath string
+	ClusterName  string
+	AuthInfoName string
+	Namespace    string
+	// allow the potential for shorter namespace flags for commands that tend to work across namespaces
+	NamespaceShort string
 }
 
 // ClusterOverride holds the flag names to be used for binding command line flags for Cluster objects
@@ -67,19 +70,20 @@ type ClusterOverrideFlags struct {
 }
 
 const (
-	FlagClusterName   = "cluster"
-	FlagAuthInfoName  = "user"
-	FlagContext       = "context"
-	FlagNamespace     = "namespace"
-	FlagNamespacePath = "ns-path"
-	FlagAPIServer     = "server"
-	FlagAPIVersion    = "api-version"
-	FlagAuthPath      = "auth-path"
-	FlagInsecure      = "insecure-skip-tls-verify"
-	FlagCertFile      = "client-certificate"
-	FlagKeyFile       = "client-key"
-	FlagCAFile        = "certificate-authority"
-	FlagBearerToken   = "token"
+	FlagClusterName  = "cluster"
+	FlagAuthInfoName = "user"
+	FlagContext      = "context"
+	FlagNamespace    = "namespace"
+	FlagAPIServer    = "server"
+	FlagAPIVersion   = "api-version"
+	FlagAuthPath     = "auth-path"
+	FlagInsecure     = "insecure-skip-tls-verify"
+	FlagCertFile     = "client-certificate"
+	FlagKeyFile      = "client-key"
+	FlagCAFile       = "certificate-authority"
+	FlagBearerToken  = "token"
+	FlagUsername     = "username"
+	FlagPassword     = "password"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -89,6 +93,8 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientCertificate: prefix + FlagCertFile,
 		ClientKey:         prefix + FlagKeyFile,
 		Token:             prefix + FlagBearerToken,
+		Username:          prefix + FlagUsername,
+		Password:          prefix + FlagPassword,
 	}
 }
 
@@ -115,10 +121,9 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 // RecommendedContextOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
-		ClusterName:   prefix + FlagClusterName,
-		AuthInfoName:  prefix + FlagAuthInfoName,
-		Namespace:     prefix + FlagNamespace,
-		NamespacePath: prefix + FlagNamespacePath,
+		ClusterName:  prefix + FlagClusterName,
+		AuthInfoName: prefix + FlagAuthInfoName,
+		Namespace:    prefix + FlagNamespace,
 	}
 }
 
@@ -128,11 +133,13 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flags.StringVar(&authInfo.ClientCertificate, flagNames.ClientCertificate, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.ClientKey, flagNames.ClientKey, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.Token, flagNames.Token, "", "Bearer token for authentication to the API server.")
+	flags.StringVar(&authInfo.Username, flagNames.Username, "", "Username for basic authentication to the API server.")
+	flags.StringVar(&authInfo.Password, flagNames.Password, "", "Password for basic authentication to the API server.")
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
-	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address of the Kubernetes API server")
+	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address and port of the Kubernetes API server")
 	flags.StringVar(&clusterInfo.APIVersion, flagNames.APIVersion, "", "The API version to use when talking to the server")
 	flags.StringVar(&clusterInfo.CertificateAuthority, flagNames.CertificateAuthority, "", "Path to a cert. file for the certificate authority.")
 	flags.BoolVar(&clusterInfo.InsecureSkipTLSVerify, flagNames.InsecureSkipTLSVerify, false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
@@ -150,6 +157,5 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 func BindContextFlags(contextInfo *clientcmdapi.Context, flags *pflag.FlagSet, flagNames ContextOverrideFlags) {
 	flags.StringVar(&contextInfo.Cluster, flagNames.ClusterName, "", "The name of the kubeconfig cluster to use")
 	flags.StringVar(&contextInfo.AuthInfo, flagNames.AuthInfoName, "", "The name of the kubeconfig user to use")
-	flags.StringVar(&contextInfo.Namespace, flagNames.Namespace, "", "If present, the namespace scope for this CLI request.")
-	flags.StringVar(&contextInfo.NamespacePath, flagNames.NamespacePath, "", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
+	flags.StringVarP(&contextInfo.Namespace, flagNames.Namespace, flagNames.NamespaceShort, "", "If present, the namespace scope for this CLI request.")
 }

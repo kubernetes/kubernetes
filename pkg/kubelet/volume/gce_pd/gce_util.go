@@ -21,25 +21,20 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/golang/glog"
 )
-
-const partitionRegex = "[a-z][a-z]*(?P<partition>[0-9][0-9]*)?"
-
-var regexMatcher = regexp.MustCompile(partitionRegex)
 
 type GCEDiskUtil struct{}
 
 // Attaches a disk specified by a volume.GCEPersistentDisk to the current kubelet.
 // Mounts the disk to it's global path.
-func (util *GCEDiskUtil) AttachDisk(pd *gcePersistentDisk) error {
+func (util *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
 	gce, err := cloudprovider.GetCloudProvider("gce", nil)
 	if err != nil {
 		return err
@@ -71,7 +66,7 @@ func (util *GCEDiskUtil) AttachDisk(pd *gcePersistentDisk) error {
 		}
 		time.Sleep(time.Second)
 	}
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
+
 	// Only mount the PD globally once.
 	mountpoint, err := isMountPoint(globalPDPath)
 	if err != nil {
@@ -85,57 +80,63 @@ func (util *GCEDiskUtil) AttachDisk(pd *gcePersistentDisk) error {
 		}
 	}
 	if !mountpoint {
-		err = pd.mounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
+		err = pd.diskMounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
 		if err != nil {
-			os.RemoveAll(globalPDPath)
+			os.Remove(globalPDPath)
 			return err
 		}
 	}
 	return nil
 }
 
-func getDeviceName(devicePath, canonicalDevicePath string) (string, error) {
-	isMatch := regexMatcher.MatchString(path.Base(canonicalDevicePath))
-	if !isMatch {
-		return "", fmt.Errorf("unexpected device: %s", canonicalDevicePath)
-	}
-	if isMatch {
-		result := make(map[string]string)
-		substrings := regexMatcher.FindStringSubmatch(path.Base(canonicalDevicePath))
-		for i, label := range regexMatcher.SubexpNames() {
-			result[label] = substrings[i]
-		}
-		partition := result["partition"]
-		devicePath = strings.TrimSuffix(devicePath, "-part"+partition)
-	}
-	return strings.TrimPrefix(path.Base(devicePath), "google-"), nil
-}
-
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-// Expects a GCE device path symlink. Ex: /dev/disk/by-id/google-mydisk-part1
-func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk, devicePath string) error {
-	// Follow the symlink to the actual device path.
-	canonicalDevicePath, err := filepath.EvalSymlinks(devicePath)
-	if err != nil {
-		return err
-	}
-	deviceName, err := getDeviceName(devicePath, canonicalDevicePath)
-	if err != nil {
-		return err
-	}
-	globalPDPath := makeGlobalPDName(pd.plugin.host, deviceName, pd.readOnly)
+func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk) error {
+	// Unmount the global PD mount, which should be the only one.
+	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
 	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(globalPDPath); err != nil {
+	if err := os.Remove(globalPDPath); err != nil {
 		return err
 	}
+	// Detach the disk
 	gce, err := cloudprovider.GetCloudProvider("gce", nil)
 	if err != nil {
 		return err
 	}
-	if err := gce.(*gce_cloud.GCECloud).DetachDisk(deviceName); err != nil {
+	if err := gce.(*gce_cloud.GCECloud).DetachDisk(pd.pdName); err != nil {
 		return err
 	}
 	return nil
+}
+
+// safe_format_and_mount is a utility script on GCE VMs that probes a persistent disk, and if
+// necessary formats it before mounting it.
+// This eliminates the necesisty to format a PD before it is used with a Pod on GCE.
+// TODO: port this script into Go and use it for all Linux platforms
+type gceSafeFormatAndMount struct {
+	mount.Interface
+	runner exec.Interface
+}
+
+// uses /usr/share/google/safe_format_and_mount to optionally mount, and format a disk
+func (mounter *gceSafeFormatAndMount) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	// Don't attempt to format if mounting as readonly. Go straight to mounting.
+	if (flags & mount.FlagReadOnly) != 0 {
+		return mounter.Interface.Mount(source, target, fstype, flags, data)
+	}
+	args := []string{}
+	// ext4 is the default for safe_format_and_mount
+	if len(fstype) > 0 && fstype != "ext4" {
+		args = append(args, "-m", fmt.Sprintf("mkfs.%s", fstype))
+	}
+	args = append(args, source, target)
+	// TODO: Accept other options here?
+	glog.V(5).Infof("exec-ing: /usr/share/google/safe_format_and_mount %v", args)
+	cmd := mounter.runner.Command("/usr/share/google/safe_format_and_mount", args...)
+	dataOut, err := cmd.CombinedOutput()
+	if err != nil {
+		glog.V(5).Infof("error running /usr/share/google/safe_format_and_mount\n%s", string(dataOut))
+	}
+	return err
 }

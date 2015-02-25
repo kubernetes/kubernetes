@@ -229,7 +229,8 @@ func TestCreateReplica(t *testing.T) {
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Labels: controllerSpec.Spec.Template.Labels,
+			Labels:       controllerSpec.Spec.Template.Labels,
+			GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
@@ -238,7 +239,7 @@ func TestCreateReplica(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !api.Semantic.DeepEqual(&expectedPod, actualPod) {
+	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
 		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}
@@ -350,7 +351,7 @@ func TestWatchControllers(t *testing.T) {
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})
 	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
-		if !api.Semantic.DeepEqual(controllerSpec, testControllerSpec) {
+		if !api.Semantic.DeepDerivative(controllerSpec, testControllerSpec) {
 			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
 		}
 		close(received)

@@ -83,6 +83,9 @@ func ExtractList(obj Object) ([]Object, error) {
 	return list, nil
 }
 
+// objectSliceType is the type of a slice of Objects
+var objectSliceType = reflect.TypeOf([]Object{})
+
 // SetList sets the given list object's Items member have the elements given in
 // objects.
 // Returns an error if list is not a List type (does not have an Items member),
@@ -95,6 +98,10 @@ func SetList(list Object, objects []Object) error {
 	items, err := conversion.EnforcePtr(itemsPtr)
 	if err != nil {
 		return err
+	}
+	if items.Type() == objectSliceType {
+		items.Set(reflect.ValueOf(objects))
+		return nil
 	}
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
@@ -113,4 +120,28 @@ func SetList(list Object, objects []Object) error {
 	}
 	items.Set(slice)
 	return nil
+}
+
+// fieldPtr puts the address of fieldName, which must be a member of v,
+// into dest, which must be an address of a variable to which this field's
+// address can be assigned.
+func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+	}
+	v, err := conversion.EnforcePtr(dest)
+	if err != nil {
+		return err
+	}
+	field = field.Addr()
+	if field.Type().AssignableTo(v.Type()) {
+		v.Set(field)
+		return nil
+	}
+	if field.Type().ConvertibleTo(v.Type()) {
+		v.Set(field.Convert(v.Type()))
+		return nil
+	}
+	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
 }

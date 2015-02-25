@@ -35,9 +35,9 @@ import (
 )
 
 var (
-	PodLister     = &cache.StoreToPodLister{cache.NewStore()}
-	MinionLister  = &cache.StoreToNodeLister{cache.NewStore()}
-	ServiceLister = &cache.StoreToServiceLister{cache.NewStore()}
+	PodLister     = &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	MinionLister  = &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	ServiceLister = &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -57,7 +57,7 @@ type ConfigFactory struct {
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
 		Client:        client,
-		PodQueue:      cache.NewFIFO(),
+		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		PodLister:     PodLister,
 		MinionLister:  MinionLister,
 		ServiceLister: ServiceLister,
@@ -143,11 +143,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 // createUnassignedPodLW returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-		Resource:      "pods",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{"DesiredState.Host": ""}.AsSelector())
 }
 
 func parseSelectorOrDie(s string) labels.Selector {
@@ -162,20 +158,12 @@ func parseSelectorOrDie(s string) labels.Selector {
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie("DesiredState.Host!="),
-		Resource:      "pods",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, parseSelectorOrDie("DesiredState.Host!="))
 }
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
 func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie(""),
-		Resource:      "minions",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "minions", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 // pollMinions lists all minions and filter out unhealthy ones, then returns
@@ -191,10 +179,10 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 		ListMeta: allNodes.ListMeta,
 	}
 	for _, node := range allNodes.Items {
-		conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
+		conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 		for i := range node.Status.Conditions {
 			cond := node.Status.Conditions[i]
-			conditionMap[cond.Kind] = &cond
+			conditionMap[cond.Type] = &cond
 		}
 		if condition, ok := conditionMap[api.NodeReady]; ok {
 			if condition.Status == api.ConditionFull {
@@ -205,9 +193,8 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 				nodes.Items = append(nodes.Items, node)
 			}
 		} else {
-			// If no condition is set, either node health check is disabled (master
-			// flag "healthCheckMinions" is set to false), or we get unknown condition.
-			// In such cases, we add nodes unconditionally.
+			// If no condition is set, we get unknown node condition. In such cases,
+			// we add nodes unconditionally.
 			nodes.Items = append(nodes.Items, node)
 		}
 	}
@@ -216,11 +203,7 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 
 // createServiceLW returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie(""),
-		Resource:      "services",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
@@ -242,7 +225,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				return
 			}
 			if pod.Status.Host == "" {
-				podQueue.Add(pod.Name, pod)
+				podQueue.Add(pod)
 			}
 		}()
 	}
@@ -262,8 +245,8 @@ func (ne *nodeEnumerator) Len() int {
 }
 
 // Get returns the item (and ID) with the particular index.
-func (ne *nodeEnumerator) Get(index int) (string, interface{}) {
-	return ne.Items[index].Name, &ne.Items[index]
+func (ne *nodeEnumerator) Get(index int) interface{} {
+	return &ne.Items[index]
 }
 
 type binder struct {
@@ -274,7 +257,7 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Post().Namespace(api.Namespace(ctx)).Resource("bindings").Body(binding).Do().Error()
+	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 }
 
 type clock interface {

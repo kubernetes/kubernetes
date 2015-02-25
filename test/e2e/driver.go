@@ -17,8 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"path"
-	"time"
+	"regexp"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -30,43 +32,56 @@ import (
 
 type testResult bool
 
+type GCEConfig struct {
+	ProjectID  string
+	Zone       string
+	MasterName string
+}
+
+func init() {
+	// Turn on verbose by default to get spec names
+	config.DefaultReporterConfig.Verbose = true
+
+	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
+	config.GinkgoConfig.EmitSpecProgress = true
+
+	// Randomize specs as well as suites
+	config.GinkgoConfig.RandomizeAllSpecs = true
+}
+
 func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
-func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed int64, times int, reportDir string, testList []string) {
-	testContext = testContextType{authConfig, certDir, host, repoRoot, provider}
+func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
+	testContext = testContextType{authConfig, certDir, host, repoRoot, provider, *gceConfig}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	// TODO: Associate a timeout with each test individually.
-	go func() {
-		defer util.FlushLogs()
-		// TODO: We should modify testSpec to include an estimated running time
-		//       for each test and use that information to estimate a timeout
-		//       value. Until then, as we add more tests (and before we move to
-		//       parallel testing) we need to adjust this value as we add more tests.
-		time.Sleep(15 * time.Minute)
-		glog.Fatalf("This test has timed out. Cleanup not guaranteed.")
-	}()
+	if len(testList) != 0 {
+		if config.GinkgoConfig.FocusString != "" || config.GinkgoConfig.SkipString != "" {
+			glog.Fatal("Either specify --test/-t or --ginkgo.focus/--ginkgo.skip but not both.")
+		}
+		var testRegexps []string
+		for _, t := range testList {
+			testRegexps = append(testRegexps, regexp.QuoteMeta(t))
+		}
+		config.GinkgoConfig.FocusString = `\b(` + strings.Join(testRegexps, "|") + `)\b`
+	}
 
-	// TODO: Make -t TestName work again.
-	// TODO: Make "times" work again.
 	// TODO: Make orderseed work again.
 
 	var passed testResult = true
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	// Turn of colors for now to make it easier to collect console output in Jenkins
-	config.DefaultReporterConfig.NoColor = true
-	var r []ginkgo.Reporter
-	if reportDir != "" {
-		// TODO: When we start using parallel tests we need to change this to "junit_%d.xml",
-		// see ginkgo docs for more details.
-		r = append(r, reporters.NewJUnitReporter(path.Join(reportDir, "junit.xml")))
-	}
 	// Run the existing tests with output to console + JUnit for Jenkins
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, "Kubernetes e2e Suite", r)
+	for i := 0; i < times && passed; i++ {
+		var r []ginkgo.Reporter
+		if reportDir != "" {
+			r = append(r, reporters.NewJUnitReporter(path.Join(reportDir, fmt.Sprintf("junit_%d.xml", i+1))))
+		}
+		ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, fmt.Sprintf("Kubernetes e2e Suite run %d of %d", i+1, times), r)
+	}
 
 	if !passed {
 		glog.Fatalf("At least one test failed")

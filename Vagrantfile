@@ -50,8 +50,11 @@ else # sorry Windows folks, I can't help you
   $vm_cpus = 2
 end
 
-# Give VM 512MB of RAM
-$vm_mem = 512
+# Give VM 1024MB of RAM
+# In Fedora VM, tmpfs device is mapped to /tmp.  tmpfs is given 50% of RAM allocation.
+# When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
+# This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
+$vm_mem = 1024
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def customize_vm(config)
@@ -69,12 +72,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   end
 
   # Kubernetes master
-  config.vm.define "master" do |config|
-    customize_vm config
-
-    config.vm.provision "shell", run: "always", path: "#{ENV['KUBE_TEMP']}/master-start.sh"
-    config.vm.network "private_network", ip: "#{$master_ip}"
-    config.vm.hostname = ENV['MASTER_NAME']
+  config.vm.define "master" do |c|
+    customize_vm c
+    if ENV['KUBE_TEMP'] then
+      script = "#{ENV['KUBE_TEMP']}/master-start.sh"
+      c.vm.provision "shell", run: "always", path: script
+    end
+    c.vm.network "private_network", ip: "#{$master_ip}"
+    c.vm.hostname = ENV['MASTER_NAME']
   end
 
   # Kubernetes minion
@@ -84,10 +89,12 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
       minion_index = n+1
       minion_ip = $minion_ips[n]
-      minion.vm.provision "shell", run: "always", path: "#{ENV['KUBE_TEMP']}/minion-start-#{n}.sh"
+      if ENV['KUBE_TEMP'] then
+        script = "#{ENV['KUBE_TEMP']}/minion-start-#{n}.sh"
+        minion.vm.provision "shell", run: "always", path: script
+      end
       minion.vm.network "private_network", ip: "#{minion_ip}"
       minion.vm.hostname = "#{ENV['INSTANCE_PREFIX']}-minion-#{minion_index}"
     end
   end
-
 end

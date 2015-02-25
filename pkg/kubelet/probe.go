@@ -19,6 +19,9 @@ package kubelet
 import (
 	"fmt"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -29,32 +32,60 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 
+	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
-var (
-	execprober = execprobe.New()
-	httprober  = httprobe.New()
-	tcprober   = tcprobe.New()
-)
+const maxProbeRetries = 3
 
-func (kl *Kubelet) probeContainer(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Status, error) {
+// probeContainer executes the given probe on a container and returns the result.
+// If the probe is nil this returns Success. If the probe's initial delay has not passed
+// since the creation of the container, this returns the defaultResult. It will then attempt
+// to execute the probe repeatedly up to maxProbeRetries times, and return on the first
+// successful result, else returning the last unsucessful result and error.
+func (kl *Kubelet) probeContainer(p *api.Probe,
+	podFullName string,
+	podUID types.UID,
+	status api.PodStatus,
+	container api.Container,
+	dockerContainer *docker.APIContainers,
+	defaultResult probe.Result) (probe.Result, error) {
+	var err error
+	result := probe.Unknown
+	if p == nil {
+		return probe.Success, nil
+	}
+	if time.Now().Unix()-dockerContainer.Created < p.InitialDelaySeconds {
+		return defaultResult, nil
+	}
+	for i := 0; i < maxProbeRetries; i++ {
+		result, err = kl.runProbe(p, podFullName, podUID, status, container)
+		if result == probe.Success {
+			return result, err
+		}
+	}
+	return result, err
+}
+
+func (kl *Kubelet) runProbe(p *api.Probe, podFullName string, podUID types.UID, status api.PodStatus, container api.Container) (probe.Result, error) {
+	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
-		return execprober.Probe(kl.newExecInContainer(podFullName, podUID, container))
+		return kl.prober.exec.Probe(kl.newExecInContainer(podFullName, podUID, container))
 	}
 	if p.HTTPGet != nil {
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return httprober.Probe(extractGetParams(p.HTTPGet, status, port))
+		host, port, path := extractGetParams(p.HTTPGet, status, port)
+		return kl.prober.http.Probe(host, port, path, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
 		if err != nil {
 			return probe.Unknown, err
 		}
-		return tcprober.Probe(status.PodIP, port)
+		return kl.prober.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)
 	return probe.Unknown, nil
@@ -122,4 +153,56 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 
 func (eic execInContainer) SetDir(dir string) {
 	//unimplemented
+}
+
+// This will eventually maintain info about probe results over time
+// to allow for implementation of health thresholds
+func newReadinessStates() *readinessStates {
+	return &readinessStates{states: make(map[string]bool)}
+}
+
+type readinessStates struct {
+	// guards states
+	sync.RWMutex
+	states map[string]bool
+}
+
+func (r *readinessStates) IsReady(c api.ContainerStatus) bool {
+	if c.State.Running == nil {
+		return false
+	}
+	return r.get(strings.TrimPrefix(c.ContainerID, "docker://"))
+}
+
+func (r *readinessStates) get(key string) bool {
+	r.RLock()
+	defer r.RUnlock()
+	state, found := r.states[key]
+	return state && found
+}
+
+func (r *readinessStates) set(key string, value bool) {
+	r.Lock()
+	defer r.Unlock()
+	r.states[key] = value
+}
+
+func (r *readinessStates) remove(key string) {
+	r.Lock()
+	defer r.Unlock()
+	delete(r.states, key)
+}
+
+func newProbeHolder() probeHolder {
+	return probeHolder{
+		exec: execprobe.New(),
+		http: httprobe.New(),
+		tcp:  tcprobe.New(),
+	}
+}
+
+type probeHolder struct {
+	exec execprobe.ExecProber
+	http httprobe.HTTPProber
+	tcp  tcprobe.TCPProber
 }

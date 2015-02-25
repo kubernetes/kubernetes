@@ -49,6 +49,12 @@ func newPodList(count int) *api.PodList {
 			},
 			Status: api.PodStatus{
 				PodIP: "1.2.3.4",
+				Conditions: []api.PodCondition{
+					{
+						Type:   api.PodReady,
+						Status: api.ConditionFull,
+					},
+				},
 			},
 		})
 	}
@@ -239,7 +245,72 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Endpoints: []string{"6.7.8.9:1000"},
+			Protocol:  api.ProtocolTCP,
+			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
+		}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
+func TestSyncEndpointsProtocolTCP(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{},
+					Protocol: api.ProtocolTCP,
+				},
+			},
+		},
+	}
+	testServer, endpointsHandler := makeTestServer(t,
+		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				ResourceVersion: "1",
+			},
+			Protocol:  api.ProtocolTCP,
+			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
+		}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
+func TestSyncEndpointsProtocolUDP(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{},
+					Protocol: api.ProtocolUDP,
+				},
+			},
+		},
+	}
+	testServer, endpointsHandler := makeTestServer(t,
+		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				ResourceVersion: "1",
+			},
+			Protocol:  api.ProtocolUDP,
+			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -254,7 +325,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{},
 				},
@@ -269,7 +340,8 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Endpoints: []string{},
+			Protocol:  api.ProtocolTCP,
+			Endpoints: []api.Endpoint{},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -282,16 +354,17 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Endpoints: []string{"1.2.3.4:8080"},
+		Protocol:  api.ProtocolTCP,
+		Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=other", "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -308,7 +381,8 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Endpoints: []string{"6.7.8.9:1000"},
+			Protocol:  api.ProtocolTCP,
+			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -321,16 +395,17 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Endpoints: []string{"1.2.3.4:8080"},
+		Protocol:  api.ProtocolTCP,
+		Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=bar", "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -346,7 +421,8 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Endpoints: []string{"1.2.3.4:8080"},
+			Protocol:  api.ProtocolTCP,
+			Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -354,14 +430,14 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "GET", nil)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=default", "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -384,9 +460,10 @@ func TestSyncEndpointsItems(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			ResourceVersion: "",
 		},
-		Endpoints: []string{"1.2.3.4:8080"},
+		Protocol:  api.ProtocolTCP,
+		Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints", "POST", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints?namespace=other", "POST", &data)
 }
 
 func TestSyncEndpointsPodError(t *testing.T) {

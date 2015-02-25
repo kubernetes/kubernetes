@@ -17,6 +17,8 @@ limitations under the License.
 package registrytest
 
 import (
+	"sync"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -26,28 +28,47 @@ import (
 type ControllerRegistry struct {
 	Err         error
 	Controllers *api.ReplicationControllerList
+	sync.Mutex
+}
+
+func (r *ControllerRegistry) SetError(err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Err = err
 }
 
 func (r *ControllerRegistry) ListControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
+	r.Lock()
+	defer r.Unlock()
 	return r.Controllers, r.Err
 }
 
 func (r *ControllerRegistry) GetController(ctx api.Context, ID string) (*api.ReplicationController, error) {
+	r.Lock()
+	defer r.Unlock()
 	return &api.ReplicationController{}, r.Err
 }
 
 func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
+	r.Lock()
+	defer r.Unlock()
 	return r.Err
 }
 
 func (r *ControllerRegistry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
+	r.Lock()
+	defer r.Unlock()
 	return r.Err
 }
 
 func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error {
+	r.Lock()
+	defer r.Unlock()
 	return r.Err
 }
 
 func (r *ControllerRegistry) WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	r.Lock()
+	defer r.Unlock()
 	return nil, r.Err
 }

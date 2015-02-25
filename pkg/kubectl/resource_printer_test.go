@@ -305,7 +305,7 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 }
 
 func TestTemplatePanic(t *testing.T) {
-	tmpl := `{{and ((index .currentState.info "update-demo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
+	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
 	printer, err := NewTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
@@ -328,18 +328,18 @@ func TestTemplateStrings(t *testing.T) {
 	}{
 		"nilInfo":   {api.Pod{}, "false"},
 		"emptyInfo": {api.Pod{Status: api.PodStatus{Info: api.PodInfo{}}}, "false"},
-		"containerExists": {
+		"fooExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"update-demo": api.ContainerStatus{}},
+					Info: api.PodInfo{"foo": api.ContainerStatus{}},
 				},
 			},
 			"false",
 		},
-		"netExists": {
+		"barExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"POD": api.ContainerStatus{}},
+					Info: api.PodInfo{"bar": api.ContainerStatus{}},
 				},
 			},
 			"false",
@@ -348,8 +348,8 @@ func TestTemplateStrings(t *testing.T) {
 			api.Pod{
 				Status: api.PodStatus{
 					Info: api.PodInfo{
-						"update-demo": api.ContainerStatus{},
-						"POD":         api.ContainerStatus{},
+						"foo": api.ContainerStatus{},
+						"bar": api.ContainerStatus{},
 					},
 				},
 			},
@@ -359,8 +359,8 @@ func TestTemplateStrings(t *testing.T) {
 			api.Pod{
 				Status: api.PodStatus{
 					Info: api.PodInfo{
-						"update-demo": api.ContainerStatus{},
-						"POD": api.ContainerStatus{
+						"foo": api.ContainerStatus{},
+						"bar": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -376,14 +376,14 @@ func TestTemplateStrings(t *testing.T) {
 			api.Pod{
 				Status: api.PodStatus{
 					Info: api.PodInfo{
-						"update-demo": api.ContainerStatus{
+						"foo": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
 								},
 							},
 						},
-						"POD": api.ContainerStatus{
+						"bar": api.ContainerStatus{
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -400,14 +400,14 @@ func TestTemplateStrings(t *testing.T) {
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
 	tmpl :=
-		`{{and (exists . "currentState" "info" "update-demo" "state" "running") (exists . "currentState" "info" "POD" "state" "running")}}`
+		`{{and (exists . "currentState" "info" "foo" "state" "running") (exists . "currentState" "info" "bar" "state" "running")}}`
 	useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}
-c: {{exists . "currentState" "info" "update-demo"}}
-d: {{exists . "currentState" "info" "update-demo" "state"}}
-e: {{exists . "currentState" "info" "update-demo" "state" "running"}}
-f: {{exists . "currentState" "info" "update-demo" "state" "running" "startedAt"}}`
+c: {{exists . "currentState" "info" "foo"}}
+d: {{exists . "currentState" "info" "foo" "state"}}
+e: {{exists . "currentState" "info" "foo" "state" "running"}}
+f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
 	_ = useThisToDebug // don't complain about unused var
 
 	p, err := NewTemplatePrinter([]byte(tmpl))
@@ -452,10 +452,11 @@ func TestPrinters(t *testing.T) {
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
 		"emptyPodList":    &api.PodList{},
 		"nonEmptyPodList": &api.PodList{Items: []api.Pod{{}}},
+		"endpoints":       &api.Endpoints{Endpoints: []api.Endpoint{{IP: "127.0.0.1"}, {IP: "localhost", Port: 8080}}},
 	}
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]util.StringSet{
-		"template2": util.NewStringSet("pod", "emptyPodList"),
+		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {
@@ -479,19 +480,25 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	obj := api.EventList{
 		Items: []api.Event{
 			{
-				Source:    api.EventSource{Component: "kubelet"},
-				Message:   "Item 1",
-				Timestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 1",
+				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
 			},
 			{
-				Source:    api.EventSource{Component: "scheduler"},
-				Message:   "Item 2",
-				Timestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				Source:         api.EventSource{Component: "scheduler"},
+				Message:        "Item 2",
+				FirstTimestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
 			},
 			{
-				Source:    api.EventSource{Component: "kubelet"},
-				Message:   "Item 3",
-				Timestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 3",
+				FirstTimestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
 			},
 		},
 	}
@@ -517,7 +524,7 @@ func TestPrintMinionStatus(t *testing.T) {
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo1"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionFull}}},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFull}}},
 			},
 			status: "Ready",
 		},
@@ -525,8 +532,8 @@ func TestPrintMinionStatus(t *testing.T) {
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo2"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Kind: api.NodeReady, Status: api.ConditionFull},
-					{Kind: api.NodeReachable, Status: api.ConditionFull}}},
+					{Type: api.NodeReady, Status: api.ConditionFull},
+					{Type: api.NodeReachable, Status: api.ConditionFull}}},
 			},
 			status: "Ready,Reachable",
 		},
@@ -534,22 +541,22 @@ func TestPrintMinionStatus(t *testing.T) {
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Kind: api.NodeReady, Status: api.ConditionFull},
-					{Kind: api.NodeReady, Status: api.ConditionFull}}},
+					{Type: api.NodeReady, Status: api.ConditionFull},
+					{Type: api.NodeReady, Status: api.ConditionFull}}},
 			},
 			status: "Ready",
 		},
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo4"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: api.NodeReady, Status: api.ConditionNone}}},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionNone}}},
 			},
 			status: "NotReady",
 		},
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo5"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Kind: "InvalidValue", Status: api.ConditionFull}}},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionFull}}},
 			},
 			status: "Unknown",
 		},

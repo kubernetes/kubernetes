@@ -94,6 +94,7 @@ func HandleCreateContainerSuccessfully(t *testing.T) {
 		th.TestHeader(t, r, "Accept", "application/json")
 
 		w.Header().Add("X-Container-Meta-Foo", "bar")
+		w.Header().Add("X-Trans-Id", "1234567")
 		w.WriteHeader(http.StatusNoContent)
 	})
 }

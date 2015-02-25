@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"sort"
 )
 
@@ -30,6 +31,18 @@ func NewStringSet(items ...string) StringSet {
 	ss := StringSet{}
 	ss.Insert(items...)
 	return ss
+}
+
+// KeySet creates a StringSet from a keys of a map[string](? extends interface{}).  Since you can't describe that map type in the Go type system
+// the reflected value is required.
+func KeySet(theMap reflect.Value) StringSet {
+	ret := StringSet{}
+
+	for _, keyValue := range theMap.MapKeys() {
+		ret.Insert(keyValue.String())
+	}
+
+	return ret
 }
 
 // Insert adds items to the set.
@@ -60,6 +73,22 @@ func (s StringSet) HasAll(items ...string) bool {
 		}
 	}
 	return true
+}
+
+// Difference returns a set of objects that are not in s2
+// For example:
+// s1 = {1, 2, 3}
+// s2 = {1, 2, 4, 5}
+// s1.Difference(s2) = {3}
+// s2.Difference(s1) = {4, 5}
+func (s StringSet) Difference(s2 StringSet) StringSet {
+	result := NewStringSet()
+	for key := range s {
+		if !s2.Has(key) {
+			result.Insert(key)
+		}
+	}
+	return result
 }
 
 // IsSuperset returns true iff s1 is a superset of s2.

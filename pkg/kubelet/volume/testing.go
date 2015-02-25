@@ -21,12 +21,14 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 // FakeHost is useful for testing volume plugins.
 type FakeHost struct {
-	RootDir string
+	RootDir    string
+	KubeClient client.Interface
 }
 
 func (f *FakeHost) GetPluginDir(podUID string) string {
@@ -39,6 +41,10 @@ func (f *FakeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName stri
 
 func (f *FakeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return path.Join(f.RootDir, "pods", string(podUID), "plugins", pluginName)
+}
+
+func (f *FakeHost) GetKubeClient() client.Interface {
+	return f.KubeClient
 }
 
 // FakePlugin is useful for for testing.  It tries to be a fully compliant

@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -76,6 +77,9 @@ type Host interface {
 	// does not exist, the result of this call might not exist.  This
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
+
+	// GetKubeClient returns a client interface
+	GetKubeClient() client.Interface
 }
 
 // PluginMgr tracks registered plugins.

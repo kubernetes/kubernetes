@@ -35,7 +35,21 @@ func errToAPIStatus(err error) *api.Status {
 	switch t := err.(type) {
 	case statusError:
 		status := t.Status()
-		status.Status = api.StatusFailure
+		if len(status.Status) == 0 {
+		}
+		switch status.Status {
+		case api.StatusSuccess:
+			if status.Code == 0 {
+				status.Code = http.StatusOK
+			}
+		case "":
+			status.Status = api.StatusFailure
+			fallthrough
+		case api.StatusFailure:
+			if status.Code == 0 {
+				status.Code = http.StatusInternalServerError
+			}
+		}
 		//TODO: check for invalid responses
 		return &status
 	default:

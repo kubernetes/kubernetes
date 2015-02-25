@@ -118,6 +118,46 @@ func TestHTTPKubeletClientNotFound(t *testing.T) {
 	}
 }
 
+func TestHTTPKubeletClientError(t *testing.T) {
+	expectObj := api.PodContainerInfo{
+		ContainerInfo: map[string]api.ContainerStatus{
+			"myID": {},
+		},
+	}
+	_, err := json.Marshal(expectObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	fakeHandler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "Internal server error",
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+
+	hostURL, err := url.Parse(testServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	parts := strings.Split(hostURL.Host, ":")
+
+	port, err := strconv.Atoi(parts[1])
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	podInfoGetter := &HTTPKubeletClient{
+		Client: http.DefaultClient,
+		Port:   uint(port),
+	}
+	_, err = podInfoGetter.GetPodStatus(parts[0], api.NamespaceDefault, "foo")
+	if err == nil || !strings.Contains(err.Error(), "HTTP error code 500") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestNewKubeletClient(t *testing.T) {
 	config := &KubeletConfig{
 		Port:        9000,
@@ -147,9 +187,11 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 		Port:        9000,
 		EnableHttps: true,
 		//Invalid certificate and key path
-		CertFile: "./testdata/mycertinvalid.cer",
-		KeyFile:  "./testdata/mycertinvalid.key",
-		CAFile:   "./testdata/myCA.cer",
+		TLSClientConfig: TLSClientConfig{
+			CertFile: "./testdata/mycertinvalid.cer",
+			KeyFile:  "./testdata/mycertinvalid.key",
+			CAFile:   "./testdata/myCA.cer",
+		},
 	}
 
 	client, err := NewKubeletClient(config)
@@ -165,11 +207,13 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	config := &KubeletConfig{
 		Port:        9000,
 		EnableHttps: true,
-		CertFile:    "./testdata/mycertvalid.cer",
-		// TLS Configuration, only applies if EnableHttps is true.
-		KeyFile: "./testdata/mycertvalid.key",
-		// TLS Configuration, only applies if EnableHttps is true.
-		CAFile: "./testdata/myCA.cer",
+		TLSClientConfig: TLSClientConfig{
+			CertFile: "./testdata/mycertvalid.cer",
+			// TLS Configuration, only applies if EnableHttps is true.
+			KeyFile: "./testdata/mycertvalid.key",
+			// TLS Configuration, only applies if EnableHttps is true.
+			CAFile: "./testdata/myCA.cer",
+		},
 	}
 
 	client, err := NewKubeletClient(config)

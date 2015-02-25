@@ -88,3 +88,7 @@ func Get(c *gophercloud.ServiceClient, containerName, objectName string, opts os
 func Update(c *gophercloud.ServiceClient, containerName, objectName string, opts os.UpdateOptsBuilder) os.UpdateResult {
 	return os.Update(c, containerName, objectName, opts)
 }
+
+func CreateTempURL(c *gophercloud.ServiceClient, containerName, objectName string, opts os.CreateTempURLOpts) (string, error) {
+	return os.CreateTempURL(c, containerName, objectName, opts)
+}

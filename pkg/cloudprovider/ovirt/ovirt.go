@@ -117,7 +117,11 @@ func (v *OVirtCloud) Zones() (cloudprovider.Zones, bool) {
 // IPAddress returns the address of a particular machine instance
 func (v *OVirtCloud) IPAddress(instance string) (net.IP, error) {
 	// since the instance now is the IP in the ovirt env, this is trivial no-op
-	return net.ParseIP(instance), nil
+	ip, err := net.LookupIP(instance)
+	if err != nil || len(ip) < 1 {
+		return nil, fmt.Errorf("cannot find ip address for: %s", instance)
+	}
+	return ip[0], nil
 }
 
 func getInstancesFromXml(body io.Reader) ([]string, error) {

@@ -18,12 +18,15 @@ package client
 
 import (
 	"fmt"
-	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"reflect"
+	gruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -61,26 +64,15 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
-	// Server requires TLS client certificate authentication
-	CertFile string
-	// Server requires TLS client certificate authentication
-	KeyFile string
-	// Trusted root certificates for server
-	CAFile string
-
-	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
-	// CertData takes precedence over CertFile
-	CertData []byte
-	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
-	// KeyData takes precedence over KeyFile
-	KeyData []byte
-	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
-	// CAData takes precedence over CAFile
-	CAData []byte
+	// TLSClientConfig contains settings to enable transport layer security
+	TLSClientConfig
 
 	// Server should be accessed without verifying the TLS
 	// certificate. For testing only.
 	Insecure bool
+
+	// UserAgent is an optional field that specifies the caller of this request.
+	UserAgent string
 
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options.
@@ -92,11 +84,17 @@ type KubeletConfig struct {
 	Port        uint
 	EnableHttps bool
 
-	// TLS Configuration, only applies if EnableHttps is true.
+	// TLSClientConfig contains settings to enable transport layer security
+	TLSClientConfig
+}
+
+// TLSClientConfig contains settings to enable transport layer security
+type TLSClientConfig struct {
+	// Server requires TLS client certificate authentication
 	CertFile string
-	// TLS Configuration, only applies if EnableHttps is true.
+	// Server requires TLS client certificate authentication
 	KeyFile string
-	// TLS Configuration, only applies if EnableHttps is true.
+	// Trusted root certificates for server
 	CAFile string
 
 	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
@@ -159,6 +157,9 @@ func SetKubernetesDefaults(config *Config) error {
 	if config.Prefix == "" {
 		config.Prefix = "/api"
 	}
+	if len(config.UserAgent) == 0 {
+		config.UserAgent = DefaultKubernetesUserAgent()
+	}
 	if len(config.Version) == 0 {
 		config.Version = defaultVersionFor(config)
 	}
@@ -215,57 +216,34 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	if config.Transport != nil && (hasCA || hasCert || config.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
 	}
-	if hasCA && config.Insecure {
-		return nil, fmt.Errorf("specifying a root certificates file with the insecure flag is not allowed")
-	}
-	var transport http.RoundTripper
-	switch {
-	case config.Transport != nil:
-		transport = config.Transport
-	case hasCert:
-		var (
-			certData, keyData, caData []byte
-			err                       error
-		)
-		if certData, err = dataFromSliceOrFile(config.CertData, config.CertFile); err != nil {
-			return nil, err
-		}
-		if keyData, err = dataFromSliceOrFile(config.KeyData, config.KeyFile); err != nil {
-			return nil, err
-		}
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewClientCertTLSTransport(certData, keyData, caData); err != nil {
-			return nil, err
-		}
-	case hasCA:
-		var (
-			caData []byte
-			err    error
-		)
-		if caData, err = dataFromSliceOrFile(config.CAData, config.CAFile); err != nil {
-			return nil, err
-		}
-		if transport, err = NewTLSTransport(caData); err != nil {
-			return nil, err
-		}
-	case config.Insecure:
-		transport = NewUnsafeTLSTransport()
-	default:
-		transport = http.DefaultTransport
+
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		return nil, err
 	}
 
-	// Set authentication wrappers
-	hasBasicAuth := config.Username != "" || config.Password != ""
-	if hasBasicAuth && config.BearerToken != "" {
-		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
+	var transport http.RoundTripper
+	if config.Transport != nil {
+		transport = config.Transport
+	} else {
+		if tlsConfig != nil {
+			transport = &http.Transport{
+				TLSClientConfig: tlsConfig,
+				Proxy:           http.ProxyFromEnvironment,
+				Dial: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				TLSHandshakeTimeout: 10 * time.Second,
+			}
+		} else {
+			transport = http.DefaultTransport
+		}
 	}
-	switch {
-	case config.BearerToken != "":
-		transport = NewBearerAuthRoundTripper(config.BearerToken, transport)
-	case hasBasicAuth:
-		transport = NewBasicAuthRoundTripper(config.Username, config.Password, transport)
+
+	transport, err = HTTPWrappersForConfig(config, transport)
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO: use the config context to wrap a transport
@@ -273,17 +251,26 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	return transport, nil
 }
 
-// dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
-// or an error if an error occurred reading the file
-func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
-	if len(data) > 0 {
-		return data, nil
+// HTTPWrappersForConfig wraps a round tripper with any relevant layered behavior from the
+// config. Exposed to allow more clients that need HTTP-like behavior but then must hijack
+// the underlying connection (like WebSocket or HTTP2 clients). Pure HTTP clients should use
+// the higher level TransportFor or RESTClientFor methods.
+func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTripper, error) {
+	// Set authentication wrappers
+	hasBasicAuth := config.Username != "" || config.Password != ""
+	if hasBasicAuth && config.BearerToken != "" {
+		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
 	}
-	fileData, err := ioutil.ReadFile(file)
-	if err != nil {
-		return []byte{}, err
+	switch {
+	case config.BearerToken != "":
+		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
+	case hasBasicAuth:
+		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
 	}
-	return fileData, nil
+	if len(config.UserAgent) > 0 {
+		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
+	}
+	return rt, nil
 }
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
@@ -353,7 +340,9 @@ func IsConfigTransportTLS(config Config) bool {
 func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
-	defaultTLS := config.CertFile != "" || config.Insecure
+	hasCA := len(config.CAFile) != 0 || len(config.CAData) != 0
+	hasCert := len(config.CertFile) != 0 || len(config.CertData) != 0
+	defaultTLS := hasCA || hasCert || config.Insecure
 	host := config.Host
 	if host == "" {
 		host = "localhost"
@@ -370,4 +359,19 @@ func defaultVersionFor(config *Config) string {
 		version = latest.Version
 	}
 	return version
+}
+
+// DefaultKubernetesUserAgent returns the default user agent that clients can use.
+func DefaultKubernetesUserAgent() string {
+	commit := version.Get().GitCommit
+	if len(commit) > 7 {
+		commit = commit[:7]
+	}
+	if len(commit) == 0 {
+		commit = "unknown"
+	}
+	version := version.Get().GitVersion
+	seg := strings.SplitN(version, "-", 2)
+	version = seg[0]
+	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
 }

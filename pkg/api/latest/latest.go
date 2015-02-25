@@ -103,7 +103,44 @@ func init() {
 			return interfaces, true
 		},
 	)
-	mapper.Add(api.Scheme, true, "v1beta1", "v1beta2")
-	mapper.Add(api.Scheme, false, "v1beta3")
+	// list of versions we support on the server
+	versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+
+	// versions that used mixed case URL formats
+	versionMixedCase := map[string]bool{
+		"v1beta1": true,
+		"v1beta2": true,
+	}
+
+	// backwards compatibility, prior to v1beta3, we identified the namespace as a query parameter
+	versionToNamespaceScope := map[string]meta.RESTScope{
+		"v1beta1": meta.RESTScopeNamespaceLegacy,
+		"v1beta2": meta.RESTScopeNamespaceLegacy,
+		"v1beta3": meta.RESTScopeNamespace,
+	}
+
+	// the list of kinds that are scoped at the root of the api hierarchy
+	// if a kind is not enumerated here, it is assumed to have a namespace scope
+	kindToRootScope := map[string]bool{
+		"Node":      true,
+		"Minion":    true,
+		"Namespace": true,
+	}
+
+	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
+	for _, version := range versions {
+		for kind := range api.Scheme.KnownTypes(version) {
+			mixedCase, found := versionMixedCase[version]
+			if !found {
+				mixedCase = false
+			}
+			scope := versionToNamespaceScope[version]
+			_, found = kindToRootScope[kind]
+			if found {
+				scope = meta.RESTScopeRoot
+			}
+			mapper.Add(scope, kind, version, mixedCase)
+		}
+	}
 	RESTMapper = mapper
 }

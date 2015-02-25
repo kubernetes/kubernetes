@@ -43,7 +43,7 @@ func TestBuildQueryString(t *testing.T) {
 		R: "red",
 		C: true,
 	}
-	expected := &url.URL{RawQuery: "j=2&r=red&c=true"}
+	expected := &url.URL{RawQuery: "c=true&j=2&r=red"}
 	actual, err := BuildQueryString(&opts)
 	if err != nil {
 		t.Errorf("Error building query string: %v", err)
@@ -138,5 +138,18 @@ func TestIsZero(t *testing.T) {
 	expected = false
 	actual = isZero(testStructValue)
 	th.CheckEquals(t, expected, actual)
+}
 
+func TestQueriesAreEscaped(t *testing.T) {
+	type foo struct {
+		Name  string `q:"something"`
+		Shape string `q:"else"`
+	}
+
+	expected := &url.URL{RawQuery: "else=Triangl+e&something=blah%2B%3F%21%21foo"}
+
+	actual, err := BuildQueryString(foo{Name: "blah+?!!foo", Shape: "Triangl e"})
+	th.AssertNoErr(t, err)
+
+	th.AssertDeepEquals(t, expected, actual)
 }

@@ -72,18 +72,16 @@ func ResolvePort(portReference util.IntOrString, container *api.Container) (int,
 func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
-		var status api.PodStatus
 		status, err := h.kubelet.GetPodStatus(podFullName, uid)
 		if err != nil {
-			glog.Errorf("unable to get pod info, event handlers may be invalid.")
+			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return err
 		}
 		netInfo, found := status.Info[dockertools.PodInfraContainerName]
-		if found {
-			host = netInfo.PodIP
-		} else {
+		if !found {
 			return fmt.Errorf("failed to find networking container: %v", status)
 		}
+		host = netInfo.PodIP
 	}
 	var port int
 	if handler.HTTPGet.Port.Kind == util.IntstrString && len(handler.HTTPGet.Port.StrVal) == 0 {

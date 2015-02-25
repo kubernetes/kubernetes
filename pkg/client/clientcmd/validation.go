@@ -109,6 +109,10 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 	if len(clusterInfo.Server) == 0 {
 		validationErrors = append(validationErrors, fmt.Errorf("no server found for %v", clusterName))
 	}
+	// Make sure CA data and CA file aren't both specified
+	if len(clusterInfo.CertificateAuthority) != 0 && len(clusterInfo.CertificateAuthorityData) != 0 {
+		validationErrors = append(validationErrors, fmt.Errorf("certificate-authority-data and certificate-authority are both specified for %v. certificate-authority-data will override.", clusterName))
+	}
 	if len(clusterInfo.CertificateAuthority) != 0 {
 		clientCertCA, err := os.Open(clusterInfo.CertificateAuthority)
 		defer clientCertCA.Close()
@@ -129,6 +133,9 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 	if len(authInfo.Token) != 0 {
 		methods = append(methods, "token")
 	}
+	if len(authInfo.Username) != 0 || len(authInfo.Password) != 0 {
+		methods = append(methods, "basicAuth")
+	}
 	if len(authInfo.AuthPath) != 0 {
 		usingAuthPath = true
 		methods = append(methods, "authFile")
@@ -140,18 +147,34 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			validationErrors = append(validationErrors, fmt.Errorf("unable to read auth-path %v for %v due to %v", authInfo.AuthPath, authInfoName, err))
 		}
 	}
-	if len(authInfo.ClientCertificate) != 0 {
-		methods = append(methods, "clientCert")
 
-		clientCertFile, err := os.Open(authInfo.ClientCertificate)
-		defer clientCertFile.Close()
-		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
+	if len(authInfo.ClientCertificate) != 0 || len(authInfo.ClientCertificateData) != 0 {
+		// Make sure cert data and file aren't both specified
+		if len(authInfo.ClientCertificate) != 0 && len(authInfo.ClientCertificateData) != 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("client-cert-data and client-cert are both specified for %v. client-cert-data will override.", authInfoName))
 		}
-		clientKeyFile, err := os.Open(authInfo.ClientKey)
-		defer clientKeyFile.Close()
-		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
+		// Make sure key data and file aren't both specified
+		if len(authInfo.ClientKey) != 0 && len(authInfo.ClientKeyData) != 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("client-key-data and client-key are both specified for %v. client-key-data will override.", authInfoName))
+		}
+		// Make sure a key is specified
+		if len(authInfo.ClientKey) == 0 && len(authInfo.ClientKeyData) == 0 {
+			validationErrors = append(validationErrors, fmt.Errorf("client-key-data or client-key must be specified for %v to use the clientCert authentication method.", authInfoName))
+		}
+
+		if len(authInfo.ClientCertificate) != 0 {
+			clientCertFile, err := os.Open(authInfo.ClientCertificate)
+			defer clientCertFile.Close()
+			if err != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
+			}
+		}
+		if len(authInfo.ClientKey) != 0 {
+			clientKeyFile, err := os.Open(authInfo.ClientKey)
+			defer clientKeyFile.Close()
+			if err != nil {
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
+			}
 		}
 	}
 

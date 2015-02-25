@@ -42,12 +42,13 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	selector labels.Selector
+	selector  labels.Selector
+	selectAll bool
 
 	resources []string
 
 	namespace string
-	name      string
+	names     []string
 
 	defaultNamespace bool
 	requireNamespace bool
@@ -171,6 +172,10 @@ func (b *Builder) SelectorParam(s string) *Builder {
 	if selector.Empty() {
 		return b
 	}
+	if b.selectAll {
+		b.errs = append(b.errs, fmt.Errorf("found non empty selector %q with previously set 'all' parameter. ", s))
+		return b
+	}
 	return b.Selector(selector)
 }
 
@@ -202,22 +207,35 @@ func (b *Builder) RequireNamespace() *Builder {
 	return b
 }
 
-// ResourceTypeOrNameArgs indicates that the builder should accept one or two arguments
-// of the form `(<type1>[,<type2>,...]|<type> <name>)`. When one argument is received, the types
-// provided will be retrieved from the server (and be comma delimited).  When two arguments are
-// received, they must be a single type and name. If more than two arguments are provided an
-// error is set.
-func (b *Builder) ResourceTypeOrNameArgs(args ...string) *Builder {
-	switch len(args) {
-	case 2:
-		b.name = args[1]
+// SelectEverythingParam
+func (b *Builder) SelectAllParam(selectAll bool) *Builder {
+	if selectAll && b.selector != nil {
+		b.errs = append(b.errs, fmt.Errorf("setting 'all' parameter but found a non empty selector. "))
+		return b
+	}
+	b.selectAll = selectAll
+	return b
+}
+
+// ResourceTypeOrNameArgs indicates that the builder should accept arguments
+// of the form `(<type1>[,<type2>,...]|<type> <name1>[,<name2>,...])`. When one argument is
+// received, the types provided will be retrieved from the server (and be comma delimited).
+// When two or more arguments are received, they must be a single type and resource name(s).
+// The allowEmptySelector permits to select all the resources (via Everything func).
+func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
+	switch {
+	case len(args) > 2:
+		b.names = append(b.names, args[1:]...)
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case 1:
+	case len(args) == 2:
+		b.names = append(b.names, args[1])
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
-		if b.selector == nil {
+	case len(args) == 1:
+		b.ResourceTypes(SplitResourceArgument(args[0])...)
+		if b.selector == nil && allowEmptySelector {
 			b.selector = labels.Everything()
 		}
-	case 0:
+	case len(args) == 0:
 	default:
 		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource or resource and name"))
 	}
@@ -229,7 +247,7 @@ func (b *Builder) ResourceTypeOrNameArgs(args ...string) *Builder {
 func (b *Builder) ResourceTypeAndNameArgs(args ...string) *Builder {
 	switch len(args) {
 	case 2:
-		b.name = args[1]
+		b.names = append(b.names, args[1])
 		b.ResourceTypes(SplitResourceArgument(args[0])...)
 	case 0:
 	default:
@@ -291,9 +309,13 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{err: errors.NewAggregate(b.errs)}
 	}
 
+	if b.selectAll {
+		b.selector = labels.Everything()
+	}
+
 	// visit selectors
 	if b.selector != nil {
-		if len(b.name) != 0 {
+		if len(b.names) != 0 {
 			return &Result{err: fmt.Errorf("name cannot be provided when a selector is specified")}
 		}
 		if len(b.resources) == 0 {
@@ -318,7 +340,11 @@ func (b *Builder) visitorResult() *Result {
 			if err != nil {
 				return &Result{err: err}
 			}
-			visitors = append(visitors, NewSelector(client, mapping, b.namespace, b.selector))
+			selectorNamespace := b.namespace
+			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+				selectorNamespace = ""
+			}
+			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector))
 		}
 		if b.continueOnError {
 			return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -326,33 +352,49 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{visitor: VisitorList(visitors), sources: visitors}
 	}
 
-	// visit single item specified by name
-	if len(b.name) != 0 {
+	// visit items specified by name
+	if len(b.names) != 0 {
+		isSingular := len(b.names) == 1
+
 		if len(b.paths) != 0 {
-			return &Result{singular: true, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
+			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
 		}
 		if len(b.resources) == 0 {
-			return &Result{singular: true, err: fmt.Errorf("you must provide a resource and a resource name together")}
+			return &Result{singular: isSingular, err: fmt.Errorf("you must provide a resource and a resource name together")}
 		}
 		if len(b.resources) > 1 {
-			return &Result{singular: true, err: fmt.Errorf("you must specify only one resource")}
+			return &Result{singular: isSingular, err: fmt.Errorf("you must specify only one resource")}
 		}
-		if len(b.namespace) == 0 {
-			return &Result{singular: true, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
-		}
+
 		mappings, err := b.resourceMappings()
 		if err != nil {
-			return &Result{singular: true, err: err}
+			return &Result{singular: isSingular, err: err}
 		}
-		client, err := b.mapper.ClientForMapping(mappings[0])
+		mapping := mappings[0]
+
+		client, err := b.mapper.ClientForMapping(mapping)
 		if err != nil {
-			return &Result{singular: true, err: err}
+			return &Result{err: err}
 		}
-		info := NewInfo(client, mappings[0], b.namespace, b.name)
-		if err := info.Get(); err != nil {
-			return &Result{singular: true, err: err}
+
+		selectorNamespace := b.namespace
+		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			selectorNamespace = ""
+		} else {
+			if len(b.namespace) == 0 {
+				return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+			}
 		}
-		return &Result{singular: true, visitor: info, sources: []Visitor{info}}
+
+		visitors := []Visitor{}
+		for _, name := range b.names {
+			info := NewInfo(client, mapping, selectorNamespace, name)
+			if err := info.Get(); err != nil {
+				return &Result{singular: isSingular, err: err}
+			}
+			visitors = append(visitors, info)
+		}
+		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
 	}
 
 	// visit items specified by paths
@@ -402,6 +444,7 @@ func (b *Builder) Do() *Result {
 	if b.requireNamespace {
 		helpers = append(helpers, RequireNamespace(b.namespace))
 	}
+	helpers = append(helpers, FilterNamespace())
 	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	return r
 }

@@ -13,7 +13,7 @@ Currently the collection of container logs using the [Fluentd](http://www.fluent
 enabled by default for clusters created for the GCE platform. Each node uses Fluentd to collect
 the container logs which are submitted in [Logstash](http://logstash.net/docs/1.4.2/tutorials/getting-started-with-logstash)
 format (in JSON) to an [Elasticsearch](http://www.elasticsearch.org/) cluster which runs as a Kubernetes service.
-When you create a cluster the console output reports the URL of both the Elasticsearch cluster as well as
+As of Kubernetes 0.11, when you create a cluster the console output reports the URL of both the Elasticsearch cluster as well as
 a URL for a [Kibana](http://www.elasticsearch.org/overview/kibana/) dashboard viewer for the logs that have been ingested
 into Elasticsearch.
 ```

@@ -57,7 +57,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -65,7 +65,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "bar"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReachable, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -73,8 +73,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "baz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-							{Kind: api.NodeReachable, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -82,8 +82,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "baz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-							{Kind: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -96,7 +96,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -104,7 +104,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "bar"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionNone},
+							{Type: api.NodeReady, Status: api.ConditionNone},
 						},
 					},
 				},
@@ -117,8 +117,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReady, Status: api.ConditionFull},
-							{Kind: api.NodeReachable, Status: api.ConditionNone}},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionNone}},
 					},
 				},
 			},
@@ -130,8 +130,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Kind: api.NodeReachable, Status: api.ConditionFull},
-							{Kind: "invalidValue", Status: api.ConditionNone}},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
+							{Type: "invalidValue", Status: api.ConditionNone}},
 					},
 				},
 			},
@@ -195,7 +195,13 @@ func makeURL(suffix string) string {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"}}
+	testPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+	}
 	handler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
@@ -208,7 +214,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
-	queue := cache.NewFIFO()
+	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[string]*backoffEntry{},
 		clock:           &fakeClock{},
@@ -223,7 +229,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		// whole error handling system in the future. The test will time
 		// out if something doesn't work.
 		time.Sleep(10 * time.Millisecond)
-		got, exists := queue.Get("foo")
+		got, exists, _ := queue.Get(testPod)
 		if !exists {
 			continue
 		}
@@ -249,8 +255,8 @@ func TestMinionEnumerator(t *testing.T) {
 		t.Fatalf("expected %v, got %v", e, a)
 	}
 	for i := range testList.Items {
-		gotID, gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotID; e != a {
+		gotObj := me.Get(i)
+		if e, a := testList.Items[i].Name, gotObj.(*api.Node).Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
@@ -271,7 +277,13 @@ func TestBind(t *testing.T) {
 	table := []struct {
 		binding *api.Binding
 	}{
-		{binding: &api.Binding{PodID: "foo", Host: "foohost.kubernetes.mydomain.com"}},
+		{binding: &api.Binding{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: api.NamespaceDefault,
+			},
+			PodID: "foo",
+			Host:  "foohost.kubernetes.mydomain.com",
+		}},
 	}
 
 	for _, item := range table {
@@ -290,7 +302,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings?namespace=default", "POST", &expectedBody)
 	}
 }
 

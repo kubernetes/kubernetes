@@ -22,8 +22,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-
-	"github.com/golang/glog"
 )
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -51,12 +49,7 @@ type RESTClient struct {
 	// used.
 	Client HTTPClient
 
-	// Set the poll behavior of this client. If not set the DefaultPoll method will
-	// be called.
-	Poller PollFunc
-
-	PollPeriod time.Duration
-	Timeout    time.Duration
+	Timeout time.Duration
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
@@ -78,9 +71,6 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 		Codec: c,
 
 		LegacyBehavior: legacyBehavior,
-
-		// Poll frequently
-		PollPeriod: time.Second * 2,
 	}
 }
 
@@ -102,11 +92,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	// if c.Client != nil {
 	// 	timeout = c.Client.Timeout
 	// }
-	poller := c.Poller
-	if poller == nil {
-		poller = c.DefaultPoll
-	}
-	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Poller(poller).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -127,22 +113,6 @@ func (c *RESTClient) Get() *Request {
 // Delete begins a DELETE request. Short for c.Verb("DELETE").
 func (c *RESTClient) Delete() *Request {
 	return c.Verb("DELETE")
-}
-
-// PollFor makes a request to do a single poll of the completion of the given operation.
-func (c *RESTClient) Operation(name string) *Request {
-	return c.Get().Resource("operations").Name(name).NoPoll()
-}
-
-// DefaultPoll performs a polling action based on the PollPeriod set on the Client.
-func (c *RESTClient) DefaultPoll(name string) (*Request, bool) {
-	if c.PollPeriod == 0 {
-		return nil, false
-	}
-	glog.Infof("Waiting for completion of operation %s", name)
-	time.Sleep(c.PollPeriod)
-	// Make a poll request
-	return c.Operation(name).Poller(c.DefaultPoll), true
 }
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.

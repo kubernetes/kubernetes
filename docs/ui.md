@@ -7,7 +7,7 @@ Kubernetes currently supports a simple web user interface.
 Start the server:
 
 ```sh
-cluster/kubectl.sh proxy -www=$PWD/www
+cluster/kubectl.sh proxy --www=$PWD/www
 ```
 
 The UI should now be running on [localhost](http://localhost:8001/static/index.html#/groups//selector)

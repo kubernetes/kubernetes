@@ -56,17 +56,15 @@ func TestCreateObjects(t *testing.T) {
 	items := []runtime.Object{}
 
 	items = append(items, &api.Pod{
-		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Pod"},
-		ObjectMeta: api.ObjectMeta{Name: "test-pod"},
+		ObjectMeta: api.ObjectMeta{Name: "test-pod", Namespace: "default"},
 	})
 
 	items = append(items, &api.Service{
-		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Service"},
-		ObjectMeta: api.ObjectMeta{Name: "test-service"},
+		ObjectMeta: api.ObjectMeta{Name: "test-service", Namespace: "default"},
 	})
 
 	typer, mapper := getTyperAndMapper()
-	client, s := getFakeClient(t, []string{"/api/v1beta1/pods", "/api/v1beta1/services"})
+	client, s := getFakeClient(t, []string{"/api/v1beta1/pods?namespace=default", "/api/v1beta1/services?namespace=default"})
 
 	errs := CreateObjects(typer, mapper, client, items)
 	s.Close()

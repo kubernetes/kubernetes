@@ -63,7 +63,7 @@ type CreateOpts struct {
 // load balancer pool member.
 func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 	type member struct {
-		TenantID     string `json:"tenant_id"`
+		TenantID     string `json:"tenant_id,omitempty"`
 		ProtocolPort int    `json:"protocol_port"`
 		Address      string `json:"address"`
 		PoolID       string `json:"pool_id"`

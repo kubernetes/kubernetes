@@ -27,14 +27,9 @@ import (
 	"github.com/golang/glog"
 )
 
-type IPGetter interface {
-	GetInstanceIP(host string) (ip string)
-}
-
 // PodCache contains both a cache of container information, as well as the mechanism for keeping
 // that cache up to date.
 type PodCache struct {
-	ipCache       IPGetter
 	containerInfo client.PodInfoGetter
 	pods          pod.Registry
 	// For confirming existance of a node
@@ -56,9 +51,8 @@ type objKey struct {
 // NewPodCache returns a new PodCache which watches container information
 // registered in the given PodRegistry.
 // TODO(lavalamp): pods should be a client.PodInterface.
-func NewPodCache(ipCache IPGetter, info client.PodInfoGetter, nodes client.NodeInterface, pods pod.Registry) *PodCache {
+func NewPodCache(info client.PodInfoGetter, nodes client.NodeInterface, pods pod.Registry) *PodCache {
 	return &PodCache{
-		ipCache:       ipCache,
 		containerInfo: info,
 		pods:          pods,
 		nodes:         nodes,
@@ -69,14 +63,38 @@ func NewPodCache(ipCache IPGetter, info client.PodInfoGetter, nodes client.NodeI
 
 // GetPodStatus gets the stored pod status.
 func (p *PodCache) GetPodStatus(namespace, name string) (*api.PodStatus, error) {
+	status := p.getPodStatusInternal(namespace, name)
+	if status != nil {
+		return status, nil
+	}
+	return p.updateCacheAndReturn(namespace, name)
+}
+
+func (p *PodCache) updateCacheAndReturn(namespace, name string) (*api.PodStatus, error) {
+	pod, err := p.pods.GetPod(api.WithNamespace(api.NewContext(), namespace), name)
+	if err != nil {
+		return nil, err
+	}
+	if err := p.updatePodStatus(pod); err != nil {
+		return nil, err
+	}
+	status := p.getPodStatusInternal(namespace, name)
+	if status == nil {
+		glog.Warningf("nil status after successful update.  that's odd... (%s %s)", namespace, name)
+		return nil, client.ErrPodInfoNotAvailable
+	}
+	return status, nil
+}
+
+func (p *PodCache) getPodStatusInternal(namespace, name string) *api.PodStatus {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	value, ok := p.podStatus[objKey{namespace, name}]
 	if !ok {
-		return nil, client.ErrPodInfoNotAvailable
+		return nil
 	}
 	// Make a copy
-	return &value, nil
+	return &value
 }
 
 func (p *PodCache) ClearPodStatus(namespace, name string) {
@@ -116,6 +134,12 @@ func (p *PodCache) getNodeStatus(name string) (*api.NodeStatus, error) {
 	return &node.Status, nil
 }
 
+func (p *PodCache) clearNodeStatus() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.currentNodes = map[objKey]api.NodeStatus{}
+}
+
 // TODO: once Host gets moved to spec, this can take a podSpec + metadata instead of an
 // entire pod?
 func (p *PodCache) updatePodStatus(pod *api.Pod) error {
@@ -124,7 +148,9 @@ func (p *PodCache) updatePodStatus(pod *api.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	// Map accesses must be locked.
-	p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
+	if err == nil {
+		p.podStatus[objKey{pod.Namespace, pod.Name}] = newStatus
+	}
 
 	return err
 }
@@ -138,6 +164,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	if pod.Status.Host == "" {
 		// Not assigned.
 		newStatus.Phase = api.PodPending
+		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 		return newStatus, nil
 	}
 
@@ -145,43 +172,61 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	// Assigned to non-existing node.
 	if err != nil || len(nodeStatus.Conditions) == 0 {
+		glog.V(5).Infof("node doesn't exist: %v %v, setting pod %q status to unknown", err, nodeStatus, pod.Name)
 		newStatus.Phase = api.PodUnknown
+		newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 		return newStatus, nil
 	}
 
 	// Assigned to an unhealthy node.
 	for _, condition := range nodeStatus.Conditions {
-		if condition.Kind == api.NodeReady && condition.Status == api.ConditionNone {
+		if (condition.Type == api.NodeReady || condition.Type == api.NodeReachable) && condition.Status == api.ConditionNone {
+			glog.V(5).Infof("node status: %v, setting pod %q status to unknown", condition, pod.Name)
 			newStatus.Phase = api.PodUnknown
-			return newStatus, nil
-		}
-		if condition.Kind == api.NodeReachable && condition.Status == api.ConditionNone {
-			newStatus.Phase = api.PodUnknown
+			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
 			return newStatus, nil
 		}
 	}
 
 	result, err := p.containerInfo.GetPodStatus(pod.Status.Host, pod.Namespace, pod.Name)
-	newStatus.HostIP = p.ipCache.GetInstanceIP(pod.Status.Host)
 
 	if err != nil {
-		newStatus.Phase = api.PodUnknown
+		glog.V(5).Infof("error getting pod %s status: %v, retry later", pod.Name, err)
 	} else {
+		newStatus.HostIP = nodeStatus.HostIP
 		newStatus.Info = result.Status.Info
-		newStatus.Phase = getPhase(&pod.Spec, newStatus.Info)
-		if netContainerInfo, ok := newStatus.Info["POD"]; ok {
-			if netContainerInfo.PodIP != "" {
-				newStatus.PodIP = netContainerInfo.PodIP
-			}
+		newStatus.PodIP = result.Status.PodIP
+		if newStatus.Info == nil {
+			// There is a small race window that kubelet couldn't
+			// propulated the status yet. This should go away once
+			// we removed boundPods
+			newStatus.Phase = api.PodPending
+			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
+		} else {
+			newStatus.Phase = result.Status.Phase
+			newStatus.Conditions = result.Status.Conditions
 		}
 	}
 	return newStatus, err
 }
 
-func (p *PodCache) resetNodeStatusCache() {
+func (p *PodCache) GarbageCollectPodStatus() {
+	pods, err := p.pods.ListPods(api.NewContext(), labels.Everything())
+	if err != nil {
+		glog.Errorf("Error getting pod list: %v", err)
+	}
+	keys := map[objKey]bool{}
+	for _, pod := range pods.Items {
+		keys[objKey{pod.Namespace, pod.Name}] = true
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.currentNodes = map[objKey]api.NodeStatus{}
+	for key := range p.podStatus {
+		if _, found := keys[key]; !found {
+			glog.Infof("Deleting orphaned cache entry: %v", key)
+			delete(p.podStatus, key)
+		}
+	}
 }
 
 // UpdateAllContainers updates information about all containers.
@@ -189,7 +234,9 @@ func (p *PodCache) resetNodeStatusCache() {
 // calling again, or risk having new info getting clobbered by delayed
 // old info.
 func (p *PodCache) UpdateAllContainers() {
-	p.resetNodeStatusCache()
+	// TODO: this is silly, we should pro-actively update the pod status when
+	// the API server makes changes.
+	p.clearNodeStatus()
 
 	ctx := api.NewContext()
 	pods, err := p.pods.ListPods(ctx, labels.Everything())
@@ -215,68 +262,4 @@ func (p *PodCache) UpdateAllContainers() {
 		}()
 	}
 	wg.Wait()
-}
-
-// getPhase returns the phase of a pod given its container info.
-// TODO(dchen1107): push this all the way down into kubelet.
-func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
-	if info == nil {
-		return api.PodPending
-	}
-	running := 0
-	waiting := 0
-	stopped := 0
-	failed := 0
-	succeeded := 0
-	unknown := 0
-	for _, container := range spec.Containers {
-		if containerStatus, ok := info[container.Name]; ok {
-			if containerStatus.State.Running != nil {
-				running++
-			} else if containerStatus.State.Termination != nil {
-				stopped++
-				if containerStatus.State.Termination.ExitCode == 0 {
-					succeeded++
-				} else {
-					failed++
-				}
-			} else if containerStatus.State.Waiting != nil {
-				waiting++
-			} else {
-				unknown++
-			}
-		} else {
-			unknown++
-		}
-	}
-	switch {
-	case waiting > 0:
-		// One or more containers has not been started
-		return api.PodPending
-	case running > 0 && unknown == 0:
-		// All containers have been started, and at least
-		// one container is running
-		return api.PodRunning
-	case running == 0 && stopped > 0 && unknown == 0:
-		// All containers are terminated
-		if spec.RestartPolicy.Always != nil {
-			// All containers are in the process of restarting
-			return api.PodRunning
-		}
-		if stopped == succeeded {
-			// RestartPolicy is not Always, and all
-			// containers are terminated in success
-			return api.PodSucceeded
-		}
-		if spec.RestartPolicy.Never != nil {
-			// RestartPolicy is Never, and all containers are
-			// terminated with at least one in failure
-			return api.PodFailed
-		}
-		// RestartPolicy is OnFailure, and at least one in failure
-		// and in the process of restarting
-		return api.PodRunning
-	default:
-		return api.PodPending
-	}
 }

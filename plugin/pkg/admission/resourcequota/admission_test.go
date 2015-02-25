@@ -25,6 +25,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
+func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
+	res := api.ResourceRequirements{}
+	res.Limits = api.ResourceList{}
+	if cpu != "" {
+		res.Limits[api.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res.Limits[api.ResourceMemory] = resource.MustParse(memory)
+	}
+
+	return res
+}
+
 func TestAdmissionIgnoresDelete(t *testing.T) {
 	namespace := "default"
 	handler := NewResourceQuota(&client.Fake{})
@@ -43,7 +56,7 @@ func TestIncrementUsagePods(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 					Spec: api.PodSpec{
 						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 					},
 				},
 			},
@@ -78,7 +91,7 @@ func TestIncrementUsageMemory(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 					Spec: api.PodSpec{
 						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 					},
 				},
 			},
@@ -96,7 +109,7 @@ func TestIncrementUsageMemory(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 		}}
 	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
 	if err != nil {
@@ -121,7 +134,7 @@ func TestExceedUsageMemory(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 					Spec: api.PodSpec{
 						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 					},
 				},
 			},
@@ -139,7 +152,7 @@ func TestExceedUsageMemory(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("3Gi"), CPU: resource.MustParse("100m")}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "3Gi")}},
 		}}
 	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
 	if err == nil {
@@ -156,7 +169,7 @@ func TestIncrementUsageCPU(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 					Spec: api.PodSpec{
 						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 					},
 				},
 			},
@@ -174,7 +187,7 @@ func TestIncrementUsageCPU(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 		}}
 	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
 	if err != nil {
@@ -199,7 +212,7 @@ func TestExceedUsageCPU(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 					Spec: api.PodSpec{
 						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 					},
 				},
 			},
@@ -217,7 +230,7 @@ func TestExceedUsageCPU(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("500m")}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("500m", "1Gi")}},
 		}}
 	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
 	if err == nil {
@@ -234,7 +247,7 @@ func TestExceedUsagePods(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 					Spec: api.PodSpec{
 						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Memory: resource.MustParse("1Gi"), CPU: resource.MustParse("100m")}},
+						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 					},
 				},
 			},

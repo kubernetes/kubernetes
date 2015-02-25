@@ -23,12 +23,20 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+
+: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBE_CONFIG_FILE:="config-test.sh"}
+
+export KUBECTL KUBE_CONFIG_FILE
+
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+prepare-e2e
 
 MONITORING="${KUBE_ROOT}/cluster/addons/cluster-monitoring"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-KUBECFG="${KUBE_ROOT}/cluster/kubecfg.sh"
 BIGRAND=$(printf "%x\n" $(( $RANDOM << 16 | $RANDOM ))) # random 2^32 in hex
 MONITORING_FIREWALL_RULE="monitoring-test-${BIGRAND}"
 
@@ -49,12 +57,8 @@ function setup {
 }
 
 function cleanup {
-  "${KUBECFG}" resize monitoring-influxGrafanaController 0 &> /dev/null || true
-  "${KUBECFG}" resize monitoring-heapsterController 0 &> /dev/null || true
-  while "${KUBECTL}" get pods -l "name=influxGrafana" -o template -t {{range.items}}{{.id}}:{{end}} | grep -c . &> /dev/null \
-    || "${KUBECTL}" get pods -l "name=heapster" -o template -t {{range.items}}{{.id}}:{{end}} | grep -c . &> /dev/null; do
-    sleep 2
-  done
+  "${KUBECTL}" stop rc monitoring-influx-grafana-controller &> /dev/null || true
+  "${KUBECTL}" stop rc monitoring-heapster-controller &> /dev/null || true
   "${KUBECTL}" delete -f "${MONITORING}/" &> /dev/null || true
 
   # This only has work to do on gce and gke

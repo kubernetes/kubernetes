@@ -43,6 +43,10 @@ type CreateOpts struct {
 	// ConfigDrive [optional] enables metadata injection through a configuration drive.
 	ConfigDrive bool
 
+	// AdminPass [optional] sets the root user password. If not set, a randomly-generated
+	// password will be created and returned in the response.
+	AdminPass string
+
 	// Rackspace-specific extensions begin here.
 
 	// KeyPair [optional] specifies the name of the SSH KeyPair to be injected into the newly launched
@@ -72,6 +76,7 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 		Metadata:         opts.Metadata,
 		Personality:      opts.Personality,
 		ConfigDrive:      opts.ConfigDrive,
+		AdminPass:        opts.AdminPass,
 	}
 
 	drive := diskconfig.CreateOptsExt{

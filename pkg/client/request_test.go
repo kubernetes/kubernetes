@@ -18,6 +18,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -26,7 +27,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"reflect"
+	// "reflect"
 	"strings"
 	"testing"
 	"time"
@@ -40,13 +41,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
-
-func skipPolling(name string) (*Request, bool) {
-	return nil, false
-}
 
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{err: errors.New("test")}
@@ -61,14 +59,12 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 		Namespace("new").
 		Resource("foos").
 		Name("bars").
-		NoPoll().
 		Body("foo").
-		Poller(skipPolling).
 		Timeout(time.Millisecond)
 	if changed != &r {
 		t.Errorf("returned request should point to the same object")
 	}
-	if !reflect.DeepEqual(&original, changed) {
+	if !api.Semantic.DeepDerivative(changed, &original) {
 		t.Errorf("expected %#v, got %#v", &original, changed)
 	}
 }
@@ -118,7 +114,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 			Path: "/",
 		},
 	}).Namespace("foo")
-	if s := r.finalURL(); s != "ns/foo" {
+	if s := r.finalURL(); s != "namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
 }
@@ -128,7 +124,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 		baseURL: &url.URL{},
 		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
-	if s := r.finalURL(); s != "/test/ns/foo/baz/bar" {
+	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
 	}
 }
@@ -154,7 +150,25 @@ func TestRequestParseSelectorParam(t *testing.T) {
 
 func TestRequestParam(t *testing.T) {
 	r := (&Request{}).Param("foo", "a")
-	if !reflect.DeepEqual(map[string]string{"foo": "a"}, r.params) {
+	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+
+	r.Param("bar", "1")
+	r.Param("bar", "2")
+	if !api.Semantic.DeepDerivative(r.params, url.Values{"foo": []string{"a"}, "bar": []string{"1", "2"}}) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+}
+
+func TestRequestURI(t *testing.T) {
+	r := (&Request{}).Param("foo", "a")
+	r.Prefix("other")
+	r.RequestURI("/test?foo=b&a=b&c=1&c=2")
+	if r.path != "/test" {
+		t.Errorf("path is wrong: %#v", r)
+	}
+	if !api.Semantic.DeepDerivative(r.params, url.Values{"a": []string{"b"}, "foo": []string{"b"}, "c": []string{"1", "2"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
 }
@@ -224,7 +238,7 @@ func TestTransformResponse(t *testing.T) {
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
 		}
-		if !(test.Data == nil && response == nil) && !reflect.DeepEqual(test.Data, response) {
+		if !(test.Data == nil && response == nil) && !api.Semantic.DeepDerivative(test.Data, response) {
 			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)
 		}
 		if test.Created != created {
@@ -437,6 +451,122 @@ func TestRequestStream(t *testing.T) {
 	}
 }
 
+type fakeUpgradeConnection struct{}
+
+func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	return nil, nil
+}
+func (c *fakeUpgradeConnection) Close() error {
+	return nil
+}
+func (c *fakeUpgradeConnection) CloseChan() <-chan bool {
+	return make(chan bool)
+}
+func (c *fakeUpgradeConnection) SetIdleTimeout(timeout time.Duration) {
+}
+
+type fakeUpgradeRoundTripper struct {
+	req  *http.Request
+	conn httpstream.Connection
+}
+
+func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	f.req = req
+	b := []byte{}
+	body := ioutil.NopCloser(bytes.NewReader(b))
+	resp := &http.Response{
+		StatusCode: 101,
+		Body:       body,
+	}
+	return resp, nil
+}
+
+func (f *fakeUpgradeRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
+	return f.conn, nil
+}
+
+func TestRequestUpgrade(t *testing.T) {
+	uri, _ := url.Parse("http://localhost/")
+	testCases := []struct {
+		Request          *Request
+		Config           *Config
+		RoundTripper     *fakeUpgradeRoundTripper
+		Err              bool
+		AuthBasicHeader  bool
+		AuthBearerHeader bool
+	}{
+		{
+			Request: &Request{err: errors.New("bail")},
+			Err:     true,
+		},
+		{
+			Request: &Request{},
+			Config: &Config{
+				TLSClientConfig: TLSClientConfig{
+					CAFile: "foo",
+				},
+				Insecure: true,
+			},
+			Err: true,
+		},
+		{
+			Request: &Request{},
+			Config: &Config{
+				Username:    "u",
+				Password:    "p",
+				BearerToken: "b",
+			},
+			Err: true,
+		},
+		{
+			Request: NewRequest(nil, "", uri, testapi.Codec(), true, true),
+			Config: &Config{
+				Username: "u",
+				Password: "p",
+			},
+			AuthBasicHeader: true,
+			Err:             false,
+		},
+		{
+			Request: NewRequest(nil, "", uri, testapi.Codec(), true, true),
+			Config: &Config{
+				BearerToken: "b",
+			},
+			AuthBearerHeader: true,
+			Err:              false,
+		},
+	}
+	for i, testCase := range testCases {
+		r := testCase.Request
+		rt := &fakeUpgradeRoundTripper{}
+		expectedConn := &fakeUpgradeConnection{}
+		conn, err := r.Upgrade(testCase.Config, func(config *tls.Config) httpstream.UpgradeRoundTripper {
+			rt.conn = expectedConn
+			return rt
+		})
+		_ = conn
+		hasErr := err != nil
+		if hasErr != testCase.Err {
+			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, r.err)
+		}
+		if testCase.Err {
+			continue
+		}
+
+		if testCase.AuthBasicHeader && !strings.Contains(rt.req.Header.Get("Authorization"), "Basic") {
+			t.Errorf("%d: expected basic auth header, got: %s", rt.req.Header.Get("Authorization"))
+		}
+
+		if testCase.AuthBearerHeader && !strings.Contains(rt.req.Header.Get("Authorization"), "Bearer") {
+			t.Errorf("%d: expected bearer auth header, got: %s", rt.req.Header.Get("Authorization"))
+		}
+
+		if e, a := expectedConn, conn; e != a {
+			t.Errorf("%d: conn: expected %#v, got %#v", i, e, a)
+		}
+	}
+}
+
 func TestRequestDo(t *testing.T) {
 	testCases := []struct {
 		Request *Request
@@ -497,7 +627,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &reqBody)
@@ -532,7 +662,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
@@ -568,7 +698,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
@@ -617,7 +747,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if wasCreated {
@@ -659,7 +789,7 @@ func TestWasCreated(t *testing.T) {
 	}
 	if obj == nil {
 		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
+	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if !wasCreated {
@@ -768,90 +898,6 @@ func TestBody(t *testing.T) {
 	}
 }
 
-func TestSetPoller(t *testing.T) {
-	c := NewOrDie(&Config{})
-	r := c.Get()
-	if c.PollPeriod == 0 {
-		t.Errorf("polling should be on by default")
-	}
-	if r.poller == nil {
-		t.Errorf("polling should be on by default")
-	}
-	r.NoPoll()
-	if r.poller != nil {
-		t.Errorf("'NoPoll' doesn't work")
-	}
-}
-
-func TestPolling(t *testing.T) {
-	objects := []runtime.Object{
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
-		&api.Status{Status: api.StatusSuccess},
-	}
-
-	callNumber := 0
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if callNumber == 0 {
-			if r.URL.Path != "/api/v1beta1/" {
-				t.Fatalf("unexpected request URL path %s", r.URL.Path)
-			}
-		} else {
-			if r.URL.Path != "/api/v1beta1/operations/1234" {
-				t.Fatalf("unexpected request URL path %s", r.URL.Path)
-			}
-		}
-		t.Logf("About to write %d", callNumber)
-		data, err := v1beta1.Codec.Encode(objects[callNumber])
-		if err != nil {
-			t.Errorf("Unexpected encode error")
-		}
-		callNumber++
-		w.Write(data)
-	}))
-
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
-	c.PollPeriod = 1 * time.Millisecond
-	trials := []func(){
-		func() {
-			// Check that we do indeed poll when asked to.
-			obj, err := c.Get().Do().Get()
-			if err != nil {
-				t.Errorf("Unexpected error: %v %#v", err, err)
-				return
-			}
-			if s, ok := obj.(*api.Status); !ok || s.Status != api.StatusSuccess {
-				t.Errorf("Unexpected return object: %#v", obj)
-				return
-			}
-			if callNumber != len(objects) {
-				t.Errorf("Unexpected number of calls: %v", callNumber)
-			}
-		},
-		func() {
-			// Check that we don't poll when asked not to.
-			obj, err := c.Get().NoPoll().Do().Get()
-			if err == nil {
-				t.Errorf("Unexpected non error: %v", obj)
-				return
-			}
-			if se, ok := err.(APIStatus); !ok || se.Status().Status != api.StatusWorking {
-				t.Errorf("Unexpected kind of error: %#v", err)
-				return
-			}
-			if callNumber != 1 {
-				t.Errorf("Unexpected number of calls: %v", callNumber)
-			}
-		},
-	}
-	for _, f := range trials {
-		callNumber = 0
-		f()
-	}
-}
-
 func authFromReq(r *http.Request) (*Config, bool) {
 	auth, ok := r.Header["Authorization"]
 	if !ok {
@@ -880,7 +926,7 @@ func checkAuth(t *testing.T, expect *Config, r *http.Request) {
 	foundAuth, found := authFromReq(r)
 	if !found {
 		t.Errorf("no auth found")
-	} else if e, a := expect, foundAuth; !reflect.DeepEqual(e, a) {
+	} else if e, a := expect, foundAuth; !api.Semantic.DeepDerivative(e, a) {
 		t.Fatalf("Wrong basic auth: wanted %#v, got %#v", e, a)
 	}
 }
@@ -939,7 +985,7 @@ func TestWatch(t *testing.T) {
 		if e, a := item.t, got.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
-		if e, a := item.obj, got.Object; !reflect.DeepEqual(e, a) {
+		if e, a := item.obj, got.Object; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}

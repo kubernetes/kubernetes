@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 )
@@ -49,7 +48,7 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		api.ValidNamespace(ctx, &t.ObjectMeta)
-		errors = validation.ValidateService(t, registrytest.NewServiceRegistry(), api.NewDefaultContext())
+		errors = validation.ValidateService(t)
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
@@ -109,12 +108,36 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"service-list":     &api.ServiceList{},
 		},
 		"../examples/guestbook": {
+			"frontend-controller":     &api.ReplicationController{},
+			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-master-controller": &api.ReplicationController{},
+			"frontend-service":        &api.Service{},
+			"redis-master-service":    &api.Service{},
+			"redis-slave-service":     &api.Service{},
+		},
+		"../examples/guestbook/v1beta3": {
 			"frontend-controller":    &api.ReplicationController{},
 			"redis-slave-controller": &api.ReplicationController{},
-			"redis-master":           &api.Pod{},
+			"redis-master":           &api.ReplicationController{},
 			"frontend-service":       &api.Service{},
 			"redis-master-service":   &api.Service{},
 			"redis-slave-service":    &api.Service{},
+		},
+		"../examples/guestbook-go": {
+			"guestbook-controller":    &api.ReplicationController{},
+			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-master-controller": &api.ReplicationController{},
+			"guestbook-service":       &api.Service{},
+			"redis-master-service":    &api.Service{},
+			"redis-slave-service":     &api.Service{},
+		},
+		"../examples/guestbook-go/v1beta3": {
+			"guestbook-controller":    &api.ReplicationController{},
+			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-master-controller": &api.ReplicationController{},
+			"guestbook-service":       &api.Service{},
+			"redis-master-service":    &api.Service{},
+			"redis-slave-service":     &api.Service{},
 		},
 		"../examples/walkthrough": {
 			"pod1": &api.Pod{},

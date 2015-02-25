@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
+	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -65,7 +67,13 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 			MetadataAccessor: meta.NewAccessor(),
 		}, (version == "unlikelyversion")
 	})
-	mapper.Add(scheme, false, "unlikelyversion")
+	for _, version := range []string{"unlikelyversion"} {
+		for kind := range scheme.KnownTypes(version) {
+			mixedCase := false
+			scope := meta.RESTScopeNamespace
+			mapper.Add(scope, kind, version, mixedCase)
+		}
+	}
 
 	return scheme, mapper, codec
 }
@@ -171,4 +179,68 @@ func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 
 func stringBody(body string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+}
+
+// Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
+func TestClientVersions(t *testing.T) {
+	f := NewFactory(nil)
+
+	versions := []string{
+		"v1beta1",
+		"v1beta2",
+		"v1beta3",
+	}
+	for _, version := range versions {
+		mapping := &meta.RESTMapping{
+			APIVersion: version,
+		}
+		c, err := f.RESTClient(nil, mapping)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		client := c.(*client.RESTClient)
+		if client.APIVersion() != version {
+			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
+		}
+	}
+}
+
+func ExamplePrintReplicationController() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false)
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := f.NewCmdRunContainer(os.Stdout)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:   "foo",
+			Labels: map[string]string{"foo": "bar"},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// CONTROLLER          CONTAINER(S)        IMAGE(S)            SELECTOR            REPLICAS
+	// foo                 foo                 someimage           foo=bar             1
 }

@@ -97,14 +97,28 @@ func TestRunOnce(t *testing.T) {
 				label: "syncPod",
 				container: docker.Container{
 					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true},
+					State:  docker.State{Running: true, Pid: 42},
 				},
 			},
 			{
 				label: "syncPod",
 				container: docker.Container{
 					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true},
+					State:  docker.State{Running: true, Pid: 42},
+				},
+			},
+			{
+				label: "syncPod",
+				container: docker.Container{
+					Config: &docker.Config{Image: "someimage"},
+					State:  docker.State{Running: true, Pid: 42},
+				},
+			},
+			{
+				label: "syncPod",
+				container: docker.Container{
+					Config: &docker.Config{Image: "someimage"},
+					State:  docker.State{Running: true, Pid: 42},
 				},
 			},
 		},

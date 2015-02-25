@@ -21,16 +21,16 @@ package mount
 const FlagBind = 0
 const FlagReadOnly = 0
 
-type mounter struct{}
+type Mounter struct{}
 
-func (mounter *mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (mounter *Mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
 	return nil
 }
 
-func (mounter *mounter) Unmount(target string, flags int) error {
+func (mounter *Mounter) Unmount(target string, flags int) error {
 	return nil
 }
 
-func (mounter *mounter) List() ([]MountPoint, error) {
+func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }

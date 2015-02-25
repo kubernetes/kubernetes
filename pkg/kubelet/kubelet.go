@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -49,12 +50,14 @@ import (
 	"github.com/golang/glog"
 )
 
-const defaultChanSize = 1024
-
 // taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 const minShares = 2
 const sharesPerCPU = 1024
 const milliCPUToCPU = 1000
+
+// The oom_score_adj of the POD infrastructure container. The default is 0, so
+// any value below that makes it *less* likely to get OOM killed.
+const podOomScoreAdj = -100
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
@@ -82,7 +85,8 @@ func NewMainKubelet(
 	clusterDomain string,
 	clusterDNS net.IP,
 	masterServiceNamespace string,
-	volumePlugins []volume.Plugin) (*Kubelet, error) {
+	volumePlugins []volume.Plugin,
+	streamingConnectionIdleTimeout time.Duration) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -93,39 +97,48 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
 	}
 
-	serviceStore := cache.NewStore()
+	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
-		cache.NewReflector(&cache.ListWatch{kubeClient, labels.Everything(), "services", api.NamespaceAll}, &api.Service{}, serviceStore).Run()
+		cache.NewReflector(cache.NewListWatchFromClient(kubeClient, "services", api.NamespaceAll, labels.Everything()), &api.Service{}, serviceStore).Run()
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
 	klet := &Kubelet{
-		hostname:               hostname,
-		dockerClient:           dockerClient,
-		etcdClient:             etcdClient,
-		kubeClient:             kubeClient,
-		rootDirectory:          rootDirectory,
-		resyncInterval:         resyncInterval,
-		podInfraContainerImage: podInfraContainerImage,
-		podWorkers:             newPodWorkers(),
-		dockerIDToRef:          map[dockertools.DockerID]*api.ObjectReference{},
-		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
-		httpClient:             &http.Client{},
-		pullQPS:                pullQPS,
-		pullBurst:              pullBurst,
-		minimumGCAge:           minimumGCAge,
-		maxContainerCount:      maxContainerCount,
-		sourceReady:            sourceReady,
-		clusterDomain:          clusterDomain,
-		clusterDNS:             clusterDNS,
-		serviceLister:          serviceLister,
-		masterServiceNamespace: masterServiceNamespace,
+		hostname:                       hostname,
+		dockerClient:                   dockerClient,
+		etcdClient:                     etcdClient,
+		kubeClient:                     kubeClient,
+		rootDirectory:                  rootDirectory,
+		resyncInterval:                 resyncInterval,
+		podInfraContainerImage:         podInfraContainerImage,
+		podWorkers:                     newPodWorkers(),
+		dockerIDToRef:                  map[dockertools.DockerID]*api.ObjectReference{},
+		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
+		httpClient:                     &http.Client{},
+		pullQPS:                        pullQPS,
+		pullBurst:                      pullBurst,
+		minimumGCAge:                   minimumGCAge,
+		maxContainerCount:              maxContainerCount,
+		sourceReady:                    sourceReady,
+		clusterDomain:                  clusterDomain,
+		clusterDNS:                     clusterDNS,
+		serviceLister:                  serviceLister,
+		masterServiceNamespace:         masterServiceNamespace,
+		prober:                         newProbeHolder(),
+		readiness:                      newReadinessStates(),
+		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 	}
 
-	if err := klet.setupDataDirs(); err != nil {
+	dockerCache, err := dockertools.NewDockerCache(dockerClient)
+	if err != nil {
 		return nil, err
 	}
-	if err := klet.volumePluginMgr.InitPlugins(volumePlugins, &volumeHost{klet}); err != nil {
+	klet.dockerCache = dockerCache
+
+	if err = klet.setupDataDirs(); err != nil {
+		return nil, err
+	}
+	if err = klet.volumePluginMgr.InitPlugins(volumePlugins, &volumeHost{klet}); err != nil {
 		return nil, err
 	}
 
@@ -144,6 +157,7 @@ type serviceLister interface {
 type Kubelet struct {
 	hostname               string
 	dockerClient           dockertools.DockerInterface
+	dockerCache            dockertools.DockerCache
 	kubeClient             *client.Client
 	rootDirectory          string
 	podInfraContainerImage string
@@ -156,11 +170,6 @@ type Kubelet struct {
 	// Tracks references for reporting events
 	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
 	refLock       sync.RWMutex
-
-	// Tracks active pulls.  Needed to protect image garbage collection
-	// See: https://github.com/docker/docker/issues/8926 for details
-	// TODO: Remove this when (if?) that issue is fixed.
-	pullLock sync.RWMutex
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
@@ -196,6 +205,15 @@ type Kubelet struct {
 
 	// Volume plugins.
 	volumePluginMgr volume.PluginMgr
+
+	// probe runner holder
+	prober probeHolder
+	// container readiness state holder
+	readiness *readinessStates
+
+	// how long to keep idle streaming command execution/port forwarding
+	// connections open before terminating them
+	streamingConnectionIdleTimeout time.Duration
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -388,7 +406,7 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 	}
 	uidToIDMap := map[string][]string{}
 	for _, container := range containers {
-		_, uid, name, _ := dockertools.ParseDockerName(container.ID)
+		_, uid, name, _ := dockertools.ParseDockerName(container.Names[0])
 		uidName := string(uid) + "." + name
 		uidToIDMap[uidName] = append(uidToIDMap[uidName], container.ID)
 	}
@@ -527,6 +545,20 @@ func milliCPUToShares(milliCPU int64) int64 {
 	return shares
 }
 
+func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) ([]string, []string) {
+	var (
+		addCaps  []string
+		dropCaps []string
+	)
+	for _, cap := range capAdd {
+		addCaps = append(addCaps, string(cap))
+	}
+	for _, cap := range capDrop {
+		dropCaps = append(dropCaps, string(cap))
+	}
+	return addCaps, dropCaps
+}
+
 // A basic interface that knows how to execute handlers
 type actionHandler interface {
 	Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error
@@ -635,8 +667,8 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			ExposedPorts: exposedPorts,
 			Hostname:     pod.Name,
 			Image:        container.Image,
-			Memory:       container.Memory.Value(),
-			CPUShares:    milliCPUToShares(container.CPU.MilliValue()),
+			Memory:       container.Resources.Limits.Memory().Value(),
+			CPUShares:    milliCPUToShares(container.Resources.Limits.Cpu().MilliValue()),
 			WorkingDir:   container.WorkingDir,
 		},
 	}
@@ -662,11 +694,13 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			containerLogPath := path.Join(p, dockerContainer.ID)
 			fs, err := os.Create(containerLogPath)
 			if err != nil {
+				// TODO: Clean up the previouly created dir? return the error?
 				glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
+			} else {
+				fs.Close() // Close immediately; we're just doing a `touch` here
+				b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+				binds = append(binds, b)
 			}
-			defer fs.Close()
-			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
-			binds = append(binds, b)
 		}
 	}
 	privileged := false
@@ -675,12 +709,16 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	} else if container.Privileged {
 		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
 	}
+
+	capAdd, capDrop := makeCapabilites(container.Capabilities.Add, container.Capabilities.Drop)
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
 		IpcMode:      ipcMode,
 		Privileged:   privileged,
+		CapAdd:       capAdd,
+		CapDrop:      capDrop,
 	}
 	if pod.Spec.DNSPolicy == api.DNSClusterFirst {
 		if err := kl.applyClusterDNS(hc, pod); err != nil {
@@ -726,7 +764,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	}
 	services, err := kl.serviceLister.List()
 	if err != nil {
-		return m, fmt.Errorf("Failed to list services when setting up env vars.")
+		return m, fmt.Errorf("failed to list services when setting up env vars.")
 	}
 
 	// project the services in namespace ns onto the master services
@@ -857,6 +895,7 @@ func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 
 func (kl *Kubelet) killContainerByID(ID, name string) error {
 	glog.V(2).Infof("Killing container with id %q and name %q", ID, name)
+	kl.readiness.remove(ID)
 	err := kl.dockerClient.StopContainer(ID, 10)
 	if len(name) == 0 {
 		return err
@@ -910,12 +949,32 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 	if ref != nil {
 		record.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
-	return kl.runContainer(pod, container, nil, "", "")
+	id, err := kl.runContainer(pod, container, nil, "", "")
+	if err != nil {
+		return "", err
+	}
+
+	// Set OOM score of POD container to lower than those of the other
+	// containers in the pod. This ensures that it is killed only as a last
+	// resort.
+	containerInfo, err := kl.dockerClient.InspectContainer(string(id))
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the PID actually exists, else we'll move ourselves.
+	if containerInfo.State.Pid == 0 {
+		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
+	}
+	return id, util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 }
 
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
-	kl.pullLock.RLock()
-	defer kl.pullLock.RUnlock()
+	start := time.Now()
+	defer func() {
+		metrics.ImagePullLatency.Observe(float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds()))
+	}()
+
 	if err := kl.dockerPuller.Pull(img); err != nil {
 		if ref != nil {
 			record.Eventf(ref, "failed", "Failed to pull image %q", img)
@@ -971,6 +1030,11 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	killedContainers := make(map[dockertools.DockerID]empty)
 	glog.V(4).Infof("Syncing Pod, podFullName: %q, uid: %q", podFullName, uid)
 
+	ref, err := api.GetReference(pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	}
+
 	// Make data dirs.
 	if err := os.Mkdir(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
@@ -1010,17 +1074,17 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
+		if ref != nil {
+			record.Eventf(ref, "failedMount",
+				"Unable to mount volumes for pod %q: %v", podFullName, err)
+		}
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
 		return err
 	}
 
 	podStatus, err := kl.GetPodStatus(podFullName, uid)
 	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info, health checks may be invalid", podFullName, uid)
-	}
-	netInfo, found := podStatus.Info[dockertools.PodInfraContainerName]
-	if found {
-		podStatus.PodIP = netInfo.PodIP
+		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 	}
 
 	for _, container := range pod.Spec.Containers {
@@ -1031,21 +1095,40 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
 			// look for changes in the container.
-			if hash == 0 || hash == expectedHash {
+			podChanged := hash != 0 && hash != expectedHash
+			if !podChanged {
 				// TODO: This should probably be separated out into a separate goroutine.
-				healthy, err := kl.probeLiveness(podFullName, uid, podStatus, container, dockerContainer)
+				// If the container's liveness probe is unsuccessful, set readiness to false. If liveness is succesful, do a readiness check and set
+				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
+				// If the initial delay on the readiness probe has not passed the probe will return Failure.
+				ready := probe.Unknown
+				live, err := kl.probeContainer(container.LivenessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Success)
+				if live == probe.Success {
+					ready, _ = kl.probeContainer(container.ReadinessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Failure)
+				}
 				if err != nil {
-					glog.V(1).Infof("health check errored: %v", err)
+					glog.V(1).Infof("liveness/readiness probe errored: %v", err)
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				if healthy == probe.Success {
+				if ready == probe.Success {
+					kl.readiness.set(dockerContainer.ID, true)
+				} else {
+					kl.readiness.set(dockerContainer.ID, false)
+				}
+				if live == probe.Success {
 					containersToKeep[containerID] = empty{}
 					continue
 				}
-				glog.V(1).Infof("pod %q container %q is unhealthy. Container will be killed and re-created.", podFullName, container.Name, healthy)
+				ref, ok := kl.getRef(containerID)
+				if !ok {
+					glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
+				} else {
+					record.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
+				}
+				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
-				glog.V(1).Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
+				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
 			if err := kl.killContainer(dockerContainer); err != nil {
 				glog.V(1).Infof("Failed to kill container %q: %v", dockerContainer.ID, err)
@@ -1053,11 +1136,13 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 			killedContainers[containerID] = empty{}
 
-			// Also kill associated pod infra container
-			if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
-				if err := kl.killContainer(podInfraContainer); err != nil {
-					glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
-					continue
+			if podChanged {
+				// Also kill associated pod infra container if the pod changed.
+				if podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+					if err := kl.killContainer(podInfraContainer); err != nil {
+						glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
+						continue
+					}
 				}
 			}
 		}
@@ -1067,6 +1152,10 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		if err != nil {
 			glog.Errorf("Error listing recent containers:%s", dockerContainerName)
 			// TODO(dawnchen): error handling here?
+		}
+		// set dead containers to unready state
+		for _, c := range recentContainers {
+			kl.readiness.remove(c.ID)
 		}
 
 		if len(recentContainers) > 0 && pod.Spec.RestartPolicy.Always == nil {
@@ -1085,7 +1174,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			}
 		}
 
-		glog.V(3).Infof("Container with name %s doesn't exist, creating %#v", dockerContainerName)
+		glog.V(3).Infof("Container with name %s doesn't exist, creating", dockerContainerName)
 		ref, err := containerRef(pod, &container)
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -1179,11 +1268,24 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker.Container) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
+	runningSet := util.StringSet{}
+	for ix := range running {
+		if len(running[ix].Name) == 0 {
+			glog.V(2).Infof("Found running container ix=%d with info: %+v", ix, running[ix])
+		}
+		_, uid, _, _ := dockertools.ParseDockerName(running[ix].Name)
+		runningSet.Insert(string(uid))
+	}
 	for name, vol := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
+			parts := strings.Split(name, "/")
+			if runningSet.Has(parts[0]) {
+				glog.Infof("volume %s, still has a container running %s, skipping teardown", name, parts[0])
+				continue
+			}
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
 			//to be deleted and volumes that are leftover after a crash.
 			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
@@ -1204,7 +1306,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	desiredContainers := make(map[podContainer]empty)
 	desiredPods := make(map[types.UID]empty)
 
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	dockerContainers, err := kl.dockerCache.RunningContainers()
 	if err != nil {
 		glog.Errorf("Error listing containers: %#v", dockerContainers)
 		return err
@@ -1232,9 +1334,10 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		})
 	}
 	// Kill any containers we don't need.
-	for _, container := range dockerContainers {
+	killed := []string{}
+	for ix := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
-		podFullName, uid, containerName, _ := dockertools.ParseDockerName(container.Names[0])
+		podFullName, uid, containerName, _ := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
 		if _, found := desiredPods[uid]; found {
 			// syncPod() will handle this one.
 			continue
@@ -1249,21 +1352,29 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		pc := podContainer{podFullName, uid, containerName}
 		if _, ok := desiredContainers[pc]; !ok {
 			glog.V(1).Infof("Killing unwanted container %+v", pc)
-			err = kl.killContainer(container)
+			err = kl.killContainer(dockerContainers[ix])
 			if err != nil {
 				glog.Errorf("Error killing container %+v: %v", pc, err)
+			} else {
+				killed = append(killed, dockerContainers[ix].ID)
 			}
 		}
 	}
 
-	// Remove any orphaned pods.
-	err = kl.cleanupOrphanedPods(pods)
+	running, err := dockertools.GetRunningContainers(kl.dockerClient, killed)
 	if err != nil {
+		glog.Errorf("Failed to poll container state: %v", err)
 		return err
 	}
 
 	// Remove any orphaned volumes.
-	err = kl.cleanupOrphanedVolumes(pods)
+	err = kl.cleanupOrphanedVolumes(pods, running)
+	if err != nil {
+		return err
+	}
+
+	// Remove any orphaned pods.
+	err = kl.cleanupOrphanedPods(pods)
 	if err != nil {
 		return err
 	}
@@ -1317,23 +1428,24 @@ func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 // state every sync_frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	for {
+		unsyncedPod := false
 		select {
 		case u := <-updates:
-			switch u.Op {
-			case SET:
-				glog.V(3).Infof("SET: Containers changed")
-				kl.pods = u.Pods
-				kl.pods = filterHostPortConflicts(kl.pods)
-			case UPDATE:
-				glog.V(3).Infof("Update: Containers changed")
-				kl.pods = updateBoundPods(u.Pods, kl.pods)
-				kl.pods = filterHostPortConflicts(kl.pods)
-
-			default:
-				panic("syncLoop does not support incremental changes")
-			}
+			kl.updatePods(u)
+			unsyncedPod = true
 		case <-time.After(kl.resyncInterval):
 			glog.V(4).Infof("Periodic sync")
+		}
+		// If we already caught some update, try to wait for some short time
+		// to possibly batch it with other incoming updates.
+		for unsyncedPod {
+			select {
+			case u := <-updates:
+				kl.updatePods(u)
+			case <-time.After(5 * time.Millisecond):
+				// Break the for loop.
+				unsyncedPod = false
+			}
 		}
 
 		err := handler.SyncPods(kl.pods)
@@ -1343,24 +1455,65 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
+func (kl *Kubelet) updatePods(u PodUpdate) {
+	switch u.Op {
+	case SET:
+		glog.V(3).Infof("SET: Containers changed")
+		kl.pods = u.Pods
+		kl.pods = filterHostPortConflicts(kl.pods)
+	case UPDATE:
+		glog.V(3).Infof("Update: Containers changed")
+		kl.pods = updateBoundPods(u.Pods, kl.pods)
+		kl.pods = filterHostPortConflicts(kl.pods)
+	default:
+		panic("syncLoop does not support incremental changes")
+	}
+}
+
+// Returns Docker version for this Kubelet.
+func (kl *Kubelet) GetDockerVersion() ([]uint, error) {
+	if kl.dockerClient == nil {
+		return nil, fmt.Errorf("no Docker client")
+	}
+	dockerRunner := dockertools.NewDockerContainerCommandRunner(kl.dockerClient)
+	return dockerRunner.GetDockerServerVersion()
+}
+
 // GetKubeletContainerLogs returns logs from the container
 // The second parameter of GetPodStatus and FindPodContainer methods represents pod UUID, which is allowed to be blank
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
 // or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
-	_, err := kl.GetPodStatus(podFullName, "")
-	if err == dockertools.ErrNoContainersInPod {
-		return fmt.Errorf("pod not found (%q)\n", podFullName)
-	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, true)
+	podStatus, err := kl.GetPodStatus(podFullName, "")
 	if err != nil {
-		return err
+		if err == dockertools.ErrNoContainersInPod {
+			return fmt.Errorf("pod %q not found\n", podFullName)
+		} else {
+			return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
+		}
 	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, "", containerName)
-	if !found {
-		return fmt.Errorf("container not found (%q)\n", containerName)
+	switch podStatus.Phase {
+	case api.PodRunning, api.PodSucceeded, api.PodFailed:
+		break
+	default:
+		return fmt.Errorf("pod %q is not in 'Running', 'Succeeded' or 'Failed' state - State: %q", podFullName, podStatus.Phase)
 	}
-	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail, follow, stdout, stderr)
+	exists := false
+	dockerContainerID := ""
+	for cName, cStatus := range podStatus.Info {
+		if containerName == cName {
+			exists = true
+			if !cStatus.Ready {
+				return fmt.Errorf("container %q is not ready.", containerName)
+			}
+			dockerContainerID = strings.Replace(podStatus.Info[containerName].ContainerID, dockertools.DockerPrefix, "", 1)
+		}
+	}
+	if !exists {
+		return fmt.Errorf("container %q not found in pod %q", containerName, podFullName)
+	}
+
+	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainerID, tail, follow, stdout, stderr)
 }
 
 // GetBoundPods returns all pods bound to the kubelet and their spec
@@ -1380,34 +1533,142 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
 	return nil, false
 }
 
+// getPhase returns the phase of a pod given its container info.
+func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
+	running := 0
+	waiting := 0
+	stopped := 0
+	failed := 0
+	succeeded := 0
+	unknown := 0
+	for _, container := range spec.Containers {
+		if containerStatus, ok := info[container.Name]; ok {
+			if containerStatus.State.Running != nil {
+				running++
+			} else if containerStatus.State.Termination != nil {
+				stopped++
+				if containerStatus.State.Termination.ExitCode == 0 {
+					succeeded++
+				} else {
+					failed++
+				}
+			} else if containerStatus.State.Waiting != nil {
+				waiting++
+			} else {
+				unknown++
+			}
+		} else {
+			unknown++
+		}
+	}
+	switch {
+	case waiting > 0:
+		glog.V(5).Infof("pod waiting > 0, pending")
+		// One or more containers has not been started
+		return api.PodPending
+	case running > 0 && unknown == 0:
+		// All containers have been started, and at least
+		// one container is running
+		return api.PodRunning
+	case running == 0 && stopped > 0 && unknown == 0:
+		// All containers are terminated
+		if spec.RestartPolicy.Always != nil {
+			// All containers are in the process of restarting
+			return api.PodRunning
+		}
+		if stopped == succeeded {
+			// RestartPolicy is not Always, and all
+			// containers are terminated in success
+			return api.PodSucceeded
+		}
+		if spec.RestartPolicy.Never != nil {
+			// RestartPolicy is Never, and all containers are
+			// terminated with at least one in failure
+			return api.PodFailed
+		}
+		// RestartPolicy is OnFailure, and at least one in failure
+		// and in the process of restarting
+		return api.PodRunning
+	default:
+		glog.V(5).Infof("pod default case, pending")
+		return api.PodPending
+	}
+}
+
+// getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
+func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodCondition {
+	ready := []api.PodCondition{{
+		Type:   api.PodReady,
+		Status: api.ConditionFull,
+	}}
+	unready := []api.PodCondition{{
+		Type:   api.PodReady,
+		Status: api.ConditionNone,
+	}}
+	if info == nil {
+		return unready
+	}
+	for _, container := range spec.Containers {
+		if containerStatus, ok := info[container.Name]; ok {
+			if !containerStatus.Ready {
+				return unready
+			}
+		} else {
+			return unready
+		}
+	}
+	return ready
+}
+
 // GetPodStatus returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
-	var manifest api.PodSpec
+	var spec api.PodSpec
+	var podStatus api.PodStatus
+	found := false
 	for _, pod := range kl.pods {
 		if GetPodFullName(&pod) == podFullName {
-			manifest = pod.Spec
+			spec = pod.Spec
+			found = true
 			break
 		}
 	}
+	if !found {
+		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
+	}
 
-	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uid)
+	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
 
-	// TODO(dchen1107): Determine PodPhase here
-	var podStatus api.PodStatus
+	if err != nil {
+		// Error handling
+		glog.Infof("Query docker container info for pod %s failed with error (%v)", podFullName, err)
+		if strings.Contains(err.Error(), "resource temporarily unavailable") {
+			// Leave upstream layer to decide what to do
+			return podStatus, err
+		} else {
+			podStatus.Phase = api.PodPending
+			podStatus.Message = fmt.Sprintf("Query docker container info failed with error (%v)", err)
+			return podStatus, nil
+		}
+	}
+
+	// Assume info is ready to process
+	podStatus.Phase = getPhase(&spec, info)
+	for _, c := range spec.Containers {
+		containerStatus := info[c.Name]
+		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
+		info[c.Name] = containerStatus
+	}
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(&spec, info)...)
+
+	netContainerInfo, found := info[dockertools.PodInfraContainerName]
+	if found {
+		podStatus.PodIP = netContainerInfo.PodIP
+	}
+
+	// TODO(dchen1107): Change Info to list from map
 	podStatus.Info = info
 
-	return podStatus, err
-}
-
-func (kl *Kubelet) probeLiveness(podFullName string, podUID types.UID, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Status, error) {
-	// Give the container 60 seconds to start up.
-	if container.LivenessProbe == nil {
-		return probe.Success, nil
-	}
-	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return probe.Success, nil
-	}
-	return kl.probeContainer(container.LivenessProbe, podFullName, podUID, status, container)
+	return podStatus, nil
 }
 
 // Returns logs of current machine.
@@ -1432,6 +1693,40 @@ func (kl *Kubelet) RunInContainer(podFullName string, uid types.UID, container s
 	return kl.runner.RunInContainer(dockerContainer.ID, cmd)
 }
 
+// ExecInContainer executes a command in a container, connecting the supplied
+// stdin/stdout/stderr to the command's IO streams.
+func (kl *Kubelet) ExecInContainer(podFullName string, uid types.UID, container string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	if kl.runner == nil {
+		return fmt.Errorf("no runner specified.")
+	}
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	if err != nil {
+		return err
+	}
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, container)
+	if !found {
+		return fmt.Errorf("container not found (%q)", container)
+	}
+	return kl.runner.ExecInContainer(dockerContainer.ID, cmd, stdin, stdout, stderr, tty)
+}
+
+// PortForward connects to the pod's port and copies data between the port
+// and the stream.
+func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+	if kl.runner == nil {
+		return fmt.Errorf("no runner specified.")
+	}
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	if err != nil {
+		return err
+	}
+	podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName)
+	if !found {
+		return fmt.Errorf("Unable to find pod infra container for pod %s, uid %v", podFullName, uid)
+	}
+	return kl.runner.PortForward(podInfraContainer.ID, port, stream)
+}
+
 // BirthCry sends an event that the kubelet has started up.
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
@@ -1444,4 +1739,8 @@ func (kl *Kubelet) BirthCry() {
 		Namespace: api.NamespaceDefault,
 	}
 	record.Eventf(ref, "starting", "Starting kubelet.")
+}
+
+func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
+	return kl.streamingConnectionIdleTimeout
 }

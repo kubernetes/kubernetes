@@ -50,23 +50,23 @@ field values:
 Once you have your instances up and running, the `hack/build-go.sh` script sets up
 your Go workspace and builds the Go components.
 
-The `kubecfg.sh` line below spins up two containers running
-[Nginx](http://nginx.org/en/) with port 80 mapped to 8080:
+The `kubectl.sh` line below spins up two containers running
+[Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
 
 ```bash
-cluster/kubecfg.sh stop myNginx
+cluster/kubectl.sh stop rc my-nginx
 ```
 
 To delete the containers:
 
 ```bash
-cluster/kubecfg.sh rm myNginx
+cluster/kubectl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)
@@ -96,7 +96,7 @@ Where pod.json contains something like:
         "image": "dockerfile/nginx",
         "ports": [{
           "containerPort": 80,
-          "hostPort": 8080
+          "hostPort": 8081
         }],
         "livenessProbe": {
           "enabled": true,
@@ -104,7 +104,7 @@ Where pod.json contains something like:
           "initialDelaySeconds": 30,
           "httpGet": {
             "path": "/index.html",
-            "port": "8080"
+            "port": "8081"
           }
         }
       }]
@@ -127,6 +127,9 @@ and delete the pod you just created:
 ```bash
 cluster/kubectl.sh delete pods php
 ```
+
+Since this pod is scheduled on a minion running in GCE, you will have to enable incoming tcp traffic via the port specified in the
+pod manifest before you see the nginx welcome page. After doing so, it should be visible at http://<external ip of minion running nginx>:<port from manifest>.
 
 Look in `examples/` for more examples
 

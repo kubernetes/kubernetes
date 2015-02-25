@@ -22,6 +22,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -36,23 +37,23 @@ import (
 )
 
 type WatchHandler struct {
-	storage         map[string]RESTStorage
-	codec           runtime.Codec
-	canonicalPrefix string
-	selfLinker      runtime.SelfLinker
+	storage map[string]RESTStorage
+	codec   runtime.Codec
+	linker  runtime.SelfLinker
+	info    *APIRequestInfoResolver
 }
 
 // setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
 func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) error {
-	name, err := h.selfLinker.Name(obj)
+	name, err := h.linker.Name(obj)
 	if err != nil {
 		return err
 	}
 	newURL := *req.URL
-	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
+	newURL.Path = path.Join(req.URL.Path, name)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
-	return h.selfLinker.SetSelfLink(obj, newURL.String())
+	return h.linker.SetSelfLink(obj, newURL.String())
 }
 
 func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string, err error) {
@@ -82,39 +83,51 @@ func isWebsocketRequest(req *http.Request) bool {
 
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var verb string
+	var apiResource string
+	var httpCode int
+	reqStart := time.Now()
+	defer monitor("watch", verb, apiResource, httpCode, reqStart)
+
 	if req.Method != "GET" {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 
-	namespace, kind, _, err := KindAndNamespace(req)
+	requestInfo, err := h.info.GetAPIRequestInfo(req)
 	if err != nil {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	verb = requestInfo.Verb
+	ctx := api.WithNamespace(api.NewContext(), requestInfo.Namespace)
 
-	storage := h.storage[kind]
+	storage := h.storage[requestInfo.Resource]
 	if storage == nil {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
+	apiResource = requestInfo.Resource
 	watcher, ok := storage.(ResourceWatcher)
 	if !ok {
-		errorJSON(errors.NewMethodNotSupported(kind, "watch"), h.codec, w)
+		httpCode = errorJSON(errors.NewMethodNotSupported(requestInfo.Resource, "watch"), h.codec, w)
 		return
 	}
 
 	label, field, resourceVersion, err := getWatchParams(req.URL.Query())
 	if err != nil {
-		errorJSON(err, h.codec, w)
+		httpCode = errorJSON(err, h.codec, w)
 		return
 	}
 	watching, err := watcher.Watch(ctx, label, field, resourceVersion)
 	if err != nil {
-		errorJSON(err, h.codec, w)
+		httpCode = errorJSON(err, h.codec, w)
 		return
 	}
+	httpCode = http.StatusOK
 
 	// TODO: This is one watch per connection. We want to multiplex, so that
 	// multiple watches of the same thing don't create two watches downstream.

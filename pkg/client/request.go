@@ -18,6 +18,7 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 	"github.com/golang/glog"
@@ -41,12 +43,6 @@ import (
 // specialParams lists parameters that are handled specially and which users of Request
 // are therefore not allowed to set manually.
 var specialParams = util.NewStringSet("timeout")
-
-// PollFunc is called when a server operation returns 202 accepted. The name of the
-// operation is extracted from the response and passed to this function. Return a
-// request to retrieve the result of the operation, or false for the second argument
-// if polling should end.
-type PollFunc func(name string) (*Request, bool)
 
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
@@ -86,10 +82,6 @@ type Request struct {
 	baseURL *url.URL
 	codec   runtime.Codec
 
-	// optional, will be invoked if the server returns a 202 to decide
-	// whether to poll.
-	poller PollFunc
-
 	// If true, add "?namespace=<namespace>" as a query parameter, if false put ns/<namespace> in path
 	// Query parameter is considered legacy behavior
 	namespaceInQuery bool
@@ -100,7 +92,7 @@ type Request struct {
 	// generic components accessible via method setters
 	path    string
 	subpath string
-	params  map[string]string
+	params  url.Values
 
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
@@ -191,6 +183,14 @@ func (r *Request) Namespace(namespace string) *Request {
 	return r
 }
 
+// NamespaceIfScoped is a convenience function to set a namespace if scoped is true
+func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
+	if scoped {
+		return r.Namespace(namespace)
+	}
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {
@@ -202,6 +202,29 @@ func (r *Request) AbsPath(segments ...string) *Request {
 		r.path = segments[0]
 	} else {
 		r.path = path.Join(segments...)
+	}
+	return r
+}
+
+// RequestURI overwrites existing path and parameters with the value of the provided server relative
+// URI. Some parameters (those in specialParameters) cannot be overwritten.
+func (r *Request) RequestURI(uri string) *Request {
+	if r.err != nil {
+		return r
+	}
+	locator, err := url.Parse(uri)
+	if err != nil {
+		r.err = err
+		return r
+	}
+	r.path = locator.Path
+	if len(locator.Query()) > 0 {
+		if r.params == nil {
+			r.params = make(url.Values)
+		}
+		for k, v := range locator.Query() {
+			r.params[k] = v
+		}
 	}
 	return r
 }
@@ -254,9 +277,9 @@ func (r *Request) setParam(paramName, value string) *Request {
 		return r
 	}
 	if r.params == nil {
-		r.params = make(map[string]string)
+		r.params = make(url.Values)
 	}
-	r.params[paramName] = value
+	r.params[paramName] = append(r.params[paramName], value)
 	return r
 }
 
@@ -305,26 +328,10 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// NoPoll indicates a server "working" response should be returned as an error
-func (r *Request) NoPoll() *Request {
-	return r.Poller(nil)
-}
-
-// Poller indicates this request should use the specified poll function to determine whether
-// a server "working" response should be retried. The poller is responsible for waiting or
-// outputting messages to the client.
-func (r *Request) Poller(poller PollFunc) *Request {
-	if r.err != nil {
-		return r
-	}
-	r.poller = poller
-	return r
-}
-
 func (r *Request) finalURL() string {
 	p := r.path
 	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
-		p = path.Join(p, "ns", r.namespace)
+		p = path.Join(p, "namespaces", r.namespace)
 	}
 	if len(r.resource) != 0 {
 		resource := r.resource
@@ -342,17 +349,19 @@ func (r *Request) finalURL() string {
 	finalURL.Path = p
 
 	query := url.Values{}
-	for key, value := range r.params {
-		query.Add(key, value)
+	for key, values := range r.params {
+		for _, value := range values {
+			query.Add(key, value)
+		}
 	}
 
-	if r.namespaceSet && r.namespaceInQuery && len(r.namespace) > 0 {
-		query.Add("namespace", r.namespace)
+	if r.namespaceSet && r.namespaceInQuery {
+		query.Set("namespace", r.namespace)
 	}
 
 	// timeout is handled specially here.
 	if r.timeout != 0 {
-		query.Add("timeout", r.timeout.String())
+		query.Set("timeout", r.timeout.String())
 	}
 	finalURL.RawQuery = query.Encode()
 	return finalURL.String()
@@ -429,8 +438,43 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
+// Upgrade upgrades the request so that it supports multiplexed bidirectional
+// streams. The current implementation uses SPDY, but this could be replaced
+// with HTTP/2 once it's available, or something else.
+func (r *Request) Upgrade(config *Config, newRoundTripperFunc func(*tls.Config) httpstream.UpgradeRoundTripper) (httpstream.Connection, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	upgradeRoundTripper := newRoundTripperFunc(tlsConfig)
+	wrapper, err := HTTPWrappersForConfig(config, upgradeRoundTripper)
+	if err != nil {
+		return nil, err
+	}
+
+	r.client = &http.Client{Transport: wrapper}
+
+	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating request: %s", err)
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Error sending request: %s", err)
+	}
+	defer resp.Body.Close()
+
+	return upgradeRoundTripper.NewConnection(resp)
+}
+
 // Do formats and executes the request. Returns a Result object for easy response
-// processing. Handles polling the server in the event a continuation was sent.
+// processing.
 //
 // Error type:
 //  * If the request can't be constructed, or an error happened earlier while building its
@@ -453,6 +497,14 @@ func (r *Request) Do() Result {
 			return Result{err: &RequestConstructionError{r.err}}
 		}
 
+		// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
+		if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
+			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set when a resource name is provided")}}
+		}
+		if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
+			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set during creation")}}
+		}
+
 		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
 		if err != nil {
 			return Result{err: &RequestConstructionError{err}}
@@ -464,10 +516,6 @@ func (r *Request) Do() Result {
 		}
 
 		respBody, created, err := r.transformResponse(resp, req)
-		if poll, ok := r.shouldPoll(err); ok {
-			r = poll
-			continue
-		}
 
 		// Check to see if we got a 429 Too Many Requests response code.
 		if resp.StatusCode == errors.StatusTooManyRequests {
@@ -487,27 +535,6 @@ func (r *Request) Do() Result {
 	}
 }
 
-// shouldPoll checks the server error for an incomplete operation
-// and if found returns a request that would check the response.
-// If no polling is necessary or possible, it will return false.
-func (r *Request) shouldPoll(err error) (*Request, bool) {
-	if err == nil || r.poller == nil {
-		return nil, false
-	}
-	apistatus, ok := err.(APIStatus)
-	if !ok {
-		return nil, false
-	}
-	status := apistatus.Status()
-	if status.Status != api.StatusWorking {
-		return nil, false
-	}
-	if status.Details == nil || len(status.Details.ID) == 0 {
-		return nil, false
-	}
-	return r.poller(status.Details.ID)
-}
-
 // transformResponse converts an API response into a structured API object.
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) ([]byte, bool, error) {
 	defer resp.Body.Close()
@@ -525,6 +552,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) ([]b
 	}
 
 	switch {
+	case resp.StatusCode == http.StatusSwitchingProtocols:
+		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
 			var err error = &UnexpectedStatusError{

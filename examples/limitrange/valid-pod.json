@@ -8,7 +8,7 @@
   "desiredState": {
     "manifest": {
       "version": "v1beta1",
-      "id": "invalid-pod",
+      "id": "valid-pod",
       "containers": [{
         "name": "kubernetes-serve-hostname",
         "image": "kubernetes/serve_hostname",        

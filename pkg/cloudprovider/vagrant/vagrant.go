@@ -80,7 +80,7 @@ func newVagrantCloud() (*VagrantCloud, error) {
 	}, nil
 }
 
-func (aws *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
+func (v *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 

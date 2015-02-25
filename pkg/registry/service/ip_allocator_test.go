@@ -214,6 +214,75 @@ func TestIPAdd(t *testing.T) {
 	}
 }
 
+func TestGenerateFirstTwoIPsFromSubnet(t *testing.T) {
+	// Arrange
+	testCases := []struct {
+		subnet        string
+		expected1stIP string
+		expected2ndIP string
+	}{
+		{"10.0.0.0/24", "10.0.0.1", "10.0.0.2"},
+		{"10.10.10.10/24", "10.10.10.1", "10.10.10.2"},
+		{"10.10.10.10/16", "10.10.0.1", "10.10.0.2"},
+		{"10.10.10.10/8", "10.0.0.1", "10.0.0.2"},
+		{"10.10.10.10/0", "0.0.0.1", "0.0.0.2"},
+		{"192.168.100.1/16", "192.168.0.1", "192.168.0.2"},
+		{"153.15.250.5/23", "153.15.250.1", "153.15.250.2"},
+		{"2001:db8::/48", "2001:db8::1", "2001:db8::2"},
+		{"2001:db8:123:255::/48", "2001:db8:123::1", "2001:db8:123::2"},
+		{"12.12.0.0/30", "12.12.0.1", "12.12.0.2"},
+	}
+
+	// Act & Assert
+	for _, testCase := range testCases {
+		_, subnet, _ := net.ParseCIDR(testCase.subnet)
+		firstIP, err := GetIndexedIP(subnet, 1)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		secondIP, err := GetIndexedIP(subnet, 2)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if firstIP.String() != testCase.expected1stIP {
+			t.Errorf("Unexpected first IP: Expected <%q> Actual <%q>", testCase.expected1stIP, firstIP.String())
+		}
+		if secondIP.String() != testCase.expected2ndIP {
+			t.Errorf("Unexpected second IP: Expected <%q> Actual <%q>", testCase.expected2ndIP, secondIP.String())
+		}
+	}
+}
+
+func TestGetIndexedIPSubnetTooSmall(t *testing.T) {
+	// Arrange
+	testCases := []struct {
+		subnet string
+	}{
+		{"12.12.0.0/32"},
+		{"12.12.0.0/31"},
+	}
+
+	// Act & Assert
+	for _, testCase := range testCases {
+		_, subnet, _ := net.ParseCIDR(testCase.subnet)
+		secondIP, err := GetIndexedIP(subnet, 2)
+		if err == nil {
+			t.Errorf("Expected error but no error occured for subnet: ", testCase.subnet)
+		}
+		thirdIP, err := GetIndexedIP(subnet, 3)
+		if err == nil {
+			t.Errorf("Expected error but no error occured for subnet: ", testCase.subnet)
+		}
+		if secondIP != nil {
+			t.Errorf("Unexpected second IP: Expected nil Actual <%q>", thirdIP.String())
+		}
+		if thirdIP != nil {
+			t.Errorf("Unexpected third IP: Expected nil Actual <%q>", secondIP.String())
+		}
+
+	}
+}
+
 func TestCopyIP(t *testing.T) {
 	ip1 := net.ParseIP("1.2.3.4")
 	ip2 := copyIP(ip1)

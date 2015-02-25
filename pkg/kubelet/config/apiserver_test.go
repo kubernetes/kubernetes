@@ -139,6 +139,47 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 }
 
+func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
+	pod1 := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "p", Namespace: "one"},
+		Spec:       api.PodSpec{Containers: []api.Container{{Image: "image/one"}}}}
+	pod2 := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "p", Namespace: "two"},
+		Spec:       api.PodSpec{Containers: []api.Container{{Image: "image/blah"}}}}
+
+	// Setup fake api client.
+	fakeWatch := watch.NewFake()
+	lw := fakePodLW{
+		listResp:  &api.PodList{Items: []api.Pod{pod1, pod2}},
+		watchResp: fakeWatch,
+	}
+
+	ch := make(chan interface{})
+
+	newSourceApiserverFromLW(lw, ch)
+
+	got, ok := <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	update := got.(kubelet.PodUpdate)
+	// Make sure that we get both pods.  Catches bug #2294.
+	if !(len(update.Pods) == 2) {
+		t.Errorf("Expected %d, Got %d", 2, len(update.Pods))
+	}
+
+	// Delete pod1
+	fakeWatch.Delete(&pod1)
+	got, ok = <-ch
+	if !ok {
+		t.Errorf("Unable to read from channel when expected")
+	}
+	update = got.(kubelet.PodUpdate)
+	if !(len(update.Pods) == 1) {
+		t.Errorf("Expected %d, Got %d", 1, len(update.Pods))
+	}
+}
+
 func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()

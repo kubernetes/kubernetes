@@ -10,10 +10,9 @@ desiredState:
       manifest:
         containers:
         - name: update-demo
-          image: DOCKER_HUB_USER/update-demo:kitten
+          image: kubernetes/update-demo:kitten
           ports:
-          - hostPort: 8080
-            containerPort: 80
+          - containerPort: 80
             protocol: TCP
     labels:
       name: update-demo

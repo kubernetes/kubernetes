@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
@@ -89,16 +90,17 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podU
 	readOnly := spec.Source.GCEPersistentDisk.ReadOnly
 
 	return &gcePersistentDisk{
-		podUID:     podUID,
-		volName:    spec.Name,
-		pdName:     pdName,
-		fsType:     fsType,
-		partition:  partition,
-		readOnly:   readOnly,
-		manager:    manager,
-		mounter:    mounter,
-		plugin:     plugin,
-		legacyMode: false,
+		podUID:      podUID,
+		volName:     spec.Name,
+		pdName:      pdName,
+		fsType:      fsType,
+		partition:   partition,
+		readOnly:    readOnly,
+		manager:     manager,
+		mounter:     mounter,
+		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
+		plugin:      plugin,
+		legacyMode:  false,
 	}, nil
 }
 
@@ -113,21 +115,22 @@ func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID
 		legacy = true
 	}
 	return &gcePersistentDisk{
-		podUID:     podUID,
-		volName:    volName,
-		manager:    manager,
-		mounter:    mounter,
-		plugin:     plugin,
-		legacyMode: legacy,
+		podUID:      podUID,
+		volName:     volName,
+		manager:     manager,
+		mounter:     mounter,
+		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
+		plugin:      plugin,
+		legacyMode:  legacy,
 	}, nil
 }
 
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(pd *gcePersistentDisk) error
+	AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(pd *gcePersistentDisk, devicePath string) error
+	DetachDisk(pd *gcePersistentDisk) error
 }
 
 // gcePersistentDisk volumes are disk resources provided by Google Compute Engine
@@ -145,14 +148,16 @@ type gcePersistentDisk struct {
 	readOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager pdManager
-	// Mounter interface that provides system calls to mount the disks.
-	mounter    mount.Interface
-	plugin     *gcePersistentDiskPlugin
-	legacyMode bool
+	// Mounter interface that provides system calls to mount the global path to the pod local path.
+	mounter mount.Interface
+	// diskMounter provides the interface that is used to mount the actual block device.
+	diskMounter mount.Interface
+	plugin      *gcePersistentDiskPlugin
+	legacyMode  bool
 }
 
 func detachDiskLogError(pd *gcePersistentDisk) {
-	err := pd.manager.DetachDisk(pd, "/dev/disk/by-id/google-"+pd.pdName)
+	err := pd.manager.DetachDisk(pd)
 	if err != nil {
 		glog.Warningf("Failed to detach disk: %v (%v)", pd, err)
 	}
@@ -174,7 +179,8 @@ func (pd *gcePersistentDisk) SetUp() error {
 		return nil
 	}
 
-	if err := pd.manager.AttachDisk(pd); err != nil {
+	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+	if err := pd.manager.AttachAndMountDisk(pd, globalPDPath); err != nil {
 		return err
 	}
 
@@ -191,10 +197,30 @@ func (pd *gcePersistentDisk) SetUp() error {
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
 	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
 	if err != nil {
-		os.RemoveAll(pd.GetPath())
+		mountpoint, mntErr := isMountPoint(pd.GetPath())
+		if mntErr != nil {
+			glog.Errorf("isMountpoint check failed: %v", mntErr)
+			return err
+		}
+		if mountpoint {
+			if mntErr = pd.mounter.Unmount(pd.GetPath(), 0); mntErr != nil {
+				glog.Errorf("Failed to unmount: %v", mntErr)
+				return err
+			}
+			mountpoint, mntErr := isMountPoint(pd.GetPath())
+			if mntErr != nil {
+				glog.Errorf("isMountpoint check failed: %v", mntErr)
+				return err
+			}
+			if mountpoint {
+				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", pd.GetPath())
+				return err
+			}
+		}
+		os.Remove(pd.GetPath())
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(pd)
 		return err
@@ -203,7 +229,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	return nil
 }
 
-func makeGlobalPDName(host volume.Host, devName string, readOnly bool) string {
+func makeGlobalPDName(host volume.Host, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }
 
@@ -223,24 +249,33 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return err
 	}
 	if !mountpoint {
-		return os.RemoveAll(pd.GetPath())
+		return os.Remove(pd.GetPath())
 	}
 
-	devicePath, refCount, err := getMountRefCount(pd.mounter, pd.GetPath())
+	refs, err := getMountRefs(pd.mounter, pd.GetPath())
 	if err != nil {
 		return err
 	}
+	// Unmount the bind-mount inside this pod
 	if err := pd.mounter.Unmount(pd.GetPath(), 0); err != nil {
 		return err
 	}
-	refCount--
-	if err := os.RemoveAll(pd.GetPath()); err != nil {
+	// If len(refs) is 1, then all bind mounts have been removed, and the
+	// remaining reference is the global mount. It is safe to detach.
+	if len(refs) == 1 {
+		// pd.pdName is not initially set for volume-cleaners, so set it here.
+		pd.pdName = path.Base(refs[0])
+		if err := pd.manager.DetachDisk(pd); err != nil {
+			return err
+		}
+	}
+	mountpoint, mntErr := isMountPoint(pd.GetPath())
+	if mntErr != nil {
+		glog.Errorf("isMountpoint check failed: %v", mntErr)
 		return err
 	}
-	// If refCount is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if refCount == 1 {
-		if err := pd.manager.DetachDisk(pd, devicePath); err != nil {
+	if !mountpoint {
+		if err := os.Remove(pd.GetPath()); err != nil {
 			return err
 		}
 	}

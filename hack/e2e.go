@@ -27,13 +27,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
@@ -44,20 +41,15 @@ var (
 	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
-	orderseed        = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
-	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
-	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
-	times            = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
+	test             = flag.Bool("test", false, "Run Ginkgo tests.")
+	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
-	tap              = flag.Bool("tap", false, "Enable Test Anything Protocol (TAP) output (disables --verbose, only failure output recorded)")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
-	trace_bash       = flag.Bool("trace-bash", false, "If true, pass -x to bash to trace all bash commands")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
 		"By default, verify that client and server have exact version match. "+
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
 
-	cfgCmd = flag.String("cfg", "", "If nonempty, pass this as an argument, and call kubecfg. Implies -v.")
 	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
 )
 
@@ -71,7 +63,6 @@ const (
 )
 
 var (
-	signals = make(chan os.Signal, 100)
 	// Root directory of the specified cluster version, rather than of where
 	// this script is being run from.
 	versionRoot = *root
@@ -94,22 +85,6 @@ type ResultsByTest map[string]TestResult
 
 func main() {
 	flag.Parse()
-	signal.Notify(signals, os.Interrupt)
-
-	if *tap {
-		fmt.Printf("TAP version 13\n")
-		log.SetPrefix("# ")
-
-		// TODO: this limitation is fixable by moving runBash to
-		// outputing to temp files, which still lets people check on
-		// stuck things interactively. The current stdout/stderr
-		// approach isn't really going to work with TAP, though.
-		*verbose = false
-	}
-
-	if *test {
-		*tests = "*"
-	}
 
 	if *isup {
 		status := 1
@@ -123,7 +98,11 @@ func main() {
 	}
 
 	if *build {
-		if !runBash("build-release", `test-build-release`) {
+		// The build-release script needs stdin to ask the user whether
+		// it's OK to download the docker image.
+		cmd := exec.Command(path.Join(*root, "hack/e2e-internal/build-release.sh"))
+		cmd.Stdin = os.Stdin
+		if !finishRunning("build-release", cmd) {
 			log.Fatal("Error building. Aborting.")
 		}
 	}
@@ -138,8 +117,11 @@ func main() {
 			log.Fatalf("Error preparing a binary of version %s: %s. Aborting.", *version, err)
 		} else {
 			versionRoot = newVersionRoot
+			os.Setenv("KUBE_VERSION_ROOT", newVersionRoot)
 		}
 	}
+
+	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
 
 	if *pushup {
 		if IsUp() {
@@ -157,32 +139,32 @@ func main() {
 			log.Fatal("Error starting e2e cluster. Aborting.")
 		}
 	} else if *push {
-		if !runBash("push", path.Join(versionRoot, "/cluster/kube-push.sh")) {
+		if !finishRunning("push", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-push.sh"))) {
 			log.Fatal("Error pushing e2e cluster. Aborting.")
 		}
 	}
 
-	failure := false
+	success := true
 	switch {
-	case *cfgCmd != "":
-		failure = !runBash("'kubecfg "+*cfgCmd+"'", "$KUBECFG "+*cfgCmd)
 	case *ctlCmd != "":
-		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
-	case *tests != "":
-		failure = PrintResults(Test())
+		ctlArgs := strings.Fields(*ctlCmd)
+		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
+		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
+	case *test:
+		success = Test()
 	}
 
 	if *down {
 		TearDown()
 	}
 
-	if failure {
+	if !success {
 		os.Exit(1)
 	}
 }
 
 func TearDown() bool {
-	return runBash("teardown", "test-teardown")
+	return finishRunning("teardown", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-down.sh")))
 }
 
 // Up brings an e2e cluster up, recreating it if one is already running.
@@ -194,20 +176,22 @@ func Up() bool {
 		}
 	}
 
-	return runBash("up", path.Join(versionRoot, "/cluster/kube-up.sh; test-setup;"))
+	return finishRunning("up", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-up.sh")))
 }
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
 	// Check that there are at least 3 minions running
-	res, stdout, _ := runBashWithOutputs(
-		"validate cluster size",
-		"cluster/kubectl.sh get minions --no-headers | wc -l")
-	if !res {
-		log.Fatal("Could not get nodes to validate cluster size")
+	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
+	if *verbose {
+		cmd.Stderr = os.Stderr
+	}
+	stdout, err := cmd.Output()
+	if err != nil {
+		log.Fatal("Could not get nodes to validate cluster size (%s)", err)
 	}
 
-	numNodes, err := strconv.Atoi(strings.TrimSpace(stdout))
+	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
 	if err != nil {
 		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
 	}
@@ -219,7 +203,7 @@ func ValidateClusterSize() {
 
 // Is the e2e cluster up?
 func IsUp() bool {
-	return runBash("get status", `$KUBECTL version`)
+	return finishRunning("get status", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-status.sh")))
 }
 
 // PrepareVersion makes sure that the specified release version is locally
@@ -262,7 +246,7 @@ func PrepareVersion(version string) (string, error) {
 		}
 		out.Close()
 	}
-	if !runRawBash("untarRelease", fmt.Sprintf("tar -C %s -zxf %s --strip-components=1", localReleaseDir, localReleaseTar)) {
+	if !finishRunning("untarRelease", exec.Command("tar", "-C", localReleaseDir, "-zxf", localReleaseTar, "--strip-components=1")) {
 		log.Fatal("Failed to untar release. Aborting.")
 	}
 	// Now that we have the binaries saved locally, use the path to the untarred
@@ -278,8 +262,8 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 	}
 }
 
-func Test() (results ResultsByTest) {
-	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
+func Test() bool {
+	defer runBashUntil("watchEvents", exec.Command(filepath.Join(*root, "hack/e2e-internal/e2e-watch-events.sh")))()
 
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
@@ -287,162 +271,16 @@ func Test() (results ResultsByTest) {
 
 	ValidateClusterSize()
 
-	// run tests!
-	dir, err := os.Open(filepath.Join(*root, "hack", "e2e-suite"))
-	if err != nil {
-		log.Fatal("Couldn't open e2e-suite dir")
-	}
-	defer dir.Close()
-	names, err := dir.Readdirnames(0)
-	if err != nil {
-		log.Fatal("Couldn't read names in e2e-suite dir")
-	}
-
-	toRun := make([]string, 0, len(names))
-	for i := range names {
-		name := names[i]
-		if name == "." || name == ".." {
-			continue
-		}
-		if match, err := path.Match(*tests, name); !match && err == nil {
-			continue
-		}
-		if err != nil {
-			log.Fatalf("Bad test pattern: %v", *tests)
-		}
-		toRun = append(toRun, name)
-	}
-
-	if *orderseed == 0 {
-		// Use low order bits of NanoTime as the default seed. (Using
-		// all the bits makes for a long, very similar looking seed
-		// between runs.)
-		*orderseed = time.Now().UnixNano() & (1<<32 - 1)
-	}
-	sort.Strings(toRun)
-	if *times != 1 {
-		if *times <= 0 {
-			log.Fatal("Invalid --times (negative or no testing requested)!")
-		}
-		newToRun := make([]string, 0, *times*len(toRun))
-		for i := 0; i < *times; i++ {
-			newToRun = append(newToRun, toRun...)
-		}
-		toRun = newToRun
-	}
-	shuffleStrings(toRun, rand.New(rand.NewSource(*orderseed)))
-	log.Printf("Running tests matching %v shuffled with seed %#x: %v", *tests, *orderseed, toRun)
-	results = ResultsByTest{}
-	if *tap {
-		fmt.Printf("1..%v\n", len(toRun))
-	}
-	for i, name := range toRun {
-		absName := filepath.Join(*root, "hack", "e2e-suite", name)
-		log.Printf("Starting test [%v/%v]: %v", i+1, len(toRun), name)
-		start := time.Now()
-		testResult := results[name]
-		res, stdout, stderr := runBashWithOutputs(name, absName)
-		// The duration_ms output is an undocumented Jenkins TAP
-		// plugin feature for test duration. One might think _ms means
-		// milliseconds, but Jenkins interprets this field in seconds.
-		duration_secs := time.Now().Sub(start).Seconds()
-		if res {
-			fmt.Printf("ok %v - %v\n", i+1, name)
-			if *tap {
-				fmt.Printf("  ---\n  duration_ms: %.3f\n  ...\n", duration_secs)
-			}
-			testResult.Pass++
-		} else {
-			fmt.Printf("not ok %v - %v\n", i+1, name)
-			if *tap {
-				fmt.Printf("  ---\n  duration_ms: %.3f\n", duration_secs)
-			}
-			printBashOutputs("  ", "    ", stdout, stderr, *tap)
-			if *tap {
-				fmt.Printf("  ...\n")
-			}
-			testResult.Fail++
-		}
-		results[name] = testResult
-	}
-
-	return
-}
-
-func PrintResults(results ResultsByTest) bool {
-	failures := 0
-
-	passed := []string{}
-	flaky := []string{}
-	failed := []string{}
-	for test, result := range results {
-		if result.Pass > 0 && result.Fail == 0 {
-			passed = append(passed, test)
-		} else if result.Pass > 0 && result.Fail > 0 {
-			flaky = append(flaky, test)
-			failures += result.Fail
-		} else {
-			failed = append(failed, test)
-			failures += result.Fail
-		}
-	}
-	sort.Strings(passed)
-	sort.Strings(flaky)
-	sort.Strings(failed)
-	printSubreport("Passed", passed, results)
-	printSubreport("Flaky", flaky, results)
-	printSubreport("Failed", failed, results)
-	if failures > 0 {
-		log.Printf("%v test(s) failed.", failures)
-	} else {
-		log.Printf("Success!")
-	}
-
-	return failures > 0
-}
-
-func printSubreport(title string, tests []string, results ResultsByTest) {
-	report := title + " tests:"
-
-	for _, test := range tests {
-		result := results[test]
-		report += fmt.Sprintf(" %v[%v/%v]", test, result.Pass, result.Pass+result.Fail)
-	}
-	log.Printf(report)
+	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
 }
 
 // All nonsense below is temporary until we have go versions of these things.
 
-// Runs the provided bash without wrapping it in any kubernetes-specific gunk.
-func runRawBashWithOutputs(stepName, bash string) (bool, string, string) {
-	cmd := exec.Command("bash", "-s")
-	if *trace_bash {
-		cmd.Args = append(cmd.Args, "-x")
-	}
-	cmd.Stdin = strings.NewReader(bash)
-	return finishRunning(stepName, cmd)
-}
-
-func runRawBash(stepName, bashFragment string) bool {
-	result, _, _ := runRawBashWithOutputs(stepName, bashFragment)
-	return result
-}
-
-func runBashWithOutputs(stepName, bashFragment string) (bool, string, string) {
-	return runRawBashWithOutputs(stepName, bashWrap(bashFragment))
-}
-
-func runBash(stepName, bashFragment string) bool {
-	return runRawBash(stepName, bashWrap(bashFragment))
-}
-
 // call the returned anonymous function to stop.
-func runBashUntil(stepName, bashFragment string) func() {
-	cmd := exec.Command("bash", "-s")
-	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
+func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 	log.Printf("Running in background: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
+	output := bytes.NewBuffer(nil)
+	cmd.Stdout, cmd.Stderr = output, output
 	if err := cmd.Start(); err != nil {
 		log.Printf("Unable to start '%v': '%v'", stepName, err)
 		return func() {}
@@ -451,83 +289,28 @@ func runBashUntil(stepName, bashFragment string) func() {
 		cmd.Process.Signal(os.Interrupt)
 		headerprefix := stepName + " "
 		lineprefix := "  "
-		if *tap {
-			headerprefix = "# " + headerprefix
-			lineprefix = "# " + lineprefix
-		}
-		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()), false)
+		printBashOutputs(headerprefix, lineprefix, string(output.Bytes()), false)
 	}
 }
 
-func finishRunning(stepName string, cmd *exec.Cmd) (bool, string, string) {
-	log.Printf("Running: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	if *verbose {
-		cmd.Stdout = io.MultiWriter(os.Stdout, stdout)
-		cmd.Stderr = io.MultiWriter(os.Stderr, stderr)
-	} else {
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 	}
-
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case s := <-signals:
-				cmd.Process.Signal(s)
-			}
-		}
-	}()
-
+	log.Printf("Running: %v", stepName)
 	if err := cmd.Run(); err != nil {
 		log.Printf("Error running %v: %v", stepName, err)
-		return false, string(stdout.Bytes()), string(stderr.Bytes())
+		return false
 	}
-	return true, string(stdout.Bytes()), string(stderr.Bytes())
+	return true
 }
 
-func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bool) {
-	// The |'s (plus appropriate prefixing) are to make this look
-	// "YAMLish" to the Jenkins TAP plugin:
-	//   https://wiki.jenkins-ci.org/display/JENKINS/TAP+Plugin
-	if stdout != "" {
-		fmt.Printf("%vstdout: |\n", headerprefix)
-		if escape {
-			stdout = escapeOutput(stdout)
-		}
-		printPrefixedLines(lineprefix, stdout)
+func printBashOutputs(headerprefix, lineprefix, output string, escape bool) {
+	if output != "" {
+		fmt.Printf("%voutput: |\n", headerprefix)
+		printPrefixedLines(lineprefix, output)
 	}
-	if stderr != "" {
-		fmt.Printf("%vstderr: |\n", headerprefix)
-		if escape {
-			stderr = escapeOutput(stderr)
-		}
-		printPrefixedLines(lineprefix, stderr)
-	}
-}
-
-// Escape stdout/stderr so the Jenkins YAMLish parser doesn't barf on
-// it. This escaping is crude (it masks all colons as something humans
-// will hopefully see as a colon, for instance), but it should get the
-// job done without pulling in a whole YAML package.
-func escapeOutput(s string) (out string) {
-	for _, r := range s {
-		switch {
-		case r == '\n':
-			out += string(r)
-		case !strconv.IsPrint(r):
-			out += " "
-		case r == ':':
-			out += "\ua789" // "꞉", modifier letter colon
-		default:
-			out += string(r)
-		}
-	}
-	return
 }
 
 func printPrefixedLines(prefix, s string) {
@@ -537,41 +320,10 @@ func printPrefixedLines(prefix, s string) {
 }
 
 // returns either "", or a list of args intended for appending with the
-// kubecfg or kubectl commands (begining with a space).
-func kubecfgArgs() string {
-	if *checkVersionSkew {
-		return " -expect_version_match"
-	}
-	return ""
-}
-
-// returns either "", or a list of args intended for appending with the
 // kubectl command (begining with a space).
 func kubectlArgs() string {
 	if *checkVersionSkew {
 		return " --match-server-version"
 	}
 	return ""
-}
-
-func bashWrap(cmd string) string {
-	return `
-set -o errexit
-set -o nounset
-set -o pipefail
-
-export KUBE_CONFIG_FILE="config-test.sh"
-
-# TODO(jbeda): This will break on usage if there is a space in
-# ${KUBE_ROOT}.  Convert to an array?  Or an exported function?
-export KUBECFG="` + versionRoot + `/cluster/kubecfg.sh` + kubecfgArgs() + `"
-export KUBECTL="` + versionRoot + `/cluster/kubectl.sh` + kubectlArgs() + `"
-
-source "` + *root + `/cluster/kube-env.sh"
-source "` + versionRoot + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
-
-prepare-e2e
-
-` + cmd + `
-`
 }

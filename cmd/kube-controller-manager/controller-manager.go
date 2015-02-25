@@ -21,101 +21,30 @@ limitations under the License.
 package main
 
 import (
-	"net"
-	"net/http"
-	"strconv"
-	"time"
+	"fmt"
+	"os"
+	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
-	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-controller-manager/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
-	"github.com/golang/glog"
-	flag "github.com/spf13/pflag"
+	"github.com/spf13/pflag"
 )
-
-var (
-	port            = flag.Int("port", ports.ControllerManagerPort, "The port that the controller-manager's http service runs on")
-	address         = util.IP(net.ParseIP("127.0.0.1"))
-	clientConfig    = &client.Config{}
-	cloudProvider   = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
-	cloudConfigFile = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	minionRegexp    = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
-	nodeSyncPeriod  = flag.Duration("node_sync_period", 10*time.Second, ""+
-		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
-		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
-	machineList util.StringList
-	// TODO: Discover these by pinging the host machines, and rip out these flags.
-	// TODO: in the meantime, use resource.QuantityFlag() instead of these
-	nodeMilliCPU            = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory              = resource.QuantityFlag("node_memory", "3Gi", "The amount of memory (in bytes) provisioned on each node")
-	resourceQuotaSyncPeriod = flag.Duration("resource_quota_sync_period", 10*time.Second, "The period for syncing quota usage status in the system")
-)
-
-func init() {
-	flag.Var(&address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
-	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
-}
-
-func verifyMinionFlags() {
-	if *cloudProvider == "" || *minionRegexp == "" {
-		if len(machineList) == 0 {
-			glog.Info("No machines specified!")
-		}
-		return
-	}
-	if len(machineList) != 0 {
-		glog.Info("-machines is overwritten by -minion_regexp")
-	}
-}
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	s := app.NewCMServer()
+	s.AddFlags(pflag.CommandLine)
+
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
-	verifyMinionFlags()
 
-	if len(clientConfig.Host) == 0 {
-		glog.Fatal("usage: controller-manager -master <master>")
+	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+		fmt.Fprint(os.Stderr, err.Error)
+		os.Exit(1)
 	}
-
-	kubeClient, err := client.New(clientConfig)
-	if err != nil {
-		glog.Fatalf("Invalid API configuration: %v", err)
-	}
-
-	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
-
-	endpoints := service.NewEndpointController(kubeClient)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
-
-	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
-	controllerManager.Run(10 * time.Second)
-
-	cloud := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
-	nodeResources := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(*nodeMilliCPU, resource.DecimalSI),
-			api.ResourceMemory: *nodeMemory,
-		},
-	}
-	nodeController := nodeControllerPkg.NewNodeController(cloud, *minionRegexp, machineList, nodeResources, kubeClient)
-	nodeController.Run(*nodeSyncPeriod)
-
-	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
-	resourceQuotaManager.Run(*resourceQuotaSyncPeriod)
-
-	select {}
 }

@@ -22,11 +22,11 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -50,7 +50,9 @@ func TestListControllersError(t *testing.T) {
 }
 
 func TestListEmptyControllerList(t *testing.T) {
-	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{ListMeta: api.ListMeta{ResourceVersion: "1"}}}
+	mockRegistry := registrytest.ControllerRegistry{
+		Controllers: &api.ReplicationControllerList{ListMeta: api.ListMeta{ResourceVersion: "1"}},
+	}
 	storage := REST{
 		registry: &mockRegistry,
 	}
@@ -106,6 +108,7 @@ func TestListControllerList(t *testing.T) {
 	}
 }
 
+// TODO: remove, this is sufficiently covered by other tests
 func TestControllerDecode(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
 	storage := REST{
@@ -121,6 +124,10 @@ func TestControllerDecode(t *testing.T) {
 					Labels: map[string]string{
 						"name": "nginx",
 					},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -140,10 +147,11 @@ func TestControllerDecode(t *testing.T) {
 	}
 }
 
+// TODO: this is sufficiently covered by other tetss
 func TestControllerParsing(t *testing.T) {
 	expectedController := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name: "nginxController",
+			Name: "nginx-controller",
 			Labels: map[string]string{
 				"name": "nginx",
 			},
@@ -220,14 +228,18 @@ var validPodTemplate = api.PodTemplate{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  "test",
-					Image: "test_image",
+					Name:            "test",
+					Image:           "test_image",
+					ImagePullPolicy: api.PullIfNotPresent,
 				},
 			},
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	},
 }
 
+// TODO: remove, this is sufficiently covered by other tests
 func TestCreateController(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
 	mockPodRegistry := registrytest.PodRegistry{
@@ -243,9 +255,8 @@ func TestCreateController(t *testing.T) {
 		},
 	}
 	storage := REST{
-		registry:   &mockRegistry,
-		podLister:  &mockPodRegistry,
-		pollPeriod: time.Millisecond * 1,
+		registry:  &mockRegistry,
+		podLister: &mockPodRegistry,
 	}
 	controller := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "test"},
@@ -256,31 +267,25 @@ func TestCreateController(t *testing.T) {
 		},
 	}
 	ctx := api.NewDefaultContext()
-	channel, err := storage.Create(ctx, controller)
+	obj, err := storage.Create(ctx, controller)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	if obj == nil {
+		t.Errorf("unexpected object")
 	}
 	if !api.HasObjectMetaSystemFieldValues(&controller.ObjectMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 
-	select {
-	case <-channel:
-		// expected case
-	case <-time.After(time.Millisecond * 100):
-		t.Error("Unexpected timeout from async channel")
-	}
 }
 
+// TODO: remove, covered by TestCreate
 func TestControllerStorageValidatesCreate(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
 	storage := REST{
-		registry:   &mockRegistry,
-		podLister:  nil,
-		pollPeriod: time.Millisecond * 1,
+		registry:  &mockRegistry,
+		podLister: nil,
 	}
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
@@ -309,9 +314,8 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 func TestControllerStorageValidatesUpdate(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
 	storage := REST{
-		registry:   &mockRegistry,
-		podLister:  nil,
-		pollPeriod: time.Millisecond * 1,
+		registry:  &mockRegistry,
+		podLister: nil,
 	}
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
@@ -327,9 +331,9 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 	}
 	ctx := api.NewDefaultContext()
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(ctx, &failureCase)
-		if c != nil {
-			t.Errorf("Expected nil channel")
+		c, created, err := storage.Update(ctx, &failureCase)
+		if c != nil || created {
+			t.Errorf("Expected nil object and not created")
 		}
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
@@ -379,6 +383,32 @@ func TestFillCurrentState(t *testing.T) {
 	}
 }
 
+// TODO: remove, covered by TestCreate
+func TestCreateControllerWithGeneratedName(t *testing.T) {
+	storage := NewREST(&registrytest.ControllerRegistry{}, nil)
+	controller := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Namespace:    api.NamespaceDefault,
+			GenerateName: "rc-",
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 2,
+			Selector: map[string]string{"a": "b"},
+			Template: &validPodTemplate.Spec,
+		},
+	}
+
+	ctx := api.NewDefaultContext()
+	_, err := storage.Create(ctx, controller)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if controller.Name == "rc-" || !strings.HasPrefix(controller.Name, "rc-") {
+		t.Errorf("unexpected name: %#v", controller)
+	}
+}
+
+// TODO: remove, covered by TestCreate
 func TestCreateControllerWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	controller := &api.ReplicationController{
@@ -392,7 +422,7 @@ func TestCreateControllerWithConflictingNamespace(t *testing.T) {
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Controller.Namespace does not match the provided context") == -1 {
+	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
 		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
@@ -404,13 +434,36 @@ func TestUpdateControllerWithConflictingNamespace(t *testing.T) {
 	}
 
 	ctx := api.NewDefaultContext()
-	channel, err := storage.Update(ctx, controller)
-	if channel != nil {
-		t.Error("Expected a nil channel, but we got a value")
+	obj, created, err := storage.Update(ctx, controller)
+	if obj != nil || created {
+		t.Error("Expected a nil object, but we got a value or created was true")
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Index(err.Error(), "Controller.Namespace does not match the provided context") == -1 {
 		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
+}
+
+func TestCreate(t *testing.T) {
+	registry := &registrytest.ControllerRegistry{}
+	test := resttest.New(t, NewREST(registry, nil), registry.SetError)
+	test.TestCreate(
+		// valid
+		&api.ReplicationController{
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 2,
+				Selector: map[string]string{"a": "b"},
+				Template: &validPodTemplate.Spec,
+			},
+		},
+		// invalid
+		&api.ReplicationController{
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 2,
+				Selector: map[string]string{},
+				Template: &validPodTemplate.Spec,
+			},
+		},
+	)
 }

@@ -56,9 +56,9 @@
     - user: root
     - group: root
 
-/usr/lib/systemd/scripts/kube-addons:
+/etc/kubernetes/kube-addons.sh:
   file.managed:
-    - source: salt://kube-addons/initd
+    - source: salt://kube-addons/kube-addons.sh
     - user: root
     - group: root
     - mode: 755

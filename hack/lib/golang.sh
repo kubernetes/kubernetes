@@ -24,6 +24,7 @@ readonly KUBE_SERVER_TARGETS=(
   cmd/kube-apiserver
   cmd/kube-controller-manager
   cmd/kubelet
+  cmd/hyperkube
   plugin/cmd/kube-scheduler
 )
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
@@ -35,7 +36,6 @@ readonly KUBE_SERVER_PLATFORMS=(
 
 # The set of client targets that we are building for all platforms
 readonly KUBE_CLIENT_TARGETS=(
-  cmd/kubecfg
   cmd/kubectl
   cmd/kubernetes
 )
@@ -47,16 +47,17 @@ readonly KUBE_TEST_TARGETS=(
   cmd/e2e
   cmd/integration
   cmd/gendocs
+  cmd/genman
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
-  api/examples/pod.json
-  test/e2e/pod.json
   contrib/for-tests/network-tester/rc.json
   contrib/for-tests/network-tester/service.json
   hack/e2e.go
   hack/e2e-suite
+  hack/e2e-internal
+  hack/ginkgo-e2e.sh
 )
 
 # If we update this we need to also update the set of golang compilers we build

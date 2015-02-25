@@ -95,8 +95,9 @@ type resourceRequest struct {
 func getResourceRequest(pod *api.Pod) resourceRequest {
 	result := resourceRequest{}
 	for ix := range pod.Spec.Containers {
-		result.memory += pod.Spec.Containers[ix].Memory.Value()
-		result.milliCPU += pod.Spec.Containers[ix].CPU.MilliValue()
+		limits := pod.Spec.Containers[ix].Resources.Limits
+		result.memory += limits.Memory().Value()
+		result.milliCPU += limits.Cpu().MilliValue()
 	}
 	return result
 }
@@ -120,8 +121,8 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 		memoryRequested += existingRequest.memory
 	}
 
-	totalMilliCPU := info.Spec.Capacity.Get(api.ResourceCPU).MilliValue()
-	totalMemory := info.Spec.Capacity.Get(api.ResourceMemory).Value()
+	totalMilliCPU := info.Spec.Capacity.Cpu().MilliValue()
+	totalMemory := info.Spec.Capacity.Memory().Value()
 
 	fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 	fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory

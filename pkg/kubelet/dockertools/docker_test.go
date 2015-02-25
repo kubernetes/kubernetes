@@ -123,7 +123,7 @@ func TestContainerManifestNaming(t *testing.T) {
 func TestGetDockerServerVersion(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
 	runner := dockerContainerCommandRunner{fakeDocker}
-	version, err := runner.getDockerServerVersion()
+	version, err := runner.GetDockerServerVersion()
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
 	}
@@ -193,6 +193,27 @@ func TestParseImageName(t *testing.T) {
 		if name != tt.name || tag != tt.tag {
 			t.Errorf("Expected name/tag: %s/%s, got %s/%s", tt.name, tt.tag, name, tag)
 		}
+	}
+}
+
+func TestDockerKeyringLookupFails(t *testing.T) {
+	fakeKeyring := &credentialprovider.FakeKeyring{}
+	fakeClient := &FakeDockerClient{
+		Err: fmt.Errorf("test error"),
+	}
+
+	dp := dockerPuller{
+		client:  fakeClient,
+		keyring: fakeKeyring,
+	}
+
+	err := dp.Pull("host/repository/image:version")
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	msg := "image pull failed for host/repository/image, this may be because there are no credentials on this request.  details: (test error)"
+	if err.Error() != msg {
+		t.Errorf("expected: %s, saw: %s", msg, err.Error())
 	}
 }
 
@@ -325,5 +346,108 @@ func TestIsImagePresent(t *testing.T) {
 	_, _ = puller.IsImagePresent("abc:123")
 	if cl.imageName != "abc:123" {
 		t.Errorf("expected inspection of image abc:123, instead inspected image %v", cl.imageName)
+	}
+}
+
+func TestGetRunningContainers(t *testing.T) {
+	fakeDocker := &FakeDockerClient{}
+	tests := []struct {
+		containers  map[string]*docker.Container
+		inputIDs    []string
+		expectedIDs []string
+		err         error
+	}{
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: false,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: true,
+					},
+				},
+			},
+			inputIDs:    []string{"foobar", "baz"},
+			expectedIDs: []string{"baz"},
+		},
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: true,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: true,
+					},
+				},
+			},
+			inputIDs:    []string{"foobar", "baz"},
+			expectedIDs: []string{"foobar", "baz"},
+		},
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: false,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: false,
+					},
+				},
+			},
+			inputIDs:    []string{"foobar", "baz"},
+			expectedIDs: []string{},
+		},
+		{
+			containers: map[string]*docker.Container{
+				"foobar": {
+					ID: "foobar",
+					State: docker.State{
+						Running: false,
+					},
+				},
+				"baz": {
+					ID: "baz",
+					State: docker.State{
+						Running: false,
+					},
+				},
+			},
+			inputIDs: []string{"foobar", "baz"},
+			err:      fmt.Errorf("test error"),
+		},
+	}
+	for _, test := range tests {
+		fakeDocker.ContainerMap = test.containers
+		fakeDocker.Err = test.err
+		if results, err := GetRunningContainers(fakeDocker, test.inputIDs); err == nil {
+			resultIDs := []string{}
+			for _, result := range results {
+				resultIDs = append(resultIDs, result.ID)
+			}
+			if !reflect.DeepEqual(resultIDs, test.expectedIDs) {
+				t.Errorf("expected: %v, saw: %v", test.expectedIDs, resultIDs)
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		} else {
+			if err != test.err {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
 	}
 }
