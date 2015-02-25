@@ -472,18 +472,18 @@ const (
 	PodUnknown PodPhase = "Unknown"
 )
 
-type PodConditionKind string
+type PodConditionType string
 
 // These are valid conditions of pod.
 const (
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
-	PodReady PodConditionKind = "Ready"
+	PodReady PodConditionType = "Ready"
 )
 
 // TODO: add LastTransitionTime, Reason, Message to match NodeCondition api.
 type PodCondition struct {
-	Kind   PodConditionKind `json:"kind"`
+	Type   PodConditionType `json:"type"`
 	Status ConditionStatus  `json:"status"`
 }
 
@@ -805,20 +805,20 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
-type NodeConditionKind string
+type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
 // node condition. In the future, we will add more. The proposed set of conditions are:
 // NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
 const (
 	// NodeReachable means the node can be reached (in the sense of HTTP connection) from node controller.
-	NodeReachable NodeConditionKind = "Reachable"
+	NodeReachable NodeConditionType = "Reachable"
 	// NodeReady means the node returns StatusOK for HTTP health check.
-	NodeReady NodeConditionKind = "Ready"
+	NodeReady NodeConditionType = "Ready"
 )
 
 type NodeCondition struct {
-	Kind               NodeConditionKind `json:"kind"`
+	Type               NodeConditionType `json:"type"`
 	Status             ConditionStatus   `json:"status"`
 	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty"`
 	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty"`

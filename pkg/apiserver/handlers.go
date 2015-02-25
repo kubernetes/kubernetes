@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -214,8 +215,22 @@ type APIRequestInfo struct {
 	Kind string
 	// Name is empty for some verbs, but if the request directly indicates a name (not in body content) then this field is filled in.
 	Name string
-	// Parts are the path parts for the request relative to /{resource}/{name}
+	// Parts are the path parts for the request, always starting with /{resource}/{name}
 	Parts []string
+	// Raw is the unparsed form of everything other than parts.
+	// Raw + Parts = complete URL path
+	Raw []string
+}
+
+// URLPath returns the URL path for this request, including /{resource}/{name} if present but nothing
+// following that.
+func (info APIRequestInfo) URLPath() string {
+	p := info.Parts
+	if n := len(p); n > 2 {
+		// Only take resource and name
+		p = p[:2]
+	}
+	return path.Join("/", path.Join(info.Raw...), path.Join(p...))
 }
 
 type APIRequestInfoResolver struct {
@@ -247,9 +262,11 @@ type APIRequestInfoResolver struct {
 // /api/{version}/*
 // /api/{version}/*
 func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIRequestInfo, error) {
-	requestInfo := APIRequestInfo{}
+	requestInfo := APIRequestInfo{
+		Raw: splitPath(req.URL.Path),
+	}
 
-	currentParts := splitPath(req.URL.Path)
+	currentParts := requestInfo.Raw
 	if len(currentParts) < 1 {
 		return requestInfo, fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
 	}
@@ -322,6 +339,8 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	// parsing successful, so we now know the proper value for .Parts
 	requestInfo.Parts = currentParts
+	// Raw should have everything not in Parts
+	requestInfo.Raw = requestInfo.Raw[:len(requestInfo.Raw)-len(currentParts)]
 
 	// if there's another part remaining after the kind, then that's the resource name
 	if len(requestInfo.Parts) >= 2 {

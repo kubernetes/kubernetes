@@ -238,6 +238,7 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(endpointColumns, printEndpoints)
+	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
 	h.Handler(nodeColumns, printNodeList)
 	h.Handler(statusColumns, printStatus)
@@ -379,6 +380,15 @@ func printEndpoints(endpoint *api.Endpoints, w io.Writer) error {
 	return err
 }
 
+func printEndpointsList(list *api.EndpointsList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printEndpoints(&item, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func printNamespace(item *api.Namespace, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\n", item.Name, formatLabels(item.Labels))
 	return err
@@ -409,19 +419,19 @@ func printSecretList(list *api.SecretList, w io.Writer) error {
 }
 
 func printNode(node *api.Node, w io.Writer) error {
-	conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
-	NodeAllConditions := []api.NodeConditionKind{api.NodeReady, api.NodeReachable}
+	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
+	NodeAllConditions := []api.NodeConditionType{api.NodeReady, api.NodeReachable}
 	for i := range node.Status.Conditions {
 		cond := node.Status.Conditions[i]
-		conditionMap[cond.Kind] = &cond
+		conditionMap[cond.Type] = &cond
 	}
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
 			if condition.Status == api.ConditionFull {
-				status = append(status, string(condition.Kind))
+				status = append(status, string(condition.Type))
 			} else {
-				status = append(status, "Not"+string(condition.Kind))
+				status = append(status, "Not"+string(condition.Type))
 			}
 		}
 	}

@@ -166,7 +166,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 
 func TestPathBuilder(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master.json")
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json")
 
 	test := &testVisitor{}
 	singular := false
@@ -177,7 +177,7 @@ func TestPathBuilder(t *testing.T) {
 	}
 
 	info := test.Infos[0]
-	if info.Name != "redis-master" || info.Namespace != "" || info.Object == nil {
+	if info.Name != "redis-master-controller" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -215,8 +215,8 @@ func TestNodeBuilder(t *testing.T) {
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master.json").
-		FilenameParam("../../../examples/guestbook/redis-master.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -228,7 +228,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}
 
 	info := test.Infos[1]
-	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
+	if info.Name != "redis-master-controller" || info.Namespace != "test" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -248,7 +248,7 @@ func TestDirectoryBuilder(t *testing.T) {
 
 	found := false
 	for _, info := range test.Infos {
-		if info.Name == "redis-master" && info.Namespace == "test" && info.Object != nil {
+		if info.Name == "redis-master-controller" && info.Namespace == "test" && info.Object != nil {
 			found = true
 		}
 	}
@@ -474,7 +474,7 @@ func TestMultipleObject(t *testing.T) {
 func TestSingularObject(t *testing.T) {
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
 		Flatten().
 		Do().Object()
 
@@ -482,12 +482,12 @@ func TestSingularObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	pod, ok := obj.(*api.Pod)
+	rc, ok := obj.(*api.ReplicationController)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
-	if pod.Name != "redis-master" || pod.Namespace != "test" {
-		t.Errorf("unexpected pod: %#v", pod)
+	if rc.Name != "redis-master-controller" || rc.Namespace != "test" {
+		t.Errorf("unexpected controller: %#v", rc)
 	}
 }
 
@@ -550,16 +550,16 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	pods, _ := testData()
+	_, svc := testData()
 	w, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/watch/namespaces/test/pods/redis-master?resourceVersion=10": watchBody(watch.Event{
+		"/watch/namespaces/test/services/redis-master?resourceVersion=12": watchBody(watch.Event{
 			Type:   watch.Added,
-			Object: &pods.Items[0],
+			Object: &svc.Items[0],
 		}),
 	})).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master.json").Flatten().
-		Do().Watch("10")
+		FilenameParam("../../../examples/guestbook/redis-master-service.json").Flatten().
+		Do().Watch("12")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -572,12 +572,12 @@ func TestWatch(t *testing.T) {
 		if obj.Type != watch.Added {
 			t.Fatalf("unexpected watch event", obj)
 		}
-		pod, ok := obj.Object.(*api.Pod)
+		service, ok := obj.Object.(*api.Service)
 		if !ok {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
-		if pod.Name != "foo" || pod.ResourceVersion != "10" {
-			t.Errorf("unexpected pod: %#v", pod)
+		if service.Name != "baz" || service.ResourceVersion != "12" {
+			t.Errorf("unexpected service: %#v", service)
 		}
 	}
 }
@@ -585,8 +585,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master.json").Flatten().
-		FilenameParam("../../../examples/guestbook/redis-master.json").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-controller.json").Flatten().
 		Do().Watch("")
 
 	if err == nil {

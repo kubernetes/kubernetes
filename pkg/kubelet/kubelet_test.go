@@ -934,7 +934,8 @@ func TestSyncPodBadHash(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start", "stop", "create", "start", "inspect_container"})
+	//verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start", "stop", "create", "start", "inspect_container"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -2743,11 +2744,11 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 
 func TestGetPodReadyCondition(t *testing.T) {
 	ready := []api.PodCondition{{
-		Kind:   api.PodReady,
+		Type:   api.PodReady,
 		Status: api.ConditionFull,
 	}}
 	unready := []api.PodCondition{{
-		Kind:   api.PodReady,
+		Type:   api.PodReady,
 		Status: api.ConditionNone,
 	}}
 	tests := []struct {

@@ -226,7 +226,7 @@ func makeHealthyNode(name string, ip string) *api.Node {
 		Status: api.NodeStatus{
 			HostIP: ip,
 			Conditions: []api.NodeCondition{
-				{Kind: api.NodeReady, Status: api.ConditionFull},
+				{Type: api.NodeReady, Status: api.ConditionFull},
 			},
 		},
 	}
@@ -236,7 +236,7 @@ func makeUnhealthyNode(name string) *api.Node {
 	return &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Status: api.NodeStatus{Conditions: []api.NodeCondition{
-			{Kind: api.NodeReady, Status: api.ConditionNone},
+			{Type: api.NodeReady, Status: api.ConditionNone},
 		}},
 	}
 }

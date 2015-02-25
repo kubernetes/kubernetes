@@ -4,25 +4,26 @@
   "apiVersion": "v1beta1",
   "desiredState": {
     "replicas": 2,
-    "replicaSelector": {"name": "redisslave"},
+    "replicaSelector": {"name": "redis-slave"},
     "podTemplate": {
       "desiredState": {
          "manifest": {
            "version": "v1beta1",
-           "id": "redis-slave-controller",
+           "id": "redis-slave",
            "containers": [{
-             "name": "slave",
+             "name": "redis-slave",
              "image": "brendanburns/redis-slave",
              "cpu": 200,
-             "ports": [{"containerPort": 6379, "hostPort": 6380}]
+             "ports": [{"containerPort": 6379}]
            }]
          }
       },
       "labels": {
-        "name": "redisslave",
-        "uses": "redis-master"
+        "name": "redis-slave",
+        "uses": "redis-master",
+        "app": "redis"
       }
     }
   },
-  "labels": {"name": "redisslave"}
+  "labels": {"name": "redis-slave"}
 }
