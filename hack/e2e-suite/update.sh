@@ -103,7 +103,7 @@ function validate() {
         continue
       fi
 
-      curl -s --max-time 5 --fail http://localhost:8010/api/v1beta1/proxy/pods/${id}/data.json \
+      curl -s --max-time 5 --fail http://localhost:8011/api/v1beta1/proxy/pods/${id}/data.json \
           | grep -q ${container_image_version} || {
         echo "  ${id} is running the right image but curl to contents failed or returned wrong info"
         continue
@@ -128,7 +128,7 @@ function teardown() {
 trap "teardown" EXIT
 
 # Launch a local proxy to the apiserver
-${KUBECTL} proxy --port=8010 &
+${KUBECTL} proxy --port=8011 &
 kubectl_proxy_pid=$!
 
 # Launch a container
