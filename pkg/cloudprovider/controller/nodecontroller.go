@@ -102,7 +102,7 @@ func (s *NodeController) Run(period time.Duration, syncNodeList bool) {
 		glog.Errorf("Error getting nodes ips: %v", err)
 	}
 	if err = s.RegisterNodes(nodes, s.registerRetryCount, period); err != nil {
-		glog.Errorf("Error registrying node list %+v: %v", nodes, err)
+		glog.Errorf("Error registering node list %+v: %v", nodes, err)
 	}
 
 	// Start syncing node list from cloudprovider.
