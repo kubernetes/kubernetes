@@ -26,20 +26,28 @@ $ cd kubernetes
 $ hack/dev-build-and-up.sh
 ```
 
+If you are running your cluster on GCE (the default), you may need to open the firewall for port 8080 using the [console](https://console.developer.google.com) or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+
+```bash
+$ gcloud compute firewall-rules create \
+  --allow tcp:8080 --target-tags=kubernetes-minion \
+  kubernetes-minion-8080
+```
+
 ### Step One: Turn up the UX for the demo
 
-You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).  This can sometimes spew to the output so you could also run it in a different terminal.
+You can use bash job control to run this in the background.  This can sometimes spew to the output so you could also run it in a different terminal.
 
 ```
-$ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/ &
-+ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/
+$ ./cluster/kubectl.sh proxy --www=local/ &
++ ./cluster/kubectl.sh proxy --www=local/
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
 Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
 ### Step Two: Run the controller
-Now we will turn up two replicas of an image.  They all serve on internal port 80.
+Now we will turn up two replicas of an image.  They all serve on port 8080, mapped to internal port 80
 
 ```bash
 $ ./cluster/kubectl.sh create -f examples/update-demo/nautilus-rc.yaml

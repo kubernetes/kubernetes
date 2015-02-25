@@ -103,7 +103,9 @@ function validate() {
         continue
       fi
 
-      curl -s --max-time 5 --fail http://localhost:8011/api/v1beta1/proxy/pods/${id}/data.json \
+
+      host_ip=$($KUBECTL get pods "$id" -o template --template='{{.currentState.hostIP}}')
+      curl -s --max-time 5 --fail http://${host_ip}:8080/data.json \
           | grep -q ${container_image_version} || {
         echo "  ${id} is running the right image but curl to contents failed or returned wrong info"
         continue
@@ -122,14 +124,9 @@ function teardown() {
   echo "Cleaning up test artifacts"
   ${KUBECTL} stop rc update-demo-kitten || true
   ${KUBECTL} stop rc update-demo-nautilus || true
-  kill -TERM "${kubectl_proxy_pid:-}" &> /dev/null || true
 }
 
 trap "teardown" EXIT
-
-# Launch a local proxy to the apiserver
-${KUBECTL} proxy --port=8011 &
-kubectl_proxy_pid=$!
 
 # Launch a container
 ${KUBECTL} create -f "${KUBE_ROOT}/examples/update-demo/nautilus-rc.yaml"
