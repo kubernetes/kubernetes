@@ -131,6 +131,12 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		{
+			kind:      "Service",
+			obj:       &api.Service{},
+			fragment:  `{ "apiVersion": "badVersion" }`,
+			expectErr: true,
+		},
+		{
 			kind: "Service",
 			obj: &api.Service{
 				Spec: api.ServiceSpec{

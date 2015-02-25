@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/evanphx/json-patch"
@@ -161,10 +161,13 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("apiVersion must be a string")
 	}
+	i, err := latest.InterfacesFor(versionString)
+	if err != nil {
+		return nil, err
+	}
 
-	codec := runtime.CodecFor(api.Scheme, versionString)
 	// encode dst into versioned json and apply fragment directly too it
-	target, err := codec.Encode(dst)
+	target, err := i.Codec.Encode(dst)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +175,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := codec.Decode(patched)
+	out, err := i.Codec.Decode(patched)
 	if err != nil {
 		return nil, err
 	}
