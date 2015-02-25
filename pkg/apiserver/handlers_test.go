@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -141,6 +142,9 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		}
 		if !reflect.DeepEqual(successCase.expectedParts, apiRequestInfo.Parts) {
 			t.Errorf("Unexpected parts for url: %s, expected: %v, actual: %v", successCase.url, successCase.expectedParts, apiRequestInfo.Parts)
+		}
+		if e, a := strings.Split(successCase.url, "?")[0], apiRequestInfo.URLPath(); e != a {
+			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
 
