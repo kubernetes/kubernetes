@@ -35,13 +35,34 @@ const (
 	kittenImage         = "kubernetes/update-demo:kitten"
 	updateDemoSelector  = "name=update-demo"
 	updateDemoContainer = "update-demo"
+	kubectlProxyPort    = 8011
 )
 
 var _ = Describe("kubectl", func() {
 
-	updateDemoRoot := filepath.Join(root, "examples/update-demo")
-	nautilusPath := filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
-	kittenPath := filepath.Join(updateDemoRoot, "kitten-rc.yaml")
+	// Constants.
+	var (
+		updateDemoRoot = filepath.Join(root, "examples/update-demo")
+		nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
+		kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
+	)
+
+	var cmd *exec.Cmd
+
+	BeforeEach(func() {
+		cmd = kubectlCmd("proxy", fmt.Sprintf("--port=%d", kubectlProxyPort))
+		if err := cmd.Start(); err != nil {
+			Failf("Unable to start kubectl proxy: %v", err)
+		}
+	})
+
+	AfterEach(func() {
+		// Kill the proxy
+		if cmd.Process != nil {
+			Logf("Stopping kubectl proxy (pid %d)", cmd.Process.Pid)
+			cmd.Process.Kill()
+		}
+	})
 
 	It("should create and stop a replication controller", func() {
 		defer cleanup(nautilusPath)
@@ -106,8 +127,6 @@ func validateController(image string, replicas int, timeout time.Duration) {
 
 	getImageTemplate := fmt.Sprintf(`--template={{(index .currentState.info "%s").image}}`, updateDemoContainer)
 
-	getHostIPTemplate := "--template={{.currentState.hostIP}}"
-
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", updateDemoSelector))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "-l", updateDemoSelector)
@@ -117,32 +136,31 @@ func validateController(image string, replicas int, timeout time.Duration) {
 			continue
 		}
 		var runningPods []string
-		for _, podId := range pods {
-			running := runKubectl("get", "pods", podId, "-o", "template", getContainerStateTemplate)
+		for _, podID := range pods {
+			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate)
 			if running == "false" {
-				By(fmt.Sprintf("%s is created but not running", podId))
+				Logf("%s is created but not running", podID)
 				continue
 			}
 
-			currentImage := runKubectl("get", "pods", podId, "-o", "template", getImageTemplate)
+			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate)
 			if currentImage != image {
-				By(fmt.Sprintf("%s is created but running wrong image; expected: %s, actual: %s", podId, image, currentImage))
+				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, image, currentImage)
 				continue
 			}
 
-			hostIP := runKubectl("get", "pods", podId, "-o", "template", getHostIPTemplate)
-			data, err := getData(hostIP)
+			data, err := getData(podID)
 			if err != nil {
-				By(fmt.Sprintf("%s is running right image but fetching data failed: %v", podId, err))
+				Logf("%s is running right image but fetching data failed: %v", podID, err)
 				continue
 			}
 			if strings.Contains(data.image, image) {
-				By(fmt.Sprintf("%s is running right image but fetched data has the wrong info: %s", podId, data))
+				Logf("%s is running right image but fetched data has the wrong info: %s", podID, data)
 				continue
 			}
 
-			Logf("%s is verified up and running", podId)
-			runningPods = append(runningPods, podId)
+			Logf("%s is verified up and running", podID)
+			runningPods = append(runningPods, podID)
 		}
 		if len(runningPods) == replicas {
 			return
@@ -155,9 +173,8 @@ type updateDemoData struct {
 	image string `json:"image"`
 }
 
-func getData(hostIP string) (*updateDemoData, error) {
-	addr := fmt.Sprintf("http://%s:8080/data.json", hostIP)
-	resp, err := http.Get(fmt.Sprintf(addr))
+func getData(podID string) (*updateDemoData, error) {
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1beta1/proxy/pods/%s/data.json", kubectlProxyPort, podID))
 	if err != nil || resp.StatusCode != 200 {
 		return nil, err
 	}
@@ -172,16 +189,17 @@ func getData(hostIP string) (*updateDemoData, error) {
 	return &data, err
 }
 
-func runKubectl(args ...string) string {
+func kubectlCmd(args ...string) *exec.Cmd {
 	// TODO: use kubectl binary directly instead of shell wrapper
 	path := filepath.Join(root, "cluster/kubectl.sh")
-	cmdStr := path + " " + strings.Join(args, " ")
-	Logf("Running '%v'", cmdStr)
+	Logf("Running '%v'", path+" "+strings.Join(args, " "))
+	return exec.Command(path, args...)
+}
 
-	cmd := exec.Command(path, args...)
+func runKubectl(args ...string) string {
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd := kubectlCmd(args...)
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	if err := cmd.Run(); err != nil {
 		Failf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
