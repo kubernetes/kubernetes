@@ -197,7 +197,7 @@ func TestTCPProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: tcpServerPort}}}},
 		},
 	})
 
@@ -217,7 +217,7 @@ func TestUDPProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: udpServerPort}}}},
 		},
 	})
 
@@ -246,7 +246,7 @@ func TestTCPProxyStop(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: tcpServerPort}}}},
 		},
 	})
 
@@ -277,7 +277,7 @@ func TestUDPProxyStop(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: udpServerPort}}}},
 		},
 	})
 
@@ -308,7 +308,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: tcpServerPort}}}},
 		},
 	})
 
@@ -338,7 +338,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: udpServerPort}}}},
 		},
 	})
 
@@ -368,7 +368,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: tcpServerPort}}}},
 		},
 	})
 
@@ -407,7 +407,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: udpServerPort}}}},
 		},
 	})
 
@@ -446,7 +446,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: tcpServerPort}}}},
 		},
 	})
 
@@ -482,7 +482,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Ports: []api.EndpointPort{{Port: udpServerPort}}}},
 		},
 	})
 

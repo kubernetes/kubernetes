@@ -592,7 +592,7 @@ func TestResourceLocation(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						{Name: "ctr", Ports: []api.Port{{ContainerPort: 9376}}},
+						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
 			},
@@ -604,7 +604,7 @@ func TestResourceLocation(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						{Name: "ctr", Ports: []api.Port{{ContainerPort: 9376}}},
+						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
 			},
@@ -617,7 +617,7 @@ func TestResourceLocation(t *testing.T) {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "ctr1"},
-						{Name: "ctr2", Ports: []api.Port{{ContainerPort: 9376}}},
+						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
 			},
@@ -629,8 +629,8 @@ func TestResourceLocation(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
-						{Name: "ctr1", Ports: []api.Port{{ContainerPort: 9376}}},
-						{Name: "ctr2", Ports: []api.Port{{ContainerPort: 1234}}},
+						{Name: "ctr1", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
+						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 1234}}},
 					},
 				},
 			},

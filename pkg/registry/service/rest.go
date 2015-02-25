@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -218,17 +219,57 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
-	eps, err := rs.registry.GetEndpoints(ctx, id)
+	// Allow ID as "svcname" or "svcname:port".  Choose an endpoint at
+	// random.  If the port is specified as a number, use that value
+	// directly.  If the port is specified as a name, try to look up that
+	// name on the chosen endpoint. If port is not specified, try to use
+	// the first unnamed port on the chosen endpoint.  If there are no
+	// unnamed ports, try to use the first defined port.
+	parts := strings.Split(id, ":")
+	if len(parts) > 2 {
+		return "", errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
+	}
+	name := parts[0]
+	port := ""
+	if len(parts) == 2 {
+		port = parts[1]
+	}
+
+	eps, err := rs.registry.GetEndpoints(ctx, name)
 	if err != nil {
 		return "", err
 	}
 	if len(eps.Endpoints) == 0 {
-		return "", fmt.Errorf("no endpoints available for %v", id)
+		return "", fmt.Errorf("no endpoints available for %v", name)
 	}
+	ep := &eps.Endpoints[rand.Intn(len(eps.Endpoints))]
+
+	// Try to figure out a port.
+	if _, err := strconv.Atoi(port); err != nil {
+		// Do nothing - port is correct as is.
+	} else {
+		// Try a name lookup, even if name is "".
+		for i := range ep.Ports {
+			if ep.Ports[i].Name == port {
+				port = strconv.Itoa(ep.Ports[i].Port)
+				break
+			}
+		}
+	}
+	if port == "" {
+		// Still nothing - try the first defined port.
+		if len(ep.Ports) > 0 {
+			port = strconv.Itoa(ep.Ports[0].Port)
+		}
+	}
+
 	// We leave off the scheme ('http://') because we have no idea what sort of server
 	// is listening at this endpoint.
-	ep := &eps.Endpoints[rand.Intn(len(eps.Endpoints))]
-	return net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)), nil
+	loc := ep.IP
+	if port != "" {
+		loc += fmt.Sprintf(":%s", port)
+	}
+	return loc, nil
 }
 
 func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service) error {
