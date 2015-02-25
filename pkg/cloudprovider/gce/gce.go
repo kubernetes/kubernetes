@@ -178,8 +178,7 @@ func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinit
 	if err != nil {
 		return "", err
 	}
-	err = gce.waitForRegionOp(op, region)
-	if err != nil {
+	if err = gce.waitForRegionOp(op, region); err != nil {
 		return "", err
 	}
 	link := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
@@ -259,10 +258,10 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	}
 
 	op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, req).Do()
-	gce.waitForRegionOp(op, region)
 	if err != nil {
 		return err
 	}
+	err = gce.waitForRegionOp(op, region)
 	return err
 }
 
