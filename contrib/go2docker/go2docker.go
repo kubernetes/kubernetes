@@ -198,6 +198,16 @@ func main() {
 	if _, err := io.Copy(ftw, file); err != nil {
 		log.Fatalf("failed to write /%s body: %v", aout, err)
 	}
+	certBytes := []byte(caCerts)
+	if err := ftw.WriteHeader(&tar.Header{
+		Name: "/etc/ssl/certs/ca-certificates.crt",
+		Size: int64(len(certBytes)),
+	}); err != nil {
+		log.Fatalf("failed to write ca-certificates.crt header: %v", err)
+	}
+	if _, err := ftw.Write(certBytes); err != nil {
+		log.Fatalf("failed to write ca-certificates.crt body: %v", err)
+	}
 	if err := ftw.Close(); err != nil {
 		log.Fatalf("failed to close layer.tar: %v", err)
 	}
