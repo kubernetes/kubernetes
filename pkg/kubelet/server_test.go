@@ -129,9 +129,6 @@ func newServerTest() *serverTestFramework {
 				ObjectMeta: api.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
-					Annotations: map[string]string{
-						ConfigSourceAnnotationKey: "etcd",
-					},
 				},
 			}, true
 		},
@@ -157,6 +154,14 @@ func readResp(resp *http.Response) (string, error) {
 	return string(body), err
 }
 
+// A helper function to return the correct pod name.
+func getPodName(name, namespace string) string {
+	if namespace == "" {
+		namespace = NamespaceDefault
+	}
+	return name + "_" + namespace
+}
+
 func TestPodStatus(t *testing.T) {
 	fw := newServerTest()
 	expected := api.PodStatus{
@@ -165,7 +170,7 @@ func TestPodStatus(t *testing.T) {
 		},
 	}
 	fw.fakeKubelet.statusFunc = func(name string) (api.PodStatus, error) {
-		if name == "goodpod.default.etcd" {
+		if name == "goodpod_default" {
 			return expected, nil
 		}
 		return api.PodStatus{}, fmt.Errorf("bad pod %s", name)
@@ -191,7 +196,7 @@ func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
 	expectedInfo := &info.ContainerInfo{}
 	podID := "somepod"
-	expectedPodID := "somepod" + ".default.etcd"
+	expectedPodID := getPodName(podID, "")
 	expectedContainerName := "goodcontainer"
 	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
@@ -220,7 +225,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 	expectedInfo := &info.ContainerInfo{}
 	podID := "somepod"
 	expectedNamespace := "custom"
-	expectedPodID := "somepod" + "." + expectedNamespace + ".etcd"
+	expectedPodID := getPodName(podID, expectedNamespace)
 	expectedContainerName := "goodcontainer"
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
 	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
@@ -344,7 +349,7 @@ func TestServeRunInContainer(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + "." + podNamespace + ".etcd"
+	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
 	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
@@ -384,7 +389,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + "." + podNamespace + ".etcd"
+	expectedPodName := getPodName(podName, podNamespace)
 	expectedUID := "7e00838d_-_3523_-_11e4_-_8421_-_42010af0a720"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
@@ -509,9 +514,6 @@ func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string)
 			ObjectMeta: api.ObjectMeta{
 				Namespace: namespace,
 				Name:      pod,
-				Annotations: map[string]string{
-					ConfigSourceAnnotationKey: "etcd",
-				},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -548,7 +550,7 @@ func TestContainerLogs(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
+	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := false
@@ -575,7 +577,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
+	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
 	expectedTail := "5"
 	expectedFollow := false
@@ -602,7 +604,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
 	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".other.etcd"
+	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := true
@@ -693,7 +695,7 @@ func TestServeExecInContainer(t *testing.T) {
 
 		podNamespace := "other"
 		podName := "foo"
-		expectedPodName := podName + "." + podNamespace + ".etcd"
+		expectedPodName := getPodName(podName, podNamespace)
 		expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
 		expectedContainerName := "baz"
 		expectedCommand := "ls -a"
@@ -955,7 +957,7 @@ func TestServePortForward(t *testing.T) {
 
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + "." + podNamespace + ".etcd"
+	expectedPodName := getPodName(podName, podNamespace)
 	expectedUid := "9b01b80f-8fb4-11e4-95ab-4200af06647"
 
 	for i, test := range tests {

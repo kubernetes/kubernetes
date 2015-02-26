@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"sync"
 
@@ -206,7 +207,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
-			name := podUniqueName(ref)
+			name := kubelet.GetPodFullName(ref)
 			if existing, found := pods[name]; found {
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
@@ -229,7 +230,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	case kubelet.REMOVE:
 		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
-			name := podUniqueName(&value)
+			name := kubelet.GetPodFullName(&value)
 			if existing, found := pods[name]; found {
 				// this is a delete
 				delete(pods, name)
@@ -248,7 +249,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
-			name := podUniqueName(ref)
+			name := kubelet.GetPodFullName(ref)
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
@@ -306,7 +307,7 @@ func filterInvalidPods(pods []api.BoundPod, source string, recorder record.Event
 			// If validation fails, don't trust it any further -
 			// even Name could be bad.
 		} else {
-			name := podUniqueName(pod)
+			name := kubelet.GetPodFullName(pod)
 			if names.Has(name) {
 				errlist = append(errlist, apierrs.NewFieldDuplicate("name", pod.Name))
 			} else {
@@ -349,12 +350,6 @@ func (s *podStorage) MergedState() interface{} {
 	return pods
 }
 
-// podUniqueName returns a value for a given pod that is unique across a source,
-// which is the combination of namespace and name.
-func podUniqueName(pod *api.BoundPod) string {
-	return fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
-}
-
 func bestPodIdentString(pod *api.BoundPod) string {
 	namespace := pod.Namespace
 	if namespace == "" {
@@ -365,4 +360,12 @@ func bestPodIdentString(pod *api.BoundPod) string {
 		name = "<empty-name>"
 	}
 	return fmt.Sprintf("%s.%s", name, namespace)
+}
+
+func GeneratePodName(name string) (string, error) {
+	hostname, err := os.Hostname() //TODO: kubelet name would be better
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s-%s", name, hostname), nil
 }

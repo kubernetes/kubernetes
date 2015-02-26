@@ -102,8 +102,14 @@ func TestEventToPods(t *testing.T) {
 				},
 			},
 			pods: []api.BoundPod{
-				{ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: "foo"}, Spec: api.PodSpec{}},
-				{ObjectMeta: api.ObjectMeta{UID: "222", Name: "bar", Namespace: "bar"}, Spec: api.PodSpec{}},
+				{
+					ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: kubelet.NamespaceDefault},
+					Spec:       api.PodSpec{},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{UID: "222", Name: "bar", Namespace: kubelet.NamespaceDefault},
+					Spec:       api.PodSpec{},
+				},
 			},
 			fail: false,
 		},
@@ -116,7 +122,9 @@ func TestEventToPods(t *testing.T) {
 				},
 			},
 			pods: []api.BoundPod{
-				{ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: "default"}, Spec: api.PodSpec{}},
+				{
+					ObjectMeta: api.ObjectMeta{UID: "111", Name: "foo", Namespace: kubelet.NamespaceDefault},
+					Spec:       api.PodSpec{}},
 			},
 			fail: false,
 		},

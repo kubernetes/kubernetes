@@ -396,22 +396,21 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
-			Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo.new.test_12345678_0"},
+			Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo_new_12345678_0"},
 			ID:    "1234",
 		},
 		{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_0"},
+			Names: []string{"/k8s_POD_foo_new_12345678_0"},
 			ID:    "9876",
 		},
 	}
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -439,10 +438,9 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -486,10 +484,9 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -521,8 +518,8 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	}
 
 	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[1]) {
+		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
@@ -537,10 +534,9 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -566,8 +562,8 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	}
 
 	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[1]) {
+		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
@@ -578,17 +574,16 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_0"},
+			Names: []string{"/k8s_POD_foo_new_12345678_0"},
 			ID:    "9876",
 		},
 	}
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -609,7 +604,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) {
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
@@ -622,17 +617,16 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_0"},
+			Names: []string{"/k8s_POD_foo_new_12345678_0"},
 			ID:    "9876",
 		},
 	}
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -664,7 +658,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.new.test_", fakeDocker.Created[0]) {
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
@@ -678,17 +672,16 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_bar_foo.new.test_12345678_0"},
+			Names: []string{"/k8s_bar_foo_new_12345678_0"},
 			ID:    "1234",
 		},
 	}
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -727,12 +720,12 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.test_12345678_42"},
+			Names: []string{"/k8s_foo_bar_new_12345678_42"},
 			ID:    "1234",
 		},
 		{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_POD_foo_new_12345678_42"},
 			ID:    "9876",
 		},
 	}
@@ -767,12 +760,12 @@ func TestSyncPodsDeletes(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.test_12345678_42"},
+			Names: []string{"/k8s_foo_bar_new_12345678_42"},
 			ID:    "1234",
 		},
 		{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_POD_foo_new_12345678_42"},
 			ID:    "9876",
 		},
 		{
@@ -805,26 +798,25 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.test_12345678_1111"},
+			Names: []string{"/k8s_foo_bar_new_12345678_1111"},
 			ID:    "1234",
 		},
 		"9876": &docker.APIContainers{
 			// pod infra container
-			Names: []string{"/k8s_POD_bar.new.test_12345678_2222"},
+			Names: []string{"/k8s_POD_bar_new_12345678_2222"},
 			ID:    "9876",
 		},
 		"4567": &docker.APIContainers{
 			// Duplicate for the same container.
-			Names: []string{"/k8s_foo_bar.new.test_12345678_3333"},
+			Names: []string{"/k8s_foo_bar_new_12345678_3333"},
 			ID:    "4567",
 		},
 	}
 	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        "bar",
-			Namespace:   "new",
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -850,21 +842,20 @@ func TestSyncPodBadHash(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar.1234_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_bar.1234_foo_new_12345678_42"},
 			ID:    "1234",
 		},
 		"9876": &docker.APIContainers{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_POD_foo_new_12345678_42"},
 			ID:    "9876",
 		},
 	}
 	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        "foo",
-			Namespace:   "new",
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -899,21 +890,20 @@ func TestSyncPodUnhealthy(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_bar_foo_new_12345678_42"},
 			ID:    "1234",
 		},
 		"9876": &docker.APIContainers{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_POD_foo_new_12345678_42"},
 			ID:    "9876",
 		},
 	}
 	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        "foo",
-			Namespace:   "new",
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -1234,11 +1224,11 @@ func TestGetContainerInfo(t *testing.T) {
 			ID: containerID,
 			// pod id: qux
 			// container id: foo
-			Names: []string{"/k8s_foo_qux_1234_42"},
+			Names: []string{"/k8s_foo_qux_ns_1234_42"},
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", cadvisorReq)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1308,11 +1298,11 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 			ID: containerID,
 			// pod id: qux
 			// container id: foo
-			Names: []string{"/k8s_foo_qux_uuid_1234"},
+			Names: []string{"/k8s_foo_qux_ns_uuid_1234"},
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", cadvisorReq)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
@@ -1367,7 +1357,7 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 	kubelet.cadvisorClient = mockCadvisor
 
 	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil}
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
 	if err == nil {
 		t.Errorf("Expected error from cadvisor client, got none")
 	}
@@ -1388,12 +1378,12 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	containerList := []docker.APIContainers{
 		{
 			ID:    "fakeId",
-			Names: []string{"/k8s_bar_qux_1234_42"},
+			Names: []string{"/k8s_bar_qux_ns_1234_42"},
 		},
 	}
 
 	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil, containerList: containerList}
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
+	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
 	if err == nil {
 		t.Errorf("Expected error from cadvisor client, got none")
 	}
@@ -1479,7 +1469,7 @@ func TestRunInContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    containerID,
-			Names: []string{"/k8s_" + containerName + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+			Names: []string{"/k8s_" + containerName + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 	}
 
@@ -1487,10 +1477,9 @@ func TestRunInContainer(t *testing.T) {
 	_, err := kubelet.RunInContainer(
 		GetPodFullName(&api.BoundPod{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        podName,
-				Namespace:   podNamespace,
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      podName,
+				Namespace: podNamespace,
 			},
 		}),
 		"",
@@ -1520,7 +1509,7 @@ func TestRunHandlerExec(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    containerID,
-			Names: []string{"/k8s_" + containerName + "_" + podName + "." + podNamespace + "_12345678_42"},
+			Names: []string{"/k8s_" + containerName + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 	}
 
@@ -1534,7 +1523,7 @@ func TestRunHandlerExec(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.runHandler(podName+"."+podNamespace, "", &container, container.Lifecycle.PostStart)
+	err := kubelet.runHandler(podName+"_"+podNamespace, "", &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1576,7 +1565,7 @@ func TestRunHandlerHttp(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.runHandler(podName+"."+podNamespace, "", &container, container.Lifecycle.PostStart)
+	err := kubelet.runHandler(podName+"_"+podNamespace, "", &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1624,16 +1613,15 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	dockerContainers := dockertools.DockerContainers{
 		"9876": &docker.APIContainers{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.test_12345678_42"},
+			Names: []string{"/k8s_POD_foo_new_12345678_42"},
 			ID:    "9876",
 		},
 	}
 	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        "foo",
-			Namespace:   "new",
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -1675,17 +1663,17 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			containers: []docker.APIContainers{
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "1876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "2876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "3876",
 				},
 			},
@@ -1705,22 +1693,22 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			containers: []docker.APIContainers{
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "1876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "2876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "3876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "4876",
 				},
 			},
@@ -1747,7 +1735,7 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			containers: []docker.APIContainers{
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "1876",
 				},
 			},
@@ -1757,32 +1745,32 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			containers: []docker.APIContainers{
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo2.new.test_.beefbeef_40"},
+					Names: []string{"/k8s_POD_foo2_new_.beefbeef_40"},
 					ID:    "1706",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo2.new.test_.beefbeef_40"},
+					Names: []string{"/k8s_POD_foo2_new_.beefbeef_40"},
 					ID:    "2706",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo2.new.test_.beefbeef_40"},
+					Names: []string{"/k8s_POD_foo2_new_.beefbeef_40"},
 					ID:    "3706",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "1876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "2876",
 				},
 				{
 					// pod infra container
-					Names: []string{"/k8s_POD_foo.new.test_.deadbeef_42"},
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
 					ID:    "3876",
 				},
 			},
@@ -1991,10 +1979,9 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -2790,16 +2777,15 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "notfound",
-			Names: []string{"/k8s_notfound_" + podName + "." + podNamespace + ".test_12345678_42"},
+			Names: []string{"/k8s_notfound_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 	}
 
 	err := kubelet.ExecInContainer(
 		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        podName,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
 		}}),
 		"",
 		containerID,
@@ -2848,16 +2834,15 @@ func TestExecInContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    containerID,
-			Names: []string{"/k8s_" + containerID + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+			Names: []string{"/k8s_" + containerID + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 	}
 
 	err := kubelet.ExecInContainer(
 		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        podName,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
 		}}),
 		"",
 		containerID,
@@ -2926,16 +2911,15 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "notfound",
-			Names: []string{"/k8s_notfound_" + podName + "." + podNamespace + ".test_12345678_42"},
+			Names: []string{"/k8s_notfound_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 	}
 
 	err := kubelet.PortForward(
 		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        podName,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
 		}}),
 		"",
 		port,
@@ -2966,20 +2950,19 @@ func TestPortForward(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    infraContainerID,
-			Names: []string{"/k8s_" + kubelet.podInfraContainerImage + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+			Names: []string{"/k8s_" + kubelet.podInfraContainerImage + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 		{
 			ID:    containerID,
-			Names: []string{"/k8s_" + containerID + "_" + podName + "." + podNamespace + ".test_12345678_42"},
+			Names: []string{"/k8s_" + containerID + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 	}
 
 	err := kubelet.PortForward(
 		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
-			UID:         "12345678",
-			Name:        podName,
-			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			UID:       "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
 		}}),
 		"",
 		port,

@@ -50,6 +50,8 @@ const (
 	ApiserverSource = "api"
 	// Updates from all sources
 	AllSource = "*"
+
+	NamespaceDefault = api.NamespaceDefault
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
@@ -69,5 +71,12 @@ type PodUpdate struct {
 
 // GetPodFullName returns a name that uniquely identifies a pod across all config sources.
 func GetPodFullName(pod *api.BoundPod) string {
-	return fmt.Sprintf("%s.%s.%s", pod.Name, pod.Namespace, pod.Annotations[ConfigSourceAnnotationKey])
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
+}
+
+// Build the pod full name from pod name and namespace.
+func BuildPodFullName(name, namespace string) string {
+	return name + "_" + namespace
 }

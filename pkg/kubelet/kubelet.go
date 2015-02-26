@@ -1404,6 +1404,7 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 		glog.V(4).Infof("Skipping deletes, sources aren't ready yet.")
 		return nil
 	}
+
 	// Kill any containers we don't need.
 	killed := []string{}
 	for ix := range dockerContainers {
@@ -1413,6 +1414,7 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 			// syncPod() will handle this one.
 			continue
 		}
+
 		pc := podContainer{podFullName, uid, containerName}
 		if _, ok := desiredContainers[pc]; !ok {
 			glog.V(1).Infof("Killing unwanted container %+v", pc)

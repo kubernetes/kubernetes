@@ -719,11 +719,11 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
 		return
 	}
-	if len(parts) < 5 {
+	if len(parts) < 6 {
 		// We have at least 5 fields.  We may have more in the future.
 		// Anything with less fields than this is not something we can
 		// manage.
-		glog.Warningf("found a container with the %q prefix, but too few fields (%d): ", containerNamePrefix, len(parts), name)
+		glog.Warningf("found a container with the %q prefix, but too few fields (%d): %q", containerNamePrefix, len(parts), name)
 		return
 	}
 
@@ -739,11 +739,10 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	}
 
 	// Pod fullname.
-	podFullName = parts[2]
+	podFullName = parts[2] + "_" + parts[3]
 
 	// Pod UID.
-	podUID = types.UID(parts[3])
-
+	podUID = types.UID(parts[4])
 	return
 }
 
