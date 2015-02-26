@@ -30,7 +30,6 @@ import (
 
 type syncPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
 
-// TODO(wojtek-t) Add unit tests for this type.
 type podWorkers struct {
 	// Protects podUpdates field.
 	podLock sync.Mutex
