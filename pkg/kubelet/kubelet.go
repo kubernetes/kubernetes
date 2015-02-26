@@ -1545,6 +1545,11 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainerID, tail, follow, stdout, stderr)
 }
 
+// GetHostname Returns the hostname as the kubelet sees it.
+func (kl *Kubelet) GetHostname() string {
+	return kl.hostname
+}
+
 // GetBoundPods returns all pods bound to the kubelet and their spec
 func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
 	kl.podLock.RLock()

@@ -57,6 +57,7 @@ kube::log::status "Starting kubelet in masterless mode"
   --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
   --docker_endpoint="fake://" \
+  --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!

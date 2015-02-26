@@ -78,6 +78,7 @@ type HostInterface interface {
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	StreamingConnectionIdleTimeout() time.Duration
+	GetHostname() string
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -146,6 +147,25 @@ func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
 	valid, version := isValidDockerVersion(versions)
 	if !valid {
 		s.error(w, errors.New("Docker version is too old ("+version+")"))
+		return
+	}
+
+	masterHostname, _, err := net.SplitHostPort(req.Host)
+	if err != nil {
+		if !strings.Contains(req.Host, ":") {
+			masterHostname = req.Host
+		} else {
+			msg := fmt.Sprintf("Could not parse hostname from http request: %v", err)
+			s.error(w, errors.New(msg))
+			return
+		}
+	}
+
+	// Check that the hostname known by the master matches the hostname
+	// the kubelet knows
+	hostname := s.host.GetHostname()
+	if masterHostname != hostname {
+		s.error(w, errors.New("Kubelet hostname \""+hostname+"\" does not match the hostname expected by the master \""+masterHostname+"\""))
 		return
 	}
 	w.Write([]byte("ok"))
