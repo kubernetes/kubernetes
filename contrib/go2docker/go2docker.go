@@ -76,7 +76,7 @@ func main() {
 	}
 	toolPath := filepath.Dir(goBin)
 	// check for linux_amd64 toolchain
-	crossPath := filepath.Join(toolPath, "linux_amd642")
+	crossPath := filepath.Join(toolPath, "linux_amd64")
 	if _, crossErr := os.Stat(crossPath); os.IsNotExist(crossErr) {
 		// check for make.bash
 		makeBash, err := filepath.Abs(filepath.Join(toolPath, "..", "src", "make.bash"))
