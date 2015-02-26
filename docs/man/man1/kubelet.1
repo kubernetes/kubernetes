@@ -1,15 +1,12 @@
 .TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
 
-
 .SH NAME
 .PP
 kubelet \- Processes a container manifest so the containers are launched according to how they are described.
 
-
 .SH SYNOPSIS
 .PP
 \fBkubelet\fP [OPTIONS]
-
 
 .SH DESCRIPTION
 .PP
@@ -24,12 +21,10 @@ There are 4 ways that a container manifest can be provided to the Kubelet:
 .nf
 File Path passed as a flag on the command line. This file is rechecked every 20 seconds (configurable with a flag).
 HTTP endpoint HTTP endpoint passed as a parameter on the command line. This endpoint is checked every 20 seconds (also configurable with a flag).
-etcd server The Kubelet will reach out and do a watch on an etcd server. The etcd path that is watched is /registry/hosts/$(hostname \-f). As this is a watch, changes are noticed and acted upon very quickly.
+etcd server The Kubelet will reach out and do a watch on an etcd server. The etcd path that is watched is /registry/hosts/\$(hostname \-f). As this is a watch, changes are noticed and acted upon very quickly.
 HTTP server The kubelet can also listen for HTTP and respond to a simple API (underspec'd currently) to submit a new manifest.
 
 .fi
-.RE
-
 
 .SH OPTIONS
 .PP
@@ -133,7 +128,6 @@ HTTP server The kubelet can also listen for HTTP and respond to a simple API (un
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging.
 
-
 .SH EXAMPLES
 .PP
 .RS
@@ -142,8 +136,6 @@ HTTP server The kubelet can also listen for HTTP and respond to a simple API (un
 /usr/bin/kubelet \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-address=127.0.0.1 \-\-port=10250 \-\-hostname\_override=127.0.0.1 \-\-allow\_privileged=false
 
 .fi
-.RE
-
 
 .SH HISTORY
 .PP

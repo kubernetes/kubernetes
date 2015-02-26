@@ -7,10 +7,10 @@ Markdown (*.md) files.
 
 # File List
 
-	kube-apiserver.1.md  
-	kube-controller-manager.1.md  
-	kubelet.1.md  
-	kube-proxy.1.md  
+	kube-apiserver.1.md
+	kube-controller-manager.1.md
+	kubelet.1.md
+	kube-proxy.1.md
 	kube-scheduler.1.md
 	Dockerfile
 	md2man-all.sh
