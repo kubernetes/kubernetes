@@ -814,6 +814,8 @@ type NodeSpec struct {
 	Capacity ResourceList `json:"capacity,omitempty"`
 	// PodCIDR represents the pod IP range assigned to the node
 	PodCIDR string `json:"cidr,omitempty"`
+	// External ID of the node assigned by some machine database (e.g. a cloud provider)
+	ExternalID string `json:"externalID,omitempty"`
 }
 
 // NodeStatus is information about the current status of a node.

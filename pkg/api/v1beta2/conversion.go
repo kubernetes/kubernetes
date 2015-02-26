@@ -619,6 +619,7 @@ func init() {
 
 			out.HostIP = in.Status.HostIP
 			out.PodCIDR = in.Spec.PodCIDR
+			out.ExternalID = in.Spec.ExternalID
 			return s.Convert(&in.Spec.Capacity, &out.NodeResources.Capacity, 0)
 		},
 		func(in *Minion, out *newer.Node, s conversion.Scope) error {
@@ -640,6 +641,7 @@ func init() {
 
 			out.Status.HostIP = in.HostIP
 			out.Spec.PodCIDR = in.PodCIDR
+			out.Spec.ExternalID = in.ExternalID
 			return s.Convert(&in.NodeResources.Capacity, &out.Spec.Capacity, 0)
 		},
 		func(in *newer.LimitRange, out *LimitRange, s conversion.Scope) error {

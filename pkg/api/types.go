@@ -781,6 +781,8 @@ type NodeSpec struct {
 	// PodCIDR represents the pod IP range assigned to the node
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
 	PodCIDR string `json:"cidr,omitempty"`
+	// External ID of the node assigned by some machine database (e.g. a cloud provider)
+	ExternalID string `json:"externalID,omitempty"`
 }
 
 // NodeStatus is information about the current status of a node.

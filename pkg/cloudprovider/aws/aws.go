@@ -122,6 +122,28 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 
 // IPAddress is an implementation of Instances.IPAddress.
 func (aws *AWSCloud) IPAddress(name string) (net.IP, error) {
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(inst.PrivateIpAddress)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid network IP: %s", inst.PrivateIpAddress)
+	}
+	return ip, nil
+}
+
+// ExternalID returns the cloud provider ID of the specified instance.
+func (aws *AWSCloud) ExternalID(name string) (string, error) {
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return "", err
+	}
+	return inst.InstanceId, nil
+}
+
+// Return the instances matching the relevant private dns name.
+func (aws *AWSCloud) getInstancesByDnsName(name string) (*ec2.Instance, error) {
 	f := ec2.NewFilter()
 	f.Add("private-dns-name", name)
 
@@ -142,12 +164,7 @@ func (aws *AWSCloud) IPAddress(name string) (net.IP, error) {
 		return nil, fmt.Errorf("multiple instances found for host: %s", name)
 	}
 
-	ipAddress := resp.Reservations[0].Instances[0].PrivateIpAddress
-	ip := net.ParseIP(ipAddress)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid network IP: %s", ipAddress)
-	}
-	return ip, nil
+	return &resp.Reservations[0].Instances[0], nil
 }
 
 // Return a list of instances matching regex string.
