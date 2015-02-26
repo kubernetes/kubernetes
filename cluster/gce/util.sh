@@ -445,6 +445,7 @@ function kube-up {
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
@@ -912,8 +913,8 @@ function setup-logging-firewall {
   done
 
   local -r region="${ZONE:0:${#ZONE}-2}"
-  local -r es_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" elasticsearch-logging | grep IPAddress | awk '{print $2}')
-  local -r kibana_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" kibana-logging | grep IPAddress | awk '{print $2}')
+  local -r es_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" "${INSTANCE_PREFIX}"-elasticsearch-logging | grep IPAddress | awk '{print $2}')
+  local -r kibana_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" "${INSTANCE_PREFIX}"-kibana-logging | grep IPAddress | awk '{print $2}')
   echo
   echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}http://${es_ip}:9200"
   echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}http://${kibana_ip}:5601${color_norm}"

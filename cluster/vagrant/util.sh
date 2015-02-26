@@ -65,6 +65,7 @@ function create-provision-scripts {
   (
     echo "#! /bin/bash"
     echo "KUBE_ROOT=/vagrant"
+    echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
     echo "MASTER_IP='${MASTER_IP}'"
     echo "MINION_NAMES=(${MINION_NAMES[@]})"

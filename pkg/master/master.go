@@ -112,6 +112,9 @@ type Config struct {
 	// Control the interval that pod, node IP, and node heath status caches
 	// expire.
 	CacheTimeout time.Duration
+
+	// The name of the cluster.
+	ClusterName string
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -402,7 +405,7 @@ func (m *Master) init(c *Config) {
 		"bindings": bindingStorage,
 
 		"replicationControllers": controller.NewREST(registry, podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet),
+		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                nodeStorage,
 		"nodes":                  nodeStorage,

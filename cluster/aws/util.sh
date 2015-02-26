@@ -294,6 +294,7 @@ function kube-up {
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SALT_TAR_URL}'"
