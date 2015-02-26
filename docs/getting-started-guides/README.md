@@ -18,7 +18,8 @@ Bare-metal     | custom       | Ubuntu Cluster | [docs](../../docs/getting-start
 Local          |              |        | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     |
 Ovirt          |              |        | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
 Rackspace      | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
-Bare-metal        | custom       | CentOS | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
+Bare-metal     | custom       | CentOS | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
+libvirt/KVM    | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
 Definition of columns:
   - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
   - **OS** is the base operating system of the nodes.
