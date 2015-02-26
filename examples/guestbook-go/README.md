@@ -159,21 +159,16 @@ redis-master            <none>                                    name=redis,rol
 redis-slave             name=redis,role=slave                     name=redis,role=slave        10.0.22.180         6379
 ```
 
-To play with the service itself, find the external IP of the load balancer from the [Google Cloud Console][cloud-console] or the `gcloud` tool, and visit `http://<ip>:3000`.
+To play with the service itself, find the external IP of the load balancer:
 
 ```shell
-$ gcloud compute forwarding-rules describe --region=us-central1 guestbook
-IPAddress: 11.22.33.44
-IPProtocol: TCP
-creationTimestamp: '2014-11-24T16:08:15.327-08:00'
-id: '17594840560849468061'
-kind: compute#forwardingRule
-name: guestbook
-portRange: 1-65535
-region: https://www.googleapis.com/compute/v1/projects/jbeda-prod/regions/us-central1
-selfLink: https://www.googleapis.com/compute/v1/projects/jbeda-prod/regions/us-central1/forwardingRules/guestbook
-target: https://www.googleapis.com/compute/v1/projects/jbeda-prod/regions/us-central1/targetPools/guestbook
+$ cluster/kubectl.sh get services guestbook -o template --template='{{index . "publicIPs"}}'
+current-context: "kubernetes-satnam_kubernetes"
+Running: cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services guestbook -o template --template={{index . "publicIPs"}}
+[104.154.87.59]$
+
 ```
+and then visit port 3000 of that IP address e.g. `http://104.154.87.59:3000`.
 
 You may need to open the firewall for port 3000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
@@ -189,6 +184,18 @@ For details about limiting traffic to specific sources, see the [GCE firewall do
 
 ### Step Seven: Cleanup
 
+You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (pods, replication controllers and service) can be deleted with a single command:
+```shell
+$ cluster/kubectl.sh delete -f examples/guestbook-go
+current-context: "kubernetes-satnam_kubernetes"
+Running: cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl delete -f examples/guestbook-go
+guestbook-controller
+guestbook
+redis-master-controller
+redis-master
+redis-slave-controller
+redis-slave
+```
 To turn down a Kubernetes cluster:
 
 ```shell
