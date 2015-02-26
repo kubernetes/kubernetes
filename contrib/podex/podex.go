@@ -262,8 +262,12 @@ func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error)
 	req.Header.Add("X-Docker-Token", "true")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting X-Docker-Token from index.docker.io: %v", err)
+		return nil, fmt.Errorf("error making request to %q: %v", host, err)
 	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("error getting X-Docker-Token from %s: %q", host, resp.Status)
+	}
+
 	endpoints := resp.Header.Get("X-Docker-Endpoints")
 	token := resp.Header.Get("X-Docker-Token")
 	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/tags/%s", endpoints, namespace, repo, tag), nil)
