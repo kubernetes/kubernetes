@@ -157,7 +157,7 @@ function upload-server-tars() {
   echo "Uploading to Amazon S3"
   if ! aws s3 ls "s3://${staging_bucket}" > /dev/null 2>&1 ; then
     echo "Creating ${staging_bucket}"
-    aws s3 mb "s3://${staging_bucket}"
+    aws --region us-east-1 s3 mb "s3://${staging_bucket}"
   fi
 
   aws s3api put-bucket-acl --bucket $staging_bucket --acl public-read
@@ -295,8 +295,8 @@ function kube-up {
     echo "cd /var/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
-    echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
-    echo "readonly SALT_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SALT_TAR_URL}'"
+    echo "readonly SERVER_BINARY_TAR_URL='https://s3.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
+    echo "readonly SALT_TAR_URL='https://s3.amazonaws.com/${SALT_TAR_URL}'"
     echo "readonly AWS_ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
