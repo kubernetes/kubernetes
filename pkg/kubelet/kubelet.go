@@ -61,7 +61,10 @@ const podOomScoreAdj = -100
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
-	SyncPods([]api.BoundPod) error
+	// Syncs current state to match the specified pods. SyncPodType specified what
+	// type of sync is occuring per pod. StartTime specifies the time at which
+	// syncing began (for use in monitoring).
+	SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
 }
 
 type SourceReadyFn func(source string) bool
@@ -942,7 +945,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 	start := time.Now()
 	defer func() {
-		metrics.ImagePullLatency.Observe(float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds()))
+		metrics.ImagePullLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
 
 	if err := kl.dockerPuller.Pull(img); err != nil {
@@ -1270,7 +1273,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
+func (kl *Kubelet) SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
 	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
 	desiredContainers := make(map[podContainer]empty)
@@ -1296,7 +1299,9 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		}
 
 		// Run the sync in an async manifest worker.
-		kl.podWorkers.UpdatePod(*pod)
+		kl.podWorkers.UpdatePod(pod, func() {
+			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
+		})
 	}
 
 	// Stop the workers for no-longer existing pods.
@@ -1416,19 +1421,21 @@ func (kl *Kubelet) handleUpdate(u PodUpdate) {
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	for {
 		unsyncedPod := false
+		podSyncTypes := make(map[types.UID]metrics.SyncPodType)
 		select {
 		case u := <-updates:
-			kl.updatePods(u)
+			kl.updatePods(u, podSyncTypes)
 			unsyncedPod = true
 		case <-time.After(kl.resyncInterval):
 			glog.V(4).Infof("Periodic sync")
 		}
+		start := time.Now()
 		// If we already caught some update, try to wait for some short time
 		// to possibly batch it with other incoming updates.
 		for unsyncedPod {
 			select {
 			case u := <-updates:
-				kl.updatePods(u)
+				kl.updatePods(u, podSyncTypes)
 			case <-time.After(5 * time.Millisecond):
 				// Break the for loop.
 				unsyncedPod = false
@@ -1440,24 +1447,53 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			glog.Errorf("Failed to get bound pods.")
 			return
 		}
-		if err := handler.SyncPods(pods); err != nil {
+		if err := handler.SyncPods(pods, podSyncTypes, start); err != nil {
 			glog.Errorf("Couldn't sync containers: %v", err)
 		}
 	}
 }
 
-func (kl *Kubelet) updatePods(u PodUpdate) {
+// Updated the Kubelet's internal pods with those provided by the update.
+// Records new and updated pods in newPods and updatedPods.
+func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType) {
 	switch u.Op {
 	case SET:
 		glog.V(3).Infof("SET: Containers changed")
+
+		// Store the new pods. Don't worry about filtering host ports since those
+		// pods will never be looked up.
+		existingPods := make(map[types.UID]struct{})
+		for i := range kl.pods {
+			existingPods[kl.pods[i].UID] = struct{}{}
+		}
+		for i := range u.Pods {
+			if _, ok := existingPods[u.Pods[i].UID]; !ok {
+				podSyncTypes[u.Pods[i].UID] = metrics.SyncPodCreate
+			}
+		}
+
 		kl.pods = u.Pods
 		kl.pods = filterHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
+
+		// Store the updated pods. Don't worry about filtering host ports since those
+		// pods will never be looked up.
+		for i := range u.Pods {
+			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodUpdate
+		}
+
 		kl.pods = updateBoundPods(u.Pods, kl.pods)
 		kl.pods = filterHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
+	}
+
+	// Mark all remaining pods as sync.
+	for i := range kl.pods {
+		if _, ok := podSyncTypes[kl.pods[i].UID]; !ok {
+			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodSync
+		}
 	}
 }
 

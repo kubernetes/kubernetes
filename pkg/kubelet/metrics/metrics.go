@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -35,8 +36,16 @@ var (
 			Help:      "Image pull latency in microseconds.",
 		},
 	)
+	// TODO(vmarmol): Break down by number of containers in pod?
+	SyncPodLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      "sync_pod_latency_microseconds",
+			Help:      "Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
+		},
+		[]string{"operation_type"},
+	)
 	// TODO(vmarmol): Containers per pod
-	// TODO(vmarmol): Latency of pod startup
 	// TODO(vmarmol): Latency of SyncPods
 )
 
@@ -47,8 +56,35 @@ func Register(containerCache dockertools.DockerCache) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(ImagePullLatency)
+		prometheus.MustRegister(SyncPodLatency)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 	})
+}
+
+type SyncPodType int
+
+const (
+	SyncPodCreate SyncPodType = iota
+	SyncPodUpdate
+	SyncPodSync
+)
+
+func (self SyncPodType) String() string {
+	switch self {
+	case SyncPodCreate:
+		return "create"
+	case SyncPodUpdate:
+		return "update"
+	case SyncPodSync:
+		return "sync"
+	default:
+		return "unknown"
+	}
+}
+
+// Gets the time since the specified start in microseconds.
+func SinceInMicroseconds(start time.Time) float64 {
+	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
 
 func newPodAndContainerCollector(containerCache dockertools.DockerCache) *podAndContainerCollector {
