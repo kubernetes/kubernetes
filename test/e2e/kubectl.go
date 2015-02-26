@@ -35,6 +35,7 @@ const (
 	kittenImage         = "kubernetes/update-demo:kitten"
 	updateDemoSelector  = "name=update-demo"
 	updateDemoContainer = "update-demo"
+	validateTimeout     = 60 * time.Second
 )
 
 var _ = Describe("kubectl", func() {
@@ -48,7 +49,7 @@ var _ = Describe("kubectl", func() {
 
 		By("creating a replication controller")
 		runKubectl("create", "-f", nautilusPath)
-		validateController(nautilusImage, 2, 30*time.Second)
+		validateController(nautilusImage, 2)
 	})
 
 	It("should scale a replication controller", func() {
@@ -56,13 +57,13 @@ var _ = Describe("kubectl", func() {
 
 		By("creating a replication controller")
 		runKubectl("create", "-f", nautilusPath)
-		validateController(nautilusImage, 2, 30*time.Second)
+		validateController(nautilusImage, 2)
 		By("scaling down the replication controller")
 		runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=1")
-		validateController(nautilusImage, 1, 30*time.Second)
+		validateController(nautilusImage, 1)
 		By("scaling up the replication controller")
 		runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=2")
-		validateController(nautilusImage, 2, 30*time.Second)
+		validateController(nautilusImage, 2)
 	})
 
 	It("should do a rolling update of a replication controller", func() {
@@ -71,10 +72,10 @@ var _ = Describe("kubectl", func() {
 
 		By("creating the initial replication controller")
 		runKubectl("create", "-f", nautilusPath)
-		validateController(nautilusImage, 2, 30*time.Second)
+		validateController(nautilusImage, 2)
 		By("rollingupdate to new replication controller")
 		runKubectl("rollingupdate", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath)
-		validateController(kittenImage, 2, 30*time.Second)
+		validateController(kittenImage, 2)
 	})
 
 })
@@ -89,7 +90,7 @@ func cleanup(filePath string) {
 	}
 }
 
-func validateController(image string, replicas int, timeout time.Duration) {
+func validateController(image string, replicas int) {
 
 	getPodsTemplate := "--template={{range.items}}{{.id}} {{end}}"
 
@@ -109,7 +110,7 @@ func validateController(image string, replicas int, timeout time.Duration) {
 	getHostIPTemplate := "--template={{.currentState.hostIP}}"
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", updateDemoSelector))
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < validateTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "-l", updateDemoSelector)
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
