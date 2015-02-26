@@ -14,7 +14,7 @@ spec:
         name: wordpress
     spec: 
       containers: 
-          image: wordpress
+        - image: wordpress
           name: wordpress
           env:
             - name: WORDPRESS_DB_PASSWORD

@@ -16,7 +16,7 @@ spec:
       containers: 
         - resources:
             limits :
-              cpu: 1000m
+              cpu: 1
           image: mysql
           name: mysql
           env:
