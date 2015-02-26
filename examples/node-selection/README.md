@@ -8,72 +8,15 @@ This example assumes that you have a basic understanding of kubernetes pods and 
 
 ### Step One: Attach label to the node
 
-Run `kubectl get nodes` to get the names of the nodes. Pick out the one that you want to add a label to. Note that label keys must be in the form of DNS labels (as described in the [identifiers doc](/docs/design/identifiers.md)), meaning that they are not allowed to contain any upper-case letters. Then run `kubectl get node <node-name> -o yaml > node.yaml`. The contents of the file should look something like this:
+Run `kubectl get nodes` to get the names of your cluster's nodes. Pick out the one that you want to add a label to.
 
-<pre>
-apiVersion: v1beta1
-creationTimestamp: 2015-02-03T01:16:46Z
-hostIP: 104.154.60.112
-id: <node-name>
-kind: Node
-resourceVersion: 12
-resources:
-  capacity:
-    cpu: "1"
-    memory: 4.0265318e+09
-selfLink: /api/v1beta1/minions/<node-name>
-status:
-  conditions:
-  - kind: Ready
-    lastTransitionTime: null
-    status: Full
-uid: 526a4156-ab42-11e4-9817-42010af0258d
-</pre>
+Then, to add a label to the node you've chosen, run `kubectl label nodes <node-name> <label-key>=<label-value>`. For example, if my node name is 'kubernetes-foo-node-1.c.a-robinson.internal' and my desired label is 'disktype=ssd', then I can run `kubectl label nodes kubernetes-foo-node-1.c.a-robinson.internal disktype=ssd`.
 
-Add the labels that you want to the file like this:
+If this fails with an "invalid command" error, you're likely using an older version of kubectl that doesn't have the `label` command. In that case, see the [previous version](https://github.com/GoogleCloudPlatform/kubernetes/blob/a053dbc313572ed60d89dae9821ecab8bfd676dc/examples/node-selection/README.md) of this guide for instructions on how to manually set labels on a node.
 
-<pre>
-apiVersion: v1beta1
-creationTimestamp: 2015-02-03T01:16:46Z
-hostIP: 104.154.60.112
-id: <node-name>
-kind: Node
-<b>labels:
-  disktype: ssd</b>
-resourceVersion: 12
-resources:
-  capacity:
-    cpu: "1"
-    memory: 4.0265318e+09
-selfLink: /api/v1beta1/minions/<node-name>
-status:
-  conditions:
-  - kind: Ready
-    lastTransitionTime: null
-    status: Full
-uid: 526a4156-ab42-11e4-9817-42010af0258d
-</pre>
+Also, note that label keys must be in the form of DNS labels (as described in the [identifiers doc](/docs/design/identifiers.md)), meaning that they are not allowed to contain any upper-case letters.
 
-Then update the node by running `kubectl update -f node.yaml`. Make sure that the resourceVersion you use in your update call is the same as the resourceVersion returned by the get call. If something about the node changes between your get and your update, the update will fail because the resourceVersion will have changed.
-
-Note that as of 2015-02-03 there are a couple open issues that prevent this from working without modification. Due to [issue #3005](https://github.com/GoogleCloudPlatform/kubernetes/issues/3005), you have to remove all status-related fields from the file, which is both everything under the `status` field as well as the `hostIP` field (removing hostIP isn't required in v1beta3). Due to [issue 4041](https://github.com/GoogleCloudPlatform/kubernetes/issues/4041), you may have to modify the representation of the resource capacity numbers to make them integers. These are both temporary, and fixes are being worked on. In the meantime, you would actually call `kubectl update -f node.yaml` with a file that looks like this:
-
-<pre>
-apiVersion: v1beta1
-creationTimestamp: 2015-02-03T01:16:46Z
-id: <node-name>
-kind: Node
-<b>labels:
-  disktype: ssd</b>
-resourceVersion: 12
-resources:
-  capacity:
-    cpu: "1"
-    memory: 4026531800
-selfLink: /api/v1beta1/minions/<node-name>
-uid: 526a4156-ab42-11e4-9817-42010af0258d
-</pre>
-
+You can verify that it worked by re-running `kubectl get nodes` and checking that the node now has a label.
 
 ### Step Two: Add a nodeSelector field to your pod configuration
 
