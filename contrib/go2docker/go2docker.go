@@ -26,6 +26,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"flag"
 	"io"
 	"io/ioutil"
@@ -68,6 +69,27 @@ func main() {
 		args = flag.Args()
 	}
 
+	// check for go
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		log.Fatalf("`go` executable not found: %v, see %q ", err, "golang.org/doc/install")
+	}
+	toolPath := filepath.Dir(goBin)
+	// check for linux_amd64 toolchain
+	crossPath := filepath.Join(toolPath, "linux_amd642")
+	if _, crossErr := os.Stat(crossPath); os.IsNotExist(crossErr) {
+		// check for make.bash
+		makeBash, err := filepath.Abs(filepath.Join(toolPath, "..", "src", "make.bash"))
+		if err != nil {
+			log.Fatalf("failed to resolve make.bash path: %v", err)
+		}
+		if _, err := os.Stat(makeBash); os.IsNotExist(err) {
+			log.Fatalf("`make.bash` not found %q: %v", err)
+		}
+		makeBashCmd := fmt.Sprintf("(cd %s; GOOS=linux GOARCH=amd64 ./make.bash --no-clean)", filepath.Dir(makeBash))
+		log.Fatalf("`go %s` toolchain not found: %v, run: %q", "linux_amd64", crossErr, makeBashCmd)
+	}
+	
 	fpath, err := filepath.Abs(args[0])
 	ext := filepath.Ext(fpath)
 	basename := filepath.Base(fpath[:len(fpath)-len(ext)])
@@ -84,9 +106,25 @@ func main() {
 	}
 	aout := filepath.Join(tmpDir, basename)
 	command := append([]string{"go", "build", "-o", aout, "-a", "-tags", "netgo", "-installsuffix", "netgo"}, args...)
-	if _, err := exec.Command(command[0], command[1:]...).Output(); err != nil {
-		log.Fatalf("failed to run command %q: %v", strings.Join(command, " "), err)
+	cmd := exec.Command(command[0], command[1:]...)
+	gopath := os.Getenv("GOPATH")
+	cmd.Env = []string{
+		"GOOS=linux",
+		"GOARCH=amd64",
+		"GOPATH=" + gopath,
 	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatalf("failed to get process stderr: %v", err)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Fatalf("failed to start command %q: %v", strings.Join(command, " "), err)
+	}
+	io.Copy(os.Stderr, stderr)
+	if err := cmd.Wait(); err != nil {
+		log.Fatalf("command %q failed: %v", strings.Join(command, " "), err)
+	}
+	
 	imageIDBytes := make([]byte, 32)
 	if _, err := rand.Read(imageIDBytes); err != nil {
 		log.Fatalf("failed to generate ID: %v")
