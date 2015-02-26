@@ -17,6 +17,7 @@ ExecStart=/usr/bin/kube-apiserver \
 	    $KUBE_SERVICE_ADDRESSES \
 	    $KUBE_API_ARGS
 Restart=on-failure
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
