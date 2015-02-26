@@ -48,6 +48,7 @@ const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES
 var flManifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
 var flManifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
 var flManifestName = flag.String("name", "", "manifest name, default to image base name")
+var flDaemon = flag.Bool("daemon", false, "daemon mode")
 
 func init() {
 	flag.Usage = func() {
@@ -63,6 +64,53 @@ type image struct {
 	Tag       string
 }
 
+func main() {
+	flag.Parse()
+
+	if *flDaemon {
+		http.HandleFunc("/pods/", func(w http.ResponseWriter, r *http.Request) {
+			image := strings.TrimPrefix(r.URL.Path, "/pods/")
+			_, _, manifestName, _ := splitDockerImageName(image)
+			manifest, err := getManifest(manifestName, "pod", "json", image)
+			if err != nil {
+				errMessage := fmt.Sprintf("failed to generate pod manifest for image %q: %v", image, err)
+				log.Print(errMessage)
+				http.Error(w, errMessage, http.StatusInternalServerError)
+				return
+			}
+			io.Copy(w, manifest)
+		})
+		log.Fatal(http.ListenAndServe(":8080", nil))
+	}
+
+	if flag.NArg() < 1 {
+		flag.Usage()
+		log.Fatal("pod: missing image argument")
+	}
+	if *flManifestName == "" {
+		if flag.NArg() > 1 {
+			flag.Usage()
+			log.Fatal("podex: -id arg is required when passing more than one image")
+		}
+		_, _, *flManifestName, _ = splitDockerImageName(flag.Arg(0))
+	}
+	if *flManifestType != "pod" && *flManifestType != "container" {
+		flag.Usage()
+		log.Fatalf("unsupported manifest type %q", *flManifestType)
+	}
+	if *flManifestFormat != "yaml" && *flManifestFormat != "json" {
+		flag.Usage()
+		log.Fatalf("unsupported manifest format %q", *flManifestFormat)
+	}
+
+	manifest, err := getManifest(*flManifestName, *flManifestType, *flManifestFormat, flag.Args()...)
+	if err != nil {
+		log.Fatalf("failed to generate %q manifest for %v: %v", *flManifestType, flag.Args(), err)
+	}
+	io.Copy(os.Stdout, manifest)
+}
+
+// getManifest infers a pod (or container) manifest for a list of docker images.
 func getManifest(manifestName, manifestType, manifestFormat string, images ...string) (io.Reader, error) {
 	podContainers := []goyaml.MapSlice{}
 
@@ -152,36 +200,6 @@ func getManifest(manifestName, manifestType, manifestFormat string, images ...st
 		return nil, fmt.Errorf("unsupported manifest format %q", manifestFormat)
 	}
 
-}
-
-func main() {
-	flag.Parse()
-
-	if flag.NArg() < 1 {
-		flag.Usage()
-		log.Fatal("pod: missing image argument")
-	}
-	if *flManifestName == "" {
-		if flag.NArg() > 1 {
-			flag.Usage()
-			log.Fatal("podex: -id arg is required when passing more than one image")
-		}
-		_, _, *flManifestName, _ = splitDockerImageName(flag.Arg(0))
-	}
-	if *flManifestType != "pod" && *flManifestType != "container" {
-		flag.Usage()
-		log.Fatalf("unsupported manifest type %q", *flManifestType)
-	}
-	if *flManifestFormat != "yaml" && *flManifestFormat != "json" {
-		flag.Usage()
-		log.Fatalf("unsupported manifest format %q", *flManifestFormat)
-	}
-
-	manifest, err := getManifest(*flManifestName, *flManifestType, *flManifestFormat, flag.Args()...)
-	if err != nil {
-		log.Fatalf("failed to generate %q manifest for %v: %v", *flManifestType, flag.Args(), err)
-	}
-	io.Copy(os.Stdout, manifest)
 }
 
 // splitDockerImageName split a docker image name of the form [HOST/][NAMESPACE/]REPOSITORY[:TAG]
