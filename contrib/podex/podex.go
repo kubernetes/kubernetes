@@ -45,9 +45,9 @@ import (
 
 const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES..."
 
-var manifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
-var manifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
-var manifestName = flag.String("name", "", "manifest name, default to image base name")
+var flManifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
+var flManifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
+var flManifestName = flag.String("name", "", "manifest name, default to image base name")
 
 func init() {
 	flag.Usage = func() {
@@ -63,24 +63,10 @@ type image struct {
 	Tag       string
 }
 
-func main() {
-	flag.Parse()
-
-	if flag.NArg() < 1 {
-		flag.Usage()
-		log.Fatal("pod: missing image argument")
-	}
-	if *manifestName == "" {
-		if flag.NArg() > 1 {
-			flag.Usage()
-			log.Fatal("podex: -id arg is required when passing more than one image")
-		}
-		_, _, *manifestName, _ = splitDockerImageName(flag.Arg(0))
-	}
-
+func getManifest(manifestName, manifestType, manifestFormat string, images ...string) (io.Reader, error) {
 	podContainers := []goyaml.MapSlice{}
 
-	for _, imageName := range flag.Args() {
+	for _, imageName := range images {
 		host, namespace, repo, tag := splitDockerImageName(imageName)
 
 		container := goyaml.MapSlice{
@@ -91,13 +77,13 @@ func main() {
 		img, err := getImageMetadata(host, namespace, repo, tag)
 
 		if err != nil {
-			log.Fatalf("failed to get image metadata %q: %v", imageName, err)
+			return nil, fmt.Errorf("failed to get image metadata %q: %v", imageName, err)
 		}
 		portSlice := []goyaml.MapSlice{}
 		for p := range img.ContainerConfig.ExposedPorts {
 			port, err := strconv.Atoi(p.Port())
 			if err != nil {
-				log.Fatalf("failed to parse port %q: %v", p.Port(), err)
+				return nil, fmt.Errorf("failed to parse port %q: %v", p.Port(), err)
 			}
 			portEntry := goyaml.MapSlice{{
 				Key:   "name",
@@ -125,15 +111,15 @@ func main() {
 
 	var data interface{}
 
-	switch *manifestType {
+	switch manifestType {
 	case "container":
 		containerManifest = append(goyaml.MapSlice{
-			{Key: "id", Value: *manifestName},
+			{Key: "id", Value: manifestName},
 		}, containerManifest...)
 		data = containerManifest
 	case "pod":
 		data = goyaml.MapSlice{
-			{Key: "id", Value: *manifestName},
+			{Key: "id", Value: manifestName},
 			{Key: "kind", Value: "Pod"},
 			{Key: "apiVersion", Value: "v1beta1"},
 			{Key: "desiredState", Value: goyaml.MapSlice{
@@ -141,32 +127,61 @@ func main() {
 			}},
 		}
 	default:
-		flag.Usage()
-		log.Fatalf("unsupported manifest type %q", *manifestType)
+		return nil, fmt.Errorf("unsupported manifest type %q", manifestFormat)
 	}
 
 	yamlBytes, err := goyaml.Marshal(data)
 	if err != nil {
-		log.Fatalf("failed to marshal container manifest: %v", err)
+		return nil, fmt.Errorf("failed to marshal container manifest: %v", err)
 	}
 
-	switch *manifestFormat {
+	switch manifestFormat {
 	case "yaml":
-		os.Stdout.Write(yamlBytes)
+		return bytes.NewBuffer(yamlBytes), nil
 	case "json":
 		jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 		if err != nil {
-			log.Fatalf("failed to marshal container manifest into JSON: %v", err)
+			return nil, fmt.Errorf("failed to marshal container manifest into JSON: %v", err)
 		}
 		var jsonPretty bytes.Buffer
 		if err := json.Indent(&jsonPretty, jsonBytes, "", "  "); err != nil {
-			log.Fatalf("failed to indent json %q: %v", string(jsonBytes), err)
+			return nil, fmt.Errorf("failed to indent json %q: %v", string(jsonBytes), err)
 		}
-		io.Copy(os.Stdout, &jsonPretty)
+		return &jsonPretty, nil
 	default:
-		flag.Usage()
-		log.Fatalf("unsupported manifest format %q", *manifestFormat)
+		return nil, fmt.Errorf("unsupported manifest format %q", manifestFormat)
 	}
+
+}
+
+func main() {
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		flag.Usage()
+		log.Fatal("pod: missing image argument")
+	}
+	if *flManifestName == "" {
+		if flag.NArg() > 1 {
+			flag.Usage()
+			log.Fatal("podex: -id arg is required when passing more than one image")
+		}
+		_, _, *flManifestName, _ = splitDockerImageName(flag.Arg(0))
+	}
+	if *flManifestType != "pod" && *flManifestType != "container" {
+		flag.Usage()
+		log.Fatalf("unsupported manifest type %q", *flManifestType)
+	}
+	if *flManifestFormat != "yaml" && *flManifestFormat != "json" {
+		flag.Usage()
+		log.Fatalf("unsupported manifest format %q", *flManifestFormat)
+	}
+
+	manifest, err := getManifest(*flManifestName, *flManifestType, *flManifestFormat, flag.Args()...)
+	if err != nil {
+		log.Fatalf("failed to generate %q manifest for %v: %v", *flManifestType, flag.Args(), err)
+	}
+	io.Copy(os.Stdout, manifest)
 }
 
 // splitDockerImageName split a docker image name of the form [HOST/][NAMESPACE/]REPOSITORY[:TAG]
