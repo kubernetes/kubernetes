@@ -1306,6 +1306,11 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metr
 		kl.podWorkers.UpdatePod(pod, func() {
 			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
 		})
+
+		// Note the number of containers for new pods.
+		if val, ok := podSyncTypes[pod.UID]; ok && (val == metrics.SyncPodCreate) {
+			metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
+		}
 	}
 
 	// Stop the workers for no-longer existing pods.
