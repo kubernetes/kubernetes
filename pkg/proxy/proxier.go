@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
@@ -58,16 +60,17 @@ type proxySocket interface {
 	// while sessions are active.
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service string, info *serviceInfo, proxier *Proxier)
+	ProxyLoop(namespace, service string, info *serviceInfo, proxier *Proxier)
 }
 
 // tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
 // no new connections are allowed but existing connections are left untouched.
 type tcpProxySocket struct {
 	net.Listener
+	client client.Interface
 }
 
-func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
+func tryConnect(client client.Interface, namespace, service string, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
 	for _, retryTimeout := range endpointDialTimeout {
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
 		if err != nil {
@@ -80,6 +83,29 @@ func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Prox
 		outConn, err := net.DialTimeout(protocol, endpoint, retryTimeout*time.Second)
 		if err != nil {
 			glog.Errorf("Dial failed: %v", err)
+			if client != nil {
+				host, err := os.Hostname()
+				if err != nil {
+					glog.Errorf("failed to get hostname: %v", err)
+				}
+				event := &api.Event{
+					InvolvedObject: api.ObjectReference{
+						Kind:      "Service",
+						Name:      service,
+						Namespace: namespace,
+						FieldPath: fmt.Sprintf("pods.%s", endpoint),
+					},
+					Reason:  "CONNECT_FAILED",
+					Message: err.Error(),
+					Source: api.EventSource{
+						Component: "kube-proxy",
+						Host:      host,
+					},
+				}
+				if _, err := client.Events(api.NamespaceDefault).Create(event); err != nil {
+					glog.Errorf("Error writing event: %v", err)
+				}
+			}
 			continue
 		}
 		return outConn, nil
@@ -87,7 +113,7 @@ func tryConnect(service string, srcAddr net.Addr, protocol string, proxier *Prox
 	return nil, fmt.Errorf("failed to connect to an endpoint.")
 }
 
-func (tcp *tcpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxier *Proxier) {
+func (tcp *tcpProxySocket) ProxyLoop(namespace, service string, myInfo *serviceInfo, proxier *Proxier) {
 	for {
 		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 			// The service port was closed or replaced.
@@ -105,7 +131,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxie
 			continue
 		}
 		glog.V(2).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
-		outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
+		outConn, err := tryConnect(tcp.client, namespace, service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
 		if err != nil {
 			glog.Errorf("Failed to connect to balancer: %v", err)
 			inConn.Close()
@@ -162,7 +188,7 @@ func newClientCache() *clientCache {
 	return &clientCache{clients: map[string]net.Conn{}}
 }
 
-func (udp *udpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxier *Proxier) {
+func (udp *udpProxySocket) ProxyLoop(namespace, service string, myInfo *serviceInfo, proxier *Proxier) {
 	activeClients := newClientCache()
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
@@ -185,7 +211,7 @@ func (udp *udpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxie
 			break
 		}
 		// If this is a client we know already, reuse the connection and goroutine.
-		svrConn, err := udp.getBackendConn(activeClients, cliAddr, proxier, service, myInfo.timeout)
+		svrConn, err := udp.getBackendConn(activeClients, cliAddr, proxier, namespace, service, myInfo.timeout)
 		if err != nil {
 			continue
 		}
@@ -207,7 +233,7 @@ func (udp *udpProxySocket) ProxyLoop(service string, myInfo *serviceInfo, proxie
 	}
 }
 
-func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service string, timeout time.Duration) (net.Conn, error) {
+func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, namespace, service string, timeout time.Duration) (net.Conn, error) {
 	activeClients.mu.Lock()
 	defer activeClients.mu.Unlock()
 
@@ -217,7 +243,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 		// and keep accepting inbound traffic.
 		glog.V(2).Infof("New UDP connection from %s", cliAddr)
 		var err error
-		svrConn, err = tryConnect(service, cliAddr, "udp", proxier)
+		svrConn, err = tryConnect(nil, namespace, service, cliAddr, "udp", proxier)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +301,7 @@ func logTimeout(err error) bool {
 	return false
 }
 
-func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
+func newProxySocket(client client.Interface, protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
 	host := ip.String()
 	switch strings.ToUpper(string(protocol)) {
 	case "TCP":
@@ -283,7 +309,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 		if err != nil {
 			return nil, err
 		}
-		return &tcpProxySocket{listener}, nil
+		return &tcpProxySocket{listener, client}, nil
 	case "UDP":
 		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(host, strconv.Itoa(port)))
 		if err != nil {
@@ -308,6 +334,7 @@ type Proxier struct {
 	listenIP      net.IP
 	iptables      iptables.Interface
 	hostIP        net.IP
+	client        client.Interface
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
@@ -417,8 +444,8 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 // addServiceOnPort starts listening for a new service, returning the serviceInfo.
 // Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnPort(service string, protocol api.Protocol, proxyPort int, timeout time.Duration) (*serviceInfo, error) {
-	sock, err := newProxySocket(protocol, proxier.listenIP, proxyPort)
+func (proxier *Proxier) addServiceOnPort(namespace, service string, protocol api.Protocol, proxyPort int, timeout time.Duration) (*serviceInfo, error) {
+	sock, err := newProxySocket(proxier.client, protocol, proxier.listenIP, proxyPort)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +473,7 @@ func (proxier *Proxier) addServiceOnPort(service string, protocol api.Protocol, 
 	go func(service string, proxier *Proxier) {
 		defer util.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
-		sock.ProxyLoop(service, si, proxier)
+		sock.ProxyLoop(namespace, service, si, proxier)
 		atomic.AddInt32(&proxier.numProxyLoops, -1)
 	}(service, proxier)
 
@@ -482,7 +509,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 		}
 		glog.V(1).Infof("Adding new service %q at %s:%d/%s", service.Name, serviceIP, service.Spec.Port, service.Spec.Protocol)
-		info, err := proxier.addServiceOnPort(service.Name, service.Spec.Protocol, 0, udpIdleTimeout)
+		info, err := proxier.addServiceOnPort(service.Namespace, service.Name, service.Spec.Protocol, 0, udpIdleTimeout)
 		if err != nil {
 			glog.Errorf("Failed to start proxy for %q: %v", service.Name, err)
 			continue
