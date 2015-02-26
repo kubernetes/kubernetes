@@ -26,8 +26,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -89,7 +89,7 @@ func main() {
 		makeBashCmd := fmt.Sprintf("(cd %s; GOOS=linux GOARCH=amd64 ./make.bash --no-clean)", filepath.Dir(makeBash))
 		log.Fatalf("`go %s` toolchain not found: %v, run: %q", "linux_amd64", crossErr, makeBashCmd)
 	}
-	
+
 	fpath, err := filepath.Abs(args[0])
 	ext := filepath.Ext(fpath)
 	basename := filepath.Base(fpath[:len(fpath)-len(ext)])
@@ -124,7 +124,7 @@ func main() {
 	if err := cmd.Wait(); err != nil {
 		log.Fatalf("command %q failed: %v", strings.Join(command, " "), err)
 	}
-	
+
 	imageIDBytes := make([]byte, 32)
 	if _, err := rand.Read(imageIDBytes); err != nil {
 		log.Fatalf("failed to generate ID: %v")
