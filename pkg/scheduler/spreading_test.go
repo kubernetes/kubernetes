@@ -119,7 +119,7 @@ func TestServiceSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		serviceSpread := ServiceSpread{serviceLister: FakeServiceLister(test.services)}
-		list, err := serviceSpread.CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeMinionList(test.nodes)))
+		list, err := serviceSpread.CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
