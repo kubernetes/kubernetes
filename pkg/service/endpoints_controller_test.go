@@ -80,6 +80,11 @@ func TestFindPort(t *testing.T) {
 							ContainerPort: 8000,
 							HostPort:      9000,
 						},
+						{
+							Name:          "default",
+							ContainerPort: 8100,
+							HostPort:      9200,
+						},
 					},
 				},
 			},
@@ -95,6 +100,37 @@ func TestFindPort(t *testing.T) {
 			},
 		},
 	}
+
+	singlePortPod := api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: []api.ContainerPort{
+						{
+							ContainerPort: 8300,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	noDefaultPod := api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: []api.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8300,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	servicePort := 999
 
 	tests := []struct {
 		pod      api.Pod
@@ -134,32 +170,50 @@ func TestFindPort(t *testing.T) {
 			true,
 		},
 		{
-			pod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
-			8080,
-			false,
-		},
-		{
-			pod,
-			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
-			8080,
-			false,
-		},
-		{
 			emptyPortsPod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			util.IntOrString{Kind: util.IntstrString, StrVal: "foo"},
 			0,
 			true,
 		},
 		{
 			emptyPortsPod,
+			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			servicePort,
+			false,
+		},
+		{
+			emptyPortsPod,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
-			0,
-			true,
+			servicePort,
+			false,
+		},
+		{
+			singlePortPod,
+			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			8300,
+			false,
+		},
+		{
+			singlePortPod,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
+			8300,
+			false,
+		},
+		{
+			noDefaultPod,
+			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			8300,
+			false,
+		},
+		{
+			noDefaultPod,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
+			8300,
+			false,
 		},
 	}
 	for _, test := range tests {
-		port, err := findPort(&test.pod, test.portName)
+		port, err := findPort(&test.pod, &api.Service{Spec: api.ServiceSpec{Port: servicePort, ContainerPort: test.portName}})
 		if port != test.wport {
 			t.Errorf("Expected port %d, Got %d", test.wport, port)
 		}

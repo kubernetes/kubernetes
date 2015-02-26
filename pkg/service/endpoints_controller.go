@@ -71,7 +71,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			// assume that service.Spec.ContainerPort is populated.
 			_ = v1beta1.Dependency
 			_ = v1beta2.Dependency
-			port, err := findPort(&pod, service.Spec.ContainerPort)
+			port, err := findPort(&pod, &service)
 			if err != nil {
 				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
@@ -156,18 +156,30 @@ func endpointsEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
 	return true
 }
 
-// findPort locates the container port for the given manifest and portName.
-func findPort(pod *api.Pod, portName util.IntOrString) (int, error) {
-	firstContainerPort := 0
-	if len(pod.Spec.Containers) > 0 && len(pod.Spec.Containers[0].Ports) > 0 {
-		firstContainerPort = pod.Spec.Containers[0].Ports[0].ContainerPort
+func findDefaultPort(pod *api.Pod, servicePort int) (int, bool) {
+	foundPorts := []int{}
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			foundPorts = append(foundPorts, port.ContainerPort)
+		}
 	}
+	if len(foundPorts) == 0 {
+		return servicePort, true
+	}
+	if len(foundPorts) == 1 {
+		return foundPorts[0], true
+	}
+	return 0, false
+}
 
+// findPort locates the container port for the given manifest and portName.
+func findPort(pod *api.Pod, service *api.Service) (int, error) {
+	portName := service.Spec.ContainerPort
 	switch portName.Kind {
 	case util.IntstrString:
 		if len(portName.StrVal) == 0 {
-			if firstContainerPort != 0 {
-				return firstContainerPort, nil
+			if port, found := findDefaultPort(pod, service.Spec.Port); found {
+				return port, nil
 			}
 			break
 		}
@@ -181,8 +193,8 @@ func findPort(pod *api.Pod, portName util.IntOrString) (int, error) {
 		}
 	case util.IntstrInt:
 		if portName.IntVal == 0 {
-			if firstContainerPort != 0 {
-				return firstContainerPort, nil
+			if port, found := findDefaultPort(pod, service.Spec.Port); found {
+				return port, nil
 			}
 			break
 		}
