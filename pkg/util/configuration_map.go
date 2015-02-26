@@ -40,9 +40,9 @@ func (m *ConfigurationMap) Set(value string) error {
 		}
 		arr := strings.SplitN(s, "=", 2)
 		if len(arr) == 2 {
-			(*m)[arr[0]] = arr[1]
+			(*m)[strings.TrimSpace(arr[0])] = strings.TrimSpace(arr[1])
 		} else {
-			(*m)[arr[0]] = ""
+			(*m)[strings.TrimSpace(arr[0])] = ""
 		}
 	}
 	return nil

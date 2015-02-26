@@ -153,42 +153,45 @@ while true; do
     echo
 
 	case $option in
-	    [2] )
+	    [1] )
+            # as both master and minion
         	read -p "IP address of this machine > " myIP
             echo
             etcdName=${mm[$myIP]}
-            inList $etcdName $myIP 
-            configEtcd $etcdName $myIP $cluster
-            # set MINION IPs in kube-controller-manager
-            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager  
-	        cpMaster
-	        break
-	        ;;
-	    [3] )     
-        	read -p "IP address of this machine > " myIP
-            echo           
-            etcdName=${mm[$myIP]}
-            inList $etcdName $myIP 
-            configEtcd $etcdName $myIP $cluster
-            # set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
-	        cpMinion
-	        break
-	        ;;
-	    [1] )
-        	read -p "IP address of this machine > " myIP
-            echo 
-            etcdName=${mm[$myIP]}
-            inList $etcdName $myIP 
+            inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
             # For minion set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet 
+            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
             
             # For master set MINION IPs in kube-controller-manager
-	        minionIPs="$minionIPs,$myIP"       
+	        minionIPs="$minionIPs,$myIP"
 	        sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
 	        
 	        cpMaster
+	        cpMinion
+	        break
+	        ;;
+        [2] )
+            # as master
+        	read -p "IP address of this machine > " myIP
+            echo
+            etcdName=${mm[$myIP]}
+            inList $etcdName $myIP
+            configEtcd $etcdName $myIP $cluster
+            # set MINION IPs in kube-controller-manager
+            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
+	        cpMaster
+	        break
+            ;;
+        [3] )
+            # as minion
+        	read -p "IP address of this machine > " myIP
+            echo
+            etcdName=${mm[$myIP]}
+            inList $etcdName $myIP
+            configEtcd $etcdName $myIP $cluster
+            # set MINION IP in default_scripts/kubelet
+            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
 	        cpMinion
 	        break
 	        ;;

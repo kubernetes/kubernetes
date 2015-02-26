@@ -13,7 +13,8 @@ desiredState:
         - name: update-demo
           image: kubernetes/update-demo:nautilus
           ports:
-          - containerPort: 80
+          - hostPort: 8080
+            containerPort: 80
             protocol: TCP
     labels:
         name: update-demo

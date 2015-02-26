@@ -56,19 +56,17 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		secret, err := c.Secrets(ns).Create(secret)
 		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		if err != nil {
-			Fail(fmt.Sprintf("unable to create test secret %s: %v", secret.Name, err))
-		}
-
-		// Clean up secret
 		defer func() {
 			By("Cleaning up the secret")
-			if err = c.Secrets(ns).Delete(secret.Name); err != nil {
-				Fail(fmt.Sprintf("unable to delete secret %v: %v", secret.Name, err))
+			if err := c.Secrets(ns).Delete(secret.Name); err != nil {
+				Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 		}()
+		var err error
+		if secret, err = c.Secrets(ns).Create(secret); err != nil {
+			Failf("unable to create test secret %s: %v", secret.Name, err)
+		}
 
 		By(fmt.Sprintf("Creating a pod to consume secret %v", secret.Name))
 		// Make a client pod that verifies that it has the service environment variables.
@@ -112,21 +110,17 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		_, err = c.Pods(ns).Create(clientPod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+		defer c.Pods(ns).Delete(clientPod.Name)
+		if _, err := c.Pods(ns).Create(clientPod); err != nil {
+			Failf("Failed to create pod: %v", err)
 		}
-		defer func() {
-			c.Pods(ns).Delete(clientPod.Name)
-		}()
-
 		// Wait for client pod to complete.
 		expectNoError(waitForPodRunning(c, clientPod.Name, 60*time.Second))
 
 		// Grab its logs.  Get host first.
 		clientPodStatus, err := c.Pods(ns).Get(clientPod.Name)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to get clientPod to know host: %v", err))
+			Failf("Failed to get clientPod to know host: %v", err)
 		}
 		By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
 			clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))

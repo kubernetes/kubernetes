@@ -111,7 +111,6 @@ func NewMainKubelet(
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
 		podInfraContainerImage:         podInfraContainerImage,
-		podWorkers:                     newPodWorkers(),
 		dockerIDToRef:                  map[dockertools.DockerID]*api.ObjectReference{},
 		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
 		httpClient:                     &http.Client{},
@@ -134,6 +133,9 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.dockerCache = dockerCache
+	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod)
+
+	metrics.Register(dockerCache)
 
 	if err = klet.setupDataDirs(); err != nil {
 		return nil, err
@@ -163,8 +165,13 @@ type Kubelet struct {
 	podInfraContainerImage string
 	podWorkers             *podWorkers
 	resyncInterval         time.Duration
-	pods                   []api.BoundPod
 	sourceReady            SourceReadyFn
+
+	// Protects the pods array
+	// We make complete array copies out of this while locked, which is OK because once added to this array,
+	// pods are immutable
+	podLock sync.RWMutex
+	pods    []api.BoundPod
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -444,43 +451,6 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
 	}
 	kl.syncLoop(updates, kl)
-}
-
-// Per-pod workers.
-type podWorkers struct {
-	lock sync.Mutex
-
-	// Set of pods with existing workers.
-	workers util.StringSet
-}
-
-func newPodWorkers() *podWorkers {
-	return &podWorkers{
-		workers: util.NewStringSet(),
-	}
-}
-
-// Runs a worker for "podFullName" asynchronously with the specified "action".
-// If the worker for the "podFullName" is already running, functions as a no-op.
-func (self *podWorkers) Run(podFullName string, action func()) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	// This worker is already running, let it finish.
-	if self.workers.Has(podFullName) {
-		return
-	}
-	self.workers.Insert(podFullName)
-
-	// Run worker async.
-	go func() {
-		defer util.HandleCrash()
-		action()
-
-		self.lock.Lock()
-		defer self.lock.Unlock()
-		self.workers.Delete(podFullName)
-	}()
 }
 
 func makeBinds(pod *api.BoundPod, container *api.Container, podVolumes volumeMap) []string {
@@ -1326,13 +1296,12 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		}
 
 		// Run the sync in an async manifest worker.
-		kl.podWorkers.Run(podFullName, func() {
-			if err := kl.syncPod(pod, dockerContainers); err != nil {
-				glog.Errorf("Error syncing pod, skipping: %v", err)
-				record.Eventf(pod, "failedSync", "Error syncing pod, skipping: %v", err)
-			}
-		})
+		kl.podWorkers.UpdatePod(*pod)
 	}
+
+	// Stop the workers for no-longer existing pods.
+	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
+
 	// Kill any containers we don't need.
 	killed := []string{}
 	for ix := range dockerContainers {
@@ -1421,6 +1390,24 @@ func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	return filtered
 }
 
+func (kl *Kubelet) handleUpdate(u PodUpdate) {
+	kl.podLock.Lock()
+	defer kl.podLock.Unlock()
+	switch u.Op {
+	case SET:
+		glog.V(3).Infof("SET: Containers changed")
+		kl.pods = u.Pods
+		kl.pods = filterHostPortConflicts(kl.pods)
+	case UPDATE:
+		glog.V(3).Infof("Update: Containers changed")
+		kl.pods = updateBoundPods(u.Pods, kl.pods)
+		kl.pods = filterHostPortConflicts(kl.pods)
+
+	default:
+		panic("syncLoop does not support incremental changes")
+	}
+}
+
 // syncLoop is the main loop for processing changes. It watches for changes from
 // four channels (file, etcd, server, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
@@ -1448,8 +1435,12 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 		}
 
-		err := handler.SyncPods(kl.pods)
+		pods, err := kl.GetBoundPods()
 		if err != nil {
+			glog.Errorf("Failed to get bound pods.")
+			return
+		}
+		if err := handler.SyncPods(pods); err != nil {
 			glog.Errorf("Couldn't sync containers: %v", err)
 		}
 	}
@@ -1518,16 +1509,19 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 
 // GetBoundPods returns all pods bound to the kubelet and their spec
 func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
-	return kl.pods, nil
+	kl.podLock.RLock()
+	defer kl.podLock.RUnlock()
+	return append([]api.BoundPod{}, kl.pods...), nil
 }
 
-// GetPodFullName provides the first pod that matches namespace and name, or false
-// if no such pod can be found.
+// GetPodByName provides the first pod that matches namespace and name, as well as whether the node was found.
 func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
+	kl.podLock.RLock()
+	defer kl.podLock.RUnlock()
 	for i := range kl.pods {
-		pod := &kl.pods[i]
+		pod := kl.pods[i]
 		if pod.Namespace == namespace && pod.Name == name {
-			return pod, true
+			return &pod, true
 		}
 	}
 	return nil, false
@@ -1620,23 +1614,27 @@ func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodConditio
 	return ready
 }
 
-// GetPodStatus returns information from Docker about the containers in a pod
-func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
-	var spec api.PodSpec
-	var podStatus api.PodStatus
-	found := false
+func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.PodSpec, bool) {
+	kl.podLock.RLock()
+	defer kl.podLock.RUnlock()
 	for _, pod := range kl.pods {
 		if GetPodFullName(&pod) == podFullName {
-			spec = pod.Spec
-			found = true
-			break
+			return &pod.Spec, true
 		}
 	}
+	return nil, false
+}
+
+// GetPodStatus returns information from Docker about the containers in a pod
+func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
+	var podStatus api.PodStatus
+	spec, found := kl.GetPodByFullName(podFullName)
+
 	if !found {
 		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
 	}
 
-	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, spec, podFullName, uid)
+	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, *spec, podFullName, uid)
 
 	if err != nil {
 		// Error handling
@@ -1652,13 +1650,13 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	}
 
 	// Assume info is ready to process
-	podStatus.Phase = getPhase(&spec, info)
+	podStatus.Phase = getPhase(spec, info)
 	for _, c := range spec.Containers {
 		containerStatus := info[c.Name]
 		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
 		info[c.Name] = containerStatus
 	}
-	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(&spec, info)...)
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, info)...)
 
 	netContainerInfo, found := info[dockertools.PodInfraContainerName]
 	if found {

@@ -107,24 +107,23 @@ var _ = Describe("Services", func() {
 		}
 
 		By("submitting the pod to kuberenetes")
-		_, err := podClient.Create(pod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to create %s pod: %v", pod.Name, err))
-		}
 		defer func() {
 			By("deleting the pod")
 			defer GinkgoRecover()
 			podClient.Delete(pod.Name)
 		}()
+		if _, err := podClient.Create(pod); err != nil {
+			Failf("Failed to create %s pod: %v", pod.Name, err)
+		}
 
 		By("waiting for the pod to start running")
-		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		err := waitForPodRunning(c, pod.Name, 300*time.Second)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("retrieving the pod")
 		pod, err = podClient.Get(pod.Name)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to get pod %s: %v", pod.Name, err))
+			Failf("Failed to get pod %s: %v", pod.Name, err)
 		}
 
 		// Try to find results for each expected name.
@@ -166,7 +165,7 @@ var _ = Describe("Services", func() {
 			Do().
 			Into(&svc)
 		if err != nil {
-			Fail(fmt.Sprintf("unexpected error listing services using ro service: %v", err))
+			Failf("unexpected error listing services using ro service: %v", err)
 		}
 		var foundRW, foundRO bool
 		for i := range svc.Items {
@@ -210,15 +209,17 @@ var _ = Describe("Services", func() {
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, []string{})
 
-		name1 := "test1"
-		addEndpointPodOrFail(c, ns, name1, labels)
-		names := []string{name1}
+		var names []string
 		defer func() {
 			for _, name := range names {
 				err := c.Pods(ns).Delete(name)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
+
+		name1 := "test1"
+		addEndpointPodOrFail(c, ns, name1, labels)
+		names = append(names, name1)
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
@@ -251,7 +252,7 @@ func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEn
 	ips := util.StringSet{}
 	for _, ep := range endpoints.Endpoints {
 		if ep.Port != expectedPort {
-			Fail(fmt.Sprintf("invalid port, expected %d, got %d", expectedPort, ep.Port))
+			Failf("invalid port, expected %d, got %d", expectedPort, ep.Port)
 		}
 		ips.Insert(ep.IP)
 	}
@@ -259,10 +260,10 @@ func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEn
 	for _, name := range expectedEndpoints {
 		pod, err := c.Pods(ns).Get(name)
 		if err != nil {
-			Fail(fmt.Sprintf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err))
+			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
 		if !ips.Has(pod.Status.PodIP) {
-			Fail(fmt.Sprintf("ip validation failed, expected: %v, saw: %v", ips, pod.Status.PodIP))
+			Failf("ip validation failed, expected: %v, saw: %v", ips, pod.Status.PodIP)
 		}
 	}
 }

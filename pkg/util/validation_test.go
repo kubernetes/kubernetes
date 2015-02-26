@@ -189,3 +189,35 @@ func TestIsQualifiedName(t *testing.T) {
 		}
 	}
 }
+
+func TestIsValidLabelValue(t *testing.T) {
+	successCases := []string{
+		"simple",
+		"now-with-dashes",
+		"1-starts-with-num",
+		"end-with-num-1",
+		"-starts-with-dash",
+		"ends-with-dash-",
+		".starts.with.dot",
+		"ends.with.dot.",
+		"\\preserve\\backslash",
+		"1234",                  // only num
+		strings.Repeat("a", 63), // to the limit
+	}
+	for i := range successCases {
+		if !IsValidLabelValue(successCases[i]) {
+			t.Errorf("case[%d] expected success", i)
+		}
+	}
+
+	errorCases := []string{
+		"nospecialchars%^=@",
+		"Tama-nui-te-rā.is.Māori.sun",
+		strings.Repeat("a", 65),
+	}
+	for i := range errorCases {
+		if IsValidLabelValue(errorCases[i]) {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
