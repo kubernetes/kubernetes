@@ -135,6 +135,8 @@ func NewMainKubelet(
 	}
 	klet.dockerCache = dockerCache
 
+	metrics.Register(dockerCache)
+
 	if err = klet.setupDataDirs(); err != nil {
 		return nil, err
 	}
