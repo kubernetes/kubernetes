@@ -18,7 +18,6 @@ package master
 
 import (
 	"bytes"
-	_ "expvar"
 	"fmt"
 	"net"
 	"net/http"
