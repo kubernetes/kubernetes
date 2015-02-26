@@ -25,3 +25,15 @@ import (
 func IsNotRegisteredError(err error) bool {
 	return conversion.IsNotRegisteredError(err)
 }
+
+// IsMissingKind returns true if the error indicates that the provided object
+// is missing a 'Kind' field.
+func IsMissingKind(err error) bool {
+	return conversion.IsMissingKind(err)
+}
+
+// IsMissingVersion returns true if the error indicates that the provided object
+// is missing a 'Versioj' field.
+func IsMissingVersion(err error) bool {
+	return conversion.IsMissingVersion(err)
+}

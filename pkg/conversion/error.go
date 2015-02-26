@@ -49,3 +49,35 @@ func IsNotRegisteredError(err error) bool {
 	_, ok := err.(*notRegisteredErr)
 	return ok
 }
+
+type missingKindErr struct {
+	data string
+}
+
+func (k *missingKindErr) Error() string {
+	return fmt.Sprintf("Object 'Kind' is missing in '%s'", k.data)
+}
+
+func IsMissingKind(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*missingKindErr)
+	return ok
+}
+
+type missingVersionErr struct {
+	data string
+}
+
+func (k *missingVersionErr) Error() string {
+	return fmt.Sprintf("Object 'apiVersion' is missing in '%s'", k.data)
+}
+
+func IsMissingVersion(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*missingVersionErr)
+	return ok
+}
