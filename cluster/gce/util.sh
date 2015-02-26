@@ -857,23 +857,9 @@ function setup-monitoring-firewall {
   gcloud compute firewall-rules create "${INSTANCE_PREFIX}-monitoring-heapster" --project "${PROJECT}" \
     --allow tcp:80 tcp:8083 tcp:8086 --target-tags="${MINION_TAG}" --network="${NETWORK}"
 
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  local grafana_host=""
-  echo "waiting for monitoring pods to be scheduled."
-  for i in `seq 1 10`; do
-    grafana_host=$("${kubectl}" get pods -l name=influxGrafana -o template -t {{range.items}}{{.currentState.hostIP}}:{{end}} | sed s/://g)
-    if [[ ${grafana_host} != *"<"* ]]; then
-	  break
-    fi
-    sleep 10
-  done
-  if [[ ${grafana_host} != *"<"* ]]; then
-    echo
-    echo -e "${color_green}Grafana dashboard will be available at ${color_yellow}http://${grafana_host}${color_green}. Wait for the monitoring dashboard to be online.${color_norm}"
-    echo
-  else
-    echo -e "${color_red}Monitoring pods failed to be scheduled!${color_norm}"
-  fi
+  echo
+  echo -e "${color_green}Grafana dashboard will be available at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/monitoring-grafana/${color_green}. Wait for the monitoring dashboard to be online.${color_norm}"
+  echo
 }
 
 function teardown-monitoring-firewall {
