@@ -3086,3 +3086,38 @@ func TestPortForward(t *testing.T) {
 		t.Fatalf("stream: expected %v, got %v", e, a)
 	}
 }
+
+// Tests that upon host port conflict, the newer pod is removed.
+func TestFilterHostPortConflicts(t *testing.T) {
+	// Reuse the pod spec with the same port to create a conflict.
+	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}}
+	var pods = []api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123456789",
+				Name:      "newpod",
+				Namespace: "foo",
+			},
+			Spec: spec,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "987654321",
+				Name:      "oldpod",
+				Namespace: "foo",
+			},
+			Spec: spec,
+		},
+	}
+	// Make sure the BoundPods are in the reverse order of creation time.
+	pods[1].CreationTimestamp = util.NewTime(time.Now())
+	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
+	filteredPods := filterHostPortConflicts(pods)
+	if len(filteredPods) != 1 {
+		t.Fatalf("Expected one pod. Got pods %#v", filteredPods)
+	}
+	if filteredPods[0].Name != "oldpod" {
+		t.Fatalf("Expected pod %#v. Got pod %#v", pods[1], filteredPods[0])
+	}
+
+}

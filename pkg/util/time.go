@@ -44,6 +44,11 @@ func Now() Time {
 	return Time{time.Now()}
 }
 
+// Before reports whether the time instant t is before u.
+func (t Time) Before(u Time) bool {
+	return t.Time.Before(u.Time)
+}
+
 // Unix returns the local time corresponding to the given Unix time
 // by wrapping time.Unix.
 func Unix(sec int64, nsec int64) Time {

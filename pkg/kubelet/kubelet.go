@@ -1378,15 +1378,35 @@ func updateBoundPods(changed []api.BoundPod, current []api.BoundPod) []api.Bound
 	return updated
 }
 
+type podsByCreationTime []api.BoundPod
+
+func (s podsByCreationTime) Len() int {
+	return len(s)
+}
+
+func (s podsByCreationTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s podsByCreationTime) Less(i, j int) bool {
+	return s[i].CreationTimestamp.Before(s[j].CreationTimestamp)
+}
+
 // filterHostPortConflicts removes pods that conflict on Port.HostPort values
 func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	filtered := []api.BoundPod{}
 	ports := map[int]bool{}
 	extract := func(p *api.Port) int { return p.HostPort }
+
+	// Respect the pod creation order when resolving conflicts.
+	sort.Sort(podsByCreationTime(pods))
+
 	for i := range pods {
 		pod := &pods[i]
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {
 			glog.Warningf("Pod %q: HostPort is already allocated, ignoring: %v", GetPodFullName(pod), errs)
+			record.Eventf(pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
+			// TODO: Set the pod status to fail.
 			continue
 		}
 		filtered = append(filtered, *pod)
