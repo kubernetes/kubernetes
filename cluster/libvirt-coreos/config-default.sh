@@ -47,3 +47,10 @@ done
 MINION_CONTAINER_SUBNETS[$NUM_MINIONS]=$MASTER_CONTAINER_SUBNET
 
 PORTAL_NET=10.11.0.0/16
+
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING=false
+LOGGING_DESTINATION=elasticsearch

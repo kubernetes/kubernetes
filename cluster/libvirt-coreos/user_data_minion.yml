@@ -16,7 +16,8 @@ coreos:
         ExecStart=/opt/kubernetes/bin/kubelet \
         --address=0.0.0.0 \
         --hostname_override=${MINION_IPS[$i]} \
-        --etcd_servers=http://127.0.0.1:4001
+        --etcd_servers=http://127.0.0.1:4001 \
+        --config=/opt/kubernetes/manifests
         Restart=always
         RestartSec=2
 
