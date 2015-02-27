@@ -33,6 +33,6 @@ const OldestVersion = "v1"
 var Versions = []string{"v1"}
 
 // Codec is the default codec for serializing input that should use
-// the latest supported version.  Use this Codec when reading from the file.
+// the latest supported version.
 // This codec can decode any object that Kubernetes is aware of.
 var Codec = v1.Codec

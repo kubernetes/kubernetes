@@ -30,7 +30,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	latestschedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
@@ -44,6 +47,76 @@ func TestCreate(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 	factory := NewConfigFactory(client)
 	factory.Create()
+}
+
+func TestCreateFromConfig(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+	factory := NewConfigFactory(client)
+
+	// Register the predicate and priority functions
+	// These would be registered by the DefaultProvider in regular operation
+	RegisterFitPredicate("PodFitsPorts", algorithm.PodFitsPorts)
+	RegisterFitPredicate("PodFitsResources", algorithm.NewResourceFitPredicate(MinionLister))
+	RegisterFitPredicate("NoDiskConflict", algorithm.NoDiskConflict)
+	RegisterFitPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(MinionLister))
+	RegisterFitPredicate("HostName", algorithm.PodFitsHost)
+	RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1)
+	RegisterPriorityFunction("ServiceSpreadingPriority", algorithm.NewServiceSpreadPriority(ServiceLister), 1)
+	RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 0)
+
+	configData = []byte(`{
+		"kind" : "Policy",
+		"apiVersion" : "v1",
+		"predicates" : [
+			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
+			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
+			{"name" : "PodFitsPorts"},
+			{"name" : "MatchNodeSelector"}
+		],
+		"priorities" : [
+			{"name" : "RackSpread", "weight" : 2, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "ServiceSpreadingPriority", "weight" : 1}
+		]
+	}`)
+	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
+	if err != nil {
+		t.Errorf("Invalid configuration: %v", err)
+	}
+
+	factory.CreateFromConfig(policy)
+}
+
+func TestCreateFromEmptyConfig(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+	factory := NewConfigFactory(client)
+
+	configData = []byte(`{}`)
+	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
+	if err != nil {
+		t.Errorf("Invalid configuration: %v", err)
+	}
+
+	factory.CreateFromConfig(policy)
 }
 
 func TestPollMinions(t *testing.T) {
