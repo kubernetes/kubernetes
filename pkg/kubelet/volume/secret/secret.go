@@ -21,10 +21,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -63,7 +65,7 @@ func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volu
 }
 
 func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
-	return &secretVolume{spec.Name, podUID, plugin, &spec.Source.Secret.Target}, nil
+	return &secretVolume{spec.Name, podUID, plugin, spec.Source.Secret}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -77,10 +79,10 @@ func (plugin *secretPlugin) newCleanerInternal(volName string, podUID types.UID)
 // secretVolume handles retrieving secrets from the API server
 // and placing them into the volume on the host.
 type secretVolume struct {
-	volName   string
-	podUID    types.UID
-	plugin    *secretPlugin
-	secretRef *api.ObjectReference
+	volName string
+	podUID  types.UID
+	plugin  *secretPlugin
+	source  *api.SecretVolumeSource
 }
 
 func (sv *secretVolume) SetUp() error {
@@ -97,22 +99,65 @@ func (sv *secretVolume) SetUp() error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", sv)
 	}
 
-	secret, err := kubeClient.Secrets(sv.secretRef.Namespace).Get(sv.secretRef.Name)
+	secret, err := kubeClient.Secrets(sv.source.Target.Namespace).Get(sv.source.Target.Name)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", sv.secretRef.Namespace, sv.secretRef.Name)
+		glog.Errorf("Couldn't get secret %v/%v", sv.source.Target.Namespace, sv.source.Target.Name)
 		return err
 	}
 
-	for name, data := range secret.Data {
-		hostFilePath := path.Join(hostPath, name)
-		err := ioutil.WriteFile(hostFilePath, data, 0777)
+	if sv.source.EnvAdaptations != nil {
+		envFileContent := makeEnvFileContent(secret, sv.source.EnvAdaptations)
+		hostFilePath := path.Join(hostPath, sv.source.EnvAdaptations.Name)
+
+		err := ioutil.WriteFile(hostFilePath, []byte(envFileContent), 0777)
 		if err != nil {
-			glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
-			return err
+			glog.Errorf("Error writing secret data to env file at host path: %v, %v", hostFilePath, err)
+		}
+	} else {
+		for name, data := range secret.Data {
+			hostFilePath := path.Join(hostPath, name)
+			err := ioutil.WriteFile(hostFilePath, data, 0777)
+			if err != nil {
+				glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func makeEnvFileContent(secret *api.Secret, env *api.SecretEnv) string {
+	adaptedKeys := util.NewStringSet()
+	content := ""
+
+	for _, adaptation := range env.Adaptations {
+		data, ok := secret.Data[adaptation.From]
+		if !ok {
+			glog.Errorf("Could't apply adaptation of secret data with non-existent key: %v", adaptation.From)
+			continue
+		}
+		// TODO: should there be a validation here for the size of the secret data?
+
+		adaptedKeys.Insert(adaptation.From)
+		content += fmt.Sprintf("export %v=\"%v\"\n", adaptation.To, string(data))
+	}
+
+	for key, data := range secret.Data {
+		if adaptedKeys.Has(key) {
+			continue
+		}
+
+		content += fmt.Sprintf("export %v=\"%v\"\n", convertKeyToVar(key), string(data))
+	}
+
+	return content
+}
+
+func convertKeyToVar(key string) string {
+	key = strings.ToUpper(key)
+	key = strings.Replace(key, "-", "_", -1)
+	return strings.Replace(key, ".", "_", -1)
 }
 
 func (sv *secretVolume) GetPath() string {

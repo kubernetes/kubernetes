@@ -320,7 +320,18 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 	if secretSource.Target.Kind != "Secret" {
 		allErrs = append(allErrs, errs.NewFieldInvalid("target.kind", secretSource.Target.Kind, "Secret"))
 	}
+	if secretSource.EnvAdaptations != nil {
+		allErrs = append(allErrs, validateSecretVolumeSourceEnv(secretSource.EnvAdaptations).Prefix("env")...)
+	}
 	return allErrs
+}
+
+func validateSecretVolumeSourceEnv(env *api.SecretEnv) errs.ValidationErrorList {
+	// TODO:
+	//
+	// Validate 'From' against DNS_SUBDOMAIN
+	// Validate 'To' against C_IDENTIFIER
+	return errs.ValidationErrorList{}
 }
 
 var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))

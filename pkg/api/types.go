@@ -237,6 +237,30 @@ type GitRepoVolumeSource struct {
 type SecretVolumeSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target"`
+
+	// EnvAdaptations adapts the secret into an environment file
+	EnvAdaptations *SecretEnv `json:"env"`
+	// FUTURE: fine-grained control of files
+	// FileAdaptations *SecretFiles `json:"files"`
+}
+
+// SecretEnv adapts secret data into an environment file.  The keys in the
+// secret data are converted from DNS_SUBDOMAIN into environment variable
+// names by upper casing and subsituting the '_' character for '-' and '.'.
+type SecretEnv struct {
+	// Name is the name of the environment file to generate.
+	Name string `json:"name"`
+
+	// Adaptations is a list of adaptations to apply to the
+	// names of environment variables superceding the normal
+	// algorithm.
+	Adaptations []StringAdaptation `json:"adaptations,omitempty"`
+}
+
+// StringAdaptation specifies a mapping from one value to another
+type StringAdaptation struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 // Port represents a network port in a single container
