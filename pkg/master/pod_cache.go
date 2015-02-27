@@ -214,6 +214,7 @@ func (p *PodCache) GarbageCollectPodStatus() {
 	pods, err := p.pods.ListPods(api.NewContext(), labels.Everything())
 	if err != nil {
 		glog.Errorf("Error getting pod list: %v", err)
+		return
 	}
 	keys := map[objKey]bool{}
 	for _, pod := range pods.Items {
