@@ -19,14 +19,12 @@ package algorithmprovider
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider/affinity"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 )
 
 var (
 	algorithmProviderNames = []string{
 		factory.DefaultProvider,
-		affinity.AffinityProvider,
 	}
 )
 
