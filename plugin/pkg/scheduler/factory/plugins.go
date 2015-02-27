@@ -46,7 +46,7 @@ type AlgorithmProviderConfig struct {
 	PriorityFunctionKeys util.StringSet
 }
 
-// RegisterFitPredicate registers a fit predicate with the algorithm registry. Returns the name,
+// Registers a fit predicate with the algorithm registry. Returns the name,
 // with which the predicate was registered.
 func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string {
 	schedulerFactoryMutex.Lock()
@@ -56,9 +56,9 @@ func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string 
 	return name
 }
 
-// RegisterCustomPredicate registers a custom fit predicate with the algorithm registry.
+// Registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
-func RegisterCustomPredicate(policy schedulerapi.PredicatePolicy) string {
+func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	var predicate algorithm.FitPredicate
 	var ok bool
 
@@ -83,7 +83,7 @@ func RegisterCustomPredicate(policy schedulerapi.PredicatePolicy) string {
 	return RegisterFitPredicate(policy.Name, predicate)
 }
 
-// IsFitPredicateRegistered check is useful for testing providers.
+// This check is useful for testing providers.
 func IsFitPredicateRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -91,7 +91,7 @@ func IsFitPredicateRegistered(name string) bool {
 	return ok
 }
 
-// RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
+// Registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
 	schedulerFactoryMutex.Lock()
@@ -101,7 +101,7 @@ func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, 
 	return name
 }
 
-// RegisterCustomPriority registers a custom priority function with the algorithm registry.
+// Registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
 func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	var priority algorithm.PriorityFunction
@@ -127,7 +127,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	return RegisterPriorityFunction(policy.Name, priority, policy.Weight)
 }
 
-// IsPriorityFunctionRegistered check is useful for testing providers.
+// This check is useful for testing providers.
 func IsPriorityFunctionRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -135,7 +135,7 @@ func IsPriorityFunctionRegistered(name string) bool {
 	return ok
 }
 
-// SetPriorityFunctionWeight sets the weight of an already registered priority function.
+// Sets the weight of an already registered priority function.
 func SetPriorityFunctionWeight(name string, weight int) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -148,7 +148,7 @@ func SetPriorityFunctionWeight(name string, weight int) {
 	priorityFunctionMap[name] = config
 }
 
-// RegisterAlgorithmProvider registers a new algorithm provider with the algorithm registry. This should
+// Registers a new algorithm provider with the algorithm registry. This should
 // be called from the init function in a provider plugin.
 func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys util.StringSet) string {
 	schedulerFactoryMutex.Lock()
@@ -161,7 +161,7 @@ func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys util.Str
 	return name
 }
 
-// GetAlgorithmProvider should not be used to modify providers. It is publicly visible for testing.
+// This function should not be used to modify providers. It is publicly visible for testing.
 func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()

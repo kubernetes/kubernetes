@@ -101,7 +101,6 @@ func (s *SchedulerServer) createConfig(configFactory *factory.ConfigFactory) (*s
 		if err != nil {
 			return nil, fmt.Errorf("Unable to read policy config: %v", err)
 		}
-		//err = json.Unmarshal(configData, &policy)
 		err = latestschedulerapi.Codec.DecodeInto(configData, &policy)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid configuration: %v", err)

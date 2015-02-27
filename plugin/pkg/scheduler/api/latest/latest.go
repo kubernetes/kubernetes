@@ -23,8 +23,7 @@ import (
 // Version is the string that represents the current external default version.
 const Version = "v1"
 
-// OldestVersion is the string that represents the oldest server version supported,
-// for client code that wants to hardcode the lowest common denominator.
+// OldestVersion is the string that represents the oldest server version supported.
 const OldestVersion = "v1"
 
 // Versions is the list of versions that are recognized in code. The order provided
@@ -33,8 +32,7 @@ const OldestVersion = "v1"
 // with a set of versions to choose.
 var Versions = []string{"v1"}
 
-// Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
-// disk, a data store that is not dynamically versioned, or in tests.
+// Codec is the default codec for serializing input that should use
+// the latest supported version.  Use this Codec when reading from the file.
 // This codec can decode any object that Kubernetes is aware of.
 var Codec = v1.Codec

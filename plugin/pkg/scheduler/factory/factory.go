@@ -54,7 +54,7 @@ type ConfigFactory struct {
 	ServiceLister *cache.StoreToServiceLister
 }
 
-// NewConfigFactory initializes the factory.
+// Initializes the factory.
 func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
 		Client:        client,
@@ -70,7 +70,7 @@ func (f *ConfigFactory) Create() (*scheduler.Config, error) {
 	return f.CreateFromProvider(DefaultProvider)
 }
 
-// CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
+// Creates a scheduler from the name of a registered algorithm provider.
 func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
@@ -81,14 +81,14 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
 }
 
-// CreateFromConfig creates a scheduler from the configuration file
+// Creates a scheduler from the configuration file
 func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler from configuration: %v", policy)
 
 	predicateKeys := util.NewStringSet()
 	for _, predicate := range policy.Predicates {
 		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
-		predicateKeys.Insert(RegisterCustomPredicate(predicate))
+		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
 	}
 
 	priorityKeys := util.NewStringSet()
@@ -100,7 +100,7 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	return f.CreateFromKeys(predicateKeys, priorityKeys)
 }
 
-// CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
+// Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys)
@@ -160,7 +160,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}, nil
 }
 
-// createUnassignedPodLW returns a cache.ListWatch that finds all pods that need to be
+// Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{"DesiredState.Host": ""}.AsSelector())
@@ -174,7 +174,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 	return selector
 }
 
-// createAssignedPodLW returns a cache.ListWatch that finds all pods that are
+// Returns a cache.ListWatch that finds all pods that are
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
@@ -186,7 +186,7 @@ func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "minions", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
-// pollMinions lists all minions and filter out unhealthy ones, then returns
+// Lists all minions and filter out unhealthy ones, then returns
 // an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	allNodes := &api.NodeList{}
@@ -221,7 +221,7 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &nodeEnumerator{nodes}, nil
 }
 
-// createServiceLW returns a cache.ListWatch that gets all changes to services.
+// Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
 }
@@ -251,7 +251,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 	}
 }
 
-// nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
+// Allows a cache.Poller to enumerate items in an api.NodeList
 type nodeEnumerator struct {
 	*api.NodeList
 }
