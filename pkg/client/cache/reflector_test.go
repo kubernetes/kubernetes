@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -36,15 +37,27 @@ func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
 	return t.WatchFunc(resourceVersion)
 }
 
+func TestReflector_resyncChan(t *testing.T) {
+	s := NewStore(MetaNamespaceKeyFunc)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, time.Millisecond)
+	a, b := g.resyncChan(), time.After(100*time.Millisecond)
+	select {
+	case <-a:
+		t.Logf("got timeout as expected")
+	case <-b:
+		t.Errorf("resyncChan() is at least 99 milliseconds late??")
+	}
+}
+
 func TestReflector_watchHandlerError(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &api.Pod{}, s)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, 0)
 	fw := watch.NewFake()
 	go func() {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV)
+	err := g.watchHandler(fw, &resumeRV, neverExitWatch)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -52,7 +65,7 @@ func TestReflector_watchHandlerError(t *testing.T) {
 
 func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &api.Pod{}, s)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, 0)
 	fw := watch.NewFake()
 	s.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	s.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})
@@ -64,7 +77,7 @@ func TestReflector_watchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV)
+	err := g.watchHandler(fw, &resumeRV, neverExitWatch)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -101,6 +114,19 @@ func TestReflector_watchHandler(t *testing.T) {
 	}
 }
 
+func TestReflector_watchHandlerTimeout(t *testing.T) {
+	s := NewStore(MetaNamespaceKeyFunc)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, 0)
+	fw := watch.NewFake()
+	var resumeRV string
+	exit := make(chan time.Time, 1)
+	exit <- time.Now()
+	err := g.watchHandler(fw, &resumeRV, exit)
+	if err != errorResyncRequested {
+		t.Errorf("expected timeout error, but got %q", err)
+	}
+}
+
 func TestReflector_listAndWatch(t *testing.T) {
 	createdFakes := make(chan *watch.FakeWatcher)
 
@@ -125,7 +151,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 		},
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
-	r := NewReflector(lw, &api.Pod{}, s)
+	r := NewReflector(lw, &api.Pod{}, s, 0)
 	go r.listAndWatch()
 
 	ids := []string{"foo", "bar", "baz", "qux", "zoo"}
@@ -242,7 +268,7 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 				return item.list, item.listErr
 			},
 		}
-		r := NewReflector(lw, &api.Pod{}, s)
+		r := NewReflector(lw, &api.Pod{}, s, 0)
 		r.listAndWatch()
 	}
 }
