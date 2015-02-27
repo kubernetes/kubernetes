@@ -71,8 +71,8 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 		} else if policy.Argument.LabelsPresence != nil {
 			predicate = algorithm.NewNodeLabelPredicate(MinionLister, policy.Argument.LabelsPresence.Labels, policy.Argument.LabelsPresence.Presence)
 		}
-		// check to see if a pre-defined predicate is requested
 	} else if predicate, ok = fitPredicateMap[policy.Name]; ok {
+		// checking to see if a pre-defined predicate is requested
 		glog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
 	}
 
