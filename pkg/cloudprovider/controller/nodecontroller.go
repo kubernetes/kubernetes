@@ -77,7 +77,7 @@ func NewNodeController(
 
 // Run creates initial node list and start syncing instances from cloudprovider if any.
 // It also starts syncing cluster node status.
-func (s *NodeController) Run(period time.Duration, syncNodeList bool) {
+func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus bool) {
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
@@ -96,7 +96,6 @@ func (s *NodeController) Run(period time.Duration, syncNodeList bool) {
 			glog.Errorf("Error loading initial static nodes: %v", err)
 		}
 	}
-	nodes = s.DoChecks(nodes)
 	nodes, err = s.PopulateIPs(nodes)
 	if err != nil {
 		glog.Errorf("Error getting nodes ips: %v", err)
@@ -114,12 +113,21 @@ func (s *NodeController) Run(period time.Duration, syncNodeList bool) {
 		}, period)
 	}
 
-	// Start syncing node status.
-	go util.Forever(func() {
-		if err = s.SyncNodeStatus(); err != nil {
-			glog.Errorf("Error syncing status: %v", err)
-		}
-	}, period)
+	if syncNodeStatus {
+		// Start syncing node status.
+		go util.Forever(func() {
+			if err = s.SyncNodeStatus(); err != nil {
+				glog.Errorf("Error syncing status: %v", err)
+			}
+		}, period)
+	} else {
+		// Start checking node reachability and evicting timeouted pods.
+		go util.Forever(func() {
+			if err = s.EvictTimeoutedPods(); err != nil {
+				glog.Errorf("Error evicting timeouted pods: %v", err)
+			}
+		}, period)
+	}
 }
 
 // RegisterNodes registers the given list of nodes, it keeps retrying for `retryCount` times.
@@ -214,6 +222,33 @@ func (s *NodeController) SyncNodeStatus() error {
 		}
 	}
 	return nil
+}
+
+// EvictTimeoutedPods verifies if nodes are reachable by checking the time of last probe
+// and deletes pods from not reachable nodes.
+func (s *NodeController) EvictTimeoutedPods() error {
+	nodes, err := s.kubeClient.Nodes().List()
+	if err != nil {
+		return err
+	}
+	for _, node := range nodes.Items {
+		if util.Now().After(latestReadyTime(&node).Add(s.podEvictionTimeout)) {
+			s.deletePods(node.Name)
+		}
+	}
+	return nil
+}
+
+func latestReadyTime(node *api.Node) util.Time {
+	readyTime := node.ObjectMeta.CreationTimestamp
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == api.NodeReady &&
+			condition.Status == api.ConditionFull &&
+			condition.LastProbeTime.After(readyTime.Time) {
+			readyTime = condition.LastProbeTime
+		}
+	}
+	return readyTime
 }
 
 // PopulateIPs queries IPs for given list of nodes.
