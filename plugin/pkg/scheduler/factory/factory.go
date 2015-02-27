@@ -94,18 +94,18 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue).Run()
+	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).Run()
 
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
-	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.PodLister.Store).Run()
+	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.PodLister.Store, 0).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
 	if false {
 		// Disable this code until minions support watches. Note when this code is enabled,
 		// we need to make sure minion ListWatcher has proper FieldSelector.
-		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.MinionLister.Store).Run()
+		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.MinionLister.Store, 0).Run()
 	} else {
 		cache.NewPoller(f.pollMinions, 10*time.Second, f.MinionLister.Store).Run()
 	}
@@ -113,7 +113,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same service, so that it can spread them correctly.
 	// Cache this locally.
-	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store).Run()
+	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).Run()
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 

@@ -90,6 +90,7 @@ func NewProvision(c client.Interface) admission.Interface {
 		},
 		&api.Namespace{},
 		store,
+		0,
 	)
 	reflector.Run()
 	return &provision{
