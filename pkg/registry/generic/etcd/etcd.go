@@ -148,7 +148,7 @@ func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) 
 			return err
 		}
 	}
-	err = e.Helper.CreateObj(key, obj, ttl)
+	err = e.Helper.CreateObj(key, obj, nil, ttl)
 	err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)
@@ -177,7 +177,7 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 		}
 	}
 	out := e.NewFunc()
-	if err := e.Helper.Create(key, obj, out, ttl); err != nil {
+	if err := e.Helper.CreateObj(key, obj, out, ttl); err != nil {
 		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
@@ -209,7 +209,7 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 			return err
 		}
 	}
-	err = e.Helper.SetObj(key, obj, ttl)
+	err = e.Helper.SetObj(key, obj, nil, ttl)
 	err = etcderr.InterpretUpdateError(err, e.EndpointName, name)
 	if err == nil && e.Decorator != nil {
 		err = e.Decorator(obj)

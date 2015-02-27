@@ -157,7 +157,7 @@ func (r *Registry) CreateController(ctx api.Context, controller *api.Replication
 	if err != nil {
 		return err
 	}
-	err = r.CreateObj(key, controller, 0)
+	err = r.CreateObj(key, controller, nil, 0)
 	return etcderr.InterpretCreateError(err, "replicationController", controller.Name)
 }
 
@@ -167,7 +167,7 @@ func (r *Registry) UpdateController(ctx api.Context, controller *api.Replication
 	if err != nil {
 		return err
 	}
-	err = r.SetObj(key, controller, 0 /* ttl */)
+	err = r.SetObj(key, controller, nil, 0)
 	return etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
 }
 
@@ -204,7 +204,7 @@ func (r *Registry) CreateService(ctx api.Context, svc *api.Service) error {
 	if err != nil {
 		return err
 	}
-	err = r.CreateObj(key, svc, 0)
+	err = r.CreateObj(key, svc, nil, 0)
 	return etcderr.InterpretCreateError(err, "service", svc.Name)
 }
 
@@ -275,7 +275,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) error {
 	if err != nil {
 		return err
 	}
-	err = r.SetObj(key, svc, 0 /* ttl */)
+	err = r.SetObj(key, svc, nil, 0)
 	return etcderr.InterpretUpdateError(err, "service", svc.Name)
 }
 
@@ -362,13 +362,13 @@ func (r *Registry) ListMinions(ctx api.Context) (*api.NodeList, error) {
 
 func (r *Registry) CreateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.CreateObj(makeNodeKey(minion.Name), minion, 0)
+	err := r.CreateObj(makeNodeKey(minion.Name), minion, nil, 0)
 	return etcderr.InterpretCreateError(err, "minion", minion.Name)
 }
 
 func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.SetObj(makeNodeKey(minion.Name), minion, 0 /* ttl */)
+	err := r.SetObj(makeNodeKey(minion.Name), minion, nil, 0)
 	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
 }
 

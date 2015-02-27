@@ -60,7 +60,7 @@ func TestSetObj(t *testing.T) {
 	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
 	withEtcdKey(func(key string) {
 		fakeObject := fakeAPIObject("object")
-		if err := helper.SetObj(key, &fakeObject, 0 /* ttl */); err != nil {
+		if err := helper.SetObj(key, &fakeObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := client.Get(key, false, false)
