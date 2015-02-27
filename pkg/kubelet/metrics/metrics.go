@@ -36,7 +36,13 @@ var (
 			Help:      "Image pull latency in microseconds.",
 		},
 	)
-	// TODO(vmarmol): Break down by number of containers in pod?
+	ContainersPerPodCount = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      "containers_per_pod_count",
+			Help:      "The number of containers per pod.",
+		},
+	)
 	SyncPodLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
@@ -52,7 +58,6 @@ var (
 			Help:      "Latency in microseconds to sync all pods.",
 		},
 	)
-	// TODO(vmarmol): Containers per pod
 	DockerOperationsLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
@@ -73,6 +78,7 @@ func Register(containerCache dockertools.DockerCache) {
 		prometheus.MustRegister(SyncPodLatency)
 		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(SyncPodsLatency)
+		prometheus.MustRegister(ContainersPerPodCount)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 	})
 }
