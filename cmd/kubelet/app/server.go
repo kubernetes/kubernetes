@@ -389,12 +389,20 @@ type KubeletConfig struct {
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
-
+	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
+	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
+	// a nil pointer to it when what we really want is a nil interface.
+	var kubeClient client.Interface
+	if kc.KubeClient == nil {
+		kubeClient = nil
+	} else {
+		kubeClient = kc.KubeClient
+	}
 	k, err := kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.DockerClient,
 		kc.EtcdClient,
-		kc.KubeClient,
+		kubeClient,
 		kc.RootDirectory,
 		kc.PodInfraContainerImage,
 		kc.SyncFrequency,

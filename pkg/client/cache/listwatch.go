@@ -37,7 +37,7 @@ type ListWatch struct {
 	WatchFunc WatchFunc
 }
 
-// ListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector
+// NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
 func NewListWatchFromClient(client *client.Client, resource string, namespace string, fieldSelector labels.Selector) *ListWatch {
 	listFunc := func() (runtime.Object, error) {
 		return client.Get().Namespace(namespace).Resource(resource).SelectorParam("fields", fieldSelector).Do().Get()

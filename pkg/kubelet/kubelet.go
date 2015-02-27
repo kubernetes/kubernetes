@@ -42,10 +42,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -76,7 +78,7 @@ func NewMainKubelet(
 	hostname string,
 	dockerClient dockertools.DockerInterface,
 	etcdClient tools.EtcdClient,
-	kubeClient *client.Client,
+	kubeClient client.Interface,
 	rootDirectory string,
 	podInfraContainerImage string,
 	resyncInterval time.Duration,
@@ -103,12 +105,17 @@ func NewMainKubelet(
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
-		cache.NewReflector(
-			cache.NewListWatchFromClient(kubeClient, "services", api.NamespaceAll, labels.Everything()),
-			&api.Service{},
-			serviceStore,
-			0,
-		).Run()
+		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
+		// than an interface. There is no way to construct a list+watcher using resource name.
+		listWatch := &cache.ListWatch{
+			ListFunc: func() (runtime.Object, error) {
+				return kubeClient.Services(api.NamespaceAll).List(labels.Everything())
+			},
+			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
+				return kubeClient.Services(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), resourceVersion)
+			},
+		}
+		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
@@ -173,7 +180,7 @@ type Kubelet struct {
 	hostname               string
 	dockerClient           dockertools.DockerInterface
 	dockerCache            dockertools.DockerCache
-	kubeClient             *client.Client
+	kubeClient             client.Interface
 	rootDirectory          string
 	podInfraContainerImage string
 	podWorkers             *podWorkers
