@@ -156,6 +156,25 @@ function render-template {
   eval "echo \"$(cat $1)\""
 }
 
+function wait-cluster-readiness {
+  echo "Wait for cluster readiness"
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+
+  local timeout=50
+  while [[ $timeout -ne 0 ]]; do
+    nb_ready_minions=$("${kubectl}" get minions -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
+    if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
+        return 0
+    fi
+
+    timeout=$(($timeout-1))
+    sleep .5
+  done
+
+  return 1
+}
+
 # Instantiate a kubernetes cluster
 function kube-up {
   detect-master
@@ -194,6 +213,15 @@ function kube-up {
     virsh create $domain_xml
     rm $domain_xml
   done
+
+  wait-cluster-readiness
+
+  echo "Kubernetes cluster is running. The master is running at:"
+  echo
+  echo "  http://${KUBE_MASTER_IP}:8080"
+  echo
+  echo "You can control the Kubernetes cluster with: 'cluster/kubectl.sh'"
+  echo "You can connect on the master with: 'ssh core@${KUBE_MASTER_IP}'"
 }
 
 # Delete a kubernetes cluster
