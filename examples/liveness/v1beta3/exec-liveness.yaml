@@ -1,0 +1,29 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata: 
+  labels: 
+    test: liveness
+  name: liveness-exec
+spec: 
+  replicas: 1
+  selector: 
+    test: liveness
+  template: 
+    metadata: 
+      labels: 
+        test: liveness
+    spec: 
+      containers: 
+        - command: 
+            - "/bin/sh"
+            - "-c"
+            - "echo ok > /tmp/health; sleep 10; echo fail > /tmp/health; sleep 600"
+          image: busybox
+          livenessProbe: 
+            exec: 
+              command: 
+                - "cat"
+                - "/tmp/health"
+            initialDelaySeconds: 15
+          name: liveness
+

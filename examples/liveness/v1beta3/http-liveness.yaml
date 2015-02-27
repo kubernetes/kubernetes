@@ -1,0 +1,26 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata: 
+  labels: 
+    test: liveness
+  name: liveness-http
+spec: 
+  replicas: 1
+  selector: 
+    test: liveness
+  template: 
+    metadata: 
+      labels: 
+        test: liveness
+    spec: 
+      containers: 
+        - command: 
+            - "/server"
+          image: kubernetes/liveness
+          livenessProbe: 
+            httpGet: 
+              path: "/healthz"
+              port: 8080
+            initialDelaySeconds: 15
+          name: liveness
+
