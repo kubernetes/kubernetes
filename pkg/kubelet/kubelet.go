@@ -1692,20 +1692,18 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 
 	// Assume info is ready to process
 	podStatus.Phase = getPhase(spec, info)
+	podStatus.Info = api.PodInfo{}
 	for _, c := range spec.Containers {
 		containerStatus := info[c.Name]
 		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
-		info[c.Name] = containerStatus
+		podStatus.Info[c.Name] = containerStatus
 	}
-	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, info)...)
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.Info)...)
 
 	netContainerInfo, found := info[dockertools.PodInfraContainerName]
 	if found {
 		podStatus.PodIP = netContainerInfo.PodIP
 	}
-
-	// TODO(dchen1107): Change Info to list from map
-	podStatus.Info = info
 
 	return podStatus, nil
 }

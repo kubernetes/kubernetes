@@ -91,7 +91,6 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 	m := make(api.PodInfo)
 	for k, v := range r.Status.Info {
 		v.Ready = true
-		v.PodIP = "1.2.3.4"
 		m[k] = v
 	}
 	r.Status.Info = m
@@ -257,8 +256,10 @@ func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpoint
 	return func() (bool, error) {
 		endpoints, err := c.Endpoints(serviceNamespace).Get(serviceID)
 		if err != nil {
+			glog.Infof("Error on creating endpoints: %v", err)
 			return false, nil
 		}
+		glog.Infof("endpoints: %v", endpoints.Endpoints)
 		return len(endpoints.Endpoints) == endpointCount, nil
 	}
 }
