@@ -590,7 +590,8 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 	return &containerStatus, nil
 }
 
-// GetDockerPodInfo returns docker info for all containers in the pod/manifest.
+// GetDockerPodInfo returns docker info for all containers in the pod/manifest and
+// infrastructure container
 func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
 	info := api.PodInfo{}
 	expectedContainers := make(map[string]api.Container)
