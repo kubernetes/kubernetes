@@ -454,6 +454,14 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	return allErrors
 }
 
+func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	if len(tcp.Port.StrVal) == 0 && tcp.Port.IntVal == 0 {
+		allErrors = append(allErrors, errs.NewFieldRequired("port", tcp.Port))
+	}
+	return allErrors
+}
+
 func validateHandler(handler *api.Handler) errs.ValidationErrorList {
 	numHandlers := 0
 	allErrors := errs.ValidationErrorList{}
@@ -464,6 +472,10 @@ func validateHandler(handler *api.Handler) errs.ValidationErrorList {
 	if handler.HTTPGet != nil {
 		numHandlers++
 		allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet).Prefix("httpGet")...)
+	}
+	if handler.TCPSocket != nil {
+		numHandlers++
+		allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket).Prefix("tcpSocket")...)
 	}
 	if numHandlers != 1 {
 		allErrors = append(allErrors, errs.NewFieldInvalid("", handler, "exactly 1 handler type is required"))
