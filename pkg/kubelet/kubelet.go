@@ -106,6 +106,7 @@ func NewMainKubelet(
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
+	dockerClient = metrics.NewInstrumentedDockerInterface(dockerClient)
 	klet := &Kubelet{
 		hostname:                       hostname,
 		dockerClient:                   dockerClient,

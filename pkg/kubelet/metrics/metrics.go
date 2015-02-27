@@ -47,6 +47,14 @@ var (
 	)
 	// TODO(vmarmol): Containers per pod
 	// TODO(vmarmol): Latency of SyncPods
+	DockerOperationsLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      "docker_operations_latency_microseconds",
+			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
+		},
+		[]string{"operation_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -57,6 +65,7 @@ func Register(containerCache dockertools.DockerCache) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(ImagePullLatency)
 		prometheus.MustRegister(SyncPodLatency)
+		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 	})
 }
