@@ -103,22 +103,16 @@ func (util *ISCSIDiskUtil) AttachDisk(disk interface{}) error {
 	return err
 }
 
-func (util *ISCSIDiskUtil) DetachDisk(disk interface{}, devicePath string) error {
+func (util *ISCSIDiskUtil) DetachDisk(disk interface{}, mntPath string) error {
 	iscsi := disk.(iscsiDisk)
-	globalPDPath, refCount, err := volume.GetMountFromDevicePath(iscsi.mounter, devicePath)
-	if refCount > 1 {
-		glog.Errorf("iSCSIPersistentDisk detach disk: mount %s is used %d times", globalPDPath, refCount)
-		return errors.New("path busy")
-	}
-	//glog.Infof("iSCSIPersistentDisk detach disk:  umount:%s", globalPDPath)
-	if err := iscsi.mounter.Unmount(globalPDPath, 0); err != nil {
-		glog.Errorf("iSCSIPersistentDisk detach disk: failed to umount: %s\nError: %v", globalPDPath, err)
+	if err := iscsi.mounter.Unmount(mntPath, 0); err != nil {
+		glog.Errorf("iSCSIPersistentDisk detach disk: failed to umount: %s\nError: %v", mntPath, err)
 		return err
 	}
 
 	// if the iscsi portal is no longer used, logout the target
 	prefix := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi"}, "-")
-	refCount, err = volume.GetDeviceRefCount(iscsi.mounter, prefix)
+	refCount, err := volume.GetDeviceRefCount(iscsi.mounter, prefix)
 	//glog.Infof("iSCSIPersistentDisk: log out target: dev %s ref %d error %v", prefix, refCount, err)
 	if err == nil && refCount == 0 {
 		glog.Infof("iSCSIPersistentDisk: log out target %s", iscsi.portal)

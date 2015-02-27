@@ -18,7 +18,6 @@ package disk
 
 import (
 	"os"
-	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
@@ -31,7 +30,7 @@ type PDManager interface {
 	// Attaches the disk to the kubelet's host machine.
 	AttachDisk(disk interface{}) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk interface{}, devicePath string) error
+	DetachDisk(disk interface{}, mntPath string) error
 }
 
 func CommonPDSetUp(manager PDManager, disk interface{}, volPath string, mounter mount.Interface) error {
@@ -88,10 +87,9 @@ func CommonPDTearDown(manager PDManager, disk interface{}, volPath string, mount
 	// If len(refs) is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
-		// pd.pdName is not initially set for volume-cleaners, so set it here.
-		devicePath := path.Base(refs[0])
-		if err := manager.DetachDisk(disk, devicePath); err != nil {
-			glog.Errorf("failed to detach disk from %s", devicePath)
+		mntPath := refs[0]
+		if err := manager.DetachDisk(disk, mntPath); err != nil {
+			glog.Errorf("failed to detach disk from %s", mntPath)
 			return err
 		}
 	}

@@ -26,8 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/gce_pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/git_repo"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/iscsi_pd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/secret"
 )
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
