@@ -23,7 +23,7 @@ export NUM_MINIONS
 # The IP of the master
 export MASTER_IP="10.245.1.2"
 
-export INSTANCE_PREFIX=kubernetes
+export INSTANCE_PREFIX="kubernetes"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # Map out the IPs, names and container subnets of each minion
