@@ -38,8 +38,8 @@ function join {
 
 # Must ensure that the following ENV vars are set
 function detect-master {
-  KUBE_MASTER_IP=192.168.10.1
-  KUBE_MASTER=kubernetes-master
+  KUBE_MASTER_IP=$MASTER_IP
+  KUBE_MASTER=$MASTER_NAME
   export KUBERNETES_MASTER=http://$KUBE_MASTER_IP:8080
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP"
   echo "KUBE_MASTER: $KUBE_MASTER"
@@ -47,10 +47,7 @@ function detect-master {
 
 # Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
 function detect-minions {
-  for (( i = 0 ; i < $NUM_MINIONS ; i++ )); do
-    KUBE_MINION_IP_ADDRESSES[$i]=192.168.10.$(($i+2))
-  done
-  echo "KUBE_MINION_IP_ADDRESSES=[${KUBE_MINION_IP_ADDRESSES[@]}]"
+  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
 # Verify prereqs on host machine
@@ -161,12 +158,15 @@ function kube-up {
 
   local i
   for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
-    if [[ $i -eq 0 ]]; then
+    if [[ $i -eq $NUM_MINIONS ]]; then
         type=master
+        name=$MASTER_NAME
+        public_ip=$MASTER_IP
     else
       type=minion-$(printf "%02d" $i)
+      name=${MINION_NAMES[$i]}
+      public_ip=${MINION_IPS[$i]}
     fi
-    name=kubernetes_$type
     image=$name.img
     config=kubernetes_config_$type
 

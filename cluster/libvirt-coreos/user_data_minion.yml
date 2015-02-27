@@ -15,7 +15,7 @@ coreos:
         [Service]
         ExecStart=/opt/kubernetes/bin/kubelet \
         --address=0.0.0.0 \
-        --hostname_override=192.168.10.$(($i+1)) \
+        --hostname_override=${MINION_IPS[$i]} \
         --etcd_servers=http://127.0.0.1:4001
         Restart=always
         RestartSec=2
@@ -35,7 +35,7 @@ coreos:
         [Service]
         ExecStart=/opt/kubernetes/bin/kube-proxy \
         --etcd_servers=http://127.0.0.1:4001 \
-        --master=http://192.168.10.1:7080
+        --master=http://${MASTER_IP}:7080
         Restart=always
         RestartSec=2
 
