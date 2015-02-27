@@ -75,6 +75,8 @@ func TestValidateLabels(t *testing.T) {
 		{"1-num.2-num/3-num": "bar"},
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
+		{"UpperCaseAreOK123": "bar"},
+		{"goodvalue": "123_-.BaR,"},
 	}
 	for i := range successCases {
 		errs := ValidateLabels(successCases[i], "field")
@@ -83,21 +85,37 @@ func TestValidateLabels(t *testing.T) {
 		}
 	}
 
-	errorCases := []map[string]string{
-		{"NoUppercase123": "bar"},
+	labelNameErrorCases := []map[string]string{
 		{"nospecialchars^=@": "bar"},
 		{"cantendwithadash-": "bar"},
 		{"only/one/slash": "bar"},
 		{strings.Repeat("a", 254): "bar"},
 	}
-	for i := range errorCases {
-		errs := ValidateLabels(errorCases[i], "field")
+	for i := range labelNameErrorCases {
+		errs := ValidateLabels(labelNameErrorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		} else {
 			detail := errs[0].(*errors.ValidationError).Detail
 			if detail != qualifiedNameErrorMsg {
 				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
+			}
+		}
+	}
+
+	labelValueErrorCases := []map[string]string{
+		{"toolongvalue": strings.Repeat("a", 64)},
+		{"backslashesinvalue": "some\\bad\\value"},
+		{"strangecharsinvalue": "?#$notsogood"},
+	}
+	for i := range labelValueErrorCases {
+		errs := ValidateLabels(labelValueErrorCases[i], "field")
+		if len(errs) != 1 {
+			t.Errorf("case[%d] expected failure", i)
+		} else {
+			detail := errs[0].(*errors.ValidationError).Detail
+			if detail != labelValueErrorMsg {
+				t.Errorf("error detail %s should be equal %s", detail, labelValueErrorMsg)
 			}
 		}
 	}
@@ -118,6 +136,7 @@ func TestValidateAnnotations(t *testing.T) {
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
 		{"UpperCase123": "bar"},
+		{"a": strings.Repeat("b", 64*(1<<10)-1)},
 	}
 	for i := range successCases {
 		errs := ValidateAnnotations(successCases[i], "field")
@@ -125,22 +144,30 @@ func TestValidateAnnotations(t *testing.T) {
 			t.Errorf("case[%d] expected success, got %#v", i, errs)
 		}
 	}
-
-	errorCases := []map[string]string{
+	
+	nameErrorCases := []map[string]string{
 		{"nospecialchars^=@": "bar"},
 		{"cantendwithadash-": "bar"},
 		{"only/one/slash": "bar"},
 		{strings.Repeat("a", 254): "bar"},
 	}
+	for i := range nameErrorCases {
+		errs := ValidateAnnotations(nameErrorCases[i], "field")
+		if len(errs) != 1 {
+			t.Errorf("case[%d] expected failure", i)
+		}
+		detail := errs[0].(*errors.ValidationError).Detail
+		if detail != qualifiedNameErrorMsg {
+			t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
+		}
+	}
+	errorCases := []map[string]string{
+		{"a": strings.Repeat("b", 64*(1<<10))},
+	}
 	for i := range errorCases {
 		errs := ValidateAnnotations(errorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
-		} else {
-			detail := errs[0].(*errors.ValidationError).Detail
-			if detail != qualifiedNameErrorMsg {
-				t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
-			}
 		}
 	}
 }
@@ -840,19 +867,6 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		"bad annotation": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
@@ -1469,24 +1483,6 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid annotation",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "abc123",
-					Namespace: api.NamespaceDefault,
-					Annotations: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			numErrs: 1,
-		},
-		{
 			name: "invalid selector",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -1832,19 +1828,6 @@ func TestValidateReplicationController(t *testing.T) {
 				Template: &invalidPodTemplate.Spec,
 			},
 		},
-		"invalid_annotation": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-				Annotations: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: api.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
-			},
-		},
 		"invalid restart policy 1": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "abc-123",
@@ -1955,12 +1938,6 @@ func TestValidateMinion(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:   "abc-123",
 				Labels: invalidSelector,
-			},
-		},
-		"invalid-annotations": {
-			ObjectMeta: api.ObjectMeta{
-				Name:        "abc-123",
-				Annotations: invalidSelector,
 			},
 		},
 	}
@@ -2097,7 +2074,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Name:   "foo",
 				Labels: map[string]string{"Foo": "baz"},
 			},
-		}, false},
+		}, true},
 	}
 	for i, test := range tests {
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
@@ -2266,7 +2243,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 					Name:   "foo",
 					Labels: map[string]string{"Foo": "baz"},
 				},
-			}, false},
+			}, true},
 	}
 	for i, test := range tests {
 		errs := ValidateServiceUpdate(&test.oldService, &test.service)
@@ -2297,10 +2274,10 @@ func TestValidateResourceNames(t *testing.T) {
 		{".", false},
 		{"..", false},
 		{"my.favorite.app.co/12345", true},
-		{"my.favorite.app.co/_12345", false},
+		{"my.favorite.app.co/_12345", true},
 		{"my.favorite.app.co/12345_", false},
 		{"kubernetes.io/..", false},
-		{"kubernetes.io/" + longString, false},
+		{"kubernetes.io/" + longString, true},
 		{"kubernetes.io//", false},
 		{"kubernetes.io", false},
 		{"kubernetes.io/will/not/work/", false},
@@ -2557,7 +2534,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 				Name:   "foo",
 				Labels: map[string]string{"Foo": "baz"},
 			},
-		}, false},
+		}, true},
 	}
 	for i, test := range tests {
 		errs := ValidateNamespaceUpdate(&test.oldNamespace, &test.namespace)
