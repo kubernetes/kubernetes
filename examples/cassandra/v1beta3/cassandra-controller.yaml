@@ -18,7 +18,7 @@ spec:
             - /run.sh
           resources:
             limits:
-              cpu: 1
+              cpu: 1000
           env: 
             - name: MAX_HEAP_SIZE
               key: MAX_HEAP_SIZE
