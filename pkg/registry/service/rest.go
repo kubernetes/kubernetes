@@ -110,11 +110,13 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if service.Spec.CreateExternalLoadBalancer {
 		err := rs.createExternalLoadBalancer(ctx, service)
 		if err != nil {
+			rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
 			return nil, err
 		}
 	}
 
 	if err := rs.registry.CreateService(ctx, service); err != nil {
+		rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
 		return nil, err
 	}
