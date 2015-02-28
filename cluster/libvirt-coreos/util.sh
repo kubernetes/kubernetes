@@ -137,6 +137,12 @@ function initialize-pool {
       fi
   fi
 
+  mkdir -p "$POOL_PATH/kubernetes/addons"
+  if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
+      render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
+      render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
+  fi
+
   virsh pool-refresh $POOL
 }
 

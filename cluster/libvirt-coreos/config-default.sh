@@ -54,3 +54,9 @@ ENABLE_NODE_MONITORING=true
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
+
+# Optional: Install cluster DNS.
+ENABLE_CLUSTER_DNS=true
+DNS_SERVER_IP="10.11.0.254"
+DNS_DOMAIN="kubernetes.local"
+DNS_REPLICAS=1
