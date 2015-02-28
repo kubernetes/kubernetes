@@ -800,21 +800,6 @@ func SelectorFromSetParse(ls Set) (Selector, error) {
 // ParseSelector takes a string representing a selector and returns an
 // object suitable for matching, or an error.
 func ParseSelector(selector string) (Selector, error) {
-	return parseSelector(selector,
-		func(lhs, rhs string) (newLhs, newRhs string, err error) {
-			return lhs, rhs, nil
-		})
-}
-
-// Parses the selector and runs them through the given TransformFunc.
-func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, error) {
-	return parseSelector(selector, fn)
-}
-
-// Function to transform selectors.
-type TransformFunc func(label, value string) (newLabel, newValue string, err error)
-
-func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 	parts := strings.Split(selector, ",")
 	sort.StringSlice(parts).Sort()
 	var items []Selector
@@ -823,22 +808,10 @@ func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 			continue
 		}
 		if lhs, rhs, ok := try(part, "!="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
 			items = append(items, &notHasTerm{label: lhs, value: rhs})
 		} else if lhs, rhs, ok := try(part, "=="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
 			items = append(items, &hasTerm{label: lhs, value: rhs})
 		} else if lhs, rhs, ok := try(part, "="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
 			items = append(items, &hasTerm{label: lhs, value: rhs})
 		} else {
 			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)

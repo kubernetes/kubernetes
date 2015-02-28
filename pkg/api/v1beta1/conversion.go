@@ -1291,26 +1291,4 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-
-	// Add field conversion funcs.
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "pods",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "name":
-				return "name", value, nil
-			case "DesiredState.Host":
-				return "Status.Host", value, nil
-			case "DesiredState.Status":
-				podStatus := PodStatus(value)
-				var internalValue newer.PodPhase
-				newer.Scheme.Convert(&podStatus, &internalValue)
-				return "Status.Phase", string(internalValue), nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
 }

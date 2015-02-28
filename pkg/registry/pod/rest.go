@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
@@ -119,10 +120,18 @@ func MatchPod(label, field labels.Selector) generic.Matcher {
 // PodToSelectableFields returns a label set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
 func PodToSelectableFields(pod *api.Pod) labels.Set {
+	// TODO we are populating both Status and DesiredState because selectors are not aware of API versions
+	// see https://github.com/GoogleCloudPlatform/kubernetes/pull/2503
+
+	var olderPodStatus v1beta1.PodStatus
+	api.Scheme.Convert(pod.Status.Phase, &olderPodStatus)
+
 	return labels.Set{
-		"name":         pod.Name,
-		"Status.Phase": string(pod.Status.Phase),
-		"Status.Host":  pod.Status.Host,
+		"name":                pod.Name,
+		"Status.Phase":        string(pod.Status.Phase),
+		"Status.Host":         pod.Status.Host,
+		"DesiredState.Status": string(olderPodStatus),
+		"DesiredState.Host":   pod.Status.Host,
 	}
 }
 
