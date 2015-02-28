@@ -45,10 +45,10 @@ func removeDNS(record string, etcdClient *etcd.Client) error {
 	return err
 }
 
-func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error {
+func addDNS(record string, address string, port int, etcdClient *etcd.Client) error {
 	svc := skymsg.Service{
-		Host:     service.Spec.PortalIP,
-		Port:     service.Spec.Port,
+		Host:     address,
+		Port:     port,
 		Priority: 10,
 		Weight:   10,
 		Ttl:      30,
@@ -59,7 +59,7 @@ func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error
 	}
 	// Set with no TTL, and hope that kubernetes events are accurate.
 
-	log.Printf("Setting dns record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Port)
+	log.Printf("Setting dns record: %v -> %s:%d\n", record, address, port)
 	_, err = etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
 	return err
 }
@@ -115,8 +115,17 @@ func watchOnce(etcdClient *etcd.Client, kubeClient *kclient.Client) {
 		case SetServices, AddService:
 			for i := range ev.Services {
 				s := &ev.Services[i]
+				if len(s.Spec.PublicIPs) > 0 {
+					for j := range s.Spec.PublicIPs {
+						name := buildNameString(fmt.Sprintf("%d", j), s.Name, *domain)
+						err := addDNS(name, s.Spec.PublicIPs[j], s.Spec.Port, etcdClient)
+						if err != nil {
+							log.Printf("Failed to add DNS for %s: %v", name, err)
+						}
+					}
+				}
 				name := buildNameString(s.Name, s.Namespace, *domain)
-				err := addDNS(name, s, etcdClient)
+				err := addDNS(name, s.Spec.PortalIP, s.Spec.Port, etcdClient)
 				if err != nil {
 					log.Printf("Failed to add DNS for %s: %v", name, err)
 				}
@@ -124,6 +133,15 @@ func watchOnce(etcdClient *etcd.Client, kubeClient *kclient.Client) {
 		case RemoveService:
 			for i := range ev.Services {
 				s := &ev.Services[i]
+				if len(s.Spec.PublicIPs) > 0 {
+					for j := range s.Spec.PublicIPs {
+						name := buildNameString(fmt.Sprintf("%d", j), s.Name, *domain)
+						err := removeDNS(name, etcdClient)
+						if err != nil {
+							log.Printf("Failed to remove DNS for %s: %v", name, err)
+						}
+					}
+				}
 				name := buildNameString(s.Name, s.Namespace, *domain)
 				err := removeDNS(name, etcdClient)
 				if err != nil {
