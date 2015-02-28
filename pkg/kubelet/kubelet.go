@@ -974,6 +974,7 @@ func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers docke
 			count++
 			wg.Add(1)
 			go func() {
+				defer util.HandleCrash()
 				err := kl.killContainer(dockerContainer)
 				if err != nil {
 					glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, podFullName)

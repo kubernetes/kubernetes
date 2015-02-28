@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -104,7 +105,10 @@ func (p *podWorkers) UpdatePod(pod *api.BoundPod, updateComplete func()) {
 		// update of this pod is being processed are ignored.
 		podUpdates = make(chan workUpdate, 1)
 		p.podUpdates[uid] = podUpdates
-		go p.managePodLoop(podUpdates)
+		go func() {
+			defer util.HandleCrash()
+			p.managePodLoop(podUpdates)
+		}()
 	}
 	// TODO(wojtek-t): Consider changing to the following model:
 	// - add a cache of "desired" pod state
