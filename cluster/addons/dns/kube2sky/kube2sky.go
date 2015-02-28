@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -35,8 +36,12 @@ import (
 )
 
 var (
-	domain  = flag.String("domain", "kubernetes.local", "domain under which to create names")
-	verbose = flag.Bool("verbose", false, "log extra information")
+	domain   = flag.String("domain", "kubernetes.local", "domain under which to create names")
+	verbose  = flag.Bool("verbose", false, "log extra information")
+	machines = flag.String("machines", "http://127.0.0.1:4001", "machine address(es) running etcd")
+	tlspem   = flag.String("tls-pem", "", "X509 Certificate")
+	tlskey   = flag.String("tls-key", "", "TLS Private Key path")
+	cacert   = flag.String("ca-cert", "", "CA Certificate")
 )
 
 func removeDNS(record string, etcdClient *etcd.Client) error {
@@ -59,14 +64,21 @@ func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error
 	}
 	// Set with no TTL, and hope that kubernetes events are accurate.
 
-	log.Printf("Setting dns record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Port)
+	log.Printf("Setting dns record: %v -> %s:%d\n", record, address, port)
 	_, err = etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
 	return err
 }
 
 func newEtcdClient() (client *etcd.Client) {
-	// TODO: take a flag for etcd server(s).
-	client = etcd.NewClient([]string{"http://127.0.0.1:4001"})
+	m := strings.Split(*machines, ",")
+	if strings.HasPrefix(m[0], "https://") {
+		var err error
+		if client, err = etcd.NewTLSClient(m, *tlspem, *tlskey, *cacert); err != nil {
+			log.Printf("Failure to connect: %s", err)
+		}
+	} else {
+		client = etcd.NewClient(m)
+	}
 	if client == nil {
 		return nil
 	}
