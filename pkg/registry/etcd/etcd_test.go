@@ -212,7 +212,7 @@ func TestEtcdCreateController(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	key, _ := makeControllerKey(ctx, "foo")
-	err := registry.CreateController(ctx, &api.ReplicationController{
+	_, err := registry.CreateController(ctx, &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
@@ -242,7 +242,7 @@ func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.CreateController(ctx, &api.ReplicationController{
+	_, err := registry.CreateController(ctx, &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
@@ -259,7 +259,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	key, _ := makeControllerKey(ctx, "foo")
 	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.UpdateController(ctx, &api.ReplicationController{
+	_, err := registry.UpdateController(ctx, &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 2,
@@ -417,7 +417,7 @@ func TestEtcdCreateService(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.CreateService(ctx, &api.Service{
+	_, err := registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	})
 	if err != nil {
@@ -447,7 +447,7 @@ func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 	key, _ := makeServiceKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.CreateService(ctx, &api.Service{
+	_, err := registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	})
 	if !errors.IsAlreadyExists(err) {
@@ -572,7 +572,7 @@ func TestEtcdUpdateService(t *testing.T) {
 			SessionAffinity: "None",
 		},
 	}
-	err := registry.UpdateService(ctx, &testService)
+	_, err := registry.UpdateService(ctx, &testService)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
