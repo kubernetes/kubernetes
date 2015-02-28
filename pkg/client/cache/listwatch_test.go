@@ -48,6 +48,15 @@ func buildResourcePath(prefix, namespace, resource string) string {
 	return path.Join(base, resource)
 }
 
+func getHostFieldLabel() string {
+	switch testapi.Version() {
+	case "v1beta1", "v1beta2":
+		return "DesiredState.Host"
+	default:
+		return "Status.Host"
+	}
+}
+
 // buildQueryValues is a convenience function for knowing if a namespace should be in a query param or not
 func buildQueryValues(namespace string, query url.Values) url.Values {
 	v := url.Values{}
@@ -84,17 +93,17 @@ func TestListWatchesCanList(t *testing.T) {
 		},
 		// pod with "assigned" field selector.
 		{
-			location:      buildLocation(buildResourcePath("", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{"DesiredState.Host="}})),
+			location:      buildLocation(buildResourcePath("", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{getHostFieldLabel() + "="}})),
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
-			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 		// pod in namespace "foo"
 		{
-			location:      buildLocation(buildResourcePath("", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{"DesiredState.Host="}})),
+			location:      buildLocation(buildResourcePath("", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{getHostFieldLabel() + "="}})),
 			resource:      "pods",
 			namespace:     "foo",
-			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 	}
 	for _, item := range table {
@@ -138,19 +147,19 @@ func TestListWatchesCanWatch(t *testing.T) {
 		},
 		// pod with "assigned" field selector.
 		{
-			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{"DesiredState.Host="}, "resourceVersion": []string{"0"}})),
+			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{getHostFieldLabel() + "="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
-			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 		// pod with namespace foo and assigned field selector
 		{
-			location:      buildLocation(buildResourcePath("watch", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{"DesiredState.Host="}, "resourceVersion": []string{"0"}})),
+			location:      buildLocation(buildResourcePath("watch", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{getHostFieldLabel() + "="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
 			namespace:     "foo",
-			fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 	}
 
