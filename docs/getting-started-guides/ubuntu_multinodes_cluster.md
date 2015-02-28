@@ -1,6 +1,8 @@
 # Kubernetes deployed on multiple ubuntu nodes
 
-This document describes how to deploy kubernetes on multiple ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. Although there exists saltstack based ubuntu k8s installation ,  it may be tedious and hard for a guy that knows little about saltstack but want to build a really distributed k8s cluster. This approach is inspired by [k8s deploy on a single node](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/ubuntu_single_node.md).       [Cloud team from ZJU](https://github.com/ZJU-SEL) will keep updating this work.
+This document describes how to deploy kubernetes on multiple ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. Although there exists saltstack based ubuntu k8s installation ,  it may be tedious and hard for a guy that knows little about saltstack but want to build a really distributed k8s cluster. This approach is inspired by [k8s deploy on a single node](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/ubuntu_single_node.md).
+
+[Cloud team from ZJU](https://github.com/ZJU-SEL) will keep updating this work.
 
 ### **Prerequisites：**
 *1 The minion nodes have installed docker version 1.2+* 
@@ -37,7 +39,7 @@ $ sudo cp ./binaries/* /opt/bin
 > We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
 #### II. Configue and install every components upstart script
-The example cluster is listed as below:
+An example cluster is listed as below:
 
 | IP Address|Role |      
 |---------|------|
@@ -56,7 +58,7 @@ $ sudo ./configure.sh
 Welcome to use this script to configure k8s setup
 
 Please enter all your cluster node ips, MASTER node comes first
-And separated with blank space like "<ip_1> <ip2> <ip3> 10.10.103.250 10.10.103.223 10.10.103.224 10.10.103.162
+And separated with blank space like "<ip_1> <ip2> <ip3>": 10.10.103.250 10.10.103.223 10.10.103.224 10.10.103.162
 
 This machine acts as
   both MASTER and MINION:      1
@@ -78,7 +80,7 @@ $ sudo ./configure.sh
 Welcome to use this script to configure k8s setup
 
 Please enter all your cluster node ips, MASTER node comes first
-And separated with blank space like "<ip_1> <ip2> <ip3> 10.10.103.250 10.10.103.223 10.10.103.224 10.10.103.162
+And separated with blank space like "<ip_1> <ip2> <ip3>": 10.10.103.250 10.10.103.223 10.10.103.224 10.10.103.162
 
 This machine acts as
   both MASTER and MINION:      1
@@ -112,15 +114,14 @@ If you want a node acts as **both running the master and minion**, please choose
 	
 	> `$ /opt/bin/etcdctl get /coreos.com/network/config`
 	
-	> If you got `{"Network":"10.0.0.0/16"}`，then etcd cluster is working in good condition. **Victory is in sight！**
-	> If not , you should check` /var/log/upstart/etcd.log` to resolve etcd problem before going forward.
+	> If you got `{"Network":"10.0.0.0/16"}`, then etcd cluster is working well.
+	> If not , please check` /var/log/upstart/etcd.log` to resolve etcd problem before going forward.
+	> Finally, use `ifconfig` to see if there is a new network interface named `flannel0` coming up.
   
   
 3. On every minion node
-  
-	> You can use ifconfig to see if there is a new network interface named `flannel0` coming up.
 	
-	> Make sure you have `brctl` installed on every minion, otherwise run `sudo apt-get install bridge-utils`
+	Make sure you have `brctl` installed on every minion, otherwise please run `sudo apt-get install bridge-utils`
 	
 	`$ sudo ./reconfigureDocker.sh`
 	
@@ -140,11 +141,11 @@ Also you can run kubernetes [guest-example](https://github.com/GoogleCloudPlatfo
 
 Generally, what of this guide did is quite simple: 
 
-1. copy bins and files to right dirctories 
+1. Build and copy binaries and configuration files to proper dirctories on every node
 
-2. config etcd using inputed IPs 
+2. Configure `etcd` using IPs based on input from user 
 
-3. start flannel network
+3. Create and start flannel network
 
 So, whenver you have problem, do not blame Kubernetes, **check etcd configuration first** 
 
@@ -152,9 +153,10 @@ Please try:
 
 1. Check `/var/log/upstart/etcd.log` for suspicisous etcd log 
 
-2. Check `/etc/default/etcd`, as we do not have much input validation, the right config should be like:
-
-`ETCD_OPTS="-name infra1 -initial-advertise-peer-urls <http://ip_of_this_node:2380> -listen-peer-urls <http://ip_of_this_node:2380> -initial-cluster-token etcd-cluster-1 -initial-cluster infra1=<http://ip_of_this_node:2380>,infra2=<http://ip_of_another_node:2380>,infra3=<http://ip_of_another_node:2380> -initial-cluster-state new"`
+2. Check `/etc/default/etcd`, as we do not have much input validation, a right config should be like:
+	```
+	ETCD_OPTS="-name infra1 -initial-advertise-peer-urls <http://ip_of_this_node:2380> -listen-peer-urls <http://ip_of_this_node:2380> -initial-cluster-token etcd-cluster-1 -initial-cluster infra1=<http://ip_of_this_node:2380>,infra2=<http://ip_of_another_node:2380>,infra3=<http://ip_of_another_node:2380> -initial-cluster-state new"
+	```
 
 3. Remove `data-dir` of etcd and run `reconfigureDocker.sh`again, the default path of `data-dir` is /infra*.etcd/
 
