@@ -242,7 +242,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, ctxFn, action.Namer, codec, a.group.info)).
+			route := ws.GET(action.Path).To(ListResource(lister, ctxFn, action.Namer, codec)).
 				Filter(m).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).

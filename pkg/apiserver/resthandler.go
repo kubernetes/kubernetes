@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"net/http"
-	"net/url"
 	gpath "path"
 	"time"
 
@@ -80,24 +79,8 @@ func GetResource(r RESTGetter, ctxFn ContextFunc, namer ScopeNamer, codec runtim
 	}
 }
 
-func parseSelectorQueryParams(query url.Values, version, apiResource string) (label, field labels.Selector, err error) {
-	label, err = labels.ParseSelector(query.Get("labels"))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	convertToInternalVersionFunc := func(label, value string) (newLabel, newValue string, err error) {
-		return api.Scheme.ConvertFieldLabel(version, apiResource, label, value)
-	}
-	field, err = labels.ParseAndTransformSelector(query.Get("fields"), convertToInternalVersionFunc)
-	if err != nil {
-		return nil, nil, err
-	}
-	return label, field, nil
-}
-
 // ListResource returns a function that handles retrieving a list of resources from a RESTStorage object.
-func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, requestInfoResolver *APIRequestInfoResolver) restful.RouteFunction {
+func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -109,13 +92,12 @@ func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runti
 		ctx := ctxFn(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		requestInfo, err := requestInfoResolver.GetAPIRequestInfo(req.Request)
+		label, err := labels.ParseSelector(req.Request.URL.Query().Get("labels"))
 		if err != nil {
 			errorJSON(err, codec, w)
 			return
 		}
-
-		label, field, err := parseSelectorQueryParams(req.Request.URL.Query(), requestInfo.APIVersion, requestInfo.Resource)
+		field, err := labels.ParseSelector(req.Request.URL.Query().Get("fields"))
 		if err != nil {
 			errorJSON(err, codec, w)
 			return
