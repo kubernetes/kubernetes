@@ -40,7 +40,7 @@ const (
 
 var _ = Describe("kubectl", func() {
 
-	updateDemoRoot := filepath.Join(root, "examples/update-demo")
+	updateDemoRoot := filepath.Join(testContext.repoRoot, "examples/update-demo")
 	nautilusPath := filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 	kittenPath := filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 
@@ -174,15 +174,22 @@ func getData(hostIP string) (*updateDemoData, error) {
 }
 
 func runKubectl(args ...string) string {
-	// TODO: use kubectl binary directly instead of shell wrapper
-	path := filepath.Join(root, "cluster/kubectl.sh")
-	cmdStr := path + " " + strings.Join(args, " ")
-	Logf("Running '%v'", cmdStr)
-
-	cmd := exec.Command(path, args...)
+	defaultArgs := []string{"--auth-path=" + testContext.authConfig}
+	if testContext.certDir != "" {
+		defaultArgs = append(defaultArgs,
+			fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.certDir, "ca.crt")),
+			fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "kubecfg.crt")),
+			fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "kubecfg.key")))
+	}
+	kubectlArgs := append(defaultArgs, args...)
+	// TODO: Remove this once gcloud writes a proper entry in the kubeconfig file.
+	if testContext.provider == "gke" {
+		kubectlArgs = append(kubectlArgs, "--server="+testContext.host)
+	}
+	Logf("Running 'kubectl %v'", strings.Join(kubectlArgs, " "))
+	cmd := exec.Command("kubectl", kubectlArgs...)
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	if err := cmd.Run(); err != nil {
 		Failf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
