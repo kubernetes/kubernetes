@@ -24,6 +24,12 @@ import (
 // Codec encodes internal objects to the v1beta1 scheme
 var Codec = runtime.CodecFor(api.Scheme, "v1beta1")
 
+// Dependency does nothing but give a hook for other packages to force a
+// compile-time error when this API version is eventually removed.  This is
+// useful, for example, to clean up things that are implicitly tied to
+// semantics of older APIs.
+const Dependency = true
+
 func init() {
 	api.Scheme.AddKnownTypes("v1beta1",
 		&Pod{},

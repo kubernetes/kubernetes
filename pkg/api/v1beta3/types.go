@@ -747,7 +747,7 @@ type ServiceSpec struct {
 
 	// ContainerPort is the name or number of the port on the container to direct traffic to.
 	// This is useful if the containers the service points to have multiple open ports.
-	// Optional: If unspecified, the first port on the container will be used.
+	// Optional: If unspecified, the service port is used (an identity map).
 	ContainerPort util.IntOrString `json:"containerPort,omitempty"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
