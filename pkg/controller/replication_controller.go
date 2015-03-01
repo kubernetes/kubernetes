@@ -56,6 +56,9 @@ type RealPodControl struct {
 	kubeClient client.Interface
 }
 
+// Time period of main replication controller sync loop
+const DefaultSyncPeriod = 10 * time.Second
+
 func (r RealPodControl) createReplica(namespace string, controller api.ReplicationController) {
 	desiredLabels := make(labels.Set)
 	for k, v := range controller.Spec.Template.Labels {
