@@ -245,6 +245,27 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.Fuzz(&http.Port)
 			c.Fuzz(&http.Host)
 		},
+		func(ss *api.ServiceSpec, c fuzz.Continue) {
+			// TODO: I wish I could say "fuzz myself but without the custom fuzz-func"
+			c.Fuzz(&ss.Port)
+			c.Fuzz(&ss.Protocol)
+			c.Fuzz(&ss.Selector)
+			c.Fuzz(&ss.PortalIP)
+			c.Fuzz(&ss.CreateExternalLoadBalancer)
+			c.Fuzz(&ss.PublicIPs)
+			c.Fuzz(&ss.SessionAffinity)
+			// TODO: would be great if types could voluntarily fuzz themselves.
+			kinds := []util.IntstrKind{util.IntstrInt, util.IntstrString}
+			ss.ContainerPort.Kind = kinds[c.Rand.Intn(len(kinds))]
+			switch ss.ContainerPort.Kind {
+			case util.IntstrInt:
+				ss.ContainerPort.IntVal = 1 + c.Rand.Intn(65535) // non-zero
+				ss.ContainerPort.StrVal = ""                     // needed because we reuse objects without zeroing them
+			case util.IntstrString:
+				ss.ContainerPort.StrVal = "x" + c.RandString() // non-empty
+				ss.ContainerPort.IntVal = 0                    // needed because we reuse objects without zeroing them
+			}
+		},
 	)
 	return f
 }

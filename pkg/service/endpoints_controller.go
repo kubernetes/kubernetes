@@ -21,6 +21,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -65,6 +67,10 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		endpoints := []api.Endpoint{}
 
 		for _, pod := range pods.Items {
+			// TODO: Once v1beta1 and v1beta2 are EOL'ed, this can
+			// assume that service.Spec.ContainerPort is populated.
+			_ = v1beta1.Dependency
+			_ = v1beta2.Dependency
 			port, err := findPort(&pod, service.Spec.ContainerPort)
 			if err != nil {
 				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)

@@ -22,6 +22,7 @@ import (
 
 	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -110,5 +111,21 @@ func TestSetDefaulEndpointsProtocol(t *testing.T) {
 
 	if out.Protocol != current.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
+	}
+}
+
+func TestSetDefaulServiceDestinationPort(t *testing.T) {
+	in := &current.Service{Spec: current.ServiceSpec{Port: 1234}}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*current.Service)
+	if out.Spec.ContainerPort.Kind != util.IntstrInt || out.Spec.ContainerPort.IntVal != 1234 {
+		t.Errorf("Expected ContainerPort to be defaulted, got %s", out.Spec.ContainerPort)
+	}
+
+	in = &current.Service{Spec: current.ServiceSpec{Port: 1234, ContainerPort: util.NewIntOrStringFromInt(5678)}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*current.Service)
+	if out.Spec.ContainerPort.Kind != util.IntstrInt || out.Spec.ContainerPort.IntVal != 5678 {
+		t.Errorf("Expected ContainerPort to be unchanged, got %s", out.Spec.ContainerPort)
 	}
 }

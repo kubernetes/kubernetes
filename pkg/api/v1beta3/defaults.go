@@ -90,5 +90,11 @@ func init() {
 				obj.Path = "/"
 			}
 		},
+		func(obj *ServiceSpec) {
+			if obj.ContainerPort.Kind == util.IntstrInt && obj.ContainerPort.IntVal == 0 ||
+				obj.ContainerPort.Kind == util.IntstrString && obj.ContainerPort.StrVal == "" {
+				obj.ContainerPort = util.NewIntOrStringFromInt(obj.Port)
+			}
+		},
 	)
 }
