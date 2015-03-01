@@ -19,9 +19,12 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +40,9 @@ $ kubectl resize --replicas=3 replicationcontrollers foo
 
 // If the replication controller named foo's current size is 2, resize foo to 3.
 $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`
+
+	retryFrequency = controller.DefaultSyncPeriod / 100
+	retryTimeout   = 10 * time.Second
 )
 
 func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
@@ -63,9 +69,15 @@ func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 
 			resourceVersion := util.GetFlagString(cmd, "resource-version")
 			currentSize := util.GetFlagInt(cmd, "current-replicas")
-			s, err := resizer.Resize(namespace, name, &kubectl.ResizePrecondition{currentSize, resourceVersion}, uint(count))
-			checkErr(err)
-			fmt.Fprintf(out, "%s\n", s)
+			precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
+			cond := kubectl.ResizeCondition(resizer, precondition, namespace, name, uint(count))
+
+			msg := "resized"
+			if err = wait.Poll(retryFrequency, retryTimeout, cond); err != nil {
+				msg = fmt.Sprintf("Failed to resize controller in spite of retrying for %s", retryTimeout)
+				checkErr(err)
+			}
+			fmt.Fprintf(out, "%s\n", msg)
 		},
 	}
 	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to resize.")

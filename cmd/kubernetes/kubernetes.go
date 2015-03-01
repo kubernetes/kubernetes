@@ -133,7 +133,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	controllerManager := controller.NewReplicationManager(cl)
-	controllerManager.Run(10 * time.Second)
+	controllerManager.Run(controller.DefaultSyncPeriod)
 }
 
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
