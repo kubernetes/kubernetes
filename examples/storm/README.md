@@ -8,6 +8,9 @@ You will setup an [Apache ZooKeeper](http://zookeeper.apache.org/)
 service, a Storm master service (a.k.a. Nimbus server), and a set of
 Storm workers (a.k.a. supervisors).
 
+For the impatient expert, jump straight to the [tl;dr](#tl-dr)
+section.
+
 ## Step Zero: Prerequisites
 
 This example assumes you have a Kubernetes cluster installed and
