@@ -62,26 +62,26 @@
     },
     "KeyPair": {
       "Description": "The name of an EC2 Key Pair to allow SSH access to the instance.",
-      "Type": "String"
+      "Type": "AWS::EC2::KeyPair::KeyName"
     },
     "VpcId": {
-       "Description": "The ID of the VPC to launch into.",
-       "Type": "String",
-       "Default": ""
-     },
-     "SubnetId": {
-       "Description": "The ID of the VPC to launch into (that must be within the supplied VPC)",
-       "Type": "String",
-       "Default": ""
-     },
-     "SubnetAZ": {
-       "Description": "The availability zone of the subnet supplied (for example eu-west-1a)",
-       "Type": "String",
-       "Default": ""
-     }
+      "Description": "The ID of the VPC to launch into.",
+      "Type": "AWS::EC2::VPC::Id",
+      "Default": ""
+    },
+    "SubnetId": {
+      "Description": "The ID of the subnet to launch into (that must be within the supplied VPC)",
+      "Type": "AWS::EC2::Subnet::Id",
+      "Default": ""
+    },
+    "SubnetAZ": {
+      "Description": "The availability zone of the subnet supplied (for example eu-west-1a)",
+      "Type": "String",
+      "Default": ""
+    }
   },
   "Conditions": {
-     "UseEC2Classic": {"Fn::Equals": [{"Ref": "VpcId"}, ""]}
+    "UseEC2Classic": {"Fn::Equals": [{"Ref": "VpcId"}, ""]}
   },
   "Resources": {
     "KubernetesSecurityGroup": {
@@ -130,7 +130,8 @@
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI"]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
-        "SecurityGroups": [{"Ref": "KubernetesSecurityGroup"}],
+        "SecurityGroups": [{"Fn::If": ["UseEC2Classic", {"Ref": "KubernetesSecurityGroup"}, {"Ref":"AWS::NoValue"}]}],
+        "SecurityGroupIds": [{"Fn::If": ["UseEC2Classic", {"Ref":"AWS::NoValue"}, {"Ref": "KubernetesSecurityGroup"}]}],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
           "---\n",
@@ -311,7 +312,6 @@
     "KubernetesNodeLaunchConfig": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
-        "SubnetId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]},
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
