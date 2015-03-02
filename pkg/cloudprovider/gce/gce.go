@@ -17,6 +17,7 @@ limitations under the License.
 package gce_cloud
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -194,6 +195,9 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 		if err != nil {
 			return err
 		}
+	}
+	if pollOp.Error != nil && len(pollOp.Error.Errors) > 0 {
+		return errors.New(pollOp.Error.Errors[0].Message)
 	}
 	return nil
 }
