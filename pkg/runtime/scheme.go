@@ -322,14 +322,13 @@ func (s *Scheme) Convert(in, out interface{}) error {
 // Converts the given field label and value for an apiResource field selector from
 // versioned representation to an unversioned one.
 func (s *Scheme) ConvertFieldLabel(version, apiResource, label, value string) (string, string, error) {
-	if s.fieldLabelConversionFuncs[version] == nil {
-		return "", "", fmt.Errorf("No conversion function found for version: %s", version)
+	if typeFuncMap, ok := s.fieldLabelConversionFuncs[version]; ok {
+		if conversionFunc, ok := typeFuncMap[apiResource]; ok {
+			return conversionFunc(label, value)
+		}
 	}
-	conversionFunc, ok := s.fieldLabelConversionFuncs[version][apiResource]
-	if !ok {
-		return "", "", fmt.Errorf("No conversion function found for version %s and api resource %s", version, apiResource)
-	}
-	return conversionFunc(label, value)
+	// Don't fail on types we haven't added conversion funcs for yet.
+	return label, value, nil
 }
 
 // ConvertToVersion attempts to convert an input object to its matching Kind in another
