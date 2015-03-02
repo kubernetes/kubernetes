@@ -72,11 +72,17 @@ Loop:
 				timer.Reset(i.timeout)
 			}
 		case <-expired:
-			for _, stream := range i.conn.streams {
-				stream.Reset()
-			}
-			i.conn.Close()
-			break Loop
+			i.conn.streamCond.L.Lock()
+			streams := i.conn.streams
+			i.conn.streams = make(map[spdy.StreamId]*Stream)
+			i.conn.streamCond.Broadcast()
+			i.conn.streamCond.L.Unlock()
+			go func() {
+				for _, stream := range streams {
+					stream.resetStream()
+				}
+				i.conn.Close()
+			}()
 		case <-i.conn.closeChan:
 			if timer != nil {
 				timer.Stop()

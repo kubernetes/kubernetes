@@ -396,6 +396,49 @@ func TestCloseNotification(t *testing.T) {
 	}
 }
 
+func TestIdleShutdownRace(t *testing.T) {
+	var wg sync.WaitGroup
+	server, listen, serverErr := runServer(&wg)
+	if serverErr != nil {
+		t.Fatalf("Error initializing server: %s", serverErr)
+	}
+
+	conn, dialErr := net.Dial("tcp", listen)
+	if dialErr != nil {
+		t.Fatalf("Error dialing server: %s", dialErr)
+	}
+
+	spdyConn, spdyErr := NewConnection(conn, false)
+	if spdyErr != nil {
+		t.Fatalf("Error creating spdy connection: %s", spdyErr)
+	}
+	go spdyConn.Serve(NoOpStreamHandler)
+
+	authenticated = true
+	stream, err := spdyConn.CreateStream(http.Header{}, nil, false)
+	if err != nil {
+		t.Fatalf("Error creating stream: %v", err)
+	}
+
+	spdyConn.SetIdleTimeout(5 * time.Millisecond)
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		stream.Reset()
+	}()
+
+	select {
+	case <-spdyConn.CloseChan():
+	case <-time.After(20 * time.Millisecond):
+		t.Fatal("Timed out waiting for idle connection closure")
+	}
+
+	closeErr := server.Close()
+	if closeErr != nil {
+		t.Fatalf("Error shutting down server: %s", closeErr)
+	}
+	wg.Wait()
+}
+
 func TestIdleNoTimeoutSet(t *testing.T) {
 	var wg sync.WaitGroup
 	server, listen, serverErr := runServer(&wg)
@@ -550,6 +593,44 @@ Loop:
 			t.Fatal("Timed out waiting for idle connection closure")
 		}
 	}
+
+	closeErr := server.Close()
+	if closeErr != nil {
+		t.Fatalf("Error shutting down server: %s", closeErr)
+	}
+	wg.Wait()
+}
+
+func TestIdleRace(t *testing.T) {
+	var wg sync.WaitGroup
+	server, listen, serverErr := runServer(&wg)
+	if serverErr != nil {
+		t.Fatalf("Error initializing server: %s", serverErr)
+	}
+
+	conn, dialErr := net.Dial("tcp", listen)
+	if dialErr != nil {
+		t.Fatalf("Error dialing server: %s", dialErr)
+	}
+
+	spdyConn, spdyErr := NewConnection(conn, false)
+	if spdyErr != nil {
+		t.Fatalf("Error creating spdy connection: %s", spdyErr)
+	}
+	go spdyConn.Serve(NoOpStreamHandler)
+
+	spdyConn.SetIdleTimeout(10 * time.Millisecond)
+
+	authenticated = true
+
+	for i := 0; i < 10; i++ {
+		_, err := spdyConn.CreateStream(http.Header{}, nil, false)
+		if err != nil {
+			t.Fatalf("Error creating stream: %v", err)
+		}
+	}
+
+	<-spdyConn.CloseChan()
 
 	closeErr := server.Close()
 	if closeErr != nil {
