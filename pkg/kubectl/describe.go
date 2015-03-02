@@ -323,6 +323,12 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 					c.Message)
 			}
 		}
+		if len(minion.Spec.Capacity) > 0 {
+			fmt.Fprintf(out, "Capacity:\n")
+			for resource, value := range minion.Spec.Capacity {
+				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
+			}
+		}
 		fmt.Fprintf(out, "Pods:\t(%d in total)\n", len(pods))
 		for _, pod := range pods {
 			if pod.Status.Host != name {
