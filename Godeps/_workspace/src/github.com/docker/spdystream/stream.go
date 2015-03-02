@@ -168,7 +168,10 @@ func (s *Stream) Close() error {
 // Reset sends a reset frame, putting the stream into the fully closed state.
 func (s *Stream) Reset() error {
 	s.conn.removeStream(s)
+	return s.resetStream()
+}
 
+func (s *Stream) resetStream() error {
 	s.finishLock.Lock()
 	if s.finished {
 		s.finishLock.Unlock()
