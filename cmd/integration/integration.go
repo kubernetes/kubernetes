@@ -97,6 +97,10 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 	return r, nil
 }
 
+func (fakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
+	return api.NodeInfo{}, nil
+}
+
 func (fakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return probe.Success, nil
 }

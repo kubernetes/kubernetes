@@ -33,6 +33,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -46,8 +47,9 @@ import (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	host HostInterface
-	mux  *http.ServeMux
+	host        HostInterface
+	mux         *http.ServeMux
+	machineInfo *cadvisorApi.MachineInfo
 }
 
 type TLSOptions struct {
@@ -114,6 +116,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
+	s.mux.HandleFunc("/api/v1beta1/nodeInfo", s.handleNodeInfoVersioned)
 	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
@@ -329,9 +332,47 @@ func (s *Server) handleLogs(w http.ResponseWriter, req *http.Request) {
 	s.host.ServeLogs(w, req)
 }
 
+// getCachedMachineInfo assumes that the machine info can't change without a reboot
+func (s *Server) getCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
+	if s.machineInfo == nil {
+		info, err := s.host.GetMachineInfo()
+		if err != nil {
+			return nil, err
+		}
+		s.machineInfo = info
+	}
+	return s.machineInfo, nil
+}
+
+// handleNodeInfoVersioned handles node info requests against the Kubelet.
+func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Request) {
+	info, err := s.getCachedMachineInfo()
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	capacity := api.ResourceList{
+		api.ResourceCPU: *resource.NewMilliQuantity(
+			int64(info.NumCores*1000),
+			resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(
+			info.MemoryCapacity,
+			resource.BinarySI),
+	}
+	data, err := json.Marshal(api.NodeInfo{
+		Capacity: capacity,
+	})
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	w.Header().Add("Content-type", "application/json")
+	w.Write(data)
+}
+
 // handleSpec handles spec requests against the Kubelet.
 func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
-	info, err := s.host.GetMachineInfo()
+	info, err := s.getCachedMachineInfo()
 	if err != nil {
 		s.error(w, err)
 		return

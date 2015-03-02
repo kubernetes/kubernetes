@@ -829,6 +829,13 @@ type NodeStatus struct {
 	Addresses []NodeAddress `json:"addresses,omitempty" description:"list of addresses reachable to the node"`
 }
 
+// NodeInfo is the information collected on the node.
+type NodeInfo struct {
+	TypeMeta `json:",inline"`
+	// Capacity represents the available resources of a node
+	Capacity ResourceList `json:"capacity,omitempty"`
+}
+
 type NodePhase string
 
 // These are the valid phases of node.
