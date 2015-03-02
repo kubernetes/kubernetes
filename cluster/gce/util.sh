@@ -804,6 +804,7 @@ function test-setup {
   detect-project
 
   # Open up port 80 & 8080 so common containers on minions can be reached
+  # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \

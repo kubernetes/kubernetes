@@ -17,27 +17,25 @@ limitations under the License.
 var base = "http://localhost:8001/api/v1beta1/";
 
 var updateImage = function($http, server) {
-  $http.get("http://" + server.ip + ":8080/data.json")
+  $http.get(base + "proxy/pods/" + server.podId + "/data.json")
     .success(function(data) {
-      server.image = data.image;
       console.log(data);
+      server.image = data.image;
     })
     .error(function(data) {
-      server.image = "";
       console.log(data);
+      server.image = "";
     });
 };
 
 var updateServer = function($http, server) {
-  $http.get(base + "pods/" + server.id)
+  $http.get(base + "pods/" + server.podId)
     .success(function(data) {
       console.log(data);
-      server.ip = data.currentState.hostIP;
       server.labels = data.labels;
       server.host = data.currentState.host.split('.')[0];
       server.status = data.currentState.status;
-
-      server.dockerImage = data.currentState.info["update-demo"].Image;
+      server.dockerImage = data.currentState.info["update-demo"].image;
       updateImage($http, server);
     })
     .error(function(data) {
@@ -62,7 +60,7 @@ var ButtonsCtrl = function ($scope, $http, $interval) {
 var getServer = function($scope, id) {
   var servers = $scope.servers;
   for (var i = 0; i < servers.length; ++i) {
-    if (servers[i].id == id) {
+    if (servers[i].podId == id) {
       return servers[i];
     }
   }
@@ -89,7 +87,7 @@ var update = function($scope, $http) {
         }
         var server = getServer($scope, pod.id);
         if (server == null) {
-          server = { "id": pod.id };
+          server = { "podId": pod.id };
         }
         newServers.push(server);
       }
