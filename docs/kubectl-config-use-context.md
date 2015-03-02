@@ -23,6 +23,7 @@ kubectl config use-context context-name
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+      --gssproxy="": Path to gssproxy socket to use for Negotiate authentication.
   -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
