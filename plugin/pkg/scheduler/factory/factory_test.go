@@ -49,6 +49,8 @@ func TestCreate(t *testing.T) {
 	factory.Create()
 }
 
+// Test configures a scheduler from a policies defined in a file
+// It combines some configurable predicate/priorities with some pre-defined ones
 func TestCreateFromConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
@@ -63,16 +65,11 @@ func TestCreateFromConfig(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 	factory := NewConfigFactory(client)
 
-	// Register the predicate and priority functions
-	// These would be registered by the DefaultProvider in regular operation
-	RegisterFitPredicate("PodFitsPorts", algorithm.PodFitsPorts)
-	RegisterFitPredicate("PodFitsResources", algorithm.NewResourceFitPredicate(MinionLister))
-	RegisterFitPredicate("NoDiskConflict", algorithm.NoDiskConflict)
-	RegisterFitPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(MinionLister))
-	RegisterFitPredicate("HostName", algorithm.PodFitsHost)
-	RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1)
-	RegisterPriorityFunction("ServiceSpreadingPriority", algorithm.NewServiceSpreadPriority(ServiceLister), 1)
-	RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 0)
+	// Pre-register some predicate and priority functions
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterFitPredicate("PredicateTwo", PredicateTwo)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -80,13 +77,13 @@ func TestCreateFromConfig(t *testing.T) {
 		"predicates" : [
 			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
 			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
-			{"name" : "PodFitsPorts"},
-			{"name" : "MatchNodeSelector"}
+			{"name" : "PredicateOne"},
+			{"name" : "PredicateTwo"}
 		],
 		"priorities" : [
-			{"name" : "RackSpread", "weight" : 2, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
-			{"name" : "ServiceSpreadingPriority", "weight" : 1}
-		]
+			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "PriorityOne", "weight" : 2},
+			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
 	err := latestschedulerapi.Codec.DecodeInto(configData, &policy)
 	if err != nil {
@@ -117,6 +114,22 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 
 	factory.CreateFromConfig(policy)
+}
+
+func PredicateOne(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	return true, nil
+}
+
+func PredicateTwo(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	return true, nil
+}
+
+func PriorityOne(pod api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+	return []algorithm.HostPriority{}, nil
+}
+
+func PriorityTwo(pod api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+	return []algorithm.HostPriority{}, nil
 }
 
 func TestPollMinions(t *testing.T) {
