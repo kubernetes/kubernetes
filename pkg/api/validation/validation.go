@@ -469,6 +469,14 @@ func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList 
 	return allErrors
 }
 
+func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	if len(tcp.Port.StrVal) == 0 && tcp.Port.IntVal == 0 {
+		allErrors = append(allErrors, errs.NewFieldRequired("port", tcp.Port))
+	}
+	return allErrors
+}
+
 func validateHandler(handler *api.Handler) errs.ValidationErrorList {
 	numHandlers := 0
 	allErrors := errs.ValidationErrorList{}

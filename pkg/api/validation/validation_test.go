@@ -496,12 +496,60 @@ func TestValidateContainers(t *testing.T) {
 				ImagePullPolicy: "IfNotPresent",
 			},
 		},
+		"invalid lifecycle, no tcp socket port.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				Lifecycle: &api.Lifecycle{
+					PreStop: &api.Handler{
+						TCPSocket: &api.TCPSocketAction{},
+					},
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"invalid lifecycle, zero tcp socket port.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				Lifecycle: &api.Lifecycle{
+					PreStop: &api.Handler{
+						TCPSocket: &api.TCPSocketAction{
+							Port: util.IntOrString{IntVal: 0},
+						},
+					},
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
 		"invalid lifecycle, no action.": {
 			{
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &api.Lifecycle{
 					PreStop: &api.Handler{},
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"invalid liveness probe, no tcp socket port.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				LivenessProbe: &api.Probe{
+					Handler: api.Handler{
+						TCPSocket: &api.TCPSocketAction{},
+					},
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"invalid liveness probe, no action.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				LivenessProbe: &api.Probe{
+					Handler: api.Handler{},
 				},
 				ImagePullPolicy: "IfNotPresent",
 			},
