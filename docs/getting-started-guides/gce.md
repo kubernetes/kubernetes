@@ -104,7 +104,7 @@ Where pod.json contains something like:
           "initialDelaySeconds": 30,
           "httpGet": {
             "path": "/index.html",
-            "port": "8081"
+            "port": 8081
           }
         }
       }]

@@ -173,7 +173,7 @@ cat <<EOF >"${ORIGIN}/api-service.json"
   "kind": "Service",
   "id": "origin-api",
   "port": 8443,
-  "containerPort": "https-api",
+  "containerPort": 8443,
   "selector": { "name": "origin" },
 }
 EOF
@@ -186,7 +186,7 @@ cat <<EOF >"${ORIGIN}/ui-service.json"
   "kind": "Service",
   "id": "origin-ui",
   "port": 8444,
-  "containerPort": "https-ui",
+  "containerPort": 8444,
   "selector": { "name": "origin" },
 }
 EOF
