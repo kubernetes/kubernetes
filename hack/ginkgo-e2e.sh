@@ -103,6 +103,8 @@ else
   auth_config=()
 fi
 
+# Use the kubectl binary from the same directory as the e2e binary.
+export PATH=$(dirname "${e2e}"):"${PATH}"
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
