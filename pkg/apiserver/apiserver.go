@@ -52,10 +52,12 @@ var (
 		},
 		[]string{"handler", "verb", "resource", "code"},
 	)
-	requestLatencies = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	requestLatencies = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Name: "apiserver_request_latencies",
-			Help: "Response latency summary in microseconds for each request handler and verb.",
+			Help: "Response latency distribution in microseconds for each request handler and verb.",
+			// Use buckets ranging from 125 ms to 8 seconds.
+			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
 		[]string{"handler", "verb"},
 	)
