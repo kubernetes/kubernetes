@@ -240,6 +240,11 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			ep.IP = fmt.Sprintf("%d.%d.%d.%d", c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256))
 			ep.Port = c.Rand.Intn(65536)
 		},
+		func(http *api.HTTPGetAction, c fuzz.Continue) {
+			http.Path = "/" + c.RandString() // can't be blank
+			c.Fuzz(&http.Port)
+			c.Fuzz(&http.Host)
+		},
 	)
 	return f
 }

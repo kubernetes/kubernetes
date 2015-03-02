@@ -331,6 +331,33 @@ func TestValidateProbe(t *testing.T) {
 	}
 }
 
+func TestValidateHandler(t *testing.T) {
+	successCases := []api.Handler{
+		{Exec: &api.ExecAction{Command: []string{"echo"}}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromInt(1), Host: ""}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: util.NewIntOrStringFromInt(65535), Host: "host"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromString("port"), Host: ""}},
+	}
+	for _, h := range successCases {
+		if errs := validateHandler(&h); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []api.Handler{
+		{},
+		{Exec: &api.ExecAction{Command: []string{}}},
+		{HTTPGet: &api.HTTPGetAction{Path: "", Port: util.NewIntOrStringFromInt(0), Host: ""}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: util.NewIntOrStringFromInt(65536), Host: "host"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "", Port: util.NewIntOrStringFromString(""), Host: ""}},
+	}
+	for _, h := range errorCases {
+		if errs := validateHandler(&h); len(errs) == 0 {
+			t.Errorf("expected failure for %#v", h)
+		}
+	}
+}
+
 func TestValidatePullPolicy(t *testing.T) {
 	type T struct {
 		Container      api.Container

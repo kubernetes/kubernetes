@@ -92,5 +92,10 @@ func init() {
 				obj.Protocol = "TCP"
 			}
 		},
+		func(obj *HTTPGetAction) {
+			if obj.Path == "" {
+				obj.Path = "/"
+			}
+		},
 	)
 }

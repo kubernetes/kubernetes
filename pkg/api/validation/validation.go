@@ -451,6 +451,21 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, errs.NewFieldRequired("path", http.Path))
 	}
+	if http.Port.Kind == util.IntstrInt && !util.IsValidPortNum(http.Port.IntVal) {
+		allErrors = append(allErrors, errs.NewFieldInvalid("port", http.Port, portRangeErrorMsg))
+	} else if http.Port.Kind == util.IntstrString && len(http.Port.StrVal) == 0 {
+		allErrors = append(allErrors, errs.NewFieldRequired("port", http.Port.StrVal))
+	}
+	return allErrors
+}
+
+func validateTCPSocketAction(tcp *api.TCPSocketAction) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	if tcp.Port.Kind == util.IntstrInt && !util.IsValidPortNum(tcp.Port.IntVal) {
+		allErrors = append(allErrors, errs.NewFieldInvalid("port", tcp.Port, portRangeErrorMsg))
+	} else if tcp.Port.Kind == util.IntstrString && len(tcp.Port.StrVal) == 0 {
+		allErrors = append(allErrors, errs.NewFieldRequired("port", tcp.Port.StrVal))
+	}
 	return allErrors
 }
 
@@ -464,6 +479,10 @@ func validateHandler(handler *api.Handler) errs.ValidationErrorList {
 	if handler.HTTPGet != nil {
 		numHandlers++
 		allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet).Prefix("httpGet")...)
+	}
+	if handler.TCPSocket != nil {
+		numHandlers++
+		allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket).Prefix("tcpSocket")...)
 	}
 	if numHandlers != 1 {
 		allErrors = append(allErrors, errs.NewFieldInvalid("", handler, "exactly 1 handler type is required"))
@@ -661,6 +680,11 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.protocol", service.Spec.Protocol))
 	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
+	}
+	if service.Spec.ContainerPort.Kind == util.IntstrInt && service.Spec.ContainerPort.IntVal != 0 && !util.IsValidPortNum(service.Spec.ContainerPort.IntVal) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containerPort", service.Spec.Port, portRangeErrorMsg))
+	} else if service.Spec.ContainerPort.Kind == util.IntstrString && len(service.Spec.ContainerPort.StrVal) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.containerPort", service.Spec.ContainerPort.StrVal))
 	}
 
 	if service.Spec.Selector != nil {
