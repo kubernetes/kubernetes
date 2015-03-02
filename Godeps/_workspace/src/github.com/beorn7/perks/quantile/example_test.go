@@ -5,11 +5,12 @@ package quantile_test
 import (
 	"bufio"
 	"fmt"
-	"github.com/bmizerany/perks/quantile"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/beorn7/perks/quantile"
 )
 
 func Example_simple() {
@@ -17,7 +18,11 @@ func Example_simple() {
 	go sendFloats(ch)
 
 	// Compute the 50th, 90th, and 99th percentile.
-	q := quantile.NewTargeted(0.50, 0.90, 0.99)
+	q := quantile.NewTargeted(map[float64]float64{
+		0.50: 0.005,
+		0.90: 0.001,
+		0.99: 0.0001,
+	})
 	for v := range ch {
 		q.Insert(v)
 	}
@@ -28,8 +33,8 @@ func Example_simple() {
 	fmt.Println("count:", q.Count())
 	// Output:
 	// perc50: 5
-	// perc90: 14
-	// perc99: 40
+	// perc90: 16
+	// perc99: 223
 	// count: 2388
 }
 
@@ -52,7 +57,7 @@ func Example_mergeMultipleStreams() {
 	// even if we do not plan to query them all here.
 	ch := make(chan quantile.Samples)
 	getDBQuerySamples(ch)
-	q := quantile.NewTargeted(0.90)
+	q := quantile.NewTargeted(map[float64]float64{0.90: 0.001})
 	for samples := range ch {
 		q.Merge(samples)
 	}
@@ -67,7 +72,11 @@ func Example_window() {
 	go sendStreamValues(ch)
 
 	tick := time.NewTicker(1 * time.Minute)
-	q := quantile.NewTargeted(0.90, 0.95, 0.99)
+	q := quantile.NewTargeted(map[float64]float64{
+		0.90: 0.001,
+		0.95: 0.0005,
+		0.99: 0.0001,
+	})
 	for {
 		select {
 		case t := <-tick.C:

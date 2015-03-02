@@ -20,11 +20,12 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/beorn7/perks/quantile"
+	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/prometheus/client_golang/_vendor/perks/quantile"
+	"github.com/prometheus/client_golang/model"
 )
 
 // A Summary captures individual observations from an event or sample stream and
@@ -35,6 +36,12 @@ import (
 // Summary provides the median, the 90th and the 99th percentile of the latency
 // as rank estimations.
 //
+// Note that the rank estimations cannot be aggregated in a meaningful way with
+// the Prometheus query language (i.e. you cannot average or add them). If you
+// need aggregatable quantiles (e.g. you want the 99th percentile latency of all
+// queries served across all instances of a service), consider the Histogram
+// metric type. See the Prometheus documentation for more details.
+//
 // To create Summary instances, use NewSummary.
 type Summary interface {
 	Metric
@@ -44,9 +51,13 @@ type Summary interface {
 	Observe(float64)
 }
 
-// DefObjectives are the default Summary quantile values.
 var (
+	// DefObjectives are the default Summary quantile values.
 	DefObjectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+
+	errQuantileLabelNotAllowed = fmt.Errorf(
+		"%q is not allowed as label name in summaries", model.QuantileLabel,
+	)
 )
 
 // Default values for SummaryOpts.
@@ -110,7 +121,10 @@ type SummaryOpts struct {
 	// AgeBuckets is the number of buckets used to exclude observations that
 	// are older than MaxAge from the summary. A higher number has a
 	// resource penalty, so only increase it if the higher resolution is
-	// really required. The default value is DefAgeBuckets.
+	// really required. For very high observation rates, you might want to
+	// reduce the number of age buckets. With only one age bucket, you will
+	// effectively see a complete reset of the summary each time MaxAge has
+	// passed. The default value is DefAgeBuckets.
 	AgeBuckets uint32
 
 	// BufCap defines the default sample stream buffer size.  The default
@@ -119,10 +133,6 @@ type SummaryOpts struct {
 	// is the internal buffer size of the underlying package
 	// "github.com/bmizerany/perks/quantile").
 	BufCap uint32
-
-	// Epsilon is the error epsilon for the quantile rank estimate. Must be
-	// positive. The default is DefEpsilon.
-	Epsilon float64
 }
 
 // TODO: Great fuck-up with the sliding-window decay algorithm... The Merge
@@ -156,6 +166,17 @@ func NewSummary(opts SummaryOpts) Summary {
 func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 	if len(desc.variableLabels) != len(labelValues) {
 		panic(errInconsistentCardinality)
+	}
+
+	for _, n := range desc.variableLabels {
+		if n == model.QuantileLabel {
+			panic(errQuantileLabelNotAllowed)
+		}
+	}
+	for _, lp := range desc.constLabelPairs {
+		if lp.GetName() == model.QuantileLabel {
+			panic(errQuantileLabelNotAllowed)
+		}
 	}
 
 	if len(opts.Objectives) == 0 {
@@ -358,7 +379,7 @@ func (s quantSort) Less(i, j int) bool {
 // SummaryVec is a Collector that bundles a set of Summaries that all share the
 // same Desc, but have different values for their variable labels. This is used
 // if you want to count the same thing partitioned by various dimensions
-// (e.g. http request latencies, partitioned by status code and method). Create
+// (e.g. HTTP request latencies, partitioned by status code and method). Create
 // instances with NewSummaryVec.
 type SummaryVec struct {
 	MetricVec
@@ -411,14 +432,14 @@ func (m *SummaryVec) GetMetricWith(labels Labels) (Summary, error) {
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
 // GetMetricWithLabelValues would have returned an error. By not returning an
 // error, WithLabelValues allows shortcuts like
-//     myVec.WithLabelValues("404", "GET").Add(42)
+//     myVec.WithLabelValues("404", "GET").Observe(42.21)
 func (m *SummaryVec) WithLabelValues(lvs ...string) Summary {
 	return m.MetricVec.WithLabelValues(lvs...).(Summary)
 }
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. By not returning an error, With allows shortcuts like
-//     myVec.With(Labels{"code": "404", "method": "GET"}).Add(42)
+//     myVec.With(Labels{"code": "404", "method": "GET"}).Observe(42.21)
 func (m *SummaryVec) With(labels Labels) Summary {
 	return m.MetricVec.With(labels).(Summary)
 }

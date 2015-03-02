@@ -74,7 +74,7 @@ func (c *counter) Add(v float64) {
 // CounterVec is a Collector that bundles a set of Counters that all share the
 // same Desc, but have different values for their variable labels. This is used
 // if you want to count the same thing partitioned by various dimensions
-// (e.g. number of http requests, partitioned by response code and
+// (e.g. number of HTTP requests, partitioned by response code and
 // method). Create instances with NewCounterVec.
 //
 // CounterVec embeds MetricVec. See there for a full list of methods with

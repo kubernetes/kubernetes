@@ -22,7 +22,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 // ValueType is an enumeration of metric types that represent a simple value.

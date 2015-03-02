@@ -129,3 +129,31 @@ func BenchmarkSummaryNoLabels(b *testing.B) {
 		m.Observe(3.1415)
 	}
 }
+
+func BenchmarkHistogramWithLabelValues(b *testing.B) {
+	m := NewHistogramVec(
+		HistogramOpts{
+			Name: "benchmark_histogram",
+			Help: "A histogram to benchmark it.",
+		},
+		[]string{"one", "two", "three"},
+	)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.WithLabelValues("eins", "zwei", "drei").Observe(3.1415)
+	}
+}
+
+func BenchmarkHistogramNoLabels(b *testing.B) {
+	m := NewHistogram(HistogramOpts{
+		Name: "benchmark_histogram",
+		Help: "A histogram to benchmark it.",
+	},
+	)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Observe(3.1415)
+	}
+}
