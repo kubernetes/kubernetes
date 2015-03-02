@@ -329,6 +329,7 @@ func (s *NodeController) updateNodeInfo(node *api.Node) error {
 	for key, value := range nodeInfo.Capacity {
 		node.Spec.Capacity[key] = value
 	}
+	node.Status.NodeInfo = nodeInfo.NodeSystemInfo
 	return nil
 }
 

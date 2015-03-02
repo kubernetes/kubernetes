@@ -788,6 +788,14 @@ type NodeSpec struct {
 	ExternalID string `json:"externalID,omitempty"`
 }
 
+// NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
+type NodeSystemInfo struct {
+	// MachineID is the machine-id reported by the node
+	MachineID string `json:"machineID"`
+	// SystemUUID is the system-uuid reported by the node
+	SystemUUID string `json:"systemUUID"`
+}
+
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// NodePhase is the current lifecycle phase of the node.
@@ -796,6 +804,8 @@ type NodeStatus struct {
 	Conditions []NodeCondition `json:"conditions,omitempty"`
 	// Queried from cloud provider, if available.
 	Addresses []NodeAddress `json:"addresses,omitempty"`
+	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
+	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }
 
 // NodeInfo is the information collected on the node.
@@ -803,6 +813,8 @@ type NodeInfo struct {
 	TypeMeta `json:",inline"`
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `json:"capacity,omitempty"`
+	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
+	NodeSystemInfo `json:",inline,omitempty"`
 }
 
 type NodePhase string

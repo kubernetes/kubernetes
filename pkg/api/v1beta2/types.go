@@ -623,6 +623,14 @@ type EndpointsList struct {
 	Items    []Endpoints `json:"items" description:"list of service endpoint lists"`
 }
 
+// NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
+type NodeSystemInfo struct {
+	// MachineID is the machine-id reported by the node
+	MachineID string `json:"machineID" description:"machine id is the machine-id reported by the node"`
+	// SystemUUID is the system-uuid reported by the node
+	SystemUUID string `json:"systemUUID" description:"system uuid is the system-uuid reported by the node"`
+}
+
 // NodeStatus is information about the current status of a node.
 //
 // https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-status
@@ -633,6 +641,8 @@ type NodeStatus struct {
 	Conditions []NodeCondition `json:"conditions,omitempty" description:"conditions is an array of current node conditions"`
 	// Queried from cloud provider, if available.
 	Addresses []NodeAddress `json:"addresses,omitempty" description:"list of addresses reachable to the node"`
+	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
+	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty" description:"node identity is a set of ids/uuids to uniquely identify the node"`
 }
 
 // NodeInfo is the information collected on the node.
@@ -640,6 +650,8 @@ type NodeInfo struct {
 	TypeMeta `json:",inline"`
 	// Capacity represents the available resources.
 	Capacity ResourceList `json:"capacity,omitempty" description:"resource capacity of a node represented as a map of resource name to quantity of resource"`
+	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
+	NodeSystemInfo `json:",inline,omitempty" description:"node identity is a set of ids/uuids to uniquely identify the node"`
 }
 
 // Described the current lifecycle phase of a node.

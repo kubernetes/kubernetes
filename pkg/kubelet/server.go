@@ -361,6 +361,10 @@ func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Reques
 	}
 	data, err := json.Marshal(api.NodeInfo{
 		Capacity: capacity,
+		NodeSystemInfo: api.NodeSystemInfo{
+			MachineID:  info.MachineID,
+			SystemUUID: info.SystemUUID,
+		},
 	})
 	if err != nil {
 		s.error(w, err)
