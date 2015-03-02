@@ -28,7 +28,7 @@ import (
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
 func NewSourceApiserver(client *client.Client, hostname string, updates chan<- interface{}) {
-	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, labels.OneTermEqualSelector("Status.Host", hostname))
+	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, labels.OneTermEqualSelector(getHostFieldLabel(client.APIVersion()), hostname))
 	newSourceApiserverFromLW(lw, updates)
 }
 
@@ -50,4 +50,13 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 		updates <- kubelet.PodUpdate{bpods, kubelet.SET, kubelet.ApiserverSource}
 	}
 	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
+}
+
+func getHostFieldLabel(apiVersion string) string {
+	switch apiVersion {
+	case "v1beta1", "v1beta2":
+		return "DesiredState.Host"
+	default:
+		return "Status.Host"
+	}
 }

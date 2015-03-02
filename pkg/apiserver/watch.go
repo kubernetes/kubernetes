@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"net/http"
-	"net/url"
 	"path"
 	"regexp"
 	"strings"
@@ -27,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
@@ -54,25 +52,6 @@ func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
 	return h.linker.SetSelfLink(obj, newURL.String())
-}
-
-func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string, err error) {
-	s, perr := labels.ParseSelector(query.Get("labels"))
-	if perr != nil {
-		err = perr
-		return
-	}
-	label = s
-
-	s, perr = labels.ParseSelector(query.Get("fields"))
-	if perr != nil {
-		err = perr
-		return
-	}
-	field = s
-
-	resourceVersion = query.Get("resourceVersion")
-	return
 }
 
 var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
@@ -117,11 +96,13 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	label, field, resourceVersion, err := getWatchParams(req.URL.Query())
+	label, field, err := parseSelectorQueryParams(req.URL.Query(), requestInfo.APIVersion, apiResource)
 	if err != nil {
 		httpCode = errorJSON(err, h.codec, w)
 		return
 	}
+
+	resourceVersion := req.URL.Query().Get("resourceVersion")
 	watching, err := watcher.Watch(ctx, label, field, resourceVersion)
 	if err != nil {
 		httpCode = errorJSON(err, h.codec, w)
