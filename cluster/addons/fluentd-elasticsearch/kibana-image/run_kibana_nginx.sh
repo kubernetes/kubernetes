@@ -43,28 +43,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Report all environment variables containing 'elasticsearch'
-set | grep -i elasticsearch
-# Set the default value for the Elasticsearch host as seen by the client
-# Javascript code for Kibana.
-: ${ES_HOST:='"+window.location.hostname+"'}
-echo ES_HOST=$ES_HOST
-# Set the default port for Elasticsearch host as seen by the client
-# Javascript for Kibana.
-: ${ES_PORT:=5601}
-echo ES_PORT=$ES_PORT
-# Set the default host IP and port for Elasticsearch as seen by the proxy
-# code in the configuration for nginx. If a Kubernetes Elasticsearch
-# service called 'elasticsearch' is defined, use that. Otherwise, use
-# a local instance of Elasticsearch on port 9200.
-PROXY_HOST=${ELASTICSEARCH_LOGGING_SERVICE_HOST:-127.0.0.1}
-echo PROXY_HOST=${PROXY_HOST}
-PROXY_PORT=${ELASTICSEARCH_SERVICE_LOGGING_PORT:-9200}
-echo PROXY_PORT=${PROXY_PORT}
- 
-# Create a config.hs that defines the Elasticsearch server to be
-# at http://${ES_HOST}:${ES_PORT}/elasticsearch from the perspective of
-# the client Javascript code.
 cat << EOF > /usr/share/nginx/html/config.js
 /** @scratch /configuration/config.js/1
  *
@@ -97,7 +75,10 @@ function (Settings) {
      *  +elasticsearch: {server: "http://localhost:9200", withCredentials: true}+
      *
      */
-    elasticsearch: "http://${ES_HOST}:${ES_PORT}/elasticsearch",
+
+
+    elasticsearch: "https://"+window.location.hostname+"/api/v1beta1/proxy/services/elasticsearch-logging",
+
 
     /** @scratch /configuration/config.js/5
      *
@@ -146,35 +127,6 @@ function (Settings) {
     ]
   });
 });
-EOF
-
-# Proxy all calls to ...:80/elasticsearch to the location
-# defined by http://${PROXY_HOST}:${PROXY_PORT}
-cat <<EOF > /etc/nginx/sites-available/default
-server {
-        listen 80 default_server;
-        listen [::]:80 default_server ipv6only=on;
-
-        root /usr/share/nginx/html;
-        index index.html index.htm;
-
-        # Make site accessible from http://localhost/
-        server_name localhost;
-
-        location ~ /elasticsearch/?(.*)$ {
-        proxy_http_version 1.1;
-                proxy_set_header Upgrade \$http_upgrade;
-                proxy_read_timeout 1d;
-                proxy_set_header Connection "upgrade";
-                proxy_pass http://${PROXY_HOST}:${PROXY_PORT}/\$1;
-        }
-
-        location / {
-                # First attempt to serve request as file, then
-                # as directory, then fall back to displaying a 404.
-                try_files \$uri \$uri/ =404;
-        }
-}
 EOF
 
 exec nginx -c /etc/nginx/nginx.conf "$@"

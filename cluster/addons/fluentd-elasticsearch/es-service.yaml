@@ -8,4 +8,3 @@ labels:
   kubernetes.io/cluster-service: "true"
 selector:
   name: elasticsearch-logging
-createExternalLoadBalancer: true
