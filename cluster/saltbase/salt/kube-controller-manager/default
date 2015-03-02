@@ -21,7 +21,7 @@
 {% if grains.cloud is defined -%}
 {% if grains.cloud == 'gce' -%}
   {% set cloud_provider = "--cloud_provider=gce" -%}
-  {% set machines = "--machines=" + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) -%}
+  {% set machines = "--machines=" + pillar['gce_node_names'] -%}
 {% endif -%}
 {% if grains.cloud == 'aws' -%}
   {% set cloud_provider = "--cloud_provider=aws" -%}

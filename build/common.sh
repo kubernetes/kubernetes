@@ -786,8 +786,8 @@ function kube::release::gcs::copy_release_artifacts() {
   # Having the "template" scripts from the GCE cluster deploy hosted with the
   # release is useful for GKE.  Copy everything from that directory up also.
   gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
-    "${RELEASE_STAGE}/full/kubernetes/cluster/gce/templates/*.sh" \
-    "${gcs_destination}extra/gce-templates/"
+    "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" \
+    "${gcs_destination}extra/gce/"
 
   # Upload the "naked" binaries to GCS.  This is useful for install scripts that
   # download the binaries directly and don't need tars.
