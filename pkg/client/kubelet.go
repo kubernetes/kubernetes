@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -85,28 +86,24 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	}, nil
 }
 
-func (c *HTTPKubeletClient) url(host string) string {
-	scheme := "http://"
+func (c *HTTPKubeletClient) url(host, path, query string) string {
+	scheme := "http"
 	if c.EnableHttps {
-		scheme = "https://"
+		scheme = "https"
 	}
 
-	return fmt.Sprintf(
-		"%s%s",
-		scheme,
-		net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)))
+	return (&url.URL{
+		Scheme:   scheme,
+		Host:     net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
+		Path:     path,
+		RawQuery: query,
+	}).String()
 }
 
 // GetPodInfo gets information about the specified pod.
 func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
-	request, err := http.NewRequest(
-		"GET",
-		fmt.Sprintf(
-			"%s/api/v1beta1/podInfo?podID=%s&podNamespace=%s",
-			c.url(host),
-			podID,
-			podNamespace),
-		nil)
+	query := url.Values{"podID": {podID}, "podNamespace": {podNamespace}}
+	request, err := http.NewRequest("GET", c.url(host, "/api/v1beta1/podInfo", query.Encode()), nil)
 	status := api.PodStatusResult{}
 	if err != nil {
 		return status, err
@@ -135,7 +132,7 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 }
 
 func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, error) {
-	return httprobe.DoHTTPProbe(fmt.Sprintf("%s/healthz", c.url(host)), c.Client)
+	return httprobe.DoHTTPProbe(c.url(host, "/healthz", ""), c.Client)
 }
 
 // FakeKubeletClient is a fake implementation of KubeletClient which returns an error
