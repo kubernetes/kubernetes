@@ -111,7 +111,7 @@ Running: ../../../../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubect
     "publicIPs": [
         "104.154.81.135"
     ],
-    "containerPort": "es-port",
+    "containerPort": 9200,
     "portalIP": "10.0.58.62",
     "sessionAffinity": "None"
 }
@@ -139,7 +139,7 @@ Running: ../../../../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubect
     "publicIPs": [
         "104.154.91.224"
     ],
-    "containerPort": "kibana-port",
+    "containerPort": 80,
     "portalIP": "10.0.124.153",
     "sessionAffinity": "None"
 }

@@ -2,7 +2,7 @@ id: blog-service
 kind: Service
 apiVersion: v1beta1
 port: 80
-containerPort: http-server
+containerPort: 80
 selector:
   name: blog
 createExternalLoadBalancer: true
