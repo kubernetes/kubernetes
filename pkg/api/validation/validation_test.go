@@ -76,7 +76,7 @@ func TestValidateLabels(t *testing.T) {
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
 		{"UpperCaseAreOK123": "bar"},
-		{"goodvalue": "123_-.BaR,"},
+		{"goodvalue": "123_-.BaR"},
 	}
 	for i := range successCases {
 		errs := ValidateLabels(successCases[i], "field")
@@ -106,6 +106,7 @@ func TestValidateLabels(t *testing.T) {
 	labelValueErrorCases := []map[string]string{
 		{"toolongvalue": strings.Repeat("a", 64)},
 		{"backslashesinvalue": "some\\bad\\value"},
+		{"nocommasallowed": "bad,value"},
 		{"strangecharsinvalue": "?#$notsogood"},
 	}
 	for i := range labelValueErrorCases {
@@ -136,7 +137,11 @@ func TestValidateAnnotations(t *testing.T) {
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
 		{"UpperCase123": "bar"},
-		{"a": strings.Repeat("b", 64*(1<<10)-1)},
+		{"a": strings.Repeat("b", (64*1024)-1)},
+		{
+			"a": strings.Repeat("b", (32*1024)-1),
+			"c": strings.Repeat("d", (32*1024)-1),
+		},
 	}
 	for i := range successCases {
 		errs := ValidateAnnotations(successCases[i], "field")
@@ -144,7 +149,7 @@ func TestValidateAnnotations(t *testing.T) {
 			t.Errorf("case[%d] expected success, got %#v", i, errs)
 		}
 	}
-	
+
 	nameErrorCases := []map[string]string{
 		{"nospecialchars^=@": "bar"},
 		{"cantendwithadash-": "bar"},
@@ -161,11 +166,15 @@ func TestValidateAnnotations(t *testing.T) {
 			t.Errorf("error detail %s should be equal %s", detail, qualifiedNameErrorMsg)
 		}
 	}
-	errorCases := []map[string]string{
-		{"a": strings.Repeat("b", 64*(1<<10))},
+	totalSizeErrorCases := []map[string]string{
+		{"a": strings.Repeat("b", 64*1024)},
+		{
+			"a": strings.Repeat("b", 32*1024),
+			"c": strings.Repeat("d", 32*1024),
+		},
 	}
-	for i := range errorCases {
-		errs := ValidateAnnotations(errorCases[i], "field")
+	for i := range totalSizeErrorCases {
+		errs := ValidateAnnotations(totalSizeErrorCases[i], "field")
 		if len(errs) != 1 {
 			t.Errorf("case[%d] expected failure", i)
 		}
@@ -2274,7 +2283,7 @@ func TestValidateResourceNames(t *testing.T) {
 		{".", false},
 		{"..", false},
 		{"my.favorite.app.co/12345", true},
-		{"my.favorite.app.co/_12345", true},
+		{"my.favorite.app.co/_12345", false},
 		{"my.favorite.app.co/12345_", false},
 		{"kubernetes.io/..", false},
 		{"kubernetes.io/" + longString, true},

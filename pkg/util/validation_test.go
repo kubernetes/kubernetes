@@ -169,7 +169,6 @@ func TestIsQualifiedName(t *testing.T) {
 		"1234/5678",
 		"1.2.3.4/5678",
 		"UppercaseIsOK123",
-		"-canstartwithadash",
 	}
 	for i := range successCases {
 		if !IsQualifiedName(successCases[i]) {
@@ -182,6 +181,7 @@ func TestIsQualifiedName(t *testing.T) {
 		"cantendwithadash-",
 		"only/one/slash",
 		strings.Repeat("a", 254),
+		"-cantstartwithadash",
 	}
 	for i := range errorCases {
 		if IsQualifiedName(errorCases[i]) {

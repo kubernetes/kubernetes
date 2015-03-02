@@ -30,7 +30,6 @@ import (
 	"github.com/golang/glog"
 )
 
-const invalidAnnotationValueErrorMsg string = "must match regex " + util.AnnotationValueFmt
 const cIdentifierErrorMsg string = "must match regex " + util.CIdentifierFmt
 const isNegativeErrorMsg string = "value must not be negative"
 
@@ -45,6 +44,8 @@ var dnsLabelErrorMsg string = fmt.Sprintf("must have at most %d characters and m
 var dns952LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS952LabelMaxLength, util.DNS952LabelFmt)
 var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
+
+const totalAnnotationSizeLimitB int = 64 * (1 << 10) // 64 kB
 
 // ValidateLabels validates that a set of labels are correctly defined.
 func ValidateLabels(labels map[string]string, field string) errs.ValidationErrorList {
@@ -69,11 +70,11 @@ func ValidateAnnotations(annotations map[string]string, field string) errs.Valid
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, qualifiedNameErrorMsg))
 		}
 		if !util.IsValidAnnotationValue(v) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, invalidAnnotationValueErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
 		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
-	if totalSize > (int64)(util.TotalAnnotationSizeB) {
+	if totalSize > (int64)(totalAnnotationSizeLimitB) {
 		allErrs = append(allErrs, errs.NewFieldTooLong("annotations", ""))
 	}
 	return allErrs
@@ -881,7 +882,7 @@ func validateResourceName(value string, field string) errs.ValidationErrorList {
 
 	if len(strings.Split(value, "/")) == 1 {
 		if !api.IsStandardResourceName(value) {
-			return append(allErrs, errs.NewFieldInvalid(field, value, "is neither a standard resource type nor is fully qualified")
+			return append(allErrs, errs.NewFieldInvalid(field, value, "is neither a standard resource type nor is fully qualified"))
 		}
 	}
 
