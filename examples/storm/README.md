@@ -97,6 +97,53 @@ $ sudo docker run -it -w /opt/apache-storm mattf/storm-base sh -c '/configure.sh
 No topologies running.
 ```
 
+## Step Three: Start your Storm workers
+
+The Storm workers (or supervisors) do the heavy lifting in a Storm
+cluster. They run your stream processing topologies and are managed by
+the Nimbus service.
+
+The Storm workers need both the ZooKeeper and Nimbus services to be
+running.
+
+Use the `examples/storm/storm-worker-controller.json` file to create a
+ReplicationController that manages the worker pods.
+
+```shell
+$ kubectl create -f examples/storm/storm-worker-controller.json
+```
+
+### Check to see if the workers are running
+
+One way to check on the workers is to get information from the
+ZooKeeper service about how many clients it has.
+
+```shell
+$  echo stat | nc 10.254.139.141 2181; echo
+Zookeeper version: 3.4.6--1, built on 10/23/2014 14:18 GMT
+Clients:
+ /192.168.48.0:44187[0](queued=0,recved=1,sent=0)
+ /192.168.45.0:39568[1](queued=0,recved=14072,sent=14072)
+ /192.168.86.1:57591[1](queued=0,recved=34,sent=34)
+ /192.168.8.0:50375[1](queued=0,recved=34,sent=34)
+ /192.168.45.0:39576[1](queued=0,recved=34,sent=34)
+
+Latency min/avg/max: 0/2/2570
+Received: 23199
+Sent: 23198
+Connections: 5
+Outstanding: 0
+Zxid: 0xa39
+Mode: standalone
+Node count: 13
+```
+
+There should be one client from the Nimbus service and one per
+worker. Ideally, you should get ```stat``` output from ZooKeeper
+before and after creating the ReplicationController.
+
+(Pull requests welcome for alternative ways to validate the workers)
+
 ## tl;dr
 
 ```kubectl create -f zookeeper.json```
