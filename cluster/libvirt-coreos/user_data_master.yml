@@ -18,7 +18,7 @@ coreos:
         --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
         --kubelet_port=10250 \
-        --portal_net=10.10.254.0/24
+        --portal_net=${PORTAL_NET}
         Restart=always
         RestartSec=2
 
@@ -58,6 +58,26 @@ coreos:
         --master=127.0.0.1:8080
         Restart=always
         RestartSec=2
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: kube-addons.service
+      command: start
+      content: |
+        [Unit]
+        After=opt-kubernetes.mount kube-apiserver.service
+        ConditionPathIsDirectory=/opt/kubernetes/addons
+        Description=Kubernetes addons
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=opt-kubernetes.mount kube-apiserver.service
+
+        [Service]
+        Type=oneshot
+        ExecStartPre=/bin/bash -c 'while [[ \"\$(curl -s http://127.0.0.1:8080/healthz)\" != \"ok\" ]]; do sleep 1; done'
+        ExecStartPre=/bin/sleep 10
+        ExecStart=/opt/kubernetes/bin/kubectl create -f /opt/kubernetes/addons
+        ExecStop=/opt/kubernetes/bin/kubectl stop -f /opt/kubernetes/addons
+        RemainAfterExit=yes
 
         [Install]
         WantedBy=multi-user.target

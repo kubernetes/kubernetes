@@ -103,10 +103,16 @@ else
   auth_config=()
 fi
 
+if [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
+    host="http://${KUBE_MASTER_IP-}:8080"
+else
+    host="https://${KUBE_MASTER_IP-}"
+fi
+
 # Use the kubectl binary from the same directory as the e2e binary.
 export PATH=$(dirname "${e2e}"):"${PATH}"
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
-  --host="https://${KUBE_MASTER_IP-}" \
+  --host="$host" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce_project="${PROJECT:-}" \
   --gce_zone="${ZONE:-}" \

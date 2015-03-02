@@ -16,7 +16,7 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
-readonly KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source $ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}
 
@@ -38,8 +38,8 @@ function join {
 
 # Must ensure that the following ENV vars are set
 function detect-master {
-  KUBE_MASTER_IP=192.168.10.1
-  KUBE_MASTER=kubernetes-master
+  KUBE_MASTER_IP=$MASTER_IP
+  KUBE_MASTER=$MASTER_NAME
   export KUBERNETES_MASTER=http://$KUBE_MASTER_IP:8080
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP"
   echo "KUBE_MASTER: $KUBE_MASTER"
@@ -47,10 +47,7 @@ function detect-master {
 
 # Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
 function detect-minions {
-  for (( i = 0 ; i < $NUM_MINIONS ; i++ )); do
-    KUBE_MINION_IP_ADDRESSES[$i]=192.168.10.$(($i+2))
-  done
-  echo "KUBE_MINION_IP_ADDRESSES=[${KUBE_MINION_IP_ADDRESSES[@]}]"
+  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
 # Verify prereqs on host machine
@@ -127,6 +124,25 @@ function initialize-pool {
 
   mkdir -p "$POOL_PATH/kubernetes"
   kube-push
+
+  mkdir -p "$POOL_PATH/kubernetes/manifests"
+  if [[ "$ENABLE_NODE_MONITORING" == "true" ]]; then
+      cp "$KUBE_ROOT/cluster/saltbase/salt/cadvisor/cadvisor.manifest" "$POOL_PATH/kubernetes/manifests"
+  fi
+  if [[ "$ENABLE_NODE_LOGGING" == "true" ]]; then
+      if [[ "$LOGGING_DESTINATION" == "elasticsearch" ]]; then
+          cp "$KUBE_ROOT/cluster/saltbase/salt/fluentd-es/fluentd-es.manifest" "$POOL_PATH/kubernetes/manifests"
+      elif [[ "$LOGGING_DESTINATION" == "gcp" ]]; then
+          cp "$KUBE_ROOT/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.manifest" "$POOL_PATH/kubernetes/manifests"
+      fi
+  fi
+
+  mkdir -p "$POOL_PATH/kubernetes/addons"
+  if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
+      render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
+      render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
+  fi
+
   virsh pool-refresh $POOL
 }
 
@@ -146,6 +162,25 @@ function render-template {
   eval "echo \"$(cat $1)\""
 }
 
+function wait-cluster-readiness {
+  echo "Wait for cluster readiness"
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+
+  local timeout=50
+  while [[ $timeout -ne 0 ]]; do
+    nb_ready_minions=$("${kubectl}" get minions -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
+    if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
+        return 0
+    fi
+
+    timeout=$(($timeout-1))
+    sleep .5
+  done
+
+  return 1
+}
+
 # Instantiate a kubernetes cluster
 function kube-up {
   detect-master
@@ -161,12 +196,15 @@ function kube-up {
 
   local i
   for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
-    if [[ $i -eq 0 ]]; then
+    if [[ $i -eq $NUM_MINIONS ]]; then
         type=master
+        name=$MASTER_NAME
+        public_ip=$MASTER_IP
     else
       type=minion-$(printf "%02d" $i)
+      name=${MINION_NAMES[$i]}
+      public_ip=${MINION_IPS[$i]}
     fi
-    name=kubernetes_$type
     image=$name.img
     config=kubernetes_config_$type
 
@@ -181,6 +219,15 @@ function kube-up {
     virsh create $domain_xml
     rm $domain_xml
   done
+
+  wait-cluster-readiness
+
+  echo "Kubernetes cluster is running. The master is running at:"
+  echo
+  echo "  http://${KUBE_MASTER_IP}:8080"
+  echo
+  echo "You can control the Kubernetes cluster with: 'cluster/kubectl.sh'"
+  echo "You can connect on the master with: 'ssh core@${KUBE_MASTER_IP}'"
 }
 
 # Delete a kubernetes cluster
@@ -230,7 +277,7 @@ function test-setup {
 
 # Execute after running tests to perform any required clean-up
 function test-teardown {
-  echo "TODO"
+  kube-down
 }
 
 # Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
@@ -245,6 +292,11 @@ function setup-monitoring-firewall {
 
 function teardown-monitoring-firewall {
   echo "TODO" 1>&2
+}
+
+# Perform preparations required to run e2e tests
+function prepare-e2e() {
+    echo "libvirt-coreos doesn't need special preparations for e2e tests" 1>&2
 }
 
 function setup-logging-firewall {

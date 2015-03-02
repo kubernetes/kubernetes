@@ -16,9 +16,9 @@ write_files:
 coreos:
   etcd:
     name: ${name}
-    addr: 192.168.10.$(($i+1)):4001
+    addr: ${public_ip}:4001
     bind-addr: 0.0.0.0
-    peer-addr: 192.168.10.$(($i+1)):7001
+    peer-addr: ${public_ip}:7001
     # peers: {etcd_peers}
     discovery: ${discovery}
   units:
@@ -30,7 +30,7 @@ coreos:
         MACAddress=52:54:00:00:00:${i}
 
         [Network]
-        Address=192.168.10.$(($i+1))/24
+        Address=${public_ip}/24
         DNS=192.168.10.254
         Gateway=192.168.10.254
     - name: cbr0.netdev
@@ -46,10 +46,10 @@ coreos:
         Name=cbr0
 
         [Network]
-        Address=10.10.$(($i+1)).1/24
+        Address=${MINION_CONTAINER_SUBNETS[$i]}
 
         [Route]
-        Destination=10.10.0.0/16
+        Destination=${CONTAINER_SUBNET}
     - name: cbr0-interface.network
       command: start
       content: |
@@ -66,7 +66,7 @@ coreos:
         Description=NAT non container traffic
 
         [Service]
-        ExecStart=/usr/sbin/iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE ! -d 10.10.0.0/16
+        ExecStart=/usr/sbin/iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE ! -d ${CONTAINER_SUBNET}
         RemainAfterExit=yes
         Type=oneshot
     - name: etcd.service
