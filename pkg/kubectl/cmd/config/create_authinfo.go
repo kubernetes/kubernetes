@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -38,6 +39,7 @@ type createAuthInfoOptions struct {
 	token             util.StringFlag
 	username          util.StringFlag
 	password          util.StringFlag
+	embedCertData     util.BoolFlag
 }
 
 func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Command {
@@ -78,11 +80,12 @@ func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Com
 	}
 
 	cmd.Flags().Var(&options.authPath, clientcmd.FlagAuthPath, clientcmd.FlagAuthPath+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.clientCertificate, clientcmd.FlagCertFile, clientcmd.FlagCertFile+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, clientcmd.FlagKeyFile+" for the user entry in .kubeconfig")
+	cmd.Flags().Var(&options.clientCertificate, clientcmd.FlagCertFile, "path to "+clientcmd.FlagCertFile+" for the user entry in .kubeconfig")
+	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "path to "+clientcmd.FlagKeyFile+" for the user entry in .kubeconfig")
 	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in .kubeconfig")
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in .kubeconfig")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in .kubeconfig")
+	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in .kubeconfig")
 
 	return cmd
 }
@@ -120,15 +123,27 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	}
 
 	if o.clientCertificate.Provided() {
-		modifiedAuthInfo.ClientCertificate = o.clientCertificate.Value()
-		if len(modifiedAuthInfo.ClientCertificate) > 0 {
-			modifiedAuthInfo.ClientCertificateData = nil
+		certPath := o.clientCertificate.Value()
+		if o.embedCertData.Value() {
+			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
+			modifiedAuthInfo.ClientCertificate = ""
+		} else {
+			modifiedAuthInfo.ClientCertificate = certPath
+			if len(modifiedAuthInfo.ClientCertificate) > 0 {
+				modifiedAuthInfo.ClientCertificateData = nil
+			}
 		}
 	}
 	if o.clientKey.Provided() {
-		modifiedAuthInfo.ClientKey = o.clientKey.Value()
-		if len(modifiedAuthInfo.ClientKey) > 0 {
-			modifiedAuthInfo.ClientKeyData = nil
+		keyPath := o.clientKey.Value()
+		if o.embedCertData.Value() {
+			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
+			modifiedAuthInfo.ClientKey = ""
+		} else {
+			modifiedAuthInfo.ClientKey = keyPath
+			if len(modifiedAuthInfo.ClientKey) > 0 {
+				modifiedAuthInfo.ClientKeyData = nil
+			}
 		}
 	}
 
@@ -184,6 +199,23 @@ func (o createAuthInfoOptions) validate() error {
 	}
 	if len(methods) > 1 {
 		return fmt.Errorf("You cannot specify more than one authentication method at the same time: %v", strings.Join(methods, ", "))
+	}
+	if o.embedCertData.Value() {
+		certPath := o.clientCertificate.Value()
+		keyPath := o.clientKey.Value()
+		if certPath == "" && keyPath == "" {
+			return fmt.Errorf("You must specify a --%s or --%s to embed", clientcmd.FlagCertFile, clientcmd.FlagKeyFile)
+		}
+		if certPath != "" {
+			if _, err := ioutil.ReadFile(certPath); err != nil {
+				return fmt.Errorf("Error reading %s data from %s: %v", clientcmd.FlagCertFile, certPath, err)
+			}
+		}
+		if keyPath != "" {
+			if _, err := ioutil.ReadFile(keyPath); err != nil {
+				return fmt.Errorf("Error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
+			}
+		}
 	}
 
 	return nil

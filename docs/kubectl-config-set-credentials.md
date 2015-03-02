@@ -28,6 +28,12 @@ Sets a user entry in .kubeconfig
 
 kubectl config set-credentials name [--auth-path=authfile] [--client-certificate=certfile] [--client-key=keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
 
+### Options
+
+```
+      --embed-certs=false: embed client cert/key for the user entry in .kubeconfig
+```
+
 ### Options inherrited from parent commands
 
 ```
