@@ -898,12 +898,9 @@ function setup-logging-firewall {
     sleep 10
   done
 
-  local -r region="${ZONE:0:${#ZONE}-2}"
-  local -r es_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" "${INSTANCE_PREFIX}"-elasticsearch-logging | grep IPAddress | awk '{print $2}')
-  local -r kibana_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" "${INSTANCE_PREFIX}"-kibana-logging | grep IPAddress | awk '{print $2}')
   echo
-  echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}http://${es_ip}:9200"
-  echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}http://${kibana_ip}:5601${color_norm}"
+  echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}https://https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/elasticsearch-logging/"
+  echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/kibana-logging/${color_norm} (note the trailing slash)"
   echo
 }
 
