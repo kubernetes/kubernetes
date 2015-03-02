@@ -24,7 +24,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/model"
 )
 
@@ -59,14 +59,19 @@ type Parser struct {
 	currentMetric        *dto.Metric
 	currentLabelPair     *dto.LabelPair
 
-	// The remaining member variables are only used for summaries.
+	// The remaining member variables are only used for summaries/histograms.
+	currentLabels map[string]string // All labels including '__name__' but excluding 'quantile'/'le'
+	// Summary specific.
 	summaries       map[uint64]*dto.Metric // Key is created with LabelsToSignature.
-	currentLabels   map[string]string      // All labels including '__name__' but excluding 'quantile'.
 	currentQuantile float64
+	// Histogram specific.
+	histograms    map[uint64]*dto.Metric // Key is created with LabelsToSignature.
+	currentBucket float64
 	// These tell us if the currently processed line ends on '_count' or
-	// '_sum' respectively and belong to a summary, representing the sample
-	// count and sum of that summary.
-	currentIsSummaryCount, currentIsSummarySum bool
+	// '_sum' respectively and belong to a summary/histogram, representing the sample
+	// count and sum of that summary/histogram.
+	currentIsSummaryCount, currentIsSummarySum     bool
+	currentIsHistogramCount, currentIsHistogramSum bool
 }
 
 // TextToMetricFamilies reads 'in' as the simple and flat text-based exchange
@@ -111,7 +116,11 @@ func (p *Parser) reset(in io.Reader) {
 	if p.summaries == nil || len(p.summaries) > 0 {
 		p.summaries = map[uint64]*dto.Metric{}
 	}
+	if p.histograms == nil || len(p.histograms) > 0 {
+		p.histograms = map[uint64]*dto.Metric{}
+	}
 	p.currentQuantile = math.NaN()
+	p.currentBucket = math.NaN()
 }
 
 // startOfLine represents the state where the next byte read from p.buf is the
@@ -224,13 +233,14 @@ func (p *Parser) readingMetricName() stateFn {
 // p.currentByte) is either the first byte of the label set (i.e. a '{'), or the
 // first byte of the value (otherwise).
 func (p *Parser) readingLabels() stateFn {
-	// Alas, summaries are really special... We have to reset the
-	// currentLabels map and the currentQuantile before starting to
+	// Summaries/histograms are special. We have to reset the
+	// currentLabels map, currentQuantile and currentBucket before starting to
 	// read labels.
-	if p.currentMF.GetType() == dto.MetricType_SUMMARY {
+	if p.currentMF.GetType() == dto.MetricType_SUMMARY || p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
 		p.currentLabels = map[string]string{}
 		p.currentLabels[string(model.MetricNameLabel)] = p.currentMF.GetName()
 		p.currentQuantile = math.NaN()
+		p.currentBucket = math.NaN()
 	}
 	if p.currentByte != '{' {
 		return p.readingValue
@@ -262,10 +272,10 @@ func (p *Parser) startLabelName() stateFn {
 		p.parseError(fmt.Sprintf("label name %q is reserved", model.MetricNameLabel))
 		return nil
 	}
-	// Once more, special summary treatment... Don't add 'quantile'
+	// Special summary/histogram treatment. Don't add 'quantile' and 'le'
 	// labels to 'real' labels.
-	if p.currentMF.GetType() != dto.MetricType_SUMMARY ||
-		p.currentLabelPair.GetName() != "quantile" {
+	if !(p.currentMF.GetType() == dto.MetricType_SUMMARY && p.currentLabelPair.GetName() == model.QuantileLabel) &&
+		!(p.currentMF.GetType() == dto.MetricType_HISTOGRAM && p.currentLabelPair.GetName() == model.BucketLabel) {
 		p.currentMetric.Label = append(p.currentMetric.Label, p.currentLabelPair)
 	}
 	if p.skipBlankTabIfCurrentBlankTab(); p.err != nil {
@@ -292,14 +302,26 @@ func (p *Parser) startLabelValue() stateFn {
 		return nil
 	}
 	p.currentLabelPair.Value = proto.String(p.currentToken.String())
-	// Once more, special treatment of summaries:
+	// Special treatment of summaries:
 	// - Quantile labels are special, will result in dto.Quantile later.
 	// - Other labels have to be added to currentLabels for signature calculation.
 	if p.currentMF.GetType() == dto.MetricType_SUMMARY {
-		if p.currentLabelPair.GetName() == "quantile" {
+		if p.currentLabelPair.GetName() == model.QuantileLabel {
 			if p.currentQuantile, p.err = strconv.ParseFloat(p.currentLabelPair.GetValue(), 64); p.err != nil {
 				// Create a more helpful error message.
-				p.parseError(fmt.Sprintf("expected float as value for quantile label, got %q", p.currentLabelPair.GetValue()))
+				p.parseError(fmt.Sprintf("expected float as value for 'quantile' label, got %q", p.currentLabelPair.GetValue()))
+				return nil
+			}
+		} else {
+			p.currentLabels[p.currentLabelPair.GetName()] = p.currentLabelPair.GetValue()
+		}
+	}
+	// Similar special treatment of histograms.
+	if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+		if p.currentLabelPair.GetName() == model.BucketLabel {
+			if p.currentBucket, p.err = strconv.ParseFloat(p.currentLabelPair.GetValue(), 64); p.err != nil {
+				// Create a more helpful error message.
+				p.parseError(fmt.Sprintf("expected float as value for 'le' label, got %q", p.currentLabelPair.GetValue()))
 				return nil
 			}
 		} else {
@@ -328,7 +350,7 @@ func (p *Parser) startLabelValue() stateFn {
 // p.currentByte) is the first byte of the sample value (i.e. a float).
 func (p *Parser) readingValue() stateFn {
 	// When we are here, we have read all the labels, so for the
-	// infamous special case of a summary, we can finally find out
+	// special case of a summary/histogram, we can finally find out
 	// if the metric already exists.
 	if p.currentMF.GetType() == dto.MetricType_SUMMARY {
 		signature := model.LabelsToSignature(p.currentLabels)
@@ -336,6 +358,14 @@ func (p *Parser) readingValue() stateFn {
 			p.currentMetric = summary
 		} else {
 			p.summaries[signature] = p.currentMetric
+			p.currentMF.Metric = append(p.currentMF.Metric, p.currentMetric)
+		}
+	} else if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+		signature := model.LabelsToSignature(p.currentLabels)
+		if histogram := p.histograms[signature]; histogram != nil {
+			p.currentMetric = histogram
+		} else {
+			p.histograms[signature] = p.currentMetric
 			p.currentMF.Metric = append(p.currentMF.Metric, p.currentMetric)
 		}
 	} else {
@@ -373,6 +403,25 @@ func (p *Parser) readingValue() stateFn {
 				&dto.Quantile{
 					Quantile: proto.Float64(p.currentQuantile),
 					Value:    proto.Float64(value),
+				},
+			)
+		}
+	case dto.MetricType_HISTOGRAM:
+		// *sigh*
+		if p.currentMetric.Histogram == nil {
+			p.currentMetric.Histogram = &dto.Histogram{}
+		}
+		switch {
+		case p.currentIsHistogramCount:
+			p.currentMetric.Histogram.SampleCount = proto.Uint64(uint64(value))
+		case p.currentIsHistogramSum:
+			p.currentMetric.Histogram.SampleSum = proto.Float64(value)
+		case !math.IsNaN(p.currentBucket):
+			p.currentMetric.Histogram.Bucket = append(
+				p.currentMetric.Histogram.Bucket,
+				&dto.Bucket{
+					UpperBound:      proto.Float64(p.currentBucket),
+					CumulativeCount: proto.Uint64(uint64(value)),
 				},
 			)
 		}
@@ -598,11 +647,13 @@ func (p *Parser) readTokenAsLabelValue() {
 func (p *Parser) setOrCreateCurrentMF() {
 	p.currentIsSummaryCount = false
 	p.currentIsSummarySum = false
+	p.currentIsHistogramCount = false
+	p.currentIsHistogramSum = false
 	name := p.currentToken.String()
 	if p.currentMF = p.metricFamiliesByName[name]; p.currentMF != nil {
 		return
 	}
-	// Try out if this is a _sum or _count for a summary.
+	// Try out if this is a _sum or _count for a summary/histogram.
 	summaryName := summaryMetricName(name)
 	if p.currentMF = p.metricFamiliesByName[summaryName]; p.currentMF != nil {
 		if p.currentMF.GetType() == dto.MetricType_SUMMARY {
@@ -611,6 +662,18 @@ func (p *Parser) setOrCreateCurrentMF() {
 			}
 			if isSum(name) {
 				p.currentIsSummarySum = true
+			}
+			return
+		}
+	}
+	histogramName := histogramMetricName(name)
+	if p.currentMF = p.metricFamiliesByName[histogramName]; p.currentMF != nil {
+		if p.currentMF.GetType() == dto.MetricType_HISTOGRAM {
+			if isCount(name) {
+				p.currentIsHistogramCount = true
+			}
+			if isSum(name) {
+				p.currentIsHistogramSum = true
 			}
 			return
 		}
@@ -647,12 +710,29 @@ func isSum(name string) bool {
 	return len(name) > 4 && name[len(name)-4:] == "_sum"
 }
 
+func isBucket(name string) bool {
+	return len(name) > 7 && name[len(name)-7:] == "_bucket"
+}
+
 func summaryMetricName(name string) string {
 	switch {
 	case isCount(name):
 		return name[:len(name)-6]
 	case isSum(name):
 		return name[:len(name)-4]
+	default:
+		return name
+	}
+}
+
+func histogramMetricName(name string) string {
+	switch {
+	case isCount(name):
+		return name[:len(name)-6]
+	case isSum(name):
+		return name[:len(name)-4]
+	case isBucket(name):
+		return name[:len(name)-7]
 	default:
 		return name
 	}

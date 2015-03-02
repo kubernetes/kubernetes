@@ -22,7 +22,7 @@
 //    	"fmt"
 //    	"log"
 //
-//    	"github.com/prometheus/client_golang/procfs"
+//    	"github.com/prometheus/procfs"
 //    )
 //
 //    func main() {
@@ -31,7 +31,7 @@
 //    		log.Fatalf("could not get process: %s", err)
 //    	}
 //
-//    	stat, err := p.Stat()
+//    	stat, err := p.NewStat()
 //    	if err != nil {
 //    		log.Fatalf("could not get process stat: %s", err)
 //    	}

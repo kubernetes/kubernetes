@@ -6,6 +6,11 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "bitbucket.org/ww/goautoneg",
+			"Comment": "null-5",
+			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
+		},
+		{
 			"ImportPath": "code.google.com/p/gcfg",
 			"Rev": "c2d3050044d05357eaf6c3547249ba57c5e235cb"
 		},
@@ -43,6 +48,10 @@
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
+		},
+		{
+			"ImportPath": "github.com/beorn7/perks/quantile",
+			"Rev": "b965b613227fddccbfffe13eae360ed3fa822f8d"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
@@ -195,38 +204,28 @@
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
 		},
 		{
-			"ImportPath": "github.com/prometheus/client_golang/_vendor/goautoneg",
-			"Comment": "0.1.0-11-gc70db11",
-			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
-		},
-		{
-			"ImportPath": "github.com/prometheus/client_golang/_vendor/perks/quantile",
-			"Comment": "0.1.0-11-gc70db11",
-			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
-		},
-		{
 			"ImportPath": "github.com/prometheus/client_golang/model",
-			"Comment": "0.1.0-11-gc70db11",
-			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+			"Comment": "0.2.0-5-gde5f7a2",
+			"Rev": "de5f7a2db9d883392ce3ad667087280fe1ff9cea"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Comment": "0.1.0-11-gc70db11",
-			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+			"Comment": "0.2.0-5-gde5f7a2",
+			"Rev": "de5f7a2db9d883392ce3ad667087280fe1ff9cea"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/text",
-			"Comment": "0.1.0-11-gc70db11",
-			"Rev": "c70db11f1ee77a34066aa41345dca4b105c2ed06"
+			"Comment": "0.2.0-5-gde5f7a2",
+			"Rev": "de5f7a2db9d883392ce3ad667087280fe1ff9cea"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_model/go",
-			"Comment": "model-0.0.2-10-gbc9454c",
-			"Rev": "bc9454ca562dc050e060ea61a1c0e562a189850f"
+			"Comment": "model-0.0.2-12-gfa8ad6f",
+			"Rev": "fa8ad6fec33561be4280a8f0514318c79d7f6cb6"
 		},
 		{
 			"ImportPath": "github.com/prometheus/procfs",
-			"Rev": "92faa308558161acab0ada1db048e9996ecec160"
+			"Rev": "6c34ef819e19b4e16f410100ace4aa006f0e3bf8"
 		},
 		{
 			"ImportPath": "github.com/racker/perigee",

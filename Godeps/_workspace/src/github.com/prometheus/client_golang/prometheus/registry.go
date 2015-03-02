@@ -33,11 +33,11 @@ import (
 	"strings"
 	"sync"
 
+	"bitbucket.org/ww/goautoneg"
+	"github.com/golang/protobuf/proto"
+
 	dto "github.com/prometheus/client_model/go"
 
-	"code.google.com/p/goprotobuf/proto"
-
-	"github.com/prometheus/client_golang/_vendor/goautoneg"
 	"github.com/prometheus/client_golang/model"
 	"github.com/prometheus/client_golang/text"
 )
@@ -171,7 +171,7 @@ func SetMetricFamilyInjectionHook(hook func() []*dto.MetricFamily) {
 }
 
 // PanicOnCollectError sets the behavior whether a panic is caused upon an error
-// while metrics are collected and served to the http endpoint. By default, an
+// while metrics are collected and served to the HTTP endpoint. By default, an
 // internal server error (status code 500) is served with an error message.
 func PanicOnCollectError(b bool) {
 	defRegistry.panicOnCollectError = b
@@ -464,6 +464,8 @@ func (r *registry) writePB(w io.Writer, writeEncoded encoder) (int, error) {
 			metricFamily.Type = dto.MetricType_SUMMARY.Enum()
 		case dtoMetric.Untyped != nil:
 			metricFamily.Type = dto.MetricType_UNTYPED.Enum()
+		case dtoMetric.Histogram != nil:
+			metricFamily.Type = dto.MetricType_HISTOGRAM.Enum()
 		default:
 			return 0, fmt.Errorf("empty metric collected: %s", dtoMetric)
 		}

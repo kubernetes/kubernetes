@@ -24,26 +24,20 @@ func processCollectSupported() bool {
 	return false
 }
 
+// TODO(ts): Bring back error reporting by reverting 7faf9e7 as soon as the
+// client allows users to configure the error behavior.
 func (c *processCollector) processCollect(ch chan<- Metric) {
 	pid, err := c.pidFn()
 	if err != nil {
-		c.reportCollectErrors(ch, err)
 		return
 	}
 
 	p, err := procfs.NewProc(pid)
 	if err != nil {
-		c.reportCollectErrors(ch, err)
 		return
 	}
 
-	if stat, err := p.NewStat(); err != nil {
-		// Report collect errors for metrics depending on stat.
-		ch <- NewInvalidMetric(c.vsize.Desc(), err)
-		ch <- NewInvalidMetric(c.rss.Desc(), err)
-		ch <- NewInvalidMetric(c.startTime.Desc(), err)
-		ch <- NewInvalidMetric(c.cpuTotal.Desc(), err)
-	} else {
+	if stat, err := p.NewStat(); err == nil {
 		c.cpuTotal.Set(stat.CPUTime())
 		ch <- c.cpuTotal
 		c.vsize.Set(float64(stat.VirtualMemory()))
@@ -51,34 +45,19 @@ func (c *processCollector) processCollect(ch chan<- Metric) {
 		c.rss.Set(float64(stat.ResidentMemory()))
 		ch <- c.rss
 
-		if startTime, err := stat.StartTime(); err != nil {
-			ch <- NewInvalidMetric(c.startTime.Desc(), err)
-		} else {
+		if startTime, err := stat.StartTime(); err == nil {
 			c.startTime.Set(startTime)
 			ch <- c.startTime
 		}
 	}
 
-	if fds, err := p.FileDescriptorsLen(); err != nil {
-		ch <- NewInvalidMetric(c.openFDs.Desc(), err)
-	} else {
+	if fds, err := p.FileDescriptorsLen(); err == nil {
 		c.openFDs.Set(float64(fds))
 		ch <- c.openFDs
 	}
 
-	if limits, err := p.NewLimits(); err != nil {
-		ch <- NewInvalidMetric(c.maxFDs.Desc(), err)
-	} else {
+	if limits, err := p.NewLimits(); err == nil {
 		c.maxFDs.Set(float64(limits.OpenFiles))
 		ch <- c.maxFDs
 	}
-}
-
-func (c *processCollector) reportCollectErrors(ch chan<- Metric, err error) {
-	ch <- NewInvalidMetric(c.cpuTotal.Desc(), err)
-	ch <- NewInvalidMetric(c.openFDs.Desc(), err)
-	ch <- NewInvalidMetric(c.maxFDs.Desc(), err)
-	ch <- NewInvalidMetric(c.vsize.Desc(), err)
-	ch <- NewInvalidMetric(c.rss.Desc(), err)
-	ch <- NewInvalidMetric(c.startTime.Desc(), err)
 }

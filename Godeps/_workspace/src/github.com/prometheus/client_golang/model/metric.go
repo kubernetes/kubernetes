@@ -22,6 +22,8 @@ import (
 	"strings"
 )
 
+var separator = []byte{0}
+
 // A Metric is similar to a LabelSet, but the key difference is that a Metric is
 // a singleton and refers to one and only one stream of samples.
 type Metric map[LabelName]LabelValue
@@ -64,23 +66,34 @@ func (m Metric) String() string {
 
 // Fingerprint returns a Metric's Fingerprint.
 func (m Metric) Fingerprint() Fingerprint {
-	labelLength := len(m)
-	labelNames := make([]string, 0, labelLength)
+	labelNames := make([]string, 0, len(m))
+	maxLength := 0
 
-	for labelName := range m {
+	for labelName, labelValue := range m {
 		labelNames = append(labelNames, string(labelName))
+		if len(labelName) > maxLength {
+			maxLength = len(labelName)
+		}
+		if len(labelValue) > maxLength {
+			maxLength = len(labelValue)
+		}
 	}
 
 	sort.Strings(labelNames)
 
 	summer := fnv.New64a()
+	buf := make([]byte, maxLength)
 
 	for _, labelName := range labelNames {
 		labelValue := m[LabelName(labelName)]
 
-		summer.Write([]byte(labelName))
-		summer.Write([]byte{0})
-		summer.Write([]byte(labelValue))
+		copy(buf, labelName)
+		summer.Write(buf[:len(labelName)])
+
+		summer.Write(separator)
+
+		copy(buf, labelValue)
+		summer.Write(buf[:len(labelValue)])
 	}
 
 	return Fingerprint(binary.LittleEndian.Uint64(summer.Sum(nil)))

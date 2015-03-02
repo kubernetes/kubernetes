@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"io"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/matttproud/golang_protobuf_extensions/ext"
 
 	dto "github.com/prometheus/client_model/go"

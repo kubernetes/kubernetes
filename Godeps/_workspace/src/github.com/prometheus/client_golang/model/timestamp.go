@@ -14,18 +14,14 @@
 package model
 
 import (
+	"math"
 	"strconv"
 
 	native_time "time"
 )
 
-// TODO(julius): Should this use milliseconds/nanoseconds instead? This is
-//               mostly hidden from the user of these types when using the
-//               methods below, so it will be easy to change this later
-//               without requiring significant user code changes.
-
-// Timestamp is the number of seconds since the epoch (1970-01-01 00:00 UTC)
-// without leap seconds.
+// Timestamp is the number of milliseconds since the epoch
+// (1970-01-01 00:00 UTC) excluding leap seconds.
 type Timestamp int64
 
 const (
@@ -36,6 +32,13 @@ const (
 	second = int64(native_time.Second / MinimumTick)
 	// The number of nanoseconds per minimum tick.
 	nanosPerTick = int64(MinimumTick / native_time.Nanosecond)
+
+	// Earliest is the earliest timestamp representable. Handy for
+	// initializing a high watermark.
+	Earliest = Timestamp(math.MinInt64)
+	// Latest is the latest timestamp representable. Handy for initializing
+	// a low watermark.
+	Latest = Timestamp(math.MaxInt64)
 )
 
 // Equal reports whether two timestamps represent the same instant.
