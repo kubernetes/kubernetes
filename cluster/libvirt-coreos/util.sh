@@ -16,7 +16,7 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
-readonly KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source $ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}
 
@@ -277,7 +277,7 @@ function test-setup {
 
 # Execute after running tests to perform any required clean-up
 function test-teardown {
-  echo "TODO"
+  kube-down
 }
 
 # Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
@@ -292,6 +292,11 @@ function setup-monitoring-firewall {
 
 function teardown-monitoring-firewall {
   echo "TODO" 1>&2
+}
+
+# Perform preparations required to run e2e tests
+function prepare-e2e() {
+    echo "libvirt-coreos doesn't need special preparations for e2e tests" 1>&2
 }
 
 function setup-logging-firewall {
