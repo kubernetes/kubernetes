@@ -8,6 +8,58 @@ You will setup an [Apache ZooKeeper](http://zookeeper.apache.org/)
 service, a Storm master service (a.k.a. Nimbus server), and a set of
 Storm workers (a.k.a. supervisors).
 
+## Step Zero: Prerequisites
+
+This example assumes you have a Kubernetes cluster installed and
+running, and that you have installed the ```kubectl``` command line
+tool somewhere in your path. Please see the [getting
+started](../../docs/getting-started-guides) for installation
+instructions for your platform.
+
+## Step One: Start your ZooKeeper service
+
+ZooKeeper is a distributed coordination service that Storm uses as a
+bootstrap and for state storage.
+
+Use the `examples/storm/zookeeper.json` file to create a pod running
+the ZooKeeper service.
+
+```shell
+$ kubectl create -f examples/storm/zookeeper.json
+```
+
+Then, use the `examples/storm/zookeeper-service.json` file to create a
+logical service endpoint that Storm can use to access the ZooKeeper
+pod.
+
+```shell
+$ kubectl create -f examples/storm/zookeeper-service.json
+```
+
+You should make sure the ZooKeeper pod is Running and accessible
+before proceeding.
+
+### Check to see if ZooKeeper is running
+
+```shell
+$ kubectl get pods
+POD                 IP                  CONTAINER(S)        IMAGE(S)             HOST                          LABELS                      STATUS
+zookeeper           192.168.86.4        zookeeper           mattf/zookeeper      172.18.145.8/172.18.145.8     name=zookeeper              Running
+```
+
+### Check to see if ZooKeeper is accessible
+
+```shell
+$ kubectl get services
+NAME                LABELS                                    SELECTOR            IP                  PORT
+kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
+kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
+zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
+
+$ echo ruok | nc 10.254.139.141 2181; echo
+imok
+```
+
 ## tl;dr
 
 ```kubectl create -f zookeeper.json```
