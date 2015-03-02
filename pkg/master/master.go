@@ -206,34 +206,14 @@ func setDefaults(c *Config) {
 		c.CacheTimeout = 5 * time.Second
 	}
 	for c.PublicAddress == nil {
-		// Find and use the first non-loopback address.
-		// TODO: potentially it'd be useful to skip the docker interface if it
-		// somehow is first in the list.
-		addrs, err := net.InterfaceAddrs()
+		hostIP, err := util.ChooseHostInterface()
 		if err != nil {
-			glog.Fatalf("Unable to get network interfaces: error='%v'", err)
-		}
-		found := false
-		for i := range addrs {
-			ip, _, err := net.ParseCIDR(addrs[i].String())
-			if err != nil {
-				glog.Errorf("Error parsing '%v': %v", addrs[i], err)
-				continue
-			}
-			if ip.IsLoopback() {
-				glog.V(5).Infof("'%v' (%v) is a loopback address, ignoring.", ip, addrs[i])
-				continue
-			}
-			found = true
-			c.PublicAddress = ip
-			glog.V(2).Infof("Will report %v as public IP address.", ip)
-			break
-		}
-		if !found {
-			glog.Errorf("Unable to find suitable network address in list: '%v'\n"+
-				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", addrs)
+			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
+				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", err)
 			time.Sleep(5 * time.Second)
 		}
+		c.PublicAddress = hostIP
+		glog.Infof("Will report %v as public IP address.", c.PublicAddress)
 	}
 	if c.RequestContextMapper == nil {
 		c.RequestContextMapper = api.NewRequestContextMapper()
