@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/racker/perigee"
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
@@ -228,11 +227,10 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", rootURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("POST", rootURL(c), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{202},
 	})
 
 	return res
@@ -245,10 +243,9 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 func Get(c *gophercloud.ServiceClient, id int) GetResult {
 	var res GetResult
 
-	_, res.Err = perigee.Request("GET", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", resourceURL(c, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -272,9 +269,8 @@ func BulkDelete(c *gophercloud.ServiceClient, ids []int) DeleteResult {
 	url := rootURL(c)
 	url += gophercloud.IDSliceToQueryString("id", ids)
 
-	_, res.Err = perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res
@@ -284,9 +280,8 @@ func BulkDelete(c *gophercloud.ServiceClient, ids []int) DeleteResult {
 func Delete(c *gophercloud.ServiceClient, id int) DeleteResult {
 	var res DeleteResult
 
-	_, res.Err = perigee.Request("DELETE", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", resourceURL(c, id), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res
@@ -368,10 +363,9 @@ func Update(c *gophercloud.ServiceClient, id int, opts UpdateOptsBuilder) Update
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("PUT", resourceURL(c, id), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -400,10 +394,9 @@ func ListAlgorithms(client *gophercloud.ServiceClient) pagination.Pager {
 func IsLoggingEnabled(client *gophercloud.ServiceClient, id int) (bool, error) {
 	var body interface{}
 
-	_, err := perigee.Request("GET", loggingURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &body,
-		OkCodes:     []int{200},
+	_, err := client.Request("GET", loggingURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &body,
+		OkCodes:      []int{200},
 	})
 	if err != nil {
 		return false, err
@@ -430,10 +423,9 @@ func EnableLogging(client *gophercloud.ServiceClient, id int) gophercloud.ErrRes
 	reqBody := toConnLoggingMap(true)
 	var res gophercloud.ErrResult
 
-	_, res.Err = perigee.Request("PUT", loggingURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("PUT", loggingURL(client, id), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -444,10 +436,9 @@ func DisableLogging(client *gophercloud.ServiceClient, id int) gophercloud.ErrRe
 	reqBody := toConnLoggingMap(false)
 	var res gophercloud.ErrResult
 
-	_, res.Err = perigee.Request("PUT", loggingURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("PUT", loggingURL(client, id), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -457,10 +448,9 @@ func DisableLogging(client *gophercloud.ServiceClient, id int) gophercloud.ErrRe
 func GetErrorPage(client *gophercloud.ServiceClient, id int) ErrorPageResult {
 	var res ErrorPageResult
 
-	_, res.Err = perigee.Request("GET", errorPageURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("GET", errorPageURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -474,11 +464,10 @@ func SetErrorPage(client *gophercloud.ServiceClient, id int, html string) ErrorP
 	type stringMap map[string]string
 	reqBody := map[string]stringMap{"errorpage": stringMap{"content": html}}
 
-	_, res.Err = perigee.Request("PUT", errorPageURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		ReqBody:     &reqBody,
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("PUT", errorPageURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		JSONBody:     &reqBody,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -488,9 +477,8 @@ func SetErrorPage(client *gophercloud.ServiceClient, id int, html string) ErrorP
 func DeleteErrorPage(client *gophercloud.ServiceClient, id int) gophercloud.ErrResult {
 	var res gophercloud.ErrResult
 
-	_, res.Err = perigee.Request("DELETE", errorPageURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("DELETE", errorPageURL(client, id), gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 
 	return res
@@ -500,10 +488,9 @@ func DeleteErrorPage(client *gophercloud.ServiceClient, id int) gophercloud.ErrR
 func GetStats(client *gophercloud.ServiceClient, id int) StatsResult {
 	var res StatsResult
 
-	_, res.Err = perigee.Request("GET", statsURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("GET", statsURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -520,10 +507,9 @@ func GetStats(client *gophercloud.ServiceClient, id int) StatsResult {
 func IsContentCached(client *gophercloud.ServiceClient, id int) (bool, error) {
 	var body interface{}
 
-	_, err := perigee.Request("GET", cacheURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &body,
-		OkCodes:     []int{200},
+	_, err := client.Request("GET", cacheURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &body,
+		OkCodes:      []int{200},
 	})
 	if err != nil {
 		return false, err
@@ -550,10 +536,9 @@ func EnableCaching(client *gophercloud.ServiceClient, id int) gophercloud.ErrRes
 	reqBody := toCachingMap(true)
 	var res gophercloud.ErrResult
 
-	_, res.Err = perigee.Request("PUT", cacheURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("PUT", cacheURL(client, id), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -564,10 +549,9 @@ func DisableCaching(client *gophercloud.ServiceClient, id int) gophercloud.ErrRe
 	reqBody := toCachingMap(false)
 	var res gophercloud.ErrResult
 
-	_, res.Err = perigee.Request("PUT", cacheURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("PUT", cacheURL(client, id), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res

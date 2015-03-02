@@ -3,8 +3,6 @@ package defsecrules
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -75,11 +73,10 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return result
 	}
 
-	_, result.Err = perigee.Request("POST", rootURL(client), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     &reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("POST", rootURL(client), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     &reqBody,
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -89,10 +86,9 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var result GetResult
 
-	_, result.Err = perigee.Request("GET", resourceURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("GET", resourceURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -102,9 +98,8 @@ func Get(client *gophercloud.ServiceClient, id string) GetResult {
 func Delete(client *gophercloud.ServiceClient, id string) gophercloud.ErrResult {
 	var result gophercloud.ErrResult
 
-	_, result.Err = perigee.Request("DELETE", resourceURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, result.Err = client.Request("DELETE", resourceURL(client, id), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 
 	return result

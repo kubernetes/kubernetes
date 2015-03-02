@@ -3,8 +3,6 @@ package networks
 import (
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // AdminState gives users a solid type to work with for create and update
@@ -81,10 +79,9 @@ func List(c *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pager {
 // Get retrieves a specific network based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", getURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", getURL(c, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -138,11 +135,10 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 	}
 
 	// Send request to API
-	_, res.Err = perigee.Request("POST", createURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{201},
+	_, res.Err = c.Request("POST", createURL(c), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{201},
 	})
 	return res
 }
@@ -188,11 +184,10 @@ func Update(c *gophercloud.ServiceClient, networkID string, opts UpdateOptsBuild
 	}
 
 	// Send request to API
-	_, res.Err = perigee.Request("PUT", updateURL(c, networkID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200, 201},
+	_, res.Err = c.Request("PUT", updateURL(c, networkID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200, 201},
 	})
 
 	return res
@@ -201,9 +196,8 @@ func Update(c *gophercloud.ServiceClient, networkID string, opts UpdateOptsBuild
 // Delete accepts a unique ID and deletes the network associated with it.
 func Delete(c *gophercloud.ServiceClient, networkID string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(c, networkID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = c.Request("DELETE", deleteURL(c, networkID), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 	return res
 }

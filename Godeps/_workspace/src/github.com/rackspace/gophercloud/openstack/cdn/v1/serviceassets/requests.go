@@ -3,7 +3,6 @@ package serviceassets
 import (
 	"strings"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 )
 
@@ -44,9 +43,8 @@ func Delete(c *gophercloud.ServiceClient, idOrURL string, opts DeleteOptsBuilder
 	}
 
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 	return res
 }

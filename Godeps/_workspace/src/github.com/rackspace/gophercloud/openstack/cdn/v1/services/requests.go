@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -178,12 +177,11 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 	}
 
 	// Send request to API
-	resp, err := perigee.Request("POST", createURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	resp, err := c.Request("POST", createURL(c), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -201,10 +199,9 @@ func Get(c *gophercloud.ServiceClient, idOrURL string) GetResult {
 	}
 
 	var res GetResult
-	_, res.Err = perigee.Request("GET", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", url, gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -359,13 +356,12 @@ func Update(c *gophercloud.ServiceClient, idOrURL string, opts UpdateOpts) Updat
 		reqBody[i] = patch.ToCDNServiceUpdateMap()
 	}
 
-	resp, err := perigee.Request("PATCH", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	resp, err := c.Request("PATCH", url, gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 	var result UpdateResult
-	result.Header = resp.HttpResponse.Header
+	result.Header = resp.Header
 	result.Err = err
 	return result
 }
@@ -383,9 +379,8 @@ func Delete(c *gophercloud.ServiceClient, idOrURL string) DeleteResult {
 	}
 
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 	return res
 }

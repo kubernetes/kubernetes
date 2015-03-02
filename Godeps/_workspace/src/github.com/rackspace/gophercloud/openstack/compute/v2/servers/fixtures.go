@@ -285,6 +285,11 @@ var (
 		Created:  "2014-09-25T13:10:02Z",
 		TenantID: "fcad67a6189847c4aecfa3c81a05783b",
 		Metadata: map[string]interface{}{},
+		SecurityGroups: []map[string]interface{}{
+			map[string]interface{}{
+				"name": "default",
+			},
+		},
 	}
 
 	// ServerDerp is a Server struct that should correspond to the second server in ServerListBody.
@@ -336,6 +341,11 @@ var (
 		Created:  "2014-09-25T13:04:41Z",
 		TenantID: "fcad67a6189847c4aecfa3c81a05783b",
 		Metadata: map[string]interface{}{},
+		SecurityGroups: []map[string]interface{}{
+			map[string]interface{}{
+				"name": "default",
+			},
+		},
 	}
 )
 

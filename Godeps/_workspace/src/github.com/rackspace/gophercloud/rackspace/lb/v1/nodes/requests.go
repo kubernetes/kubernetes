@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -113,18 +112,17 @@ func Create(client *gophercloud.ServiceClient, loadBalancerID int, opts CreateOp
 		return res
 	}
 
-	resp, err := perigee.Request("POST", rootURL(client, loadBalancerID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{202},
+	resp, err := client.Request("POST", rootURL(client, loadBalancerID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{202},
 	})
 	if err != nil {
 		res.Err = err
 		return res
 	}
 
-	pr, err := pagination.PageResultFrom(resp.HttpResponse)
+	pr, err := pagination.PageResultFrom(resp)
 	if err != nil {
 		res.Err = err
 		return res
@@ -147,9 +145,8 @@ func BulkDelete(c *gophercloud.ServiceClient, loadBalancerID int, nodeIDs []int)
 	url := rootURL(c, loadBalancerID)
 	url += gophercloud.IDSliceToQueryString("id", nodeIDs)
 
-	_, res.Err = perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res
@@ -159,10 +156,9 @@ func BulkDelete(c *gophercloud.ServiceClient, loadBalancerID int, nodeIDs []int)
 func Get(c *gophercloud.ServiceClient, lbID, nodeID int) GetResult {
 	var res GetResult
 
-	_, res.Err = perigee.Request("GET", resourceURL(c, lbID, nodeID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", resourceURL(c, lbID, nodeID), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -217,10 +213,9 @@ func Update(c *gophercloud.ServiceClient, lbID, nodeID int, opts UpdateOptsBuild
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", resourceURL(c, lbID, nodeID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("PUT", resourceURL(c, lbID, nodeID), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -229,9 +224,8 @@ func Update(c *gophercloud.ServiceClient, lbID, nodeID int, opts UpdateOptsBuild
 // Delete is the operation responsible for permanently deleting a node.
 func Delete(c *gophercloud.ServiceClient, lbID, nodeID int) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", resourceURL(c, lbID, nodeID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", resourceURL(c, lbID, nodeID), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 	return res
 }

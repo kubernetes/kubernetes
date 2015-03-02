@@ -45,8 +45,16 @@ func MockGetResponse(t *testing.T) {
 {
     "volume": {
         "display_name": "vol-001",
-        "id": "d32019d3-bc6e-4319-9c1d-6722fc136a22"
-    }
+        "id": "d32019d3-bc6e-4319-9c1d-6722fc136a22",
+ 	"attachments": [
+	  {
+            "device": "/dev/vde",
+            "server_id": "a740d24b-dc5b-4d59-ac75-53971c2920ba",
+            "id": "d6da11e5-2ed3-413e-88d8-b772ba62193d",
+            "volume_id": "d6da11e5-2ed3-413e-88d8-b772ba62193d"
+          }
+        ]
+   }
 }
       `)
 	})

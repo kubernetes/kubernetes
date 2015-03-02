@@ -1,7 +1,6 @@
 package extensions
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -9,10 +8,9 @@ import (
 // Get retrieves information for a specific extension using its alias.
 func Get(c *gophercloud.ServiceClient, alias string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", ExtensionURL(c, alias), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", ExtensionURL(c, alias), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }

@@ -3,8 +3,6 @@ package sessions
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 )
 
@@ -44,11 +42,10 @@ func Enable(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Enab
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("PUT", rootURL(c, lbID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{202},
 	})
 
 	return res
@@ -59,10 +56,9 @@ func Enable(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Enab
 func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 	var res GetResult
 
-	_, res.Err = perigee.Request("GET", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", rootURL(c, lbID), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -73,9 +69,8 @@ func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 func Disable(c *gophercloud.ServiceClient, lbID int) DisableResult {
 	var res DisableResult
 
-	_, res.Err = perigee.Request("DELETE", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", rootURL(c, lbID), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res

@@ -42,7 +42,5 @@ type AuthOptions struct {
 	// re-authenticate automatically if/when your token expires.  If you set it to
 	// false, it will not cache these settings, but re-authentication will not be
 	// possible.  This setting defaults to false.
-	//
-	// This setting is speculative and is currently not respected!
 	AllowReauth bool
 }

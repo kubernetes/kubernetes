@@ -1,7 +1,6 @@
 package pools
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -100,11 +99,10 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 	}}
 
 	var res CreateResult
-	_, res.Err = perigee.Request("POST", rootURL(c), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{201},
+	_, res.Err = c.Request("POST", rootURL(c), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{201},
 	})
 	return res
 }
@@ -112,10 +110,9 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 // Get retrieves a particular pool based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", resourceURL(c, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -148,11 +145,10 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 
 	// Send request to API
 	var res UpdateResult
-	_, res.Err = perigee.Request("PUT", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("PUT", resourceURL(c, id), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -160,9 +156,8 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 // Delete will permanently delete a particular pool based on its unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", resourceURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = c.Request("DELETE", resourceURL(c, id), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 	return res
 }
@@ -183,11 +178,10 @@ func AssociateMonitor(c *gophercloud.ServiceClient, poolID, monitorID string) As
 	reqBody := request{hm{ID: monitorID}}
 
 	var res AssociateResult
-	_, res.Err = perigee.Request("POST", associateURL(c, poolID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{201},
+	_, res.Err = c.Request("POST", associateURL(c, poolID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{201},
 	})
 	return res
 }
@@ -197,9 +191,8 @@ func AssociateMonitor(c *gophercloud.ServiceClient, poolID, monitorID string) As
 // check for the health of the members of the pool.
 func DisassociateMonitor(c *gophercloud.ServiceClient, poolID, monitorID string) AssociateResult {
 	var res AssociateResult
-	_, res.Err = perigee.Request("DELETE", disassociateURL(c, poolID, monitorID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = c.Request("DELETE", disassociateURL(c, poolID, monitorID), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 	return res
 }

@@ -7,3 +7,9 @@ type SinglePageBase PageResult
 func (current SinglePageBase) NextPageURL() (string, error) {
 	return "", nil
 }
+
+// GetBody returns the single page's body. This method is needed to satisfy the
+// Page interface.
+func (current SinglePageBase) GetBody() interface{} {
+	return current.Body
+}

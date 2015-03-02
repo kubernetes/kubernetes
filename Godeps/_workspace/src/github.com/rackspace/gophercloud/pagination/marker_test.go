@@ -111,3 +111,16 @@ func TestEnumerateMarker(t *testing.T) {
 	testhelper.AssertNoErr(t, err)
 	testhelper.AssertEquals(t, callCount, 3)
 }
+
+func TestAllPagesMarker(t *testing.T) {
+	pager := createMarkerPaged(t)
+	defer testhelper.TeardownHTTP()
+
+	page, err := pager.AllPages()
+	testhelper.AssertNoErr(t, err)
+
+	expected := []string{"aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh", "iii"}
+	actual, err := ExtractMarkerStrings(page)
+	testhelper.AssertNoErr(t, err)
+	testhelper.CheckDeepEquals(t, expected, actual)
+}

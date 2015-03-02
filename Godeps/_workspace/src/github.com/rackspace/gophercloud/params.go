@@ -144,6 +144,17 @@ func BuildQueryString(opts interface{}) (*url.URL, error) {
 						params.Add(tags[0], strconv.FormatInt(v.Int(), 10))
 					case reflect.Bool:
 						params.Add(tags[0], strconv.FormatBool(v.Bool()))
+					case reflect.Slice:
+						switch v.Type().Elem() {
+						case reflect.TypeOf(0):
+							for i := 0; i < v.Len(); i++ {
+								params.Add(tags[0], strconv.FormatInt(v.Index(i).Int(), 10))
+							}
+						default:
+							for i := 0; i < v.Len(); i++ {
+								params.Add(tags[0], v.Index(i).String())
+							}
+						}
 					}
 				} else {
 					// Otherwise, the field is not set.

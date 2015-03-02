@@ -3,8 +3,6 @@ package secgroups
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -80,11 +78,10 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return result
 	}
 
-	_, result.Err = perigee.Request("POST", rootURL(client), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     &reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("POST", rootURL(client), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     &reqBody,
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -126,11 +123,10 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 		return result
 	}
 
-	_, result.Err = perigee.Request("PUT", resourceURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     &reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("PUT", resourceURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     &reqBody,
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -140,10 +136,9 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var result GetResult
 
-	_, result.Err = perigee.Request("GET", resourceURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("GET", resourceURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -153,9 +148,8 @@ func Get(client *gophercloud.ServiceClient, id string) GetResult {
 func Delete(client *gophercloud.ServiceClient, id string) gophercloud.ErrResult {
 	var result gophercloud.ErrResult
 
-	_, result.Err = perigee.Request("DELETE", resourceURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, result.Err = client.Request("DELETE", resourceURL(client, id), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return result
@@ -222,7 +216,7 @@ func (opts CreateRuleOpts) ToRuleCreateMap() (map[string]interface{}, error) {
 		rule["cidr"] = opts.CIDR
 	}
 	if opts.FromGroupID != "" {
-		rule["from_group_id"] = opts.FromGroupID
+		rule["group_id"] = opts.FromGroupID
 	}
 
 	return map[string]interface{}{"security_group_rule": rule}, nil
@@ -240,11 +234,10 @@ func CreateRule(client *gophercloud.ServiceClient, opts CreateRuleOptsBuilder) C
 		return result
 	}
 
-	_, result.Err = perigee.Request("POST", rootRuleURL(client), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     &reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("POST", rootRuleURL(client), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     &reqBody,
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -254,9 +247,8 @@ func CreateRule(client *gophercloud.ServiceClient, opts CreateRuleOptsBuilder) C
 func DeleteRule(client *gophercloud.ServiceClient, id string) gophercloud.ErrResult {
 	var result gophercloud.ErrResult
 
-	_, result.Err = perigee.Request("DELETE", resourceRuleURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, result.Err = client.Request("DELETE", resourceRuleURL(client, id), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return result
@@ -273,11 +265,10 @@ func actionMap(prefix, groupName string) map[string]map[string]string {
 func AddServerToGroup(client *gophercloud.ServiceClient, serverID, groupName string) gophercloud.ErrResult {
 	var result gophercloud.ErrResult
 
-	_, result.Err = perigee.Request("POST", serverActionURL(client, serverID), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     actionMap("add", groupName),
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, result.Err = client.Request("POST", serverActionURL(client, serverID), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     actionMap("add", groupName),
+		OkCodes:      []int{202},
 	})
 
 	return result
@@ -287,11 +278,10 @@ func AddServerToGroup(client *gophercloud.ServiceClient, serverID, groupName str
 func RemoveServerFromGroup(client *gophercloud.ServiceClient, serverID, groupName string) gophercloud.ErrResult {
 	var result gophercloud.ErrResult
 
-	_, result.Err = perigee.Request("POST", serverActionURL(client, serverID), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     actionMap("remove", groupName),
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, result.Err = client.Request("POST", serverActionURL(client, serverID), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     actionMap("remove", groupName),
+		OkCodes:      []int{202},
 	})
 
 	return result

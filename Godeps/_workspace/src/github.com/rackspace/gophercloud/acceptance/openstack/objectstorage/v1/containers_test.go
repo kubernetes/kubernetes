@@ -87,3 +87,51 @@ func TestContainers(t *testing.T) {
 		}
 	}
 }
+
+func TestListAllContainers(t *testing.T) {
+	// Create a new client to execute the HTTP requests. See common.go for newClient body.
+	client := newClient(t)
+
+	numContainers := 20
+
+	// Create a slice of random container names.
+	cNames := make([]string, numContainers)
+	for i := 0; i < numContainers; i++ {
+		cNames[i] = tools.RandomString("gophercloud-test-container-", 8)
+	}
+
+	// Create numContainers containers.
+	for i := 0; i < len(cNames); i++ {
+		res := containers.Create(client, cNames[i], nil)
+		th.AssertNoErr(t, res.Err)
+	}
+	// Delete the numContainers containers after function completion.
+	defer func() {
+		for i := 0; i < len(cNames); i++ {
+			res := containers.Delete(client, cNames[i])
+			th.AssertNoErr(t, res.Err)
+		}
+	}()
+
+	// List all the numContainer names that were just created. To just list those,
+	// the 'prefix' parameter is used.
+	allPages, err := containers.List(client, &containers.ListOpts{Full: true, Limit: 5, Prefix: "gophercloud-test-container-"}).AllPages()
+	th.AssertNoErr(t, err)
+	containerInfoList, err := containers.ExtractInfo(allPages)
+	th.AssertNoErr(t, err)
+	for _, n := range containerInfoList {
+		t.Logf("Container: Name [%s] Count [%d] Bytes [%d]",
+			n.Name, n.Count, n.Bytes)
+	}
+	th.AssertEquals(t, numContainers, len(containerInfoList))
+
+	// List the info for all the numContainer containers that were created.
+	allPages, err = containers.List(client, &containers.ListOpts{Full: false, Limit: 2, Prefix: "gophercloud-test-container-"}).AllPages()
+	th.AssertNoErr(t, err)
+	containerNamesList, err := containers.ExtractNames(allPages)
+	th.AssertNoErr(t, err)
+	for _, n := range containerNamesList {
+		t.Logf("Container: Name [%s]", n)
+	}
+	th.AssertEquals(t, numContainers, len(containerNamesList))
+}

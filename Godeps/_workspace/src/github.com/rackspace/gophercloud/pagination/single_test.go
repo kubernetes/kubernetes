@@ -69,3 +69,16 @@ func TestEnumerateSinglePaged(t *testing.T) {
 	testhelper.CheckNoErr(t, err)
 	testhelper.CheckEquals(t, 1, callCount)
 }
+
+func TestAllPagesSingle(t *testing.T) {
+	pager := setupSinglePaged()
+	defer testhelper.TeardownHTTP()
+
+	page, err := pager.AllPages()
+	testhelper.AssertNoErr(t, err)
+
+	expected := []int{1, 2, 3}
+	actual, err := ExtractSingleInts(page)
+	testhelper.AssertNoErr(t, err)
+	testhelper.CheckDeepEquals(t, expected, actual)
+}

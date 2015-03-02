@@ -3,7 +3,6 @@ package keypairs
 import (
 	"errors"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"
@@ -82,11 +81,10 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", createURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("POST", createURL(client), gophercloud.RequestOpts{
+		JSONBody:     reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -94,10 +92,9 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Get returns public data about a previously uploaded KeyPair.
 func Get(client *gophercloud.ServiceClient, name string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", getURL(client, name), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("GET", getURL(client, name), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -105,9 +102,8 @@ func Get(client *gophercloud.ServiceClient, name string) GetResult {
 // Delete requests the deletion of a previous stored KeyPair from the server.
 func Delete(client *gophercloud.ServiceClient, name string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, name), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("DELETE", deleteURL(client, name), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 	return res
 }

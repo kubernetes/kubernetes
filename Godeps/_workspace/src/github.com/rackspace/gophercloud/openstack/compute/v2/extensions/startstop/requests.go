@@ -1,9 +1,6 @@
 package startstop
 
-import (
-	"github.com/racker/perigee"
-	"github.com/rackspace/gophercloud"
-)
+import "github.com/rackspace/gophercloud"
 
 func actionURL(client *gophercloud.ServiceClient, id string) string {
 	return client.ServiceURL("servers", id, "action")
@@ -15,10 +12,9 @@ func Start(client *gophercloud.ServiceClient, id string) gophercloud.ErrResult {
 
 	reqBody := map[string]interface{}{"os-start": nil}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -30,10 +26,9 @@ func Stop(client *gophercloud.ServiceClient, id string) gophercloud.ErrResult {
 
 	reqBody := map[string]interface{}{"os-stop": nil}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
