@@ -108,7 +108,7 @@ var _ = Describe("Pods", func() {
 					{
 						Name:  "nginx",
 						Image: "dockerfile/nginx",
-						Ports: []api.Port{{ContainerPort: 80}},
+						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
@@ -165,7 +165,7 @@ var _ = Describe("Pods", func() {
 					{
 						Name:  "nginx",
 						Image: "dockerfile/nginx",
-						Ports: []api.Port{{ContainerPort: 80}},
+						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
 								HTTPGet: &api.HTTPGetAction{
@@ -236,7 +236,7 @@ var _ = Describe("Pods", func() {
 					{
 						Name:  "srv",
 						Image: "kubernetes/serve_hostname",
-						Ports: []api.Port{{ContainerPort: 9376}},
+						Ports: []api.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
 			},

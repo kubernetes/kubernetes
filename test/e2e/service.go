@@ -297,7 +297,7 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 				{
 					Name:  "test",
 					Image: "kubernetes/pause",
-					Ports: []api.Port{{ContainerPort: 80}},
+					Ports: []api.ContainerPort{{ContainerPort: 80}},
 				},
 			},
 		},

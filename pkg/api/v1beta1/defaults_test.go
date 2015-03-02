@@ -73,7 +73,7 @@ func TestSetDefaulPodSpec(t *testing.T) {
 func TestSetDefaultContainer(t *testing.T) {
 	bp := &current.BoundPod{}
 	bp.Spec.Containers = []current.Container{{}}
-	bp.Spec.Containers[0].Ports = []current.Port{{}}
+	bp.Spec.Containers[0].Ports = []current.ContainerPort{{}}
 
 	obj2 := roundTrip(t, runtime.Object(bp))
 	bp2 := obj2.(*current.BoundPod)
