@@ -163,7 +163,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 // Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{"DesiredState.Host": ""}.AsSelector())
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{getHostFieldLabel(factory.Client.APIVersion()): ""}.AsSelector())
 }
 
 func parseSelectorOrDie(s string) labels.Selector {
@@ -178,7 +178,8 @@ func parseSelectorOrDie(s string) labels.Selector {
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, parseSelectorOrDie("DesiredState.Host!="))
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
+		parseSelectorOrDie(getHostFieldLabel(factory.Client.APIVersion())+"!="))
 }
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
@@ -251,7 +252,16 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 	}
 }
 
-// Allows a cache.Poller to enumerate items in an api.NodeList
+func getHostFieldLabel(apiVersion string) string {
+	switch apiVersion {
+	case "v1beta1", "v1beta2":
+		return "DesiredState.Host"
+	default:
+		return "Status.Host"
+	}
+}
+
+// nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
 type nodeEnumerator struct {
 	*api.NodeList
 }

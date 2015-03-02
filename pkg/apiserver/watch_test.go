@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"golang.org/x/net/websocket"
@@ -164,15 +165,19 @@ func TestWatchHTTP(t *testing.T) {
 }
 
 func TestWatchParamParsing(t *testing.T) {
+	api.Scheme.AddFieldLabelConversionFunc(testVersion, "foo",
+		func(label, value string) (string, string, error) {
+			return label, value, nil
+		})
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, requestContextMapper, mapper)
+	}, codec, "/api", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/version/watch/foo"
+	dest.Path = "/api/" + testVersion + "/watch/foo"
 
 	table := []struct {
 		rawQuery        string
@@ -194,10 +199,10 @@ func TestWatchParamParsing(t *testing.T) {
 			fieldSelector:   "Host=",
 			namespace:       api.NamespaceDefault,
 		}, {
-			rawQuery:        "namespace=watchother&fields=ID%3dfoo&resourceVersion=1492",
+			rawQuery:        "namespace=watchother&fields=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
-			fieldSelector:   "ID=foo",
+			fieldSelector:   "id=foo",
 			namespace:       "watchother",
 		}, {
 			rawQuery:        "",
@@ -209,8 +214,8 @@ func TestWatchParamParsing(t *testing.T) {
 	}
 
 	for _, item := range table {
-		simpleStorage.requestedLabelSelector = nil
-		simpleStorage.requestedFieldSelector = nil
+		simpleStorage.requestedLabelSelector = labels.Everything()
+		simpleStorage.requestedFieldSelector = labels.Everything()
 		simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
 		simpleStorage.requestedResourceNamespace = ""
 		dest.RawQuery = item.rawQuery
