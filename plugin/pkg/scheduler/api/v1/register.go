@@ -14,9 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package is used to register algorithm provider plugins.
-package algorithmprovider
+package v1
 
 import (
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 )
+
+// Codec encodes internal objects to the v1 scheme
+var Codec = runtime.CodecFor(api.Scheme, "v1")
+
+func init() {
+	api.Scheme.AddKnownTypes("v1",
+		&Policy{},
+	)
+}
+
+func (*Policy) IsAnAPIObject() {}

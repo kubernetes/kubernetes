@@ -14,9 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package is used to register algorithm provider plugins.
-package algorithmprovider
+package api
 
 import (
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
+
+// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
+var Scheme = runtime.NewScheme()
+
+func init() {
+	Scheme.AddKnownTypes("",
+		&Policy{},
+	)
+}
+
+func (*Policy) IsAnAPIObject() {}

@@ -135,6 +135,13 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates map[string]Fi
 // All scores are finally combined (added) to get the total weighted scores of all minions
 func prioritizeNodes(pod api.Pod, podLister PodLister, priorityConfigs []PriorityConfig, minionLister MinionLister) (HostPriorityList, error) {
 	result := HostPriorityList{}
+
+	// If no priority configs are provided, then the EqualPriority function is applied
+	// This is required to generate the priority list in the required format
+	if len(priorityConfigs) == 0 {
+		return EqualPriority(pod, podLister, minionLister)
+	}
+
 	combinedScores := map[string]int{}
 	for _, priorityConfig := range priorityConfigs {
 		weight := priorityConfig.Weight
