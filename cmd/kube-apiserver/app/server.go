@@ -73,6 +73,7 @@ type APIServer struct {
 	RuntimeConfig              util.ConfigurationMap
 	KubeletConfig              client.KubeletConfig
 	ClusterName                string
+	SyncPodStatus              bool
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -92,6 +93,7 @@ func NewAPIServer() *APIServer {
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
+		SyncPodStatus:          true,
 
 		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: client.KubeletConfig{
@@ -146,6 +148,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.AllowPrivileged, "allow_privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.PortalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
 	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
+	fs.BoolVar(&s.SyncPodStatus, "sync_pod_status", s.SyncPodStatus, "If true, periodically fetch pods statuses from kubelets.")
 	fs.Var(&s.RuntimeConfig, "runtime_config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
@@ -245,6 +248,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableV1Beta3:          v1beta3,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
+		SyncPodStatus:          s.SyncPodStatus,
 	}
 	m := master.New(config)
 

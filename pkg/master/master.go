@@ -115,6 +115,9 @@ type Config struct {
 
 	// The name of the cluster.
 	ClusterName string
+
+	// If true we will periodically probe pods statuses.
+	SyncPodStatus bool
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -393,7 +396,9 @@ func (m *Master) init(c *Config) {
 		nodeStorageClient.Nodes(),
 		podRegistry,
 	)
-	go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
+	if c.SyncPodStatus {
+		go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
+	}
 	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
 
 	// TODO: refactor podCache to sit on top of podStorage via status calls

@@ -183,6 +183,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		ReadOnlyPort:      portNumber,
 		PublicAddress:     publicAddress,
 		CacheTimeout:      2 * time.Second,
+		SyncPodStatus:     true,
 	})
 	handler.delegate = m.Handler
 
