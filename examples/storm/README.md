@@ -60,6 +60,43 @@ $ echo ruok | nc 10.254.139.141 2181; echo
 imok
 ```
 
+## Step Two: Start your Nimbus service
+
+The Nimbus service is the master (or head) service for a Storm
+cluster. It depends on a functional ZooKeeper service.
+
+Use the `examples/storm/storm-nimbus.json` file to create a pod running
+the Nimbus service.
+
+```shell
+$ kubectl create -f examples/storm/storm-nimbus.json
+```
+
+Then, use the `examples/storm/storm-nimbus-service.json` file to
+create a logical service endpoint that Storm workers can use to access
+the Nimbus pod.
+
+```shell
+$ kubectl create -f examples/storm/storm-nimbus-service.json
+```
+
+Ensure that the Nimbus service is running and functional.
+
+### Check to see if Nimbus is running and accessible
+
+```shell
+$ kubectl get services
+NAME                LABELS                                    SELECTOR            IP                  PORT
+kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
+kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
+nimbus              name=nimbus                               name=nimbus         10.254.115.208      6627
+zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
+
+$ sudo docker run -it -w /opt/apache-storm mattf/storm-base sh -c '/configure.sh 10.254.139.141 10.254.115.208; ./bin/storm list'
+...
+No topologies running.
+```
+
 ## tl;dr
 
 ```kubectl create -f zookeeper.json```
