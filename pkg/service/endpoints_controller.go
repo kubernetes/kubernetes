@@ -65,7 +65,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		endpoints := []api.Endpoint{}
 
 		for _, pod := range pods.Items {
-			port, err := findPort(&pod, service.Spec.ContainerPort)
+			port, err := findPort(&pod, service.Spec.PodServicePort)
 			if err != nil {
 				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
