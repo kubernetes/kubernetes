@@ -1,0 +1,27 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata: 
+  labels: 
+    name: heapster
+    kubernetes.io/cluster-service: "true"
+  name: monitoring-heapster-controller
+spec: 
+  replicas: 1
+  selector: 
+    name: heapster
+  template: 
+    metadata: 
+      labels: 
+        name: heapster
+        kubernetes.io/cluster-service: "true"
+    spec: 
+      containers: 
+        - image: kubernetes/heapster:v0.8
+          name: heapster
+          env: 
+            - name: "INFLUXDB_HOST"
+              value: "monitoring-influxdb"
+          ports: 
+            - containerPort: 5701
+              name: heapster
+
