@@ -67,7 +67,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	return nil
 }
 
-// CheckGeneratedNameError checks whether an error that occured creating a resource is due
+// CheckGeneratedNameError checks whether an error that occurred creating a resource is due
 // to generation being unable to pick a valid name.
 func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime.Object) error {
 	if !errors.IsAlreadyExists(err) {

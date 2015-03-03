@@ -202,6 +202,76 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 }
 
+func testVolume(name string, namespace string) *api.PersistentVolume {
+
+	objMeta := api.ObjectMeta{Name: name}
+	if namespace != "" {
+		objMeta.Namespace = namespace
+	}
+
+	return &api.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       api.PersistentVolumeSpec{},
+	}
+}
+
+func TestValidatePersistentVolumes(t *testing.T) {
+
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *api.PersistentVolume
+	}{
+		"good-volume": {
+			isExpectedFailure: false,
+			volume:            testVolume("foo", ""),
+		},
+		"bad-volume": {
+			isExpectedFailure: true,
+			volume:            testVolume("foo", "unexpected-namespace"),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure: %s, errs: %v", name, errs)
+		}
+	}
+
+}
+
+func testVolumeClaim(name string, namespace string) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       api.PersistentVolumeClaimSpec{},
+	}
+}
+
+func TestValidatePersistentVolumeClaim(t *testing.T) {
+
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		claim             *api.PersistentVolumeClaim
+	}{
+		"good-claim": {
+			isExpectedFailure: true,
+			claim:             testVolumeClaim("foo", ""),
+		},
+		"bad-claim": {
+			isExpectedFailure: false,
+			claim:             testVolumeClaim("foo", "valid-namespace"),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeClaim(scenario.claim)
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure: %s, errs: %v", name, errs)
+		}
+	}
+
+}
+
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path1"}}},

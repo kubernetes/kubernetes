@@ -68,6 +68,15 @@ func init() {
 				obj.RestartPolicy = RestartPolicyAlways
 			}
 		},
+		func(obj *Pod) {
+			for _, v := range obj.Spec.Volumes {
+				if v.Source.PersistentVolumeClaimVolumeSource != nil &&
+					v.Source.PersistentVolumeClaimVolumeSource.PersistentVolumeClaimRef != nil {
+					// ClaimRefs will be posted with a name to the user's claim, but we don't want/need them to set a namespace
+					v.Source.PersistentVolumeClaimVolumeSource.PersistentVolumeClaimRef.Namespace = obj.Namespace
+				}
+			}
+		},
 		func(obj *Probe) {
 			if obj.TimeoutSeconds == 0 {
 				obj.TimeoutSeconds = 1

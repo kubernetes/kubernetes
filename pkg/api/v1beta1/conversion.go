@@ -1059,6 +1059,15 @@ func init() {
 			if err := s.Convert(&in.NFS, &out.NFS, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.AWSElasticBlockStore, &out.AWSElasticBlockStore, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.NFSMount, &out.NFSMount, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.PersistentVolumeClaimVolumeSource, &out.PersistentVolumeClaimVolumeSource, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *VolumeSource, out *newer.VolumeSource, s conversion.Scope) error {
@@ -1080,9 +1089,149 @@ func init() {
 			if err := s.Convert(&in.NFS, &out.NFS, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.AWSElasticBlockStore, &out.AWSElasticBlockStore, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.NFSMount, &out.NFSMount, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.PersistentVolumeClaimVolumeSource, &out.PersistentVolumeClaimVolumeSource, 0); err != nil {
+				return err
+			}
 			return nil
 		},
-
+		func(in *PersistentVolume, out *newer.PersistentVolume, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.PersistentVolumeList, out *PersistentVolumeList, s conversion.Scope) error {
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PersistentVolumeList, out *newer.PersistentVolumeList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.PersistentVolumeSpec, out *PersistentVolumeSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Source, &out.Source, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Capacity, &out.Capacity, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PersistentVolumeSpec, out *newer.PersistentVolumeSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Source, &out.Source, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Capacity, &out.Capacity, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.PersistentVolumeStatus, out *PersistentVolumeStatus, s conversion.Scope) error {
+			if err := s.Convert(&in.Phase, &out.Phase, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PersistentVolumeStatus, out *newer.PersistentVolumeStatus, s conversion.Scope) error {
+			if err := s.Convert(&in.Phase, &out.Phase, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PersistentVolumeClaim, out *newer.PersistentVolumeClaim, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *newer.PersistentVolumeClaimList, out *PersistentVolumeClaimList, s conversion.Scope) error {
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PersistentVolumeClaimList, out *newer.PersistentVolumeClaimList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		func(in *newer.PullPolicy, out *PullPolicy, s conversion.Scope) error {
 			switch *in {
 			case newer.PullAlways:

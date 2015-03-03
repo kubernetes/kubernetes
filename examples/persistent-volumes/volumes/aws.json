@@ -1,0 +1,18 @@
+{
+    "kind": "PersistentVolume",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "pv0001"
+    },
+    "spec": {
+        "capacity":{
+            "storage":"10"
+        },
+        "source":{
+            "awsElasticBlockStore":{
+                "volumeId": "abc123"
+            }
+        }
+    }
+}
+

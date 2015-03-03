@@ -58,7 +58,7 @@ type Volume struct {
 	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"`
 }
 
-// VolumeSource represents the source location of a valume to mount.
+// VolumeSource represents the source location of a volume to mount.
 // Only one of its members may be specified.
 //
 // https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#types-of-volumes
@@ -78,8 +78,111 @@ type VolumeSource struct {
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret is a secret to populate the volume with
 	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume"`
+
+	// TODO (per thockin) https://github.com/GoogleCloudPlatform/kubernetes/pull/4055#discussion_r24865963
+	AWSElasticBlockStore *AWSElasticBlockStore `json:"elasticBlockStore"`
+
+	NFSMount *NFSMount `json:"nfsMount"`
+
+	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine"`
+}
+
+type PersistentVolume struct {
+	TypeMeta `json:",inline"`
+
+	//Spec defines a persistent volume owned by the cluster
+	Spec PersistentVolumeSpec `json:"spec,omitempty"`
+
+	// Status represents the current information about persistent volume.
+	Status PersistentVolumeStatus `json:"status,omitempty"`
+
+	// holds the binding reference to a PersistentVolumeClaim
+	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+}
+
+type PersistentVolumeSpec struct {
+	Capacity ResourceList `json:"capacity,omitempty`
+	// AccessModeTypes are inferred from the Source
+	Source VolumeSource `json:",inline"`
+}
+
+type PersistentVolumeStatus struct {
+	Phase StoragePhase `json:"phase,omitempty"`
+}
+
+type PersistentVolumeList struct {
+	TypeMeta `json:",inline"`
+	Items    []PersistentVolume `json:"items,omitempty"`
+}
+
+// a PersistentVolumeClaim is a user's request for and claim to a persistent volume
+type PersistentVolumeClaim struct {
+	TypeMeta `json:",inline"`
+
+	// Spec defines the volume
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
+
+	// Status represents the current information about a persistent volume.
+	// this data may not be up to date.
+	Status PersistentVolumeClaimStatus `json:"status,omitempty"`
+}
+
+type PersistentVolumeClaimList struct {
+	TypeMeta `json:",inline"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty"`
+}
+
+// a PersistentVolumeClaimSpec describes the common attributes of storage devices
+// and allows a Source for provider-specific attributes
+type PersistentVolumeClaimSpec struct {
+	// Contains the types of access modes desired
+	AccessModes []AccessModeType     `json:"accessModes,omitempty"`
+	Resources   ResourceRequirements `json:"resources,omitempty"`
+}
+
+type PersistentVolumeClaimStatus struct {
+	Phase       StoragePhase     `json:"phase,omitempty"`
+	AccessModes []AccessModeType `json:"accessModes,omitempty`
+	Requests    ResourceList     `json:"requests,omitempty"`
+	VolumeRef   *ObjectReference `json:"volumeRef,omitempty"`
+}
+
+type AccessModeType string
+
+const (
+	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadOnlyMany  AccessModeType = "ReadOnlyMany"
+	ReadWriteMany AccessModeType = "ReadWriteMany"
+)
+
+type StoragePhase string
+
+const (
+	StoragePending StoragePhase = "Pending"
+	StorageBound   StoragePhase = "Bound"
+)
+
+type PersistentVolumeClaimVolumeSource struct {
+	AccessMode               AccessModeType   `json:"accessMode,omitempty"`
+	PersistentVolumeClaimRef *ObjectReference `json:"claimRef,omitempty"`
+}
+
+//
+// AWSEBS and NFS are orthogonal tasks that don't need to be here for Persistent Volumes.
+// They are here in the meantime for me to work with AccessModes correctly.
+// These will be refactored out after the NFS PR gets merged and this feature nears completion.
+//
+type AWSElasticBlockStore struct {
+	// the device's EBS volumeID from AWS
+	VolumeID string `json:"volumeId,omitempty"`
+}
+
+type NFSMount struct {
+	Server       string `json:"server"`
+	SourcePath   string `json:"sourcePath"`
+	MountOptions string `json:"mountOptions"`
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -268,6 +371,8 @@ type Capabilities struct {
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
+	// Requests describes the minimum amount of compute resources required.
+	Requests ResourceList `json:"requests,omitempty"`
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -765,6 +870,8 @@ const (
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceMemory ResourceName = "memory"
+	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
+	ResourceStorage ResourceName = "storage"
 )
 
 type ResourceList map[ResourceName]util.IntOrString
