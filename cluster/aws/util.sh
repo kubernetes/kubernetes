@@ -179,31 +179,28 @@ function upload-server-tars() {
   aws s3api put-object-acl --bucket ${staging_bucket} --key "devel/${SALT_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
 }
 
+
 # Ensure that we have a password created for validating to the master.  Will
-# read from $HOME/.kubernetres_auth if available.
+# read from the kubernetes auth-file for the current context if available.
+#
+# Assumed vars
+#   KUBE_ROOT
 #
 # Vars set:
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
+  # go template to extract the auth-path of the current-context user
+  # Note: we save dot ('.') to $dot because the 'with' action overrides dot
+  local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "auth-path"}}{{end}}'
+  local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
+  if [[ ! -z "$file" && -r "$file" ]]; then
     KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
     KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
     return
   fi
   KUBE_USER=admin
   KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Remove this code, since in all use cases I can see, we are overwriting this
-  # at cluster creation time.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 # Adds a tag to an AWS resource
@@ -469,6 +466,47 @@ function kube-up {
   done
 
   echo "Kubernetes cluster created."
+
+  local kube_cert="kubecfg.crt"
+  local kube_key="kubecfg.key"
+  local ca_cert="kubernetes.ca.crt"
+  # TODO use token instead of kube_auth
+  local kube_auth="kubernetes_auth"
+
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local context="${INSTANCE_PREFIX}"
+  local user="${INSTANCE_PREFIX}-admin"
+  local config_dir="${HOME}/.kube/${context}"
+
+  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
+  # config file.  Distribute the same way the htpasswd is done.
+  (
+    mkdir -p "${config_dir}"
+    umask 077
+    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${config_dir}/${kube_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${config_dir}/${kube_key}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
+
+    "${kubectl}" config set-cluster "${context}" --server="https://${KUBE_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
+    "${kubectl}" config set-credentials "${user}" --auth-path="${config_dir}/${kube_auth}" --global
+    "${kubectl}" config set-context "${context}" --cluster="${context}" --user="${user}" --global
+    "${kubectl}" config use-context "${context}" --global
+
+    cat << EOF > "${config_dir}/${kube_auth}"
+{
+  "User": "$KUBE_USER",
+  "Password": "$KUBE_PASSWORD",
+  "CAFile": "${config_dir}/${ca_cert}",
+  "CertFile": "${config_dir}/${kube_cert}",
+  "KeyFile": "${config_dir}/${kube_key}"
+}
+EOF
+
+    chmod 0600 "${config_dir}/${kube_auth}" "${config_dir}/$kube_cert" \
+      "${config_dir}/${kube_key}" "${config_dir}/${ca_cert}"
+    echo "Wrote ${config_dir}/${kube_auth}"
+  )
+
   echo "Sanity checking cluster..."
 
   sleep 5
@@ -477,47 +515,51 @@ function kube-up {
   set +e
 
   # Basic sanity checking
-  for i in ${KUBE_MINION_IP_ADDRESSES[@]}; do
-    # Make sure docker is installed
-    ssh -oStrictHostKeyChecking=no ubuntu@$i -i ${AWS_SSH_KEY} which docker > $LOG 2>&1
-    if [ "$?" != "0" ]; then
-      echo "Docker failed to install on $i. Your cluster is unlikely to work correctly."
-      echo "Please run ./cluster/aws/kube-down.sh and re-create the cluster. (sorry!)"
-      exit 1
-    fi
+  local rc # Capture return code without exiting because of errexit bash option
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+      # Make sure docker is installed and working.
+      local attempt=0
+      while true; do
+        local minion_name=${MINION_NAMES[$i]}
+        local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
+        echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
+        local output=$(ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@$minion_ip sudo docker ps -a 2>/dev/null)
+        if [[ -z "${output}" ]]; then
+          if (( attempt > 9 )); then
+            echo
+            echo -e "${color_red}Docker failed to install on node ${minion_name}. Your cluster is unlikely" >&2
+            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo -e "cluster. (sorry!)${color_norm}" >&2
+            exit 1
+          fi
+        # TODO: Reintroduce this (where does this container come from?)
+#        elif [[ "${output}" != *"kubernetes/pause"* ]]; then
+#          if (( attempt > 9 )); then
+#            echo
+#            echo -e "${color_red}Failed to observe kubernetes/pause on node ${minion_name}. Your cluster is unlikely" >&2
+#            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+#            echo -e "cluster. (sorry!)${color_norm}" >&2
+#            exit 1
+#          fi
+        else
+          echo -e " ${color_green}[working]${color_norm}"
+          break
+        fi
+        echo -e " ${color_yellow}[not working yet]${color_norm}"
+        # Start Docker, in case it failed to start.
+        ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@$$minion_ip sudo service docker start > $LOG 2>&1
+        attempt=$(($attempt+1))
+        sleep 30
+      done
   done
 
   echo
-  echo "Kubernetes cluster is running.  Access the master at:"
+  echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo
-  echo "  https://${KUBE_USER}:${KUBE_PASSWORD}@${KUBE_MASTER_IP}"
+  echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
   echo
-
-  local kube_cert=".kubecfg.crt"
-  local kube_key=".kubecfg.key"
-  local ca_cert=".kubernetes.ca.crt"
-
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-  # config file.  Distribute the same way the htpasswd is done.
-  (
-    umask 077
-    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>$LOG
-
-    cat << EOF > ~/.kubernetes_auth
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
-}
-EOF
-
-    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-      "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
-  )
+  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}.${color_norm}"
+  echo
 }
 
 function kube-down {
