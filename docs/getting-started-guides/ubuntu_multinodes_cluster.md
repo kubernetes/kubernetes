@@ -9,7 +9,7 @@ This document describes how to deploy kubernetes on multiple ubuntu nodes, inclu
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.0, flannel-0.2.0, k8s-0.10.1, but it should also work on higher versions*
+*4 Dependences of this guide: etcd-2.0.0, flannel-0.2.0, K8s-0.12.0, but it should also work on higher versions*
 
 
 ### **Main Steps**
