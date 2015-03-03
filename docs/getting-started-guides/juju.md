@@ -3,6 +3,8 @@
 Juju handles provisioning machines and deploying complex systems to a
 wide number of clouds.
 
+
+
 ### Prerequisites
 
 #### On Ubuntu
@@ -173,18 +175,16 @@ Kubernetes Bundle on Github
 Juju runs natively against a variety of cloud providers and can be
 made to work against many more using a generic manual provider.
 
-#### Verified
 
- - EC2
- - OpenStack/HPCloud
 
-#### Untested but likely to work
+Provider          | v0.8.1
+--------------    | -------
+AWS               | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
+HPCloud           | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
+OpenStack         | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
+Joyent            | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
+Azure             | TBD
+Digital Ocean     | TBD
+MAAS (bare metal) | TBD
+GCE               | TBD
 
- - Azure
- - Joyent
- - Digital Ocean
- - MAAS (bare metal)
-
-#### Coming soon
-
- - GCE

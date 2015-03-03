@@ -20,6 +20,14 @@ Ovirt          |              |        | [docs](../../docs/getting-started-guide
 Rackspace      | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
 Bare-metal     | custom       | CentOS | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
 libvirt/KVM    | CoreOS       | CoreOS | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
+Bare-metal        | custom       | CentOS | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
+AWS            | Juju         | Ubuntu | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
+OpenStack/HPCloud | Juju      | Ubuntu | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
+Joyent         | Juju         | Ubuntu | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
+
+
+
+
 Definition of columns:
   - **IaaS Provider** is who/what provides the virtual or physical machines (nodes) that Kubernetes runs on.
   - **OS** is the base operating system of the nodes.
