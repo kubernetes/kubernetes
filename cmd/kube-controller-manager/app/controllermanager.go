@@ -144,7 +144,7 @@ func (s *CMServer) Run(_ []string) error {
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
-	controllerManager.Run(10 * time.Second)
+	controllerManager.Run(replicationControllerPkg.DefaultSyncPeriod)
 
 	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
 	if err != nil {
