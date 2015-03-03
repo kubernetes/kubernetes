@@ -19,7 +19,7 @@ See the companion [Setup Kubernetes](https://github.com/GoogleCloudPlatform/kube
 
 ### Step One: Fire up the redis master
 
-Note: This redis-master is *not* highly available.  Making it highly available would be a very interesting, but intricate exersize - redis doesn't actually support multi-master deployments at the time of this writing, so high availability would be a somewhat tricky thing implement, and might involve periodic serialization to disk, and so on.
+Note: This redis-master is *not* highly available.  Making it highly available would be a very interesting, but intricate exercise - redis doesn't actually support multi-master deployments at the time of this writing, so high availability would be a somewhat tricky thing implement, and might involve periodic serialization to disk, and so on.
 
 Use (or just create) the file `examples/guestbook/redis-master-controller.json` which describes a single pod running a redis key-value server in a container:
 Note that, although the redis server runs just with a single replica, we use replication controller to enforce that exactly one pod keeps running (e.g. in a event of node going down, the replication controller will ensure that the redis master gets restarted on a healthy node). 
