@@ -105,6 +105,10 @@ type Request struct {
 	// output
 	err  error
 	body io.Reader
+
+	// The constructed request and the response
+	req  *http.Request
+	resp *http.Response
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
@@ -482,16 +486,8 @@ func (r *Request) Upgrade(config *Config, newRoundTripperFunc func(*tls.Config) 
 	return upgradeRoundTripper.NewConnection(resp)
 }
 
-// Do formats and executes the request. Returns a Result object for easy response
-// processing.
-//
-// Error type:
-//  * If the request can't be constructed, or an error happened earlier while building its
-//    arguments: *RequestConstructionError
-//  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
-//  * If the status code and body don't make sense together: *UnexpectedStatusError
-//  * http.Client.Do errors are returned directly.
-func (r *Request) Do() Result {
+// DoRaw executes a raw request which is not subject to interpretation as an API response.
+func (r *Request) DoRaw() ([]byte, error) {
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
@@ -503,34 +499,33 @@ func (r *Request) Do() Result {
 
 	for {
 		if r.err != nil {
-			return Result{err: &RequestConstructionError{r.err}}
+			return nil, r.err
 		}
 
 		// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
 		if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
-			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set when a resource name is provided")}}
+			return nil, fmt.Errorf("an empty namespace may not be set when a resource name is provided")
 		}
 		if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
-			return Result{err: &RequestConstructionError{fmt.Errorf("an empty namespace may not be set during creation")}}
+			return nil, fmt.Errorf("an empty namespace may not be set during creation")
 		}
 
-		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
+		var err error
+		r.req, err = http.NewRequest(r.verb, r.finalURL(), r.body)
 		if err != nil {
-			return Result{err: &RequestConstructionError{err}}
+			return nil, err
 		}
 
-		resp, err := client.Do(req)
+		r.resp, err = client.Do(r.req)
 		if err != nil {
-			return Result{err: err}
+			return nil, err
 		}
-
-		respBody, created, err := r.transformResponse(resp, req)
 
 		// Check to see if we got a 429 Too Many Requests response code.
-		if resp.StatusCode == errors.StatusTooManyRequests {
+		if r.resp.StatusCode == errors.StatusTooManyRequests {
 			if retries < 10 {
 				retries++
-				if waitFor := resp.Header.Get("Retry-After"); waitFor != "" {
+				if waitFor := r.resp.Header.Get("Retry-After"); waitFor != "" {
 					delay, err := strconv.Atoi(waitFor)
 					if err == nil {
 						glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", waitFor, retries, r.finalURL())
@@ -540,19 +535,35 @@ func (r *Request) Do() Result {
 				}
 			}
 		}
-		return Result{respBody, created, err, r.codec}
+		body, err := ioutil.ReadAll(r.resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		defer r.resp.Body.Close()
+		return body, err
 	}
 }
 
-// transformResponse converts an API response into a structured API object.
-func (r *Request) transformResponse(resp *http.Response, req *http.Request) ([]byte, bool, error) {
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
+// Do formats and executes the request. Returns a Result object for easy response
+// processing.
+//
+// Error type:
+//  * If the request can't be constructed, or an error happened earlier while building its
+//    arguments: *RequestConstructionError
+//  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
+//  * If the status code and body don't make sense together: *UnexpectedStatusError
+//  * http.Client.Do errors are returned directly.
+func (r *Request) Do() Result {
+	body, err := r.DoRaw()
 	if err != nil {
-		return nil, false, err
+		return Result{err: err}
 	}
+	respBody, created, err := r.transformResponse(body, r.resp, r.req)
+	return Result{respBody, created, err, r.codec}
+}
 
+// transformResponse converts an API response into a structured API object.
+func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.Request) ([]byte, bool, error) {
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
@@ -596,7 +607,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) ([]b
 	}
 
 	created := resp.StatusCode == http.StatusCreated
-	return body, created, err
+	return body, created, nil
 }
 
 // Result contains the result of calling Request.Do().
