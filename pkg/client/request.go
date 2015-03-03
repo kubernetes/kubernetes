@@ -520,6 +520,7 @@ func (r *Request) DoRaw() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer r.resp.Body.Close()
 
 		// Check to see if we got a 429 Too Many Requests response code.
 		if r.resp.StatusCode == errors.StatusTooManyRequests {
@@ -539,7 +540,6 @@ func (r *Request) DoRaw() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer r.resp.Body.Close()
 		return body, err
 	}
 }
@@ -600,7 +600,8 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 	}
 
 	// If the server gave us a status back, look at what it was.
-	if isStatusResponse && status.Status != api.StatusSuccess {
+	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
+	if isStatusResponse && (status.Status != api.StatusSuccess && !success) {
 		// "Working" requests need to be handled specially.
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
 		return nil, false, errors.FromObject(&status)
