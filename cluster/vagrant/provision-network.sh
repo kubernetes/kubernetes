@@ -31,8 +31,8 @@ cat <<EOF > ${POST_NETWORK_SCRIPT}
 
 set -e
 
-# Only do this operation once, otherwise, we get docker.service files output on disk, and the command line arguments get applied multiple times
-grep -q kbr0 /etc/sysconfig/docker || {
+# Only do this operation if the bridge is not defined
+ifconfig | grep -q kbr0 || {
   CONTAINER_SUBNETS=(${MASTER_CONTAINER_SUBNET} ${MINION_CONTAINER_SUBNETS[@]})
   CONTAINER_IPS=(${MASTER_IP} ${MINION_IPS[@]})
 
