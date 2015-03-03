@@ -148,15 +148,15 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 	if len(binding.Target.Name) == 0 {
 		return nil, errors.NewInvalid("binding", binding.Name, errors.ValidationErrorList{errors.NewFieldRequired("to.name", binding.Target.Name)})
 	}
-	err = r.assignPod(ctx, binding.Name, binding.Target.Name)
-	err = etcderr.InterpretCreateError(err, "binding", "")
+	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &api.Status{Status: api.StatusSuccess}
 	return
 }
 
-// setPodHostTo sets the given pod's host to 'machine' iff it was previously 'oldMachine'.
+// setPodHostAndAnnotations sets the given pod's host to 'machine' iff it was previously 'oldMachine' and merges
+// the provided annotations with those of the pod.
 // Returns the current state of the pod, or an error.
-func (r *BindingREST) setPodHostTo(ctx api.Context, podID, oldMachine, machine string) (finalPod *api.Pod, err error) {
+func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachine, machine string, annotations map[string]string) (finalPod *api.Pod, err error) {
 	podKey, err := r.store.KeyFunc(ctx, podID)
 	if err != nil {
 		return nil, err
@@ -171,6 +171,12 @@ func (r *BindingREST) setPodHostTo(ctx api.Context, podID, oldMachine, machine s
 		}
 		pod.Spec.Host = machine
 		pod.Status.Host = machine
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			pod.Annotations[k] = v
+		}
 		finalPod = pod
 		return pod, nil
 	})
@@ -178,12 +184,15 @@ func (r *BindingREST) setPodHostTo(ctx api.Context, podID, oldMachine, machine s
 }
 
 // assignPod assigns the given pod to the given machine.
-func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string) error {
-	_, err := r.setPodHostTo(ctx, podID, "", machine)
-	if err != nil {
-		return err
+func (r *BindingREST) assignPod(ctx api.Context, podID string, machine string, annotations map[string]string) (err error) {
+	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
+		err = etcderr.InterpretGetError(err, "pod", podID)
+		err = etcderr.InterpretUpdateError(err, "pod", podID)
+		if _, ok := err.(*errors.StatusError); !ok {
+			err = errors.NewConflict("binding", podID, err)
+		}
 	}
-	return err
+	return
 }
 
 type podLifecycle struct{}
