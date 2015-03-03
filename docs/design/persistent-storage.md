@@ -12,7 +12,8 @@ A `PersistentVolumeClaim` is a user's request for a persistent volume to use in 
 
 One new system component:
 
-`PersistentVolumeManager` watches for new volumes to manage in the system, analogous to the node controller.  The volume manager also watches for claims by users and binds them to available volumes.
+`PersistentVolumeManager` watches for new volumes to manage in the system, analogous to the node controller.  The volume manager also watches for claims by users and binds them to available volumes. This 
+component is a singleton that manages all persistent volumes in the cluster.
 
 Kubernetes makes no guarantees at runtime that the underlying storage exists or is available.  High availability is left to the storage provider.
 
@@ -28,7 +29,8 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 #### Describe available storage
 
-Cluster adminstrators use the API to manage *PersistentVolumes*.  A manager watches for new volumes and adds them to the available supply of volumes.  All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available, matching volume.
+Cluster adminstrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the Kubernetes API for new volumes and adds them to its internal cache of volumes in the system.
+All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available, matching volume.
 
 Many means of dynamic provisioning will be eventually be implemented for various storage types. 
 
