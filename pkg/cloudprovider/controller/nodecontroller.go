@@ -166,12 +166,17 @@ func (s *NodeController) SyncCloud() error {
 	if err != nil {
 		return err
 	}
+	matches, err = s.PopulateIPs(matches)
+	if err != nil {
+		return err
+	}
 	nodes, err := s.kubeClient.Nodes().List()
 	if err != nil {
 		return err
 	}
 	nodeMap := make(map[string]*api.Node)
-	for _, node := range nodes.Items {
+	for i := range nodes.Items {
+		node := nodes.Items[i]
 		nodeMap[node.Name] = &node
 	}
 
