@@ -1,0 +1,170 @@
+#cloud-config
+
+coreos:
+  units:
+    - name: kubernetes-node-params.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch kubernetes-node-params
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /etc/kubernetes-node-params \
+        http://169.254.169.254/computeMetadata/v1/instance/attributes/kubernetes-node-params
+
+    - name: etcd.service
+      command: start
+      content: |
+        [Unit]
+        Description=etcd
+        Requires=kubernetes-node-params.service
+        After=kubernetes-node-params.service
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        PermissionsStartOnly=true
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/.kube
+        ExecStartPre=/usr/bin/mv /etc/${KUBE_MINION_HOSTNAME}.tar.gz /opt/kubernetes/.kube
+        ExecStartPre=/usr/bin/tar xzf /opt/kubernetes/.kube/${KUBE_MINION_HOSTNAME}.tar.gz -C /opt/kubernetes/.kube --overwrite
+        ExecStart=/usr/bin/etcd \
+        --name ${KUBE_MINION_HOSTNAME} \
+        --discovery ${ETCD_DISCOVERY} \
+        --addr $private_ipv4:4001 \
+        --bind-addr 0.0.0.0 \
+        --data-dir /var/lib/etcd \
+        --peer-addr $private_ipv4:2380 \
+        --peer-bind-addr $private_ipv4:2380 \
+        --peer-ca-file=/opt/kubernetes/.kube/ca.crt \
+        --peer-cert-file=/opt/kubernetes/.kube/issued/${KUBE_MINION_HOSTNAME}.crt \
+        --peer-key-file=/opt/kubernetes/.kube/private/${KUBE_MINION_HOSTNAME}.key
+        Restart=always
+        RestartSec=10s
+
+    - name: fleet.socket
+      command: start
+      content: |
+        [Socket]
+        ListenStream=/var/run/fleet.sock
+
+    - name: fleet.service
+      command: start
+      content: |
+        [Unit]
+        Description=fleet daemon
+        Requires=kubernetes-node-params.service
+        After=kubernetes-node-params.service
+        Requires=fleet.socket
+        After=fleet.socket
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/usr/bin/fleetd
+        Restart=always
+        RestartSec=10s
+
+    - name: container-bridge.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetches and runs container_bridge.sh script
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kubernetes-node-params.service
+        After=kubernetes-node-params.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes
+        ExecStartPre=/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /opt/kubernetes/container_bridge.sh \
+        http://169.254.169.254/computeMetadata/v1/instance/attributes/container-bridge-sh
+        ExecStartPre=/usr/bin/chmod 0755 /opt/kubernetes/container_bridge.sh
+        ExecStart=/opt/kubernetes/container_bridge.sh
+
+    - name: docker.service
+      command: start
+      content: |
+        [Unit]
+        Description=Docker Application Container Engine
+        Documentation=http://docs.docker.com
+        Requires=network-online.target
+        After=network-online.target
+        Requires=docker.socket
+        After=docker.socket
+        Requires=container-bridge.service
+        After=container-bridge.service
+
+        [Service]
+        LimitNOFILE=1048576
+        LimitNPROC=1048576
+        Environment=TMPDIR=/var/tmp
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/usr/bin/docker -D -d \
+        --host=unix:///var/run/docker.sock \
+        --bridge="cbr0" \
+        --iptables=false \
+        --ip-masq=false
+
+        Restart=always
+        RestartSec=10
+
+    - name: kubernetes-install-minion.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install Kubernetes Server
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kubernetes-node-params.service
+        After=kubernetes-node-params.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/pkg
+        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
+
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubelet
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=docker.socket
+        After=docker.socket
+
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/opt/kubernetes/server/bin/kubelet \
+        --api_servers=http://${KUBE_MASTER_INTERNAL_IP}:8080 \
+        --address=0.0.0.0 \
+        --hostname_override=${KUBE_MINION_HOSTNAME} \
+        --allow_privileged=false \
+        --v=2 \
+        --logtostderr=true
+
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubelet
+        Requires=kubelet.service
+        After=kubelet.service
+
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/opt/kubernetes/server/bin/kube-proxy \
+        --master=http://${KUBE_MASTER_INTERNAL_IP}:8080 \
+        --v=2 \
+        --logtostderr=true
+

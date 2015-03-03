@@ -1,0 +1,169 @@
+#cloud-config
+
+coreos:
+  units:
+    - name: kubernetes-node-params.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Configuration Fetcher
+        Requires=network-online.target
+        After=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /etc/kubernetes-node-params \
+        http://169.254.169.254/computeMetadata/v1/instance/attributes/kubernetes-node-params
+
+    - name: etcd.service
+      command: start
+      content: |
+        [Unit]
+        Description=etcd
+        Requires=kubernetes-node-params.service
+        After=kubernetes-node-params.service
+
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        PermissionsStartOnly=true
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/.kube
+        ExecStartPre=/usr/bin/mv /etc/${MASTER_NAME}.tar.gz /opt/kubernetes/.kube
+        ExecStartPre=/usr/bin/tar xzf /opt/kubernetes/.kube/${MASTER_NAME}.tar.gz -C /opt/kubernetes/.kube --overwrite
+        ExecStart=/usr/bin/etcd \
+        --name ${MASTER_NAME} \
+        --discovery ${ETCD_DISCOVERY} \
+        --addr $private_ipv4:4001 \
+        --bind-addr 0.0.0.0 \
+        --data-dir /var/lib/etcd \
+        --peer-addr $private_ipv4:2380 \
+        --peer-bind-addr $private_ipv4:2380 \
+        --peer-ca-file=/opt/kubernetes/.kube/ca.crt \
+        --peer-cert-file=/opt/kubernetes/.kube/issued/${MASTER_NAME}.crt \
+        --peer-key-file=/opt/kubernetes/.kube/private/${MASTER_NAME}.key
+        Restart=always
+        RestartSec=10s
+
+    - name: fleet.socket
+      command: start
+      content: |
+        [Socket]
+        ListenStream=/var/run/fleet.sock
+
+    - name: fleet.service
+      command: start
+      content: |
+        [Unit]
+        Description=fleet daemon
+        Wants=etcd.service
+        After=etcd.service
+        Wants=fleet.socket
+        After=fleet.socket
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/usr/bin/fleetd
+        Restart=always
+        RestartSec=10s
+
+# TODO: Organize these into targets.
+    - name: kubernetes-install-master.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Installer Scripts
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kubernetes-node-params.service
+        After=kubernetes-node-params.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/pkg
+        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
+
+    - name: kube-apiserver.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes API Server
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=etcd.service
+        Requires=kubernetes-install-master.service
+        Requires=kubernetes-node-params.service
+        After=etcd.service
+        After=kubernetes-install-master.service
+        After=kubernetes-node-params.service
+
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStartPre=/usr/bin/cp /opt/kubernetes/.kube/issued/${MASTER_NAME}.crt /opt/kubernetes/.kube/apiserver.crt
+        ExecStartPre=/usr/bin/bash -c "cat /opt/kubernetes/.kube/ca.crt >> /opt/kubernetes/.kube/apiserver.crt"
+        ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
+            --address=0.0.0.0 \
+            --port=8080 \
+            --secure_port=${KUBE_APISERVER_SECURE_PORT} \
+            --etcd_servers=http://127.0.0.1:4001 \
+            --tls_cert_file=/opt/kubernetes/.kube/apiserver.crt \
+            --tls_private_key_file=/opt/kubernetes/.kube/private/${MASTER_NAME}.key \
+            --cloud_provider=gce \
+            --allow_privileged=false \
+            --portal_net=${PORTAL_NET} \
+            --v=2 \
+            --logtostderr=true
+
+    - name: kube-scheduler.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=kube-apiserver.service
+        After=kube-apiserver.service
+
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/opt/kubernetes/server/bin/kube-scheduler \
+            --master=127.0.0.1:8080 \
+            --v=2 \
+            --logtostderr=true
+        Restart=always
+        RestartSec=10
+
+    - name: kube-controller-manager.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=kube-apiserver.service
+        After=kube-apiserver.service
+
+        [Service]
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/opt/kubernetes/server/bin/kube-controller-manager \
+            --master=127.0.0.1:8080 \
+            --cloud_provider=gce \
+            --minion_regexp='${NODE_INSTANCE_PREFIX}.*' \
+            --v=2 \
+            --logtostderr=true
+        Restart=always
+        RestartSec=10
+
+    - name: https-redirector.service
+      command: start
+      content: |
+        [Unit]
+        Description=HTTPS Port Redirector
+        Requires=kube-apiserver.service
+        After=kube-apiserver.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kubernetes-node-params
+        ExecStart=/sbin/iptables -A PREROUTING -t nat -p tcp --dport 443 -j REDIRECT --to-port ${KUBE_APISERVER_SECURE_PORT}
