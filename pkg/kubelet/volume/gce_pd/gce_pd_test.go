@@ -36,7 +36,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/gce-pd" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
+	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -73,7 +73,7 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name: "vol1",
-		Source: api.VolumeSource{
+		VolumeSource: api.VolumeSource{
 			GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 				PDName: "pd",
 				FSType: "ext4",
@@ -140,11 +140,11 @@ func TestPluginLegacy(t *testing.T) {
 	if plug.Name() != "gce-pd" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&api.Volume{Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
+	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}, types.UID("poduid")); err == nil {
+	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}, types.UID("poduid")); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

@@ -63,7 +63,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if spec.Source.GitRepo != nil {
+	if spec.GitRepo != nil {
 		return true
 	}
 	return false
@@ -77,8 +77,8 @@ func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (vol
 	return &gitRepo{
 		podUID:     podUID,
 		volName:    spec.Name,
-		source:     spec.Source.GitRepo.Repository,
-		revision:   spec.Source.GitRepo.Revision,
+		source:     spec.GitRepo.Repository,
+		revision:   spec.GitRepo.Revision,
 		exec:       exec.New(),
 		plugin:     plugin,
 		legacyMode: false,

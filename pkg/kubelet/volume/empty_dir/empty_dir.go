@@ -60,10 +60,10 @@ func (plugin *emptyDirPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if util.AllPtrFieldsNil(&spec.Source) {
+	if util.AllPtrFieldsNil(&spec.VolumeSource) {
 		return true
 	}
-	if spec.Source.EmptyDir != nil {
+	if spec.EmptyDir != nil {
 		return true
 	}
 	return false

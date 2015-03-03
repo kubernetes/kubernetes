@@ -177,7 +177,7 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source VolumeSource `json:"source,omitempty"`
+	VolumeSource `json:"inline,omitempty"`
 }
 
 // VolumeSource represents the source location of a valume to mount.

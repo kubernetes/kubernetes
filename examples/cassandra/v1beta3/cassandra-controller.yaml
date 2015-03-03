@@ -38,6 +38,5 @@ spec:
               name: data
       volumes: 
         - name: data
-          source: 
-            emptyDir: {}
+          emptyDir: {}
 

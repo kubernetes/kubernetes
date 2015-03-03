@@ -64,7 +64,7 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if spec.Source.GCEPersistentDisk != nil {
+	if spec.GCEPersistentDisk != nil {
 		return true
 	}
 	return false
@@ -81,13 +81,13 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podU
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 
-	pdName := spec.Source.GCEPersistentDisk.PDName
-	fsType := spec.Source.GCEPersistentDisk.FSType
+	pdName := spec.GCEPersistentDisk.PDName
+	fsType := spec.GCEPersistentDisk.FSType
 	partition := ""
-	if spec.Source.GCEPersistentDisk.Partition != 0 {
-		partition = strconv.Itoa(spec.Source.GCEPersistentDisk.Partition)
+	if spec.GCEPersistentDisk.Partition != 0 {
+		partition = strconv.Itoa(spec.GCEPersistentDisk.Partition)
 	}
-	readOnly := spec.Source.GCEPersistentDisk.ReadOnly
+	readOnly := spec.GCEPersistentDisk.ReadOnly
 
 	return &gcePersistentDisk{
 		podUID:      podUID,

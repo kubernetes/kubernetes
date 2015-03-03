@@ -155,10 +155,10 @@ type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
 	Name string `json:"name"`
-	// Source represents the location and type of a volume to mount.
+	// The VolumeSource represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source VolumeSource `json:"source,omitempty"`
+	VolumeSource `json:"inline,omitempty"`
 }
 
 // VolumeSource represents the source location of a volume to mount.

@@ -51,7 +51,7 @@ func (plugin *secretPlugin) Name() string {
 }
 
 func (plugin *secretPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.Source.Secret != nil {
+	if spec.Secret != nil {
 		return true
 	}
 
@@ -63,7 +63,7 @@ func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volu
 }
 
 func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
-	return &secretVolume{spec.Name, podUID, plugin, &spec.Source.Secret.Target}, nil
+	return &secretVolume{spec.Name, podUID, plugin, &spec.Secret.Target}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {

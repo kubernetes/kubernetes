@@ -30,10 +30,8 @@ spec:
               mountPath: /var/www/html
       volumes:
         - name: wordpress-persistent-storage
-          source:
-            # emptyDir: {}
-            persistentDisk:
-              # This GCE PD must already exist.
-              pdName: wordpress-disk
-              fsType: ext4
+          persistentDisk:
+            # This GCE PD must already exist.
+            pdName: wordpress-disk
+            fsType: ext4
 

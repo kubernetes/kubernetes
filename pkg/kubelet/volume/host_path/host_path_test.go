@@ -35,10 +35,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/host-path" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
+	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&api.Volume{Source: api.VolumeSource{}}) {
+	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -52,8 +52,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	spec := &api.Volume{
-		Name:   "vol1",
-		Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/vol1"}},
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/vol1"}},
 	}
 	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
 	if err != nil {
