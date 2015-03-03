@@ -23,7 +23,7 @@ readonly   red=$(tput setaf 1)
 readonly green=$(tput setaf 2)
 
 kube::test::clear_all() {
-  kubectl delete rc,pods --all
+  kubectl delete "${kube_flags[@]}" rc,pods --all
 }
 
 kube::test::get_object_assert() {
@@ -31,7 +31,7 @@ kube::test::get_object_assert() {
   local request=$2
   local expected=$3
 
-  res=$(kubectl get $object -o template -t "$request")
+  res=$(kubectl get "${kube_flags[@]}" $object -o template -t "$request")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
