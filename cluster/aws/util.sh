@@ -61,13 +61,17 @@ function expect_instance_states {
 }
 
 function get_instance_public_ip {
-  python -c "import json,sys; lst = [str(instance['NetworkInterfaces'][0]['Association']['PublicIp']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] for tag in instance.get('Tags', []) if tag['Value'] == '$1' and instance['State']['Name'] == 'running']; print ' '.join(lst)"
+  local tagName=$1
+  $AWS_CMD --output text describe-instances \
+    --filters Name=tag:Name,Values=${tagName} Name=instance-state-name,Values=running \
+    --query Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp
 }
+
 
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$($AWS_CMD describe-instances | get_instance_public_ip $MASTER_NAME)
+    KUBE_MASTER_IP=$(get_instance_public_ip $MASTER_NAME)
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
@@ -79,7 +83,7 @@ function detect-master () {
 function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    local minion_ip=$($AWS_CMD describe-instances --filters Name=tag-value,Values=${MINION_NAMES[$i]} Name=instance-state-name,Values=running | get_instance_public_ip ${MINION_NAMES[$i]})
+    local minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
     echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
   done
@@ -338,7 +342,7 @@ function kube-up {
 
    while true; do
     echo -n Attempt "$(($attempt+1))" to check for master node
-    local ip=$($AWS_CMD describe-instances | get_instance_public_ip $MASTER_NAME)
+    local ip=$(get_instance_public_ip $MASTER_NAME)
     if [[ -z "${ip}" ]]; then
       if (( attempt > 30 )); then
         echo
@@ -587,22 +591,24 @@ function test-setup {
 # Execute after running tests to perform any required clean-up. This is called
 # from hack/e2e.go
 function test-teardown {
-#  detect-project
-#  echo "Shutting down test cluster in background."
-#  gcloud compute firewall-rules delete  \
-#    --project "${PROJECT}" \
-#    --quiet \
-#    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true
   echo "Shutting down test cluster."
   "${KUBE_ROOT}/cluster/kube-down.sh"
 }
+
 
 # SSH to a node by name ($1) and run a command ($2).
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
+
+  local ip=$(get_instance_public_ip ${node})
+  if [ -z "ip" ]; then
+    echo "Could not detect IP for ${node}."
+    exit 1
+  fi
+
   for try in $(seq 1 5); do
-    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"; then
+    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${ip} "${cmd}"; then
       break
     fi
   done
