@@ -35,13 +35,13 @@ func init() {
 	sleepDuration = 0
 }
 
-type testEventRecorder struct {
+type testEventSink struct {
 	OnCreate func(e *api.Event) (*api.Event, error)
 	OnUpdate func(e *api.Event) (*api.Event, error)
 }
 
 // CreateEvent records the event for testing.
-func (t *testEventRecorder) Create(e *api.Event) (*api.Event, error) {
+func (t *testEventSink) Create(e *api.Event) (*api.Event, error) {
 	if t.OnCreate != nil {
 		return t.OnCreate(e)
 	}
@@ -49,7 +49,7 @@ func (t *testEventRecorder) Create(e *api.Event) (*api.Event, error) {
 }
 
 // UpdateEvent records the event for testing.
-func (t *testEventRecorder) Update(e *api.Event) (*api.Event, error) {
+func (t *testEventSink) Update(e *api.Event) (*api.Event, error) {
 	if t.OnUpdate != nil {
 		return t.OnUpdate(e)
 	}
@@ -273,7 +273,7 @@ func TestEventf(t *testing.T) {
 
 	for _, item := range table {
 		called := make(chan struct{})
-		testEvents := testEventRecorder{
+		testEvents := testEventSink{
 			OnCreate: func(event *api.Event) (*api.Event, error) {
 				returnEvent, _ := validateEvent(event, item.expect, t)
 				if item.expectUpdate {
@@ -291,7 +291,7 @@ func TestEventf(t *testing.T) {
 				return returnEvent, nil
 			},
 		}
-		recorder := StartRecording(&testEvents, api.EventSource{Component: "eventTest"})
+		recorder := StartRecording(&testEvents)
 		logger := StartLogging(t.Logf) // Prove that it is useful
 		logger2 := StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
@@ -300,7 +300,8 @@ func TestEventf(t *testing.T) {
 			called <- struct{}{}
 		})
 
-		Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
+		testSource := api.EventSource{Component: "eventTest"}
+		FromSource(testSource).Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		<-called
 		<-called
@@ -387,7 +388,7 @@ func TestWriteEventError(t *testing.T) {
 	done := make(chan struct{})
 
 	defer StartRecording(
-		&testEventRecorder{
+		&testEventSink{
 			OnCreate: func(event *api.Event) (*api.Event, error) {
 				if event.Message == "finished" {
 					close(done)
@@ -405,13 +406,13 @@ func TestWriteEventError(t *testing.T) {
 				return event, nil
 			},
 		},
-		api.EventSource{Component: "eventTest"},
 	).Stop()
 
+	testSource := api.EventSource{Component: "eventTest"}
 	for caseName := range table {
-		Event(ref, "Reason", caseName)
+		FromSource(testSource).Event(ref, "Reason", caseName)
 	}
-	Event(ref, "Reason", "finished")
+	FromSource(testSource).Event(ref, "Reason", "finished")
 	<-done
 
 	for caseName, item := range table {
@@ -427,7 +428,7 @@ func TestLotsOfEvents(t *testing.T) {
 
 	// Fail each event a few times to ensure there's some load on the tested code.
 	var counts [1000]int
-	testEvents := testEventRecorder{
+	testEvents := testEventSink{
 		OnCreate: func(event *api.Event) (*api.Event, error) {
 			num, err := strconv.Atoi(event.Message)
 			if err != nil {
@@ -442,7 +443,8 @@ func TestLotsOfEvents(t *testing.T) {
 			return event, nil
 		},
 	}
-	recorder := StartRecording(&testEvents, api.EventSource{Component: "eventTest"})
+	recorder := StartRecording(&testEvents)
+	testSource := api.EventSource{Component: "eventTest"}
 	logger := StartLogging(func(formatter string, args ...interface{}) {
 		loggerCalled <- struct{}{}
 	})
@@ -455,7 +457,7 @@ func TestLotsOfEvents(t *testing.T) {
 		APIVersion: "v1beta1",
 	}
 	for i := 0; i < maxQueuedEvents; i++ {
-		go Event(ref, "Reason", strconv.Itoa(i))
+		go FromSource(testSource).Event(ref, "Reason", strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
 	for i := 0; i < maxQueuedEvents; i++ {

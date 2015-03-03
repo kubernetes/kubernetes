@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -283,6 +284,7 @@ func SimpleRunKubelet(client *client.Client,
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig) {
 	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
+	kcfg.Recorder = record.FromSource(api.EventSource{Component: "kubelet", Host: kcfg.Hostname})
 	if kcfg.KubeClient != nil {
 		kubelet.SetupEventSending(kcfg.KubeClient, kcfg.Hostname)
 	} else {
@@ -323,7 +325,7 @@ func startKubelet(k *kubelet.Kubelet, podCfg *config.PodConfig, kc *KubeletConfi
 
 func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 	// source of all configuration
-	cfg := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
+	cfg := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates, kc.Recorder)
 
 	// define file config source
 	if kc.ConfigFile != "" {
@@ -378,6 +380,7 @@ type KubeletConfig struct {
 	MasterServiceNamespace         string
 	VolumePlugins                  []volume.Plugin
 	StreamingConnectionIdleTimeout time.Duration
+	Recorder                       record.EventRecorder
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -401,7 +404,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
 		kc.VolumePlugins,
-		kc.StreamingConnectionIdleTimeout)
+		kc.StreamingConnectionIdleTimeout,
+		kc.Recorder)
 
 	if err != nil {
 		return nil, err

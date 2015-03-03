@@ -48,6 +48,9 @@ type podWorkers struct {
 	// NOTE: This function has to be thread-safe - it can be called for
 	// different pods at the same time.
 	syncPodFn syncPodFnType
+
+	// The EventRecorder to use
+	recorder record.EventRecorder
 }
 
 type workUpdate struct {
@@ -58,12 +61,13 @@ type workUpdate struct {
 	updateCompleteFn func()
 }
 
-func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType) *podWorkers {
+func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType, recorder record.EventRecorder) *podWorkers {
 	return &podWorkers{
 		podUpdates:  map[types.UID]chan workUpdate{},
 		isWorking:   map[types.UID]bool{},
 		dockerCache: dockerCache,
 		syncPodFn:   syncPodFn,
+		recorder:    recorder,
 	}
 }
 
@@ -83,7 +87,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 			err = p.syncPodFn(newWork.pod, containers)
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
-				record.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
+				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
 				return
 			}
 

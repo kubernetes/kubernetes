@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
@@ -54,6 +55,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient, *syn
 		RemovedImages: util.StringSet{},
 	}
 	fakeDockerCache := dockertools.NewFakeDockerCache(fakeDocker)
+	recorder := &record.FakeRecorder{}
 
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
@@ -74,11 +76,13 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient, *syn
 			err := kubelet.syncPod(pod, containers)
 			waitGroup.Done()
 			return err
-		})
+		},
+		recorder)
 	kubelet.sourceReady = func(source string) bool { return true }
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.readiness = newReadinessStates()
+	kubelet.recorder = recorder
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
@@ -1206,6 +1210,8 @@ func TestMakePortsAndBindings(t *testing.T) {
 }
 
 func TestCheckHostPortConflicts(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+
 	successCaseAll := []api.BoundPod{
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
@@ -1215,7 +1221,7 @@ func TestCheckHostPortConflicts(t *testing.T) {
 		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}},
 	}
 	expected := append(successCaseAll, successCaseNew)
-	if actual := filterHostPortConflicts(expected); !reflect.DeepEqual(actual, expected) {
+	if actual := kubelet.filterHostPortConflicts(expected); !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Expected %#v, Got %#v", expected, actual)
 	}
 
@@ -1227,7 +1233,7 @@ func TestCheckHostPortConflicts(t *testing.T) {
 	failureCaseNew := api.BoundPod{
 		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
 	}
-	if actual := filterHostPortConflicts(append(failureCaseAll, failureCaseNew)); !reflect.DeepEqual(failureCaseAll, actual) {
+	if actual := kubelet.filterHostPortConflicts(append(failureCaseAll, failureCaseNew)); !reflect.DeepEqual(failureCaseAll, actual) {
 		t.Errorf("Expected %#v, Got %#v", expected, actual)
 	}
 }
@@ -3089,6 +3095,8 @@ func TestPortForward(t *testing.T) {
 
 // Tests that upon host port conflict, the newer pod is removed.
 func TestFilterHostPortConflicts(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+
 	// Reuse the pod spec with the same port to create a conflict.
 	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
 	var pods = []api.BoundPod{
@@ -3112,7 +3120,7 @@ func TestFilterHostPortConflicts(t *testing.T) {
 	// Make sure the BoundPods are in the reverse order of creation time.
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
-	filteredPods := filterHostPortConflicts(pods)
+	filteredPods := kubelet.filterHostPortConflicts(pods)
 	if len(filteredPods) != 1 {
 		t.Fatalf("Expected one pod. Got pods %#v", filteredPods)
 	}

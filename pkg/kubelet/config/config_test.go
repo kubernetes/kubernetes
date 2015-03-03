@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
@@ -74,7 +75,7 @@ func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...api.BoundPo
 }
 
 func createPodConfigTester(mode PodConfigNotificationMode) (chan<- interface{}, <-chan kubelet.PodUpdate, *PodConfig) {
-	config := NewPodConfig(mode)
+	config := NewPodConfig(mode, record.FromSource(api.EventSource{Component: "kubelet"}))
 	channel := config.Channel(TestSource)
 	ch := config.Updates()
 	return channel, ch, config

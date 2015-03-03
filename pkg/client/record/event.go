@@ -35,20 +35,22 @@ const maxTriesPerEvent = 12
 
 var sleepDuration = 10 * time.Second
 
-// EventRecorder knows how to store events (client.Client implements it.)
-// EventRecorder must respect the namespace that will be embedded in 'event'.
-// It is assumed that EventRecorder will return the same sorts of errors as
+// EventSink knows how to store events (client.Client implements it.)
+// EventSink must respect the namespace that will be embedded in 'event'.
+// It is assumed that EventSink will return the same sorts of errors as
 // pkg/client's REST client.
-type EventRecorder interface {
+type EventSink interface {
 	Create(event *api.Event) (*api.Event, error)
 	Update(event *api.Event) (*api.Event, error)
 }
 
-// StartRecording starts sending events to recorder. Call once while initializing
+var emptySource = api.EventSource{}
+
+// StartRecording starts sending events to a sink. Call once while initializing
 // your binary. Subsequent calls will be ignored. The return value can be ignored
 // or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
-func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interface {
+func StartRecording(sink EventSink) watch.Interface {
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -57,7 +59,6 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 		// Events are safe to copy like this.
 		eventCopy := *event
 		event = &eventCopy
-		event.Source = source
 
 		previousEvent := getEvent(event)
 		updateExistingEvent := previousEvent.Count > 0
@@ -70,7 +71,7 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 
 		tries := 0
 		for {
-			if recordEvent(recorder, event, updateExistingEvent) {
+			if recordEvent(sink, event, updateExistingEvent) {
 				break
 			}
 			tries++
@@ -89,17 +90,17 @@ func StartRecording(recorder EventRecorder, source api.EventSource) watch.Interf
 	})
 }
 
-// recordEvent attempts to write event to recorder. It returns true if the event
+// recordEvent attempts to write event to a sink. It returns true if the event
 // was successfully recorded or discarded, false if it should be retried.
 // If updateExistingEvent is false, it creates a new event, otherwise it updates
 // existing event.
-func recordEvent(recorder EventRecorder, event *api.Event, updateExistingEvent bool) bool {
+func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) bool {
 	var newEvent *api.Event
 	var err error
 	if updateExistingEvent {
-		newEvent, err = recorder.Update(event)
+		newEvent, err = sink.Update(event)
 	} else {
-		newEvent, err = recorder.Create(event)
+		newEvent, err = sink.Create(event)
 	}
 	if err == nil {
 		addOrUpdateEvent(newEvent)
@@ -165,24 +166,52 @@ const maxQueuedEvents = 1000
 
 var events = watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull)
 
-// Event constructs an event from the given information and puts it in the queue for sending.
-// 'object' is the object this event is about. Event will make a reference-- or you may also
-// pass a reference to the object directly.
-// 'reason' is the reason this event is generated. 'reason' should be short and unique; it will
-// be used to automate handling of events, so imagine people writing switch statements to
-// handle them. You want to make that easy.
-// 'message' is intended to be human readable.
-//
-// The resulting event will be created in the same namespace as the reference object.
-func Event(object runtime.Object, reason, message string) {
+// EventRecorder knows how to record events for an EventSource.
+type EventRecorder interface {
+	// Event constructs an event from the given information and puts it in the queue for sending.
+	// 'object' is the object this event is about. Event will make a reference-- or you may also
+	// pass a reference to the object directly.
+	// 'reason' is the reason this event is generated. 'reason' should be short and unique; it will
+	// be used to automate handling of events, so imagine people writing switch statements to
+	// handle them. You want to make that easy.
+	// 'message' is intended to be human readable.
+	//
+	// The resulting event will be created in the same namespace as the reference object.
+	Event(object runtime.Object, reason, message string)
+
+	// Eventf is just like Event, but with Sprintf for the message field.
+	Eventf(object runtime.Object, reason, messageFmt string, args ...interface{})
+}
+
+// FromSource returns an EventRecorder that records events with the
+// given event source.
+func FromSource(source api.EventSource) EventRecorder {
+	return &recorderImpl{source}
+}
+
+type recorderImpl struct {
+	source api.EventSource
+}
+
+func (i *recorderImpl) Event(object runtime.Object, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
-		return
 	}
-	t := util.Now()
 
-	e := &api.Event{
+	e := makeEvent(ref, reason, message)
+	e.Source = i.source
+
+	events.Action(watch.Added, e)
+}
+
+func (i *recorderImpl) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
+	i.Event(object, reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
+	t := util.Now()
+	return &api.Event{
 		ObjectMeta: api.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: ref.Namespace,
@@ -194,11 +223,4 @@ func Event(object runtime.Object, reason, message string) {
 		LastTimestamp:  t,
 		Count:          1,
 	}
-
-	events.Action(watch.Added, e)
-}
-
-// Eventf is just like Event, but with Sprintf for the message field.
-func Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	Event(object, reason, fmt.Sprintf(messageFmt, args...))
 }

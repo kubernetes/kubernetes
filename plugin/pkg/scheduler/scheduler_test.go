@@ -102,6 +102,7 @@ func TestScheduler(t *testing.T) {
 			NextPod: func() *api.Pod {
 				return item.sendPod
 			},
+			Recorder: record.FromSource(api.EventSource{Component: "scheduler"}),
 		}
 		s := New(c)
 		called := make(chan struct{})
