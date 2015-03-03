@@ -372,7 +372,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 func (m *Master) init(c *Config) {
 
 	boundPodFactory := &pod.BasicBoundPodFactory{}
-	podStorage, bindingStorage := podetcd.NewREST(c.EtcdHelper, boundPodFactory)
+	podStorage, bindingStorage, podStatusStorage := podetcd.NewREST(c.EtcdHelper, boundPodFactory)
 	podRegistry := pod.NewRegistry(podStorage)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
@@ -406,8 +406,9 @@ func (m *Master) init(c *Config) {
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods":     podStorage,
-		"bindings": bindingStorage,
+		"pods":        podStorage,
+		"pods/status": podStatusStorage,
+		"bindings":    bindingStorage,
 
 		"replicationControllers": controller.NewREST(registry, podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
