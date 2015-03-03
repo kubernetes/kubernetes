@@ -327,7 +327,6 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	previousResourceVersion := make(map[string]float64)
 
 	for _, r := range getTestRequests() {
-		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
 			sub := ""
@@ -344,16 +343,19 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 				t.Errorf("Body: %v", string(b))
 			} else {
@@ -427,19 +429,21 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if resp.StatusCode != http.StatusForbidden {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
 			}
 		}()
@@ -496,7 +500,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 	for _, r := range getTestRequests() {
 		token := AliceToken
-		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
 			sub := ""
@@ -521,10 +524,12 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 				t.Errorf("Body: %v", string(b))
 			} else {
@@ -580,7 +585,6 @@ func TestBobIsForbidden(t *testing.T) {
 
 	for _, r := range getTestRequests() {
 		token := BobToken
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -592,10 +596,12 @@ func TestBobIsForbidden(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
+				t.Logf("case %v", r)
 				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
 			}
 		}()
@@ -641,7 +647,6 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 
 	for _, r := range getTestRequests() {
 		token := UnknownToken
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -652,10 +657,12 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// Expect all of unauthenticated user's request to be "Unauthorized"
 			if resp.StatusCode != http.StatusUnauthorized {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status %v, but got %v", http.StatusUnauthorized, resp.StatusCode)
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
@@ -746,7 +753,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 
 	for _, r := range requests {
 		token := BobToken
-		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
 			sub := ""
@@ -766,6 +772,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -773,10 +780,12 @@ func TestNamespaceAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 				t.Errorf("Body: %v", string(b))
 			} else {
@@ -852,7 +861,6 @@ func TestKindAuthorization(t *testing.T) {
 
 	for _, r := range requests {
 		token := BobToken
-		t.Logf("case %v", r)
 		var bodyStr string
 		if r.body != "" {
 			bodyStr = fmt.Sprintf(r.body, "")
@@ -867,6 +875,7 @@ func TestKindAuthorization(t *testing.T) {
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -874,10 +883,12 @@ func TestKindAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 				t.Errorf("Body: %v", string(b))
 			} else {
@@ -946,7 +957,6 @@ func TestReadOnlyAuthorization(t *testing.T) {
 
 	for _, r := range requests {
 		token := BobToken
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -957,9 +967,11 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
