@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -35,8 +36,9 @@ import (
 )
 
 var (
-	domain  = flag.String("domain", "kubernetes.local", "domain under which to create names")
-	verbose = flag.Bool("verbose", false, "log extra information")
+	domain                = flag.String("domain", "kubernetes.local", "domain under which to create names")
+	verbose               = flag.Bool("verbose", false, "log extra information")
+	etcd_mutation_timeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 )
 
 func removeDNS(record string, etcdClient *etcd.Client) error {
@@ -62,6 +64,26 @@ func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error
 	log.Printf("Setting dns record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Port)
 	_, err = etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
 	return err
+}
+
+// Implements retry logic for arbitrary mutator. Crashes after retrying for
+// etcd_mutation_timeout.
+func mutateEtcdOrDie(mutator func() error) {
+	timeout := time.After(*etcd_mutation_timeout)
+	for {
+		select {
+		case <-timeout:
+			log.Fatalf("Failed to mutate etcd for %v using mutator: %v", *etcd_mutation_timeout, mutator)
+		default:
+			if err := mutator(); err != nil {
+				delay := 50 * time.Millisecond
+				log.Printf("Failed to mutate etcd using mutator: %v due to: %v. Will retry in: %v", mutator, err, delay)
+				time.Sleep(delay)
+			} else {
+				return
+			}
+		}
+	}
 }
 
 func newEtcdClient() (client *etcd.Client) {
@@ -116,19 +138,13 @@ func watchOnce(etcdClient *etcd.Client, kubeClient *kclient.Client) {
 			for i := range ev.Services {
 				s := &ev.Services[i]
 				name := buildNameString(s.Name, s.Namespace, *domain)
-				err := addDNS(name, s, etcdClient)
-				if err != nil {
-					log.Printf("Failed to add DNS for %s: %v", name, err)
-				}
+				mutateEtcdOrDie(func() error { return addDNS(name, s, etcdClient) })
 			}
 		case RemoveService:
 			for i := range ev.Services {
 				s := &ev.Services[i]
 				name := buildNameString(s.Name, s.Namespace, *domain)
-				err := removeDNS(name, etcdClient)
-				if err != nil {
-					log.Printf("Failed to remove DNS for %s: %v", name, err)
-				}
+				mutateEtcdOrDie(func() error { return removeDNS(name, etcdClient) })
 			}
 		}
 	}
