@@ -213,16 +213,8 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		newStatus.HostIP = p.getHostAddress(nodeStatus.Addresses)
 		newStatus.Info = result.Status.Info
 		newStatus.PodIP = result.Status.PodIP
-		if newStatus.Info == nil {
-			// There is a small race window that kubelet couldn't
-			// propulated the status yet. This should go away once
-			// we removed boundPods
-			newStatus.Phase = api.PodPending
-			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)
-		} else {
-			newStatus.Phase = result.Status.Phase
-			newStatus.Conditions = result.Status.Conditions
-		}
+		newStatus.Phase = result.Status.Phase
+		newStatus.Conditions = result.Status.Conditions
 	}
 	return newStatus, err
 }

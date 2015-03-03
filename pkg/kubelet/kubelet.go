@@ -155,6 +155,8 @@ func NewMainKubelet(
 		return nil, err
 	}
 
+	klet.podStatuses = make(map[string]api.PodStatus)
+
 	return klet, nil
 }
 
@@ -235,6 +237,10 @@ type Kubelet struct {
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
+
+	// A pod status cache currently used to store rejected pods and their statuses.
+	podStatusesLock sync.RWMutex
+	podStatuses     map[string]api.PodStatus
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -454,6 +460,30 @@ func (kl *Kubelet) GetCadvisorClient() cadvisorInterface {
 	kl.cadvisorLock.RLock()
 	defer kl.cadvisorLock.RUnlock()
 	return kl.cadvisorClient
+}
+
+func (kl *Kubelet) getPodStatusFromCache(podFullName string) (api.PodStatus, bool) {
+	kl.podStatusesLock.RLock()
+	defer kl.podStatusesLock.RUnlock()
+	status, ok := kl.podStatuses[podFullName]
+	return status, ok
+}
+
+func (kl *Kubelet) setPodStatusInCache(podFullName string, status api.PodStatus) {
+	kl.podStatusesLock.Lock()
+	defer kl.podStatusesLock.Unlock()
+	kl.podStatuses[podFullName] = status
+}
+
+func (kl *Kubelet) removeOrphanedStatuses(podFullNames map[string]bool) {
+	kl.podStatusesLock.Lock()
+	defer kl.podStatusesLock.Unlock()
+	for key := range kl.podStatuses {
+		if _, ok := podFullNames[key]; !ok {
+			glog.V(5).Infof("Removing %q from status map.", key)
+			delete(kl.podStatuses, key)
+		}
+	}
 }
 
 // Run starts the kubelet reacting to config updates
@@ -1277,10 +1307,28 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
+func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
+
+	// Remove obsolete entries in podStatus where the pod is no longer considered bound to this node.
+	podFullNames := make(map[string]bool)
+	for _, pod := range allPods {
+		podFullNames[GetPodFullName(&pod)] = true
+	}
+	kl.removeOrphanedStatuses(podFullNames)
+
+	// Filtered out the rejected pod. They don't have running containers.
+	var pods []api.BoundPod
+	for _, pod := range allPods {
+		status, ok := kl.getPodStatusFromCache(GetPodFullName(&pod))
+		if ok && status.Phase == api.PodFailed {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+
 	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
 	desiredContainers := make(map[podContainer]empty)
@@ -1404,9 +1452,9 @@ func (s podsByCreationTime) Less(i, j int) bool {
 	return s[i].CreationTimestamp.Before(s[j].CreationTimestamp)
 }
 
-// filterHostPortConflicts removes pods that conflict on Port.HostPort values
-func (kl *Kubelet) filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
-	filtered := []api.BoundPod{}
+// getHostPortConflicts detects pods with conflicted host ports and return them.
+func getHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
+	conflicts := []api.BoundPod{}
 	ports := map[int]bool{}
 	extract := func(p *api.ContainerPort) int { return p.HostPort }
 
@@ -1416,15 +1464,24 @@ func (kl *Kubelet) filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	for i := range pods {
 		pod := &pods[i]
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {
-			glog.Warningf("Pod %q: HostPort is already allocated, ignoring: %v", GetPodFullName(pod), errs)
-			kl.recorder.Eventf(pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
-			// TODO: Set the pod status to fail.
+			glog.Errorf("Pod %q: HostPort is already allocated, ignoring: %v", GetPodFullName(pod), errs)
+			conflicts = append(conflicts, *pod)
 			continue
 		}
-		filtered = append(filtered, *pod)
 	}
 
-	return filtered
+	return conflicts
+}
+
+// handleHostPortConflicts handles pods that conflict on Port.HostPort values.
+func (kl *Kubelet) handleHostPortConflicts(pods []api.BoundPod) {
+	conflicts := getHostPortConflicts(pods)
+	for _, pod := range conflicts {
+		kl.recorder.Eventf(&pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
+		kl.setPodStatusInCache(GetPodFullName(&pod), api.PodStatus{
+			Phase:   api.PodFailed,
+			Message: "Pod cannot be started due to host port conflict"})
+	}
 }
 
 func (kl *Kubelet) handleUpdate(u PodUpdate) {
@@ -1434,12 +1491,11 @@ func (kl *Kubelet) handleUpdate(u PodUpdate) {
 	case SET:
 		glog.V(3).Infof("SET: Containers changed")
 		kl.pods = u.Pods
-		kl.pods = kl.filterHostPortConflicts(kl.pods)
+		kl.handleHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
 		kl.pods = updateBoundPods(u.Pods, kl.pods)
-		kl.pods = kl.filterHostPortConflicts(kl.pods)
-
+		kl.handleHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
 	}
@@ -1505,7 +1561,7 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		}
 
 		kl.pods = u.Pods
-		kl.pods = kl.filterHostPortConflicts(kl.pods)
+		kl.handleHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
 
@@ -1514,9 +1570,8 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		for i := range u.Pods {
 			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodUpdate
 		}
-
 		kl.pods = updateBoundPods(u.Pods, kl.pods)
-		kl.pods = kl.filterHostPortConflicts(kl.pods)
+		kl.handleHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
 	}
@@ -1712,6 +1767,12 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 
 	if !found {
 		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
+	}
+
+	// Check to see if the pod has been rejected.
+	mappedPodStatus, ok := kl.getPodStatusFromCache(podFullName)
+	if ok {
+		return mappedPodStatus, nil
 	}
 
 	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, *spec, podFullName, uid)
