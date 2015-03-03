@@ -900,7 +900,7 @@ function setup-logging-firewall {
   done
 
   echo
-  echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}https://https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/elasticsearch-logging/"
+  echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/elasticsearch-logging/"
   echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/kibana-logging/${color_norm} (note the trailing slash)"
   echo
 }
