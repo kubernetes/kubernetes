@@ -49,7 +49,7 @@ func TestVolumeController(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceSize): resource.MustParse("5G"),
+				api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
 			},
 			Source: api.VolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -63,9 +63,11 @@ func TestVolumeController(t *testing.T) {
 			Namespace: "myns",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.AccessModeType{ api.ReadOnlyMany, api.ReadWriteOnce },
-			Resources: api.ResourceList{
-				api.ResourceName(api.ResourceSize): resource.MustParse("5G"),
+			AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+				},
 			},
 		},
 	}
@@ -76,9 +78,11 @@ func TestVolumeController(t *testing.T) {
 			Namespace: "myns",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.AccessModeType{ api.ReadOnlyMany, api.ReadWriteOnce },
-			Resources: api.ResourceList{
-				api.ResourceName(api.ResourceSize): resource.MustParse("5G"),
+			AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+				},
 			},
 		},
 	}
@@ -88,7 +92,7 @@ func TestVolumeController(t *testing.T) {
 		t.Error("Unexpected error: %v", err)
 	}
 
-	if !controller.volumeIndex.Exists(pv){
+	if !controller.volumeIndex.Exists(pv) {
 		t.Error("Expected to find volume in the index")
 	}
 
@@ -114,21 +118,19 @@ func TestVolumeController(t *testing.T) {
 	}
 }
 
-
-func TestVolumeExamples(t *testing.T){
+func TestVolumeExamples(t *testing.T) {
 
 	controller := NewPersistentVolumeManager(fakeClient())
 
 	volumeA := readAndDecodeVolume("local-01.yaml", t)
 	claimA := readAndDecodeClaim("claim-01.yaml", t)
 
-
 	_, err := controller.syncPersistentVolume(volumeA)
 	if err != nil {
 		t.Error("Unexpected error: %v", err)
 	}
 
-	if !controller.volumeIndex.Exists(volumeA){
+	if !controller.volumeIndex.Exists(volumeA) {
 		t.Error("Expected to find volume in the index")
 	}
 
@@ -143,9 +145,8 @@ func TestVolumeExamples(t *testing.T){
 	}
 }
 
-
 func readAndDecodeVolume(name string, t *testing.T) *api.PersistentVolume {
-	data, err := ioutil.ReadFile("../../examples/storage/volumes/" + name)
+	data, err := ioutil.ReadFile("../../examples/persistent-volumes/volumes/" + name)
 	if err != nil {
 		t.Error("Unexpected error attempting to read example volume file: %s", name)
 	}
@@ -159,7 +160,7 @@ func readAndDecodeVolume(name string, t *testing.T) *api.PersistentVolume {
 }
 
 func readAndDecodeClaim(name string, t *testing.T) *api.PersistentVolumeClaim {
-	data, err := ioutil.ReadFile("../../examples/storage/claims/" + name)
+	data, err := ioutil.ReadFile("../../examples/persistent-volumes/claims/" + name)
 	if err != nil {
 		t.Error("Unexpected error attempting to read example volume file: %s", name)
 	}

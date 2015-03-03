@@ -22,8 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// FakePods implements PodsInterface. Meant to be embedded into a struct to get a default
-// implementation. This makes faking out just the methods you want to test easier.
 type FakePersistentVolumeClaims struct {
 	Fake      *Fake
 	Namespace string
@@ -31,12 +29,12 @@ type FakePersistentVolumeClaims struct {
 
 func (c *FakePersistentVolumeClaims) List(selector labels.Selector) (*api.PersistentVolumeClaimList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-persistentVolumeClaims"})
-	return api.Scheme.CopyOrDie(&c.Fake.PersistentVolumeClaimList).(*api.PersistentVolumeClaimList), nil
+	return api.Scheme.CopyOrDie(&c.Fake.PersistentVolumeClaimList).(*api.PersistentVolumeClaimList), c.Fake.Err
 }
 
 func (c *FakePersistentVolumeClaims) Get(name string) (*api.PersistentVolumeClaim, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-persistentVolumeClaim", Value: name})
-	return &api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
+	return api.Scheme.CopyOrDie(&c.Fake.PersistentVolumeClaim).(*api.PersistentVolumeClaim), nil
 }
 
 func (c *FakePersistentVolumeClaims) Delete(name string) error {
@@ -55,5 +53,5 @@ func (c *FakePersistentVolumeClaims) Update(persistentvolumeclaim *api.Persisten
 }
 
 func (c *FakePersistentVolumeClaims) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	return nil, nil
+	return c.Fake.Watch, c.Fake.Err
 }

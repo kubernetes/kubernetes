@@ -71,7 +71,7 @@ func NewPersistentVolumeManager(kubeClient client.Interface) *PersistentVolumeMa
 		UpdateClaimFunc: func(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
 			return kubeClient.PersistentVolumeClaims(claim.Namespace).Update(claim)
 		},
-		GetClaimFunc: func(name, namespace string)  (*api.PersistentVolumeClaim, error) {
+		GetClaimFunc: func(name, namespace string) (*api.PersistentVolumeClaim, error) {
 			return kubeClient.PersistentVolumeClaims(namespace).Get(name)
 		},
 	}
@@ -118,13 +118,13 @@ func (controller *PersistentVolumeManager) syncPersistentVolume(obj interface{})
 	// TODO index needs Remove methods to keep available storage in sync.
 
 	// verify the volume is still claimed by a user
-	if volume.Status.ClaimRef != nil {
-		if _, err := controller.client.GetClaim(volume.Status.ClaimRef.Name, volume.Status.ClaimRef.Namespace); err == nil {
-			glog.V(5).Infof("PersistentVolume[%s] is bound to PersistentVolumeClaim[%s]\n", volume.Name, volume.Status.ClaimRef.Name)
+	if volume.ClaimRef != nil {
+		if _, err := controller.client.GetClaim(volume.ClaimRef.Name, volume.ClaimRef.Namespace); err == nil {
+			glog.V(5).Infof("PersistentVolume[%s] is bound to PersistentVolumeClaim[%s]\n", volume.Name, volume.ClaimRef.Name)
 		} else {
 			//claim was deleted by user.
-			glog.V(3).Infof("PersistentVolumeClaim[UID=%s] unbound from PersistentVolume[UID=%s]\n", volume.Status.ClaimRef.UID, volume.UID)
-			volume.Status.ClaimRef = nil
+			glog.V(3).Infof("PersistentVolumeClaim[UID=%s] unbound from PersistentVolume[UID=%s]\n", volume.ClaimRef.UID, volume.UID)
+			volume.ClaimRef = nil
 			volume, err = controller.client.UpdateVolume(volume)
 			if err != nil {
 				glog.V(3).Infof("Error updating volume: %+v\n", err)
@@ -157,7 +157,7 @@ func (controller *PersistentVolumeManager) syncPersistentVolumeClaim(obj interfa
 			return nil, fmt.Errorf("Unexpected error getting volume reference: %v\n", err)
 		}
 
-		volume.Status.ClaimRef = claimRef
+		volume.ClaimRef = claimRef
 		claim.Status.VolumeRef = volumeRef
 
 		volume, err = controller.client.UpdateVolume(volume)
@@ -227,7 +227,7 @@ type persistentVolumeManagerClient interface {
 type persistentVolumeManagerClientImpl struct {
 	UpdateVolumeFunc func(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	UpdateClaimFunc  func(volume *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
-	GetClaimFunc  func(name, namespace string) (*api.PersistentVolumeClaim, error)
+	GetClaimFunc     func(name, namespace string) (*api.PersistentVolumeClaim, error)
 }
 
 func (i *persistentVolumeManagerClientImpl) UpdateVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {

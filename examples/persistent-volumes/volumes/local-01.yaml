@@ -6,7 +6,7 @@ metadata:
     type: local
 spec:
   capacity:
-    size: 10Gi
+    storage: 10Gi
   source:
     hostPath:
       path: "/tmp/data01"

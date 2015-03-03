@@ -112,9 +112,9 @@ func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 	// I'm sure this bit has a better home somewhere ...
 	//
 	mypod := obj.(*api.Pod)
-	for _,v := range mypod.Spec.Volumes {
-		if v.Source.PersistentVolumeClaimAttachment != nil {
-			v.Source.PersistentVolumeClaimAttachment.PersistentVolumeClaimReference.Namespace = mypod.Namespace
+	for _, v := range mypod.Spec.Volumes {
+		if v.Source.PersistentVolumeClaimVolumeSource != nil {
+			v.Source.PersistentVolumeClaimVolumeSource.PersistentVolumeClaimRef.Namespace = mypod.Namespace
 		}
 	}
 

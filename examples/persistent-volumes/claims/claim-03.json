@@ -9,7 +9,9 @@
             "ReadOnlyMany"
         ],
         "resources": {
-            "size": "10G"
+            "requests": {
+                "storage": "10G"
+            }
         }
     }
 }

@@ -27,8 +27,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/golang/glog"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 	"runtime/debug"
 )
 
@@ -275,9 +275,9 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateSecretVolumeSource(source.Secret).Prefix("secret")...)
 	}
-	if source.PersistentVolumeClaimAttachment != nil {
+	if source.PersistentVolumeClaimVolumeSource != nil {
 		numVolumes++
-		allErrs = append(allErrs, validatePersistentVolumeClaimAttachment(source.PersistentVolumeClaimAttachment).Prefix("persistentVolumeClaim")...)
+		allErrs = append(allErrs, validatePersistentVolumeClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("persistentVolumeClaim")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
@@ -330,18 +330,18 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 }
 
 // TODO implement full validation to complete #4055
-func validatePersistentVolumeClaimAttachment(claimAttachment *api.PersistentVolumeClaimAttachment) errs.ValidationErrorList {
+func validatePersistentVolumeClaimVolumeSource(claimAttachment *api.PersistentVolumeClaimVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	debug.PrintStack()
 
 	spew.Dump(claimAttachment)
 
-	if claimAttachment.PersistentVolumeClaimReference.Name == "" {
+	if claimAttachment.PersistentVolumeClaimRef.Name == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.claimRef.Name", ""))
 	}
 
-	if claimAttachment.PersistentVolumeClaimReference.Namespace == "" {
+	if claimAttachment.PersistentVolumeClaimRef.Namespace == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.claimRef.Namespace", ""))
 	}
 

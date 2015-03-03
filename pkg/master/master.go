@@ -420,12 +420,12 @@ func (m *Master) init(c *Config) {
 		"nodes":                  nodeStorage,
 		"events":                 event.NewREST(eventRegistry),
 
-		"limitRanges":         limitrange.NewREST(limitRangeRegistry),
-		"resourceQuotas":      resourcequota.NewREST(resourceQuotaRegistry),
-		"resourceQuotaUsages": resourcequotausage.NewREST(resourceQuotaRegistry),
-		"namespaces":          namespace.NewREST(m.namespaceRegistry),
-		"secrets":             secret.NewREST(secretRegistry),
-		"persistentVolumes": persistentvolume.NewREST(persistentVolumeRegistry),
+		"limitRanges":            limitrange.NewREST(limitRangeRegistry),
+		"resourceQuotas":         resourcequota.NewREST(resourceQuotaRegistry),
+		"resourceQuotaUsages":    resourcequotausage.NewREST(resourceQuotaRegistry),
+		"namespaces":             namespace.NewREST(m.namespaceRegistry),
+		"secrets":                secret.NewREST(secretRegistry),
+		"persistentVolumes":      persistentvolume.NewREST(persistentVolumeRegistry),
 		"persistentVolumeClaims": persistentvolumeclaim.NewREST(persistentVolumeClaimRegistry),
 	}
 

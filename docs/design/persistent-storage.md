@@ -4,15 +4,15 @@ This document proposes a model for managing persistent, cluster-scoped storage f
 
 ### tl;dr
 
-Two new kinds:
+Two new API kinds:
 
 A `PersistentVolume` is created by a cluster admin and is a piece of persistent storage exposed as a volume.  It is analogous to a node.
 
 A `PersistentVolumeClaim` is a user's request for a persistent volume to use in a pod. It is analogous to a pod.  
 
-One new component:
+One new system component:
 
-`PersistentVolumeManager` watches for new volumes to manage in the system.  The volume manager also watches for claims by users and binds them to available volumes.
+`PersistentVolumeManager` watches for new volumes to manage in the system, analogous to the node controller.  The volume manager also watches for claims by users and binds them to available volumes.
 
 Kubernetes makes no guarantees at runtime that the underlying storage exists or is available.  High availability is left to the storage provider.
 
@@ -58,7 +58,7 @@ Kubernetes users request a persistent volume for their pod by creating a *Persis
 
 Requests for volumes are bound to available volumes by the volume manager, if a suitable match is found.  Requests for resources can go unfulfilled.
 
-Users attach their claim to their pod using a new *PersistentVolumeClaimAttachment* volume source.
+Users attach their claim to their pod using a new *PersistentVolumeClaimVolumeSource* volume source.
 
 
 ##### Users require a full API to manage their claims.

@@ -6,7 +6,7 @@
     },
     "spec": {
         "capacity":{
-            "size":"10"
+            "storage":"10"
         },
         "source":{
             "awsElasticBlockStore":{

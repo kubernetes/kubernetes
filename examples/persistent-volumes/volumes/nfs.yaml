@@ -4,7 +4,7 @@ metadata:
   name: pv0001
 spec:
   capacity:
-    size: 10
+    storage: 10
   nfsMount:
     server: "127.0.0.1"
     sourcePath: "/tmp"

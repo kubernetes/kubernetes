@@ -111,17 +111,20 @@ type VolumeSource struct {
 
 	NFSMount *NFSMount `json:"nfsMount"`
 
-	PersistentVolumeClaimAttachment *PersistentVolumeClaimAttachment `json:"persistentVolumeClaim,omitempty"`
+	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 }
 
 type PersistentVolume struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
 
 	//Spec defines a persistent volume owned by the cluster
 	Spec PersistentVolumeSpec `json:"spec,omitempty"`
 
 	// Status represents the current information about persistent volume.
 	Status PersistentVolumeStatus `json:"status,omitempty"`
+
+	// holds the binding reference to a PersistentVolumeClaim
+	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 }
 
 type PersistentVolumeSpec struct {
@@ -131,18 +134,17 @@ type PersistentVolumeSpec struct {
 }
 
 type PersistentVolumeStatus struct {
-	Phase   StoragePhase     `json:"phase,omitempty"`
-	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+	Phase StoragePhase `json:"phase,omitempty"`
 }
 
 type PersistentVolumeList struct {
 	TypeMeta `json:",inline"`
-	Items    []PersistentVolume `json:"items"`
+	Items    []PersistentVolume `json:"items,omitempty"`
 }
 
 // a PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
 
 	// Spec defines the volume
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
@@ -154,53 +156,52 @@ type PersistentVolumeClaim struct {
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	Items    []PersistentVolumeClaim `json:"items"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty"`
 }
 
 // a PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes desired
-	AccessModes     []AccessModeType  `json:"accessModes,omitempty"`
-	Resources       ResourceList      `json:"resources,omitempty"`
-	VolumeSelector 	map[string]string `json:"selector,omitempty"`
+	AccessModes []AccessModeType     `json:"accessModes,omitempty"`
+	Resources   ResourceRequirements `json:"resources,omitempty"`
 }
 
 type PersistentVolumeClaimStatus struct {
-	Phase           StoragePhase `json:"phase,omitempty"`
-	AccessModes     []AccessModeType
-	Resources       ResourceList
-	VolumeRef *ObjectReference
+	Phase       StoragePhase     `json:"phase,omitempty"`
+	AccessModes []AccessModeType `json:"accessModes,omitempty`
+	Requests    ResourceList     `json:"requests,omitempty"`
+	VolumeRef   *ObjectReference `json:"volumeRef,omitempty"`
 }
 
 type AccessModeType string
 
 const (
-	ReadWriteOnce	= "ReadWriteOnce"
-	ReadOnlyMany 	= "ReadOnlyMany"
-	ReadWriteMany 	= "ReadWriteMany"
+	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadOnlyMany  AccessModeType = "ReadOnlyMany"
+	ReadWriteMany AccessModeType = "ReadWriteMany"
 )
 
 type StoragePhase string
 
 const (
-	MountPending StoragePhase = "Pending"
-	Attached     StoragePhase = "Attached"
-	Formatting   StoragePhase = "Formatting"
-	Formatted    StoragePhase = "Formatted"
-	Mounted      StoragePhase = "Mounted"
-	MountFailed  StoragePhase = "Failed"
-	MountDelete  StoragePhase = "Deleted"
+	StoragePending StoragePhase = "Pending"
+	StorageBound   StoragePhase = "Bound"
 )
 
-type PersistentVolumeClaimAttachment struct {
-	AccessMode                     AccessModeType   `json:"accessMode,omitempty"`
-	PersistentVolumeClaimReference *ObjectReference `json:"claimRef,omitempty"`
+type PersistentVolumeClaimVolumeSource struct {
+	AccessMode               AccessModeType   `json:"accessMode,omitempty"`
+	PersistentVolumeClaimRef *ObjectReference `json:"claimRef,omitempty"`
 }
 
+//
+// AWSEBS and NFS are orthogonal tasks that don't need to be here for Persistent Volumes.
+// They are here in the meantime for me to work with AccessModes correctly.
+// These will be refactored out after the NFS PR gets merged and this feature nears completion.
+//
 type AWSElasticBlockStore struct {
 	// the device's EBS volumeID from AWS
-	VolumeID string `json:"volumeId"`
+	VolumeID string `json:"volumeId,omitempty"`
 }
 
 type NFSMount struct {
@@ -372,6 +373,8 @@ type Capabilities struct {
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
+	// Requests describes the minimum amount of compute resources required.
+	Requests ResourceList `json:"requests,omitempty"`
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -771,13 +774,11 @@ type ResourceName string
 
 const (
 	// CPU, in cores. (500m = .5 cores)
-	ResourceCPU			ResourceName = "cpu"
+	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	ResourceMemory 		ResourceName = "memory"
-	// volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 2014 * 2014)
-	ResourceSize		ResourceName = "size"
-	ResourceIOPS    	ResourceName = "iops"
-	ResourceThroughput	ResourceName = "throughput"
+	ResourceMemory ResourceName = "memory"
+	// volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
+	ResourceStorage ResourceName = "storage"
 )
 
 type ResourceList map[ResourceName]util.IntOrString

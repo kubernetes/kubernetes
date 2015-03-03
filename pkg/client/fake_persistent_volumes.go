@@ -22,10 +22,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// FakePods implements PodsInterface. Meant to be embedded into a struct to get a default
-// implementation. This makes faking out just the methods you want to test easier.
 type FakePersistentVolumes struct {
-	Fake      *Fake
+	Fake *Fake
 }
 
 func (c *FakePersistentVolumes) List(selector labels.Selector) (*api.PersistentVolumeList, error) {
@@ -35,7 +33,7 @@ func (c *FakePersistentVolumes) List(selector labels.Selector) (*api.PersistentV
 
 func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-persistentVolume", Value: name})
-	return &api.PersistentVolume{ObjectMeta: api.ObjectMeta{Name: name}}, nil
+	return api.Scheme.CopyOrDie(&c.Fake.PersistentVolume).(*api.PersistentVolume), nil
 }
 
 func (c *FakePersistentVolumes) Delete(name string) error {

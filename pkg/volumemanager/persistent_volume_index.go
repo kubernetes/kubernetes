@@ -40,7 +40,6 @@ type genericPersistentVolumeIndex struct {
 	cache map[string][]*api.PersistentVolume
 }
 
-
 // TODO make this store keys to objects, not objects.  use the store/reflector.
 func NewPersistentVolumeIndex() PersistentVolumeIndex {
 	cache := make(map[string][]*api.PersistentVolume)
@@ -48,8 +47,6 @@ func NewPersistentVolumeIndex() PersistentVolumeIndex {
 		cache: cache,
 	}
 }
-
-
 
 // given a set of volumes, match the one that closest fits the claim
 func (binder *genericPersistentVolumeIndex) Match(claim *api.PersistentVolumeClaim) *api.PersistentVolume {
@@ -62,13 +59,13 @@ func (binder *genericPersistentVolumeIndex) Match(claim *api.PersistentVolumeCla
 		return nil
 	}
 
-	quantity := claim.Spec.Resources[api.ResourceSize]
+	quantity := claim.Spec.Resources.Requests[api.ResourceStorage]
 	desiredSize := quantity.Value()
 	volumes := binder.cache[desiredModes]
 
 	for _, v := range volumes {
-		qty := v.Spec.Capacity[api.ResourceSize]
-		if qty.Value() >= desiredSize && v.Status.ClaimRef == nil {
+		qty := v.Spec.Capacity[api.ResourceStorage]
+		if qty.Value() >= desiredSize && v.ClaimRef == nil {
 			return v
 		}
 	}
@@ -121,8 +118,8 @@ func GetAccessModesAsString(modes []api.AccessModeType) string {
 	return modesAsString
 }
 
-func contains(modes []api.AccessModeType, mode api.AccessModeType) bool{
-	for _,m := range modes {
+func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
+	for _, m := range modes {
 		if m == mode {
 			return true
 		}
@@ -155,14 +152,13 @@ func GetAccessModeType(source api.VolumeSource) []api.AccessModeType {
 	return []api.AccessModeType{}
 }
 
-
 type PersistentVolumeComparator []*api.PersistentVolume
 
 func (comp PersistentVolumeComparator) Len() int      { return len(comp) }
 func (comp PersistentVolumeComparator) Swap(i, j int) { comp[i], comp[j] = comp[j], comp[i] }
 func (comp PersistentVolumeComparator) Less(i, j int) bool {
-	aQty := comp[i].Spec.Capacity[api.ResourceSize]
-	bQty := comp[j].Spec.Capacity[api.ResourceSize]
+	aQty := comp[i].Spec.Capacity[api.ResourceStorage]
+	bQty := comp[j].Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
 	bSize := bQty.Value()
 	return aSize < bSize

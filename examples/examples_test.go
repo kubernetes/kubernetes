@@ -155,15 +155,15 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
 		},
-		"../examples/storage/volumes": {
-			"local-01":	&api.PersistentVolume{},
+		"../examples/persistent-volumes/volumes": {
+			"local-01": &api.PersistentVolume{},
 			"local-02": &api.PersistentVolume{},
-			"aws":		&api.PersistentVolume{},
-			"gce":		&api.PersistentVolume{},
-			"nfs":		&api.PersistentVolume{},
+			"aws":      &api.PersistentVolume{},
+			"gce":      &api.PersistentVolume{},
+			"nfs":      &api.PersistentVolume{},
 		},
-		"../examples/storage/claims": {
-			"claim-01":	&api.PersistentVolumeClaim{},
+		"../examples/persistent-volumes/claims": {
+			"claim-01": &api.PersistentVolumeClaim{},
 			"claim-02": &api.PersistentVolumeClaim{},
 			"claim-03": &api.PersistentVolumeClaim{},
 		},

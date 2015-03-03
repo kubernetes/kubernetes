@@ -32,9 +32,9 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumemanager"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/docker/docker/pkg/units"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumemanager"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
@@ -231,7 +231,7 @@ var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS"}
 var secretColumns = []string{"NAME", "DATA"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
-var persistentVolumeClaimColumns = []string{"NAME","LABELS", "STATUS", "VOLUME"}
+var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -462,16 +462,19 @@ func printNodeList(list *api.NodeList, w io.Writer) error {
 
 func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 	claimRefUID := ""
-	if pv.Status.ClaimRef != nil {
-		claimRefUID += pv.Status.ClaimRef.Name
+	if pv.ClaimRef != nil {
+		claimRefUID += pv.ClaimRef.Name
 		claimRefUID += " / "
-		claimRefUID += string(pv.Status.ClaimRef.UID)
+		claimRefUID += string(pv.ClaimRef.UID)
 	}
 
 	modes := volumemanager.GetAccessModeType(pv.Spec.Source)
 	modesStr := volumemanager.GetAccessModesAsString(modes)
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", pv.Name, pv.Labels, pv.Spec.Capacity, modesStr,  pv.Status.Phase, claimRefUID)
+	aQty := pv.Spec.Capacity[api.ResourceStorage]
+	aSize := aQty.Value()
+
+	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", pv.Name, pv.Labels, aSize, modesStr, pv.Status.Phase, claimRefUID)
 	return err
 }
 

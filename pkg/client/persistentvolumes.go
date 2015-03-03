@@ -41,7 +41,7 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumesInterface
 type persistentVolumes struct {
-	r  *Client
+	r *Client
 }
 
 func newPersistentVolumes(c *Client) *persistentVolumes {

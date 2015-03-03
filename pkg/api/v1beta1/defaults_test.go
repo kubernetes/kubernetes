@@ -70,6 +70,38 @@ func TestSetDefaulPodSpec(t *testing.T) {
 	}
 }
 
+func TestSetDefaultNamespacePersistentVolumeClaim(t *testing.T) {
+	pod := &current.Pod{
+		TypeMeta: current.TypeMeta{
+			Namespace: "foo",
+		},
+		DesiredState: current.PodState{
+			Manifest: current.ContainerManifest{
+				Volumes: []current.Volume{
+					{
+						Name: "myvol",
+						Source: current.VolumeSource{
+							PersistentVolumeClaimVolumeSource: &current.PersistentVolumeClaimVolumeSource{
+								AccessMode: current.ReadWriteOnce,
+								PersistentVolumeClaimRef: &current.ObjectReference{
+									ID: "some-claim-ref",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	obj2 := roundTrip(t, runtime.Object(pod))
+	pod2 := obj2.(*current.Pod)
+	receivedNamespace := pod2.DesiredState.Manifest.Volumes[0].Source.PersistentVolumeClaimVolumeSource.PersistentVolumeClaimRef.Namespace
+	if receivedNamespace != pod.Namespace {
+		t.Errorf("Expected default namespace to be set on claim.  Expected: %s, got: %s", pod.Namespace, receivedNamespace)
+	}
+}
+
 func TestSetDefaultContainer(t *testing.T) {
 	bp := &current.BoundPod{}
 	bp.Spec.Containers = []current.Container{{}}
