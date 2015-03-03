@@ -17,6 +17,8 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
@@ -228,6 +230,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	if err != nil {
 		return nil, false, err
 	}
+	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
 	err = e.Helper.AtomicUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, error) {
@@ -237,7 +240,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 		if version == 0 {
 			if !e.UpdateStrategy.AllowCreateOnUpdate() {
-				return nil, kubeerr.NewAlreadyExists(e.EndpointName, name)
+				return nil, kubeerr.NewNotFound(e.EndpointName, name)
 			}
 			creating = true
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -245,13 +248,22 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 			}
 			return obj, nil
 		}
+
 		creating = false
+		newVersion, err := e.Helper.ResourceVersioner.ResourceVersion(obj)
+		if err != nil {
+			return nil, err
+		}
+		if newVersion != version {
+			// TODO: return the most recent version to a client?
+			return nil, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the resource was updated to %d", version))
+		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, err
 		}
-		// TODO: expose TTL
 		return obj, nil
 	})
+
 	if err != nil {
 		if creating {
 			err = etcderr.InterpretCreateError(err, e.EndpointName, name)
