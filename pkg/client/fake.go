@@ -51,6 +51,10 @@ type Fake struct {
 	Secret              api.Secret
 	Err                 error
 	Watch               watch.Interface
+	PersistentVolume          api.PersistentVolume
+	PersistentVolumesList     api.PersistentVolumeList
+	PersistentVolumeClaim     api.PersistentVolumeClaim
+	PersistentVolumeClaimList api.PersistentVolumeClaimList	
 }
 
 func (c *Fake) LimitRanges(namespace string) LimitRangeInterface {
@@ -79,6 +83,14 @@ func (c *Fake) Endpoints(namespace string) EndpointsInterface {
 
 func (c *Fake) Pods(namespace string) PodInterface {
 	return &FakePods{Fake: c, Namespace: namespace}
+}
+
+func (c *Fake) PersistentVolumes() PersistentVolumeInterface {
+	return &FakePersistentVolumes{Fake: c}
+}
+
+func (c *Fake) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
+	return &FakePersistentVolumeClaims{Fake: c, Namespace: namespace}
 }
 
 func (c *Fake) Services(namespace string) ServiceInterface {

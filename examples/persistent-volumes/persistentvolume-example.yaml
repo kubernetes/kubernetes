@@ -1,0 +1,9 @@
+id: pv0002
+kind: PersistentVolume
+apiVersion: v1beta1
+spec:
+  retentionPolicy: "DeleteOnExit"
+  source:
+    persistentDisk:
+      pdName: "abc123"
+      fsType: "ext4"

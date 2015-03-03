@@ -1,0 +1,17 @@
+{
+    "kind": "PersistentVolumeClaim",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "claim01"
+    }, "spec": {
+        "accessModes": [
+            "ReadWriteOnce",
+            "ReadOnlyMany"
+        ],
+        "resources": {
+            "requests": {
+                "storage": "10G"
+            }
+        }
+    }
+}
