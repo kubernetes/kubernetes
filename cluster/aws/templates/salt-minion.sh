@@ -16,7 +16,7 @@
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+echo "master: $SALT_MASTER" > /etc/salt/minion.d/master.conf
 
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion

@@ -24,6 +24,8 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 export AWS_DEFAULT_REGION=${ZONE}
 AWS_CMD="aws --output json ec2"
 
+MASTER_INTERNAL_IP=172.20.0.9
+
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
 }
@@ -293,7 +295,7 @@ function kube-up {
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
-    echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
@@ -386,7 +388,7 @@ function kube-up {
     (
       # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
       echo "#! /bin/bash"
-      echo "MASTER_NAME='${MASTER_NAME}'"
+      echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
