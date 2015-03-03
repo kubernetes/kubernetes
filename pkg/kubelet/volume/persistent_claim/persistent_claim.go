@@ -93,6 +93,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *api.Volume, podUID types.U
 			return nil, err
 		}
 
+		volPlugin.Init(plugin.host)
 		builder, err := volPlugin.NewBuilder(wrapper, podUID)
 
 		if err != nil {
@@ -105,11 +106,11 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *api.Volume, podUID types.U
 		}
 	}
 
-	return nil, fmt.Errorf("This should never be called.  There are no cleaners for persistent volume sources.  The cleaner for %s will come right from its own plugin.")
+	return nil, fmt.Errorf("No builder found for volume %+v\n", spec)
 }
 
 func (plugin *persistentClaimPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return nil, fmt.Errorf("This should never be called.  There are no cleaners for persistent volume sources.  The cleaner for %s will come right from its own plugin.")
+	return nil, fmt.Errorf("This will never be called directly.  Volumes backing a PV have their own cleaners and Kubelet reconciles volumes in its syncLoop.")
 }
 
 func getVolumePlugin(spec *api.Volume) volume.Plugin {
