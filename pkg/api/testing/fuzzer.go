@@ -101,6 +101,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.Spec = api.PodSpec{}
 			c.Fuzz(&j.Spec)
 		},
+		func(j *api.Binding, c fuzz.Continue) {
+			c.Fuzz(&j.ObjectMeta)
+			j.Target.Name = c.RandString()
+		},
 		func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j)   // fuzz self without calling this function again
 			j.TemplateRef = nil // this is required for round trip

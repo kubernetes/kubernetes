@@ -366,9 +366,11 @@ func TestBind(t *testing.T) {
 		{binding: &api.Binding{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: api.NamespaceDefault,
+				Name:      "foo",
 			},
-			PodID: "foo",
-			Host:  "foohost.kubernetes.mydomain.com",
+			Target: api.ObjectReference{
+				Name: "foohost.kubernetes.mydomain.com",
+			},
 		}},
 	}
 

@@ -1240,6 +1240,24 @@ func init() {
 
 			return nil
 		},
+		func(in *Binding, out *newer.Binding, s conversion.Scope) error {
+			if err := s.DefaultConvert(in, out, conversion.IgnoreMissingFields); err != nil {
+				return err
+			}
+			out.Target = newer.ObjectReference{
+				Name: in.Host,
+			}
+			out.Name = in.PodID
+			return nil
+		},
+		func(in *newer.Binding, out *Binding, s conversion.Scope) error {
+			if err := s.DefaultConvert(in, out, conversion.IgnoreMissingFields); err != nil {
+				return err
+			}
+			out.Host = in.Target.Name
+			out.PodID = in.Name
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

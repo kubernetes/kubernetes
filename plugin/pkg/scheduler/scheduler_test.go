@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type fakeBinder struct {
@@ -63,7 +64,7 @@ func TestScheduler(t *testing.T) {
 		{
 			sendPod:     podWithID("foo"),
 			algo:        mockScheduler{"machine1", nil},
-			expectBind:  &api.Binding{PodID: "foo", Host: "machine1"},
+			expectBind:  &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			eventReason: "scheduled",
 		}, {
 			sendPod:        podWithID("foo"),
@@ -74,7 +75,7 @@ func TestScheduler(t *testing.T) {
 		}, {
 			sendPod:         podWithID("foo"),
 			algo:            mockScheduler{"machine1", nil},
-			expectBind:      &api.Binding{PodID: "foo", Host: "machine1"},
+			expectBind:      &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			injectBindError: errB,
 			expectError:     errB,
 			expectErrorPod:  podWithID("foo"),
@@ -120,7 +121,7 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectBind, gotBinding; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
+			t.Errorf("%v: error: %s", i, util.ObjectDiff(e, a))
 		}
 		<-called
 		events.Stop()

@@ -287,9 +287,11 @@ type binder struct {
 
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *api.Binding) error {
-	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
+	glog.V(2).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
 	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+	// TODO: use Pods interface for binding once clusters are upgraded
+	// return b.Pods(binding.Namespace).Bind(binding)
 }
 
 type clock interface {

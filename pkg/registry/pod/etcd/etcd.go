@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
@@ -146,7 +147,14 @@ func (r *BindingREST) New() runtime.Object {
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
 	binding := obj.(*api.Binding)
-	err = r.assignPod(ctx, binding.PodID, binding.Host)
+	// TODO: move me to a binding strategy
+	if len(binding.Target.Kind) != 0 && (binding.Target.Kind != "Node" && binding.Target.Kind != "Minion") {
+		return nil, errors.NewInvalid("binding", binding.Name, errors.ValidationErrorList{errors.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty, 'Node', or 'Minion'")})
+	}
+	if len(binding.Target.Name) == 0 {
+		return nil, errors.NewInvalid("binding", binding.Name, errors.ValidationErrorList{errors.NewFieldRequired("to.name", binding.Target.Name)})
+	}
+	err = r.assignPod(ctx, binding.Name, binding.Target.Name)
 	err = etcderr.InterpretCreateError(err, "binding", "")
 	out = &api.Status{Status: api.StatusSuccess}
 	return

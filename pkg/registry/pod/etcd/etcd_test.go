@@ -817,7 +817,10 @@ func TestEtcdCreate(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine", ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}})
+	_, err = bindingRegistry.Create(ctx, &api.Binding{
+		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		Target:     api.ObjectReference{Name: "machine"},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -865,7 +868,10 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	// - Create (apiserver)
 	// - Schedule (scheduler)
 	// - Delete (apiserver)
-	_, err := bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine", ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}})
+	_, err := bindingRegistry.Create(ctx, &api.Binding{
+		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		Target:     api.ObjectReference{Name: "machine"},
+	})
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -935,7 +941,10 @@ func TestEtcdCreateWithContainersError(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine"})
+	_, err = bindingRegistry.Create(ctx, &api.Binding{
+		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		Target:     api.ObjectReference{Name: "machine"},
+	})
 	if !errors.IsAlreadyExists(err) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
@@ -973,7 +982,10 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine"})
+	_, err = bindingRegistry.Create(ctx, &api.Binding{
+		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		Target:     api.ObjectReference{Name: "machine"},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1025,7 +1037,10 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	_, err = bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine"})
+	_, err = bindingRegistry.Create(ctx, &api.Binding{
+		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		Target:     api.ObjectReference{Name: "machine"},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1052,6 +1067,70 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &boundPods)
 	if len(boundPods.Items) != 2 || boundPods.Items[1].Name != "foo" {
 		t.Errorf("Unexpected boundPod list: %#v", boundPods)
+	}
+}
+
+func TestEtcdCreateBinding(t *testing.T) {
+	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	ctx := api.NewDefaultContext()
+	fakeClient.TestIndex = true
+
+	testCases := map[string]struct {
+		binding api.Binding
+		errOK   func(error) bool
+	}{
+		"noName": {
+			binding: api.Binding{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{},
+			},
+			errOK: func(err error) bool { return errors.IsInvalid(err) },
+		},
+		"badKind": {
+			binding: api.Binding{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{Name: "machine", Kind: "unknown"},
+			},
+			errOK: func(err error) bool { return errors.IsInvalid(err) },
+		},
+		"emptyKind": {
+			binding: api.Binding{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{Name: "machine"},
+			},
+			errOK: func(err error) bool { return err == nil },
+		},
+		"kindNode": {
+			binding: api.Binding{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{Name: "machine", Kind: "Node"},
+			},
+			errOK: func(err error) bool { return err == nil },
+		},
+		"kindMinion": {
+			binding: api.Binding{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{Name: "machine", Kind: "Minion"},
+			},
+			errOK: func(err error) bool { return err == nil },
+		},
+	}
+	for k, test := range testCases {
+		key, _ := registry.store.KeyFunc(ctx, "foo")
+		fakeClient.Data[key] = tools.EtcdResponseWithError{
+			R: &etcd.Response{
+				Node: nil,
+			},
+			E: tools.EtcdErrorNotFound,
+		}
+		fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
+		if _, err := registry.Create(ctx, validNewPod()); err != nil {
+			t.Fatalf("%s: unexpected error: %v", k, err)
+		}
+		fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
+		if _, err := bindingRegistry.Create(ctx, &test.binding); !test.errOK(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		}
 	}
 }
 
