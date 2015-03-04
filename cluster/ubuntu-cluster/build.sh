@@ -57,8 +57,9 @@ if [ ! -f etcd.tar.gz ] ; then
 fi
 cp $ETCD/etcd $ETCD/etcdctl binaries
 
-# kuber
+# k8s
 echo "Download kubernetes release ..."
+
 K8S_V="v0.12.0"
 if [ ! -f kubernetes.tar.gz ] ; then
     curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/$K8S_V/kubernetes.tar.gz -o kubernetes.tar.gz
