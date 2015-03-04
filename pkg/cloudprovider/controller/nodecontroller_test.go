@@ -18,6 +18,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"reflect"
 	"sort"
@@ -49,6 +50,12 @@ type FakeNodeHandler struct {
 	DeletedNodes []*api.Node
 	UpdatedNodes []*api.Node
 	RequestCount int
+}
+
+func init() {
+	lookupIP = func(host string) ([]net.IP, error) {
+		return nil, fmt.Errorf("lookup %v: no such host", host)
+	}
 }
 
 func (c *FakeNodeHandler) Nodes() client.NodeInterface {

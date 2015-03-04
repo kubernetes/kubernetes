@@ -40,6 +40,11 @@ var (
 	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
 )
 
+var (
+	// aliased to allow mocking in tests
+	lookupIP = net.LookupIP
+)
+
 type NodeController struct {
 	cloud              cloudprovider.Interface
 	matchRE            string
@@ -285,7 +290,7 @@ func (s *NodeController) PopulateIPs(nodes *api.NodeList) (*api.NodeList, error)
 			if addr != nil {
 				node.Status.HostIP = node.Name
 			} else {
-				addrs, err := net.LookupIP(node.Name)
+				addrs, err := lookupIP(node.Name)
 				if err != nil {
 					glog.Errorf("Can't get ip address of node %s: %v", node.Name, err)
 				} else if len(addrs) == 0 {
