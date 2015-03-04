@@ -233,7 +233,7 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationError
 
 	allNames := util.StringSet{}
 	for i, vol := range volumes {
-		el := validateSource(&vol.Source).Prefix("source")
+		el := validateSource(&vol.VolumeSource).Prefix("source")
 		if len(vol.Name) == 0 {
 			el = append(el, errs.NewFieldRequired("name", vol.Name))
 		} else if !util.IsDNSLabel(vol.Name) {
@@ -793,8 +793,8 @@ func ValidatePodTemplateSpec(spec *api.PodTemplateSpec, replicas int) errs.Valid
 func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	for _, vol := range volumes {
-		if vol.Source.GCEPersistentDisk != nil {
-			if vol.Source.GCEPersistentDisk.ReadOnly == false {
+		if vol.GCEPersistentDisk != nil {
+			if vol.GCEPersistentDisk.ReadOnly == false {
 				allErrs = append(allErrs, errs.NewFieldInvalid("GCEPersistentDisk.ReadOnly", false, "ReadOnly must be true for replicated pods > 1, as GCE PD can only be mounted on multiple machines if it is read-only."))
 			}
 		}

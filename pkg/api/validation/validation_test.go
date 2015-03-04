@@ -147,13 +147,13 @@ func TestValidateAnnotations(t *testing.T) {
 
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
-		{Name: "abc", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path1"}}},
-		{Name: "123", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path2"}}},
-		{Name: "abc-123", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path3"}}},
-		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}},
-		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
-		{Name: "secret", Source: api.VolumeSource{Secret: &api.SecretVolumeSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
+		{Name: "abc", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path1"}}},
+		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path2"}}},
+		{Name: "abc-123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path3"}}},
+		{Name: "empty", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+		{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}},
+		{Name: "gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
+		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -168,10 +168,10 @@ func TestValidateVolumes(t *testing.T) {
 		T errors.ValidationErrorType
 		F string
 	}{
-		"zero-length name":     {[]api.Volume{{Name: "", Source: emptyVS}}, errors.ValidationErrorTypeRequired, "[0].name"},
-		"name > 63 characters": {[]api.Volume{{Name: strings.Repeat("a", 64), Source: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not a DNS label": {[]api.Volume{{Name: "a.b.c", Source: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not unique":      {[]api.Volume{{Name: "abc", Source: emptyVS}, {Name: "abc", Source: emptyVS}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
+		"zero-length name":     {[]api.Volume{{Name: "", VolumeSource: emptyVS}}, errors.ValidationErrorTypeRequired, "[0].name"},
+		"name > 63 characters": {[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not a DNS label": {[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not unique":      {[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
@@ -648,8 +648,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol1"}}},
-				{Name: "vol2", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol2"}}}},
+			Volumes: []api.Volume{{Name: "vol1", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol1"}}},
+				{Name: "vol2", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol2"}}}},
 			Containers: []api.Container{
 				{
 					Name:       "abc",
@@ -699,7 +699,7 @@ func TestValidateManifest(t *testing.T) {
 		"invalid volume name": {
 			Version:       "v1beta1",
 			ID:            "abc",
-			Volumes:       []api.Volume{{Name: "vol.1", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Volumes:       []api.Volume{{Name: "vol.1", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -722,14 +722,14 @@ func TestValidateManifest(t *testing.T) {
 func TestValidatePodSpec(t *testing.T) {
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
-			Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate all fields.
 			Volumes: []api.Volume{
-				{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -778,7 +778,7 @@ func TestValidatePod(t *testing.T) {
 		{ // Basic fields.
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
-				Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+				Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
@@ -788,7 +788,7 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
-					{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+					{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -1080,7 +1080,7 @@ func TestValidateBoundPods(t *testing.T) {
 		{ // Basic fields.
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
-				Volumes:       []api.Volume{{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+				Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
@@ -1090,7 +1090,7 @@ func TestValidateBoundPods(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
-					{Name: "vol", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+					{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -1552,7 +1552,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
-				Volumes:       []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
+				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
 			},
 		},
 	}
@@ -1710,7 +1710,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				Volumes:       []api.Volume{{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
+				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
 				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 				DNSPolicy:     api.DNSClusterFirst,
 			},

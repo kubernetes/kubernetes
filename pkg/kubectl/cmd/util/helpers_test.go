@@ -88,12 +88,12 @@ func TestMerge(t *testing.T) {
 				Spec: api.PodSpec{
 					Volumes: []api.Volume{
 						{
-							Name:   "v1",
-							Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+							Name:         "v1",
+							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 						{
-							Name:   "v2",
-							Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+							Name:         "v2",
+							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 					},
 					RestartPolicy: api.RestartPolicy{

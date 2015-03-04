@@ -26,8 +26,8 @@ import (
 func init() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *Volume) {
-			if util.AllPtrFieldsNil(&obj.Source) {
-				obj.Source = VolumeSource{
+			if util.AllPtrFieldsNil(&obj.VolumeSource) {
+				obj.VolumeSource = VolumeSource{
 					EmptyDir: &EmptyDirVolumeSource{},
 				}
 			}

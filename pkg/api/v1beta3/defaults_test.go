@@ -65,7 +65,7 @@ func TestSetDefaulPodSpec(t *testing.T) {
 	if policy.Never != nil || policy.OnFailure != nil || policy.Always == nil {
 		t.Errorf("Expected only policy.Always is set, got: %s", policy)
 	}
-	vsource := bp2.Spec.Volumes[0].Source
+	vsource := bp2.Spec.Volumes[0].VolumeSource
 	if vsource.EmptyDir == nil {
 		t.Errorf("Expected non-empty volume is set, got: %s", vsource.EmptyDir)
 	}

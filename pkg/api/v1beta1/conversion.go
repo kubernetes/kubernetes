@@ -1016,6 +1016,21 @@ func init() {
 			return nil
 		},
 
+		func(in *newer.Volume, out *Volume, s conversion.Scope) error {
+			if err := s.Convert(&in.VolumeSource, &out.Source, 0); err != nil {
+				return err
+			}
+			out.Name = in.Name
+			return nil
+		},
+		func(in *Volume, out *newer.Volume, s conversion.Scope) error {
+			if err := s.Convert(&in.Source, &out.VolumeSource, 0); err != nil {
+				return err
+			}
+			out.Name = in.Name
+			return nil
+		},
+
 		// VolumeSource's HostDir is deprecated in favor of HostPath.
 		// TODO: It would be great if I could just map field names to
 		// convert or else maybe say "convert all members of this

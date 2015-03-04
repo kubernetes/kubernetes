@@ -33,10 +33,8 @@ spec:
               mountPath: /var/lib/mysql
       volumes:
         - name: mysql-persistent-storage
-          source:
-            # emptyDir: {}
-            persistentDisk:
-              # This GCE PD must already exist.
-              pdName: mysql-disk
-              fsType: ext4
+          persistentDisk:
+            # This GCE PD must already exist.
+            pdName: mysql-disk
+            fsType: ext4
 

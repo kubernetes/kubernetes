@@ -935,6 +935,22 @@ func init() {
 			}
 			return nil
 		},
+
+		func(in *newer.Volume, out *Volume, s conversion.Scope) error {
+			if err := s.Convert(&in.VolumeSource, &out.Source, 0); err != nil {
+				return err
+			}
+			out.Name = in.Name
+			return nil
+		},
+		func(in *Volume, out *newer.Volume, s conversion.Scope) error {
+			if err := s.Convert(&in.Source, &out.VolumeSource, 0); err != nil {
+				return err
+			}
+			out.Name = in.Name
+			return nil
+		},
+
 		func(in *newer.VolumeSource, out *VolumeSource, s conversion.Scope) error {
 			if err := s.Convert(&in.EmptyDir, &out.EmptyDir, 0); err != nil {
 				return err

@@ -1018,8 +1018,8 @@ func TestMountExternalVolumes(t *testing.T) {
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
 				{
-					Name:   "vol1",
-					Source: api.VolumeSource{},
+					Name:         "vol1",
+					VolumeSource: api.VolumeSource{},
 				},
 			},
 		},
