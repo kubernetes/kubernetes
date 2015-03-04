@@ -878,11 +878,6 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 			Names: []string{"/k8s_foo_bar.new.test_12345678_3333"},
 			ID:    "4567",
 		},
-		"2304": &docker.APIContainers{
-			// Container for another pod, untouched.
-			Names: []string{"/k8s_baz_fiz.new.test_6_42"},
-			ID:    "2304",
-		},
 	}
 	bound := api.BoundPod{
 		ObjectMeta: api.ObjectMeta{
