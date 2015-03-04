@@ -117,7 +117,9 @@ func (s *Server) InstallDebuggingHandlers() {
 
 // error serializes an error object into an HTTP response.
 func (s *Server) error(w http.ResponseWriter, err error) {
-	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
+	msg := fmt.Sprintf("Internal Error: %v", err)
+	glog.Infof("HTTP InternalServerError: %s", msg)
+	http.Error(w, msg, http.StatusInternalServerError)
 }
 
 func isValidDockerVersion(ver []uint) (bool, string) {
