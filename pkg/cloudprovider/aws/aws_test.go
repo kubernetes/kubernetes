@@ -134,10 +134,12 @@ func TestList(t *testing.T) {
 }
 
 func TestIPAddress(t *testing.T) {
+	// Note these instances have the same name
+	// (we test that this produces an error)
 	instances := make([]ec2.Instance, 2)
 	instances[0].PrivateDNSName = "instance1"
 	instances[0].PrivateIpAddress = "192.168.0.1"
-	instances[1].PrivateDNSName = "instance2"
+	instances[1].PrivateDNSName = "instance1"
 	instances[1].PrivateIpAddress = "192.168.0.2"
 
 	aws1 := mockInstancesResp([]ec2.Instance{})
