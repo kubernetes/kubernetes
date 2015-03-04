@@ -23,6 +23,7 @@ import (
 	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -69,6 +70,9 @@ type Etcd struct {
 	// Return the TTL objects should be persisted with. Update is true if this
 	// is an operation against an existing object.
 	TTLFunc func(obj runtime.Object, update bool) (uint64, error)
+
+	// Returns a matcher corresponding to the provided labels and fields.
+	PredicateFunc func(label, field labels.Selector) generic.Matcher
 
 	// Called on all objects returned from the underlying store, after
 	// the exit hooks are invoked. Decorators are intended for integrations
@@ -119,10 +123,23 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	return key, nil
 }
 
-// List returns a list of all the items matching m.
-// TODO: rename this to ListPredicate, take the default predicate function on the constructor, and
-// introduce a List method that uses the default predicate function
-func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
+// New implements RESTStorage
+func (e *Etcd) New() runtime.Object {
+	return e.NewFunc()
+}
+
+// NewList implements RESTLister
+func (e *Etcd) NewList() runtime.Object {
+	return e.NewListFunc()
+}
+
+// List returns a list of items matching labels and field
+func (e *Etcd) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+	return e.ListPredicate(ctx, e.PredicateFunc(label, field))
+}
+
+// ListPredicate returns a list of all the items matching m.
+func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
 	err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
 	if err != nil {
@@ -339,11 +356,15 @@ func (e *Etcd) Delete(ctx api.Context, name string) (runtime.Object, error) {
 	return &api.Status{Status: api.StatusSuccess}, nil
 }
 
-// Watch starts a watch for the items that m matches.
+// WatchPredicate starts a watch for the items that m matches.
 // TODO: Detect if m references a single object instead of a list.
-// TODO: rename this to WatchPredicate, take the default predicate function on the constructor, and
-// introduce a Watch method that uses the default predicate function
-func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+func (e *Etcd) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
+}
+
+// WatchPredicate starts a watch for the items that m matches.
+// TODO: Detect if m references a single object instead of a list.
+func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
 	if err != nil {
 		return nil, err

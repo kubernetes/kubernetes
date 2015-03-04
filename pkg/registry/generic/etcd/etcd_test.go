@@ -172,7 +172,7 @@ func TestEtcdList(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		fakeClient.Data[registry.KeyRootFunc(api.NewContext())] = item.in
-		list, err := registry.List(api.NewContext(), item.m)
+		list, err := registry.ListPredicate(api.NewContext(), item.m)
 		if e, a := item.succeed, err == nil; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 			continue
@@ -660,7 +660,7 @@ func TestEtcdWatch(t *testing.T) {
 	}
 
 	fakeClient, registry := NewTestGenericEtcdRegistry(t)
-	wi, err := registry.Watch(api.NewContext(), EverythingMatcher{}, "1")
+	wi, err := registry.WatchPredicate(api.NewContext(), EverythingMatcher{}, "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
