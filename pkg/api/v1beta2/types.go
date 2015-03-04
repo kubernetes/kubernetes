@@ -46,6 +46,8 @@ import (
 //         DNS_LABEL(\.DNS_LABEL)*
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
@@ -58,6 +60,8 @@ type Volume struct {
 
 // VolumeSource represents the source location of a valume to mount.
 // Only one of its members may be specified.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#types-of-volumes
 type VolumeSource struct {
 	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
@@ -77,13 +81,20 @@ type VolumeSource struct {
 }
 
 // HostPathVolumeSource represents bare host directory volume.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#hostdir
 type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
+// Represents an empty directory volume.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#emptydir
 type EmptyDirVolumeSource struct{}
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
 type SecretVolumeSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
@@ -119,6 +130,8 @@ type ContainerPort struct {
 // A GCE PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#gcepersistentdisk
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName" description:"unique name of the PD resource in GCE"`
@@ -146,6 +159,8 @@ type GitRepoVolumeSource struct {
 }
 
 // VolumeMount describes a mounting of a Volume within a container.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
 	Name string `json:"name" description:"name of the volume to mount"`
@@ -164,6 +179,8 @@ type EnvVar struct {
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
@@ -174,12 +191,16 @@ type HTTPGetAction struct {
 }
 
 // TCPSocketAction describes an action based on opening a socket
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
 type TCPSocketAction struct {
 	// Required: Port to connect to.
 	Port util.IntOrString `json:"port,omitempty" description:"number of name of the port to access on the container"`
 }
 
 // ExecAction describes a "run in container" action.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
@@ -204,6 +225,8 @@ type LivenessProbe struct {
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/images.md#preloading-images
 type PullPolicy string
 
 const (
@@ -219,6 +242,8 @@ const (
 type CapabilityType string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/containers.md#capabilities
 type Capabilities struct {
 	// Added capabilities
 	Add []CapabilityType `json:"add,omitempty" description:"added capabilities"`
@@ -232,6 +257,8 @@ type ResourceRequirements struct {
 }
 
 // Container represents a single container that is expected to be run on the host.
+//
+//
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
@@ -270,6 +297,8 @@ const (
 
 // Handler defines a specific action that should be taken
 // TODO: pass structured data to these actions, and document that data here.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
 type Handler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
@@ -284,6 +313,8 @@ type Handler struct {
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-details
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
@@ -338,6 +369,8 @@ const (
 )
 
 // PodStatus represents a status of a pod.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md
 type PodStatus string
 
 // These are the valid statuses of pods.
@@ -471,6 +504,8 @@ type PodList struct {
 }
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md
 type Pod struct {
 	TypeMeta     `json:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
@@ -494,6 +529,8 @@ type ReplicationControllerList struct {
 }
 
 // ReplicationController represents the configuration of a replication controller.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md
 type ReplicationController struct {
 	TypeMeta     `json:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" description:"specification of the desired state of the replication controller"`
@@ -502,6 +539,8 @@ type ReplicationController struct {
 }
 
 // PodTemplate holds the information used for creating pods.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md#pod-template
 type PodTemplate struct {
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
@@ -529,6 +568,8 @@ type ServiceList struct {
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md
 type Service struct {
 	TypeMeta `json:",inline"`
 
@@ -582,6 +623,8 @@ type EndpointsList struct {
 }
 
 // NodeStatus is information about the current status of a node.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-status
 type NodeStatus struct {
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"node phase is the current lifecycle phase of the node"`
@@ -589,6 +632,9 @@ type NodeStatus struct {
 	Conditions []NodeCondition `json:"conditions,omitempty" description:"conditions is an array of current node conditions"`
 }
 
+// Described the current lifecycle phase of a node.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-phase
 type NodePhase string
 
 // These are the valid phases of node.
@@ -601,6 +647,9 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
+// Describes the condition of a running node.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
 type NodeConditionKind string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -613,6 +662,9 @@ const (
 	NodeReady NodeConditionKind = "Ready"
 )
 
+// Described the conditions of a running node.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
 type NodeCondition struct {
 	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, one of Reachable, Ready"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
@@ -623,7 +675,8 @@ type NodeCondition struct {
 }
 
 // NodeResources represents resources on a Kubernetes system node
-// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md
 type NodeResources struct {
 	// Capacity represents the available resources.
 	Capacity ResourceList `json:"capacity,omitempty" description:"resource capacity of a node represented as a map of resource name to quantity of resource"`
@@ -642,6 +695,8 @@ type ResourceList map[ResourceName]util.IntOrString
 
 // Minion is a worker node in Kubernetenes.
 // The name of the minion according to etcd is in ID.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
 type Minion struct {
 	TypeMeta `json:",inline"`
 	// Queried from cloud provider, if available.
@@ -673,7 +728,9 @@ type NamespaceStatus struct {
 }
 
 // A namespace provides a scope for Names.
-// Use of multiple namespaces is optional
+// Use of multiple namespaces is optional.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md
 type Namespace struct {
 	TypeMeta `json:",inline"`
 
@@ -876,6 +933,8 @@ type ObjectReference struct {
 
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#events
 type Event struct {
 	TypeMeta `json:",inline"`
 
@@ -1116,6 +1175,8 @@ type ResourceQuotaList struct {
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
 type Secret struct {
 	TypeMeta `json:",inline"`
 
