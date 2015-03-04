@@ -24,6 +24,7 @@ Note: This redis-master is *not* highly available.  Making it highly available w
 Use (or just create) the file `examples/guestbook/redis-master-controller.json` which describes a single pod running a redis key-value server in a container:
 Note that, although the redis server runs just with a single replica, we use replication controller to enforce that exactly one pod keeps running (e.g. in a event of node going down, the replication controller will ensure that the redis master gets restarted on a healthy node). 
 
+**Note, the JSON definititions are for v1beta1 do not work in the v1beta3 API version. **
 ```js
 {
   "id": "redis-master-controller",
