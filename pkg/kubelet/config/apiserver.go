@@ -49,7 +49,7 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 		}
 		updates <- kubelet.PodUpdate{bpods, kubelet.SET, kubelet.ApiserverSource}
 	}
-	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)).Run()
+	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
 }
 
 func getHostFieldLabel(apiVersion string) string {

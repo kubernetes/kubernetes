@@ -102,7 +102,12 @@ func NewMainKubelet(
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
-		cache.NewReflector(cache.NewListWatchFromClient(kubeClient, "services", api.NamespaceAll, labels.Everything()), &api.Service{}, serviceStore).Run()
+		cache.NewReflector(
+			cache.NewListWatchFromClient(kubeClient, "services", api.NamespaceAll, labels.Everything()),
+			&api.Service{},
+			serviceStore,
+			0,
+		).Run()
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
