@@ -47,7 +47,7 @@ var _ = Describe("PD", func() {
 
 		nodes, err := c.Nodes().List()
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
-		Expect(len(nodes.Items) >= 2)
+		Expect(len(nodes.Items) >= 2).To(BeTrue())
 
 		diskName = fmt.Sprintf("e2e-%s", string(util.NewUUID()))
 		host0Name = nodes.Items[0].ObjectMeta.Name
