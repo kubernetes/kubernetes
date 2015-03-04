@@ -271,25 +271,9 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // CreateObj adds a new object at a key unless it already exists. 'ttl' is time-to-live in seconds,
-// and 0 means forever.
-func (h *EtcdHelper) CreateObj(key string, obj runtime.Object, ttl uint64) error {
-	data, err := h.Codec.Encode(obj)
-	if err != nil {
-		return err
-	}
-	if h.ResourceVersioner != nil {
-		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
-			return errors.New("resourceVersion may not be set on objects to be created")
-		}
-	}
-
-	_, err = h.Client.Create(key, string(data), ttl)
-	return err
-}
-
-// Create adds a new object at a key unless it already exists. 'ttl' is time-to-live in seconds,
-// and 0 means forever. If no error is returned, out will be set to the read value from etcd.
-func (h *EtcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) error {
+// and 0 means forever. If no error is returned and out is not nil, out will be set to the read value
+// from etcd.
+func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
@@ -303,10 +287,12 @@ func (h *EtcdHelper) Create(key string, obj, out runtime.Object, ttl uint64) err
 	if err != nil {
 		return err
 	}
-	if _, err := conversion.EnforcePtr(out); err != nil {
-		panic("unable to convert output object to pointer")
+	if out != nil {
+		if _, err := conversion.EnforcePtr(out); err != nil {
+			panic("unable to convert output object to pointer")
+		}
+		_, _, err = h.extractObj(response, err, out, false, false)
 	}
-	_, _, err = h.extractObj(response, err, out, false, false)
 	return err
 }
 
@@ -332,21 +318,41 @@ func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
 }
 
 // SetObj marshals obj via json, and stores under key. Will do an atomic update if obj's ResourceVersion
-// field is set. 'ttl' is time-to-live in seconds, and 0 means forever.
-func (h *EtcdHelper) SetObj(key string, obj runtime.Object, ttl uint64) error {
+// field is set. 'ttl' is time-to-live in seconds, and 0 means forever. If no error is returned and out is
+//not nil, out will be set to the read value from etcd.
+func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) error {
+	var response *etcd.Response
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
 	}
+
+	create := true
 	if h.ResourceVersioner != nil {
-		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
-			_, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
-			return err // err is shadowed!
+		version, err := h.ResourceVersioner.ResourceVersion(obj)
+		if err == nil && version != 0 {
+			create = false
+			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
 		}
 	}
+	if err != nil {
+		return err
+	}
+	if create {
+		// Create will fail if a key already exists.
+		response, err = h.Client.Create(key, string(data), ttl)
+	}
 
-	// Create will fail if a key already exists.
-	_, err = h.Client.Create(key, string(data), ttl)
+	if err != nil {
+		return err
+	}
+	if out != nil {
+		if _, err := conversion.EnforcePtr(out); err != nil {
+			panic("unable to convert output object to pointer")
+		}
+		_, _, err = h.extractObj(response, err, out, false, false)
+	}
+
 	return err
 }
 

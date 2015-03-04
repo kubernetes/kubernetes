@@ -27,7 +27,7 @@ type Registry interface {
 	ListControllers(ctx api.Context) (*api.ReplicationControllerList, error)
 	WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
-	CreateController(ctx api.Context, controller *api.ReplicationController) error
-	UpdateController(ctx api.Context, controller *api.ReplicationController) error
+	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteController(ctx api.Context, controllerID string) error
 }

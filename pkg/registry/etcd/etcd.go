@@ -152,23 +152,25 @@ func (r *Registry) GetController(ctx api.Context, controllerID string) (*api.Rep
 }
 
 // CreateController creates a new ReplicationController.
-func (r *Registry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
+func (r *Registry) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	key, err := makeControllerKey(ctx, controller.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = r.CreateObj(key, controller, 0)
-	return etcderr.InterpretCreateError(err, "replicationController", controller.Name)
+	out := &api.ReplicationController{}
+	err = r.CreateObj(key, controller, out, 0)
+	return out, etcderr.InterpretCreateError(err, "replicationController", controller.Name)
 }
 
 // UpdateController replaces an existing ReplicationController.
-func (r *Registry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
+func (r *Registry) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	key, err := makeControllerKey(ctx, controller.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = r.SetObj(key, controller, 0 /* ttl */)
-	return etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
+	out := &api.ReplicationController{}
+	err = r.SetObj(key, controller, out, 0)
+	return out, etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
@@ -199,13 +201,14 @@ func (r *Registry) ListServices(ctx api.Context) (*api.ServiceList, error) {
 }
 
 // CreateService creates a new Service.
-func (r *Registry) CreateService(ctx api.Context, svc *api.Service) error {
+func (r *Registry) CreateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
 	key, err := makeServiceKey(ctx, svc.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = r.CreateObj(key, svc, 0)
-	return etcderr.InterpretCreateError(err, "service", svc.Name)
+	out := &api.Service{}
+	err = r.CreateObj(key, svc, out, 0)
+	return out, etcderr.InterpretCreateError(err, "service", svc.Name)
 }
 
 // GetService obtains a Service specified by its name.
@@ -270,13 +273,14 @@ func (r *Registry) DeleteService(ctx api.Context, name string) error {
 }
 
 // UpdateService replaces an existing Service.
-func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) error {
+func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
 	key, err := makeServiceKey(ctx, svc.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = r.SetObj(key, svc, 0 /* ttl */)
-	return etcderr.InterpretUpdateError(err, "service", svc.Name)
+	out := &api.Service{}
+	err = r.SetObj(key, svc, out, 0)
+	return out, etcderr.InterpretUpdateError(err, "service", svc.Name)
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
@@ -362,13 +366,13 @@ func (r *Registry) ListMinions(ctx api.Context) (*api.NodeList, error) {
 
 func (r *Registry) CreateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.CreateObj(makeNodeKey(minion.Name), minion, 0)
+	err := r.CreateObj(makeNodeKey(minion.Name), minion, nil, 0)
 	return etcderr.InterpretCreateError(err, "minion", minion.Name)
 }
 
 func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 	// TODO: Add some validations.
-	err := r.SetObj(makeNodeKey(minion.Name), minion, 0 /* ttl */)
+	err := r.SetObj(makeNodeKey(minion.Name), minion, nil, 0)
 	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
 }
 

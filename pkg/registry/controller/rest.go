@@ -23,7 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	rc "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -60,11 +59,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
-	if err := rs.registry.CreateController(ctx, controller); err != nil {
+	out, err := rs.registry.CreateController(ctx, controller)
+	if err != nil {
 		err = rest.CheckGeneratedNameError(rest.ReplicationControllers, err, controller)
-		return apiserver.RESTResult{}, err
 	}
-	return rs.registry.GetController(ctx, controller.Name)
+	return out, err
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
@@ -124,11 +123,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, false, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
-	err := rs.registry.UpdateController(ctx, controller)
-	if err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.GetController(ctx, controller.Name)
+	out, err := rs.registry.UpdateController(ctx, controller)
 	return out, false, err
 }
 

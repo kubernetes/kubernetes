@@ -115,12 +115,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		}
 	}
 
-	if err := rs.registry.CreateService(ctx, service); err != nil {
+	out, err := rs.registry.CreateService(ctx, service)
+	if err != nil {
 		rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
-		return nil, err
 	}
-	return rs.registry.GetService(ctx, service.Name)
+	return out, err
 }
 
 func hostsFromMinionList(list *api.NodeList) []string {
@@ -213,11 +213,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 			}
 		}
 	}
-	err = rs.registry.UpdateService(ctx, service)
-	if err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.GetService(ctx, service.Name)
+	out, err := rs.registry.UpdateService(ctx, service)
 	return out, false, err
 }
 

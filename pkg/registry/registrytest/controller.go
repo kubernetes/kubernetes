@@ -49,16 +49,16 @@ func (r *ControllerRegistry) GetController(ctx api.Context, ID string) (*api.Rep
 	return &api.ReplicationController{}, r.Err
 }
 
-func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
+func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Err
+	return controller, r.Err
 }
 
-func (r *ControllerRegistry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
+func (r *ControllerRegistry) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Err
+	return controller, r.Err
 }
 
 func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error {
