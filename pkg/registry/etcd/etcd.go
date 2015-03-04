@@ -322,9 +322,9 @@ func (r *Registry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) er
 	}
 	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
 	err = r.AtomicUpdate(key, &api.Endpoints{}, true,
-		func(input runtime.Object) (runtime.Object, error) {
+		func(input runtime.Object) (runtime.Object, uint64, error) {
 			// TODO: racy - label query is returning different results for two simultaneous updaters
-			return endpoints, nil
+			return endpoints, 0, nil
 		})
 	return etcderr.InterpretUpdateError(err, "endpoints", endpoints.Name)
 }

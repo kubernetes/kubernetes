@@ -357,7 +357,7 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 
 // Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
 // See the comment for AtomicUpdate for more detail.
-type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error)
+type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, ttl uint64, err error)
 
 // AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
 // Note, tryUpdate may be called more than once.
@@ -365,7 +365,7 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error
 // Example:
 //
 // h := &util.EtcdHelper{client, encoding, versioning}
-// err := h.AtomicUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, error) {
+// err := h.AtomicUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, uint64, error) {
 //	// Before this function is called, currentObj has been reset to etcd's current
 //	// contents for "myKey".
 //
@@ -374,8 +374,9 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error
 //	// Make a *modification*.
 //	cur.Counter++
 //
-//	// Return the modified object. Return an error to stop iterating.
-//	return cur, nil
+//	// Return the modified object. Return an error to stop iterating. Return a non-zero uint64 to set
+//  // the TTL on the object.
+//	return cur, 0, nil
 // })
 //
 func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
@@ -391,7 +392,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNo
 			return err
 		}
 
-		ret, err := tryUpdate(obj)
+		ret, ttl, err := tryUpdate(obj)
 		if err != nil {
 			return err
 		}
@@ -403,7 +404,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNo
 
 		// First time this key has been used, try creating new value.
 		if index == 0 {
-			response, err := h.Client.Create(key, string(data), 0)
+			response, err := h.Client.Create(key, string(data), ttl)
 			if IsEtcdNodeExist(err) {
 				continue
 			}
@@ -415,7 +416,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNo
 			return nil
 		}
 
-		response, err := h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
+		response, err := h.Client.CompareAndSwap(key, string(data), ttl, origBody, index)
 		if IsEtcdTestFailed(err) {
 			continue
 		}

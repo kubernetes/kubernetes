@@ -160,18 +160,18 @@ func (r *BindingREST) setPodHostTo(ctx api.Context, podID, oldMachine, machine s
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Helper.AtomicUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, error) {
+	err = r.store.Helper.AtomicUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, uint64, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
-			return nil, fmt.Errorf("unexpected object: %#v", obj)
+			return nil, 0, fmt.Errorf("unexpected object: %#v", obj)
 		}
 		if pod.Spec.Host != oldMachine || pod.Status.Host != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to host %q or %q", pod.Name, pod.Spec.Host, pod.Status.Host)
+			return nil, 0, fmt.Errorf("pod %v is already assigned to host %q or %q", pod.Name, pod.Spec.Host, pod.Status.Host)
 		}
 		pod.Spec.Host = machine
 		pod.Status.Host = machine
 		finalPod = pod
-		return pod, nil
+		return pod, 0, nil
 	})
 	return finalPod, err
 }
