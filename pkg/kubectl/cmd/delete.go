@@ -66,7 +66,7 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			cmdutil.CheckErr(err)
 			mapper, typer := f.Object(cmd)
 			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
@@ -77,7 +77,7 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 				ResourceTypeOrNameArgs(false, args...).
 				Flatten().
 				Do()
-			checkErr(r.Err())
+			cmdutil.CheckErr(r.Err())
 
 			found := 0
 			err = r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
@@ -88,7 +88,7 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 				fmt.Fprintf(out, "%s\n", r.Name)
 				return nil
 			})
-			checkErr(err)
+			cmdutil.CheckErr(err)
 			if found == 0 {
 				fmt.Fprintf(cmd.Out(), "No resources found\n")
 			}

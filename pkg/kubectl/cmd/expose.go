@@ -51,9 +51,9 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 			}
 
 			namespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 			client, err := f.Client(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			generatorName := util.GetFlagString(cmd, "generator")
 
@@ -73,7 +73,7 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 			}
 			if _, found := params["selector"]; !found {
 				rc, err := client.ReplicationControllers(namespace).Get(args[0])
-				checkErr(err)
+				util.CheckErr(err)
 				params["selector"] = kubectl.MakeLabels(rc.Spec.Selector)
 			}
 			if util.GetFlagBool(cmd, "create-external-load-balancer") {
@@ -81,25 +81,25 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 			}
 
 			err = kubectl.ValidateParams(names, params)
-			checkErr(err)
+			util.CheckErr(err)
 
 			service, err := generator.Generate(params)
-			checkErr(err)
+			util.CheckErr(err)
 
 			inline := util.GetFlagString(cmd, "overrides")
 			if len(inline) > 0 {
 				service, err = util.Merge(service, inline, "Service")
-				checkErr(err)
+				util.CheckErr(err)
 			}
 
 			// TODO: extract this flag to a central location, when such a location exists.
 			if !util.GetFlagBool(cmd, "dry-run") {
 				service, err = client.Services(namespace).Create(service.(*api.Service))
-				checkErr(err)
+				util.CheckErr(err)
 			}
 
 			err = f.PrintObject(cmd, service, out)
-			checkErr(err)
+			util.CheckErr(err)
 		},
 	}
 	util.AddPrinterFlags(cmd)

@@ -61,10 +61,10 @@ func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 			}
 			oldName := args[0]
 			schema, err := f.Validator(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			clientConfig, err := f.ClientConfig(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 			cmdApiVersion := clientConfig.Version
 
 			mapper, typer := f.Object(cmd)
@@ -79,23 +79,23 @@ func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 			}
 
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 			// TODO: use resource.Builder instead
 			err = util.CompareNamespace(cmdNamespace, namespace)
-			checkErr(err)
+			util.CheckErr(err)
 
 			client, err := f.Client(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			obj, err := mapping.Codec.Decode(data)
-			checkErr(err)
+			util.CheckErr(err)
 			newRc := obj.(*api.ReplicationController)
 
 			updater := kubectl.NewRollingUpdater(cmdNamespace, client)
 
 			// fetch rc
 			oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
-			checkErr(err)
+			util.CheckErr(err)
 
 			var hasLabel bool
 			for key, oldValue := range oldRc.Spec.Selector {
@@ -113,7 +113,7 @@ func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 				newRc.Spec.Replicas = oldRc.Spec.Replicas
 			}
 			err = updater.Update(out, oldRc, newRc, period, interval, timeout)
-			checkErr(err)
+			util.CheckErr(err)
 
 			fmt.Fprintf(out, "%s\n", newName)
 		},

@@ -62,6 +62,12 @@ func (u *UnexpectedStatusError) Error() string {
 	return fmt.Sprintf("request [%+v] failed (%d) %s: %s", u.Request, u.Response.StatusCode, u.Response.Status, u.Body)
 }
 
+// IsUnexpectedStatusError determines if err is due to an unexpected status from the server.
+func IsUnexpectedStatusError(err error) bool {
+	_, ok := err.(*UnexpectedStatusError)
+	return ok
+}
+
 // RequestConstructionError is returned when there's an error assembling a request.
 type RequestConstructionError struct {
 	Err error
@@ -576,7 +582,8 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
-			var err error = &UnexpectedStatusError{
+			var err error
+			err = &UnexpectedStatusError{
 				Request:  req,
 				Response: resp,
 				Body:     string(body),

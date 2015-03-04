@@ -54,10 +54,10 @@ func (f *Factory) NewCmdRunContainer(out io.Writer) *cobra.Command {
 			}
 
 			namespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			client, err := f.Client(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			generatorName := util.GetFlagString(cmd, "generator")
 			generator, found := kubectl.Generators[generatorName]
@@ -69,25 +69,25 @@ func (f *Factory) NewCmdRunContainer(out io.Writer) *cobra.Command {
 			params["name"] = args[0]
 
 			err = kubectl.ValidateParams(names, params)
-			checkErr(err)
+			util.CheckErr(err)
 
 			controller, err := generator.Generate(params)
-			checkErr(err)
+			util.CheckErr(err)
 
 			inline := util.GetFlagString(cmd, "overrides")
 			if len(inline) > 0 {
 				controller, err = util.Merge(controller, inline, "ReplicationController")
-				checkErr(err)
+				util.CheckErr(err)
 			}
 
 			// TODO: extract this flag to a central location, when such a location exists.
 			if !util.GetFlagBool(cmd, "dry-run") {
 				controller, err = client.ReplicationControllers(namespace).Create(controller.(*api.ReplicationController))
-				checkErr(err)
+				util.CheckErr(err)
 			}
 
 			err = f.PrintObject(cmd, controller, out)
-			checkErr(err)
+			util.CheckErr(err)
 		},
 	}
 	util.AddPrinterFlags(cmd)

@@ -97,7 +97,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 		Object: func(cmd *cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
-			checkErr(err)
+			cmdutil.CheckErr(err)
 			cmdApiVersion := cfg.Version
 
 			return kubectl.OutputVersionMapper{mapper, cmdApiVersion}, api.Scheme
@@ -253,7 +253,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 	}
 	if ok {
 		clientConfig, err := f.ClientConfig(cmd)
-		checkErr(err)
+		cmdutil.CheckErr(err)
 		defaultVersion := clientConfig.Version
 
 		version := cmdutil.OutputVersion(cmd, defaultVersion)
@@ -327,12 +327,6 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
-}
-
-func checkErr(err error) {
-	if err != nil {
-		glog.FatalDepth(1, err.Error())
-	}
 }
 
 func usageError(cmd *cobra.Command, format string, args ...interface{}) {

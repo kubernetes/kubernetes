@@ -74,14 +74,14 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 			}
 
 			namespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 			client, err := f.Client(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			podID := args[0]
 
 			pod, err := client.Pods(namespace).Get(podID)
-			checkErr(err)
+			util.CheckErr(err)
 
 			var container string
 			if len(args) == 1 {
@@ -111,11 +111,11 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 				Suffix("containerLogs", namespace, podID, container).
 				Param("follow", strconv.FormatBool(follow)).
 				Stream()
-			checkErr(err)
+			util.CheckErr(err)
 
 			defer readCloser.Close()
 			_, err = io.Copy(out, readCloser)
-			checkErr(err)
+			util.CheckErr(err)
 		},
 	}
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")

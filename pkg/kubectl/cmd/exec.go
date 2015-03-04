@@ -61,13 +61,13 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 			}
 
 			namespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			client, err := f.Client(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			pod, err := client.Pods(namespace).Get(flags.pod)
-			checkErr(err)
+			util.CheckErr(err)
 
 			if pod.Status.Phase != api.PodRunning {
 				glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
@@ -113,7 +113,7 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 			}
 
 			config, err := f.ClientConfig(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			req := client.RESTClient.Get().
 				Prefix("proxy").
@@ -123,7 +123,7 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 
 			e := remotecommand.New(req, config, args, stdin, cmdOut, cmdErr, flags.tty)
 			err = e.Execute()
-			checkErr(err)
+			util.CheckErr(err)
 		},
 	}
 	cmd.Flags().StringVarP(&flags.pod, "pod", "p", "", "Pod name")

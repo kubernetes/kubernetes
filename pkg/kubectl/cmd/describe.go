@@ -34,17 +34,17 @@ This command joins many API calls together to form a detailed description of a
 given resource.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			mapper, _ := f.Object(cmd)
 			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			describer, err := f.Describer(cmd, mapping)
-			checkErr(err)
+			util.CheckErr(err)
 
 			s, err := describer.Describe(namespace, name)
-			checkErr(err)
+			util.CheckErr(err)
 			fmt.Fprintf(out, "%s\n", s)
 		},
 	}

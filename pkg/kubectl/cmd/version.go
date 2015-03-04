@@ -36,7 +36,7 @@ func (f *Factory) NewCmdVersion(out io.Writer) *cobra.Command {
 			}
 
 			client, err := f.Client(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			kubectl.GetVersion(out, client)
 		},

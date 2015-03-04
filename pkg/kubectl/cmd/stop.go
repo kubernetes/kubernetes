@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
@@ -51,7 +52,7 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 		Example: stop_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			cmdutil.CheckErr(err)
 			mapper, typer := f.Object(cmd)
 			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
@@ -60,11 +61,11 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
-			checkErr(r.Err())
+			cmdutil.CheckErr(r.Err())
 
 			r.Visit(func(info *resource.Info) error {
 				reaper, err := f.Reaper(cmd, info.Mapping)
-				checkErr(err)
+				cmdutil.CheckErr(err)
 				s, err := reaper.Stop(info.Namespace, info.Name)
 				if err != nil {
 					return err
