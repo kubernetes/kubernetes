@@ -404,10 +404,11 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNo
 
 		// First time this key has been used, try creating new value.
 		if index == 0 {
-			_, err = h.Client.Create(key, string(data), 0)
+			response, err := h.Client.Create(key, string(data), 0)
 			if IsEtcdNodeExist(err) {
 				continue
 			}
+			_, _, err = h.extractObj(response, err, ptrToType, false, false)
 			return err
 		}
 
