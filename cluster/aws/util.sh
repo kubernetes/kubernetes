@@ -314,6 +314,7 @@ function kube-up {
     echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
@@ -599,6 +600,37 @@ function kube-down {
 
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
   fi
+}
+
+# Update a kubernetes cluster with latest source
+function kube-push {
+  detect-master
+
+  # Make sure we have the tar files staged on Google Storage
+  find-release-tars
+  upload-server-tars
+
+  (
+    echo "#! /bin/bash"
+    echo "mkdir -p /var/cache/kubernetes-install"
+    echo "cd /var/cache/kubernetes-install"
+    echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
+    echo "readonly SALT_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SALT_TAR_URL}'"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
+    echo "echo Executing configuration"
+    echo "sudo salt '*' mine.update"
+    echo "sudo salt --force-color '*' state.highstate"
+  ) | ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo bash
+
+  get-password
+
+  echo
+  echo "Kubernetes cluster is running.  The master is running at:"
+  echo
+  echo "  https://${KUBE_MASTER_IP}"
+  echo
+
 }
 
 function setup-logging-firewall {

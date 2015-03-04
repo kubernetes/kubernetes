@@ -21,10 +21,10 @@
 # master and run.
 
 echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-wget "$SERVER_BINARY_TAR_URL"
+download-or-bust "$SERVER_BINARY_TAR_URL"
 
 echo "Downloading binary release tar ($SALT_TAR_URL)"
-wget "$SALT_TAR_URL"
+download-or-bust "$SALT_TAR_URL"
 
 echo "Unpacking Salt tree"
 rm -rf kubernetes

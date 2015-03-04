@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,35 +26,4 @@ download-or-bust() {
     curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "$1"
     md5sum "$file"
   done
-}
-
-# Install salt from GCS.  See README.md for instructions on how to update these
-# debs.
-#
-# $1 If set to --master, also install the master
-install-salt() {
-  apt-get update
-
-  mkdir -p /var/cache/salt-install
-  cd /var/cache/salt-install
-
-  TARS=(
-    libzmq3_3.2.3+dfsg-1~bpo70~dst+1_amd64.deb
-    python-zmq_13.1.0-1~bpo70~dst+1_amd64.deb
-    salt-common_2014.1.13+ds-1~bpo70+1_all.deb
-    salt-minion_2014.1.13+ds-1~bpo70+1_all.deb
-  )
-  if [[ ${1-} == '--master' ]]; then
-    TARS+=(salt-master_2014.1.13+ds-1~bpo70+1_all.deb)
-  fi
-  URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
-
-  for tar in "${TARS[@]}"; do
-    download-or-bust "${URL_BASE}/${tar}"
-    dpkg -i "${tar}"
-  done
-
-  # This will install any of the unmet dependencies from above.
-  apt-get install -f -y
-
 }
