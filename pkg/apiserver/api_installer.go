@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
@@ -106,6 +107,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		return err
 	}
 	versionedPtr, err := api.Scheme.New(a.version, kind)
+	if conversion.IsNotRegisteredError(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
