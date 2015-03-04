@@ -138,17 +138,24 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 
 		// the outermost object will be converted to the output-version
 		version := util.OutputVersion(cmd, defaultVersion)
-		if len(version) == 0 {
-			// TODO: add a new ResourceBuilder mode for Object() that attempts to ensure the objects
-			// are in the appropriate version if one exists (and if not, use the best effort).
-			// TODO: ensure api-version is set with the default preferred api version by the client
-			// builder on initialization
-			version = latest.Version
-		}
-		printer = kubectl.NewVersionedPrinter(printer, api.Scheme, version)
 
-		obj, err := b.Flatten().Do().Object()
+		r := b.Flatten().Do()
+		obj, err := r.Object()
 		checkErr(err)
+
+		// try conversion to all the possible versions
+		// TODO: simplify by adding a ResourceBuilder mode
+		versions := []string{version, latest.Version}
+		infos, _ := r.Infos()
+		for _, info := range infos {
+			versions = append(versions, info.Mapping.APIVersion)
+		}
+
+		// TODO: add a new ResourceBuilder mode for Object() that attempts to ensure the objects
+		// are in the appropriate version if one exists (and if not, use the best effort).
+		// TODO: ensure api-version is set with the default preferred api version by the client
+		// builder on initialization
+		printer := kubectl.NewVersionedPrinter(printer, api.Scheme, versions...)
 
 		err = printer.PrintObj(obj, out)
 		checkErr(err)
