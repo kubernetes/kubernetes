@@ -1,0 +1,12 @@
+apiVersion: v1beta3
+kind: Service
+metadata:
+  labels:
+    db: influxdb
+  name: rethinkdb-driver
+  namespace: rethinkdb
+spec:
+  containerPort: 28015
+  port: 28015
+  selector:
+    db: rethinkdb

@@ -1,10 +1,12 @@
 {
   "apiVersion": "v1beta3",
   "kind": "ResourceQuota",
-  "name": "quota",
+  "metadata": {
+    "name": "quota",
+  },
   "spec": {
     "hard": {
-      "memory": "1073741824",
+      "memory": "1Gi",
       "cpu": "20",
       "pods": "10",
       "services": "5",
