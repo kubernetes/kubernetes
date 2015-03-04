@@ -82,13 +82,20 @@ func NewNodeController(
 
 // Run creates initial node list and start syncing instances from cloudprovider if any.
 // It also starts syncing cluster node status.
+// 1. RegisterNodes() is called only once to register all initial nodes (from cloudprovider
+//    or from command line flag). To make cluster bootstrap faster, node controller populates
+//    node addresses.
+// 2. SyncCloud() is called periodically (if enabled) to sync instances from cloudprovider.
+//    Node created here will only have specs.
+// 3. SyncNodeStatus() is called periodically (if enabled) to sync node status for nodes in
+//    k8s cluster.
 func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus bool) {
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
 	if s.isRunningCloudProvider() {
 		if syncNodeList {
-			nodes, err = s.CloudNodes()
+			nodes, err = s.GetCloudNodesWithSpec()
 			if err != nil {
 				glog.Errorf("Error loading initial node from cloudprovider: %v", err)
 			}
@@ -96,7 +103,7 @@ func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus 
 			nodes = &api.NodeList{}
 		}
 	} else {
-		nodes, err = s.StaticNodes()
+		nodes, err = s.GetStaticNodesWithSpec()
 		if err != nil {
 			glog.Errorf("Error loading initial static nodes: %v", err)
 		}
@@ -167,11 +174,7 @@ func (s *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, retr
 
 // SyncCloud synchronizes the list of instances from cloudprovider to master server.
 func (s *NodeController) SyncCloud() error {
-	matches, err := s.CloudNodes()
-	if err != nil {
-		return err
-	}
-	matches, err = s.PopulateIPs(matches)
+	matches, err := s.GetCloudNodesWithSpec()
 	if err != nil {
 		return err
 	}
@@ -275,12 +278,6 @@ func (s *NodeController) PopulateIPs(nodes *api.NodeList) (*api.NodeList, error)
 				glog.Errorf("error getting instance ip address for %s: %v", node.Name, err)
 			} else {
 				node.Status.HostIP = hostIP.String()
-			}
-			instanceID, err := instances.ExternalID(node.Name)
-			if err != nil {
-				glog.Errorf("error getting instance id for %s: %v", node.Name, err)
-			} else {
-				node.Spec.ExternalID = instanceID
 			}
 		}
 	} else {
@@ -398,9 +395,10 @@ func (s *NodeController) deletePods(nodeID string) error {
 	return nil
 }
 
-// StaticNodes constructs and returns api.NodeList for static nodes. If error
-// occurs, an empty NodeList will be returned with a non-nil error info.
-func (s *NodeController) StaticNodes() (*api.NodeList, error) {
+// GetStaticNodesWithSpec constructs and returns api.NodeList for static nodes. If error
+// occurs, an empty NodeList will be returned with a non-nil error info. The
+// method only constructs spec fields for nodes.
+func (s *NodeController) GetStaticNodesWithSpec() (*api.NodeList, error) {
 	result := &api.NodeList{}
 	for _, nodeID := range s.nodes {
 		node := api.Node{
@@ -412,9 +410,10 @@ func (s *NodeController) StaticNodes() (*api.NodeList, error) {
 	return result, nil
 }
 
-// CloudNodes constructs and returns api.NodeList from cloudprovider. If error
-// occurs, an empty NodeList will be returned with a non-nil error info.
-func (s *NodeController) CloudNodes() (*api.NodeList, error) {
+// GetCloudNodesWithSpec constructs and returns api.NodeList from cloudprovider. If error
+// occurs, an empty NodeList will be returned with a non-nil error info. The
+// method only constructs spec fields for nodes.
+func (s *NodeController) GetCloudNodesWithSpec() (*api.NodeList, error) {
 	result := &api.NodeList{}
 	instances, ok := s.cloud.Instances()
 	if !ok {
@@ -436,6 +435,12 @@ func (s *NodeController) CloudNodes() (*api.NodeList, error) {
 		}
 		if resources != nil {
 			node.Spec.Capacity = resources.Capacity
+		}
+		instanceID, err := instances.ExternalID(node.Name)
+		if err != nil {
+			glog.Errorf("error getting instance id for %s: %v", node.Name, err)
+		} else {
+			node.Spec.ExternalID = instanceID
 		}
 		result.Items = append(result.Items, node)
 	}

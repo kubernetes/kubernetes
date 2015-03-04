@@ -254,7 +254,7 @@ func TestRegisterNodes(t *testing.T) {
 	}
 }
 
-func TestCreateStaticNodes(t *testing.T) {
+func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 	table := []struct {
 		machines      []string
 		expectedNodes *api.NodeList
@@ -296,7 +296,7 @@ func TestCreateStaticNodes(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, nil, nil, 10, time.Minute)
-		nodes, err := nodeController.StaticNodes()
+		nodes, err := nodeController.GetStaticNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -306,7 +306,7 @@ func TestCreateStaticNodes(t *testing.T) {
 	}
 }
 
-func TestCreateCloudNodes(t *testing.T) {
+func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 	resourceList := api.ResourceList{
 		api.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
 		api.ResourceMemory: *resource.NewQuantity(3000, resource.DecimalSI),
@@ -357,7 +357,7 @@ func TestCreateCloudNodes(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil, 10, time.Minute)
-		nodes, err := nodeController.CloudNodes()
+		nodes, err := nodeController.GetCloudNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
