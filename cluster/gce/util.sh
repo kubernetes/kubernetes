@@ -847,7 +847,7 @@ function restart-kube-proxy {
   ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
-# Restart the kube-proxy on a node ($1)
+# Restart the kube-apiserver on a node ($1)
 function restart-apiserver {
   ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
