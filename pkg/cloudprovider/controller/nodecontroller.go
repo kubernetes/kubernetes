@@ -40,11 +40,6 @@ var (
 	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
 )
 
-var (
-	// aliased to allow mocking in tests
-	lookupIP = net.LookupIP
-)
-
 type NodeController struct {
 	cloud              cloudprovider.Interface
 	matchRE            string
@@ -54,6 +49,7 @@ type NodeController struct {
 	kubeletClient      client.KubeletHealthChecker
 	registerRetryCount int
 	podEvictionTimeout time.Duration
+	lookupIP           func(host string) ([]net.IP, error)
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -77,6 +73,7 @@ func NewNodeController(
 		kubeletClient:      kubeletClient,
 		registerRetryCount: registerRetryCount,
 		podEvictionTimeout: podEvictionTimeout,
+		lookupIP:           net.LookupIP,
 	}
 }
 
@@ -289,7 +286,7 @@ func (s *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList, 
 				address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: addr.String()}
 				api.AddToNodeAddresses(&node.Status.Addresses, address)
 			} else {
-				addrs, err := lookupIP(node.Name)
+				addrs, err := s.lookupIP(node.Name)
 				if err != nil {
 					glog.Errorf("Can't get ip address of node %s: %v", node.Name, err)
 				} else if len(addrs) == 0 {

@@ -52,12 +52,6 @@ type FakeNodeHandler struct {
 	RequestCount int
 }
 
-func init() {
-	lookupIP = func(host string) ([]net.IP, error) {
-		return nil, fmt.Errorf("lookup %v: no such host", host)
-	}
-}
-
 func (c *FakeNodeHandler) Nodes() client.NodeInterface {
 	return c
 }
@@ -720,6 +714,9 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
+		nodeController.lookupIP = func(host string) ([]net.IP, error) {
+			return nil, fmt.Errorf("lookup %v: no such host", host)
+		}
 		if err := nodeController.SyncNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -991,6 +988,9 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, 5*time.Minute)
+		nodeController.lookupIP = func(host string) ([]net.IP, error) {
+			return nil, fmt.Errorf("lookup %v: no such host", host)
+		}
 		if err := nodeController.SyncNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
