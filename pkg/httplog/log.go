@@ -74,7 +74,7 @@ func (passthroughLogger) Addf(format string, data ...interface{}) {
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
-	return (status < http.StatusOK || status >= http.StatusBadRequest) && status != http.StatusSwitchingProtocols
+	return (status < http.StatusOK || status >= http.StatusInternalServerError) && status != http.StatusSwitchingProtocols
 }
 
 // NewLogged turns a normal response writer into a logged response writer.
