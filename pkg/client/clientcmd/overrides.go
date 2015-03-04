@@ -81,6 +81,7 @@ const (
 	FlagCertFile     = "client-certificate"
 	FlagKeyFile      = "client-key"
 	FlagCAFile       = "certificate-authority"
+	FlagEmbedCerts   = "embed-certs"
 	FlagBearerToken  = "token"
 	FlagUsername     = "username"
 	FlagPassword     = "password"

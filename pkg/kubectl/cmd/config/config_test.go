@@ -167,6 +167,56 @@ func TestAdditionalAuth(t *testing.T) {
 	test.run(t)
 }
 
+func TestEmbedClientCert(t *testing.T) {
+	fakeCertFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeCertFile.Name())
+	fakeData := []byte("fake-data")
+	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.ClientCertificateData = fakeData
+	expectedConfig.AuthInfos["another-user"] = *authInfo
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagCertFile + "=" + fakeCertFile.Name(), "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedClientKey(t *testing.T) {
+	fakeKeyFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeKeyFile.Name())
+	fakeData := []byte("fake-data")
+	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.ClientKeyData = fakeData
+	expectedConfig.AuthInfos["another-user"] = *authInfo
+
+	test := configCommandTest{
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagKeyFile + "=" + fakeKeyFile.Name(), "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"set-credentials", "another-user", "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig:  newRedFederalCowHammerConfig(),
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{"--client-certificate", "--client-key", "embed"},
+	}
+
+	test.run(t)
+}
+
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
@@ -370,6 +420,45 @@ func TestInsecureClearsCA(t *testing.T) {
 		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagInsecure + "=true"},
 		startingConfig: startingConfig,
 		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestCADataClearsCA(t *testing.T) {
+	fakeCAFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(fakeCAFile.Name())
+	fakeData := []byte("cadata")
+	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0600)
+
+	clusterInfoWithCAData := clientcmdapi.NewCluster()
+	clusterInfoWithCAData.CertificateAuthorityData = fakeData
+
+	clusterInfoWithCA := clientcmdapi.NewCluster()
+	clusterInfoWithCA.CertificateAuthority = "cafile"
+
+	startingConfig := newRedFederalCowHammerConfig()
+	startingConfig.Clusters["another-cluster"] = *clusterInfoWithCA
+
+	expectedConfig := newRedFederalCowHammerConfig()
+	expectedConfig.Clusters["another-cluster"] = *clusterInfoWithCAData
+
+	test := configCommandTest{
+		args:           []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagCAFile + "=" + fakeCAFile.Name(), "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig: startingConfig,
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedNoCADisallowed(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	test := configCommandTest{
+		args:            []string{"set-cluster", "another-cluster", "--" + clientcmd.FlagEmbedCerts + "=true"},
+		startingConfig:  newRedFederalCowHammerConfig(),
+		expectedConfig:  expectedConfig,
+		expectedOutputs: []string{"--certificate-authority", "embed"},
 	}
 
 	test.run(t)

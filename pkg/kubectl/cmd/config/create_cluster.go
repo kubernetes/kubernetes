@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 
 	"github.com/spf13/cobra"
 
@@ -35,6 +36,7 @@ type createClusterOptions struct {
 	apiVersion            util.StringFlag
 	insecureSkipTLSVerify util.BoolFlag
 	certificateAuthority  util.StringFlag
+	embedCAData           util.BoolFlag
 }
 
 func NewCmdConfigSetCluster(out io.Writer, pathOptions *pathOptions) *cobra.Command {
@@ -45,7 +47,7 @@ func NewCmdConfigSetCluster(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 		Short: "Sets a cluster entry in .kubeconfig",
 		Long: `Sets a cluster entry in .kubeconfig
 	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
+	e.g.
 		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/.kubernetes.ca.cert
 		only sets the certificate-authority field on the e2e cluster entry without touching other values.
 		`,
@@ -66,7 +68,8 @@ func NewCmdConfigSetCluster(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in .kubeconfig")
 	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+" for the cluster entry in .kubeconfig")
 	cmd.Flags().Var(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, clientcmd.FlagInsecure+" for the cluster entry in .kubeconfig")
-	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, clientcmd.FlagCAFile+" for the cluster entry in .kubeconfig")
+	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" for the cluster entry in .kubeconfig")
+	cmd.Flags().Var(&options.embedCAData, clientcmd.FlagEmbedCerts, clientcmd.FlagEmbedCerts+" for the cluster entry in .kubeconfig")
 
 	return cmd
 }
@@ -116,11 +119,18 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 		}
 	}
 	if o.certificateAuthority.Provided() {
-		modifiedCluster.CertificateAuthority = o.certificateAuthority.Value()
-		// Specifying a certificate authority file clears certificate authority data and insecure mode
-		if modifiedCluster.CertificateAuthority != "" {
-			modifiedCluster.CertificateAuthorityData = nil
+		caPath := o.certificateAuthority.Value()
+		if o.embedCAData.Value() {
+			modifiedCluster.CertificateAuthorityData, _ = ioutil.ReadFile(caPath)
 			modifiedCluster.InsecureSkipTLSVerify = false
+			modifiedCluster.CertificateAuthority = ""
+		} else {
+			modifiedCluster.CertificateAuthority = caPath
+			// Specifying a certificate authority file clears certificate authority data and insecure mode
+			if caPath != "" {
+				modifiedCluster.InsecureSkipTLSVerify = false
+				modifiedCluster.CertificateAuthorityData = nil
+			}
 		}
 	}
 
@@ -144,6 +154,15 @@ func (o createClusterOptions) validate() error {
 	}
 	if o.insecureSkipTLSVerify.Value() && o.certificateAuthority.Value() != "" {
 		return errors.New("You cannot specify a certificate authority and insecure mode at the same time")
+	}
+	if o.embedCAData.Value() {
+		caPath := o.certificateAuthority.Value()
+		if caPath == "" {
+			return fmt.Errorf("You must specify a --%s to embed", clientcmd.FlagCAFile)
+		}
+		if _, err := ioutil.ReadFile(caPath); err != nil {
+			return fmt.Errorf("Could not read %s data from %s: %v", clientcmd.FlagCAFile, caPath, err)
+		}
 	}
 
 	return nil
