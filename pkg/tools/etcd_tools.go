@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -24,7 +25,6 @@ import (
 	"os/exec"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -425,20 +425,35 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNo
 	}
 }
 
-func checkEtcd(host string) error {
+// GetEtcdVersion performs a version check against the provided Etcd server, returning a triplet
+// of the release version, internal version, and error (if any).
+func GetEtcdVersion(host string) (releaseVersion, internalVersion string, err error) {
 	response, err := http.Get(host + "/version")
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	defer response.Body.Close()
+
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return err
+		return "", "", err
 	}
-	if !strings.HasPrefix(string(body), "etcd") {
-		return fmt.Errorf("unknown server: %s", string(body))
+
+	var dat map[string]interface{}
+	if err := json.Unmarshal(body, &dat); err != nil {
+		return "", "", fmt.Errorf("unknown server: %s", string(body))
 	}
-	return nil
+	if obj := dat["releaseVersion"]; obj != nil {
+		if s, ok := obj.(string); ok {
+			releaseVersion = s
+		}
+	}
+	if obj := dat["internalVersion"]; obj != nil {
+		if s, ok := obj.(string); ok {
+			internalVersion = s
+		}
+	}
+	return
 }
 
 func startEtcd() (*exec.Cmd, error) {
@@ -451,7 +466,7 @@ func startEtcd() (*exec.Cmd, error) {
 }
 
 func NewEtcdClientStartServerIfNecessary(server string) (EtcdClient, error) {
-	err := checkEtcd(server)
+	_, _, err := GetEtcdVersion(server)
 	if err != nil {
 		glog.Infof("Failed to find etcd, attempting to start.")
 		_, err := startEtcd()

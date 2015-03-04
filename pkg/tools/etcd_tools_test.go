@@ -19,6 +19,8 @@ package tools
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"sync"
 	"testing"
@@ -29,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/stretchr/testify/assert"
 )
 
 type TestResource struct {
@@ -642,4 +645,49 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	if stored.Value != concurrency {
 		t.Errorf("Some of the writes were lost. Stored value: %d", stored.Value)
 	}
+}
+
+func TestGetEtcdVersion_ValidVersion(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "{\"releaseVersion\":\"2.0.3\",\"internalVersion\":\"2\"}")
+	}))
+	defer testServer.Close()
+
+	var relVersion string
+	var intVersion string
+	var err error
+	if relVersion, intVersion, err = GetEtcdVersion(testServer.URL); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	assert.Equal(t, "2.0.3", relVersion, "Unexpected external version")
+	assert.Equal(t, "2", intVersion, "Unexpected internal version")
+	assert.Nil(t, err)
+}
+
+func TestGetEtcdVersion_UnknownVersion(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "{\"unknownAttribute\":\"foobar\",\"internalVersion\":\"2\"}")
+	}))
+	defer testServer.Close()
+
+	var relVersion string
+	var intVersion string
+	var err error
+	if relVersion, intVersion, err = GetEtcdVersion(testServer.URL); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	assert.Equal(t, "", relVersion, "Unexpected external version")
+	assert.Equal(t, "2", intVersion, "Unexpected internal version")
+	assert.Nil(t, err)
+}
+
+func TestGetEtcdVersion_ErrorStatus(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer testServer.Close()
+
+	var err error
+	_, _, err = GetEtcdVersion(testServer.URL)
+	assert.NotNil(t, err)
 }
