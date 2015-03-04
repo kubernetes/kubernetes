@@ -545,8 +545,9 @@ type Service struct {
 	// An external load balancer should be set up via the cloud-provider
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
-	// PublicIPs are used by external load balancers.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs from which to select the address for the external load balancer"`
+	// PublicIPs are used by external load balancers, or can be set by
+	// users to handle external traffic that arrives at a node.
+	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// ContainerPort is the name or number of the port on the container to direct traffic to.
 	// This is useful if the containers the service points to have multiple open ports.

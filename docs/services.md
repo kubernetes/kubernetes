@@ -2,64 +2,73 @@
 
 ## Overview
 
-Kubernetes [`Pods`](pods.md) are ephemeral.  They can come and go over time, especially when
-driven by things like [`ReplicationControllers`](replication-controller.md).
-While each `pod` gets its own IP address, those IP addresses can not be relied
-upon to be stable over time.  This leads to a problem: if some set of `pods`
-(let's call them backends) provides functionality to other `pods` (let's call
-them frontends) inside the Kubernetes cluster, how do those frontends find the
-backends?
+Kubernetes [`Pods`](Pods.md) are mortal. They are born and they die, and they
+are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
+particular create and destroy `Pods` dynamically (e.g. when scaling up or down
+or when doing rolling updates).  While each `Pod` gets its own IP address, even
+those IP addresses can not be relied upon to be stable over time. This leads to
+a problem: if some set of `Pods` (let's call them backends) provides
+functionality to other `Pods` (let's call them frontends) inside the Kubernetes
+cluster, how do those frontends find out and keep track of which backends are
+in that set?
 
-Enter `services`.
+Enter `Services`.
 
-A Kubernetes `service` is an abstraction which defines a logical set of `pods` and
-a policy by which to access them - sometimes called a micro-service.  The goal
-of `services` is to provide a bridge for non-Kubernetes-native applications to
-access backends without the need to write code that is specific to Kubernetes.
-A `service` offers clients an IP and port pair which, when accessed, redirects
-to the appropriate backends.  The set of `pods` targetted is determined by a label
-selector.
+A Kubernetes `Service` is an abstraction which defines a logical set of `Pods`
+and a policy by which to access them - sometimes called a micro-service.  The
+set of `Pods` targetted by a `Service` is determined by a [`Label
+Selector`](labels.md).
 
-As an example, consider an image-process backend which is running with 3 live
+As an example, consider an image-processing backend which is running with 3
 replicas.  Those replicas are fungible - frontends do not care which backend
-they use.  While the actual `pods` that comprise the set may change, the
-frontend client(s) do not need to know that.  The `service` abstraction
-enables this decoupling.
+they use.  While the actual `Pods` that comprise the backend set may change, the
+frontend clients should not need to manage that themselves.  The `Service`
+abstraction enables this decoupling.
 
-## Defining a service
+For Kubernetes-native applications, Kubernetes offers a simple `Endpoints` API
+that is updated whenever the set of `Pods` in a `Service` changes.  For
+non-native applications, Kubernetes offers a virtual-IP-based bridge to Services
+which redirects to the backend `Pods`.
 
-A `service` in Kubernetes is a REST object, similar to a `pod`.  Like a `pod`, a
-`service` definition can be POSTed to the apiserver to create a new instance.
-For example, suppose you have a set of `pods` that each expose port 9376 and
-carry a label "app=MyApp".
+## Defining a Service
+
+A `Service` in Kubernetes is a REST object, similar to a `Pod`.  Like all of the
+REST objects, a `Service` definition can be POSTed to the apiserver to create a
+new instance.  For example, suppose you have a set of `Pods` that each expose
+port 9376 and carry a label "app=MyApp".
+
 
 ```json
 {
+  "kind": "Service",
+  "apiVersion": "v1beta1",
   "id": "myapp",
   "selector": {
     "app": "MyApp"
   },
   "containerPort": 9376,
   "protocol": "TCP",
-  "port": 8765
+  "port": 80
 }
 ```
 
-This specification will create a new `service` named "myapp" which resolves to
-TCP port 9376 on any `pod` with the "app=MyApp" label.  To access this
-`service`, a client can simply connect to $MYAPP_SERVICE_HOST on port
-$MYAPP_SERVICE_PORT.
+This specification will create a new `Service` object named "myapp" which
+targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  Every `Service`
+is also assigned a virtual IP address (called the "portal IP"), which is used by
+the service proxies (see below).  The `Service`'s selector will be evaluated
+continuously and the results will be posted in an `Endpoints` object also named
+"myapp".
 
-## Service without selector
+### Services without selectors
 
-Services, in addition to providing clean abstraction to access pods, can also
-abstract any kind of backend:
-  - you want to have an external database cluster in production, but in test you 
-  use your own databases.  
-  - you want to point your service to a service in another [`namespace`](namespaces.md) 
-  or on another cluster.
+Services, in addition to providing abstractions to access `Pods`, can also
+abstract any kind of backend.  For example:
+  - you want to have an external database cluster in production, but in test
+    you use your own databases.
+  - you want to point your service to a service in another
+    [`Namespace`](namespaces.md) or on another cluster.
   - you are migrating your workload to Kubernetes and some of your backends run
-  outside of Kubernetes.
+    outside of Kubernetes.
 
 In any of these scenarios you can define a service without a selector:
 
@@ -67,10 +76,10 @@ In any of these scenarios you can define a service without a selector:
   "kind": "Service",
   "apiVersion": "v1beta1",
   "id": "myapp",
-  "port": 8765
+  "port": 80
 ```
 
-then you can explicitly map the service to a specific endpoint(s):
+Then you can explicitly map the service to a specific endpoint(s):
 
 ```json
   "kind": "Endpoints",
@@ -79,26 +88,59 @@ then you can explicitly map the service to a specific endpoint(s):
   "endpoints": ["173.194.112.206:80"]
 ```
 
-Access to the service without a selector works the same as if it had selector. The
-traffic will be routed to endpoints defined by the user (`173.194.112.206:80` in 
-case of this example).
+Accessing a `Service` without a selector works the same as if it had selector. The
+traffic will be routed to endpoints defined by the user (`173.194.112.206:80` in
+this example).
 
-## How do they work?
+## Portals and service proxies
 
-Each node in a Kubernetes cluster runs a `service proxy`.  This application
-watches the Kubernetes master for the addition and removal of `service`
-objects and `endpoints` (pods that satisfy a service's label selector), and
-maintains a mapping of `service` to list of `endpoints`.  It opens a port on the
-local node for each `service` and forwards traffic to backends (ostensibly
-according to a policy, but the only policy supported for now is round-robin).
+Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
+watches the Kubernetes master for the addition and removal of `Service`
+and `Endpoints` objects. For each `Service` it opens a port (random) on the
+local node.  Any connections made to that port will be proxied to one of the
+corresponding backend `Pods`.  Which backend to use is decided based on the
+AffinityPolicy of the `Service`.  Lastly, it installs iptables rules which
+capture traffic to the `Service`'s `Port` on the `Service`'s portal IP and
+redirects that traffic to the previously described port.
 
-When a `pod` is scheduled, the master adds a set of environment variables for
-each active `service`.  We support both
-[Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/)
-variables (see [makeLinkVariables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/pkg/kubelet/envvars/envvars.go#L49)) and simpler {SVCNAME}_SERVICE_HOST and {SVCNAME}_SERVICE_PORT
-variables, where the service name is upper-cased and dashes are converted to underscores.
-For example, the service "redis-master" exposed on TCP port 6379 and allocated IP address
-10.0.0.11 produces the following environment variables:
+The net result is that any traffic bound for the `Service` is proxied to an
+appropriate backend without the clients knowing anything about Kubernetes or
+`Services` or `Pods`.
+
+![Services overview diagram](services_overview.png)
+
+### Why not use round-robin DNS?
+
+A question that pops up every now and then is why we do all this stuff with
+portals rather than just use standard round-robin DNS.  There are a few reasons:
+
+   * There is a long history of DNS libraries not respecting DNS TTLs and
+     caching the results of name lookups.
+   * Many apps do DNS lookups once and cache the results.
+   * Even if apps and libraries did proper re-resolution, the load of every
+     client re-resolving DNS over and over would be difficult to manage.
+
+We try to discourage users from doing things that hurt themselves.  That said,
+if enough people ask for this, we may implement it as an alternative to portals.
+
+## Discovering services
+
+Kubernetes supports 2 primary modes of finding a `Service` - environment
+variables and DNS.
+
+### Environment variables
+
+When a `Pod` is run on a `Node`, the kubelet adds a set of environment variables
+for each active `Service`.  It supports both [Docker links
+compatible](https://docs.docker.com/userguide/dockerlinks/) variables (see
+[makeLinkVariables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/pkg/kubelet/envvars/envvars.go#L49))
+and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables,
+where the Service name is upper-cased and dashes are converted to underscores.
+
+For example, the Service "redis-master" which exposes TCP port 6379 and has been
+allocated portal IP address 10.0.0.11 produces the following environment
+variables:
+
 ```
 REDIS_MASTER_SERVICE_HOST=10.0.0.11
 REDIS_MASTER_SERVICE_PORT=6379
@@ -109,24 +151,79 @@ REDIS_MASTER_PORT_6379_TCP_PORT=6379
 REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.0.11
 ```
 
-This does imply an ordering requirement - any `service` that a `pod`
-wants to access must be created before the `pod` itself, or else the environment
-variables will not be populated.  This restriction will be removed once DNS for
-`services` is supported.
+*This does imply an ordering requirement* - any `Service` that a `Pod` wants to
+access must be created before the `Pod` itself, or else the environment
+variables will not be populated.  DNS does not have this restriction.
 
-A `service`, through its label selector, can resolve to 0 or more `endpoints`.
-Over the life of a `service`, the set of `pods` which comprise that
-`service` can
-grow, shrink, or turn over completely.  Clients will only see issues if they are
-actively using a backend when that backend is removed from the `services` (and even
-then, open connections will persist for some protocols).
+### DNS
 
-![Services overview diagram](services_overview.png)
+An optional (though strongly recommended) cluster add-on is a DNS server.  The
+DNS server watches the Kubernetes API for new `Services` and creates a set of
+DNS records for each.  If DNS has been enabled throughout the cluster then all
+`Pods` should be able to do name resolution of `Services` automatically.
 
-## The gory details
+For example, if you have a `Service` called "my-service" in Kubernetes
+`Namespace` "my-ns" a DNS record for "my-service.my-ns" is created.  `Pods`
+which exist in the "my-ns" `Namespace` should be able to find it by simply doing
+a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
+qualify the name as "my-service.my-ns".  The result of these name lookups is the
+virtual portal IP.
+
+## External Services
+
+For some parts of your application (e.g. frontends) you may want to expose a
+Service onto an external (outside of your cluster, maybe public internet) IP
+address.
+
+On cloud providers which support external load balancers, this should be as
+simple as setting the `createExternalLoadBalancer` flag of the `Service` to
+`true`.  This sets up a cloud-specific load balancer and populates the
+`publicIPs` field (see below).  Traffic from the external load balancer will be
+directed at the backend `Pods`, though exactly how that works depends on the
+cloud provider.
+
+For cloud providers which do not support external load balancers, there is
+another approach that is a bit more "do-it-yourself" - the `publicIPs` field.
+Any address you put into the `publicIPs` array will be handled the same as the
+portal IP - the kube-proxy will install iptables rules which proxy traffic
+through to the backends.  You are then responsible for ensuring that traffic to
+those IPs gets sent to one or more Kubernetes `Nodes`.  As long as the traffic
+arrives at a Node, it will be be subject to the iptables rules.
+
+An example situation might be when a `Node` has both internal and an external
+network interfaces.  If you assign that `Node`'s external IP as a `publicIP`, you
+can then aim traffic at the `Service` port on that `Node` and it will be proxied
+to the backends.
+
+## Shortcomings
+
+We expect that using iptables and userspace proxies for portals will work at
+small to medium scale, but may not scale to very large clusters with thousands
+of Services.  See [the original design proposal for
+portals](https://github.com/GoogleCloudPlatform/kubernetes/issues/1107) for more
+details.
+
+Using the kube-proxy obscures the source-IP of a packet accessing a `Service`.
+
+## Future work
+
+In the future we envision that the proxy policy can become more nuanced than
+simple round robin balancing, for example master elected or sharded.  We also
+envision that some `Services` will have "real" load balancers, in which case the
+portal will simply transport the packets there.
+
+There's a
+[proposal](https://github.com/GoogleCloudPlatform/kubernetes/issues/3760) to
+eliminate userspace proxying in favor of doing it all in iptables.  This should
+perform better, though is less flexible than arbitrary userspace code.
+
+We hope to make the situation around external load balancers and public IPs
+simpler and easier to comprehend.
+
+## The gory details of portals
 
 The previous information should be sufficient for many people who just want to
-use `services`.  However, there is a lot going on behind the scenes that may be
+use `Services`.  However, there is a lot going on behind the scenes that may be
 worth understanding.
 
 ### Avoiding collisions
@@ -137,67 +234,36 @@ of their own.  In this situation, we are looking at network ports - users
 should not have to choose a port number if that choice might collide with
 another user.  That is an isolation failure.
 
-In order to allow users to choose a port number for their `services`, we must
-ensure that no two `services` can collide.  We do that by allocating each
-`service` its own IP address.
+In order to allow users to choose a port number for their `Services`, we must
+ensure that no two `Services` can collide.  We do that by allocating each
+`Service` its own IP address.
 
 ### IPs and Portals
 
-Unlike `pod` IP addresses, which actually route to a fixed destination,
-`service` IPs are not actually answered by a single host.  Instead, we use
+Unlike `Pod` IP addresses, which actually route to a fixed destination,
+`Service` IPs are not actually answered by a single host.  Instead, we use
 `iptables` (packet processing logic in Linux) to define "virtual" IP addresses
 which are transparently redirected as needed.  We call the tuple of the
-`service` IP and the `service` port the `portal`.  When clients connect to the
+`Service` IP and the `Service` port the `portal`.  When clients connect to the
 `portal`, their traffic is automatically transported to an appropriate
-endpoint.  The environment variables for `services` are actually populated in
-terms of the portal IP and port.  We will be adding DNS support for
-`services`, too.
+endpoint.  The environment variables and DNS for `Services` are actually
+populated in terms of the portal IP and port.
 
 As an example, consider the image processing application described above.
-When the backend `service` is created, the Kubernetes master assigns a portal
-IP address, for example 10.0.0.1.  Assuming the `service` port is 1234, the
+When the backend `Service` is created, the Kubernetes master assigns a portal
+IP address, for example 10.0.0.1.  Assuming the `Service` port is 1234, the
 portal is 10.0.0.1:1234.  The master stores that information, which is then
-observed by all of the `service proxy` instances in the cluster.  When a proxy
+observed by all of the `kube-proxy` instances in the cluster.  When a proxy
 sees a new portal, it opens a new random port, establishes an iptables redirect
 from the portal to this new port, and starts accepting connections on it.
 
-When a client connects to `MYAPP_SERVICE_HOST` on the portal port (whether
-they know the port statically or look it up as MYAPP_SERVICE_PORT), the
-iptables rule kicks in, and redirects the packets to the `service proxy`'s own
-port.  The `service proxy` chooses a backend, and starts proxying traffic from
-the client to the backend.
+When a client connects to the portal the iptables rule kicks in, and redirects
+the packets to the `Service proxy`'s own port.  The `Service proxy` chooses a
+backend, and starts proxying traffic from the client to the backend.
 
-The net result is that users can choose any `service` port they want without
+The means that `Service` owners can choose any `Service` port they want without
 risk of collision.  Clients can simply connect to an IP and port, without
-being aware of which `pods` they are accessing.
+being aware of which `Pods` they are actually accessing.
 
-![Services detailed diagram](services_detail.png)
+![Services detailed diagram](Services_detail.png)
 
-## External Services
-For some parts of your application (e.g. frontend) you want to expose a service on an external (publically visible) IP address.
-
-If you want your service to be exposed on an external IP address, you can optionally supply a list of `publicIPs`
-which the `service` should respond to.  These IP address will be combined with the `service`'s port and will also be 
-mapped to the set of `pods` selected by the `service`.  You are then responsible for ensuring that traffic to that 
-external IP address gets sent to one or more Kubernetes worker nodes. An IPTables rules on each host that maps
-packets from the specified public IP address to the service proxy in the same manner as internal service IP
-addresses.
-
-On cloud providers which support external load balancers, there is a simpler way to achieve the same thing.  On such
-providers (e.g. GCE) you can leave ```publicIPs``` empty, and instead you can set the 
-```createExternalLoadBalancer``` flag on the service.  This sets up a cloud-provider-specific load balancer
-(assuming that it is supported by your cloud provider) and populates the Public IP field with the appropriate value.
-
-## Shortcomings
-We expect that using iptables for portals will work at small scale, but will
-not scale to large clusters with thousands of services.  See [the original
-design proposal for
-portals](https://github.com/GoogleCloudPlatform/kubernetes/issues/1107) for
-more details.
-
-## Future work
-
-In the future we envision that the proxy policy can become more nuanced than
-simple round robin balancing, for example master elected or sharded.  We also
-envision that some `services` will have "real" load balancers, in which case the
-portal will simply transport the packets there.

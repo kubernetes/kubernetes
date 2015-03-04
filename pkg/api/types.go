@@ -718,7 +718,8 @@ type ServiceSpec struct {
 
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
-	// PublicIPs are used by external load balancers.
+	// PublicIPs are used by external load balancers, or can be set by
+	// users to handle external traffic that arrives at a node.
 	PublicIPs []string `json:"publicIPs,omitempty"`
 
 	// ContainerPort is the name or number of the port on the container to direct traffic to.
