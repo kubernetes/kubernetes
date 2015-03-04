@@ -16,13 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package mount
 
 import (
 	"fmt"
 )
 
 // Dummy implementation for Windows
-func isMountPoint(file string) (bool, error) {
+func IsMountPoint(file string) (bool, error) {
 	return false, fmt.Errorf("unimplemented")
 }
