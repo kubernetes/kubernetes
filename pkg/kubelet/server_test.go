@@ -484,7 +484,7 @@ func TestHealthCheck(t *testing.T) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 	}
 
 	//Test with old docker version
