@@ -1,9 +1,0 @@
-id: redis
-kind: Service
-apiVersion: v1beta1
-port: 6379
-selector:
-  name: redis
-labels:
-  name: read
-  role: service

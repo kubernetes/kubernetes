@@ -1,0 +1,21 @@
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  labels:
+    test: testpd
+  name: testpd
+spec:
+  containers:
+    - name: testpd
+      image: kubernetes/pause
+      volumeMounts:
+          # name must match the volume name below
+        - name: testpd
+          # mount path within the container
+          mountPath: /testpd
+  volumes:
+    - name: testpd
+      persistentDisk:
+        # This GCE PD must already exist.
+        pdName: %insert_pd_name_here%
+        fsType: ext4
