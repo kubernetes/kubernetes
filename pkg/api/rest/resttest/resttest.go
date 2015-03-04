@@ -179,7 +179,7 @@ func (t *Tester) TestCreateRejectsMismatchedNamespace(valid runtime.Object) {
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err)
 	}
 }
 
@@ -195,7 +195,30 @@ func (t *Tester) TestCreateRejectsNamespace(valid runtime.Object) {
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err)
+	}
+}
+
+func (t *Tester) TestUpdate(valid runtime.Object, existing, older runtime.Object) {
+	t.TestUpdateFailsOnNotFound(copyOrDie(valid))
+	t.TestUpdateFailsOnVersion(copyOrDie(older))
+}
+
+func (t *Tester) TestUpdateFailsOnNotFound(valid runtime.Object) {
+	_, _, err := t.storage.(rest.Updater).Update(api.NewDefaultContext(), valid)
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if !errors.IsNotFound(err) {
+		t.Errorf("Expected NotFound error, got '%v'", err)
+	}
+}
+
+func (t *Tester) TestUpdateFailsOnVersion(older runtime.Object) {
+	_, _, err := t.storage.(rest.Updater).Update(api.NewDefaultContext(), older)
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if !errors.IsConflict(err) {
+		t.Errorf("Expected Conflict error, got '%v'", err)
 	}
 }
 

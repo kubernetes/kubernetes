@@ -34,7 +34,6 @@ import (
 )
 
 func validateObject(obj runtime.Object) (errors []error) {
-	ctx := api.NewDefaultContext()
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		if t.Namespace == "" {
@@ -49,7 +48,6 @@ func validateObject(obj runtime.Object) (errors []error) {
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		api.ValidNamespace(ctx, &t.ObjectMeta)
 		errors = validation.ValidateService(t)
 	case *api.ServiceList:
 		for i := range t.Items {
@@ -59,7 +57,6 @@ func validateObject(obj runtime.Object) (errors []error) {
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		api.ValidNamespace(ctx, &t.ObjectMeta)
 		errors = validation.ValidatePod(t)
 	case *api.PodList:
 		for i := range t.Items {
@@ -68,8 +65,15 @@ func validateObject(obj runtime.Object) (errors []error) {
 	case *api.PersistentVolume:
 		errors = validation.ValidatePersistentVolume(t)
 	case *api.PersistentVolumeClaim:
-		api.ValidNamespace(ctx, &t.ObjectMeta)
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
 		errors = validation.ValidatePersistentVolumeClaim(t)
+	case *api.PodTemplate:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidatePodTemplate(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -156,6 +160,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod-with-http-healthcheck": &api.Pod{},
 			"service":                   &api.Service{},
 			"replication-controller":    &api.ReplicationController{},
+			"podtemplate":               &api.PodTemplate{},
 		},
 		"../examples/update-demo": {
 			"kitten-rc":   &api.ReplicationController{},

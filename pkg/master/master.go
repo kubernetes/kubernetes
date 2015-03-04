@@ -58,6 +58,7 @@ import (
 	pvcetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
+	podtemplateetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/podtemplate/etcd"
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -360,8 +361,17 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
+	// TODO: make initialization of the helper part of the Master, and allow some storage
+	// objects to have a newer storage version than the user's default.
+	newerHelper, err := NewEtcdHelper(c.EtcdHelper.Client, "v1beta3")
+	if err != nil {
+		glog.Fatalf("Unable to setup storage for v1beta3: %v", err)
+	}
+
 	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
 	podRegistry := pod.NewRegistry(podStorage.Pod)
+
+	podTemplateStorage := podtemplateetcd.NewREST(newerHelper)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
@@ -396,6 +406,8 @@ func (m *Master) init(c *Config) {
 		"pods/proxy":       podStorage.Proxy,
 		"pods/binding":     podStorage.Binding,
 		"bindings":         podStorage.Binding,
+
+		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
 		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
@@ -606,6 +618,9 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
+		if k == "podTemplates" {
+			continue
+		}
 		storage[k] = v
 	}
 	version := m.defaultAPIGroupVersion()
@@ -619,6 +634,9 @@ func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
 func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
+		if k == "podTemplates" {
+			continue
+		}
 		storage[k] = v
 	}
 	version := m.defaultAPIGroupVersion()

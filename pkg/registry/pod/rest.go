@@ -35,7 +35,6 @@ import (
 )
 
 // podStrategy implements behavior for Pods
-// TODO: move to a pod specific package.
 type podStrategy struct {
 	runtime.ObjectTyper
 	api.NameGenerator
