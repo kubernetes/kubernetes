@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -176,31 +177,45 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 	return h.decodeNodeList(nodes, slicePtr)
 }
 
-// decodeNodeList walks the tree of each node in the list and decodes into the specified object
+// decodeNodeList walks the tree of each node in the list and decodes into the specified object.
+// Processing is parallel for all non-directory nodes in a given directory.
 func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
 	v, err := conversion.EnforcePtr(slicePtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		// This should not happen at runtime.
 		panic("need ptr to slice")
 	}
+	// In case of error we return a random non-nil one.
+	var err_to_return error = nil
+	mutex := sync.Mutex{}
+	var wg sync.WaitGroup
 	for _, node := range nodes {
 		if node.Dir {
-			if err := h.decodeNodeList(node.Nodes, slicePtr); err != nil {
-				return err
+			if local_error := h.decodeNodeList(node.Nodes, slicePtr); local_error != nil {
+				return local_error
 			}
-			continue
+		} else {
+			wg.Add(1)
+			go func (node *etcd.Node) {
+				defer wg.Done()
+				obj := reflect.New(v.Type().Elem())
+				if local_error := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
+					mutex.Lock()
+					err_to_return = local_error
+					mutex.Unlock()
+				}
+				if h.ResourceVersioner != nil {
+					_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
+					// being unable to set the version does not prevent the object from being extracted
+				}
+				mutex.Lock()
+				v.Set(reflect.Append(v, obj.Elem()))
+				mutex.Unlock()
+			} (node)
 		}
-		obj := reflect.New(v.Type().Elem())
-		if err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
-			return err
-		}
-		if h.ResourceVersioner != nil {
-			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
-			// being unable to set the version does not prevent the object from being extracted
-		}
-		v.Set(reflect.Append(v, obj.Elem()))
 	}
-	return nil
+	wg.Wait()
+	return err_to_return
 }
 
 // ExtractToList is just like ExtractList, but it works on a ThingyList api object.
