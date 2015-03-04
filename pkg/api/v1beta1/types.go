@@ -57,7 +57,7 @@ type ContainerManifest struct {
 	// TODO: UUID on Manifext is deprecated in the future once we are done
 	// with the API refactory. It is required for now to determine the instance
 	// of a Pod.
-	UUID          types.UID     `json:"uuid,omitempty" description:"manifest UUID"`
+	UUID          types.UID     `json:"uuid,omitempty" description:"manifest UUID, populated by the system, read-only"`
 	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
 	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
@@ -335,10 +335,10 @@ type Lifecycle struct {
 type TypeMeta struct {
 	Kind              string    `json:"kind,omitempty" description:"kind of object, in CamelCase"`
 	ID                string    `json:"id,omitempty" description:"name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"`
-	UID               types.UID `json:"uid,omitempty" description:"UUID assigned by the system upon creation, unique across space and time"`
-	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; recorded by the system; null for lists"`
-	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object"`
-	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"`
+	UID               types.UID `json:"uid,omitempty" description:"unique UUID across space and time; populated by the system, read-only"`
+	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"`
+	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
+	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server"`
 	APIVersion        string    `json:"apiVersion,omitempty" description:"version of the schema the object should have"`
 	Namespace         string    `json:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"`
 
@@ -511,7 +511,7 @@ type Pod struct {
 	TypeMeta     `json:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of the pod"`
-	CurrentState PodState          `json:"currentState,omitempty" description:"current state of the pod"`
+	CurrentState PodState          `json:"currentState,omitempty" description:"current state of the pod; populated by the system, read-only"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
 }
@@ -533,7 +533,7 @@ type ReplicationControllerList struct {
 type ReplicationController struct {
 	TypeMeta     `json:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" description:"specification of the desired state of the replication controller"`
-	CurrentState ReplicationControllerState `json:"currentState,omitempty" description:"current state of the replication controller"`
+	CurrentState ReplicationControllerState `json:"currentState,omitempty" description:"current state of the replication controller; populated by the system, read-only"`
 	Labels       map[string]string          `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize replication controllers"`
 }
 
