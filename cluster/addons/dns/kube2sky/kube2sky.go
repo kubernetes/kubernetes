@@ -30,6 +30,7 @@ import (
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	etcd "github.com/coreos/go-etcd/etcd"
 	skymsg "github.com/skynetservices/skydns/msg"
@@ -37,8 +38,9 @@ import (
 
 var (
 	domain                = flag.String("domain", "kubernetes.local", "domain under which to create names")
-	verbose               = flag.Bool("verbose", false, "log extra information")
 	etcd_mutation_timeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
+	etcd_server           = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
+	verbose               = flag.Bool("verbose", false, "log extra information")
 )
 
 func removeDNS(record string, etcdClient *etcd.Client) error {
@@ -87,8 +89,23 @@ func mutateEtcdOrDie(mutator func() error) {
 }
 
 func newEtcdClient() (client *etcd.Client) {
-	// TODO: take a flag for etcd server(s).
-	client = etcd.NewClient([]string{"http://127.0.0.1:4001"})
+	maxConnectRetries := 12
+	for maxConnectRetries > 0 {
+		if _, _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
+			log.Fatalf("Failed to connect to etcd server: %v, error: %v", *etcd_server, err)
+			if maxConnectRetries > 0 {
+				log.Println("Retrying request after 5 second sleep.")
+				time.Sleep(5 * time.Second)
+				maxConnectRetries--
+			} else {
+				return nil
+			}
+		} else {
+			log.Printf("Etcd server found: %v", *etcd_server)
+			break
+		}
+	}
+	client = etcd.NewClient([]string{*etcd_server})
 	if client == nil {
 		return nil
 	}
