@@ -193,8 +193,11 @@ type updateDemoData struct {
 
 func getData(podID string) (*updateDemoData, error) {
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1beta1/proxy/pods/%s/data.json", kubectlProxyPort, podID))
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("received non-200 status code from master: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
