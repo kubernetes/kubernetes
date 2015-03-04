@@ -58,6 +58,8 @@ Frequently asked questions are answered on this project's [wiki](https://github.
 
 * **Glossary** ([glossary.md](glossary.md)): Terms and concepts.
 
+* **Cluster Management** ([cluster_management.md](cluster_management.md)): Starting and upgrading clusters.
+
 
 ## Further reading
 
