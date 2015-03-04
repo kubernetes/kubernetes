@@ -33,25 +33,77 @@ export KUBECTL KUBE_CONFIG_FILE
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+function wait_for_running() {
+  echo "Waiting for pods to come up."
+  frontends=$(${KUBECTL} get pods -l name=frontend -o template '--template={{range.items}}{{.id}} {{end}}')
+  master=$(${KUBECTL} get pods -l name=redis-master -o template '--template={{range.items}}{{.id}} {{end}}')
+  slaves=$(${KUBECTL} get pods -l name=redisslave -o template '--template={{range.items}}{{.id}} {{end}}')
+  pods=$(echo $frontends $master $slaves)
+
+  all_running=0
+  for i in $(seq 1 30); do
+    sleep 10
+    all_running=1
+    for pod in $pods; do
+      status=$(${KUBECTL} get pods $pod -o template '--template={{.currentState.status}}') || true
+      if [[ "$status" == "Pending" ]]; then
+        all_running=0
+        break
+      fi
+    done
+    if [[ "${all_running}" == 1 ]]; then
+      break
+    fi
+  done
+  if [[ "${all_running}" == 0 ]]; then
+    echo "Pods did not come up in time"
+    exit 1
+  fi
+}
+
+function teardown() {
+  ${KUBECTL} stop -f "${GUESTBOOK}" 
+}
+
 prepare-e2e
 
 GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
-echo "WARNING: this test is a no op that only attempts to launch guestbook resources."
 # Launch the guestbook example
 ${KUBECTL} create -f "${GUESTBOOK}"
 
-sleep 15
+trap "teardown" EXIT
 
-POD_LIST_1=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
-echo "Pods running: ${POD_LIST_1}"
+# Verify that all pods are running
+wait_for_running
 
-# TODO make this an actual test. Open up a firewall and use curl to post and
-# read a message via the frontend
+get-password
+detect-master
 
-${KUBECTL} stop -f "${GUESTBOOK}"
+# Add a new entry to the guestbook and verify that it was remembered 
+FRONTEND_ADDR=https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/frontend
+echo "Waiting for frontend to serve content"
+serving=0
+for i in $(seq 1 12); do
+  ENTRY=$(curl ${FRONTEND_ADDR}/index.php?cmd=get\&key=messages --insecure --user ${KUBE_USER}:${KUBE_PASSWORD})
+  echo $ENTRY
+  if [[ $ENTRY == '{"data": ""}' ]]; then
+    serving=1
+    break
+  fi
+  sleep 10
+done
+if [[ "${serving}" == 0 ]]; then
+  echo "Pods did not start serving content in time"
+  exit 1
+fi
 
-POD_LIST_2=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}')
-echo "Pods running after shutdown: ${POD_LIST_2}"
+curl ${FRONTEND_ADDR}/index.php?cmd=set\&key=messages\&value=TestEntry --insecure --user ${KUBE_USER}:${KUBE_PASSWORD}
+ENTRY=$(curl ${FRONTEND_ADDR}/index.php?cmd=get\&key=messages --insecure --user ${KUBE_USER}:${KUBE_PASSWORD})
+
+if [[ $ENTRY != '{"data": "TestEntry"}' ]]; then
+  echo "Wrong entry received: ${ENTRY}"
+  exit 1
+fi
 
 exit 0
