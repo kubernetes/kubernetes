@@ -50,6 +50,39 @@ TCP port 9376 on any `pod` with the "app=MyApp" label.  To access this
 `service`, a client can simply connect to $MYAPP_SERVICE_HOST on port
 $MYAPP_SERVICE_PORT.
 
+## Service without selector
+
+Services, in addition to providing clean abstraction to access pods, can also
+abstract any kind of backend:
+  - you want to have an external database cluster in production, but in test you 
+  use your own databases.  
+  - you want to point your service to a service in another [`namespace`](namespaces.md) 
+  or on another cluster.
+  - you are migrating your workload to Kubernetes and some of your backends run
+  outside of Kubernetes.
+
+In any of these scenarios you can define a service without a selector:
+
+```json
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "id": "myapp",
+  "port": 8765
+```
+
+then you can explicitly map the service to a specific endpoint(s):
+
+```json
+  "kind": "Endpoints",
+  "apiVersion": "v1beta1",
+  "id": "myapp",
+  "endpoints": ["173.194.112.206:80"]
+```
+
+Access to the service without a selector works the same as if it had selector. The
+traffic will be routed to endpoints defined by the user (`173.194.112.206:80` in 
+case of this example).
+
 ## How do they work?
 
 Each node in a Kubernetes cluster runs a `service proxy`.  This application
