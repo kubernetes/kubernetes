@@ -1,10 +1,9 @@
 ## Getting started with Vagrant
 
 ### Prerequisites
-1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
+1. Install latest version >= 1.7.1 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
-3. Install the `net-tools` package for your distribution for VirtualBox's private networks.
-4. Get or build a [binary release](binary_release.md)
+3. Get or build a [binary release](binary_release.md)
 
 ### Setup
 
