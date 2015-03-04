@@ -38,7 +38,7 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: map[string]string{"test": "foo"},
 			},
@@ -70,7 +70,7 @@ func TestCreate(t *testing.T) {
 		pod,
 		// invalid
 		&api.PodTemplate{
-			Spec: api.PodTemplateSpec{},
+			Template: api.PodTemplateSpec{},
 		},
 	)
 }

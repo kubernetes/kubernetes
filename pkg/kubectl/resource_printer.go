@@ -446,7 +446,7 @@ func printPodList(podList *api.PodList, w io.Writer) error {
 }
 
 func printPodTemplate(pod *api.PodTemplate, w io.Writer) error {
-	containers := pod.Spec.Spec.Containers
+	containers := pod.Template.Spec.Containers
 	var firstContainer api.Container
 	if len(containers) > 0 {
 		firstContainer, containers = containers[0], containers[1:]
@@ -455,7 +455,7 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer) error {
 		pod.Name,
 		firstContainer.Name,
 		firstContainer.Image,
-		formatLabels(pod.Spec.Labels),
+		formatLabels(pod.Template.Labels),
 	)
 	if err != nil {
 		return err

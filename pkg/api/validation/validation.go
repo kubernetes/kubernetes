@@ -892,7 +892,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 func ValidatePodTemplate(pod *api.PodTemplate) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Spec, 0).Prefix("spec")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, 0).Prefix("template")...)
 	return allErrs
 }
 
@@ -902,7 +902,7 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 	allErrs := errs.ValidationErrorList{}
 
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPod.ObjectMeta, &newPod.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Spec, 0).Prefix("spec")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, 0).Prefix("template")...)
 	return allErrs
 }
 

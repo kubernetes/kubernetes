@@ -1676,7 +1676,7 @@ func TestValidateService(t *testing.T) {
 func TestValidateReplicationControllerUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1688,7 +1688,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1702,7 +1702,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -1722,7 +1722,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1730,7 +1730,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 3,
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 		},
@@ -1739,7 +1739,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1747,7 +1747,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
 					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Spec,
+					Template: &readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
@@ -1765,7 +1765,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1773,7 +1773,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Spec,
+					Template: &readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
@@ -1782,7 +1782,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1790,7 +1790,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: invalidSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 		},
@@ -1799,7 +1799,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1807,7 +1807,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
-					Template: &invalidPodTemplate.Spec,
+					Template: &invalidPodTemplate.Template,
 				},
 			},
 		},
@@ -1816,7 +1816,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1824,7 +1824,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: -1,
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 		},
@@ -1840,7 +1840,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1852,7 +1852,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1866,7 +1866,7 @@ func TestValidateReplicationController(t *testing.T) {
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -1881,14 +1881,14 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		{
@@ -1896,7 +1896,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 1,
 				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Spec,
+				Template: &readWriteVolumePodTemplate.Template,
 			},
 		},
 	}
@@ -1911,27 +1911,27 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: map[string]string{"foo": "bar"},
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
@@ -1945,7 +1945,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
 				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Spec,
+				Template: &readWriteVolumePodTemplate.Template,
 			},
 		},
 		"negative_replicas": {
@@ -1965,7 +1965,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid_label 2": {
@@ -1977,7 +1977,20 @@ func TestValidateReplicationController(t *testing.T) {
 				},
 			},
 			Spec: api.ReplicationControllerSpec{
-				Template: &invalidPodTemplate.Spec,
+				Template: &invalidPodTemplate.Template,
+			},
+		},
+		"invalid_annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+				Annotations: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid restart policy 1": {
