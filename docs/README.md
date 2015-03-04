@@ -14,6 +14,8 @@ Design docs are in [design](design).
 
 API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
 
+Frequently asked questions are answered on this project's [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki).
+
 ## Primary concepts
 
 * **Overview** ([overview.md](overview.md)): A brief overview
