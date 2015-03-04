@@ -199,6 +199,20 @@ func InstallLogsSupport(mux Mux) {
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
 }
 
+// InstallTeardownHandler registers a handler for teardown on the path "/teardown" into a mux.
+// The handler is responsible for removing all external cloud resources before shutting down kubernetes cluster.
+// (Currently, it removes services using external load balancer).
+func InstallTeardownHandler(mux Mux, rest serviceREST) {
+	handler, err := NewTeardownHandler(rest)
+	if err != nil {
+		glog.Errorf("failed to set up teardown handler: %v", err)
+		return
+	}
+	if handler != nil {
+		mux.Handle("/teardown", handler)
+	}
+}
+
 // Adds a service to return the supported api versions.
 func AddApiWebService(container *restful.Container, apiPrefix string, versions []string) {
 	// TODO: InstallREST should register each version automatically

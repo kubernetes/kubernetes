@@ -450,6 +450,7 @@ func (m *Master) init(c *Config) {
 
 	// TODO: use go-restful
 	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
+	apiserver.InstallTeardownHandler(m.muxHelper, m.storage["services"].(*service.REST))
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.muxHelper)
 	}
