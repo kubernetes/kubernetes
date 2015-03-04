@@ -848,6 +848,11 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	// Clear status
 	oldMinion.Status = minion.Status
 
+	// Allow users to set ExternalID, but not to change it
+	if oldMinion.Spec.ExternalID == "" {
+		oldMinion.Spec.ExternalID = minion.Spec.ExternalID
+	}
+
 	// TODO: Add a 'real' ValidationError type for this error and provide print actual diffs.
 	if !api.Semantic.DeepEqual(oldMinion, minion) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldMinion, minion)
