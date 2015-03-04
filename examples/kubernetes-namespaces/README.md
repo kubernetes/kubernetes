@@ -4,7 +4,7 @@ Kubernetes Namespaces help different projects, teams, or customers to share a Ku
 
 It does this by providing the following:
 
-1. A scope for [Names](identifiers.md).
+1. A scope for [Names](../../docs/identifiers.md).
 2. A mechanism to attach authorization and policy to a subsection of the cluster.
 
 Use of multiple namespaces is optional.
