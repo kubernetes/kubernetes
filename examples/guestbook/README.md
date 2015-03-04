@@ -24,6 +24,7 @@ Note: This redis-master is *not* highly available.  Making it highly available w
 Use (or just create) the file `examples/guestbook/redis-master-controller.json` which describes a single pod running a redis key-value server in a container:
 Note that, although the redis server runs just with a single replica, we use replication controller to enforce that exactly one pod keeps running (e.g. in a event of node going down, the replication controller will ensure that the redis master gets restarted on a healthy node). 
 
+**Note, the JSON definititions are for v1beta1 do not work in the v1beta3 API version. **
 ```js
 {
   "id": "redis-master-controller",
@@ -464,7 +465,7 @@ When you go to localhost:8000, you might not see the page at all.  Testing it wi
    ==> default: curl: (56) Recv failure: Connection reset by peer
 ```
 
-This means the web frontend isn't up yet.  Wait a while, possibly about 2 minutes or more, depending on your set up. Also, run a *watch* on docker ps, to see if containers are cycling on and off or not starting.
+This means the web frontend isn't up yet.  So "reset by peer", is occuring because you are trying to access the right port, but nothing is bound to that port yet.  Wait a while, possibly about 2 minutes or more, depending on your set up. Also, run a *watch* on docker ps, to see if containers are cycling on and off or not starting.
 
 ```watch 
 $> watch -n 1 docker ps
