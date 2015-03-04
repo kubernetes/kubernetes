@@ -36,7 +36,7 @@ const (
 	kittenImage         = "kubernetes/update-demo:kitten"
 	updateDemoSelector  = "name=update-demo"
 	updateDemoContainer = "update-demo"
-	validateTimeout     = 60 * time.Second
+	validateTimeout     = 10 * time.Minute // TODO: Make this 30 seconds once #4566 is resolved.
 	kubectlProxyPort    = 8011
 )
 
