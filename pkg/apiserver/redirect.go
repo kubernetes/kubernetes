@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -85,7 +86,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", location)
+	w.Header().Set("Location", fmt.Sprintf("http://%s", location))
 	w.WriteHeader(http.StatusTemporaryRedirect)
 	httpCode = http.StatusTemporaryRedirect
 }
