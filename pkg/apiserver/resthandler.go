@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	gpath "path"
@@ -97,7 +98,7 @@ func parseSelectorQueryParams(query url.Values, version, apiResource string) (la
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a RESTStorage object.
-func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, requestInfoResolver *APIRequestInfoResolver) restful.RouteFunction {
+func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, version, apiResource string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -109,13 +110,7 @@ func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runti
 		ctx := ctxFn(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		requestInfo, err := requestInfoResolver.GetAPIRequestInfo(req.Request)
-		if err != nil {
-			errorJSON(err, codec, w)
-			return
-		}
-
-		label, field, err := parseSelectorQueryParams(req.Request.URL.Query(), requestInfo.APIVersion, requestInfo.Resource)
+		label, field, err := parseSelectorQueryParams(req.Request.URL.Query(), version, apiResource)
 		if err != nil {
 			errorJSON(err, codec, w)
 			return
@@ -135,7 +130,7 @@ func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runti
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, resource string, admit admission.Interface) restful.RouteFunction {
+func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -158,6 +153,7 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 
 		obj := r.New()
 		if err := codec.DecodeInto(body, obj); err != nil {
+			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, codec, w)
 			return
 		}
@@ -190,7 +186,7 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 }
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, resource string, admit admission.Interface) restful.RouteFunction {
+func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -213,6 +209,7 @@ func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 
 		obj := r.New()
 		if err := codec.DecodeInto(body, obj); err != nil {
+			err = transformDecodeError(typer, err, obj, body)
 			errorJSON(err, codec, w)
 			return
 		}
@@ -344,6 +341,18 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	case <-time.After(timeout):
 		return nil, errors.NewTimeoutError("request did not complete within allowed duration")
 	}
+}
+
+// transformDecodeError adds additional information when a decode fails.
+func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, body []byte) error {
+	_, kind, err := typer.ObjectVersionAndKind(into)
+	if err != nil {
+		return err
+	}
+	if version, dataKind, err := typer.DataVersionAndKind(body); err == nil && len(dataKind) > 0 {
+		return errors.NewBadRequest(fmt.Sprintf("%s in version %s cannot be handled as a %s: %v", dataKind, version, kind, baseErr))
+	}
+	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v", kind, baseErr))
 }
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request

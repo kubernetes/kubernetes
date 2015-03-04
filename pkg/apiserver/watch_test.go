@@ -49,9 +49,7 @@ var watchTestTable = []struct {
 func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, requestContextMapper, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -103,9 +101,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, requestContextMapper, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -170,9 +166,7 @@ func TestWatchParamParsing(t *testing.T) {
 			return label, value, nil
 		})
 	simpleStorage := &SimpleRESTStorage{}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", testVersion, selfLinker, admissionControl, requestContextMapper, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -242,9 +236,7 @@ func TestWatchParamParsing(t *testing.T) {
 
 func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, requestContextMapper, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	defer server.CloseClientConnections()

@@ -280,14 +280,10 @@ func TestProxy(t *testing.T) {
 			expectedResourceNamespace: item.reqNamespace,
 		}
 
-		namespaceHandler := Handle(map[string]RESTStorage{
-			"foo": simpleStorage,
-		}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, namespaceMapper)
+		namespaceHandler := handleNamespaced(map[string]RESTStorage{"foo": simpleStorage})
 		namespaceServer := httptest.NewServer(namespaceHandler)
 		defer namespaceServer.Close()
-		legacyNamespaceHandler := Handle(map[string]RESTStorage{
-			"foo": simpleStorage,
-		}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, legacyNamespaceMapper)
+		legacyNamespaceHandler := handle(map[string]RESTStorage{"foo": simpleStorage})
 		legacyNamespaceServer := httptest.NewServer(legacyNamespaceHandler)
 		defer legacyNamespaceServer.Close()
 
@@ -296,8 +292,8 @@ func TestProxy(t *testing.T) {
 			server           *httptest.Server
 			proxyTestPattern string
 		}{
-			{namespaceServer, "/prefix/version/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
-			{legacyNamespaceServer, "/prefix/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
+			{namespaceServer, "/api/version/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
+			{legacyNamespaceServer, "/api/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
 
 		for _, serverPattern := range serverPatterns {
@@ -344,14 +340,12 @@ func TestProxyUpgrade(t *testing.T) {
 		expectedResourceNamespace: "myns",
 	}
 
-	namespaceHandler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionControl, requestContextMapper, namespaceMapper)
+	namespaceHandler := handleNamespaced(map[string]RESTStorage{"foo": simpleStorage})
 
 	server := httptest.NewServer(namespaceHandler)
 	defer server.Close()
 
-	ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/prefix/version/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
+	ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/api/version/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
 	if err != nil {
 		t.Fatalf("websocket dial err: %s", err)
 	}

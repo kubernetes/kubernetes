@@ -29,7 +29,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -91,72 +90,38 @@ type Mux interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// defaultAPIServer exposes nested objects for testability.
-type defaultAPIServer struct {
-	http.Handler
-	group *APIGroupVersion
-}
-
-// Handle returns a Handler function that exposes the provided storage interfaces
-// as RESTful resources at prefix, serialized by codec, and also includes the support
-// http resources.
-// Note: This method is used only in tests.
-func Handle(storage map[string]RESTStorage, codec runtime.Codec, root string, version string, linker runtime.SelfLinker, admissionControl admission.Interface, contextMapper api.RequestContextMapper, mapper meta.RESTMapper) http.Handler {
-	prefix := path.Join(root, version)
-	group := NewAPIGroupVersion(storage, codec, root, prefix, linker, admissionControl, contextMapper, mapper)
-	container := restful.NewContainer()
-	container.Router(restful.CurlyRouter{})
-	mux := container.ServeMux
-	group.InstallREST(container, root, version)
-	ws := new(restful.WebService)
-	InstallSupport(mux, ws)
-	container.Add(ws)
-	return &defaultAPIServer{mux, group}
-}
-
 // APIGroupVersion is a helper for exposing RESTStorage objects as http.Handlers via go-restful
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
 // Where 'storage_key' points to a RESTStorage object stored in storage.
 type APIGroupVersion struct {
-	storage map[string]RESTStorage
-	codec   runtime.Codec
-	prefix  string
-	linker  runtime.SelfLinker
-	admit   admission.Interface
-	context api.RequestContextMapper
-	mapper  meta.RESTMapper
-	// TODO: put me into a cleaner interface
-	info *APIRequestInfoResolver
-}
+	Storage map[string]RESTStorage
 
-// NewAPIGroupVersion returns an object that will serve a set of REST resources and their
-// associated operations.  The provided codec controls serialization and deserialization.
-// This is a helper method for registering multiple sets of REST handlers under different
-// prefixes onto a server.
-// TODO: add multitype codec serialization
-func NewAPIGroupVersion(storage map[string]RESTStorage, codec runtime.Codec, root, prefix string, linker runtime.SelfLinker, admissionControl admission.Interface, contextMapper api.RequestContextMapper, mapper meta.RESTMapper) *APIGroupVersion {
-	return &APIGroupVersion{
-		storage: storage,
-		codec:   codec,
-		prefix:  prefix,
-		linker:  linker,
-		admit:   admissionControl,
-		context: contextMapper,
-		mapper:  mapper,
-		info:    &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(root, "/")), latest.RESTMapper},
-	}
+	Root    string
+	Version string
+
+	Mapper meta.RESTMapper
+
+	Codec   runtime.Codec
+	Typer   runtime.ObjectTyper
+	Creater runtime.ObjectCreater
+	Linker  runtime.SelfLinker
+
+	Admit   admission.Interface
+	Context api.RequestContextMapper
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *restful.Container, root string, version string) error {
-	prefix := path.Join(root, version)
+func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+	info := &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(g.Root, "/")), g.Mapper}
+
+	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
-		group:   g,
-		prefix:  prefix,
-		version: version,
+		group:  g,
+		info:   info,
+		prefix: prefix,
 	}
 	ws, registrationErrors := installer.Install()
 	container.Add(ws)
