@@ -20,13 +20,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -49,37 +48,12 @@ var _ = Describe("kubectl", func() {
 		kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 	)
 
-	var cmd *exec.Cmd
+	var c *client.Client
 
 	BeforeEach(func() {
-		cmd = kubectlCmd("proxy", fmt.Sprintf("--port=%d", kubectlProxyPort))
-		if err := cmd.Start(); err != nil {
-			Failf("Unable to start kubectl proxy: %v", err)
-		}
-	})
-
-	AfterEach(func() {
-		if cmd.Process == nil {
-			Logf("No process associated with the kubectl proxy")
-			return
-		}
-		// Kill the proxy
-		errChan := make(chan error, 1)
-		go func() {
-			if err := cmd.Process.Signal(os.Interrupt); err != nil {
-				errChan <- err
-			}
-			_, err := cmd.Process.Wait()
-			errChan <- err
-		}()
-		select {
-		case <-time.After(10 * time.Second):
-			Fail("Timed out waiting for kubectl proxy process to exit")
-		case err := <-errChan:
-			if err != nil {
-				Failf("Unable to kill kubectl proxy: %v", err)
-			}
-		}
+		var err error
+		c, err = loadClient()
+		expectNoError(err)
 	})
 
 	It("should create and stop a replication controller", func() {
@@ -87,7 +61,7 @@ var _ = Describe("kubectl", func() {
 
 		By("creating a replication controller")
 		runKubectl("create", "-f", nautilusPath)
-		validateController(nautilusImage, 2)
+		validateController(c, nautilusImage, 2)
 	})
 
 	It("should scale a replication controller", func() {
@@ -95,13 +69,13 @@ var _ = Describe("kubectl", func() {
 
 		By("creating a replication controller")
 		runKubectl("create", "-f", nautilusPath)
-		validateController(nautilusImage, 2)
+		validateController(c, nautilusImage, 2)
 		By("scaling down the replication controller")
 		runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=1")
-		validateController(nautilusImage, 1)
+		validateController(c, nautilusImage, 1)
 		By("scaling up the replication controller")
 		runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=2")
-		validateController(nautilusImage, 2)
+		validateController(c, nautilusImage, 2)
 	})
 
 	It("should do a rolling update of a replication controller", func() {
@@ -110,10 +84,10 @@ var _ = Describe("kubectl", func() {
 
 		By("creating the initial replication controller")
 		runKubectl("create", "-f", nautilusPath)
-		validateController(nautilusImage, 2)
+		validateController(c, nautilusImage, 2)
 		By("rollingupdate to new replication controller")
 		runKubectl("rollingupdate", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath)
-		validateController(kittenImage, 2)
+		validateController(c, kittenImage, 2)
 	})
 
 })
@@ -128,7 +102,7 @@ func cleanup(filePath string) {
 	}
 }
 
-func validateController(image string, replicas int) {
+func validateController(c *client.Client, image string, replicas int) {
 
 	getPodsTemplate := "--template={{range.items}}{{.id}} {{end}}"
 
@@ -167,7 +141,7 @@ func validateController(image string, replicas int) {
 				continue
 			}
 
-			data, err := getData(podID)
+			data, err := getData(c, podID)
 			if err != nil {
 				Logf("%s is running right image but fetching data failed: %v", podID, err)
 				continue
@@ -191,16 +165,14 @@ type updateDemoData struct {
 	image string `json:"image"`
 }
 
-func getData(podID string) (*updateDemoData, error) {
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1beta1/proxy/pods/%s/data.json", kubectlProxyPort, podID))
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("received non-200 status code from master: %d", resp.StatusCode)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+func getData(c *client.Client, podID string) (*updateDemoData, error) {
+	body, err := c.Get().
+		Prefix("proxy").
+		Resource("pods").
+		Name(podID).
+		Suffix("data.json").
+		Do().
+		Raw()
 	if err != nil {
 		return nil, err
 	}
