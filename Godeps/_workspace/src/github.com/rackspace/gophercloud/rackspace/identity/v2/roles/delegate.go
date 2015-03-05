@@ -1,7 +1,6 @@
 package roles
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 
@@ -20,9 +19,8 @@ func List(client *gophercloud.ServiceClient) pagination.Pager {
 func AddUserRole(client *gophercloud.ServiceClient, userID, roleID string) UserRoleResult {
 	var result UserRoleResult
 
-	_, result.Err = perigee.Request("PUT", userRoleURL(client, userID, roleID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 201},
+	_, result.Err = client.Request("PUT", userRoleURL(client, userID, roleID), gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
 	})
 
 	return result
@@ -34,9 +32,8 @@ func AddUserRole(client *gophercloud.ServiceClient, userID, roleID string) UserR
 func DeleteUserRole(client *gophercloud.ServiceClient, userID, roleID string) UserRoleResult {
 	var result UserRoleResult
 
-	_, result.Err = perigee.Request("DELETE", userRoleURL(client, userID, roleID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, result.Err = client.Request("DELETE", userRoleURL(client, userID, roleID), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 
 	return result

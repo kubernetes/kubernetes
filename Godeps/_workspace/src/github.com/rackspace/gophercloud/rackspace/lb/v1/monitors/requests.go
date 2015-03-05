@@ -3,8 +3,6 @@ package monitors
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 )
 
@@ -143,10 +141,9 @@ func Update(c *gophercloud.ServiceClient, id int, opts UpdateOptsBuilder) Update
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", rootURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("PUT", rootURL(c, id), gophercloud.RequestOpts{
+		JSONBody: &reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -156,10 +153,9 @@ func Update(c *gophercloud.ServiceClient, id int, opts UpdateOptsBuilder) Update
 func Get(c *gophercloud.ServiceClient, id int) GetResult {
 	var res GetResult
 
-	_, res.Err = perigee.Request("GET", rootURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", rootURL(c, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -169,9 +165,8 @@ func Get(c *gophercloud.ServiceClient, id int) GetResult {
 func Delete(c *gophercloud.ServiceClient, id int) DeleteResult {
 	var res DeleteResult
 
-	_, res.Err = perigee.Request("DELETE", rootURL(c, id), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", rootURL(c, id), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res

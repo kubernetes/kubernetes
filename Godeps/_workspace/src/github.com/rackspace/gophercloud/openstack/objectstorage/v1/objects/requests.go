@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack/objectstorage/v1/accounts"
 	"github.com/rackspace/gophercloud/pagination"
@@ -131,14 +130,14 @@ func Download(c *gophercloud.ServiceClient, containerName, objectName string, op
 		url += query
 	}
 
-	resp, err := perigee.Request("GET", url, perigee.Options{
+	resp, err := c.Request("GET", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{200, 304},
 	})
 
-	res.Body = resp.HttpResponse.Body
+	res.Body = resp.Body
 	res.Err = err
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 
 	return res
 }
@@ -193,7 +192,7 @@ func Create(c *gophercloud.ServiceClient, containerName, objectName string, cont
 	var res CreateResult
 
 	url := createURL(c, containerName, objectName)
-	h := c.AuthenticatedHeaders()
+	h := make(map[string]string)
 
 	if opts != nil {
 		headers, query, err := opts.ToObjectCreateParams()
@@ -209,21 +208,14 @@ func Create(c *gophercloud.ServiceClient, containerName, objectName string, cont
 		url += query
 	}
 
-	popts := perigee.Options{
-		ReqBody:     content,
+	ropts := gophercloud.RequestOpts{
+		RawBody:     content,
 		MoreHeaders: h,
 		OkCodes:     []int{201, 202},
 	}
 
-	if contentType, explicit := h["Content-Type"]; explicit {
-		popts.ContentType = contentType
-		delete(h, "Content-Type")
-	} else {
-		popts.OmitContentType = true
-	}
-
-	resp, err := perigee.Request("PUT", url, popts)
-	res.Header = resp.HttpResponse.Header
+	resp, err := c.Request("PUT", url, ropts)
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -275,11 +267,11 @@ func Copy(c *gophercloud.ServiceClient, containerName, objectName string, opts C
 	}
 
 	url := copyURL(c, containerName, objectName)
-	resp, err := perigee.Request("COPY", url, perigee.Options{
+	resp, err := c.Request("COPY", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{201},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -318,11 +310,10 @@ func Delete(c *gophercloud.ServiceClient, containerName, objectName string, opts
 		url += query
 	}
 
-	resp, err := perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	resp, err := c.Request("DELETE", url, gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -363,11 +354,10 @@ func Get(c *gophercloud.ServiceClient, containerName, objectName string, opts Ge
 		url += query
 	}
 
-	resp, err := perigee.Request("HEAD", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 204},
+	resp, err := c.Request("HEAD", url, gophercloud.RequestOpts{
+		OkCodes: []int{200, 204},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -420,11 +410,11 @@ func Update(c *gophercloud.ServiceClient, containerName, objectName string, opts
 	}
 
 	url := updateURL(c, containerName, objectName)
-	resp, err := perigee.Request("POST", url, perigee.Options{
+	resp, err := c.Request("POST", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{202},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }

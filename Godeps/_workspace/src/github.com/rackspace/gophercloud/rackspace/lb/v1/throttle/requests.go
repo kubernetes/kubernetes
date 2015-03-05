@@ -3,8 +3,6 @@ package throttle
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 )
 
@@ -57,11 +55,10 @@ func Create(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Crea
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("PUT", rootURL(c, lbID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{202},
 	})
 
 	return res
@@ -72,10 +69,9 @@ func Create(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Crea
 func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 	var res GetResult
 
-	_, res.Err = perigee.Request("GET", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		Results:     &res.Body,
-		OkCodes:     []int{200},
+	_, res.Err = c.Request("GET", rootURL(c, lbID), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		OkCodes:      []int{200},
 	})
 
 	return res
@@ -86,9 +82,8 @@ func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 func Delete(c *gophercloud.ServiceClient, lbID int) DeleteResult {
 	var res DeleteResult
 
-	_, res.Err = perigee.Request("DELETE", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", rootURL(c, lbID), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res

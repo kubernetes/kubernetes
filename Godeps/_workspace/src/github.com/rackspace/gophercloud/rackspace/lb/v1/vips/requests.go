@@ -3,8 +3,6 @@ package vips
 import (
 	"errors"
 
-	"github.com/racker/perigee"
-
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -69,11 +67,10 @@ func Create(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Crea
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", rootURL(c, lbID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("POST", rootURL(c, lbID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
+		OkCodes:      []int{202},
 	})
 
 	return res
@@ -93,9 +90,8 @@ func BulkDelete(c *gophercloud.ServiceClient, loadBalancerID int, vipIDs []int) 
 	url := rootURL(c, loadBalancerID)
 	url += gophercloud.IDSliceToQueryString("id", vipIDs)
 
-	_, res.Err = perigee.Request("DELETE", url, perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 
 	return res
@@ -104,9 +100,8 @@ func BulkDelete(c *gophercloud.ServiceClient, loadBalancerID int, vipIDs []int) 
 // Delete is the operation responsible for permanently deleting a VIP.
 func Delete(c *gophercloud.ServiceClient, lbID, vipID int) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", resourceURL(c, lbID, vipID), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = c.Request("DELETE", resourceURL(c, lbID, vipID), gophercloud.RequestOpts{
+		OkCodes: []int{202},
 	})
 	return res
 }

@@ -3,7 +3,6 @@ package users
 import (
 	"errors"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	os "github.com/rackspace/gophercloud/openstack/identity/v2/users"
 	"github.com/rackspace/gophercloud/pagination"
@@ -116,11 +115,10 @@ func (opts UpdateOpts) ToUserUpdateMap() map[string]interface{} {
 func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) UpdateResult {
 	var result UpdateResult
 
-	_, result.Err = perigee.Request("POST", os.ResourceURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     opts.ToUserUpdateMap(),
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("POST", os.ResourceURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     opts.ToUserUpdateMap(),
+		OkCodes:      []int{200},
 	})
 
 	return result
@@ -135,10 +133,9 @@ func Delete(client *gophercloud.ServiceClient, id string) os.DeleteResult {
 func ResetAPIKey(client *gophercloud.ServiceClient, id string) ResetAPIKeyResult {
 	var result ResetAPIKeyResult
 
-	_, result.Err = perigee.Request("POST", resetAPIKeyURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("POST", resetAPIKeyURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 
 	return result

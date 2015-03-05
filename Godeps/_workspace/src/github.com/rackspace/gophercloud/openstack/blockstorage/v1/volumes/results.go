@@ -16,7 +16,7 @@ type Volume struct {
 	Name string `mapstructure:"display_name"`
 
 	// Instances onto which the volume is attached.
-	Attachments []string `mapstructure:"attachments"`
+	Attachments []map[string]interface{} `mapstructure:"attachments"`
 
 	// This parameter is no longer used.
 	AvailabilityZone string `mapstructure:"availability_zone"`

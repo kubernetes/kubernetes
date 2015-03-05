@@ -1,7 +1,8 @@
 package tokens
 
 import (
-	"github.com/racker/perigee"
+	"net/http"
+
 	"github.com/rackspace/gophercloud"
 )
 
@@ -233,38 +234,38 @@ func Create(c *gophercloud.ServiceClient, options gophercloud.AuthOptions, scope
 	}
 
 	var result CreateResult
-	var response *perigee.Response
-	response, result.Err = perigee.Request("POST", tokenURL(c), perigee.Options{
-		ReqBody: &req,
-		Results: &result.Body,
-		OkCodes: []int{201},
+	var response *http.Response
+	response, result.Err = c.Request("POST", tokenURL(c), gophercloud.RequestOpts{
+		JSONBody:     &req,
+		JSONResponse: &result.Body,
+		OkCodes:      []int{201},
 	})
 	if result.Err != nil {
 		return result
 	}
-	result.Header = response.HttpResponse.Header
+	result.Header = response.Header
 	return result
 }
 
 // Get validates and retrieves information about another token.
 func Get(c *gophercloud.ServiceClient, token string) GetResult {
 	var result GetResult
-	var response *perigee.Response
-	response, result.Err = perigee.Request("GET", tokenURL(c), perigee.Options{
-		MoreHeaders: subjectTokenHeaders(c, token),
-		Results:     &result.Body,
-		OkCodes:     []int{200, 203},
+	var response *http.Response
+	response, result.Err = c.Request("GET", tokenURL(c), gophercloud.RequestOpts{
+		MoreHeaders:  subjectTokenHeaders(c, token),
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200, 203},
 	})
 	if result.Err != nil {
 		return result
 	}
-	result.Header = response.HttpResponse.Header
+	result.Header = response.Header
 	return result
 }
 
 // Validate determines if a specified token is valid or not.
 func Validate(c *gophercloud.ServiceClient, token string) (bool, error) {
-	response, err := perigee.Request("HEAD", tokenURL(c), perigee.Options{
+	response, err := c.Request("HEAD", tokenURL(c), gophercloud.RequestOpts{
 		MoreHeaders: subjectTokenHeaders(c, token),
 		OkCodes:     []int{204, 404},
 	})
@@ -278,7 +279,7 @@ func Validate(c *gophercloud.ServiceClient, token string) (bool, error) {
 // Revoke immediately makes specified token invalid.
 func Revoke(c *gophercloud.ServiceClient, token string) RevokeResult {
 	var res RevokeResult
-	_, res.Err = perigee.Request("DELETE", tokenURL(c), perigee.Options{
+	_, res.Err = c.Request("DELETE", tokenURL(c), gophercloud.RequestOpts{
 		MoreHeaders: subjectTokenHeaders(c, token),
 		OkCodes:     []int{204},
 	})

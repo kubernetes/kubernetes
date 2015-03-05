@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/testhelper"
 )
 
@@ -43,7 +44,11 @@ func TestChooseVersion(t *testing.T) {
 	v2 := &Version{ID: "v2.0", Priority: 2, Suffix: "blarg"}
 	v3 := &Version{ID: "v3.0", Priority: 3, Suffix: "hargl"}
 
-	v, endpoint, err := ChooseVersion(testhelper.Endpoint(), "", []*Version{v2, v3})
+	c := &gophercloud.ProviderClient{
+		IdentityBase:     testhelper.Endpoint(),
+		IdentityEndpoint: "",
+	}
+	v, endpoint, err := ChooseVersion(c, []*Version{v2, v3})
 
 	if err != nil {
 		t.Fatalf("Unexpected error from ChooseVersion: %v", err)
@@ -67,7 +72,11 @@ func TestChooseVersionOpinionatedLink(t *testing.T) {
 	v2 := &Version{ID: "v2.0", Priority: 2, Suffix: "nope"}
 	v3 := &Version{ID: "v3.0", Priority: 3, Suffix: "northis"}
 
-	v, endpoint, err := ChooseVersion(testhelper.Endpoint(), testhelper.Endpoint()+"v2.0/", []*Version{v2, v3})
+	c := &gophercloud.ProviderClient{
+		IdentityBase:     testhelper.Endpoint(),
+		IdentityEndpoint: testhelper.Endpoint() + "v2.0/",
+	}
+	v, endpoint, err := ChooseVersion(c, []*Version{v2, v3})
 	if err != nil {
 		t.Fatalf("Unexpected error from ChooseVersion: %v", err)
 	}
@@ -89,7 +98,11 @@ func TestChooseVersionFromSuffix(t *testing.T) {
 	v2 := &Version{ID: "v2.0", Priority: 2, Suffix: "/v2.0/"}
 	v3 := &Version{ID: "v3.0", Priority: 3, Suffix: "/v3.0/"}
 
-	v, endpoint, err := ChooseVersion(testhelper.Endpoint(), testhelper.Endpoint()+"v2.0/", []*Version{v2, v3})
+	c := &gophercloud.ProviderClient{
+		IdentityBase:     testhelper.Endpoint(),
+		IdentityEndpoint: testhelper.Endpoint() + "v2.0/",
+	}
+	v, endpoint, err := ChooseVersion(c, []*Version{v2, v3})
 	if err != nil {
 		t.Fatalf("Unexpected error from ChooseVersion: %v", err)
 	}

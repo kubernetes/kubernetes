@@ -3,8 +3,6 @@ package images
 import (
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // ListOptsBuilder allows extensions to add additional parameters to the
@@ -22,7 +20,7 @@ type ListOpts struct {
 	// UUID of the Image at which to set a marker.
 	Marker string `q:"marker"`
 	// The name of the Image.
-	Name string `q:"name:"`
+	Name string `q:"name"`
 	// The name of the Server (in URL format).
 	Server string `q:"server"`
 	// The current status of the Image.
@@ -62,10 +60,9 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 // Use ExtractImage() to interpret the result as an openstack Image.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var result GetResult
-	_, result.Err = perigee.Request("GET", getURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &result.Body,
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 	return result
 }

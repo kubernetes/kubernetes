@@ -38,7 +38,7 @@ func mockListGroupsResponse(t *testing.T) {
 }
 
 func mockListGroupsByServerResponse(t *testing.T, serverID string) {
-	url := fmt.Sprintf("%s/servers/%s%s", rootPath, serverID, rootPath)
+	url := fmt.Sprintf("/servers/%s%s", serverID, rootPath)
 	th.Mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
 		th.TestMethod(t, r, "GET")
 		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)

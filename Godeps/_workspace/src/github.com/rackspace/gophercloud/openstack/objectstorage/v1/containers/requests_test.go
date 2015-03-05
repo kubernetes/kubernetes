@@ -29,6 +29,18 @@ func TestListContainerInfo(t *testing.T) {
 	th.CheckEquals(t, count, 1)
 }
 
+func TestListAllContainerInfo(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleListContainerInfoSuccessfully(t)
+
+	allPages, err := List(fake.ServiceClient(), &ListOpts{Full: true}).AllPages()
+	th.AssertNoErr(t, err)
+	actual, err := ExtractInfo(allPages)
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, ExpectedListInfo, actual)
+}
+
 func TestListContainerNames(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
@@ -49,6 +61,18 @@ func TestListContainerNames(t *testing.T) {
 	})
 	th.AssertNoErr(t, err)
 	th.CheckEquals(t, count, 1)
+}
+
+func TestListAllContainerNames(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleListContainerNamesSuccessfully(t)
+
+	allPages, err := List(fake.ServiceClient(), &ListOpts{Full: false}).AllPages()
+	th.AssertNoErr(t, err)
+	actual, err := ExtractNames(allPages)
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, ExpectedListNames, actual)
 }
 
 func TestCreateContainer(t *testing.T) {

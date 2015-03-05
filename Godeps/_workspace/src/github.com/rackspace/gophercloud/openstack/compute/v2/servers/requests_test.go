@@ -39,6 +39,19 @@ func TestListServers(t *testing.T) {
 	}
 }
 
+func TestListAllServers(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleServerListSuccessfully(t)
+
+	allPages, err := List(client.ServiceClient(), ListOpts{}).AllPages()
+	th.AssertNoErr(t, err)
+	actual, err := ExtractServers(allPages)
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, ServerHerp, actual[0])
+	th.CheckDeepEquals(t, ServerDerp, actual[1])
+}
+
 func TestCreateServer(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()

@@ -105,3 +105,16 @@ func TestEnumerateLinked(t *testing.T) {
 		t.Errorf("Expected 3 calls, but was %d", callCount)
 	}
 }
+
+func TestAllPagesLinked(t *testing.T) {
+	pager := createLinked(t)
+	defer testhelper.TeardownHTTP()
+
+	page, err := pager.AllPages()
+	testhelper.AssertNoErr(t, err)
+
+	expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	actual, err := ExtractLinkedInts(page)
+	testhelper.AssertNoErr(t, err)
+	testhelper.CheckDeepEquals(t, expected, actual)
+}

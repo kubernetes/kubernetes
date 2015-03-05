@@ -5,8 +5,6 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
-
-	"github.com/racker/perigee"
 )
 
 // CreateOptsBuilder allows extensions to add additional parameters to the
@@ -69,11 +67,10 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", createURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 201},
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
+	_, res.Err = client.Request("POST", createURL(client), gophercloud.RequestOpts{
+		OkCodes:      []int{200, 201},
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
 	})
 	return res
 }
@@ -81,9 +78,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Delete will delete the existing Snapshot with the provided ID.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202, 204},
+	_, res.Err = client.Request("DELETE", deleteURL(client, id), gophercloud.RequestOpts{
+		OkCodes: []int{202, 204},
 	})
 	return res
 }
@@ -92,10 +88,9 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // object from the response, call the Extract method on the GetResult.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = perigee.Request("GET", getURL(client, id), perigee.Options{
-		Results:     &res.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
+	_, res.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
+		OkCodes:      []int{200},
+		JSONResponse: &res.Body,
 	})
 	return res
 }
@@ -178,11 +173,10 @@ func UpdateMetadata(client *gophercloud.ServiceClient, id string, opts UpdateMet
 		return res
 	}
 
-	_, res.Err = perigee.Request("PUT", updateMetadataURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-		ReqBody:     &reqBody,
-		Results:     &res.Body,
+	_, res.Err = client.Request("PUT", updateMetadataURL(client, id), gophercloud.RequestOpts{
+		OkCodes:      []int{200},
+		JSONBody:     &reqBody,
+		JSONResponse: &res.Body,
 	})
 	return res
 }

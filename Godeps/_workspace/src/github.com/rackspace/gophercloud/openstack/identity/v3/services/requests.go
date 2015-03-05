@@ -1,7 +1,6 @@
 package services
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -19,11 +18,10 @@ func Create(client *gophercloud.ServiceClient, serviceType string) CreateResult 
 	req := request{Type: serviceType}
 
 	var result CreateResult
-	_, result.Err = perigee.Request("POST", listURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &req,
-		Results:     &result.Body,
-		OkCodes:     []int{201},
+	_, result.Err = client.Request("POST", listURL(client), gophercloud.RequestOpts{
+		JSONBody:     &req,
+		JSONResponse: &result.Body,
+		OkCodes:      []int{201},
 	})
 	return result
 }
@@ -53,10 +51,9 @@ func List(client *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 // Get returns additional information about a service, given its ID.
 func Get(client *gophercloud.ServiceClient, serviceID string) GetResult {
 	var result GetResult
-	_, result.Err = perigee.Request("GET", serviceURL(client, serviceID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		Results:     &result.Body,
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("GET", serviceURL(client, serviceID), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 	return result
 }
@@ -70,11 +67,10 @@ func Update(client *gophercloud.ServiceClient, serviceID string, serviceType str
 	req := request{Type: serviceType}
 
 	var result UpdateResult
-	_, result.Err = perigee.Request("PATCH", serviceURL(client, serviceID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &req,
-		Results:     &result.Body,
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("PATCH", serviceURL(client, serviceID), gophercloud.RequestOpts{
+		JSONBody:     &req,
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 	return result
 }
@@ -83,9 +79,8 @@ func Update(client *gophercloud.ServiceClient, serviceID string, serviceType str
 // It either deletes all associated endpoints, or fails until all endpoints are deleted.
 func Delete(client *gophercloud.ServiceClient, serviceID string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", serviceURL(client, serviceID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = client.Request("DELETE", serviceURL(client, serviceID), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 	return res
 }
