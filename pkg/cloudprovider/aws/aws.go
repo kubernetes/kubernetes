@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"strings"
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/goamz/aws"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+
+	"github.com/golang/glog"
 )
 
 type EC2 interface {
@@ -175,6 +178,11 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 	}
 	if resp == nil {
 		return []string{}, fmt.Errorf("no InstanceResp returned")
+	}
+
+	if strings.HasPrefix(regex, "'") && strings.HasSuffix(regex, "'") {
+		glog.Infof("Stripping quotes around regex (%s)", regex)
+		regex = regex[1 : len(regex)-1]
 	}
 
 	re, err := regexp.Compile(regex)
