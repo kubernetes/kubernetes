@@ -21,11 +21,25 @@ import (
 	"sync"
 )
 
+// Queue is exactly like a Store, but has a Pop() method too.
+type Queue interface {
+	Store
+	// Pop blocks until it has something to return.
+	Pop() interface{}
+}
+
 // FIFO receives adds and updates from a Reflector, and puts them in a queue for
 // FIFO order processing. If multiple adds/updates of a single item happen while
 // an item is in the queue before it has been processed, it will only be
 // processed once, and when it is processed, the most recent version will be
 // processed. This can't be done with a channel.
+//
+// FIFO solves this use case:
+//  * You want to process every object (exactly) once.
+//  * You want to process the most recent version of the object when you process it.
+//  * You do not want to process deleted objects, they should be removed from the queue.
+//  * You do not want to periodically reprocess objects.
+// Compare with DeltaFIFO for other use cases.
 type FIFO struct {
 	lock sync.RWMutex
 	cond sync.Cond
@@ -36,6 +50,10 @@ type FIFO struct {
 	// should be deterministic.
 	keyFunc KeyFunc
 }
+
+var (
+	_ = Queue(&FIFO{}) // FIFO is a Queue
+)
 
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
@@ -127,7 +145,8 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 // Pop waits until an item is ready and returns it. If multiple items are
 // ready, they are returned in the order in which they were added/updated.
 // The item is removed from the queue (and the store) before it is returned,
-// so if you don't succesfully process it, you need to add it back with Add().
+// so if you don't succesfully process it, you need to add it back with
+// AddIfNotPresent().
 func (f *FIFO) Pop() interface{} {
 	f.lock.Lock()
 	defer f.lock.Unlock()
