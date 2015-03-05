@@ -270,8 +270,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		case "PUT": // Update a resource.
 			route := ws.PUT(action.Path).To(UpdateResource(updater, ctxFn, action.Namer, codec, resource, admit)).
 				Filter(m).
-				Doc("update the specified " + kind).
-				Operation("update" + kind).
+				Doc("replace the specified " + kind).
+				Operation("replace" + kind).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
