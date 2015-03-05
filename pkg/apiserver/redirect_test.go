@@ -71,7 +71,7 @@ func TestRedirect(t *testing.T) {
 		if err == nil || err.(*url.Error).Err != dontFollow {
 			t.Errorf("Unexpected err %#v", err)
 		}
-		if e, a := item.id, resp.Header.Get("Location"); e != a {
+		if e, a := "http://"+item.id, resp.Header.Get("Location"); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
@@ -124,7 +124,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 		if err == nil || err.(*url.Error).Err != dontFollow {
 			t.Errorf("Unexpected err %#v", err)
 		}
-		if e, a := item.id, resp.Header.Get("Location"); e != a {
+		if e, a := "http://"+item.id, resp.Header.Get("Location"); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
