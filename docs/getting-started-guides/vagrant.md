@@ -1,14 +1,15 @@
 ## Getting started with Vagrant
 
+Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
+
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
-3. Install the `net-tools` package for your distribution for VirtualBox's private networks.
 4. Get or build a [binary release](binary_release.md)
 
 ### Setup
 
-By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 512 MB, so make sure you have at least 2 GB of free memory. To start your local cluster, open a shell and run:
+By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
 ```
 cd kubernetes
@@ -65,7 +66,7 @@ With your Kubernetes cluster up, you can manage the nodes in your cluster with t
 
 To push updates to new Kubernetes code after making source changes:
 ```
-vagrant provision
+cluster/kube-push.sh
 ```
 
 To stop and then restart the cluster:
