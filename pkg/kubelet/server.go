@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,8 +49,14 @@ type Server struct {
 	mux  *http.ServeMux
 }
 
+type TLSOptions struct {
+	Config   *tls.Config
+	CertFile string
+	KeyFile  string
+}
+
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, enableDebuggingHandlers bool) {
+func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool) {
 	glog.V(1).Infof("Starting to listen on %s:%d", address, port)
 	handler := NewServer(host, enableDebuggingHandlers)
 	s := &http.Server{
@@ -59,7 +66,12 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
-	glog.Fatal(s.ListenAndServe())
+	if tlsOptions != nil {
+		s.TLSConfig = tlsOptions.Config
+		glog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
+	} else {
+		glog.Fatal(s.ListenAndServe())
+	}
 }
 
 // HostInterface contains all the kubelet methods required by the server.

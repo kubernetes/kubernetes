@@ -144,7 +144,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP
 	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
 	dockerClient := dockertools.ConnectToDockerOrDie(*dockerEndpoint)
-	kubeletapp.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins())
+	kubeletapp.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil)
 }
 
 func newApiClient(addr net.IP, port int) *client.Client {

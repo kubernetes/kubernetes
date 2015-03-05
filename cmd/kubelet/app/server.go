@@ -255,7 +255,8 @@ func SimpleRunKubelet(client *client.Client,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
 	masterServiceNamespace string,
-	volumePlugins []volume.Plugin) {
+	volumePlugins []volume.Plugin,
+	tlsOptions *kubelet.TLSOptions) {
 	kcfg := KubeletConfig{
 		KubeClient:             client,
 		EtcdClient:             etcdClient,
@@ -273,6 +274,7 @@ func SimpleRunKubelet(client *client.Client,
 		MaxContainerCount:       5,
 		MasterServiceNamespace:  masterServiceNamespace,
 		VolumePlugins:           volumePlugins,
+		TLSOptions:              tlsOptions,
 	}
 	RunKubelet(&kcfg)
 }
@@ -318,7 +320,7 @@ func startKubelet(k *kubelet.Kubelet, podCfg *config.PodConfig, kc *KubeletConfi
 	// start the kubelet server
 	if kc.EnableServer {
 		go util.Forever(func() {
-			kubelet.ListenAndServeKubeletServer(k, net.IP(kc.Address), kc.Port, kc.EnableDebuggingHandlers)
+			kubelet.ListenAndServeKubeletServer(k, net.IP(kc.Address), kc.Port, kc.TLSOptions, kc.EnableDebuggingHandlers)
 		}, 0)
 	}
 }
@@ -381,6 +383,7 @@ type KubeletConfig struct {
 	VolumePlugins                  []volume.Plugin
 	StreamingConnectionIdleTimeout time.Duration
 	Recorder                       record.EventRecorder
+	TLSOptions                     *kubelet.TLSOptions
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
