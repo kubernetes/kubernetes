@@ -333,6 +333,9 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 		if err == nil && version != 0 {
 			create = false
 			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if err != nil {
