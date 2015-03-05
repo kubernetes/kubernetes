@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -80,7 +81,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &fakeMounter{})
+	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &fakeMounter{})
+	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

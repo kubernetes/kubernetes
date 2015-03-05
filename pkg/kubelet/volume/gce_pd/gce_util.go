@@ -68,7 +68,7 @@ func (util *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath 
 	}
 
 	// Only mount the PD globally once.
-	mountpoint, err := isMountPoint(globalPDPath)
+	mountpoint, err := mount.IsMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(globalPDPath, 0750); err != nil {

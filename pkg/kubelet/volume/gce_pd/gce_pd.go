@@ -170,7 +170,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	}
 
 	// TODO: handle failed mounts here.
-	mountpoint, err := isMountPoint(pd.GetPath())
+	mountpoint, err := mount.IsMountPoint(pd.GetPath())
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", pd.GetPath(), mountpoint, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -199,7 +199,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
 	if err != nil {
-		mountpoint, mntErr := isMountPoint(pd.GetPath())
+		mountpoint, mntErr := mount.IsMountPoint(pd.GetPath())
 		if mntErr != nil {
 			glog.Errorf("isMountpoint check failed: %v", mntErr)
 			return err
@@ -209,7 +209,7 @@ func (pd *gcePersistentDisk) SetUp() error {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := isMountPoint(pd.GetPath())
+			mountpoint, mntErr := mount.IsMountPoint(pd.GetPath())
 			if mntErr != nil {
 				glog.Errorf("isMountpoint check failed: %v", mntErr)
 				return err
@@ -244,7 +244,7 @@ func (pd *gcePersistentDisk) GetPath() string {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *gcePersistentDisk) TearDown() error {
-	mountpoint, err := isMountPoint(pd.GetPath())
+	mountpoint, err := mount.IsMountPoint(pd.GetPath())
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (pd *gcePersistentDisk) TearDown() error {
 		return os.Remove(pd.GetPath())
 	}
 
-	refs, err := getMountRefs(pd.mounter, pd.GetPath())
+	refs, err := mount.GetMountRefs(pd.mounter, pd.GetPath())
 	if err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (pd *gcePersistentDisk) TearDown() error {
 			return err
 		}
 	}
-	mountpoint, mntErr := isMountPoint(pd.GetPath())
+	mountpoint, mntErr := mount.IsMountPoint(pd.GetPath())
 	if mntErr != nil {
 		glog.Errorf("isMountpoint check failed: %v", mntErr)
 		return err
