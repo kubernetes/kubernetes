@@ -115,7 +115,7 @@ var _ = Describe("Secrets", func() {
 			Failf("Failed to create pod: %v", err)
 		}
 		// Wait for client pod to complete.
-		expectNoError(waitForPodRunning(c, clientPod.Name, 60*time.Second))
+		expectNoError(waitForPodRunning(c, clientPod.Name))
 
 		// Grab its logs.  Get host first.
 		clientPodStatus, err := c.Pods(ns).Get(clientPod.Name)

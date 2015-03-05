@@ -35,7 +35,6 @@ const (
 	kittenImage         = "kubernetes/update-demo:kitten"
 	updateDemoSelector  = "name=update-demo"
 	updateDemoContainer = "update-demo"
-	validateTimeout     = 10 * time.Minute // TODO: Make this 30 seconds once #4566 is resolved.
 	kubectlProxyPort    = 8011
 )
 
@@ -120,7 +119,7 @@ func validateController(c *client.Client, image string, replicas int) {
 	getImageTemplate := fmt.Sprintf(`--template={{(index .currentState.info "%s").image}}`, updateDemoContainer)
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", updateDemoSelector))
-	for start := time.Now(); time.Since(start) < validateTimeout; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "-l", updateDemoSelector)
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {

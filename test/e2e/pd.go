@@ -76,8 +76,7 @@ var _ = Describe("PD", func() {
 		_, err := podClient.Create(host0Pod)
 		expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
-		By("waiting up to 180 seconds for host0Pod to start running")
-		expectNoError(waitForPodRunning(c, host0Pod.Name, 180*time.Second), "host0Pod not running after 180 seconds")
+		expectNoError(waitForPodRunning(c, host0Pod.Name))
 
 		By("deleting host0Pod")
 		expectNoError(podClient.Delete(host0Pod.Name), "Failed to delete host0Pod")
@@ -86,8 +85,7 @@ var _ = Describe("PD", func() {
 		_, err = podClient.Create(host1Pod)
 		expectNoError(err, "Failed to create host1Pod")
 
-		By("waiting up to 180 seconds for host1Pod to start running")
-		expectNoError(waitForPodRunning(c, host1Pod.Name, 180*time.Second), "host1Pod not running after 180 seconds")
+		expectNoError(waitForPodRunning(c, host1Pod.Name))
 
 		By("deleting host1Pod")
 		expectNoError(podClient.Delete(host1Pod.Name), "Failed to delete host1Pod")
@@ -128,7 +126,7 @@ var _ = Describe("PD", func() {
 		By("submitting rwPod to ensure PD is formatted")
 		_, err := podClient.Create(rwPod)
 		expectNoError(err, "Failed to create rwPod")
-		expectNoError(waitForPodRunning(c, rwPod.Name, 180*time.Second), "rwPod not running after 180 seconds")
+		expectNoError(waitForPodRunning(c, rwPod.Name))
 		expectNoError(podClient.Delete(rwPod.Name), "Failed to delete host0Pod")
 
 		By("submitting host0ROPod to kubernetes")
@@ -139,11 +137,9 @@ var _ = Describe("PD", func() {
 		_, err = podClient.Create(host1ROPod)
 		expectNoError(err, "Failed to create host1ROPod")
 
-		By("waiting up to 180 seconds for host0ROPod to start running")
-		expectNoError(waitForPodRunning(c, host0ROPod.Name, 180*time.Second), "host0ROPod not running after 180 seconds")
+		expectNoError(waitForPodRunning(c, host0ROPod.Name))
 
-		By("waiting up to 180 seconds for host1ROPod to start running")
-		expectNoError(waitForPodRunning(c, host1ROPod.Name, 180*time.Second), "host1ROPod not running after 180 seconds")
+		expectNoError(waitForPodRunning(c, host1ROPod.Name))
 
 		By("deleting host0ROPod")
 		expectNoError(podClient.Delete(host0ROPod.Name), "Failed to delete host0ROPod")

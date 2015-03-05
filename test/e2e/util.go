@@ -31,6 +31,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	// Initial pod start can be delayed O(minutes) by slow docker pulls
+	// TODO: Make this 30 seconds once #4566 is resolved.
+	podStartTimeout = 5 * time.Minute
+)
+
 type testContextType struct {
 	authConfig string
 	certDir    string
@@ -50,55 +56,45 @@ func Failf(format string, a ...interface{}) {
 	Fail(fmt.Sprintf(format, a...), 1)
 }
 
-func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
-	trySecs := int(tryFor.Seconds())
-	for i := 0; i <= trySecs; i += 5 {
-		time.Sleep(5 * time.Second)
-		pod, err := c.Pods(api.NamespaceDefault).Get(id)
-		if err != nil {
-			return fmt.Errorf("Get pod %s failed: %v", id, err.Error())
-		}
-		if pod.Status.Phase == api.PodRunning {
-			return nil
-		}
-		Logf("Waiting for pod %s status to be %q (found %q) (%d secs)", id, api.PodRunning, pod.Status.Phase, i)
-	}
-	return fmt.Errorf("Gave up waiting for pod %s to be running after %d seconds", id, trySecs)
-}
+type podCondition func(pod *api.Pod) (bool, error)
 
-// waitForPodNotPending returns false if it took too long for the pod to go out of pending state.
-func waitForPodNotPending(c *client.Client, ns, podName string, tryFor time.Duration) error {
-	trySecs := int(tryFor.Seconds())
-	for i := 0; i <= trySecs; i += 5 {
-		if i > 0 {
-			time.Sleep(5 * time.Second)
-		}
+func waitForPodCondition(c *client.Client, ns, podName, desc string, condition podCondition) error {
+	By(fmt.Sprintf("waiting up to %v for pod %s status to be %s", podStartTimeout, podName, desc))
+	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		pod, err := c.Pods(ns).Get(podName)
-		if err != nil {
-			Logf("Get pod %s in namespace %s failed, ignoring for 5s: %v", podName, ns, err)
-			continue
-		}
-		if pod.Status.Phase != api.PodPending {
-			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
-			return nil
-		}
-		Logf("Waiting for status of pod %s in namespace %s to be !%q (found %q) (%v secs)", podName, ns, api.PodPending, pod.Status.Phase, i)
-	}
-	return fmt.Errorf("Gave up waiting for status of pod %s in namespace %s to go out of pending after %d seconds", podName, ns, trySecs)
-}
-
-// waitForPodSuccess returns true if the pod reached state success, or false if it reached failure or ran too long.
-func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor time.Duration) error {
-	trySecs := int(tryFor.Seconds())
-	for i := 0; i <= trySecs; i += 5 {
-		if i > 0 {
-			time.Sleep(5 * time.Second)
-		}
-		pod, err := c.Pods(api.NamespaceDefault).Get(podName)
 		if err != nil {
 			Logf("Get pod failed, ignoring for 5s: %v", err)
 			continue
 		}
+		done, err := condition(pod)
+		if done {
+			return err
+		}
+		Logf("Waiting for pod %s status to be %q (found %q) (%d secs)", podName, api.PodRunning, pod.Status.Phase, time.Since(start).Seconds())
+	}
+	return fmt.Errorf("gave up waiting for pod %s to be %s after %v", podName, podStartTimeout)
+}
+
+func waitForPodRunning(c *client.Client, podName string) error {
+	return waitForPodCondition(c, api.NamespaceDefault, podName, "running", func(pod *api.Pod) (bool, error) {
+		return (pod.Status.Phase == api.PodRunning), nil
+	})
+}
+
+// waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
+func waitForPodNotPending(c *client.Client, ns, podName string) error {
+	return waitForPodCondition(c, ns, podName, "!pending", func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase != api.PodPending {
+			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
+// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func waitForPodSuccess(c *client.Client, podName string, contName string) error {
+	return waitForPodCondition(c, api.NamespaceDefault, podName, "success or failure", func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := pod.Status.Info[contName]
 		if !ok {
@@ -107,17 +103,17 @@ func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
 					By("Saw pod success")
-					return nil
+					return true, nil
 				} else {
-					Logf("Saw pod failure: %+v", ci.State.Termination)
+					return true, fmt.Errorf("pod %s terminated with failure: %+v", podName, ci.State.Termination)
 				}
 				Logf("Waiting for pod %q status to be success or failure", podName)
 			} else {
 				Logf("Nil State.Termination for container %s in pod %s so far", contName, podName)
 			}
 		}
-	}
-	return fmt.Errorf("Gave up waiting for pod %q status to be success or failure after %d seconds", podName, trySecs)
+		return false, nil
+	})
 }
 
 func loadConfig() (*client.Config, error) {

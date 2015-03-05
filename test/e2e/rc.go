@@ -133,7 +133,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	for _, pod := range pods.Items {
-		err = waitForPodRunning(c, pod.Name, 300*time.Second)
+		err = waitForPodRunning(c, pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
