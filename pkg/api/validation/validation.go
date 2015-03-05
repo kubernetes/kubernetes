@@ -368,16 +368,8 @@ func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 func validatePersistentVolumeClaimVolumeSource(claimAttachment *api.PersistentVolumeClaimVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	debug.PrintStack()
-
-	spew.Dump(claimAttachment)
-
-	if claimAttachment.PersistentVolumeClaimRef.Name == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.claimRef.Name", ""))
-	}
-
-	if claimAttachment.PersistentVolumeClaimRef.Namespace == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.claimRef.Namespace", ""))
+	if claimAttachment.ClaimName == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.Name", ""))
 	}
 
 	return allErrs

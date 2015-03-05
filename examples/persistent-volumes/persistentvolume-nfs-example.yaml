@@ -1,9 +1,0 @@
-id: pv0003
-kind: PersistentVolume
-apiVersion: v1beta1
-spec:
-  source:
-    nfsMount:
-      server: "172.17.0.2"
-      sourcePath: "/tmp:/mnt"
-      mountOptions: ""

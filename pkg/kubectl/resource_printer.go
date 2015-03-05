@@ -481,7 +481,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 	modes := volume.GetAccessModeType(pv.Spec.Source)
 	modesStr := volume.GetAccessModesAsString(modes)
 
-	aQty := pv.Spec.Capacity[api.ResourceStorage]
+	aQty := pv.Spec.Resources[api.ResourceStorage]
 	aSize := aQty.Value()
 
 	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", pv.Name, pv.Labels, aSize, modesStr, pv.Status.Phase, claimRefUID)

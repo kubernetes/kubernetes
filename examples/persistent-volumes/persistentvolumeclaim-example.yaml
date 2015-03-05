@@ -1,9 +1,0 @@
-name: mypsc00001
-kind: PersistentVolumeClaim
-namespace: myns
-apiVersion: v1beta3
-spec:
-  accessModes:
-    rwo:
-  resources:
-    size: 10G
