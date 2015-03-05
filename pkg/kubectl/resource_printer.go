@@ -34,8 +34,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/docker/docker/pkg/units"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumemanager"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
@@ -478,8 +478,8 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 		claimRefUID += string(pv.ClaimRef.UID)
 	}
 
-	modes := volumemanager.GetAccessModeType(pv.Spec.Source)
-	modesStr := volumemanager.GetAccessModesAsString(modes)
+	modes := volume.GetAccessModeType(pv.Spec.Source)
+	modesStr := volume.GetAccessModesAsString(modes)
 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
