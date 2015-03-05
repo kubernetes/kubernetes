@@ -39,6 +39,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumemanager"
 )
 
 // CMServer is the main context object for the controller manager.
@@ -56,6 +57,7 @@ type CMServer struct {
 	SyncNodeList            bool
 	SyncNodeStatus          bool
 	PodEvictionTimeout      time.Duration
+	PersistentVolumeSyncPeriod time.Duration
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
@@ -77,6 +79,7 @@ func NewCMServer() *CMServer {
 		NodeMemory:              resource.MustParse("3Gi"),
 		SyncNodeList:            true,
 		SyncNodeStatus:          true,
+		PersistentVolumeSyncPeriod: 10 * time.Second,
 		KubeletConfig: client.KubeletConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: false,
@@ -165,6 +168,9 @@ func (s *CMServer) Run(_ []string) error {
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)
+
+	persistentVolumeManager := volumemanager.NewPersistentVolumeManager(kubeClient)
+	persistentVolumeManager.Run(s.PersistentVolumeSyncPeriod)
 
 	select {}
 	return nil

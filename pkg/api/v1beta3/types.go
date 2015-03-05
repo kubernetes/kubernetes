@@ -199,6 +199,113 @@ type VolumeSource struct {
 	GitRepo *GitRepoVolumeSource `json:"gitRepo"`
 	// Secret represents a secret that should populate this volume.
 	Secret *SecretVolumeSource `json:"secret"`
+
+	// TODO (per thockin) https://github.com/GoogleCloudPlatform/kubernetes/pull/4055#discussion_r24865963
+	AWSElasticBlockStore *AWSElasticBlockStore `json:"elasticBlockStore"`
+
+	NFSMount *NFSMount `json:"nfsMount"`
+
+	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
+}
+
+type PersistentVolume struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	//Spec defines a persistent volume owned by the cluster
+	Spec PersistentVolumeSpec `json:"spec,omitempty"`
+
+	// Status represents the current information about persistent volume.
+	Status PersistentVolumeStatus `json:"status,omitempty"`
+
+	// holds the binding reference to a PersistentVolumeClaim
+	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+}
+
+type PersistentVolumeSpec struct {
+	Capacity ResourceList `json:"capacity,omitempty`
+	// AccessModeTypes are inferred from the Source
+	Source VolumeSource `json:",inline"`
+}
+
+type PersistentVolumeStatus struct {
+	Phase StoragePhase `json:"phase,omitempty"`
+}
+
+type PersistentVolumeList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+	Items    []PersistentVolume `json:"items,omitempty"`
+}
+
+// a PersistentVolumeClaim is a user's request for and claim to a persistent volume
+type PersistentVolumeClaim struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the volume
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
+
+	// Status represents the current information about a persistent volume.
+	// this data may not be up to date.
+	Status PersistentVolumeClaimStatus `json:"status,omitempty"`
+}
+
+type PersistentVolumeClaimList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty"`
+}
+
+// a PersistentVolumeClaimSpec describes the common attributes of storage devices
+// and allows a Source for provider-specific attributes
+type PersistentVolumeClaimSpec struct {
+	// Contains the types of access modes desired
+	AccessModes []AccessModeType     `json:"accessModes,omitempty"`
+	Resources   ResourceRequirements `json:"resources,omitempty"`
+}
+
+type PersistentVolumeClaimStatus struct {
+	Phase       StoragePhase     `json:"phase,omitempty"`
+	AccessModes []AccessModeType `json:"accessModes,omitempty`
+	Requests    ResourceList     `json:"requests,omitempty"`
+	VolumeRef   *ObjectReference `json:"volumeRef,omitempty"`
+}
+
+type AccessModeType string
+
+const (
+	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadOnlyMany  AccessModeType = "ReadOnlyMany"
+	ReadWriteMany AccessModeType = "ReadWriteMany"
+)
+
+type StoragePhase string
+
+const (
+	StoragePending StoragePhase = "Pending"
+	StorageBound   StoragePhase = "Bound"
+)
+
+type PersistentVolumeClaimVolumeSource struct {
+	AccessMode               AccessModeType   `json:"accessMode,omitempty"`
+	PersistentVolumeClaimRef *ObjectReference `json:"claimRef,omitempty"`
+}
+
+//
+// AWSEBS and NFS are orthogonal tasks that don't need to be here for Persistent Volumes.
+// They are here in the meantime for me to work with AccessModes correctly.
+// These will be refactored out after the NFS PR gets merged and this feature nears completion.
+//
+type AWSElasticBlockStore struct {
+	// the device's EBS volumeID from AWS
+	VolumeID string `json:"volumeId,omitempty"`
+}
+
+type NFSMount struct {
+	Server       string `json:"server"`
+	SourcePath   string `json:"sourcePath"`
+	MountOptions string `json:"mountOptions"`
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -349,6 +456,8 @@ type Capabilities struct {
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
+	// Requests describes the minimum amount of compute resources required.
+	Requests ResourceList `json:"requests,omitempty"`
 }
 
 const (
@@ -869,6 +978,8 @@ const (
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceMemory ResourceName = "memory"
+	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
+	ResourceStorage ResourceName = "storage"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

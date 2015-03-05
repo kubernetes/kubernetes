@@ -27,7 +27,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
+	"runtime/debug"
 )
 
 const qualifiedNameErrorMsg string = "must match regex [" + util.DNS1123SubdomainFmt + " / ] " + util.DNS1123LabelFmt
@@ -273,6 +275,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateSecretVolumeSource(source.Secret).Prefix("secret")...)
 	}
+	if source.PersistentVolumeClaimVolumeSource != nil {
+		numVolumes++
+		allErrs = append(allErrs, validatePersistentVolumeClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("persistentVolumeClaim")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -320,6 +326,41 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 	if secretSource.Target.Kind != "Secret" {
 		allErrs = append(allErrs, errs.NewFieldInvalid("target.kind", secretSource.Target.Kind, "Secret"))
 	}
+	return allErrs
+}
+
+// TODO implement full validation to complete #4055
+func validatePersistentVolumeClaimVolumeSource(claimAttachment *api.PersistentVolumeClaimVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	debug.PrintStack()
+
+	spew.Dump(claimAttachment)
+
+	if claimAttachment.PersistentVolumeClaimRef.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.claimRef.Name", ""))
+	}
+
+	if claimAttachment.PersistentVolumeClaimRef.Namespace == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.claimRef.Namespace", ""))
+	}
+
+	return allErrs
+}
+
+func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
+	return util.IsDNS1123Label(name), name
+}
+
+// TODO implement full validation to complete #4055
+func ValidatePersistentVolume(persistentvolume *api.PersistentVolume) errs.ValidationErrorList {
+	allErrs := ValidateObjectMeta(&persistentvolume.ObjectMeta, false, ValidatePersistentVolumeName)
+	return allErrs
+}
+
+// TODO implement full validation to complete #4055
+func ValidatePersistentVolumeClaim(persistentvolumeclaim *api.PersistentVolumeClaim) errs.ValidationErrorList {
+	allErrs := ValidateObjectMeta(&persistentvolumeclaim.ObjectMeta, true, ValidatePersistentVolumeName)
 	return allErrs
 }
 
