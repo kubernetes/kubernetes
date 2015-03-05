@@ -195,6 +195,7 @@ func TestEtcdDeleteController(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	key, _ := makeControllerKey(ctx, "foo")
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	err := registry.DeleteController(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -532,6 +533,11 @@ func TestEtcdDeleteService(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
+	key, _ := makeServiceKey(ctx, "foo")
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+	endpointsKey, _ := makeServiceEndpointsKey(ctx, "foo")
+	fakeClient.Set(endpointsKey, runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Protocol: "TCP"}), 0)
+
 	err := registry.DeleteService(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -540,13 +546,11 @@ func TestEtcdDeleteService(t *testing.T) {
 	if len(fakeClient.DeletedKeys) != 2 {
 		t.Errorf("Expected 2 delete, found %#v", fakeClient.DeletedKeys)
 	}
-	key, _ := makeServiceKey(ctx, "foo")
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
-	key, _ = makeServiceEndpointsKey(ctx, "foo")
-	if fakeClient.DeletedKeys[1] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[1], key)
+	if fakeClient.DeletedKeys[1] != endpointsKey {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[1], endpointsKey)
 	}
 }
 
@@ -906,6 +910,9 @@ func TestEtcdDeleteMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
+	key := "/registry/minions/foo"
+	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+
 	err := registry.DeleteMinion(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -914,7 +921,6 @@ func TestEtcdDeleteMinion(t *testing.T) {
 	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
-	key := "/registry/minions/foo"
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}

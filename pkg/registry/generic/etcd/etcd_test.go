@@ -624,7 +624,7 @@ func TestEtcdDelete(t *testing.T) {
 		"notExisting": {
 			existing: emptyNode,
 			expect:   emptyNode,
-			errOK:    func(err error) bool { return err == nil },
+			errOK:    func(err error) bool { return errors.IsNotFound(err) },
 		},
 	}
 
