@@ -290,6 +290,10 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 			Index:     f.ChangeIndex,
 		}
 	}
+	if IsEtcdNotFound(existing.E) {
+		f.DeletedKeys = append(f.DeletedKeys, key)
+		return existing.R, existing.E
+	}
 	index := f.generateIndex()
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{},

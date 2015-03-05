@@ -36,12 +36,12 @@ import (
 )
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
-	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, tools.RuntimeVersionAdapter{latest.ResourceVersioner}}, nil)
+	registry := NewRegistry(tools.NewEtcdHelper(client, latest.Codec), nil)
 	return registry
 }
 
 func NewTestEtcdRegistryWithPods(client tools.EtcdClient) *Registry {
-	helper := tools.EtcdHelper{client, latest.Codec, tools.RuntimeVersionAdapter{latest.ResourceVersioner}}
+	helper := tools.NewEtcdHelper(client, latest.Codec)
 	podStorage, _, _ := podetcd.NewREST(helper)
 	registry := NewRegistry(helper, pod.NewRegistry(podStorage))
 	return registry

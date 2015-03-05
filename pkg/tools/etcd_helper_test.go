@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -44,7 +43,6 @@ func (*TestResource) IsAnAPIObject() {}
 
 var scheme *runtime.Scheme
 var codec runtime.Codec
-var versioner = RuntimeVersionAdapter{meta.NewAccessor()}
 
 func init() {
 	scheme = runtime.NewScheme()
@@ -129,7 +127,7 @@ func TestExtractToList(t *testing.T) {
 	}
 
 	var got api.PodList
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -212,7 +210,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -282,7 +280,7 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -302,7 +300,7 @@ func TestExtractObj(t *testing.T) {
 		},
 	}
 	fakeClient.Set("/some/key", runtime.EncodeOrDie(testapi.Codec(), &expect), 0)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	var got api.Pod
 	err := helper.ExtractObj("/some/key", &got, false)
 	if err != nil {
@@ -335,7 +333,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 			},
 		},
 	}
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	helper := NewEtcdHelper(fakeClient, codec)
 	try := func(key string) {
 		var got api.Pod
 		err := helper.ExtractObj(key, &got, false)
@@ -356,7 +354,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 func TestCreateObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	returnedObj := &api.Pod{}
 	err := helper.CreateObj("/some/key", obj, returnedObj, 5)
 	if err != nil {
@@ -381,7 +379,7 @@ func TestCreateObj(t *testing.T) {
 func TestCreateObjNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	err := helper.CreateObj("/some/key", obj, nil, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -391,7 +389,7 @@ func TestCreateObjNilOutParam(t *testing.T) {
 func TestSetObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	returnedObj := &api.Pod{}
 	err := helper.SetObj("/some/key", obj, returnedObj, 5)
 	if err != nil {
@@ -418,7 +416,7 @@ func TestSetObjFailCAS(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.CasErr = fakeClient.NewError(123)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	err := helper.SetObj("/some/key", obj, nil, 5)
 	if err == nil {
 		t.Errorf("Expecting error.")
@@ -438,7 +436,7 @@ func TestSetObjWithVersion(t *testing.T) {
 		},
 	}
 
-	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec())
 	returnedObj := &api.Pod{}
 	err := helper.SetObj("/some/key", obj, returnedObj, 7)
 	if err != nil {
@@ -500,7 +498,7 @@ func TestSetObjNilOutParam(t *testing.T) {
 func TestAtomicUpdate(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	helper := NewEtcdHelper(fakeClient, codec)
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -554,7 +552,7 @@ func TestAtomicUpdate(t *testing.T) {
 func TestAtomicUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	helper := NewEtcdHelper(fakeClient, codec)
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -585,7 +583,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 func TestAtomicUpdateKeyNotFound(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	helper := NewEtcdHelper(fakeClient, codec)
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -611,7 +609,7 @@ func TestAtomicUpdateKeyNotFound(t *testing.T) {
 func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, versioner}
+	helper := NewEtcdHelper(fakeClient, codec)
 
 	fakeClient.ExpectNotFoundGet("/some/key")
 

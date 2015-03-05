@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os/exec"
 	"reflect"
-	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -33,82 +32,22 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	EtcdErrorCodeNotFound      = 100
-	EtcdErrorCodeTestFailed    = 101
-	EtcdErrorCodeNodeExist     = 105
-	EtcdErrorCodeValueRequired = 200
-)
-
-var (
-	EtcdErrorNotFound      = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNotFound}
-	EtcdErrorTestFailed    = &etcd.EtcdError{ErrorCode: EtcdErrorCodeTestFailed}
-	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
-	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
-)
-
-// EtcdClient is an injectable interface for testing.
-type EtcdClient interface {
-	GetCluster() []string
-	AddChild(key, data string, ttl uint64) (*etcd.Response, error)
-	Get(key string, sort, recursive bool) (*etcd.Response, error)
-	Set(key, value string, ttl uint64) (*etcd.Response, error)
-	Create(key, value string, ttl uint64) (*etcd.Response, error)
-	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
-	Delete(key string, recursive bool) (*etcd.Response, error)
-	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
-	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
-	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
-}
-
-// EtcdGetSet interface exposes only the etcd operations needed by EtcdHelper.
-type EtcdGetSet interface {
-	GetCluster() []string
-	Get(key string, sort, recursive bool) (*etcd.Response, error)
-	Set(key, value string, ttl uint64) (*etcd.Response, error)
-	Create(key, value string, ttl uint64) (*etcd.Response, error)
-	Delete(key string, recursive bool) (*etcd.Response, error)
-	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
-	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
-}
-
-type EtcdResourceVersioner interface {
-	SetResourceVersion(obj runtime.Object, version uint64) error
-	ResourceVersion(obj runtime.Object) (uint64, error)
-}
-
-// RuntimeVersionAdapter converts a string based versioner to EtcdResourceVersioner
-type RuntimeVersionAdapter struct {
-	Versioner runtime.ResourceVersioner
-}
-
-// SetResourceVersion implements EtcdResourceVersioner
-func (a RuntimeVersionAdapter) SetResourceVersion(obj runtime.Object, version uint64) error {
-	if version == 0 {
-		return a.Versioner.SetResourceVersion(obj, "")
-	}
-	s := strconv.FormatUint(version, 10)
-	return a.Versioner.SetResourceVersion(obj, s)
-}
-
-// SetResourceVersion implements EtcdResourceVersioner
-func (a RuntimeVersionAdapter) ResourceVersion(obj runtime.Object) (uint64, error) {
-	version, err := a.Versioner.ResourceVersion(obj)
-	if err != nil {
-		return 0, err
-	}
-	if version == "" {
-		return 0, nil
-	}
-	return strconv.ParseUint(version, 10, 64)
-}
-
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
 	Client EtcdGetSet
 	Codec  runtime.Codec
 	// optional, no atomic operations can be performed without this interface
-	ResourceVersioner EtcdResourceVersioner
+	Versioner EtcdVersioner
+}
+
+// NewEtcdHelper creates a helper that works against objects that use the internal
+// Kubernetes API objects.
+func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec) EtcdHelper {
+	return EtcdHelper{
+		Client:    client,
+		Codec:     codec,
+		Versioner: APIObjectVersioner{},
+	}
 }
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.
@@ -163,19 +102,6 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 	return result.Node.Nodes, result.EtcdIndex, nil
 }
 
-// ExtractList extracts a go object per etcd node into a slice with the resource version.
-// DEPRECATED: Use ExtractToList instead, it's more convenient.
-func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersion *uint64) error {
-	nodes, index, err := h.listEtcdNode(key)
-	if resourceVersion != nil {
-		*resourceVersion = index
-	}
-	if err != nil {
-		return err
-	}
-	return h.decodeNodeList(nodes, slicePtr)
-}
-
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
 	v, err := conversion.EnforcePtr(slicePtr)
@@ -194,28 +120,31 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 		if err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
 			return err
 		}
-		if h.ResourceVersioner != nil {
-			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
+		if h.Versioner != nil {
 			// being unable to set the version does not prevent the object from being extracted
+			_ = h.Versioner.UpdateObject(obj.Interface().(runtime.Object), node)
 		}
 		v.Set(reflect.Append(v, obj.Elem()))
 	}
 	return nil
 }
 
-// ExtractToList is just like ExtractList, but it works on a ThingyList api object.
-// extracts a go object per etcd node into a slice with the resource version.
+// ExtractToList works on a *List api object (an object that satisfies the runtime.IsList
+// definition) and extracts a go object per etcd node into a slice with the resource version.
 func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
-	var resourceVersion uint64
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
-	if err := h.ExtractList(key, listPtr, &resourceVersion); err != nil {
+	nodes, index, err := h.listEtcdNode(key)
+	if err != nil {
 		return err
 	}
-	if h.ResourceVersioner != nil {
-		if err := h.ResourceVersioner.SetResourceVersion(listObj, resourceVersion); err != nil {
+	if err := h.decodeNodeList(nodes, listPtr); err != nil {
+		return err
+	}
+	if h.Versioner != nil {
+		if err := h.Versioner.UpdateList(listObj, index); err != nil {
 			return err
 		}
 	}
@@ -263,8 +192,8 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 	}
 	body = node.Value
 	err = h.Codec.DecodeInto([]byte(body), objPtr)
-	if h.ResourceVersioner != nil {
-		_ = h.ResourceVersioner.SetResourceVersion(objPtr, node.ModifiedIndex)
+	if h.Versioner != nil {
+		_ = h.Versioner.UpdateObject(objPtr, node)
 		// being unable to set the version does not prevent the object from being extracted
 	}
 	return body, node.ModifiedIndex, err
@@ -278,8 +207,8 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 	if err != nil {
 		return err
 	}
-	if h.ResourceVersioner != nil {
-		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
+	if h.Versioner != nil {
+		if version, err := h.Versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			return errors.New("resourceVersion may not be set on objects to be created")
 		}
 	}
@@ -319,7 +248,7 @@ func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
 
 // SetObj marshals obj via json, and stores under key. Will do an atomic update if obj's ResourceVersion
 // field is set. 'ttl' is time-to-live in seconds, and 0 means forever. If no error is returned and out is
-//not nil, out will be set to the read value from etcd.
+// not nil, out will be set to the read value from etcd.
 func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) error {
 	var response *etcd.Response
 	data, err := h.Codec.Encode(obj)
@@ -328,8 +257,8 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	}
 
 	create := true
-	if h.ResourceVersioner != nil {
-		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
+	if h.Versioner != nil {
+		if version, err := h.Versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			create = false
 			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
 			if err != nil {

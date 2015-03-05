@@ -36,7 +36,7 @@ import (
 func NewTestLimitRangeEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.EtcdHelper{f, testapi.Codec(), tools.RuntimeVersionAdapter{testapi.MetadataAccessor()}}
+	h := tools.NewEtcdHelper(f, testapi.Codec())
 	return f, NewEtcdRegistry(h)
 }
 

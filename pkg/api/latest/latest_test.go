@@ -27,7 +27,7 @@ import (
 
 func TestResourceVersioner(t *testing.T) {
 	pod := internal.Pod{ObjectMeta: internal.ObjectMeta{ResourceVersion: "10"}}
-	version, err := ResourceVersioner.ResourceVersion(&pod)
+	version, err := accessor.ResourceVersion(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestResourceVersioner(t *testing.T) {
 	}
 
 	podList := internal.PodList{ListMeta: internal.ListMeta{ResourceVersion: "10"}}
-	version, err = ResourceVersioner.ResourceVersion(&podList)
+	version, err = accessor.ResourceVersion(&podList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

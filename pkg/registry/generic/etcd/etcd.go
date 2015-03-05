@@ -252,7 +252,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	creating := false
 	out := e.NewFunc()
 	err = e.Helper.AtomicUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, uint64, error) {
-		version, err := e.Helper.ResourceVersioner.ResourceVersion(existing)
+		version, err := e.Helper.Versioner.ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -275,7 +275,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 
 		creating = false
-		newVersion, err := e.Helper.ResourceVersioner.ResourceVersion(obj)
+		newVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
 		if err != nil {
 			return nil, 0, err
 		}
