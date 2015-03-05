@@ -89,7 +89,8 @@ func NewMainKubelet(
 	clusterDNS net.IP,
 	masterServiceNamespace string,
 	volumePlugins []volume.Plugin,
-	streamingConnectionIdleTimeout time.Duration) (*Kubelet, error) {
+	streamingConnectionIdleTimeout time.Duration,
+	recorder record.EventRecorder) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -135,6 +136,7 @@ func NewMainKubelet(
 		prober:                         newProbeHolder(),
 		readiness:                      newReadinessStates(),
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
+		recorder:                       recorder,
 	}
 
 	dockerCache, err := dockertools.NewDockerCache(dockerClient)
@@ -142,7 +144,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.dockerCache = dockerCache
-	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod)
+	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod, recorder)
 
 	metrics.Register(dockerCache)
 
@@ -230,6 +232,9 @@ type Kubelet struct {
 	// how long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them
 	streamingConnectionIdleTimeout time.Duration
+
+	// the EventRecorder to use
+	recorder record.EventRecorder
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -654,15 +659,14 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	dockerContainer, err := kl.dockerClient.CreateContainer(opts)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed",
-				"Failed to create docker container with error: %v", err)
+			kl.recorder.Eventf(ref, "failed", "Failed to create docker container with error: %v", err)
 		}
 		return "", err
 	}
 	// Remember this reference so we can report events about this container
 	if ref != nil {
 		kl.setRef(dockertools.DockerID(dockerContainer.ID), ref)
-		record.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
+		kl.recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
 	}
 
 	if len(container.TerminationMessagePath) != 0 {
@@ -707,13 +711,13 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	err = kl.dockerClient.StartContainer(dockerContainer.ID, hc)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed",
+			kl.recorder.Eventf(ref, "failed",
 				"Failed to start with docker id %v with error: %v", dockerContainer.ID, err)
 		}
 		return "", err
 	}
 	if ref != nil {
-		record.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
+		kl.recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
@@ -885,7 +889,7 @@ func (kl *Kubelet) killContainerByID(ID, name string) error {
 		glog.Warningf("No ref for pod '%v' - '%v'", ID, name)
 	} else {
 		// TODO: pass reason down here, and state, or move this call up the stack.
-		record.Eventf(ref, "killing", "Killing %v - %v", ID, name)
+		kl.recorder.Eventf(ref, "killing", "Killing %v - %v", ID, name)
 	}
 
 	return err
@@ -916,7 +920,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
+			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
 		}
 		return "", err
 	}
@@ -926,7 +930,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.Docke
 		}
 	}
 	if ref != nil {
-		record.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
+		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
 	id, err := kl.runContainer(pod, container, nil, "", "")
 	if err != nil {
@@ -956,12 +960,12 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 
 	if err := kl.dockerPuller.Pull(img); err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failed", "Failed to pull image %q", img)
+			kl.recorder.Eventf(ref, "failed", "Failed to pull image %q", img)
 		}
 		return err
 	}
 	if ref != nil {
-		record.Eventf(ref, "pulled", "Successfully pulled image %q", img)
+		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", img)
 	}
 	return nil
 }
@@ -1055,7 +1059,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
 		if ref != nil {
-			record.Eventf(ref, "failedMount",
+			kl.recorder.Eventf(ref, "failedMount",
 				"Unable to mount volumes for pod %q: %v", podFullName, err)
 		}
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
@@ -1104,7 +1108,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				if !ok {
 					glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
 				} else {
-					record.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
+					kl.recorder.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
 				}
 				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
@@ -1163,7 +1167,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			present, err := kl.dockerPuller.IsImagePresent(container.Image)
 			if err != nil {
 				if ref != nil {
-					record.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
+					kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
 				}
 				glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
 				continue
@@ -1408,7 +1412,7 @@ func (s podsByCreationTime) Less(i, j int) bool {
 }
 
 // filterHostPortConflicts removes pods that conflict on Port.HostPort values
-func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
+func (kl *Kubelet) filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	filtered := []api.BoundPod{}
 	ports := map[int]bool{}
 	extract := func(p *api.ContainerPort) int { return p.HostPort }
@@ -1420,7 +1424,7 @@ func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 		pod := &pods[i]
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {
 			glog.Warningf("Pod %q: HostPort is already allocated, ignoring: %v", GetPodFullName(pod), errs)
-			record.Eventf(pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
+			kl.recorder.Eventf(pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
 			// TODO: Set the pod status to fail.
 			continue
 		}
@@ -1437,11 +1441,11 @@ func (kl *Kubelet) handleUpdate(u PodUpdate) {
 	case SET:
 		glog.V(3).Infof("SET: Containers changed")
 		kl.pods = u.Pods
-		kl.pods = filterHostPortConflicts(kl.pods)
+		kl.pods = kl.filterHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
 		kl.pods = updateBoundPods(u.Pods, kl.pods)
-		kl.pods = filterHostPortConflicts(kl.pods)
+		kl.pods = kl.filterHostPortConflicts(kl.pods)
 
 	default:
 		panic("syncLoop does not support incremental changes")
@@ -1508,7 +1512,7 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		}
 
 		kl.pods = u.Pods
-		kl.pods = filterHostPortConflicts(kl.pods)
+		kl.pods = kl.filterHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
 
@@ -1519,7 +1523,7 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		}
 
 		kl.pods = updateBoundPods(u.Pods, kl.pods)
-		kl.pods = filterHostPortConflicts(kl.pods)
+		kl.pods = kl.filterHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
 	}
@@ -1810,7 +1814,7 @@ func (kl *Kubelet) BirthCry() {
 		UID:       types.UID(kl.hostname),
 		Namespace: api.NamespaceDefault,
 	}
-	record.Eventf(ref, "starting", "Starting kubelet.")
+	kl.recorder.Eventf(ref, "starting", "Starting kubelet.")
 }
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {

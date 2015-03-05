@@ -19,7 +19,6 @@ package kubelet
 import (
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -74,9 +73,5 @@ func SetupLogging() {
 
 func SetupEventSending(client *client.Client, hostname string) {
 	glog.Infof("Sending events to api server.")
-	record.StartRecording(client.Events(""),
-		api.EventSource{
-			Component: "kubelet",
-			Host:      hostname,
-		})
+	record.StartRecording(client.Events(""))
 }

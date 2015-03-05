@@ -59,9 +59,9 @@ type PodConfig struct {
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(mode PodConfigNotificationMode) *PodConfig {
+func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder) *PodConfig {
 	updates := make(chan kubelet.PodUpdate, 50)
-	storage := newPodStorage(updates, mode)
+	storage := newPodStorage(updates, mode, recorder)
 	podConfig := &PodConfig{
 		pods:    storage,
 		mux:     config.NewMux(storage),
@@ -114,17 +114,21 @@ type podStorage struct {
 	// contains the set of all sources that have sent at least one SET
 	sourcesSeenLock sync.Mutex
 	sourcesSeen     util.StringSet
+
+	// the EventRecorder to use
+	recorder record.EventRecorder
 }
 
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubelet.PodUpdate, mode PodConfigNotificationMode) *podStorage {
+func newPodStorage(updates chan<- kubelet.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
 	return &podStorage{
 		pods:        make(map[string]map[string]*api.BoundPod),
 		mode:        mode,
 		updates:     updates,
 		sourcesSeen: util.StringSet{},
+		recorder:    recorder,
 	}
 }
 
@@ -192,7 +196,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
 		}
 
-		filtered := filterInvalidPods(update.Pods, source)
+		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := podUniqueName(ref)
 			if existing, found := pods[name]; found {
@@ -234,7 +238,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		oldPods := pods
 		pods = make(map[string]*api.BoundPod)
 
-		filtered := filterInvalidPods(update.Pods, source)
+		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := podUniqueName(ref)
 			if existing, found := oldPods[name]; found {
@@ -284,7 +288,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 	return s.sourcesSeen.HasAll(sources...)
 }
 
-func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.BoundPod) {
+func filterInvalidPods(pods []api.BoundPod, source string, recorder record.EventRecorder) (filtered []*api.BoundPod) {
 	names := util.StringSet{}
 	for i := range pods {
 		pod := &pods[i]
@@ -305,7 +309,7 @@ func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.Boun
 			name := bestPodIdentString(pod)
 			err := utilerrors.NewAggregate(errlist)
 			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, name, source, err)
-			record.Eventf(pod, "failedValidation", "Error validating pod %s from %s, ignoring: %v", name, source, err)
+			recorder.Eventf(pod, "failedValidation", "Error validating pod %s from %s, ignoring: %v", name, source, err)
 			continue
 		}
 		filtered = append(filtered, pod)

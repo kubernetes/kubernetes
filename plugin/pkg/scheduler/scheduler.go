@@ -51,6 +51,9 @@ type Config struct {
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*api.Pod, error)
+
+	// Recorder is the EventRecorder to use
+	Recorder record.EventRecorder
 }
 
 // New returns a new scheduler.
@@ -72,7 +75,7 @@ func (s *Scheduler) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
-		record.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
+		s.config.Recorder.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -83,9 +86,9 @@ func (s *Scheduler) scheduleOne() {
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		glog.V(1).Infof("Failed to bind pod: %v", err)
-		record.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
+		s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	record.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 }
