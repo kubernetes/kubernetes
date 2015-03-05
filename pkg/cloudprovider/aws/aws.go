@@ -30,8 +30,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+// Abstraction over EC2, to allow mocking/other implementations
 type EC2 interface {
-	Instances(instIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error)
+	// Query EC2 for instances matching the filter
+	Instances(instIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error)
 }
 
 // AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
@@ -44,6 +46,37 @@ type AWSCloudConfig struct {
 	Global struct {
 		Region string
 	}
+}
+
+// Similar to ec2.Filter, but the filter values can be read from tests
+// (ec2.Filter only has private members)
+type ec2InstanceFilter struct {
+	PrivateDNSName string
+}
+
+// True if the passed instance matches the filter
+func (f *ec2InstanceFilter) Matches(instance ec2.Instance) bool {
+	if f.PrivateDNSName != "" && instance.PrivateDNSName != f.PrivateDNSName {
+		return false
+	}
+	return true
+}
+
+// goamzEC2 is an implementation of the EC2 interface, backed by goamz
+type GoamzEC2 struct {
+	ec2 *ec2.EC2
+}
+
+// Implementation of EC2.Instances
+func (self *GoamzEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
+	var goamzFilter *ec2.Filter
+	if filter != nil {
+		goamzFilter = ec2.NewFilter()
+		if filter.PrivateDNSName != "" {
+			goamzFilter.Add("private-dns-name", filter.PrivateDNSName)
+		}
+	}
+	return self.ec2.Instances(instanceIds, goamzFilter)
 }
 
 type AuthFunc func() (auth aws.Auth, err error)
@@ -96,7 +129,7 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 
 	ec2 := ec2.New(auth, region)
 	return &AWSCloud{
-		ec2: ec2,
+		ec2: &GoamzEC2{ec2: ec2},
 		cfg: cfg,
 	}, nil
 }
@@ -144,8 +177,8 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 
 // Return the instances matching the relevant private dns name.
 func (aws *AWSCloud) getInstancesByDnsName(name string) (*ec2.Instance, error) {
-	f := ec2.NewFilter()
-	f.Add("private-dns-name", name)
+	f := &ec2InstanceFilter{}
+	f.PrivateDNSName = name
 
 	resp, err := aws.ec2.Instances(nil, f)
 	if err != nil {
