@@ -7,6 +7,7 @@ azure.create_config('kubernetes', { 'etcd': 3, 'kube': 3 });
 
 azure.run_task_queue([
   azure.queue_default_network(),
+  azure.queue_storage_if_needed(),
   azure.queue_machines('etcd', 'stable',
     kube.create_etcd_cloud_config),
   azure.queue_machines('kube', 'stable',
