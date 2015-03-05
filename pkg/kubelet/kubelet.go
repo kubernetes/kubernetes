@@ -67,7 +67,7 @@ type SyncHandler interface {
 	SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
 }
 
-type SourceReadyFn func(source string) bool
+type SourcesReadyFn func() bool
 
 type volumeMap map[string]volume.Interface
 
@@ -84,7 +84,7 @@ func NewMainKubelet(
 	pullBurst int,
 	minimumGCAge time.Duration,
 	maxContainerCount int,
-	sourceReady SourceReadyFn,
+	sourcesReady SourcesReadyFn,
 	clusterDomain string,
 	clusterDNS net.IP,
 	masterServiceNamespace string,
@@ -128,7 +128,7 @@ func NewMainKubelet(
 		pullBurst:                      pullBurst,
 		minimumGCAge:                   minimumGCAge,
 		maxContainerCount:              maxContainerCount,
-		sourceReady:                    sourceReady,
+		sourcesReady:                   sourcesReady,
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
@@ -178,7 +178,7 @@ type Kubelet struct {
 	podInfraContainerImage string
 	podWorkers             *podWorkers
 	resyncInterval         time.Duration
-	sourceReady            SourceReadyFn
+	sourcesReady           SourcesReadyFn
 
 	// Protects the pods array
 	// We make complete array copies out of this while locked, which is OK because once added to this array,
@@ -1395,10 +1395,15 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 			metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
 		}
 	}
-
 	// Stop the workers for no-longer existing pods.
 	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
 
+	if !kl.sourcesReady() {
+		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
+		// for sources that haven't reported yet.
+		glog.V(4).Infof("Skipping deletes, sources aren't ready yet.")
+		return nil
+	}
 	// Kill any containers we don't need.
 	killed := []string{}
 	for ix := range dockerContainers {
@@ -1406,13 +1411,6 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 		podFullName, uid, containerName, _ := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
 		if _, found := desiredPods[uid]; found {
 			// syncPod() will handle this one.
-			continue
-		}
-		_, _, podAnnotations := ParsePodFullName(podFullName)
-		if source := podAnnotations[ConfigSourceAnnotationKey]; !kl.sourceReady(source) {
-			// If the source for this container is not ready, skip deletion, so that we don't accidentally
-			// delete containers for sources that haven't reported yet.
-			glog.V(4).Infof("Skipping delete of container (%q), source (%s) aren't ready yet.", podFullName, source)
 			continue
 		}
 		pc := podContainer{podFullName, uid, containerName}

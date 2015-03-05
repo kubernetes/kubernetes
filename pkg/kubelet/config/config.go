@@ -55,6 +55,10 @@ type PodConfig struct {
 
 	// the channel of denormalized changes passed to listeners
 	updates chan kubelet.PodUpdate
+
+	// contains the list of all configured sources
+	sourcesLock sync.Mutex
+	sources     util.StringSet
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -66,6 +70,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 		pods:    storage,
 		mux:     config.NewMux(storage),
 		updates: updates,
+		sources: util.StringSet{},
 	}
 	return podConfig
 }
@@ -73,17 +78,20 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 // Channel creates or returns a config source channel.  The channel
 // only accepts PodUpdates
 func (c *PodConfig) Channel(source string) chan<- interface{} {
+	c.sourcesLock.Lock()
+	defer c.sourcesLock.Unlock()
+	c.sources.Insert(source)
 	return c.mux.Channel(source)
 }
 
-// IsSourceSeen returns true if the specified source string has previously
-// been marked as seen.
-func (c *PodConfig) IsSourceSeen(source string) bool {
+// SeenAllSources returns true if this config has received a SET
+// message from all configured sources, false otherwise.
+func (c *PodConfig) SeenAllSources() bool {
 	if c.pods == nil {
 		return false
 	}
-	glog.V(6).Infof("Looking for %v, have seen %v", source, c.pods.sourcesSeen)
-	return c.pods.seenSources(source)
+	glog.V(6).Infof("Looking for %v, have seen %v", c.sources.List(), c.pods.sourcesSeen)
+	return c.pods.seenSources(c.sources.List()...)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.

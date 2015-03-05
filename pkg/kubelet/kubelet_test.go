@@ -78,7 +78,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient, *syn
 			return err
 		},
 		recorder)
-	kubelet.sourceReady = func(source string) bool { return true }
+	kubelet.sourcesReady = func() bool { return true }
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.readiness = newReadinessStates()
@@ -722,7 +722,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	ready := false
 	kubelet, fakeDocker, _ := newTestKubelet(t)
-	kubelet.sourceReady = func(source string) bool { return ready }
+	kubelet.sourcesReady = func() bool { return ready }
 
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -754,67 +754,6 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	expectedToStop := map[string]bool{
 		"1234": true,
 		"9876": true,
-	}
-	if len(fakeDocker.Stopped) != 2 ||
-		!expectedToStop[fakeDocker.Stopped[0]] ||
-		!expectedToStop[fakeDocker.Stopped[1]] {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-}
-
-func TestSyncPodsDeletesWhenContainerSourceReady(t *testing.T) {
-	ready := false
-	kubelet, fakeDocker, _ := newTestKubelet(t)
-	kubelet.sourceReady = func(source string) bool {
-		if source == "testSource" {
-			return ready
-		}
-		return false
-	}
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_boo_bar.default.testSource_12345678_42"},
-			ID:    "7492",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD_boo.default.testSource_12345678_42"},
-			ID:    "3542",
-		},
-
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar.new.otherSource_12345678_42"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD_foo.new.otherSource_12345678_42"},
-			ID:    "9876",
-		},
-	}
-	if err := kubelet.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now()); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	// Validate nothing happened.
-	verifyCalls(t, fakeDocker, []string{"list"})
-	fakeDocker.ClearCalls()
-
-	ready = true
-	if err := kubelet.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now()); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
-
-	// Validate container for testSource are killed because testSource is reported as seen, but
-	// containers for otherSource are not killed because otherSource has not.
-	expectedToStop := map[string]bool{
-		"7492": true,
-		"3542": true,
-		"1234": false,
-		"9876": false,
 	}
 	if len(fakeDocker.Stopped) != 2 ||
 		!expectedToStop[fakeDocker.Stopped[0]] ||
