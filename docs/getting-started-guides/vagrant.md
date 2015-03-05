@@ -307,5 +307,14 @@ You can control the number of minions that are instantiated via the environment 
 export NUM_MINIONS=1
 ```
 
+#### I want my VMs to have more memory !
+
+You can control the memory allotted to virtual machines with the `KUBERNETES_MEMORY` environment variable.
+Just set it to the number of megabytes you would like the machines to have. For example:
+
+```
+export KUBERNETES_MEMORY=2048
+```
+
 #### I ran vagrant suspend and nothing works!
 ```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
