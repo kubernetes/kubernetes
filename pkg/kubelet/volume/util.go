@@ -16,7 +16,7 @@ limitations under the License.
 
 package volume
 
-import(
+import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
@@ -46,8 +46,7 @@ func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
 	return false
 }
 
-// would this be better on api.VolumeSource?
-func GetAccessModeType(source api.VolumeSource) []api.AccessModeType {
+func GetAccessModeType(source api.PersistentVolumeSource) []api.AccessModeType {
 
 	if source.AWSElasticBlockStore != nil || source.HostPath != nil {
 		return []api.AccessModeType{api.ReadWriteOnce}

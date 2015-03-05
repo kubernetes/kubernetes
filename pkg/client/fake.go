@@ -54,7 +54,7 @@ type Fake struct {
 	PersistentVolume          api.PersistentVolume
 	PersistentVolumesList     api.PersistentVolumeList
 	PersistentVolumeClaim     api.PersistentVolumeClaim
-	PersistentVolumeClaimList api.PersistentVolumeClaimList	
+	PersistentVolumeClaimList api.PersistentVolumeClaimList
 }
 
 func (c *Fake) LimitRanges(namespace string) LimitRangeInterface {
