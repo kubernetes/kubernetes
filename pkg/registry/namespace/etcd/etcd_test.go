@@ -312,7 +312,7 @@ func TestDeleteNamespace(t *testing.T) {
 		},
 	}
 	storage := NewREST(helper)
-	_, err := storage.Delete(api.NewDefaultContext(), "foo")
+	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

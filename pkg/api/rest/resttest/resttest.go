@@ -196,3 +196,63 @@ func (t *Tester) TestCreateRejectsNamespace(valid runtime.Object) {
 		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
+
+func (t *Tester) TestDeleteGraceful(createFn func() runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+	t.TestDeleteGracefulHasDefault(createFn(), expectedGrace, wasGracefulFn)
+	t.TestDeleteGracefulUsesZeroOnNil(createFn(), 0)
+}
+
+func (t *Tester) TestDeleteNoGraceful(createFn func() runtime.Object, wasGracefulFn func() bool) {
+	existing := createFn()
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(api.NewContext(), objectMeta.Namespace)
+	_, err = t.storage.(apiserver.RESTGracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(10))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if _, err := t.storage.(apiserver.RESTGetter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
+		t.Errorf("unexpected error, object should not exist: %v", err)
+	}
+	if wasGracefulFn() {
+		t.Errorf("resource should not support graceful delete")
+	}
+}
+
+func (t *Tester) TestDeleteGracefulHasDefault(existing runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(api.NewContext(), objectMeta.Namespace)
+	_, err = t.storage.(apiserver.RESTGracefulDeleter).Delete(ctx, objectMeta.Name, &api.DeleteOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if _, err := t.storage.(apiserver.RESTGetter).Get(ctx, objectMeta.Name); err != nil {
+		t.Errorf("unexpected error, object should exist: %v", err)
+	}
+	if !wasGracefulFn() {
+		t.Errorf("did not gracefully delete resource")
+	}
+}
+
+func (t *Tester) TestDeleteGracefulUsesZeroOnNil(existing runtime.Object, expectedGrace int64) {
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+
+	ctx := api.WithNamespace(api.NewContext(), objectMeta.Namespace)
+	_, err = t.storage.(apiserver.RESTGracefulDeleter).Delete(ctx, objectMeta.Name, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if _, err := t.storage.(apiserver.RESTGetter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
+		t.Errorf("unexpected error, object should exist: %v", err)
+	}
+}

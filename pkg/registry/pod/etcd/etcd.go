@@ -65,6 +65,7 @@ func NewREST(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
 	store.CreateStrategy = pod.Strategy
 	store.UpdateStrategy = pod.Strategy
 	store.AfterUpdate = bindings.AfterUpdate
+	store.DeleteStrategy = pod.Strategy
 	store.ReturnDeletedObject = true
 	store.AfterDelete = bindings.AfterDelete
 

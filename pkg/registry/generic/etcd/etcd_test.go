@@ -631,7 +631,7 @@ func TestEtcdDelete(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		obj, err := registry.Delete(api.NewContext(), key)
+		obj, err := registry.Delete(api.NewContext(), key, nil)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v (%#v)", name, err, obj)
 		}

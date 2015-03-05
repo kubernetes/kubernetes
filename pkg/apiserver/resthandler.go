@@ -330,7 +330,7 @@ func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 }
 
 // DeleteResource returns a function that will handle a resource deletion
-func DeleteResource(r RESTDeleter, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, resource, kind string, admit admission.Interface) restful.RouteFunction {
+func DeleteResource(r RESTGracefulDeleter, checkBody bool, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, resource, kind string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -347,6 +347,21 @@ func DeleteResource(r RESTDeleter, ctxFn ContextFunc, namer ScopeNamer, codec ru
 			ctx = api.WithNamespace(ctx, namespace)
 		}
 
+		options := &api.DeleteOptions{}
+		if checkBody {
+			body, err := readBody(req.Request)
+			if err != nil {
+				errorJSON(err, codec, w)
+				return
+			}
+			if len(body) > 0 {
+				if err := codec.DecodeInto(body, options); err != nil {
+					errorJSON(err, codec, w)
+					return
+				}
+			}
+		}
+
 		err = admit.Admit(admission.NewAttributesRecord(nil, namespace, resource, "DELETE"))
 		if err != nil {
 			errorJSON(err, codec, w)
@@ -354,7 +369,7 @@ func DeleteResource(r RESTDeleter, ctxFn ContextFunc, namer ScopeNamer, codec ru
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Delete(ctx, name)
+			return r.Delete(ctx, name, options)
 		})
 		if err != nil {
 			errorJSON(err, codec, w)

@@ -52,6 +52,7 @@ func init() {
 		&NamespaceList{},
 		&Secret{},
 		&SecretList{},
+		&DeleteOptions{},
 	)
 	// Legacy names are supported
 	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
@@ -85,3 +86,4 @@ func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
+func (*DeleteOptions) IsAnAPIObject()             {}

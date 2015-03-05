@@ -130,6 +130,34 @@ func TestCreate(t *testing.T) {
 	)
 }
 
+func TestDelete(t *testing.T) {
+	fakeEtcdClient, helper := newHelper(t)
+	storage, _, _ := NewREST(helper)
+	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
+	storage = storage.WithPodStatus(cache)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+
+	createFn := func() runtime.Object {
+		pod := validChangedPod()
+		fakeEtcdClient.Data["/registry/pods/default/foo"] = tools.EtcdResponseWithError{
+			R: &etcd.Response{
+				Node: &etcd.Node{
+					Value:         runtime.EncodeOrDie(latest.Codec, pod),
+					ModifiedIndex: 1,
+				},
+			},
+		}
+		return pod
+	}
+	gracefulSetFn := func() bool {
+		if fakeEtcdClient.Data["/registry/pods/default/foo"].R.Node == nil {
+			return false
+		}
+		return fakeEtcdClient.Data["/registry/pods/default/foo"].R.Node.TTL == 30
+	}
+	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
+}
+
 func expectPod(t *testing.T, out runtime.Object) (*api.Pod, bool) {
 	pod, ok := out.(*api.Pod)
 	if !ok || pod == nil {
@@ -688,7 +716,7 @@ func TestDeletePod(t *testing.T) {
 	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
 	storage = storage.WithPodStatus(cache)
 
-	result, err := storage.Delete(api.NewDefaultContext(), "foo")
+	result, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1265,7 +1293,7 @@ func TestEtcdDeletePod(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Status:     api.PodStatus{Host: "machine"},
 	}), 0)
-	_, err := registry.Delete(ctx, "foo")
+	_, err := registry.Delete(ctx, "foo", api.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1286,7 +1314,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Status:     api.PodStatus{Host: "machine"},
 	}), 0)
-	_, err := registry.Delete(ctx, "foo")
+	_, err := registry.Delete(ctx, "foo", api.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

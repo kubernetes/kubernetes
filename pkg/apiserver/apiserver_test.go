@@ -97,8 +97,7 @@ func init() {
 		&api.Status{})
 	// "version" version
 	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{},
-		&api.Status{})
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.DeleteOptions{}, &api.Status{})
 
 	nsMapper := newMapper()
 	legacyNsMapper := newMapper()
@@ -204,12 +203,15 @@ func TestSimpleSetupRight(t *testing.T) {
 }
 
 type SimpleRESTStorage struct {
-	errors  map[string]error
-	list    []Simple
-	item    Simple
-	deleted string
+	errors map[string]error
+	list   []Simple
+	item   Simple
+
 	updated *Simple
 	created *Simple
+
+	deleted       string
+	deleteOptions *api.DeleteOptions
 
 	actualNamespace  string
 	namespacePresent bool
@@ -248,9 +250,10 @@ func (storage *SimpleRESTStorage) checkContext(ctx api.Context) {
 	storage.actualNamespace, storage.namespacePresent = api.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
+	storage.deleteOptions = options
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
 	}
@@ -323,6 +326,14 @@ func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (
 		return "", err
 	}
 	return storage.resourceLocation, nil
+}
+
+type LegacyRESTStorage struct {
+	*SimpleRESTStorage
+}
+
+func (storage LegacyRESTStorage) Delete(ctx api.Context, id string) (runtime.Object, error) {
+	return storage.SimpleRESTStorage.Delete(ctx, id, nil)
 }
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
@@ -782,6 +793,102 @@ func TestDelete(t *testing.T) {
 	}
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+}
+
+func TestDeleteWithOptions(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	grace := int64(300)
+	item := &api.DeleteOptions{
+		GracePeriodSeconds: &grace,
+	}
+	body, err := codec.Encode(item)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %s %#v", request.URL, res)
+		s, _ := ioutil.ReadAll(res.Body)
+		t.Logf(string(s))
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+		t.Errorf("unexpected delete options: %s", util.ObjectDiff(simpleStorage.deleteOptions, item))
+	}
+}
+
+func TestLegacyDelete(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = LegacyRESTStorage{&simpleStorage}
+	var _ RESTDeleter = storage["simple"].(LegacyRESTStorage)
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, nil)
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %#v", res)
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+	if simpleStorage.deleteOptions != nil {
+		t.Errorf("unexpected delete options: %#v", simpleStorage.deleteOptions)
+	}
+}
+
+func TestLegacyDeleteIgnoresOptions(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = LegacyRESTStorage{&simpleStorage}
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	item := api.NewDeleteOptions(300)
+	body, err := codec.Encode(item)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %#v", res)
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+	if simpleStorage.deleteOptions != nil {
+		t.Errorf("unexpected delete options: %#v", simpleStorage.deleteOptions)
 	}
 }
 

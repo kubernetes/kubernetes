@@ -21,6 +21,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -33,6 +35,9 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, node *etcd.Node) er
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return err
+	}
+	if ttl := node.Expiration; ttl != nil {
+		objectMeta.DeletionTimestamp = &util.Time{*node.Expiration}
 	}
 	version := node.ModifiedIndex
 	versionString := ""

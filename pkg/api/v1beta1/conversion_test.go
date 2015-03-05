@@ -29,6 +29,17 @@ import (
 
 var Convert = newer.Scheme.Convert
 
+func TestEmptyObjectConversion(t *testing.T) {
+	s, err := current.Codec.Encode(&current.LimitRange{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// DeletionTimestamp is not included, while CreationTimestamp is (would always be set)
+	if string(s) != `{"kind":"LimitRange","creationTimestamp":null,"apiVersion":"v1beta1","spec":{"limits":null}}` {
+		t.Errorf("unexpected empty object: %s", string(s))
+	}
+}
+
 func TestNodeConversion(t *testing.T) {
 	version, kind, err := newer.Scheme.ObjectVersionAndKind(&current.Minion{})
 	if err != nil {

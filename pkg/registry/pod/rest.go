@@ -72,6 +72,11 @@ func (podStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErro
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
+// CheckGracefulDelete allows a pod to be gracefully deleted.
+func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
+	return false
+}
+
 type podStatusStrategy struct {
 	podStrategy
 }

@@ -169,6 +169,14 @@ var aEndpoints string = `
 }
 `
 
+var deleteNow string = `
+{
+	"kind": "DeleteOptions",
+	"apiVersion": "v1beta1",
+	"gracePeriod": 0%s
+}
+`
+
 // To ensure that a POST completes before a dependent GET, set a timeout.
 var timeoutFlag = "?timeout=60s"
 
@@ -203,7 +211,7 @@ func getTestRequests() []struct {
 		{"GET", "/api/v1beta1/pods", "", code200},
 		{"GET", "/api/v1beta1/pods/a", "", code200},
 		{"PATCH", "/api/v1beta1/pods/a", "{%v}", code200},
-		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, deleteNow, code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to

@@ -44,7 +44,7 @@ type Registry interface {
 // Storage is an interface for a standard REST Storage backend
 // TODO: move me somewhere common
 type Storage interface {
-	apiserver.RESTDeleter
+	apiserver.RESTGracefulDeleter
 	apiserver.RESTLister
 	apiserver.RESTGetter
 	apiserver.ResourceWatcher
@@ -95,6 +95,6 @@ func (s *storage) UpdatePod(ctx api.Context, pod *api.Pod) error {
 }
 
 func (s *storage) DeletePod(ctx api.Context, podID string) error {
-	_, err := s.Delete(ctx, podID)
+	_, err := s.Delete(ctx, podID, nil)
 	return err
 }

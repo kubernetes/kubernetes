@@ -55,6 +55,7 @@ func TestClient(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableProfiling:   true,
 		EnableUISupport:   false,
+		EnableV1Beta3:     true,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:  admit.NewAlwaysAdmit(),
@@ -63,6 +64,7 @@ func TestClient(t *testing.T) {
 	testCases := []string{
 		"v1beta1",
 		"v1beta2",
+		"v1beta3",
 	}
 	for _, apiVersion := range testCases {
 		ns := api.NamespaceDefault

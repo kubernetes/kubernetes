@@ -58,6 +58,27 @@ type RESTDeleter interface {
 	Delete(ctx api.Context, id string) (runtime.Object, error)
 }
 
+type RESTGracefulDeleter interface {
+	// Delete finds a resource in the storage and deletes it.
+	// If options are provided, the resource will attempt to honor them or return an invalid
+	// request error.
+	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
+	// returned error value err when the specified resource is not found.
+	// Delete *may* return the object that was deleted, or a status object indicating additional
+	// information about deletion.
+	Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error)
+}
+
+// GracefulDeleteAdapter adapts the RESTDeleter interface to RESTGracefulDeleter
+type GracefulDeleteAdapter struct {
+	RESTDeleter
+}
+
+// Delete implements RESTGracefulDeleter in terms of RESTDeleter
+func (w GracefulDeleteAdapter) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
+	return w.RESTDeleter.Delete(ctx, id)
+}
+
 type RESTCreater interface {
 	// New returns an empty object that can be used with Create after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
