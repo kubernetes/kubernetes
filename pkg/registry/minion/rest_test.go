@@ -121,7 +121,9 @@ func TestMinionRegistryValidatesCreate(t *testing.T) {
 				Labels: validSelector,
 			},
 			Status: api.NodeStatus{
-				HostIP: "something",
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeLegacyHostIP, Address: "something"},
+				},
 			},
 		},
 		"invalid-labels": {
@@ -158,7 +160,9 @@ func TestCreate(t *testing.T) {
 		// valid
 		&api.Node{
 			Status: api.NodeStatus{
-				HostIP: "something",
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeLegacyHostIP, Address: "something"},
+				},
 			},
 		},
 		// invalid

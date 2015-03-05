@@ -789,12 +789,12 @@ type NodeSpec struct {
 
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
-	// Queried from cloud provider, if available.
-	HostIP string `json:"hostIP,omitempty"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty"`
 	// Conditions is an array of current node conditions.
 	Conditions []NodeCondition `json:"conditions,omitempty"`
+	// Queried from cloud provider, if available.
+	Addresses []NodeAddress `json:"addresses,omitempty"`
 }
 
 type NodePhase string
@@ -828,6 +828,22 @@ type NodeCondition struct {
 	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty"`
 	Reason             string            `json:"reason,omitempty"`
 	Message            string            `json:"message,omitempty"`
+}
+
+type NodeAddressType string
+
+// These are valid address types of node. NodeLegacyHostIP is used to transit
+// from out-dated HostIP field to NodeAddress.
+const (
+	NodeLegacyHostIP NodeAddressType = "LegacyHostIP"
+	NodeHostName     NodeAddressType = "Hostname"
+	NodeExternalIP   NodeAddressType = "ExternalIP"
+	NodeInternalIP   NodeAddressType = "InternalIP"
+)
+
+type NodeAddress struct {
+	Type    NodeAddressType `json:"type"`
+	Address string          `json:"address"`
 }
 
 // NodeResources is an object for conveying resource information about a node.

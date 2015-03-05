@@ -621,35 +621,37 @@ func TestHealthCheckNode(t *testing.T) {
 	}
 }
 
-func TestPopulateNodeIPs(t *testing.T) {
+func TestPopulateNodeAddresses(t *testing.T) {
 	table := []struct {
-		nodes        *api.NodeList
-		fakeCloud    *fake_cloud.FakeCloud
-		expectedFail bool
-		expectedIP   string
+		nodes             *api.NodeList
+		fakeCloud         *fake_cloud.FakeCloud
+		expectedFail      bool
+		expectedAddresses []api.NodeAddress
 	}{
 		{
-			nodes:      &api.NodeList{Items: []api.Node{*newNode("node0"), *newNode("node1")}},
-			fakeCloud:  &fake_cloud.FakeCloud{IP: net.ParseIP("1.2.3.4")},
-			expectedIP: "1.2.3.4",
+			nodes:     &api.NodeList{Items: []api.Node{*newNode("node0"), *newNode("node1")}},
+			fakeCloud: &fake_cloud.FakeCloud{IP: net.ParseIP("1.2.3.4")},
+			expectedAddresses: []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+			},
 		},
 		{
-			nodes:      &api.NodeList{Items: []api.Node{*newNode("node0"), *newNode("node1")}},
-			fakeCloud:  &fake_cloud.FakeCloud{Err: ErrQueryIPAddress},
-			expectedIP: "",
+			nodes:             &api.NodeList{Items: []api.Node{*newNode("node0"), *newNode("node1")}},
+			fakeCloud:         &fake_cloud.FakeCloud{Err: ErrQueryIPAddress},
+			expectedAddresses: nil,
 		},
 	}
 
 	for _, item := range table {
 		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil, 10, time.Minute)
-		result, err := nodeController.PopulateIPs(item.nodes)
+		result, err := nodeController.PopulateAddresses(item.nodes)
 		// In case of IP querying error, we should continue.
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		for _, node := range result.Items {
-			if node.Status.HostIP != item.expectedIP {
-				t.Errorf("expect HostIP %s, got %s", item.expectedIP, node.Status.HostIP)
+			if !reflect.DeepEqual(item.expectedAddresses, node.Status.Addresses) {
+				t.Errorf("expect HostIP %s, got %s", item.expectedAddresses, node.Status.Addresses)
 			}
 		}
 	}
@@ -1031,7 +1033,9 @@ func TestSyncNodeStatus(t *testing.T) {
 								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 							},
 						},
-						HostIP: "1.2.3.4",
+						Addresses: []api.NodeAddress{
+							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+						},
 					},
 				},
 				{
@@ -1044,7 +1048,9 @@ func TestSyncNodeStatus(t *testing.T) {
 								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 							},
 						},
-						HostIP: "1.2.3.4",
+						Addresses: []api.NodeAddress{
+							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+						},
 					},
 				},
 			},

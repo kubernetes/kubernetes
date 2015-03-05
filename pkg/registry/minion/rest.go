@@ -121,13 +121,6 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		return nil, false, err
 	}
 
-	// This is hacky, but minion HostIP has been moved from spec to status since v1beta2. When updating
-	// minion from older client, HostIP will be lost.  Fix it here temporarily until we strip out status
-	// info from user input.
-	if minion.Status.HostIP == "" {
-		minion.Status.HostIP = oldMinion.Status.HostIP
-	}
-
 	if errs := validation.ValidateMinionUpdate(oldMinion, minion); len(errs) > 0 {
 		return nil, false, kerrors.NewInvalid("minion", minion.Name, errs)
 	}
