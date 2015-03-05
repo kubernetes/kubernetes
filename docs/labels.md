@@ -36,7 +36,15 @@ dimensions, such as:
 
 These are just examples; you are free to develop your own conventions.
 
-Label selectors permit very simple filtering by label keys and values.   Currently, label selectors only support these forms:
+Label selectors permit very simple filtering by label keys and values. The API currently only supports equality label selectors that are ANDed together. For example, if you specify the selector below in a JSON config, you'll only select resources that have both the labels `environment=dev` and `tier=frontend`:
+```
+"selector": {
+  "environment": "dev",
+  "tier": "frontend"
+}
+```
+
+We [are actively working](https://github.com/GoogleCloudPlatform/kubernetes/issues/341) to support more types of selectors in the API, such as:
 ```
 key1
 key1 = value11
@@ -45,7 +53,7 @@ key1 in (value11, value12, ...)
 key1 not in (value11, value12, ...)
 ```
 
-LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter: `?labels=key1%3Dvalue1,key2%3Dvalue2,...`. 
+LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter: `?labels=key1%3Dvalue1,key2%3Dvalue2,...`.
 
 The `service` and `replicationController` kinds of objects use selectors to match sets of pods that they operate on.
 
