@@ -23,7 +23,7 @@ $ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 The commands above will not work if there are more than one directory in ``$GOPATH``.
 
 If you plan to do development, read about the
-[Kubernetes Github Flow](https://docs.google.com/a/google.com/presentation/d/1WDGN_ggq1Ae3eeQmbSCMyUG1UhhRH6UZTy0pePq09Xo/pub?start=false&loop=false&delayms=3000),
+[Kubernetes Github Flow](https://docs.google.com/presentation/d/1HVxKSnvlc2WJJq8b9KCYtact5ZRrzDzkWgKEfm0QO_o/pub?start=false&loop=false&delayms=3000),
 and then clone your own fork of Kubernetes as described there.
 
 ## godep and dependency management
