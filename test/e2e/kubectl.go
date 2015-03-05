@@ -43,7 +43,7 @@ var _ = Describe("kubectl", func() {
 
 	// Constants.
 	var (
-		updateDemoRoot = filepath.Join(testContext.repoRoot, "examples/update-demo")
+		updateDemoRoot = filepath.Join(testContext.repoRoot, "examples/update-demo/v1beta1")
 		nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 		kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 	)
