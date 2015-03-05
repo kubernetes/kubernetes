@@ -20,18 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
-
-export KUBECTL KUBE_CONFIG_FILE
-
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
-
-prepare-e2e
-
-detect-master >/dev/null
+# --- Find local test binaries.
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -77,36 +66,71 @@ locations=(
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded auth.  We repeat that here so that
-  # we don't clobber auth that might be used for a publicly facing cluster.
-  auth_config=(
-    "--auth_config=$HOME/.kubernetes_vagrant_auth"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-  # With GKE, our auth and certs are in gcloud's config directory.
-  detect-project &> /dev/null
-  cfg_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
-  auth_config=(
-    "--auth_config=${cfg_dir}/kubernetes_auth"
-    "--cert_dir=${cfg_dir}"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-  auth_config=(
-    "--kubeconfig=${HOME}/.kube/.kubeconfig"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-  auth_config=(
-    "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
-  )
-else
-  auth_config=()
-fi
+# --- Setup some env vars.
 
-if [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
-    host="http://${KUBE_MASTER_IP-}:8080"
+: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBE_CONFIG_FILE:="config-test.sh"}
+
+export KUBECTL KUBE_CONFIG_FILE
+
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+
+# ---- Do cloud-provider-specific setup
+if [[ -z "$AUTH_CONFIG" ]];  then
+    echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
+
+    source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+
+    prepare-e2e
+
+    detect-master >/dev/null
+
+
+    if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+      # When we are using vagrant it has hard coded auth.  We repeat that here so that
+      # we don't clobber auth that might be used for a publicly facing cluster.
+      auth_config=(
+        "--auth_config=$HOME/.kubernetes_vagrant_auth"
+      )
+    elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+      # With GKE, our auth and certs are in gcloud's config directory.
+      detect-project &> /dev/null
+      cfg_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
+      auth_config=(
+        "--auth_config=${cfg_dir}/kubernetes_auth"
+        "--cert_dir=${cfg_dir}"
+      )
+    elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+      auth_config=(
+        "--kubeconfig=${HOME}/.kube/.kubeconfig"
+      )
+    elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      auth_config=(
+        "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
+      )
+    elif [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
+      auth_config=(
+        "--auth_config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
+        "--cert_dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
+      )
+    else
+      auth_config=()
+    fi
+
+    if [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
+        host="http://${KUBE_MASTER_IP-}:8080"
+    else
+        host="https://${KUBE_MASTER_IP-}"
+    fi
 else
-    host="https://${KUBE_MASTER_IP-}"
+  echo "Conformance Test.  No cloud-provider-specific preparation."
+  KUBERNETES_PROVIDER=""
+  auth_config=(
+    "--auth_config=${AUTH_CONFIG:-}"
+    "--cert_dir=${CERT_DIR:-}"
+  )
+  host="https://${KUBE_MASTER_IP-}"
 fi
 
 # Use the kubectl binary from the same directory as the e2e binary.
