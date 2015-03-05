@@ -29,5 +29,6 @@ type FakeResourceQuotaUsages struct {
 
 func (c *FakeResourceQuotaUsages) Create(resourceQuotaUsage *api.ResourceQuotaUsage) error {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-resourceQuotaUsage"})
+	c.Fake.ResourceQuotaUsage = *resourceQuotaUsage
 	return nil
 }
