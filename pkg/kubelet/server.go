@@ -163,11 +163,13 @@ func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
 
 	// Check that the hostname known by the master matches the hostname
 	// the kubelet knows
-	hostname := s.host.GetHostname()
-	if masterHostname != hostname {
-		s.error(w, errors.New("Kubelet hostname \""+hostname+"\" does not match the hostname expected by the master \""+masterHostname+"\""))
-		return
-	}
+	/*
+		hostname := s.host.GetHostname()
+		if masterHostname != hostname {
+			s.error(w, errors.New("Kubelet hostname \""+hostname+"\" does not match the hostname expected by the master \""+masterHostname+"\""))
+			return
+		}
+	*/
 	w.Write([]byte("ok"))
 }
 

@@ -483,7 +483,7 @@ func TestHealthCheck(t *testing.T) {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
+	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 
@@ -498,7 +498,7 @@ func TestHealthCheck(t *testing.T) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
 	}
 
 }
