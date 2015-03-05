@@ -351,7 +351,7 @@ func TestListPodListSelection(t *testing.T) {
 	}
 
 	for index, item := range table {
-		label, err := labels.ParseSelector(item.label)
+		label, err := labels.Parse(item.label)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue

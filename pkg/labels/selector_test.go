@@ -302,17 +302,17 @@ func TestLexer(t *testing.T) {
 		s string
 		t Token
 	}{
-		{"", EOS},
-		{",", COMMA},
-		{"notin", NOTIN},
-		{"in", IN},
-		{"=", EQUAL},
-		{"==", EEQUAL},
-		{"!=", NEQUAL},
-		{"(", OPAR},
-		{")", CPAR},
-		{"||", IDENTIFIER},
-		{"!", ERROR},
+		{"", EndOfStringToken},
+		{",", CommaToken},
+		{"notin", NotInToken},
+		{"in", InToken},
+		{"=", EqualsToken},
+		{"==", DoubleEqualsToken},
+		{"!=", NotEqualsToken},
+		{"(", OpenParToken},
+		{")", ClosedParToken},
+		{"||", IdentifierToken},
+		{"!", ErrorToken},
 	}
 	for _, v := range testcases {
 		l := &Lexer{s: v.s, pos: 0}
@@ -320,7 +320,7 @@ func TestLexer(t *testing.T) {
 		if token != v.t {
 			t.Errorf("Got %d it should be %d for '%s'", token, v.t, v.s)
 		}
-		if v.t != ERROR && lit != v.s {
+		if v.t != ErrorToken && lit != v.s {
 			t.Errorf("Got '%s' it should be '%s'", lit, v.s)
 		}
 	}
@@ -339,13 +339,13 @@ func TestLexerSequence(t *testing.T) {
 		s string
 		t []Token
 	}{
-		{"key in ( value )", []Token{IDENTIFIER, IN, OPAR, IDENTIFIER, CPAR}},
-		{"key notin ( value )", []Token{IDENTIFIER, NOTIN, OPAR, IDENTIFIER, CPAR}},
-		{"key in ( value1, value2 )", []Token{IDENTIFIER, IN, OPAR, IDENTIFIER, COMMA, IDENTIFIER, CPAR}},
-		{"key", []Token{IDENTIFIER}},
-		{"()", []Token{OPAR, CPAR}},
-		{"x in (),y", []Token{IDENTIFIER, IN, OPAR, CPAR, COMMA, IDENTIFIER}},
-		{"== != (), = notin", []Token{EEQUAL, NEQUAL, OPAR, CPAR, COMMA, EQUAL, NOTIN}},
+		{"key in ( value )", []Token{IdentifierToken, InToken, OpenParToken, IdentifierToken, ClosedParToken}},
+		{"key notin ( value )", []Token{IdentifierToken, NotInToken, OpenParToken, IdentifierToken, ClosedParToken}},
+		{"key in ( value1, value2 )", []Token{IdentifierToken, InToken, OpenParToken, IdentifierToken, CommaToken, IdentifierToken, ClosedParToken}},
+		{"key", []Token{IdentifierToken}},
+		{"()", []Token{OpenParToken, ClosedParToken}},
+		{"x in (),y", []Token{IdentifierToken, InToken, OpenParToken, ClosedParToken, CommaToken, IdentifierToken}},
+		{"== != (), = notin", []Token{DoubleEqualsToken, NotEqualsToken, OpenParToken, ClosedParToken, CommaToken, EqualsToken, NotInToken}},
 	}
 	for _, v := range testcases {
 		var literals []string
@@ -353,7 +353,7 @@ func TestLexerSequence(t *testing.T) {
 		l := &Lexer{s: v.s, pos: 0}
 		for {
 			token, lit := l.Lex()
-			if token == EOS {
+			if token == EndOfStringToken {
 				break
 			}
 			tokens = append(tokens, token)
@@ -374,14 +374,14 @@ func TestParserLookahead(t *testing.T) {
 		s string
 		t []Token
 	}{
-		{"key in ( value )", []Token{IDENTIFIER, IN, OPAR, IDENTIFIER, CPAR, EOS}},
-		{"key notin ( value )", []Token{IDENTIFIER, NOTIN, OPAR, IDENTIFIER, CPAR, EOS}},
-		{"key in ( value1, value2 )", []Token{IDENTIFIER, IN, OPAR, IDENTIFIER, COMMA, IDENTIFIER, CPAR, EOS}},
-		{"key", []Token{IDENTIFIER, EOS}},
-		{"()", []Token{OPAR, CPAR, EOS}},
-		{"", []Token{EOS}},
-		{"x in (),y", []Token{IDENTIFIER, IN, OPAR, CPAR, COMMA, IDENTIFIER, EOS}},
-		{"== != (), = notin", []Token{EEQUAL, NEQUAL, OPAR, CPAR, COMMA, EQUAL, NOTIN, EOS}},
+		{"key in ( value )", []Token{IdentifierToken, InToken, OpenParToken, IdentifierToken, ClosedParToken, EndOfStringToken}},
+		{"key notin ( value )", []Token{IdentifierToken, NotInToken, OpenParToken, IdentifierToken, ClosedParToken, EndOfStringToken}},
+		{"key in ( value1, value2 )", []Token{IdentifierToken, InToken, OpenParToken, IdentifierToken, CommaToken, IdentifierToken, ClosedParToken, EndOfStringToken}},
+		{"key", []Token{IdentifierToken, EndOfStringToken}},
+		{"()", []Token{OpenParToken, ClosedParToken, EndOfStringToken}},
+		{"", []Token{EndOfStringToken}},
+		{"x in (),y", []Token{IdentifierToken, InToken, OpenParToken, ClosedParToken, CommaToken, IdentifierToken, EndOfStringToken}},
+		{"== != (), = notin", []Token{DoubleEqualsToken, NotEqualsToken, OpenParToken, ClosedParToken, CommaToken, EqualsToken, NotInToken, EndOfStringToken}},
 	}
 	for _, v := range testcases {
 		p := &Parser{l: &Lexer{s: v.s, pos: 0}, position: 0}
@@ -393,7 +393,7 @@ func TestParserLookahead(t *testing.T) {
 			token, lit := p.lookahead(KeyAndOperator)
 
 			token2, lit2 := p.consume(KeyAndOperator)
-			if token == EOS {
+			if token == EndOfStringToken {
 				break
 			}
 			if token != token2 || lit != lit2 {
@@ -597,6 +597,7 @@ func getRequirement(key string, op Operator, vals util.StringSet, t *testing.T) 
 	req, err := NewRequirement(key, op, vals)
 	if err != nil {
 		t.Errorf("NewRequirement(%v, %v, %v) resulted in error:%v", key, op, vals, err)
+		return Requirement{}
 	}
 	return *req
 }

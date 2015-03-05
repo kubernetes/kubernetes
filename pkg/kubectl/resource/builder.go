@@ -164,7 +164,7 @@ func (b *Builder) ResourceTypes(types ...string) *Builder {
 // This will not affect files loaded from disk or URL. If the parameter is empty it is
 // a no-op - to select all resources invoke `b.Selector(labels.Everything)`.
 func (b *Builder) SelectorParam(s string) *Builder {
-	selector, err := labels.ParseSelector(s)
+	selector, err := labels.Parse(s)
 	if err != nil {
 		b.errs = append(b.errs, fmt.Errorf("the provided selector %q is not valid: %v", s, err))
 		return b

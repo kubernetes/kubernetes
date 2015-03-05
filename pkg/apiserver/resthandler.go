@@ -81,7 +81,7 @@ func GetResource(r RESTGetter, ctxFn ContextFunc, namer ScopeNamer, codec runtim
 }
 
 func parseSelectorQueryParams(query url.Values, version, apiResource string) (label, field labels.Selector, err error) {
-	label, err = labels.ParseSelector(query.Get("labels"))
+	label, err = labels.Parse(query.Get("labels"))
 	if err != nil {
 		return nil, nil, err
 	}

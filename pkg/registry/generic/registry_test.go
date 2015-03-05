@@ -73,7 +73,7 @@ func TestSelectionPredicate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		parsedLabel, err := labels.ParseSelector(item.labelSelector)
+		parsedLabel, err := labels.Parse(item.labelSelector)
 		if err != nil {
 			panic(err)
 		}

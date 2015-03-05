@@ -236,7 +236,16 @@ func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 	if r.err != nil {
 		return r
 	}
-	sel, err := labels.ParseSelector(item)
+	var sel labels.Selector
+	var err error
+	switch paramName {
+	case "labels":
+		sel, err = labels.Parse(item)
+	case "fields":
+		sel, err = labels.ParseSelector(item)
+	default:
+		err = fmt.Errorf("unknown parameter name '%s'", paramName)
+	}
 	if err != nil {
 		r.err = err
 		return r
