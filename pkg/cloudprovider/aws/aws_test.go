@@ -23,6 +23,9 @@ import (
 
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/ec2"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
 func TestReadAWSCloudConfig(t *testing.T) {
@@ -204,5 +207,56 @@ func TestGetRegion(t *testing.T) {
 	}
 	if zone.FailureDomain != "us-west-2e" {
 		t.Errorf("Unexpected FailureDomain: %s", zone.FailureDomain)
+	}
+}
+
+func TestGetResources(t *testing.T) {
+	instances := make([]ec2.Instance, 3)
+	instances[0].PrivateDNSName = "m3.medium"
+	instances[0].InstanceType = "m3.medium"
+	instances[0].State.Name = "running"
+	instances[1].PrivateDNSName = "r3.8xlarge"
+	instances[1].InstanceType = "r3.8xlarge"
+	instances[1].State.Name = "running"
+	instances[2].PrivateDNSName = "unknown.type"
+	instances[2].InstanceType = "unknown.type"
+	instances[2].State.Name = "running"
+
+	aws1 := mockInstancesResp(instances)
+
+	res1, err1 := aws1.GetNodeResources("m3.medium")
+	if err1 != nil {
+		t.Errorf("Should not error when instance type found: %v", err1)
+	}
+	e1 := &api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(int64(3.0*1000), resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(int64(3.75*1024*1024*1024), resource.BinarySI),
+		},
+	}
+	if !reflect.DeepEqual(e1, res1) {
+		t.Errorf("Expected %v, got %v", e1, res1)
+	}
+
+	res2, err2 := aws1.GetNodeResources("r3.8xlarge")
+	if err2 != nil {
+		t.Errorf("Should not error when instance type found: %v", err2)
+	}
+	e2 := &api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(int64(104.0*1000), resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(int64(244.0*1024*1024*1024), resource.BinarySI),
+		},
+	}
+	if !reflect.DeepEqual(e2, res2) {
+		t.Errorf("Expected %v, got %v", e2, res2)
+	}
+
+	res3, err3 := aws1.GetNodeResources("unknown.type")
+	if err3 != nil {
+		t.Errorf("Should not error when unknown instance type")
+	}
+	if res3 != nil {
+		t.Errorf("Should return nil resources when unknown instance type")
 	}
 }

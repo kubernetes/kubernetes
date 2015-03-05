@@ -28,6 +28,7 @@ import (
 	"github.com/mitchellh/goamz/ec2"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 
 	"github.com/golang/glog"
@@ -308,8 +309,159 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 	return aws.getInstancesByRegex(filter)
 }
 
-func (v *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	return nil, nil
+// GetNodeResources implements Instances.GetNodeResources
+func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	instance, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	resources, err := getResourcesByInstanceType(instance.InstanceType)
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
+}
+
+// Builds an api.NodeResources
+// cpu is in ecus, memory is in GiB
+// We pass the family in so that we could provide more info (e.g. GPU or not)
+func makeNodeResources(family string, cpu float64, memory float64) (*api.NodeResources, error) {
+	return &api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(int64(cpu*1000), resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(int64(memory*1024*1024*1024), resource.BinarySI),
+		},
+	}, nil
+}
+
+// Maps an EC2 instance type to k8s resource information
+func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error) {
+	// There is no API for this (that I know of)
+	switch instanceType {
+	// t2: Burstable
+	// TODO: The ECUs are fake values (because they are burstable), so this is just a guess...
+	case "t1.micro":
+		return makeNodeResources("t1", 0.125, 0.615)
+
+		// t2: Burstable
+	// TODO: The ECUs are fake values (because they are burstable), so this is just a guess...
+	case "t2.micro":
+		return makeNodeResources("t2", 0.25, 1)
+	case "t2.small":
+		return makeNodeResources("t2", 0.5, 2)
+	case "t2.medium":
+		return makeNodeResources("t2", 1, 4)
+
+		// c1: Compute optimized
+	case "c1.medium":
+		return makeNodeResources("c1", 5, 1.7)
+	case "c1.xlarge":
+		return makeNodeResources("c1", 20, 7)
+
+		// cc2: Compute optimized
+	case "cc2.8xlarge":
+		return makeNodeResources("cc2", 88, 60.5)
+
+		// cg1: GPU instances
+	case "cg1.4xlarge":
+		return makeNodeResources("cg1", 33.5, 22.5)
+
+		// cr1: Memory optimized
+	case "cr1.8xlarge":
+		return makeNodeResources("cr1", 88, 244)
+
+		// c3: Compute optimized
+	case "c3.large":
+		return makeNodeResources("c3", 7, 3.75)
+	case "c3.xlarge":
+		return makeNodeResources("c3", 14, 7.5)
+	case "c3.2xlarge":
+		return makeNodeResources("c3", 28, 15)
+	case "c3.4xlarge":
+		return makeNodeResources("c3", 55, 30)
+	case "c3.8xlarge":
+		return makeNodeResources("c3", 108, 60)
+
+		// c4: Compute optimized
+	case "c4.large":
+		return makeNodeResources("c4", 8, 3.75)
+	case "c4.xlarge":
+		return makeNodeResources("c4", 16, 7.5)
+	case "c4.2xlarge":
+		return makeNodeResources("c4", 31, 15)
+	case "c4.4xlarge":
+		return makeNodeResources("c4", 62, 30)
+	case "c4.8xlarge":
+		return makeNodeResources("c4", 132, 60)
+
+		// g2: GPU instances
+	case "g2.2xlarge":
+		return makeNodeResources("g2", 26, 15)
+
+		// hi1: Storage optimized (SSD)
+	case "hi1.4xlarge":
+		return makeNodeResources("hs1", 35, 60.5)
+
+		// hs1: Storage optimized (HDD)
+	case "hs1.8xlarge":
+		return makeNodeResources("hs1", 35, 117)
+
+		// m1: General purpose
+	case "m1.small":
+		return makeNodeResources("m1", 1, 1.7)
+	case "m1.medium":
+		return makeNodeResources("m1", 2, 3.75)
+	case "m1.large":
+		return makeNodeResources("m1", 4, 7.5)
+	case "m1.xlarge":
+		return makeNodeResources("m1", 8, 15)
+
+		// m2: Memory optimized
+	case "m2.xlarge":
+		return makeNodeResources("m2", 6.5, 17.1)
+	case "m2.2xlarge":
+		return makeNodeResources("m2", 13, 34.2)
+	case "m2.4xlarge":
+		return makeNodeResources("m2", 26, 68.4)
+
+		// m3: General purpose
+	case "m3.medium":
+		return makeNodeResources("m3", 3, 3.75)
+	case "m3.large":
+		return makeNodeResources("m3", 6.5, 7.5)
+	case "m3.xlarge":
+		return makeNodeResources("m3", 13, 15)
+	case "m3.2xlarge":
+		return makeNodeResources("m3", 26, 30)
+
+		// i2: Storage optimized (SSD)
+	case "i2.xlarge":
+		return makeNodeResources("i2", 14, 30.5)
+	case "i2.2xlarge":
+		return makeNodeResources("i2", 27, 61)
+	case "i2.4xlarge":
+		return makeNodeResources("i2", 53, 122)
+	case "i2.8xlarge":
+		return makeNodeResources("i2", 104, 244)
+
+		// r3: Memory optimized
+	case "r3.large":
+		return makeNodeResources("r3", 6.5, 15)
+	case "r3.xlarge":
+		return makeNodeResources("r3", 13, 30.5)
+	case "r3.2xlarge":
+		return makeNodeResources("r3", 26, 61)
+	case "r3.4xlarge":
+		return makeNodeResources("r3", 52, 122)
+	case "r3.8xlarge":
+		return makeNodeResources("r3", 104, 244)
+
+	default:
+		glog.Errorf("unknown instanceType: %s", instanceType)
+		return nil, nil
+	}
 }
 
 // GetZone implements Zones.GetZone
