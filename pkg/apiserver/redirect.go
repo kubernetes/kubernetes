@@ -38,7 +38,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor("redirect", verb, apiResource, httpCode, reqStart)
+	defer monitor("redirect", &verb, &apiResource, &httpCode, reqStart)
 
 	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
