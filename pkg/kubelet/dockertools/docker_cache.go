@@ -26,14 +26,8 @@ type DockerCache interface {
 }
 
 func NewDockerCache(client DockerInterface) (DockerCache, error) {
-	containers, err := GetKubeletDockerContainers(client, false)
-	if err != nil {
-		return nil, err
-	}
 	return &dockerCache{
 		client:        client,
-		cacheTime:     time.Now(),
-		containers:    containers,
 		updatingCache: false,
 	}, nil
 }
