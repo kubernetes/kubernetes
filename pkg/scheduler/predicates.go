@@ -50,16 +50,26 @@ func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
-	if volume.GCEPersistentDisk == nil {
-		return false
-	}
-	pdName := volume.GCEPersistentDisk.PDName
+	if volume.GCEPersistentDisk != nil {
+		pdName := volume.GCEPersistentDisk.PDName
 
-	manifest := &(pod.Spec)
-	for ix := range manifest.Volumes {
-		if manifest.Volumes[ix].GCEPersistentDisk != nil &&
-			manifest.Volumes[ix].GCEPersistentDisk.PDName == pdName {
-			return true
+		manifest := &(pod.Spec)
+		for ix := range manifest.Volumes {
+			if manifest.Volumes[ix].GCEPersistentDisk != nil &&
+				manifest.Volumes[ix].GCEPersistentDisk.PDName == pdName {
+				return true
+			}
+		}
+	}
+	if volume.AWSPersistentDisk != nil {
+		pdName := volume.AWSPersistentDisk.PDName
+
+		manifest := &(pod.Spec)
+		for ix := range manifest.Volumes {
+			if manifest.Volumes[ix].AWSPersistentDisk != nil &&
+				manifest.Volumes[ix].AWSPersistentDisk.PDName == pdName {
+				return true
+			}
 		}
 	}
 	return false

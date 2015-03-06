@@ -17,11 +17,15 @@ limitations under the License.
 package aws_cloud
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/goamz/aws"
@@ -38,6 +42,19 @@ import (
 type EC2 interface {
 	// Query EC2 for instances matching the filter
 	Instances(instIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error)
+
+
+	// Attach a volume to an instance
+	AttachVolume(volumeId string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error)
+	// Detach a volume from whatever instance it is attached to
+	// TODO: We should specify the InstanceID and the Device, for safety
+	DetachVolume(volumeId string) (resp *ec2.SimpleResp, err error)
+	// Lists volumes
+	Volumes(volumeIds []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error)
+	// Create an EBS volume
+	CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error)
+	// Delete an EBS volume
+	DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err error)
 }
 
 // Abstraction over the AWS metadata service
@@ -46,12 +63,34 @@ type AWSMetadata interface {
 	GetMetaData(key string) ([]byte, error)
 }
 
+type VolumeOptions struct {
+	CapacityMB int
+	Zone       string
+}
+
+// Volumes is an interface for managing cloud-provisioned volumes
+type Volumes interface {
+	// Attach the disk to the specified instance
+	// instanceName can be empty to mean "the instance on which we are running"
+	AttachDisk(instanceName string, volumeName string, readOnly bool) error
+	// Detach the disk from the specified instance
+	// instanceName can be empty to mean "the instance on which we are running"
+	DetachDisk(instanceName string, volumeName string) error
+
+	// Create a volume with the specified options
+	CreateVolume(volumeOptions *VolumeOptions) (volumeName string, err error)
+	DeleteVolume(volumeName string) error
+}
+
 // AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
 type AWSCloud struct {
 	ec2              EC2
 	cfg              *AWSCloudConfig
 	availabilityZone string
 	region           aws.Region
+
+	// The AWS instance that we are running on
+	selfAwsInstance *awsInstance
 }
 
 type AWSCloudConfig struct {
@@ -76,12 +115,12 @@ func (f *ec2InstanceFilter) Matches(instance ec2.Instance) bool {
 }
 
 // goamzEC2 is an implementation of the EC2 interface, backed by goamz
-type GoamzEC2 struct {
+type goamzEC2 struct {
 	ec2 *ec2.EC2
 }
 
 // Implementation of EC2.Instances
-func (self *GoamzEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
+func (self *goamzEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
 	var goamzFilter *ec2.Filter
 	if filter != nil {
 		goamzFilter = ec2.NewFilter()
@@ -105,6 +144,26 @@ func (self *goamzMetadata) GetMetaData(key string) ([]byte, error) {
 }
 
 type AuthFunc func() (auth aws.Auth, err error)
+
+func (s *goamzEC2) AttachVolume(volumeId string, instanceId string, device string) (resp *ec2.AttachVolumeResp, err error) {
+	return s.ec2.AttachVolume(volumeId, instanceId, device)
+}
+
+func (s *goamzEC2) DetachVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
+	return s.ec2.DetachVolume(volumeId)
+}
+
+func (s *goamzEC2) Volumes(volumeIds []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
+	return s.ec2.Volumes(volumeIds, filter)
+}
+
+func (s *goamzEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error) {
+	return s.ec2.CreateVolume(request)
+}
+
+func (s *goamzEC2) DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
+	return s.ec2.DeleteVolume(volumeId)
+}
 
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
@@ -179,12 +238,23 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AW
 		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
 	}
 
-	return &AWSCloud{
-		ec2:              &GoamzEC2{ec2: ec2.New(auth, region)},
-		cfg:              cfg,
+	ec2 := &goamzEC2{ec2: ec2.New(auth, region)}
+
+	instanceId, err := ec2.GetMetaData("instance-id")
+	if err != nil {
+		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+	}
+
+	awsCloud := &AWSCloud{
+		ec2: ec2,
+		cfg: cfg,
 		region:           region,
 		availabilityZone: zone,
-	}, nil
+	}
+
+	awsCloud.selfAwsInstance = newAwsInstance(ec2, string(instanceId))
+
+	return awsCloud, nil
 }
 
 func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
@@ -377,7 +447,7 @@ func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error)
 		return makeNodeResources("t1", 0.125, 0.615)
 
 		// t2: Burstable
-	// TODO: The ECUs are fake values (because they are burstable), so this is just a guess...
+		// TODO: The ECUs are fake values (because they are burstable), so this is just a guess...
 	case "t2.micro":
 		return makeNodeResources("t2", 0.25, 1)
 	case "t2.small":
@@ -505,4 +575,346 @@ func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: self.availabilityZone,
 		Region:        self.region.Name,
 	}, nil
+}
+
+// Abstraction around AWS Instance Types
+// There isn't an API to get information for a particular instance type (that I know of)
+type awsInstanceType struct {
+}
+
+// TODO: Also return number of mounts allowed?
+func (self *awsInstanceType) getEbsMountDevices() []string {
+	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
+	devices := []string{}
+	for c := 'f'; c <= 'p'; c++ {
+		devices = append(devices, fmt.Sprintf("/dev/sd%s", c))
+	}
+	return devices
+}
+
+type awsInstance struct {
+	ec2 EC2
+
+	// id in AWS
+	awsId string
+
+	mutex sync.Mutex
+
+	// We must cache because otherwise there is a race condition,
+	// where we assign a device mapping and then get a second request before we attach the volume
+	deviceMappings map[string]string
+}
+
+func newAwsInstance(ec2 EC2, awsId string) *awsInstance {
+	self := &awsInstance{ec2: ec2, awsId: awsId}
+
+	// We lazy-init deviceMappings
+	self.deviceMappings = nil
+
+	return self
+}
+
+// Gets the awsInstanceType that models the instance type of this instance
+func (self *awsInstance) getInstanceType() *awsInstanceType {
+	// TODO: Make this real
+	awsInstanceType := &awsInstanceType{}
+	return awsInstanceType
+}
+
+// Gets the full information about this instance from the EC2 API
+func (self *awsInstance) getInfo() (*ec2.Instance, error) {
+	resp, err := self.ec2.Instances([]string{self.awsId}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error querying ec2 for instance info: %v", err)
+	}
+	if len(resp.Reservations) == 0 {
+		return nil, fmt.Errorf("no reservations found for instance: %s", self.awsId)
+	}
+	if len(resp.Reservations) > 1 {
+		return nil, fmt.Errorf("multiple reservations found for instance: %s", self.awsId)
+	}
+	if len(resp.Reservations[0].Instances) == 0 {
+		return nil, fmt.Errorf("no instances found for instance: %s", self.awsId)
+	}
+	if len(resp.Reservations[0].Instances) > 1 {
+		return nil, fmt.Errorf("multiple instances found for instance: %s", self.awsId)
+	}
+	return &resp.Reservations[0].Instances[0], nil
+}
+
+func (self *awsInstance) assignMountDevice(volumeId string) (string, error) {
+	instanceType := self.getInstanceType()
+	if instanceType == nil {
+		return "", fmt.Errorf("could not get instance type for instance: %s", self.awsId)
+	}
+
+	// We lock to prevent concurrent mounts from conflicting
+	// We may still conflict if someone calls the API concurrently,
+	// but the AWS API will then fail one of the two attach operations
+	self.mutex.Lock()
+	defer self.mutex.Unlock()
+
+	// We cache both for efficiency and correctness
+	if self.deviceMappings == nil {
+		info, err := self.getInfo()
+		if err != nil {
+			return "", err
+		}
+		deviceMappings := map[string]string{}
+		for _, blockDevice := range info.BlockDevices {
+			deviceMappings[blockDevice.DeviceName] = blockDevice.VolumeId
+		}
+		self.deviceMappings = deviceMappings
+	}
+
+	// Check to see if this volume is already assigned a device on this machine
+	for deviceName, mappingVolumeId := range self.deviceMappings {
+		if volumeId == mappingVolumeId {
+			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", deviceName, mappingVolumeId)
+			return deviceName, nil
+		}
+	}
+
+	// Check all the valid mountpoints to see if any of them are free
+	valid := instanceType.getEbsMountDevices()
+	chosen := ""
+	for _, device := range valid {
+		_, found := self.deviceMappings[device]
+		if !found {
+			chosen = device
+			break
+		}
+	}
+
+	if chosen == "" {
+		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", self.deviceMappings, valid)
+		return "", nil
+	}
+
+	self.deviceMappings[chosen] = volumeId
+	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeId)
+
+	return chosen, nil
+}
+
+func (self *awsInstance) releaseMountDevice(volumeId string, mountDevice string) {
+	self.mutex.Lock()
+	defer self.mutex.Unlock()
+
+	existingVolumeId, found := self.deviceMappings[mountDevice]
+	if !found {
+		glog.Errorf("releaseMountDevice on non-allocated device")
+		return
+	}
+	if volumeId != existingVolumeId {
+		glog.Errorf("releaseMountDevice on device assigned to different volume")
+		return
+	}
+	glog.V(2).Infof("Releasing mount device mapping: %s -> volume %s", mountDevice, volumeId)
+	delete(self.deviceMappings, mountDevice)
+}
+
+type awsDisk struct {
+	ec2 EC2
+
+	// Name in k8s
+	name string
+	// id in AWS
+	awsId string
+	// az which holds the volume
+	az string
+}
+
+func newAwsDisk(ec2 EC2, name string) (*awsDisk, error) {
+	// name looks like aws://availability-zone/id
+	url, err := url.Parse(name)
+	if err != nil {
+		// TODO: Maybe we should pass a URL into the Volume functions
+		return nil, fmt.Errorf("Invalid disk name (%s): %v", name, err)
+	}
+	if url.Scheme != "aws" {
+		return nil, fmt.Errorf("Invalid scheme for AWS volume (%s)", name)
+	}
+	awsId := url.Path
+	// TODO: Regex match?
+	if strings.Contains(awsId, "/") || !strings.HasPrefix(awsId, "vol-") {
+		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
+	}
+	az := url.Host
+	// TODO: Better validation?
+	// TODO: Default to our AZ?  Look it up?
+	// TODO: Should this be a region or an AZ?
+	if az == "" {
+		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
+	}
+	disk := &awsDisk{ec2: ec2, name: name, awsId: awsId, az: az}
+	return disk, nil
+}
+
+// Gets the full information about this volume from the EC2 API
+func (self *awsDisk) getInfo() (*ec2.Volume, error) {
+	resp, err := self.ec2.Volumes([]string{self.awsId}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error querying ec2 for volume info: %v", err)
+	}
+	if len(resp.Volumes) == 0 {
+		return nil, fmt.Errorf("no volumes found for volume: %s", self.awsId)
+	}
+	if len(resp.Volumes) > 1 {
+		return nil, fmt.Errorf("multiple volumes found for volume: %s", self.awsId)
+	}
+	return &resp.Volumes[0], nil
+}
+
+func (self *awsDisk) waitForAttachmentStatus(status string) error {
+	attempt := 0
+	maxAttempts := 60
+
+	for {
+		info, err := self.getInfo()
+		if err != nil {
+			return err
+		}
+		if len(info.Attachments) > 1 {
+			glog.Warningf("Found multiple attachments for volume: %v", info)
+		}
+		attachmentStatus := ""
+		for _, attachment := range info.Attachments {
+			if attachment.Status == status {
+				return nil
+			}
+			attachmentStatus = attachment.Status
+		}
+		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
+
+		attempt++
+		if attempt > maxAttempts {
+			glog.Warningf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
+			return errors.New("Timeout waiting for volume state")
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+}
+
+// Deletes the EBS disk
+func (self *awsDisk) delete() error {
+	_, err := self.ec2.DeleteVolume(self.awsId)
+	if err != nil {
+		return fmt.Errorf("error delete EBS volumes: %v", err)
+	}
+	return nil
+}
+
+// Gets the awsInstance for the EC2 instance on which we are running
+// may return nil in case of error
+func (aws *AWSCloud) getSelfAwsInstance() *awsInstance {
+	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
+	return aws.selfAwsInstance
+}
+
+// Implements Volumes.AttachDisk
+func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) error {
+	disk, err := newAwsDisk(aws.ec2, diskName)
+	if err != nil {
+		return err
+	}
+
+	var awsInstance *awsInstance
+	if instanceName == "" {
+		awsInstance = aws.selfAwsInstance
+	} else {
+		instance, err := aws.getInstancesByDnsName(instanceName)
+		if err != nil {
+			return fmt.Errorf("Error finding instance: %v", err)
+		}
+
+		awsInstance = newAwsInstance(aws.ec2, instance.InstanceId)
+	}
+
+	if readOnly {
+		// TODO: We could enforce this when we mount the volume (?)
+		// TODO: We could also snapshot the volume and attach copies of it
+		return errors.New("AWS volumes cannot be mounted read-only")
+	}
+
+	mountDevice, err := awsInstance.assignMountDevice(disk.awsId)
+	if err != nil {
+		return err
+	}
+
+	attached := false
+	defer func() {
+		if !attached {
+			awsInstance.releaseMountDevice(disk.awsId, mountDevice)
+		}
+	}()
+
+	attachResponse, err := aws.ec2.AttachVolume(disk.awsId, awsInstance.awsId, mountDevice)
+	if err != nil {
+		// TODO: Check if already attached?
+		return fmt.Errorf("Error attaching EBS volume: %v", err)
+	}
+
+	glog.V(2).Info("AttachVolume request returned %v", attachResponse)
+
+	err = disk.waitForAttachmentStatus("attached")
+	if err != nil {
+		return err
+	}
+
+	attached = true
+
+	// TODO: Return device name (and note that it might look like /dev/xvdf, not /dev/sdf)
+	return nil
+}
+
+// Implements Volumes.DetachDisk
+func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
+	disk, err := newAwsDisk(aws.ec2, diskName)
+	if err != nil {
+		return err
+	}
+
+	// TODO: We should specify the InstanceID and the Device, for safety
+	response, err := aws.ec2.DetachVolume(disk.awsId)
+	if err != nil {
+		return fmt.Errorf("error detaching EBS volume: %v", err)
+	}
+	if response == nil {
+		return errors.New("no response from DetachVolume")
+	}
+	err = disk.waitForAttachmentStatus("detached")
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+// Implements Volumes.CreateVolume
+func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
+	request := &ec2.CreateVolume{}
+	request.AvailZone = volumeOptions.Zone
+	request.Size = (int64(volumeOptions.CapacityMB) + 1023) / 1024
+	response, err := aws.ec2.CreateVolume(request)
+	if err != nil {
+		return "", err
+	}
+
+	az := response.AvailZone
+	awsId := response.VolumeId
+
+	volumeName := "aws://" + az + "/" + awsId
+
+	return volumeName, nil
+}
+
+// Implements Volumes.DeleteVolume
+func (aws *AWSCloud) DeleteVolume(volumeName string) error {
+	awsDisk, err := newAwsDisk(aws.ec2, volumeName)
+	if err != nil {
+		return err
+	}
+	return awsDisk.delete()
 }

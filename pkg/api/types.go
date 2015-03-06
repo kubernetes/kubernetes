@@ -189,6 +189,9 @@ type VolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
+	// AWSPersistentDisk represents a AWS EBS disk that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	AWSPersistentDisk *AWSPersistentDiskVolumeSource `json:"awsPersistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo"`
 	// Secret represents a secret that should populate this volume.
@@ -208,6 +211,9 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
+	// AWSPersistentDisk represents a AWS EBS disk that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	AWSPersistentDisk *AWSPersistentDiskVolumeSource `json:"awsPersistentDisk"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way
@@ -384,11 +390,31 @@ type ISCSIVolumeSource struct {
 	IQN string `json:"iqn,omitempty"`
 	// Required: iSCSI target lun number
 	Lun int `json:"lun,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// AWSPersistentDiskVolumeSource represents a Persistent Disk resource in AWS.
+//
+// An AWS EBS disk must exist and be formatted before mounting to a container.
+// The disk must also be in the same AWS zone as the kubelet.
+// A AWS EBS disk can only be mounted as read/write once.
+type AWSPersistentDiskVolumeSource struct {
+	// Unique name of the PD resource. Used to identify the disk in AWS
+	PDName string `json:"pdName"`
+
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
+
+	// Optional: Partition on the disk to mount.
+	// If omitted, kubelet will attempt to mount the device name.
+	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
+	Partition int `json:"partition,omitempty"`
+
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
