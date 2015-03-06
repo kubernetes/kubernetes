@@ -83,7 +83,7 @@ grains:
   cloud_provider: vagrant
   roles:
     - kubernetes-master
-  admission_control: NamespaceExists,AlwaysAdmit
+  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
 

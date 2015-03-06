@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // LimitRangesNamespacer has methods to work with LimitRange resources in a namespace
@@ -36,6 +37,7 @@ type LimitRangeInterface interface {
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // limitRanges implements LimitRangesNamespacer interface
@@ -91,4 +93,16 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 	}
 	err = c.r.Put().Namespace(c.ns).Resource("limitRanges").Name(limitRange.Name).Body(limitRange).Do().Into(result)
 	return
+}
+
+// Watch returns a watch.Interface that watches the requested resource
+func (c *limitRanges) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.r.Get().
+		Prefix("watch").
+		Namespace(c.ns).
+		Resource("limitRanges").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
 }

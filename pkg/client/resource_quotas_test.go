@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -173,5 +174,14 @@ func TestResourceQuotaDelete(t *testing.T) {
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().ResourceQuotas(ns).Delete("foo")
+	c.Validate(t, nil, err)
+}
+
+func TestResourceQuotaWatch(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "GET", Path: "/watch/resourceQuotas", Query: url.Values{"resourceVersion": []string{}}},
+		Response: Response{StatusCode: 200},
+	}
+	_, err := c.Setup().ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), "")
 	c.Validate(t, nil, err)
 }

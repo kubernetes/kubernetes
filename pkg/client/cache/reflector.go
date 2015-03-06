@@ -53,6 +53,14 @@ type Reflector struct {
 	resyncPeriod time.Duration
 }
 
+// NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
+// The indexer is configured to key on namespace
+func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
+	indexer = NewIndexer(MetaNamespaceKeyFunc, Indexers{"namespace": MetaNamespaceIndexFunc})
+	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod)
+	return indexer, reflector
+}
+
 // NewReflector creates a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
 // only put things in the store that have the type of expectedType.
