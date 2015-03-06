@@ -52,14 +52,19 @@ import (
 	"github.com/golang/glog"
 )
 
-// taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
-const minShares = 2
-const sharesPerCPU = 1024
-const milliCPUToCPU = 1000
+const (
+	// taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+	minShares     = 2
+	sharesPerCPU  = 1024
+	milliCPUToCPU = 1000
 
-// The oom_score_adj of the POD infrastructure container. The default is 0, so
-// any value below that makes it *less* likely to get OOM killed.
-const podOomScoreAdj = -100
+	// The oom_score_adj of the POD infrastructure container. The default is 0, so
+	// any value below that makes it *less* likely to get OOM killed.
+	podOomScoreAdj = -100
+
+	// Max amount of time to wait for the Docker daemon to come up.
+	maxWaitForDocker = 5 * time.Minute
+)
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
@@ -101,6 +106,22 @@ func NewMainKubelet(
 	}
 	if minimumGCAge <= 0 {
 		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
+	}
+
+	// Wait for the Docker daemon to be up (with a timeout).
+	waitStart := time.Now()
+	dockerUp := false
+	for time.Since(waitStart) < maxWaitForDocker {
+		_, err := dockerClient.Version()
+		if err == nil {
+			dockerUp = true
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !dockerUp {
+		return nil, fmt.Errorf("timed out waiting for Docker to come up")
 	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
