@@ -20,7 +20,11 @@ import (
 	"regexp"
 )
 
-const LabelValueFmt string = "[-A-Za-z0-9_.]*"
+const kubeChar string = "[A-Za-z0-9]"
+const extendedKubeChar string = "[-A-Za-z0-9_.]"
+const qualifiedToken string = "(" + kubeChar + extendedKubeChar + "*)?" + kubeChar
+
+const LabelValueFmt string = "((" + kubeChar + extendedKubeChar + "*)?" + kubeChar + ")?"
 
 var labelValueRegexp = regexp.MustCompile("^" + LabelValueFmt + "$")
 
@@ -35,10 +39,7 @@ func IsValidAnnotationValue(value string) bool {
 	return true
 }
 
-const kubeToken string = "[A-Za-z0-9]"
-const extendedKubeToken string = "[-A-Za-z0-9_.]"
-const qualifiedNamePiece string = "(" + kubeToken + extendedKubeToken + "*)?" + kubeToken
-const QualifiedNameFmt string = "(" + qualifiedNamePiece + "/)?" + qualifiedNamePiece
+const QualifiedNameFmt string = "(" + qualifiedToken + "/)?" + qualifiedToken
 
 var qualifiedNameRegexp = regexp.MustCompile("^" + QualifiedNameFmt + "$")
 

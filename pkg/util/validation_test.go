@@ -196,12 +196,9 @@ func TestIsValidLabelValue(t *testing.T) {
 		"now-with-dashes",
 		"1-starts-with-num",
 		"end-with-num-1",
-		"-starts-with-dash",
-		"ends-with-dash-",
-		".starts.with.dot",
-		"ends.with.dot.",
 		"1234",                  // only num
 		strings.Repeat("a", 63), // to the limit
+		"", // empty value
 	}
 	for i := range successCases {
 		if !IsValidLabelValue(successCases[i]) {
@@ -213,6 +210,10 @@ func TestIsValidLabelValue(t *testing.T) {
 		"nospecialchars%^=@",
 		"Tama-nui-te-rā.is.Māori.sun",
 		"\\backslashes\\are\\bad",
+		"-starts-with-dash",
+		"ends-with-dash-",
+		".starts.with.dot",
+		"ends.with.dot.",
 		strings.Repeat("a", 64), // over the limit
 	}
 	for i := range errorCases {
