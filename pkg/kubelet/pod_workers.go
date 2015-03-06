@@ -84,7 +84,8 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				glog.Errorf("Error listing containers while syncing pod: %v", err)
 				return
 			}
-			err = p.syncPodFn(newWork.pod, containers)
+
+			err = p.syncPodFn(newWork.pod, containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)

@@ -413,17 +413,23 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 	return nil, false, 0
 }
 
-// Note, this might return containers belong to a different Pod instance with the same name
-func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[string]*docker.APIContainers {
-	containers := make(map[string]*docker.APIContainers)
+// RemoveContainerWithID removes the container with the given containerID.
+func (c DockerContainers) RemoveContainerWithID(containerID DockerID) {
+	delete(c, containerID)
+}
+
+// FindContainersByPod returns the containers that belong to the pod.
+func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName string) DockerContainers {
+	containers := make(DockerContainers)
 
 	for _, dockerContainer := range c {
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerManifestID, _, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
-		if dockerManifestID == podFullName {
-			containers[dockerContainerName] = dockerContainer
+		dockerPodName, uuid, _, _ := ParseDockerName(dockerContainer.Names[0])
+		if podUID == uuid ||
+			(podUID == "" && podFullName == dockerPodName) {
+			containers[DockerID(dockerContainer.ID)] = dockerContainer
 		}
 	}
 	return containers

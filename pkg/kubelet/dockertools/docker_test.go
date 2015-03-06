@@ -451,3 +451,146 @@ func TestGetRunningContainers(t *testing.T) {
 		}
 	}
 }
+
+func TestFindContainersByPod(t *testing.T) {
+	tests := []struct {
+		testContainers     DockerContainers
+		inputPodID         types.UID
+		inputPodFullName   string
+		expectedContainers DockerContainers
+	}{
+		{
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+			},
+			types.UID("1234"),
+			"",
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+			},
+		},
+		{
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: []string{"/k8s_foo_qux_2343_42"},
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+			},
+			types.UID("1234"),
+			"",
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+			},
+		},
+		{
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: []string{"/k8s_foo_qux_2343_42"},
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+			},
+			types.UID("5678"),
+			"",
+			DockerContainers{},
+		},
+		{
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: nil,
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_5678_42"},
+				},
+			},
+			types.UID("5678"),
+			"",
+			DockerContainers{
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_5678_42"},
+				},
+			},
+		},
+		{
+			DockerContainers{
+				"foobar": &docker.APIContainers{
+					ID:    "foobar",
+					Names: []string{"/k8s_foo_qux_1234_42"},
+				},
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: []string{"/k8s_foo_abc_5678_42"},
+				},
+				"baz": &docker.APIContainers{
+					ID:    "baz",
+					Names: []string{"/k8s_foo_qux_5678_42"},
+				},
+			},
+			"",
+			"abc",
+			DockerContainers{
+				"barbar": &docker.APIContainers{
+					ID:    "barbar",
+					Names: []string{"/k8s_foo_abc_5678_42"},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		result := test.testContainers.FindContainersByPod(test.inputPodID, test.inputPodFullName)
+		if !reflect.DeepEqual(result, test.expectedContainers) {
+			t.Errorf("expected: %v, saw: %v", test.expectedContainers, result)
+		}
+	}
+}
