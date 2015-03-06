@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -182,12 +183,17 @@ func getData(c *client.Client, podID string) (*updateDemoData, error) {
 }
 
 func kubectlCmd(args ...string) *exec.Cmd {
-	defaultArgs := []string{"--auth-path=" + testContext.authConfig}
-	if testContext.certDir != "" {
-		defaultArgs = append(defaultArgs,
-			fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.certDir, "ca.crt")),
-			fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "kubecfg.crt")),
-			fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "kubecfg.key")))
+	defaultArgs := []string{}
+	if testContext.kubeConfig != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.kubeConfig)
+	} else {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.authConfig)
+		if testContext.certDir != "" {
+			defaultArgs = append(defaultArgs,
+				fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.certDir, "ca.crt")),
+				fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "kubecfg.crt")),
+				fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "kubecfg.key")))
+		}
 	}
 	kubectlArgs := append(defaultArgs, args...)
 	// TODO: Remove this once gcloud writes a proper entry in the kubeconfig file.

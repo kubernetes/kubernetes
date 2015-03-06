@@ -20,6 +20,7 @@ import (
 	"os"
 	goruntime "runtime"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 	"github.com/golang/glog"
@@ -27,7 +28,8 @@ import (
 )
 
 var (
-	authConfig = flag.String("auth_config", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.")
+	kubeConfig = flag.String(clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embeded authinfo. Will use cluster/user info from 'current-context'")
+	authConfig = flag.String("auth_config", "", "Path to the auth info file.")
 	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	gceProject = flag.String("gce_project", "", "The GCE project being used, if applicable")
 	gceZone    = flag.String("gce_zone", "", "GCE zone being used, if applicable")
@@ -61,5 +63,5 @@ func main() {
 		Zone:       *gceZone,
 		MasterName: *masterName,
 	}
-	e2e.RunE2ETests(*authConfig, *certDir, *host, *repoRoot, *provider, gceConfig, *orderseed, *times, *reportDir, testList)
+	e2e.RunE2ETests(*kubeConfig, *authConfig, *certDir, *host, *repoRoot, *provider, gceConfig, *orderseed, *times, *reportDir, testList)
 }
