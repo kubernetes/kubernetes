@@ -14,7 +14,7 @@ AWS            | Saltstack    | Ubuntu | OVS         | [docs](../../docs/getting
 Vmware         | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) |
 Azure          | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     |
 Bare-metal     | custom       | Ubuntu | _none_      | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
-Bare-metal     | custom       | Ubuntu Cluster | _none_ | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | community (@resouer @WIZARD-CXY) | use k8s version 0.10.1
+Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | Community (@resouer @WIZARD-CXY) | use k8s version 0.12.0
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     |
 Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
 Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |

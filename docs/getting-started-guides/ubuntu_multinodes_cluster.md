@@ -11,7 +11,7 @@ This document describes how to deploy kubernetes on multiple ubuntu nodes, inclu
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.0, flannel-0.2.0, k8s-0.10.1, but it should also work on higher versions*
+*4 Dependences of this guide: etcd-2.0.0, flannel-0.2.0, k8s-0.12.0, but it may work with higher versions*
 
 
 ### **Main Steps**
@@ -20,10 +20,15 @@ This document describes how to deploy kubernetes on multiple ubuntu nodes, inclu
 On your laptop, copy `cluster/ubuntu-cluster` directory to your workspace.
 
 The `build.sh` will download and build all the needed binaries into `./binaries`.
+
+You can customize your etcd version or K8s version in the build.sh by changing  variable `ETCD_V` and `K8S_V` in build.sh, default etcd version is 2.0.0 and K8s version is 0.12.0.
+
+
 ```
 $ cd cluster/ubuntu-cluster
 $ sudo ./build.sh
 ```
+
 Please copy all the files in `./binaries` into `/opt/bin` of every machine you want to run as Kubernetes cluster node.
 
 
