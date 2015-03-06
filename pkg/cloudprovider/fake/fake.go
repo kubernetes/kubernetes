@@ -24,6 +24,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+// FakeBalancer is a fake storage of balancer information
+type FakeBalancer struct {
+	Name       string
+	Region     string
+	ExternalIP net.IP
+	Port       int
+	Hosts      []string
+}
+
 // FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
 type FakeCloud struct {
 	Exists        bool
@@ -36,6 +45,7 @@ type FakeCloud struct {
 	ClusterList   []string
 	MasterName    string
 	ExternalIP    net.IP
+	Balancers     []FakeBalancer
 
 	cloudprovider.Zone
 }
@@ -87,6 +97,7 @@ func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 // It adds an entry "create" into the internal method call record.
 func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (net.IP, error) {
 	f.addCall("create")
+	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, port, hosts})
 	return f.ExternalIP, f.Err
 }
 
