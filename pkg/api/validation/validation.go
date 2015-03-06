@@ -30,7 +30,6 @@ import (
 	"github.com/golang/glog"
 )
 
-const qualifiedNameErrorMsg string = "must match regex [" + util.DNS1123SubdomainFmt + " / ] " + util.DNS1123LabelFmt
 const cIdentifierErrorMsg string = "must match regex " + util.CIdentifierFmt
 const isNegativeErrorMsg string = "value must not be negative"
 
@@ -38,18 +37,25 @@ func intervalErrorMsg(lo, hi int) string {
 	return fmt.Sprintf("must be greater than %d and less than %d", lo, hi)
 }
 
+var labelValueErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.LabelValueMaxLength, util.LabelValueFmt)
+var qualifiedNameErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, util.QualifiedNameFmt)
 var dnsSubdomainErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
 var dnsLabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
 var dns952LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS952LabelMaxLength, util.DNS952LabelFmt)
 var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
 
+const totalAnnotationSizeLimitB int = 64 * (1 << 10) // 64 kB
+
 // ValidateLabels validates that a set of labels are correctly defined.
 func ValidateLabels(labels map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	for k := range labels {
+	for k, v := range labels {
 		if !util.IsQualifiedName(k) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, qualifiedNameErrorMsg))
+		}
+		if !util.IsValidLabelValue(v) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, v, labelValueErrorMsg))
 		}
 	}
 	return allErrs
@@ -58,10 +64,18 @@ func ValidateLabels(labels map[string]string, field string) errs.ValidationError
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	for k := range annotations {
+	var totalSize int64
+	for k, v := range annotations {
 		if !util.IsQualifiedName(strings.ToLower(k)) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, qualifiedNameErrorMsg))
 		}
+		if !util.IsValidAnnotationValue(v) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
+		}
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+	if totalSize > (int64)(totalAnnotationSizeLimitB) {
+		allErrs = append(allErrs, errs.NewFieldTooLong("annotations", ""))
 	}
 	return allErrs
 }

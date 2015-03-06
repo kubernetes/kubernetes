@@ -417,7 +417,7 @@ func TestRequirementConstructor(t *testing.T) {
 		{"x", ExistsOperator, nil, true},
 		{"1foo", InOperator, util.NewStringSet("bar"), true},
 		{"1234", InOperator, util.NewStringSet("bar"), true},
-		{strings.Repeat("a", 64), ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 63
+		{strings.Repeat("a", 254), ExistsOperator, nil, false}, //breaks DNS rule that len(key) <= 253
 	}
 	for _, rc := range requirementConstructorTests {
 		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals); err == nil && !rc.Success {
