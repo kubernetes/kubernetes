@@ -90,7 +90,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor("proxy", verb, apiResource, httpCode, reqStart)
+	defer monitor("proxy", &verb, &apiResource, &httpCode, reqStart)
 
 	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {

@@ -66,7 +66,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor("watch", verb, apiResource, httpCode, reqStart)
+	defer monitor("watch", &verb, &apiResource, &httpCode, reqStart)
 
 	if req.Method != "GET" {
 		notFound(w, req)

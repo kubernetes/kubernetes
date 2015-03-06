@@ -70,9 +70,9 @@ func init() {
 
 // monitor is a helper function for each HTTP request handler to use for
 // instrumenting basic request counter and latency metrics.
-func monitor(handler, verb, resource string, httpCode int, reqStart time.Time) {
-	requestCounter.WithLabelValues(handler, verb, resource, strconv.Itoa(httpCode)).Inc()
-	requestLatencies.WithLabelValues(handler, verb).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+func monitor(handler string, verb, resource *string, httpCode *int, reqStart time.Time) {
+	requestCounter.WithLabelValues(handler, *verb, *resource, strconv.Itoa(*httpCode)).Inc()
+	requestLatencies.WithLabelValues(handler, *verb).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
 // monitorFilter creates a filter that reports the metrics for a given resource and action.
@@ -80,7 +80,8 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
-		monitor("rest", action, resource, res.StatusCode(), reqStart)
+		httpCode := res.StatusCode()
+		monitor("rest", &action, &resource, &httpCode, reqStart)
 	}
 }
 

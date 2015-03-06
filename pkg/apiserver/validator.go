@@ -73,9 +73,11 @@ type ServerStatus struct {
 }
 
 func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	verb := "get"
+	apiResource := ""
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor("validate", "get", "", httpCode, reqStart)
+	defer monitor("validate", &verb, &apiResource, &httpCode, reqStart)
 
 	reply := []ServerStatus{}
 	for name, server := range v.servers() {
