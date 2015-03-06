@@ -76,20 +76,26 @@ func TestNewAWSCloud(t *testing.T) {
 }
 
 type FakeEC2 struct {
-	instances func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error)
+	instances func(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error)
 }
 
-func (ec2 *FakeEC2) Instances(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
+func (ec2 *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
 	return ec2.instances(instanceIds, filter)
 }
 
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	return &AWSCloud{
 		&FakeEC2{
-			func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
+			func(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
+				matches := []ec2.Instance{}
+				for _, instance := range instances {
+					if filter == nil || filter.Matches(instance) {
+						matches = append(matches, instance)
+					}
+				}
 				return &ec2.InstancesResp{"",
 					[]ec2.Reservation{
-						{"", "", "", nil, instances}}}, nil
+						{"", "", "", nil, matches}}}, nil
 			}},
 		nil}
 }
@@ -128,10 +134,12 @@ func TestList(t *testing.T) {
 }
 
 func TestIPAddress(t *testing.T) {
+	// Note these instances have the same name
+	// (we test that this produces an error)
 	instances := make([]ec2.Instance, 2)
 	instances[0].PrivateDNSName = "instance1"
 	instances[0].PrivateIpAddress = "192.168.0.1"
-	instances[1].PrivateDNSName = "instance2"
+	instances[1].PrivateDNSName = "instance1"
 	instances[1].PrivateIpAddress = "192.168.0.2"
 
 	aws1 := mockInstancesResp([]ec2.Instance{})
