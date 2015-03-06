@@ -44,34 +44,6 @@ func AllFuncs(fns ...ObjectFunc) ObjectFunc {
 	}
 }
 
-// rcStrategy implements behavior for Replication Controllers.
-// TODO: move to a replicationcontroller specific package.
-type rcStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
-}
-
-// ReplicationControllers is the default logic that applies when creating and updating Replication Controller
-// objects.
-var ReplicationControllers RESTCreateStrategy = rcStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is true for replication controllers.
-func (rcStrategy) NamespaceScoped() bool {
-	return true
-}
-
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (rcStrategy) ResetBeforeCreate(obj runtime.Object) {
-	controller := obj.(*api.ReplicationController)
-	controller.Status = api.ReplicationControllerStatus{}
-}
-
-// Validate validates a new replication controller.
-func (rcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
-	controller := obj.(*api.ReplicationController)
-	return validation.ValidateReplicationController(controller)
-}
-
 // svcStrategy implements behavior for Services
 // TODO: move to a service specific package.
 type svcStrategy struct {

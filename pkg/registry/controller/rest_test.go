@@ -20,17 +20,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestListControllersError(t *testing.T) {
@@ -258,6 +261,7 @@ func TestCreateController(t *testing.T) {
 	storage := REST{
 		registry:  &mockRegistry,
 		podLister: &mockPodRegistry,
+		strategy:  Strategy,
 	}
 	controller := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "test"},
@@ -287,6 +291,7 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 	storage := REST{
 		registry:  &mockRegistry,
 		podLister: nil,
+		strategy:  Strategy,
 	}
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
@@ -312,33 +317,70 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 	}
 }
 
-func TestControllerStorageValidatesUpdate(t *testing.T) {
-	mockRegistry := registrytest.ControllerRegistry{}
+func TestControllerValidatesUpdate(t *testing.T) {
+	mockRegistry := registrytest.ControllerRegistry{
+		Controllers: &api.ReplicationControllerList{},
+	}
 	storage := REST{
 		registry:  &mockRegistry,
 		podLister: nil,
+		strategy:  Strategy,
 	}
-	failureCases := map[string]api.ReplicationController{
-		"empty ID": {
-			ObjectMeta: api.ObjectMeta{Name: ""},
-			Spec: api.ReplicationControllerSpec{
-				Selector: map[string]string{"bar": "baz"},
-			},
-		},
-		"empty selector": {
-			ObjectMeta: api.ObjectMeta{Name: "abc"},
-			Spec:       api.ReplicationControllerSpec{},
-		},
+
+	var validControllerSpec = api.ReplicationControllerSpec{
+		Selector: validPodTemplate.Spec.Labels,
+		Template: &validPodTemplate.Spec,
 	}
+
+	var validController = api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "default"},
+		Spec:       validControllerSpec,
+	}
+
 	ctx := api.NewDefaultContext()
-	for _, failureCase := range failureCases {
-		c, created, err := storage.Update(ctx, &failureCase)
-		if c != nil || created {
+	storage.Create(ctx, &validController)
+	ns := "newNamespace"
+
+	updaters := []func(rc api.ReplicationController) (runtime.Object, bool, error){
+		func(rc api.ReplicationController) (runtime.Object, bool, error) {
+			rc.UID = "newUID"
+			return storage.Update(ctx, &rc)
+		},
+		func(rc api.ReplicationController) (runtime.Object, bool, error) {
+			rc.Name = ""
+			return storage.Update(ctx, &rc)
+		},
+		func(rc api.ReplicationController) (runtime.Object, bool, error) {
+			rc.Namespace = ns
+			return storage.Update(api.WithNamespace(ctx, ns), &rc)
+		},
+		func(rc api.ReplicationController) (runtime.Object, bool, error) {
+			rc.Spec.Selector = map[string]string{}
+			return storage.Update(ctx, &rc)
+		},
+	}
+	for _, u := range updaters {
+		c, updated, err := u(validController)
+		if c != nil || updated {
 			t.Errorf("Expected nil object and not created")
 		}
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
+	}
+	// The update should fail if the namespace on the controller is set to something
+	// other than the namespace on the given context, even if the namespace on the
+	// controller is valid.
+	c, updated, err := storage.Update(api.WithNamespace(ctx, ns), &validController)
+	if c != nil || updated {
+		t.Errorf("Expected nil object and not created")
+	}
+	errSubString := "namespace"
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if !errors.IsBadRequest(err) ||
+		strings.Index(err.Error(), errSubString) == -1 {
+		t.Errorf("Expected a Bad Request error with the sub string '%s', got %v", errSubString, err)
 	}
 }
 
@@ -380,7 +422,7 @@ func TestCreateControllerWithGeneratedName(t *testing.T) {
 
 // TODO: remove, covered by TestCreate
 func TestCreateControllerWithConflictingNamespace(t *testing.T) {
-	storage := REST{}
+	storage := REST{strategy: Strategy}
 	controller := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
 	}
@@ -390,28 +432,12 @@ func TestCreateControllerWithConflictingNamespace(t *testing.T) {
 	if channel != nil {
 		t.Error("Expected a nil channel, but we got a value")
 	}
+	errSubString := "namespace"
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
-	}
-}
-
-func TestUpdateControllerWithConflictingNamespace(t *testing.T) {
-	storage := REST{}
-	controller := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
-	}
-
-	ctx := api.NewDefaultContext()
-	obj, created, err := storage.Update(ctx, controller)
-	if obj != nil || created {
-		t.Error("Expected a nil object, but we got a value or created was true")
-	}
-	if err == nil {
-		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Controller.Namespace does not match the provided context") == -1 {
-		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+	} else if !errors.IsBadRequest(err) ||
+		strings.Index(err.Error(), errSubString) == -1 {
+		t.Errorf("Expected a Bad Request error with the sub string '%s', got %v", errSubString, err)
 	}
 }
 
@@ -436,4 +462,76 @@ func TestCreate(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestBeforeCreate(t *testing.T) {
+	failures := []runtime.Object{
+		&api.Service{},
+		&api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "foo",
+				Namespace: "#$%%invalid",
+			},
+		},
+		&api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "##&*(&invalid",
+				Namespace: api.NamespaceDefault,
+			},
+		},
+	}
+	for _, test := range failures {
+		ctx := api.NewDefaultContext()
+		err := rest.BeforeCreate(rest.Services, ctx, test)
+		if err == nil {
+			t.Errorf("unexpected non-error for %v", test)
+		}
+	}
+
+	obj := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Selector: map[string]string{"name": "foo"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "foo",
+							Image:           "foo",
+							ImagePullPolicy: api.PullAlways,
+						},
+					},
+					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					DNSPolicy:     api.DNSDefault,
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 3,
+		},
+	}
+	ctx := api.NewDefaultContext()
+	err := rest.BeforeCreate(Strategy, ctx, obj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(obj.Status, api.ReplicationControllerStatus{}) {
+		t.Errorf("status was not cleared as expected.")
+	}
+	if obj.Name != "foo" || obj.Namespace != api.NamespaceDefault {
+		t.Errorf("unexpected object metadata: %v", obj.ObjectMeta)
+	}
+
+	obj.Spec.Replicas = -1
+	if err := rest.BeforeCreate(Strategy, ctx, obj); err == nil {
+		t.Errorf("unexpected non-error for invalid replication controller.")
+	}
 }
