@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/cadvisor/info"
-	itest "github.com/google/cadvisor/info/test"
+	info "github.com/google/cadvisor/info/v1"
+	itest "github.com/google/cadvisor/info/v1/test"
 )
 
 func testHTTPContainerInfoGetter(
@@ -62,7 +62,7 @@ func testHTTPContainerInfoGetter(
 		// So changing req after Get*Info would be a race.
 		expectedReq := req
 		// Fill any empty fields with default value
-		if !reflect.DeepEqual(expectedReq, &receivedReq) {
+		if !expectedReq.Equals(receivedReq) {
 			t.Errorf("received wrong request")
 		}
 		err = json.NewEncoder(w).Encode(cinfo)
