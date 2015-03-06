@@ -1,0 +1,16 @@
+{
+  "apiVersion":"v1beta3",
+  "kind": "Pod",
+  "metadata": {
+    "name": "invalid-pod",
+  },
+  "labels": {
+    "name": "invalid-pod"
+  },
+  "spec": {
+      "containers": [{
+        "name": "kubernetes-serve-hostname",
+        "image": "kubernetes/serve_hostname",        
+      }]
+    }
+}

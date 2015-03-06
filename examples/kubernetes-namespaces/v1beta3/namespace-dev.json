@@ -1,0 +1,11 @@
+{
+  "apiVersion":"v1beta3",  
+  "kind": "Namespace",
+  "metadata": {
+    "name": "development",
+  },
+  "spec": {},
+  "labels": {
+    "name": "development"
+  },  
+}
