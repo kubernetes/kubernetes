@@ -151,13 +151,13 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
-			"Comment": "0.6.2",
-			"Rev": "89088df70eca64cf9d6b9a23a3d2bc21a30916d6"
+			"Comment": "0.10.1-30-gb5e2f37",
+			"Rev": "b5e2f3788e4a39a0836c5490e6bf31832400c1f3"
 		},
 		{
-			"ImportPath": "github.com/google/cadvisor/info",
-			"Comment": "0.6.2",
-			"Rev": "89088df70eca64cf9d6b9a23a3d2bc21a30916d6"
+			"ImportPath": "github.com/google/cadvisor/info/v1",
+			"Comment": "0.10.1-30-gb5e2f37",
+			"Rev": "b5e2f3788e4a39a0836c5490e6bf31832400c1f3"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
@@ -226,11 +226,6 @@
 		{
 			"ImportPath": "github.com/prometheus/procfs",
 			"Rev": "6c34ef819e19b4e16f410100ace4aa006f0e3bf8"
-		},
-		{
-			"ImportPath": "github.com/racker/perigee",
-			"Comment": "v0.0.0-18-g0c00cb0",
-			"Rev": "0c00cb0a026b71034ebc8205263c77dad3577db5"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",

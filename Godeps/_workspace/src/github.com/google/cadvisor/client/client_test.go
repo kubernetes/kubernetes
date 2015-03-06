@@ -21,11 +21,12 @@ import (
 	"net/http/httptest"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/cadvisor/info"
-	itest "github.com/google/cadvisor/info/test"
+	info "github.com/google/cadvisor/info/v1"
+	itest "github.com/google/cadvisor/info/v1/test"
 	"github.com/kr/pretty"
 )
 
@@ -43,22 +44,25 @@ func testGetJsonData(
 	return nil
 }
 
-func cadvisorTestClient(path string, expectedPostObj, expectedPostObjEmpty, replyObj interface{}, t *testing.T) (*Client, *httptest.Server, error) {
+func cadvisorTestClient(path string, expectedPostObj *info.ContainerInfoRequest, replyObj interface{}, t *testing.T) (*Client, *httptest.Server, error) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == path {
 			if expectedPostObj != nil {
+				expectedPostObjEmpty := new(info.ContainerInfoRequest)
 				decoder := json.NewDecoder(r.Body)
 				if err := decoder.Decode(expectedPostObjEmpty); err != nil {
 					t.Errorf("Received invalid object: %v", err)
 				}
-				if !reflect.DeepEqual(expectedPostObj, expectedPostObjEmpty) {
-					t.Errorf("Received unexpected object: %+v", expectedPostObjEmpty)
+				if expectedPostObj.NumStats != expectedPostObjEmpty.NumStats ||
+					expectedPostObj.Start.Unix() != expectedPostObjEmpty.Start.Unix() ||
+					expectedPostObj.End.Unix() != expectedPostObjEmpty.End.Unix() {
+					t.Errorf("Received unexpected object: %+v, expected: %+v", expectedPostObjEmpty, expectedPostObj)
 				}
 			}
 			encoder := json.NewEncoder(w)
 			encoder.Encode(replyObj)
 		} else if r.URL.Path == "/api/v1.2/machine" {
-			fmt.Fprint(w, `{"num_cores":8,"memory_capacity":31625871360}`)
+			fmt.Fprint(w, `{"num_cores":8,"memory_capacity":31625871360, "disk_map":["8:0":{"name":"sda","major":8,"minor":0,"size":10737418240}]}`)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, "Page not found.")
@@ -78,8 +82,16 @@ func TestGetMachineinfo(t *testing.T) {
 	minfo := &info.MachineInfo{
 		NumCores:       8,
 		MemoryCapacity: 31625871360,
+		DiskMap: map[string]info.DiskInfo{
+			"8:0": {
+				Name:  "sda",
+				Major: 8,
+				Minor: 0,
+				Size:  10737418240,
+			},
+		},
 	}
-	client, server, err := cadvisorTestClient("/api/v1.2/machine", nil, nil, minfo, t)
+	client, server, err := cadvisorTestClient("/api/v1.2/machine", nil, minfo, t)
 	if err != nil {
 		t.Fatalf("unable to get a client %v", err)
 	}
@@ -101,7 +113,7 @@ func TestGetContainerInfo(t *testing.T) {
 	}
 	containerName := "/some/container"
 	cinfo := itest.GenerateRandomContainerInfo(containerName, 4, query, 1*time.Second)
-	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.2/containers%v", containerName), query, &info.ContainerInfoRequest{}, cinfo, t)
+	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.2/containers%v", containerName), query, cinfo, t)
 	if err != nil {
 		t.Fatalf("unable to get a client %v", err)
 	}
@@ -113,6 +125,30 @@ func TestGetContainerInfo(t *testing.T) {
 
 	if !returned.Eq(cinfo) {
 		t.Error("received unexpected ContainerInfo")
+	}
+}
+
+// Test a request failing
+func TestRequestFails(t *testing.T) {
+	errorText := "there was an error"
+	// Setup a server that simply fails.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, errorText, 500)
+	}))
+	client, err := NewClient(ts.URL)
+	if err != nil {
+		ts.Close()
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	_, err = client.ContainerInfo("/", &info.ContainerInfoRequest{NumStats: 3})
+	if err == nil {
+		t.Fatalf("Expected non-nil error")
+	}
+	expectedError := fmt.Sprintf("request failed with error: %q", errorText)
+	if strings.Contains(err.Error(), expectedError) {
+		t.Fatalf("Expected error %q but received %q", expectedError, err)
 	}
 }
 
@@ -129,7 +165,7 @@ func TestGetSubcontainersInfo(t *testing.T) {
 		*cinfo1,
 		*cinfo2,
 	}
-	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.2/subcontainers%v", containerName), query, &info.ContainerInfoRequest{}, response, t)
+	client, server, err := cadvisorTestClient(fmt.Sprintf("/api/v1.2/subcontainers%v", containerName), query, response, t)
 	if err != nil {
 		t.Fatalf("unable to get a client %v", err)
 	}
