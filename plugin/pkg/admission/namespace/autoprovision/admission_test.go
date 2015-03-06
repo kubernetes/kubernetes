@@ -15,3 +15,91 @@ limitations under the License.
 */
 
 package autoprovision
+
+import (
+	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+)
+
+// TestAdmission verifies a namespace is created on create requests for namespace managed resources
+func TestAdmission(t *testing.T) {
+	namespace := "test"
+	mockClient := &client.Fake{}
+	handler := &provision{
+		client: mockClient,
+		store:  cache.NewStore(cache.MetaNamespaceKeyFunc),
+	}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		},
+	}
+	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+	if len(mockClient.Actions) != 1 {
+		t.Errorf("Expected a create-namespace request")
+	}
+	if mockClient.Actions[0].Action != "create-namespace" {
+		t.Errorf("Expected a create-namespace request to be made via the client")
+	}
+}
+
+// TestAdmissionNamespaceExists verifies that no client call is made when a namespace already exists
+func TestAdmissionNamespaceExists(t *testing.T) {
+	namespace := "test"
+	mockClient := &client.Fake{}
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	store.Add(&api.Namespace{
+		ObjectMeta: api.ObjectMeta{Name: namespace},
+	})
+	handler := &provision{
+		client: mockClient,
+		store:  store,
+	}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		},
+	}
+	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+	if len(mockClient.Actions) != 0 {
+		t.Errorf("No client request should have been made")
+	}
+}
+
+// TestIgnoreAdmission validates that a request is ignored if its not a create
+func TestIgnoreAdmission(t *testing.T) {
+	namespace := "test"
+	mockClient := &client.Fake{}
+	handler := &provision{
+		client: mockClient,
+		store:  cache.NewStore(cache.MetaNamespaceKeyFunc),
+	}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		},
+	}
+	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "UPDATE"))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+	if len(mockClient.Actions) != 0 {
+		t.Errorf("No client request should have been made")
+	}
+}

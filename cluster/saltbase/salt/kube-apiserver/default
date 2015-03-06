@@ -59,8 +59,8 @@
 {% endif -%}
 
 {% set admission_control = "" -%}
-{% if grains.admission_control is defined -%}
- {% set admission_control = "--admission_control=" + grains.admission_control -%}
+{% if pillar['admission_control'] is defined -%}
+ {% set admission_control = "--admission_control=" + pillar['admission_control'] -%}
 {% endif -%}
 
 {% set runtime_config = "" -%}
