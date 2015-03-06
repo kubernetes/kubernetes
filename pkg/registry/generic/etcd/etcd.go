@@ -23,6 +23,7 @@ import (
 	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -72,7 +73,7 @@ type Etcd struct {
 	TTLFunc func(obj runtime.Object, update bool) (uint64, error)
 
 	// Returns a matcher corresponding to the provided labels and fields.
-	PredicateFunc func(label, field labels.Selector) generic.Matcher
+	PredicateFunc func(label labels.Selector, field fields.Selector) generic.Matcher
 
 	// Called on all objects returned from the underlying store, after
 	// the exit hooks are invoked. Decorators are intended for integrations
@@ -134,7 +135,7 @@ func (e *Etcd) NewList() runtime.Object {
 }
 
 // List returns a list of items matching labels and field
-func (e *Etcd) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	return e.ListPredicate(ctx, e.PredicateFunc(label, field))
 }
 
@@ -358,7 +359,7 @@ func (e *Etcd) Delete(ctx api.Context, name string) (runtime.Object, error) {
 
 // WatchPredicate starts a watch for the items that m matches.
 // TODO: Detect if m references a single object instead of a list.
-func (e *Etcd) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }
 

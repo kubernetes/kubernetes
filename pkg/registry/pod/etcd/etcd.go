@@ -24,6 +24,7 @@ import (
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
@@ -55,7 +56,7 @@ func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingRE
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Pod).Name, nil
 		},
-		PredicateFunc: func(label, field labels.Selector) generic.Matcher {
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return pod.MatchPod(label, field)
 		},
 		EndpointName: "pods",
@@ -96,12 +97,12 @@ func (r *REST) NewList() runtime.Object {
 }
 
 // List obtains a list of pods with labels that match selector.
-func (r *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+func (r *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	return r.store.List(ctx, label, field)
 }
 
 // Watch begins watching for new, changed, or deleted pods.
-func (r *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return r.store.Watch(ctx, label, field, resourceVersion)
 }
 

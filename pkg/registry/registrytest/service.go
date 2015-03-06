@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -107,7 +108,7 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -137,7 +138,7 @@ func (r *ServiceRegistry) UpdateEndpoints(ctx api.Context, e *api.Endpoints) err
 	return r.Err
 }
 
-func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

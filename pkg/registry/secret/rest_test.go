@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -163,7 +164,7 @@ func TestRESTgetAttrs(t *testing.T) {
 	if e, a := label, (labels.Set{}); !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
-	expect := labels.Set{
+	expect := fields.Set{
 		"type": string(api.SecretTypeOpaque),
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
@@ -183,7 +184,7 @@ func TestRESTList(t *testing.T) {
 	reg.ObjectList = &api.SecretList{
 		Items: []api.Secret{*secretA, *secretB, *secretC},
 	}
-	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Everything())
+	got, err := rest.List(api.NewContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -198,7 +199,7 @@ func TestRESTList(t *testing.T) {
 func TestRESTWatch(t *testing.T) {
 	secretA := testSecret("a")
 	reg, rest := NewTestREST()
-	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), "0")
+	wi, err := rest.Watch(api.NewContext(), labels.Everything(), fields.Everything(), "0")
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

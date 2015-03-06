@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -77,7 +78,7 @@ func TestList(t *testing.T) {
 	})
 
 	ctx := api.NewDefaultContext()
-	obj, err := rest.List(ctx, labels.Set{}.AsSelector(), labels.Set{}.AsSelector())
+	obj, err := rest.List(ctx, labels.Set{}.AsSelector(), fields.Set{}.AsSelector())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -89,7 +90,7 @@ func TestList(t *testing.T) {
 		t.Errorf("unexpected list object: %v", obj)
 	}
 
-	obj, err = rest.List(ctx, labels.Set{"foo": "bar"}.AsSelector(), labels.Set{}.AsSelector())
+	obj, err = rest.List(ctx, labels.Set{"foo": "bar"}.AsSelector(), fields.Set{}.AsSelector())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

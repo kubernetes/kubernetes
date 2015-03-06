@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -209,7 +210,7 @@ func TestWatchParamParsing(t *testing.T) {
 
 	for _, item := range table {
 		simpleStorage.requestedLabelSelector = labels.Everything()
-		simpleStorage.requestedFieldSelector = labels.Everything()
+		simpleStorage.requestedFieldSelector = fields.Everything()
 		simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
 		simpleStorage.requestedResourceNamespace = ""
 		dest.RawQuery = item.rawQuery

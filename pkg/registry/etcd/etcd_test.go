@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
@@ -281,7 +282,7 @@ func TestEtcdWatchController(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	watching, err := registry.WatchControllers(ctx,
 		labels.Everything(),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -310,7 +311,7 @@ func TestEtcdWatchControllersMatch(t *testing.T) {
 	registry := NewTestEtcdRegistryWithPods(fakeClient)
 	watching, err := registry.WatchControllers(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -351,7 +352,7 @@ func TestEtcdWatchControllersNotMatch(t *testing.T) {
 	registry := NewTestEtcdRegistryWithPods(fakeClient)
 	watching, err := registry.WatchControllers(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -678,7 +679,7 @@ func TestEtcdWatchServices(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	watching, err := registry.WatchServices(ctx,
 		labels.Everything(),
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
+		fields.SelectorFromSet(fields.Set{"name": "foo"}),
 		"1",
 	)
 	if err != nil {
@@ -707,7 +708,7 @@ func TestEtcdWatchServicesBadSelector(t *testing.T) {
 	_, err := registry.WatchServices(
 		ctx,
 		labels.Everything(),
-		labels.SelectorFromSet(labels.Set{"Field.Selector": "foo"}),
+		fields.SelectorFromSet(fields.Set{"Field.Selector": "foo"}),
 		"",
 	)
 	if err == nil {
@@ -717,7 +718,7 @@ func TestEtcdWatchServicesBadSelector(t *testing.T) {
 	_, err = registry.WatchServices(
 		ctx,
 		labels.SelectorFromSet(labels.Set{"Label.Selector": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"",
 	)
 	if err == nil {
@@ -732,7 +733,7 @@ func TestEtcdWatchEndpoints(t *testing.T) {
 	watching, err := registry.WatchEndpoints(
 		ctx,
 		labels.Everything(),
-		labels.SelectorFromSet(labels.Set{"name": "foo"}),
+		fields.SelectorFromSet(fields.Set{"name": "foo"}),
 		"1",
 	)
 	if err != nil {
@@ -761,7 +762,7 @@ func TestEtcdWatchEndpointsAcrossNamespaces(t *testing.T) {
 	watching, err := registry.WatchEndpoints(
 		ctx,
 		labels.Everything(),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -790,7 +791,7 @@ func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
 	_, err := registry.WatchEndpoints(
 		ctx,
 		labels.Everything(),
-		labels.SelectorFromSet(labels.Set{"Field.Selector": "foo"}),
+		fields.SelectorFromSet(fields.Set{"Field.Selector": "foo"}),
 		"",
 	)
 	if err == nil {
@@ -800,7 +801,7 @@ func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
 	_, err = registry.WatchEndpoints(
 		ctx,
 		labels.SelectorFromSet(labels.Set{"Label.Selector": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"",
 	)
 	if err == nil {
@@ -925,7 +926,7 @@ func TestEtcdWatchMinion(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	watching, err := registry.WatchMinions(ctx,
 		labels.Everything(),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -953,7 +954,7 @@ func TestEtcdWatchMinionsMatch(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	watching, err := registry.WatchMinions(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -993,7 +994,7 @@ func TestEtcdWatchMinionsNotMatch(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	watching, err := registry.WatchMinions(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {

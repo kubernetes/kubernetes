@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	rc "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -82,7 +83,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -129,7 +130,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 
 // Watch returns ReplicationController events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchControllers(ctx, label, field, resourceVersion)
 }
 

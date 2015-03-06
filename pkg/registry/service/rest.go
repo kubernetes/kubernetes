@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -151,8 +152,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return service, err
 }
 
-// TODO: implement field selector?
-func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	list, err := rs.registry.ListServices(ctx)
 	if err != nil {
 		return nil, err
@@ -169,7 +169,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 
 // Watch returns Services events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
 }
 

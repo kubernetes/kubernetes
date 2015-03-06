@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -216,7 +217,7 @@ type SimpleRESTStorage struct {
 	// These are set when Watch is called
 	fakeWatch                  *watch.FakeWatcher
 	requestedLabelSelector     labels.Selector
-	requestedFieldSelector     labels.Selector
+	requestedFieldSelector     fields.Selector
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
@@ -230,7 +231,7 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &SimpleList{
 		Items: storage.list,
@@ -296,7 +297,7 @@ func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (r
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	storage.checkContext(ctx)
 	storage.requestedLabelSelector = label
 	storage.requestedFieldSelector = field

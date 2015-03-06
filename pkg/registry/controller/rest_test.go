@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -41,7 +42,7 @@ func TestListControllersError(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	ctx := api.NewContext()
-	controllers, err := storage.List(ctx, labels.Everything(), labels.Everything())
+	controllers, err := storage.List(ctx, labels.Everything(), fields.Everything())
 	if err != mockRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
 	}
@@ -58,7 +59,7 @@ func TestListEmptyControllerList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	ctx := api.NewContext()
-	controllers, err := storage.List(ctx, labels.Everything(), labels.Everything())
+	controllers, err := storage.List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -92,7 +93,7 @@ func TestListControllerList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	ctx := api.NewContext()
-	controllersObj, err := storage.List(ctx, labels.Everything(), labels.Everything())
+	controllersObj, err := storage.List(ctx, labels.Everything(), fields.Everything())
 	controllers := controllersObj.(*api.ReplicationControllerList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

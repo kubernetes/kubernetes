@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -180,7 +181,7 @@ func TestRESTgetAttrs(t *testing.T) {
 	if e, a := label, (labels.Set{}); !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
-	expect := labels.Set{
+	expect := fields.Set{
 		"involvedObject.kind":            "Pod",
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",
@@ -237,7 +238,7 @@ func TestRESTList(t *testing.T) {
 	reg.ObjectList = &api.EventList{
 		Items: []api.Event{*eventA, *eventB, *eventC},
 	}
-	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Set{"source": "GoodSource"}.AsSelector())
+	got, err := rest.List(api.NewContext(), labels.Everything(), fields.Set{"source": "GoodSource"}.AsSelector())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -262,7 +263,7 @@ func TestRESTWatch(t *testing.T) {
 		Reason: "ForTesting",
 	}
 	reg, rest := NewTestREST()
-	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), "0")
+	wi, err := rest.Watch(api.NewContext(), labels.Everything(), fields.Everything(), "0")
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

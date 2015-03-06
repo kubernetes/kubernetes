@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -179,7 +180,7 @@ func TestListError(t *testing.T) {
 	storage, _, _ := NewREST(helper, nil)
 	cache := &fakeCache{}
 	storage = storage.WithPodStatus(cache)
-	pods, err := storage.List(api.NewDefaultContext(), labels.Everything(), labels.Everything())
+	pods, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("Expected %#v, Got %#v", fakeEtcdClient.Err, err)
 	}
@@ -208,7 +209,7 @@ func TestListCacheError(t *testing.T) {
 	cache := &fakeCache{errorToReturn: client.ErrPodInfoNotAvailable}
 	storage = storage.WithPodStatus(cache)
 
-	pods, err := storage.List(api.NewDefaultContext(), labels.Everything(), labels.Everything())
+	pods, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("Expected no error, got %#v", err)
 	}
@@ -232,7 +233,7 @@ func TestListEmptyPodList(t *testing.T) {
 	storage, _, _ := NewREST(helper, nil)
 	cache := &fakeCache{}
 	storage = storage.WithPodStatus(cache)
-	pods, err := storage.List(api.NewContext(), labels.Everything(), labels.Everything())
+	pods, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -271,7 +272,7 @@ func TestListPodList(t *testing.T) {
 	cache := &fakeCache{statusToReturn: &api.PodStatus{Phase: api.PodRunning}}
 	storage = storage.WithPodStatus(cache)
 
-	podsObj, err := storage.List(api.NewDefaultContext(), labels.Everything(), labels.Everything())
+	podsObj, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	pods := podsObj.(*api.PodList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -357,7 +358,7 @@ func TestListPodListSelection(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
-		field, err := labels.ParseSelector(item.field)
+		field, err := fields.ParseSelector(item.field)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -1451,7 +1452,7 @@ func TestEtcdEmptyList(t *testing.T) {
 		E: nil,
 	}
 
-	obj, err := registry.List(ctx, labels.Everything(), labels.Everything())
+	obj, err := registry.List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1469,7 +1470,7 @@ func TestEtcdListNotFound(t *testing.T) {
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
-	obj, err := registry.List(ctx, labels.Everything(), labels.Everything())
+	obj, err := registry.List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1504,7 +1505,7 @@ func TestEtcdList(t *testing.T) {
 		},
 		E: nil,
 	}
-	obj, err := registry.List(ctx, labels.Everything(), labels.Everything())
+	obj, err := registry.List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1524,7 +1525,7 @@ func TestEtcdWatchPods(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	watching, err := registry.Watch(ctx,
 		labels.Everything(),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -1551,7 +1552,7 @@ func TestEtcdWatchPodsMatch(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	watching, err := registry.Watch(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {
@@ -1590,7 +1591,7 @@ func TestEtcdWatchPodsNotMatch(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	watching, err := registry.Watch(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
-		labels.Everything(),
+		fields.Everything(),
 		"1",
 	)
 	if err != nil {

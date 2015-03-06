@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -60,7 +61,7 @@ func (e *EndpointRegistry) GetEndpoints(ctx api.Context, name string) (*api.Endp
 	return nil, errors.NewNotFound("Endpoints", name)
 }
 
-func (e *EndpointRegistry) WatchEndpoints(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (e *EndpointRegistry) WatchEndpoints(ctx api.Context, labels labels.Selector, fields fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
@@ -82,7 +83,7 @@ func GetResource(r RESTGetter, ctxFn ContextFunc, namer ScopeNamer, codec runtim
 	}
 }
 
-func parseSelectorQueryParams(query url.Values, version, apiResource string) (label, field labels.Selector, err error) {
+func parseSelectorQueryParams(query url.Values, version, apiResource string) (label labels.Selector, field fields.Selector, err error) {
 	labelString := query.Get("labels")
 	label, err = labels.Parse(labelString)
 	if err != nil {
@@ -93,7 +94,7 @@ func parseSelectorQueryParams(query url.Values, version, apiResource string) (la
 		return api.Scheme.ConvertFieldLabel(version, apiResource, label, value)
 	}
 	fieldString := query.Get("fields")
-	field, err = labels.ParseAndTransformSelector(fieldString, convertToInternalVersionFunc)
+	field, err = fields.ParseAndTransformSelector(fieldString, convertToInternalVersionFunc)
 	if err != nil {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'fields' selector parameter (%s) could not be parsed: %v", fieldString, err))
 	}
