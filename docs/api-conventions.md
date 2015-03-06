@@ -161,10 +161,10 @@ Kubernetes by convention exposes additional verbs as new root endpoints with sin
 
 * GET /watch/&lt;resourceNamePlural&gt; - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
 * GET /watch/&lt;resourceNamePlural&gt;/&lt;name&gt; - Receive a stream of JSON objects corresponding to changes made to the named resource of the given kind over time.
-* GET /redirect/&lt;resourceNamePlural&gt;/&lt;name&gt; - If the named resource can be described by a URL, return an HTTP redirect to that URL instead of a JSON response. For example, a service exposes a port and IP address and a client could invoke the redirect verb to receive an HTTP 307 redirection to that port and IP.
-* GET /proxy/&lt;resourceNamePlural&gt;/&lt;name&gt;/{subpath:*} - Proxy GET request to the named resource of the given kind. Can be used for example, to access log files on pods.
 
 These are verbs which change the fundamental type of data returned (watch returns a stream of JSON instead of a single JSON object). Support of additional verbs is not required for all object types.
+
+Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [accessing-the-cluster.md](accessing-the-cluster.md).
 
 When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "resize" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
 
