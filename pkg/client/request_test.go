@@ -27,7 +27,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	// "reflect"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -64,7 +64,7 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	if changed != &r {
 		t.Errorf("returned request should point to the same object")
 	}
-	if !api.Semantic.DeepDerivative(changed, &original) {
+	if !reflect.DeepEqual(changed, &original) {
 		t.Errorf("expected %#v, got %#v", &original, changed)
 	}
 }
