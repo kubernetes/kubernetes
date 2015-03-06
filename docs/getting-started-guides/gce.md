@@ -77,7 +77,7 @@ can create a pod like this:
 
 ```bash
 cd kubernetes
-cluster/kubectl.sh create -f api/examples/pod.json
+cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
 ```
 
 Where pod.json contains something like:
