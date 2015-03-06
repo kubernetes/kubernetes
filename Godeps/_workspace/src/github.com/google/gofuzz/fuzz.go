@@ -28,17 +28,22 @@ type fuzzFuncMap map[reflect.Type]reflect.Value
 
 // Fuzzer knows how to fill any object with random fields.
 type Fuzzer struct {
-	fuzzFuncs   fuzzFuncMap
-	r           *rand.Rand
-	nilChance   float64
-	minElements int
-	maxElements int
+	fuzzFuncs        fuzzFuncMap
+	defaultFuzzFuncs fuzzFuncMap
+	r                *rand.Rand
+	nilChance        float64
+	minElements      int
+	maxElements      int
 }
 
 // New returns a new Fuzzer. Customize your Fuzzer further by calling Funcs,
 // RandSource, NilChance, or NumElements in any order.
 func New() *Fuzzer {
 	f := &Fuzzer{
+		defaultFuzzFuncs: fuzzFuncMap{
+			reflect.TypeOf(&time.Time{}): reflect.ValueOf(fuzzTime),
+		},
+
 		fuzzFuncs:   fuzzFuncMap{},
 		r:           rand.New(rand.NewSource(time.Now().UnixNano())),
 		nilChance:   .2,
@@ -131,8 +136,16 @@ func (f *Fuzzer) genShouldFill() bool {
 	return f.r.Float64() > f.nilChance
 }
 
-// Fuzz recursively fills all of obj's fields with something random.
+// Fuzz recursively fills all of obj's fields with something random.  First
+// this tries to find a custom fuzz function (see Funcs).  If there is no
+// custom function this tests whether the object implements fuzz.Interface and,
+// if so, calls Fuzz on it to fuzz itself.  If that fails, this will see if
+// there is a default fuzz function provided by this package.  If all of that
+// fails, this will generate random values for all primitive fields and then
+// recurse for all non-primitives.
+//
 // Not safe for cyclic or tree-like structs!
+//
 // obj must be a pointer. Only exported (public) fields can be set (thanks, golang :/ )
 // Intended for tests, so will panic on bad input or unimplemented fields.
 func (f *Fuzzer) Fuzz(obj interface{}) {
@@ -141,20 +154,45 @@ func (f *Fuzzer) Fuzz(obj interface{}) {
 		panic("needed ptr!")
 	}
 	v = v.Elem()
-	f.doFuzz(v)
+	f.doFuzz(v, 0)
 }
 
-func (f *Fuzzer) doFuzz(v reflect.Value) {
+// FuzzNoCustom is just like Fuzz, except that any custom fuzz function for
+// obj's type will not be called and obj will not be tested for fuzz.Interface
+// conformance.  This applies only to obj and not other instances of obj's
+// type.
+// Not safe for cyclic or tree-like structs!
+// obj must be a pointer. Only exported (public) fields can be set (thanks, golang :/ )
+// Intended for tests, so will panic on bad input or unimplemented fields.
+func (f *Fuzzer) FuzzNoCustom(obj interface{}) {
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Ptr {
+		panic("needed ptr!")
+	}
+	v = v.Elem()
+	f.doFuzz(v, flagNoCustomFuzz)
+}
+
+const (
+	// Do not try to find a custom fuzz function.  Does not apply recursively.
+	flagNoCustomFuzz uint64 = 1 << iota
+)
+
+func (f *Fuzzer) doFuzz(v reflect.Value, flags uint64) {
 	if !v.CanSet() {
 		return
 	}
-	// Check for both pointer and non-pointer custom functions.
-	if v.CanAddr() && f.tryCustom(v.Addr()) {
-		return
+
+	if flags&flagNoCustomFuzz == 0 {
+		// Check for both pointer and non-pointer custom functions.
+		if v.CanAddr() && f.tryCustom(v.Addr()) {
+			return
+		}
+		if f.tryCustom(v) {
+			return
+		}
 	}
-	if f.tryCustom(v) {
-		return
-	}
+
 	if fn, ok := fillFuncMap[v.Kind()]; ok {
 		fn(v, f.r)
 		return
@@ -166,9 +204,9 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 			n := f.genElementCount()
 			for i := 0; i < n; i++ {
 				key := reflect.New(v.Type().Key()).Elem()
-				f.doFuzz(key)
+				f.doFuzz(key, 0)
 				val := reflect.New(v.Type().Elem()).Elem()
-				f.doFuzz(val)
+				f.doFuzz(val, 0)
 				v.SetMapIndex(key, val)
 			}
 			return
@@ -177,7 +215,7 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 	case reflect.Ptr:
 		if f.genShouldFill() {
 			v.Set(reflect.New(v.Type().Elem()))
-			f.doFuzz(v.Elem())
+			f.doFuzz(v.Elem(), 0)
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
@@ -186,14 +224,14 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 			n := f.genElementCount()
 			v.Set(reflect.MakeSlice(v.Type(), n, n))
 			for i := 0; i < n; i++ {
-				f.doFuzz(v.Index(i))
+				f.doFuzz(v.Index(i), 0)
 			}
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
-			f.doFuzz(v.Field(i))
+			f.doFuzz(v.Field(i), 0)
 		}
 	case reflect.Array:
 		fallthrough
@@ -211,9 +249,22 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 // tryCustom searches for custom handlers, and returns true iff it finds a match
 // and successfully randomizes v.
 func (f *Fuzzer) tryCustom(v reflect.Value) bool {
+	// First: see if we have a fuzz function for it.
 	doCustom, ok := f.fuzzFuncs[v.Type()]
 	if !ok {
-		return false
+		// Second: see if it can fuzz itself.
+		if v.CanInterface() {
+			intf := v.Interface()
+			if fuzzable, ok := intf.(Interface); ok {
+				fuzzable.Fuzz(Continue{f: f, Rand: f.r})
+				return true
+			}
+		}
+		// Finally: see if there is a default fuzz function.
+		doCustom, ok = f.defaultFuzzFuncs[v.Type()]
+		if !ok {
+			return false
+		}
 	}
 
 	switch v.Kind() {
@@ -242,6 +293,13 @@ func (f *Fuzzer) tryCustom(v reflect.Value) bool {
 	return true
 }
 
+// Interface represents an object that knows how to fuzz itself.  Any time we
+// find a type that implements this interface we will delegate the act of
+// fuzzing itself.
+type Interface interface {
+	Fuzz(c Continue)
+}
+
 // Continue can be passed to custom fuzzing functions to allow them to use
 // the correct source of randomness and to continue fuzzing their members.
 type Continue struct {
@@ -260,7 +318,20 @@ func (c Continue) Fuzz(obj interface{}) {
 		panic("needed ptr!")
 	}
 	v = v.Elem()
-	c.f.doFuzz(v)
+	c.f.doFuzz(v, 0)
+}
+
+// FuzzNoCustom continues fuzzing obj, except that any custom fuzz function for
+// obj's type will not be called and obj will not be tested for fuzz.Interface
+// conformance.  This applies only to obj and not other instances of obj's
+// type.
+func (c Continue) FuzzNoCustom(obj interface{}) {
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Ptr {
+		panic("needed ptr!")
+	}
+	v = v.Elem()
+	c.f.doFuzz(v, flagNoCustomFuzz)
 }
 
 // RandString makes a random string up to 20 characters long. The returned string
@@ -286,6 +357,15 @@ func fuzzInt(v reflect.Value, r *rand.Rand) {
 
 func fuzzUint(v reflect.Value, r *rand.Rand) {
 	v.SetUint(randUint64(r))
+}
+
+func fuzzTime(t *time.Time, c Continue) {
+	var sec, nsec int64
+	// Allow for about 1000 years of random time values, which keeps things
+	// like JSON parsing reasonably happy.
+	sec = c.Rand.Int63n(1000 * 365 * 24 * 60 * 60)
+	c.Fuzz(&nsec)
+	*t = time.Unix(sec, nsec)
 }
 
 var fillFuncMap = map[reflect.Kind]func(reflect.Value, *rand.Rand){

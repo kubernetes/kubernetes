@@ -161,7 +161,7 @@
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
-			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
+			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",

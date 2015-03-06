@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/davecgh/go-spew/spew"
 
 	flag "github.com/spf13/pflag"
 )
@@ -52,20 +53,22 @@ func fuzzInternalObject(t *testing.T, forVersion string, item runtime.Object, se
 }
 
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
+	printer := spew.ConfigState{DisableMethods: true}
+
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := codec.Encode(item)
 	if err != nil {
-		t.Errorf("%v: %v (%#v)", name, err, item)
+		t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
 		return
 	}
 
 	obj2, err := codec.Decode(data)
 	if err != nil {
-		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), item)
+		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, string(data), printer.Sprintf("%#v", item))
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj2) {
-		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v\nFinal: %#v", name, util.ObjectGoPrintDiff(item, obj2), codec, string(data), item, obj2)
+		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v\nFinal: %#v", name, util.ObjectGoPrintDiff(item, obj2), codec, string(data), printer.Sprintf("%#v", item), printer.Sprintf("%#v", obj2))
 		return
 	}
 

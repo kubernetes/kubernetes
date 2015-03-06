@@ -19,6 +19,8 @@ package util
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/google/gofuzz"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -89,3 +91,13 @@ func (t Time) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(t.Format(time.RFC3339))
 }
+
+// Fuzz satisfies fuzz.Interface.
+func (t *Time) Fuzz(c fuzz.Continue) {
+	// Allow for about 1000 years of randomness.  Leave off nanoseconds
+	// because JSON doesn't represent them so they can't round-trip
+	// properly.
+	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 0)
+}
+
+var _ fuzz.Interface = &Time{}
