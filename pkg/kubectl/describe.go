@@ -46,7 +46,7 @@ func DescriberFor(kind string, c *client.Client) (Describer, bool) {
 	case "Service":
 		return &ServiceDescriber{c}, true
 	case "Minion", "Node":
-		return &MinionDescriber{c}, true
+		return &NodeDescriber{c}, true
 	case "LimitRange":
 		return &LimitRangeDescriber{c}, true
 	case "ResourceQuota":
@@ -283,14 +283,14 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	})
 }
 
-// MinionDescriber generates information about a minion.
-type MinionDescriber struct {
+// NodeDescriber generates information about a node.
+type NodeDescriber struct {
 	client.Interface
 }
 
-func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
+func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	mc := d.Nodes()
-	minion, err := mc.Get(name)
+	node, err := mc.Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -307,13 +307,13 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 		pods = append(pods, pod)
 	}
 
-	events, _ := d.Events(namespace).Search(minion)
+	events, _ := d.Events(namespace).Search(node)
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", minion.Name)
-		if len(minion.Status.Conditions) > 0 {
+		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
+		if len(node.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
-			for _, c := range minion.Status.Conditions {
+			for _, c := range node.Status.Conditions {
 				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,
@@ -323,11 +323,22 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 					c.Message)
 			}
 		}
-		if len(minion.Spec.Capacity) > 0 {
+		var addresses []string
+		for _, address := range node.Status.Addresses {
+			addresses = append(addresses, address.Address)
+		}
+		fmt.Fprintf(out, "Addresses:\t%s\n", strings.Join(addresses, ","))
+		if len(node.Spec.Capacity) > 0 {
 			fmt.Fprintf(out, "Capacity:\n")
-			for resource, value := range minion.Spec.Capacity {
+			for resource, value := range node.Spec.Capacity {
 				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
 			}
+		}
+		if len(node.Spec.PodCIDR) > 0 {
+			fmt.Fprintf(out, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
+		}
+		if len(node.Spec.ExternalID) > 0 {
+			fmt.Fprintf(out, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
 		fmt.Fprintf(out, "Pods:\t(%d in total)\n", len(pods))
 		for _, pod := range pods {

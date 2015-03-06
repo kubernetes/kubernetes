@@ -104,7 +104,7 @@ CTLRMGR_PID=$!
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): " 0.2 25
 
-# expose kubectl directly for readability
+# Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 
 kube_api_versions=(
@@ -139,7 +139,7 @@ for version in "${kube_api_versions[@]}"; do
     rc_replicas_field="spec.replicas"
   fi
 
-  # passing no arguments to create is an error
+  # Passing no arguments to create is an error
   ! kubectl create
 
   ###########################
@@ -502,6 +502,8 @@ __EOF__
 
   kube::test::get_object_assert nodes "{{range.items}}{{.$id_field}}:{{end}}" '127.0.0.1:'
 
+  kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
+
   ###########
   # Minions #
   ###########
@@ -513,6 +515,8 @@ __EOF__
 
     # TODO: I should be a MinionList instead of List
     kube::test::get_object_assert minions '{{.kind}}' 'List'
+
+    kube::test::describe_object_assert minions "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
   fi
 
   kube::test::clear_all
