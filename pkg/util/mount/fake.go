@@ -18,7 +18,7 @@ package mount
 
 // FakeMounter implements mount.Interface.
 type FakeMounter struct {
-	mountPoints []MountPoint
+	MountPoints []MountPoint
 }
 
 func (f *FakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
@@ -30,5 +30,5 @@ func (f *FakeMounter) Unmount(target string, flags int) error {
 }
 
 func (f *FakeMounter) List() ([]MountPoint, error) {
-	return f.mountPoints, nil
+	return f.MountPoints, nil
 }

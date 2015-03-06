@@ -51,7 +51,7 @@ type MountPoint struct {
 }
 
 // Examines /proc/mounts to find all other references to the device referenced
-// by mountPath.
+// by mountPath; returns a list of paths.
 func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
 	if err != nil {
