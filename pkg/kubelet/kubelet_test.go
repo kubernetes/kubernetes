@@ -83,6 +83,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient, *syn
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.readiness = newReadinessStates()
 	kubelet.recorder = recorder
+	kubelet.podStatuses = map[string]api.PodStatus{}
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
@@ -1201,35 +1202,6 @@ func TestMakePortsAndBindings(t *testing.T) {
 				t.Errorf("Unexpected host IP: %s", value[0].HostIP)
 			}
 		}
-	}
-}
-
-func TestCheckHostPortConflicts(t *testing.T) {
-	kubelet, _, _ := newTestKubelet(t)
-
-	successCaseAll := []api.BoundPod{
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
-	}
-	successCaseNew := api.BoundPod{
-		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}},
-	}
-	expected := append(successCaseAll, successCaseNew)
-	if actual := kubelet.filterHostPortConflicts(expected); !reflect.DeepEqual(actual, expected) {
-		t.Errorf("Expected %#v, Got %#v", expected, actual)
-	}
-
-	failureCaseAll := []api.BoundPod{
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
-	}
-	failureCaseNew := api.BoundPod{
-		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
-	}
-	if actual := kubelet.filterHostPortConflicts(append(failureCaseAll, failureCaseNew)); !reflect.DeepEqual(failureCaseAll, actual) {
-		t.Errorf("Expected %#v, Got %#v", expected, actual)
 	}
 }
 
@@ -3088,13 +3060,35 @@ func TestPortForward(t *testing.T) {
 	}
 }
 
-// Tests that upon host port conflict, the newer pod is removed.
-func TestFilterHostPortConflicts(t *testing.T) {
-	kubelet, _, _ := newTestKubelet(t)
+// Tests that identify the host port conflicts are detected correctly.
+func TestGetHostPortConflicts(t *testing.T) {
+	pods := []api.BoundPod{
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}}},
+	}
+	// Pods should not cause any conflict.
+	conflicts := getHostPortConflicts(pods)
+	if len(conflicts) != 0 {
+		t.Errorf("expected no conflicts, Got %#v", conflicts)
+	}
 
-	// Reuse the pod spec with the same port to create a conflict.
+	// The new pod should cause conflict and be reported.
+	expected := api.BoundPod{
+		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
+	}
+	pods = append(pods, expected)
+	if actual := getHostPortConflicts(pods); !reflect.DeepEqual(actual, []api.BoundPod{expected}) {
+		t.Errorf("expected %#v, Got %#v", expected, actual)
+	}
+}
+
+// Tests that we handle port conflicts correctly by setting the failed status in status map.
+func TestHandlePortConflicts(t *testing.T) {
+	kl, _, _ := newTestKubelet(t)
 	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
-	var pods = []api.BoundPod{
+	pods := []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "123456789",
@@ -3115,12 +3109,48 @@ func TestFilterHostPortConflicts(t *testing.T) {
 	// Make sure the BoundPods are in the reverse order of creation time.
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
-	filteredPods := kubelet.filterHostPortConflicts(pods)
-	if len(filteredPods) != 1 {
-		t.Fatalf("Expected one pod. Got pods %#v", filteredPods)
+	// The newer pod should be rejected.
+	conflictedPodName := GetPodFullName(&pods[0])
+
+	kl.handleHostPortConflicts(pods)
+	if len(kl.podStatuses) != 1 {
+		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
 	}
-	if filteredPods[0].Name != "oldpod" {
-		t.Fatalf("Expected pod %#v. Got pod %#v", pods[1], filteredPods[0])
+	// Check pod status stored in the status map.
+	status, ok := kl.podStatuses[conflictedPodName]
+	if !ok {
+		t.Fatalf("status of pod %q is not found in the status map.", conflictedPodName)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+
+	// Check if we can retrieve the pod status from GetPodStatus().
+	kl.pods = pods
+	status, err := kl.GetPodStatus(conflictedPodName, "")
+	if err != nil {
+		t.Fatalf("unable to retrieve pod status for pod %q: #v.", conflictedPodName, err)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+}
+
+func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
+	kl, _, _ := newTestKubelet(t)
+	pods := []api.BoundPod{
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+	}
+	// Run once to populate the status map.
+	kl.handleHostPortConflicts(pods)
+	if len(kl.podStatuses) != 1 {
+		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
+	}
+	// Sync with empty pods so that the entry in status map will be removed.
+	kl.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now())
+	if len(kl.podStatuses) != 0 {
+		t.Fatalf("expected length of status map to be 0. Got map %#v.", kl.podStatuses)
 	}
 }
 
