@@ -193,15 +193,15 @@ achieve the state, and for the user to know what to anticipate.
 Concurrency Control and Consistency
 -----------------------------------
 
-Read-modify-write consistency is accomplished with optimistic currency.
+Kubernetes leverages the concept of *resource versions* to achieve optimistic concurrency. All kubernetes resources have a "resourceVersion" field as part of their metadata. This resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. When a record is about to be updated, it's version is checked against a pre-saved value, and if it doesn't match, the update fails with a StatusConflict (HTTP status code 409).
 
-All resources have "resourceVersion" as part of their metadata. resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. It is changed by the server every time an object is modified. If resourceVersion is included with the PUT operation the system will verify that there have not been other successful mutations to the resource during a read/modify/write cycle, by verifying that the current value of resourceVersion matches the specified value.
+The resourceVersion is changed by the server every time an object is modified. If resourceVersion is included with the PUT operation the system will verify that there have not been other successful mutations to the resource during a read/modify/write cycle, by verifying that the current value of resourceVersion matches the specified value.
+
+The resourceVersion is currently backed by [etcd's modifiedIndex](https://coreos.com/docs/distributed-configuration/etcd-api/). However, it's important to note that the application should *not* rely on the implementation details of the versioning system maintained by kubernetes. We may change the implementation of resourceVersion in the future, such as to change it to a timestamp or per-object counter.
 
 The only way for a client to know the expected value of resourceVersion is to have received it from the server in response to a prior operation, typically a GET. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. Currently, the value of resourceVersion is set to match etcd's sequencer. You could think of it as a logical clock the API server can use to order requests. However, we expect the implementation of resourceVersion to change in the future, such as in the case we shard the state by kind and/or namespace, or port to another storage system.
 
-APIs SHOULD set resourceVersion on retrieved resources, and support PUT idempotency by rejecting HTTP requests with a StatusConflict (409) HTTP status code where an HTTP header `If-Match: resourceVersion=` or `?resourceVersion=` query parameter are set and do not match the currently stored version of the resource. (Currently, the API simply uses the value from the PUT request body.) The correct client action at this point is to GET the resource again, apply the changes afresh and try submitting again.
-
-This mechanism can be used to prevent races like the following:
+In the case of a conflict, the correct client action at this point is to GET the resource again, apply the changes afresh, and try submitting again. This mechanism can be used to prevent races like the following:
 
 ```
 Client #1                                  Client #2
@@ -217,8 +217,6 @@ On the other hand, when specifying the resourceVersion, one of the PUTs will fai
 resourceVersion may be used as a precondition for other operations (e.g., GET, DELETE) in the future, such as for read-after-write consistency in the presence of caching.
 
 "Watch" operations specify resourceVersion using a query parameter. It is used to specify the point at which to begin watching the specified resources. This may be used to ensure that no mutations are missed between a GET of a resource (or list of resources) and a subsequent Watch, even if the current version of the resource is more recent. This is currently the main reason that list operations (GET on a collection) return resourceVersion.
-
-TODO: better syntax?
 
 
 Serialization Format

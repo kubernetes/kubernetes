@@ -70,7 +70,7 @@ type ListMeta struct {
 	// concurrency and change monitoring endpoints.  Clients must treat these values as opaque
 	// and values may only be valid for a particular resource or set of resources. Only servers
 	// will generate resource versions.
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 }
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -113,7 +113,7 @@ type ObjectMeta struct {
 	// concurrency, change detection, and the watch operation on a resource or set of resources.
 	// Clients must treat these values as opaque and values may only be valid for a particular
 	// resource or set of resources. Only servers will generate resource versions.
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
@@ -1111,7 +1111,7 @@ type ObjectReference struct {
 	Name            string    `json:"name,omitempty"`
 	UID             types.UID `json:"uid,omitempty"`
 	APIVersion      string    `json:"apiVersion,omitempty"`
-	ResourceVersion string    `json:"resourceVersion,omitempty"`
+	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain information to identify the sub-object. For example, if the object
