@@ -81,7 +81,8 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	return refs, nil
 }
 
-// given a device path, find its reference count from /proc/mounts
+// GetDeviceRefCount: given a device path, find its reference count from /proc/mounts
+// returns the reference count to the device and error code
 func GetDeviceRefCount(mounter Interface, deviceName string) (int, error) {
 	mps, err := mounter.List()
 	if err != nil {
@@ -98,22 +99,21 @@ func GetDeviceRefCount(mounter Interface, deviceName string) (int, error) {
 	return refCount, nil
 }
 
-// given a device path, find the mount on that device from /proc/mounts
-func GetMountFromDevicePath(mounter Interface, deviceName string) (string, int, error) {
-	// mostly borrowed from gce-pd
-	// export it so other block volume plugin can use it.
+// GetDeviceFromMnt: given a mnt point, find the device from /proc/mounts
+// returns the device name, reference count, and error code
+func GetDeviceFromMnt(mounter Interface, mnt string) (string, int, error) {
 	mps, err := mounter.List()
 	if err != nil {
 		return "", -1, err
 	}
-	mnt := ""
+	device := ""
 	// Find the number of references to the device.
 	refCount := 0
 	for i := range mps {
-		if mps[i].Device == deviceName {
-			mnt = mps[i].Path
+		if mps[i].Path == mnt {
+			device = mps[i].Device
 			refCount++
 		}
 	}
-	return mnt, refCount, nil
+	return device, refCount, nil
 }

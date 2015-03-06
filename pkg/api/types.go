@@ -182,7 +182,7 @@ type VolumeSource struct {
 	Secret *SecretVolumeSource `json:"secret"`
 	// ISCSIDiskVolumeSource represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	ISCSIDisk *ISCSIDiskVolumeSource `json:"iscsiDisk" description:"iSCSI disk resource attached to the host machine on demand"`
+	ISCSIDisk *ISCSIDiskVolumeSource `json:"iscsiDisk"`
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -226,17 +226,16 @@ type GCEPersistentDiskVolumeSource struct {
 
 // A ISCSI Disk can only be mounted as read/write once.
 type ISCSIDiskVolumeSource struct {
-	// iSCSI target portal
-	Portal string `json:"portal,omitempty" description:"iscsi target portal"`
-	// iSCSI target iqn
-	IQN string `json:"iqn,omitempty" description:"iscsi target iqn"`
-	// iSCSI target lun number
+	// Required: iSCSI target IP
+	TargetIP string `json:"targetIP,omitempty" description:"iscsi target IP address"`
+	// Required:  target iSCSI Qualified Name
+	IQN string `json:"iqn,omitempty" description:"iSCSI Qualified Name"`
+	// Required: iSCSI target lun number
 	Lun int `json:"lun,omitempty" description:"iscsi target lun number"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	// TODO: why omitempty if required?
 	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.

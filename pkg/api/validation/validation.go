@@ -318,8 +318,8 @@ func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource) errs.Validati
 
 func validateISCSIDiskVolumeSource(iscsiDisk *api.ISCSIDiskVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if iscsiDisk.Portal == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("portal", iscsiDisk.Portal))
+	if iscsiDisk.TargetIP == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("targetIP", iscsiDisk.TargetIP))
 	}
 	if iscsiDisk.IQN == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("iqn", iscsiDisk.IQN))

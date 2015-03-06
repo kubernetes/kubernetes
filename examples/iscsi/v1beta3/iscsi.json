@@ -1,10 +1,13 @@
 {
+    "apiVersion": "v1beta3",
     "id": "iscsipd",
     "kind": "Pod",
-    "apiVersion": "v1beta1",
+	"metadata": {
+		"name": "iscsi"
+	},
     "desiredState": {
         "manifest": {
-            "version": "v1beta1",
+            "version": "v1beta3",
             "id": "iscsipd",
             "containers": [
                 {
@@ -33,7 +36,7 @@
                     "name": "iscsipd-ro",
                     "source": {
                         "iscsiDisk": {
-                            "portal": "10.16.154.81:3260",
+                            "targetIP": "10.16.154.81:3260",
                             "iqn": "iqn.2014-12.world.server:storage.target1",
                             "lun": 0,
                             "fsType": "ext4",
@@ -45,7 +48,7 @@
                     "name": "iscsipd-rw",
                     "source": {
                         "iscsiDisk": {
-                            "portal": "10.16.154.81:3260",
+                            "targetIP": "10.16.154.81:3260",
                             "iqn": "iqn.2014-12.world.server:storage.target1",
                             "lun": 1,
                             "fsType": "xfs",

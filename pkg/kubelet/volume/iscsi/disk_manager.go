@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package disk
+package iscsi
 
 import (
 	"os"
@@ -23,16 +23,17 @@ import (
 	"github.com/golang/glog"
 )
 
-// Abstract interface to PD operations.
-type PDManager interface {
-	MakeGlobalPDName(disk interface{}) string
+// Abstract interface to disk operations.
+type DiskManager interface {
+	MakeGlobalPDName(disk iscsiDisk) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(disk interface{}) error
+	AttachDisk(disk iscsiDisk) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk interface{}, mntPath string) error
+	DetachDisk(disk iscsiDisk, mntPath string) error
 }
 
-func CommonPDSetUp(manager PDManager, disk interface{}, volPath string, mounter mount.Interface) error {
+// common utility to mount a disk based filesystem
+func CommonPDSetUp(manager DiskManager, disk iscsiDisk, volPath string, mounter mount.Interface) error {
 	globalPDPath := manager.MakeGlobalPDName(disk)
 	// TODO: handle failed mounts here.
 	mountpoint, err := mount.IsMountPoint(volPath)
@@ -63,7 +64,8 @@ func CommonPDSetUp(manager PDManager, disk interface{}, volPath string, mounter 
 	return nil
 }
 
-func CommonPDTearDown(manager PDManager, disk interface{}, volPath string, mounter mount.Interface) error {
+// common utility to tear down a disk based filesystem
+func CommonPDTearDown(manager DiskManager, disk iscsiDisk, volPath string, mounter mount.Interface) error {
 	mountpoint, err := mount.IsMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)
@@ -82,7 +84,6 @@ func CommonPDTearDown(manager PDManager, disk interface{}, volPath string, mount
 		glog.Errorf("failed to umount %s", volPath)
 		return err
 	}
-	//glog.Infof("ref %d umount %s iscsi path %s", refCount, devicePath, volPath)
 	// If len(refs) is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {

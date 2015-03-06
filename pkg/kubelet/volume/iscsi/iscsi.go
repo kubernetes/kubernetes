@@ -14,14 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package iscsi_pd
+package iscsi
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
@@ -31,23 +29,17 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.Plugin {
-	return []volume.Plugin{&ISCSIDiskPlugin{nil, false, "", "", ""},
-		&ISCSIDiskPlugin{nil, true, "", "", ""}}
+	return []volume.Plugin{&ISCSIDiskPlugin{nil}}
 }
 
 type ISCSIDiskPlugin struct {
-	host       volume.Host
-	legacyMode bool // if set, plugin answers to the legacy name
-	portal     string
-	iqn        string
-	lun        string
+	host volume.Host
 }
 
 var _ volume.Plugin = &ISCSIDiskPlugin{}
 
 const (
-	ISCSIDiskPluginName       = "kubernetes.io/iscsi-pd"
-	ISCSIDiskPluginLegacyName = "iscsi-pd"
+	ISCSIDiskPluginName = "kubernetes.io/iscsi-pd"
 )
 
 func (plugin *ISCSIDiskPlugin) Init(host volume.Host) {
@@ -55,54 +47,46 @@ func (plugin *ISCSIDiskPlugin) Init(host volume.Host) {
 }
 
 func (plugin *ISCSIDiskPlugin) Name() string {
-	if plugin.legacyMode {
-		return ISCSIDiskPluginLegacyName
-	}
 	return ISCSIDiskPluginName
 }
 
 func (plugin *ISCSIDiskPlugin) CanSupport(spec *api.Volume) bool {
-	if plugin.legacyMode {
-		// Legacy mode instances can be cleaned up but not created anew.
-		return false
-	}
-
 	if spec.ISCSIDisk != nil {
+		return true
+	}
+	exe := exec.New()
+	// see if iscsiadm is there
+	command := exe.Command("iscsiadm", []string{"-h"}...)
+	_, err := command.CombinedOutput()
+	if err == nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *ISCSIDiskPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
+func (plugin *ISCSIDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podUID, &ISCSIDiskUtil{}, mount.New(), exec.New())
+	return plugin.newBuilderInternal(spec, podRef.UID, &ISCSIDiskUtil{}, mount.New(), exec.New())
 }
 
-func (plugin *ISCSIDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager disk.PDManager, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
-	if plugin.legacyMode {
-		// Legacy mode instances can be cleaned up but not created anew.
-		return nil, fmt.Errorf("legacy mode: can not create new instances")
-	}
+func (plugin *ISCSIDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager DiskManager, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
 	lun := "0"
 	if spec.ISCSIDisk.Lun != 0 {
 		lun = strconv.Itoa(spec.ISCSIDisk.Lun)
 	}
-	plugin.portal = spec.ISCSIDisk.Portal
-	plugin.iqn = spec.ISCSIDisk.IQN
-	plugin.lun = lun
+
 	return &iscsiDisk{
-		podUID:     podUID,
-		volName:    spec.Name,
-		portal:     spec.ISCSIDisk.Portal,
-		iqn:        spec.ISCSIDisk.IQN,
-		lun:        lun,
-		fsType:     spec.ISCSIDisk.FSType,
-		readOnly:   spec.ISCSIDisk.ReadOnly,
-		exec:       exe,
-		manager:    manager,
-		mounter:    mounter,
-		legacyMode: false,
-		plugin:     plugin,
+		podUID:   podUID,
+		volName:  spec.Name,
+		portal:   spec.ISCSIDisk.TargetIP,
+		iqn:      spec.ISCSIDisk.IQN,
+		lun:      lun,
+		fsType:   spec.ISCSIDisk.FSType,
+		readOnly: spec.ISCSIDisk.ReadOnly,
+		exec:     exe,
+		manager:  manager,
+		mounter:  mounter,
+		plugin:   plugin,
 	}, nil
 }
 
@@ -111,57 +95,41 @@ func (plugin *ISCSIDiskPlugin) NewCleaner(volName string, podUID types.UID) (vol
 	return plugin.newCleanerInternal(volName, podUID, &ISCSIDiskUtil{}, mount.New(), exec.New())
 }
 
-func (plugin *ISCSIDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager disk.PDManager, mounter mount.Interface, exe exec.Interface) (volume.Cleaner, error) {
-	legacy := false
-	if plugin.legacyMode {
-		legacy = true
-	}
+func (plugin *ISCSIDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager DiskManager, mounter mount.Interface, exe exec.Interface) (volume.Cleaner, error) {
 
 	return &iscsiDisk{
-		podUID:     podUID,
-		volName:    volName,
-		legacyMode: legacy,
-		manager:    manager,
-		mounter:    mounter,
-		plugin:     plugin,
-		portal:     plugin.portal,
-		iqn:        plugin.iqn,
-		lun:        plugin.lun,
-		exec:       exe,
+		podUID:  podUID,
+		volName: volName,
+		manager: manager,
+		mounter: mounter,
+		plugin:  plugin,
+		exec:    exe,
 	}, nil
 }
 
 type iscsiDisk struct {
-	volName    string
-	podUID     types.UID
-	portal     string
-	iqn        string
-	readOnly   bool
-	lun        string
-	fsType     string
-	plugin     *ISCSIDiskPlugin
-	legacyMode bool
-	mounter    mount.Interface
+	volName  string
+	podUID   types.UID
+	portal   string
+	iqn      string
+	readOnly bool
+	lun      string
+	fsType   string
+	plugin   *ISCSIDiskPlugin
+	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager disk.PDManager
+	manager DiskManager
 	exec    exec.Interface
 }
 
 func (iscsi *iscsiDisk) GetPath() string {
 	name := ISCSIDiskPluginName
-	if iscsi.legacyMode {
-		name = ISCSIDiskPluginLegacyName
-	}
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
 	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, volume.EscapePluginName(name), iscsi.volName)
 }
 
 func (iscsi *iscsiDisk) SetUp() error {
-	if iscsi.legacyMode {
-		return fmt.Errorf("legacy mode: can not create new instances")
-	}
-
-	err := disk.CommonPDSetUp(iscsi.manager, *iscsi, iscsi.GetPath(), iscsi.mounter)
+	err := CommonPDSetUp(iscsi.manager, *iscsi, iscsi.GetPath(), iscsi.mounter)
 	if err != nil {
 		glog.Errorf("iSCSIPersistentDisk: failed to setup")
 		return err
@@ -169,18 +137,18 @@ func (iscsi *iscsiDisk) SetUp() error {
 	globalPDPath := iscsi.manager.MakeGlobalPDName(*iscsi)
 	// make mountpoint rw/ro work as expected
 	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
+	mode := "rw"
 	if iscsi.readOnly {
-		iscsi.execCommand("mount", []string{"-o", "remount,ro", globalPDPath, iscsi.GetPath()})
-	} else {
-		iscsi.execCommand("mount", []string{"-o", "remount,rw", globalPDPath, iscsi.GetPath()})
+		mode = "ro"
 	}
+	iscsi.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, iscsi.GetPath()})
 
 	return nil
 
 }
 
 func (iscsi *iscsiDisk) TearDown() error {
-	return disk.CommonPDTearDown(iscsi.manager, *iscsi, iscsi.GetPath(), iscsi.mounter)
+	return CommonPDTearDown(iscsi.manager, *iscsi, iscsi.GetPath(), iscsi.mounter)
 }
 
 func (iscsi *iscsiDisk) execCommand(command string, args []string) ([]byte, error) {

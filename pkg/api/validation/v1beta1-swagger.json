@@ -1315,7 +1315,7 @@
    "v1beta1.ISCSIDisk": {
     "id": "v1beta1.ISCSIDisk",
     "required": [
-     "portal",
+     "targetIP",
      "iqn"
     ],
     "properties": {
@@ -1326,7 +1326,7 @@
       "type": "integer",
       "format": "int32"
      },
-     "portal": {
+     "targetIP": {
       "type": "string"
      },
      "readOnly": {
