@@ -414,6 +414,17 @@ func TestSetObj(t *testing.T) {
 	}
 }
 
+func TestSetObjFailCAS(t *testing.T) {
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.CasErr = fakeClient.NewError(123)
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
+	err := helper.SetObj("/some/key", obj, nil, 5)
+	if err == nil {
+		t.Errorf("Expecting error.")
+	}
+}
+
 func TestSetObjWithVersion(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)

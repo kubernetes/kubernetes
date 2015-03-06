@@ -329,14 +329,13 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 
 	create := true
 	if h.ResourceVersioner != nil {
-		version, err := h.ResourceVersioner.ResourceVersion(obj)
-		if err == nil && version != 0 {
+		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
 			create = false
 			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	if err != nil {
-		return err
 	}
 	if create {
 		// Create will fail if a key already exists.

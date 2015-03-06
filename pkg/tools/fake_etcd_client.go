@@ -47,6 +47,7 @@ type FakeEtcdClient struct {
 	expectNotFoundGetSet map[string]struct{}
 	sync.Mutex
 	Err         error
+	CasErr      error
 	t           TestLogger
 	Ix          int
 	TestIndex   bool
@@ -224,6 +225,10 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 	if f.Err != nil {
 		f.t.Logf("c&s: returning err %v", f.Err)
 		return nil, f.Err
+	}
+	if f.CasErr != nil {
+		f.t.Logf("c&s: returning err %v", f.CasErr)
+		return nil, f.CasErr
 	}
 
 	if !f.TestIndex {
