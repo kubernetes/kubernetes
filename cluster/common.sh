@@ -36,7 +36,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 function create-kubeconfig() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
-  # We expect KUBECONFIG to be defined, which determines the file we write to.
+  # KUBECONFIG determines the file we write to, but it may not exist yet
+  if [[ ! -e "${KUBECONFIG}" ]]; then
+    mkdir -p $(dirname "${KUBECONFIG}")
+    touch "${KUBECONFIG}"
+  fi
   "${kubectl}" config set-cluster "${CONTEXT}" --server="https://${KUBE_MASTER_IP}" \
                                                --certificate-authority="${CA_CERT}" \
                                                --embed-certs=true
@@ -48,7 +52,7 @@ function create-kubeconfig() {
   "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
   "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
 
-   echo "Wrote config for ${CONTEXT} to ${KUBE_ROOT}/.kubeconfig"
+   echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
 }
 
 # Clear kubeconfig data for a context
@@ -67,5 +71,5 @@ function clear-kubeconfig() {
     "${kubectl}" config unset current-context
   fi
 
-  echo "Cleared config for ${CONTEXT} from ${KUBE_ROOT}/.kubeconfig"
+  echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
