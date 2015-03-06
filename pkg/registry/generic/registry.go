@@ -75,12 +75,12 @@ type DecoratorFunc func(obj runtime.Object) error
 // layer.
 // DEPRECATED: replace with direct implementation of RESTStorage
 type Registry interface {
-	List(api.Context, Matcher) (runtime.Object, error)
+	ListPredicate(api.Context, Matcher) (runtime.Object, error)
 	CreateWithName(ctx api.Context, id string, obj runtime.Object) error
 	UpdateWithName(ctx api.Context, id string, obj runtime.Object) error
 	Get(ctx api.Context, id string) (runtime.Object, error)
 	Delete(ctx api.Context, id string) (runtime.Object, error)
-	Watch(ctx api.Context, m Matcher, resourceVersion string) (watch.Interface, error)
+	WatchPredicate(ctx api.Context, m Matcher, resourceVersion string) (watch.Interface, error)
 }
 
 // FilterList filters any list object that conforms to the api conventions,

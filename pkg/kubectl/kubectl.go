@@ -63,7 +63,20 @@ type OutputVersionMapper struct {
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
 func (m OutputVersionMapper) RESTMapping(kind string, versions ...string) (*meta.RESTMapping, error) {
-	preferred := append([]string{m.OutputVersion}, versions...)
+	preferred := []string{m.OutputVersion}
+	for _, version := range versions {
+		if len(version) > 0 {
+			preferred = append(preferred, version)
+		}
+	}
+	// if the caller wants to use the default version list, try with the preferred version, and on
+	// error, use the default behavior.
+	if len(preferred) == 1 {
+		if m, err := m.RESTMapper.RESTMapping(kind, preferred...); err == nil {
+			return m, nil
+		}
+		preferred = nil
+	}
 	return m.RESTMapper.RESTMapping(kind, preferred...)
 }
 

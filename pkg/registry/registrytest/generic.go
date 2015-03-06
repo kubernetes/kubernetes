@@ -42,7 +42,7 @@ func NewGeneric(list runtime.Object) *GenericRegistry {
 	}
 }
 
-func (r *GenericRegistry) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
+func (r *GenericRegistry) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {
@@ -51,7 +51,7 @@ func (r *GenericRegistry) List(ctx api.Context, m generic.Matcher) (runtime.Obje
 	return generic.FilterList(r.ObjectList, m, nil)
 }
 
-func (r *GenericRegistry) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+func (r *GenericRegistry) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	// TODO: wire filter down into the mux; it needs access to current and previous state :(
 	return r.Broadcaster.Watch(), nil
 }

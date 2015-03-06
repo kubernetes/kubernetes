@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/docker/docker/pkg/units"
 	"github.com/ghodss/yaml"
@@ -98,11 +99,11 @@ func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 type VersionedPrinter struct {
 	printer   ResourcePrinter
 	convertor runtime.ObjectConvertor
-	version   string
+	version   []string
 }
 
 // NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConvertor, version string) ResourcePrinter {
+func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConvertor, version ...string) ResourcePrinter {
 	return &VersionedPrinter{
 		printer:   printer,
 		convertor: convertor,
@@ -115,11 +116,20 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if len(p.version) == 0 {
 		return fmt.Errorf("no version specified, object cannot be converted")
 	}
-	converted, err := p.convertor.ConvertToVersion(obj, p.version)
-	if err != nil {
-		return err
+	for _, version := range p.version {
+		if len(version) == 0 {
+			continue
+		}
+		converted, err := p.convertor.ConvertToVersion(obj, version)
+		if conversion.IsNotRegisteredError(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		return p.printer.PrintObj(converted, w)
 	}
-	return p.printer.PrintObj(converted, w)
+	return fmt.Errorf("the object cannot be converted to any of the versions: %v", p.version)
 }
 
 // JSONPrinter is an implementation of ResourcePrinter which outputs an object as JSON.

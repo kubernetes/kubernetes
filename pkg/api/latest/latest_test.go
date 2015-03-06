@@ -18,56 +18,12 @@ package latest
 
 import (
 	"encoding/json"
-	"math/rand"
 	"testing"
 
 	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
-
-func TestInternalRoundTrip(t *testing.T) {
-	latest := "v1beta2"
-
-	seed := rand.Int63()
-	apiObjectFuzzer := apitesting.FuzzerFor(t, "", rand.NewSource(seed))
-	for k := range internal.Scheme.KnownTypes("") {
-		obj, err := internal.Scheme.New("", k)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
-		apiObjectFuzzer.Fuzz(obj)
-
-		newer, err := internal.Scheme.New(latest, k)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
-
-		if err := internal.Scheme.Convert(obj, newer); err != nil {
-			t.Errorf("unable to convert %#v to %#v: %v", obj, newer, err)
-			continue
-		}
-
-		actual, err := internal.Scheme.New("", k)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
-
-		if err := internal.Scheme.Convert(newer, actual); err != nil {
-			t.Errorf("unable to convert %#v to %#v: %v", newer, actual, err)
-			continue
-		}
-
-		if !internal.Semantic.DeepEqual(obj, actual) {
-			t.Errorf("%s: diff %s", k, util.ObjectDiff(obj, actual))
-		}
-	}
-}
 
 func TestResourceVersioner(t *testing.T) {
 	pod := internal.Pod{ObjectMeta: internal.ObjectMeta{ResourceVersion: "10"}}

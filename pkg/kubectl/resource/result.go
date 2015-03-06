@@ -133,7 +133,7 @@ func (r *Result) Object() (runtime.Object, error) {
 			return objects[0], nil
 		}
 		// if the item is a list already, don't create another list
-		if _, err := runtime.GetItemsPtr(objects[0]); err == nil {
+		if runtime.IsListType(objects[0]) {
 			return objects[0], nil
 		}
 	}
