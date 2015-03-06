@@ -116,12 +116,10 @@ var _ = Describe("Services", func() {
 			Failf("Failed to create %s pod: %v", pod.Name, err)
 		}
 
-		By("waiting for the pod to start running")
-		err := waitForPodRunning(c, pod.Name, 300*time.Second)
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("retrieving the pod")
-		pod, err = podClient.Get(pod.Name)
+		pod, err := podClient.Get(pod.Name)
 		if err != nil {
 			Failf("Failed to get pod %s: %v", pod.Name, err)
 		}

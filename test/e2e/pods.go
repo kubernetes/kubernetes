@@ -47,8 +47,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	By("waiting for the pod to be something other than pending")
-	expectNoError(waitForPodNotPending(c, ns, podDescr.Name, 60*time.Second),
+	expectNoError(waitForPodNotPending(c, ns, podDescr.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", podDescr.Name, ns))
 	By(fmt.Sprintf("Started pod %s in namespace %s", podDescr.Name, ns))
 
@@ -190,8 +189,7 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
 
-		By("waiting for the pod to start running")
-		expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
+		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the pod is in kubernetes")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -213,8 +211,7 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to update pod: %v", err))
 		}
 
-		By("waiting for the updated pod to start running")
-		expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
+		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the updated pod is in kubernetes")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
@@ -246,7 +243,7 @@ var _ = Describe("Pods", func() {
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
 		}
-		expectNoError(waitForPodRunning(c, serverPod.Name, 300*time.Second))
+		expectNoError(waitForPodRunning(c, serverPod.Name))
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
 		// TODO(filbranden): We would like to use a unique service name such as:
@@ -305,8 +302,7 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
 
-		// Wait for client pod to complete.
-		expectNoError(waitForPodRunning(c, clientPod.Name, 60*time.Second))
+		expectNoError(waitForPodRunning(c, clientPod.Name))
 
 		// Grab its logs.  Get host first.
 		clientPodStatus, err := c.Pods(api.NamespaceDefault).Get(clientPod.Name)
