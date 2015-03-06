@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# simple use the sed to replace some ip settings on user's demand
+# Download the etcd, flannel, and K8s binaries automatically
 # Run as root only
 
 # author @resouer
@@ -51,10 +51,12 @@ if [ ! -f etcd.tar.gz ] ; then
 fi
 cp $ETCD/etcd $ETCD/etcdctl binaries
 
-# kuber
+# k8s
 echo "Download kubernetes release ..."
+
+K8S_V="v0.12.0"
 if [ ! -f kubernetes.tar.gz ] ; then
-    curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.10.1/kubernetes.tar.gz -o kubernetes.tar.gz
+    curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/$K8S_V/kubernetes.tar.gz -o kubernetes.tar.gz
     tar xzf kubernetes.tar.gz
 fi
 pushd kubernetes/server

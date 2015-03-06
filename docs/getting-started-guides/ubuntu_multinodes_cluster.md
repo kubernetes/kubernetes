@@ -20,10 +20,15 @@ This document describes how to deploy kubernetes on multiple ubuntu nodes, inclu
 On your laptop, copy `cluster/ubuntu-cluster` directory to your workspace.
 
 The `build.sh` will download and build all the needed binaries into `./binaries`.
+
+You can customize your etcd version or K8s version in the build.sh by changing  variable `ETCD_V` and `K8S_V`, default etcd version is 2.0.0 and K8s version is 0.12.0.
+
+
 ```
 $ cd cluster/ubuntu-cluster
 $ sudo ./build.sh
 ```
+
 Please copy all the files in `./binaries` into `/opt/bin` of every machine you want to run as Kubernetes cluster node.
 
 
