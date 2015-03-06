@@ -233,7 +233,11 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
-		response, created, err := r.transformResponse(test.Response, &http.Request{})
+		body, err := ioutil.ReadAll(test.Response.Body)
+		if err != nil {
+			t.Errorf("failed to read body of response: %v", err)
+		}
+		response, created, err := r.transformResponse(body, test.Response, &http.Request{})
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
@@ -307,7 +311,11 @@ func TestTransformUnstructuredError(t *testing.T) {
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
-		_, _, err := r.transformResponse(testCase.Res, testCase.Req)
+		body, err := ioutil.ReadAll(testCase.Res.Body)
+		if err != nil {
+			t.Errorf("failed to read body: %v", err)
+		}
+		_, _, err = r.transformResponse(body, testCase.Res, testCase.Req)
 		if !testCase.ErrFn(err) {
 			t.Errorf("unexpected error: %v", err)
 			continue
