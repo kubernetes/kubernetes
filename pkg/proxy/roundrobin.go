@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/slice"
 	"github.com/golang/glog"
 )
@@ -50,7 +51,7 @@ type affinityPolicy struct {
 }
 
 // balancerKey is a string that the balancer uses to key stored state.
-type balancerKey string
+type balancerKey types.NamespacedName
 
 // LoadBalancerRR is a round-robin load balancer.
 type LoadBalancerRR struct {
@@ -79,7 +80,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 	}
 }
 
-func (lb *LoadBalancerRR) NewService(service string, affinityType api.AffinityType, ttlMinutes int) error {
+func (lb *LoadBalancerRR) NewService(service types.NamespacedName, affinityType api.AffinityType, ttlMinutes int) error {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
@@ -88,7 +89,7 @@ func (lb *LoadBalancerRR) NewService(service string, affinityType api.AffinityTy
 }
 
 // This assumes that lb.lock is already held.
-func (lb *LoadBalancerRR) newServiceInternal(service string, affinityType api.AffinityType, ttlMinutes int) *balancerState {
+func (lb *LoadBalancerRR) newServiceInternal(service types.NamespacedName, affinityType api.AffinityType, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
 		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimeted instead????
 	}
@@ -112,7 +113,7 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb *LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (string, error) {
+func (lb *LoadBalancerRR) NextEndpoint(service types.NamespacedName, srcAddr net.Addr) (string, error) {
 	// Coarse locking is simple.  We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
@@ -227,7 +228,8 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 
 	// Update endpoints for services.
 	for _, svcEndpoints := range allEndpoints {
-		key := balancerKey(svcEndpoints.Name)
+		name := types.NewNamespacedName(svcEndpoints.Namespace, svcEndpoints.Name)
+		key := balancerKey(*name)
 		state, exists := lb.services[key]
 		curEndpoints := []string{}
 		if state != nil {
@@ -240,7 +242,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 			// On update can be called without NewService being called externally.
 			// To be safe we will call it here.  A new service will only be created
 			// if one does not already exist.
-			state = lb.newServiceInternal(svcEndpoints.Name, api.AffinityTypeNone, 0)
+			state = lb.newServiceInternal(*name, api.AffinityTypeNone, 0)
 			state.endpoints = slice.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
@@ -268,7 +270,7 @@ func slicesEquiv(lhs, rhs []string) bool {
 	return false
 }
 
-func (lb *LoadBalancerRR) CleanupStaleStickySessions(service string) {
+func (lb *LoadBalancerRR) CleanupStaleStickySessions(service types.NamespacedName) {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 

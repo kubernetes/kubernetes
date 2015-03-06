@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	"github.com/golang/glog"
 )
@@ -127,19 +128,22 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	case ADD:
 		glog.V(4).Infof("Adding new endpoint from source %s : %+v", source, update.Endpoints)
 		for _, value := range update.Endpoints {
-			endpoints[value.Name] = value
+			cachekey := types.NewNamespacedName(value.Namespace, value.Name).CacheKey().String()
+			endpoints[cachekey] = value
 		}
 	case REMOVE:
 		glog.V(4).Infof("Removing an endpoint %+v", update)
 		for _, value := range update.Endpoints {
-			delete(endpoints, value.Name)
+			cachekey := types.NewNamespacedName(value.Namespace, value.Name).CacheKey().String()
+			delete(endpoints, cachekey)
 		}
 	case SET:
 		glog.V(4).Infof("Setting endpoints %+v", update)
 		// Clear the old map entries by just creating a new map
 		endpoints = make(map[string]api.Endpoints)
 		for _, value := range update.Endpoints {
-			endpoints[value.Name] = value
+			cachekey := types.NewNamespacedName(value.Namespace, value.Name).CacheKey().String()
+			endpoints[cachekey] = value
 		}
 	default:
 		glog.V(4).Infof("Received invalid update type: %v", update)
@@ -222,19 +226,22 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	case ADD:
 		glog.V(4).Infof("Adding new service from source %s : %+v", source, update.Services)
 		for _, value := range update.Services {
-			services[value.Name] = value
+			cachekey := types.NewNamespacedName(value.Namespace, value.Name).CacheKey().String()
+			services[cachekey] = value
 		}
 	case REMOVE:
 		glog.V(4).Infof("Removing a service %+v", update)
 		for _, value := range update.Services {
-			delete(services, value.Name)
+			cachekey := types.NewNamespacedName(value.Namespace, value.Name).CacheKey().String()
+			delete(services, cachekey)
 		}
 	case SET:
 		glog.V(4).Infof("Setting services %+v", update)
 		// Clear the old map entries by just creating a new map
 		services = make(map[string]api.Service)
 		for _, value := range update.Services {
-			services[value.Name] = value
+			cachekey := types.NewNamespacedName(value.Namespace, value.Name).CacheKey().String()
+			services[cachekey] = value
 		}
 	default:
 		glog.V(4).Infof("Received invalid update type: %v", update)
