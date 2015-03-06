@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -378,7 +379,7 @@ func TestFillCurrentState(t *testing.T) {
 	if controller.Status.Replicas != 2 {
 		t.Errorf("expected 2, got: %d", controller.Status.Replicas)
 	}
-	if !api.Semantic.DeepEqual(fakeLister.s, labels.Set(controller.Spec.Selector).AsSelector()) {
+	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.Spec.Selector).AsSelector()) {
 		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.Spec.Selector).AsSelector(), fakeLister.s)
 	}
 }
