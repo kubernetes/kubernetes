@@ -67,7 +67,7 @@ func (plugin *ISCSIDiskPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if spec.Source.ISCSIDisk != nil {
+	if spec.ISCSIDisk != nil {
 		return true
 	}
 	return false
@@ -84,20 +84,20 @@ func (plugin *ISCSIDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 	lun := "0"
-	if spec.Source.ISCSIDisk.Lun != 0 {
-		lun = strconv.Itoa(spec.Source.ISCSIDisk.Lun)
+	if spec.ISCSIDisk.Lun != 0 {
+		lun = strconv.Itoa(spec.ISCSIDisk.Lun)
 	}
-	plugin.portal = spec.Source.ISCSIDisk.Portal
-	plugin.iqn = spec.Source.ISCSIDisk.IQN
+	plugin.portal = spec.ISCSIDisk.Portal
+	plugin.iqn = spec.ISCSIDisk.IQN
 	plugin.lun = lun
 	return &iscsiDisk{
 		podUID:     podUID,
 		volName:    spec.Name,
-		portal:     spec.Source.ISCSIDisk.Portal,
-		iqn:        spec.Source.ISCSIDisk.IQN,
+		portal:     spec.ISCSIDisk.Portal,
+		iqn:        spec.ISCSIDisk.IQN,
 		lun:        lun,
-		fsType:     spec.Source.ISCSIDisk.FSType,
-		readOnly:   spec.Source.ISCSIDisk.ReadOnly,
+		fsType:     spec.ISCSIDisk.FSType,
+		readOnly:   spec.ISCSIDisk.ReadOnly,
 		exec:       exe,
 		manager:    manager,
 		mounter:    mounter,

@@ -18,6 +18,10 @@ limitations under the License.
 // an alternate platform, we will need to abstract further.
 package mount
 
+import (
+	"strings"
+)
+
 // Each supported platform must define the following flags:
 //   - FlagBind: specifies a bind mount
 //   - FlagReadOnly: the mount will be read-only
@@ -75,4 +79,41 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 		}
 	}
 	return refs, nil
+}
+
+// given a device path, find its reference count from /proc/mounts
+func GetDeviceRefCount(mounter Interface, deviceName string) (int, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return -1, err
+	}
+
+	// Find the number of references to the device.
+	refCount := 0
+	for i := range mps {
+		if strings.HasPrefix(mps[i].Device, deviceName) {
+			refCount++
+		}
+	}
+	return refCount, nil
+}
+
+// given a device path, find the mount on that device from /proc/mounts
+func GetMountFromDevicePath(mounter Interface, deviceName string) (string, int, error) {
+	// mostly borrowed from gce-pd
+	// export it so other block volume plugin can use it.
+	mps, err := mounter.List()
+	if err != nil {
+		return "", -1, err
+	}
+	mnt := ""
+	// Find the number of references to the device.
+	refCount := 0
+	for i := range mps {
+		if mps[i].Device == deviceName {
+			mnt = mps[i].Path
+			refCount++
+		}
+	}
+	return mnt, refCount, nil
 }

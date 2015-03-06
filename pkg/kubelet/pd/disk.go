@@ -19,7 +19,6 @@ package disk
 import (
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
@@ -36,7 +35,7 @@ type PDManager interface {
 func CommonPDSetUp(manager PDManager, disk interface{}, volPath string, mounter mount.Interface) error {
 	globalPDPath := manager.MakeGlobalPDName(disk)
 	// TODO: handle failed mounts here.
-	mountpoint, err := volume.IsMountPoint(volPath)
+	mountpoint, err := mount.IsMountPoint(volPath)
 
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mountpoint: %s", volPath)
@@ -65,7 +64,7 @@ func CommonPDSetUp(manager PDManager, disk interface{}, volPath string, mounter 
 }
 
 func CommonPDTearDown(manager PDManager, disk interface{}, volPath string, mounter mount.Interface) error {
-	mountpoint, err := volume.IsMountPoint(volPath)
+	mountpoint, err := mount.IsMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)
 		return err
@@ -74,7 +73,7 @@ func CommonPDTearDown(manager PDManager, disk interface{}, volPath string, mount
 		return nil
 	}
 
-	refs, err := volume.GetMountRefs(mounter, volPath)
+	refs, err := mount.GetMountRefs(mounter, volPath)
 	if err != nil {
 		glog.Errorf("failed to get reference count %s", volPath)
 		return err

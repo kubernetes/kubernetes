@@ -26,22 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
-type fakeMounter struct {
-	mountPoints []mount.MountPoint
-}
-
-func (f *fakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	return nil
-}
-
-func (f *fakeMounter) Unmount(target string, flags int) error {
-	return nil
-}
-
-func (f *fakeMounter) List() ([]mount.MountPoint, error) {
-	return f.mountPoints, nil
-}
-
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
 
@@ -83,7 +84,7 @@ func (util *ISCSIDiskUtil) AttachDisk(disk interface{}) error {
 	}
 	// mount it
 	globalPDPath := iscsi.manager.MakeGlobalPDName(iscsi)
-	mountpoint, err := volume.IsMountPoint(globalPDPath)
+	mountpoint, err := mount.IsMountPoint(globalPDPath)
 	if mountpoint {
 		glog.Infof("iscsiPersistentDisk: %s already mounted", globalPDPath)
 		return nil
@@ -112,7 +113,7 @@ func (util *ISCSIDiskUtil) DetachDisk(disk interface{}, mntPath string) error {
 
 	// if the iscsi portal is no longer used, logout the target
 	prefix := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi"}, "-")
-	refCount, err := volume.GetDeviceRefCount(iscsi.mounter, prefix)
+	refCount, err := mount.GetDeviceRefCount(iscsi.mounter, prefix)
 	//glog.Infof("iSCSIPersistentDisk: log out target: dev %s ref %d error %v", prefix, refCount, err)
 	if err == nil && refCount == 0 {
 		glog.Infof("iSCSIPersistentDisk: log out target %s", iscsi.portal)
