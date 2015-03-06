@@ -730,7 +730,7 @@ func init() {
 			}
 
 			if in.HostIP != "" {
-				out.Status.Addresses = append(out.Status.Addresses,
+				newer.AddToNodeAddresses(&out.Status.Addresses,
 					newer.NodeAddress{Type: newer.NodeLegacyHostIP, Address: in.HostIP})
 			}
 			out.Spec.PodCIDR = in.PodCIDR
