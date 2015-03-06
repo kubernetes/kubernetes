@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	cadvisor "github.com/google/cadvisor/info"
+	cadvisor "github.com/google/cadvisor/info/v1"
 )
 
 var (

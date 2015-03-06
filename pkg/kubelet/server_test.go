@@ -34,7 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
-	"github.com/google/cadvisor/info"
+	info "github.com/google/cadvisor/info/v1"
 )
 
 type fakeKubelet struct {
@@ -210,7 +210,7 @@ func TestContainerInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
 	}
-	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
+	if !receivedInfo.Eq(expectedInfo) {
 		t.Errorf("received wrong data: %#v", receivedInfo)
 	}
 }
@@ -240,7 +240,7 @@ func TestContainerInfoWithUidNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
 	}
-	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
+	if !receivedInfo.Eq(expectedInfo) {
 		t.Errorf("received wrong data: %#v", receivedInfo)
 	}
 }
@@ -281,7 +281,7 @@ func TestRootInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("received invalid json data: %v", err)
 	}
-	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
+	if !receivedInfo.Eq(expectedInfo) {
 		t.Errorf("received wrong data: %#v", receivedInfo)
 	}
 }
