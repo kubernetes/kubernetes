@@ -61,7 +61,7 @@ var Semantic = conversion.EqualitiesOrDie(
 		return a.Amount.Cmp(b.Amount) == 0
 	},
 	func(a, b util.Time) bool {
-		return a.Unix() == b.Unix()
+		return a.UTC() == b.UTC()
 	},
 )
 
