@@ -17,8 +17,14 @@
 # Download the etcd, flannel, and K8s binaries automatically
 # Run as root only
 
-# author @resouer
+# author @resouer @WIZARD-CXY
 set -e
+
+function cleanup {
+    # cleanup work
+    rm -rf flannel kubernetes* etcd* binaries
+}
+trap cleanup SIGHUP SIGINT SIGTERM
 
 # check root
 if [ "$(id -u)" != "0" ]; then
