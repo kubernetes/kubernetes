@@ -227,6 +227,17 @@ go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'
 ```
 
+## Conformance testing
+End-to-end testing, as described above, is for [development
+distributions](../../docs/devel/writing-a-getting-started-guide.md).  A conformance test is used on
+a [versioned distro](../../docs/devel/writing-a-getting-started-guide.md).
+
+The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not
+require support for up/push/down and other operations.  To run a conformance test, you need to know the
+IP of the master for your cluster and the authorization arguments to use.  The conformance test is
+intended to run against a cluster at a specific binary release of Kubernetes.
+See [conformance-test.sh](../../hack/conformance-test.sh).
+
 ## Testing out flaky tests
 [Instructions here](flaky-tests.md)
 
