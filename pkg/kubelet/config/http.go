@@ -22,7 +22,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"hash/adler32"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -92,7 +91,9 @@ func (s *sourceURL) extractFromURL() error {
 			return singleErr
 		}
 		// It parsed!
-		applyDefaults(&pod, s.url)
+		if err = applyDefaults(&pod, s.url); err != nil {
+			return err
+		}
 		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
@@ -114,7 +115,9 @@ func (s *sourceURL) extractFromURL() error {
 		// Assume it parsed.
 		for i := range pods.Items {
 			pod := &pods.Items[i]
-			applyDefaults(pod, s.url)
+			if err = applyDefaults(pod, s.url); err != nil {
+				return err
+			}
 		}
 		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
 		return nil
@@ -180,7 +183,7 @@ func tryDecodeList(data []byte) (parsed bool, manifests []v1beta1.ContainerManif
 	return true, manifests, pods, nil
 }
 
-func applyDefaults(pod *api.BoundPod, url string) {
+func applyDefaults(pod *api.BoundPod, url string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		fmt.Fprintf(hasher, "url:%s", url)
@@ -190,14 +193,18 @@ func applyDefaults(pod *api.BoundPod, url string) {
 	}
 	// This is required for backward compatibility, and should be removed once we
 	// completely deprecate ContainerManifest.
+	var err error
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
-		glog.V(5).Infof("Generate Name %q from UID %q from URL %s", pod.Name, pod.UID, url)
 	}
-	if len(pod.Namespace) == 0 {
-		hasher := adler32.New()
-		fmt.Fprint(hasher, url)
-		pod.Namespace = fmt.Sprintf("url-%08x", hasher.Sum32())
-		glog.V(5).Infof("Generated namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
+	pod.Name, err = GeneratePodName(pod.Name)
+	if err != nil {
+		return err
 	}
+	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, url)
+
+	// Always overrides the namespace.
+	pod.Namespace = kubelet.NamespaceDefault
+	glog.V(5).Infof("Using namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
+	return nil
 }

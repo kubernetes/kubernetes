@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"sync"
 
@@ -55,6 +56,10 @@ type PodConfig struct {
 
 	// the channel of denormalized changes passed to listeners
 	updates chan kubelet.PodUpdate
+
+	// contains the list of all configured sources
+	sourcesLock sync.Mutex
+	sources     util.StringSet
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -66,6 +71,7 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 		pods:    storage,
 		mux:     config.NewMux(storage),
 		updates: updates,
+		sources: util.StringSet{},
 	}
 	return podConfig
 }
@@ -73,17 +79,20 @@ func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder)
 // Channel creates or returns a config source channel.  The channel
 // only accepts PodUpdates
 func (c *PodConfig) Channel(source string) chan<- interface{} {
+	c.sourcesLock.Lock()
+	defer c.sourcesLock.Unlock()
+	c.sources.Insert(source)
 	return c.mux.Channel(source)
 }
 
-// IsSourceSeen returns true if the specified source string has previously
-// been marked as seen.
-func (c *PodConfig) IsSourceSeen(source string) bool {
+// SeenAllSources returns true if this config has received a SET
+// message from all configured sources, false otherwise.
+func (c *PodConfig) SeenAllSources() bool {
 	if c.pods == nil {
 		return false
 	}
-	glog.V(6).Infof("Looking for %v, have seen %v", source, c.pods.sourcesSeen)
-	return c.pods.seenSources(source)
+	glog.V(6).Infof("Looking for %v, have seen %v", c.sources.List(), c.pods.sourcesSeen)
+	return c.pods.seenSources(c.sources.List()...)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
@@ -198,7 +207,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
-			name := podUniqueName(ref)
+			name := kubelet.GetPodFullName(ref)
 			if existing, found := pods[name]; found {
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
@@ -221,7 +230,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	case kubelet.REMOVE:
 		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
-			name := podUniqueName(&value)
+			name := kubelet.GetPodFullName(&value)
 			if existing, found := pods[name]; found {
 				// this is a delete
 				delete(pods, name)
@@ -240,7 +249,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
-			name := podUniqueName(ref)
+			name := kubelet.GetPodFullName(ref)
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
@@ -298,7 +307,7 @@ func filterInvalidPods(pods []api.BoundPod, source string, recorder record.Event
 			// If validation fails, don't trust it any further -
 			// even Name could be bad.
 		} else {
-			name := podUniqueName(pod)
+			name := kubelet.GetPodFullName(pod)
 			if names.Has(name) {
 				errlist = append(errlist, apierrs.NewFieldDuplicate("name", pod.Name))
 			} else {
@@ -341,12 +350,6 @@ func (s *podStorage) MergedState() interface{} {
 	return pods
 }
 
-// podUniqueName returns a value for a given pod that is unique across a source,
-// which is the combination of namespace and name.
-func podUniqueName(pod *api.BoundPod) string {
-	return fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
-}
-
 func bestPodIdentString(pod *api.BoundPod) string {
 	namespace := pod.Namespace
 	if namespace == "" {
@@ -357,4 +360,12 @@ func bestPodIdentString(pod *api.BoundPod) string {
 		name = "<empty-name>"
 	}
 	return fmt.Sprintf("%s.%s", name, namespace)
+}
+
+func GeneratePodName(name string) (string, error) {
+	hostname, err := os.Hostname() //TODO: kubelet name would be better
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s-%s", name, hostname), nil
 }

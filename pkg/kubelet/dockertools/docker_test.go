@@ -54,11 +54,11 @@ func TestGetContainerID(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "foobar",
-			Names: []string{"/k8s_foo_qux_1234_42"},
+			Names: []string{"/k8s_foo_qux_ns_1234_42"},
 		},
 		{
 			ID:    "barbar",
-			Names: []string{"/k8s_bar_qux_2565_42"},
+			Names: []string{"/k8s_bar_qux_ns_2565_42"},
 		},
 	}
 	fakeDocker.Container = &docker.Container{
@@ -73,7 +73,7 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", fakeDocker.ContainerList, dockerContainers)
 	}
 	verifyCalls(t, fakeDocker, []string{"list"})
-	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux", "", "foo")
+	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux_ns", "", "foo")
 	if dockerContainer == nil || !found {
 		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
@@ -91,7 +91,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	hasher := adler32.New()
 	util.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
-	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
+	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
 	name := BuildDockerName(types.UID(podUID), podFullName, container)
 	returnedPodFullName, returnedUID, returnedContainerName, hash := ParseDockerName(name)
 	if podFullName != returnedPodFullName || podUID != string(returnedUID) || containerName != returnedContainerName || computedHash != hash {
@@ -111,8 +111,8 @@ func TestContainerManifestNaming(t *testing.T) {
 	container := &api.Container{Name: "container"}
 	podName := "foo"
 	podNamespace := "test"
-	name := fmt.Sprintf("k8s_%s_%s.%s_%s_42", container.Name, podName, podNamespace, podUID)
-	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
+	name := fmt.Sprintf("k8s_%s_%s_%s_%s_42", container.Name, podName, podNamespace, podUID)
+	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
 
 	returnedPodFullName, returnedPodUID, returnedContainerName, hash := ParseDockerName(name)
 	if returnedPodFullName != podFullName || string(returnedPodUID) != podUID || returnedContainerName != container.Name || hash != 0 {
@@ -463,15 +463,15 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 			},
 			types.UID("1234"),
@@ -479,15 +479,15 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 			},
 		},
@@ -495,15 +495,15 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_2343_42"},
+					Names: []string{"/k8s_foo_qux_ns_2343_42"},
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 			},
 			types.UID("1234"),
@@ -511,11 +511,11 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 			},
 		},
@@ -523,15 +523,15 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_2343_42"},
+					Names: []string{"/k8s_foo_qux_ns_2343_42"},
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 			},
 			types.UID("5678"),
@@ -542,7 +542,7 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
@@ -550,7 +550,7 @@ func TestFindContainersByPod(t *testing.T) {
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_5678_42"},
+					Names: []string{"/k8s_foo_qux_ns_5678_42"},
 				},
 			},
 			types.UID("5678"),
@@ -558,7 +558,7 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_5678_42"},
+					Names: []string{"/k8s_foo_qux_ns_5678_42"},
 				},
 			},
 		},
@@ -566,23 +566,23 @@ func TestFindContainersByPod(t *testing.T) {
 			DockerContainers{
 				"foobar": &docker.APIContainers{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_1234_42"},
+					Names: []string{"/k8s_foo_qux_ns_1234_42"},
 				},
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_abc_5678_42"},
+					Names: []string{"/k8s_foo_abc_ns_5678_42"},
 				},
 				"baz": &docker.APIContainers{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_5678_42"},
+					Names: []string{"/k8s_foo_qux_ns_5678_42"},
 				},
 			},
 			"",
-			"abc",
+			"abc_ns",
 			DockerContainers{
 				"barbar": &docker.APIContainers{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_abc_5678_42"},
+					Names: []string{"/k8s_foo_abc_ns_5678_42"},
 				},
 			},
 		},

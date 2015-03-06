@@ -108,11 +108,8 @@ func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
 	}
 
 	for _, pod := range boundPods.Items {
-		// Backwards compatibility with old api servers
-		// TODO: Remove this after 1.0 release.
-		if len(pod.Namespace) == 0 {
-			pod.Namespace = api.NamespaceDefault
-		}
+		// Always overrides the namespace provided by the etcd event.
+		pod.Namespace = kubelet.NamespaceDefault
 		pods = append(pods, pod)
 	}
 
