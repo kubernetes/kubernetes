@@ -1018,27 +1018,100 @@ func (kl *Kubelet) makePodDataDirs(pod *api.BoundPod) error {
 	return nil
 }
 
+func (kl *Kubelet) shouldContainerBeRestarted(pod *api.BoundPod, containerName, dockerContainerName string, uid types.UID) bool {
+	// Check RestartPolicy for dead container
+	recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, GetPodFullName(pod), uid, containerName)
+	if err != nil {
+		glog.Errorf("Error listing recent containers:%s", dockerContainerName)
+		// TODO(dawnchen): error handling here?
+	}
+	// set dead containers to unready state
+	for _, c := range recentContainers {
+		kl.readiness.remove(c.ID)
+	}
+
+	if len(recentContainers) > 0 {
+		if pod.Spec.RestartPolicy.Never != nil {
+			glog.Infof("Already ran container with name %s, do nothing",
+				dockerContainerName)
+			return false
+
+		}
+		if pod.Spec.RestartPolicy.OnFailure != nil {
+			// Check the exit code of last run
+			if recentContainers[0].State.ExitCode == 0 {
+				glog.Infof("Already successfully ran container with name %s, do nothing",
+					dockerContainerName)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// Finds an infra container for a pod given by podFullName and UID in dockerContainers. If there is an infra container
+// return its ID and true, otherwise it returns empty ID and false.
+func (kl *Kubelet) getPodInfraContainer(podFullName string, uid types.UID,
+	dockerContainers dockertools.DockerContainers) (dockertools.DockerID, bool) {
+	if podInfraDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
+		podInfraContainerID := dockertools.DockerID(podInfraDockerContainer.ID)
+		return podInfraContainerID, true
+	}
+	return "", false
+}
+
+// Attempts to start a container pulling the image before that if necessary. It returns DockerID of a started container
+// if it was successful, and a non-nil error otherwise.
+func (kl *Kubelet) pullImageAndRunContainer(pod *api.BoundPod, container *api.Container, podVolumes *volumeMap,
+	podInfraContainerID dockertools.DockerID) (dockertools.DockerID, error) {
+	podFullName := GetPodFullName(pod)
+	ref, err := containerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
+	if container.ImagePullPolicy != api.PullNever {
+		present, err := kl.dockerPuller.IsImagePresent(container.Image)
+		if err != nil {
+			if ref != nil {
+				kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
+			}
+			glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
+			return "", err
+		}
+		if container.ImagePullPolicy == api.PullAlways ||
+			(container.ImagePullPolicy == api.PullIfNotPresent && (!present)) {
+			if err := kl.pullImage(container.Image, ref); err != nil {
+				return "", err
+			}
+		}
+	}
+	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
+	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
+	containerID, err := kl.runContainer(pod, container, *podVolumes, namespaceMode, namespaceMode)
+	if err != nil {
+		// TODO(bburns) : Perhaps blacklist a container after N failures?
+		glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
+		return "", err
+	}
+	return containerID, nil
+}
+
 func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.DockerContainers) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod, podFullName: %q, uid: %q", podFullName, uid)
 
-	ref, err := api.GetReference(pod)
+	err := kl.makePodDataDirs(pod)
 	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
-	}
-
-	if err = kl.makePodDataDirs(pod); err != nil {
 		return err
 	}
 
-	// Make sure we have a pod infra container
-	var podInfraContainerID dockertools.DockerID
-	if podInfraDockerContainer, found, _ := containersInPod.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
-		podInfraContainerID = dockertools.DockerID(podInfraDockerContainer.ID)
-	} else {
+	var podStatus api.PodStatus
+	podInfraContainerID, found := kl.getPodInfraContainer(podFullName, uid, containersInPod)
+	if !found {
 		glog.V(2).Infof("Pod infra container doesn't exist for pod %q, killing and re-creating the pod", podFullName)
-		count, err := kl.killContainersInPod(pod, containersInPod)
+		var count int
+		count, err = kl.killContainersInPod(pod, containersInPod)
 		if err != nil {
 			return err
 		}
@@ -1055,8 +1128,22 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 				return err
 			}
 		}
+		podStatus, err = kl.GetPodStatus(podFullName, uid)
+		if err != nil {
+			glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+		}
+	} else {
+		podStatus, err = kl.GetPodStatus(podFullName, uid)
+		if err != nil {
+			glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+		}
 	}
 	containersInPod.RemoveContainerWithID(podInfraContainerID)
+
+	ref, err := api.GetReference(pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	}
 
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
@@ -1068,11 +1155,6 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 		return err
 	}
 
-	podStatus, err := kl.GetPodStatus(podFullName, uid)
-	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
-	}
-
 	for _, container := range pod.Spec.Containers {
 		expectedHash := dockertools.HashContainer(&container)
 		dockerContainerName := dockertools.BuildDockerName(uid, podFullName, &container)
@@ -1081,8 +1163,8 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
 			// look for changes in the container.
-			podChanged := hash != 0 && hash != expectedHash
-			if !podChanged {
+			containerChanged := hash != 0 && hash != expectedHash
+			if !containerChanged {
 				// TODO: This should probably be separated out into a separate goroutine.
 				// If the container's liveness probe is unsuccessful, set readiness to false. If liveness is succesful, do a readiness check and set
 				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
@@ -1115,80 +1197,30 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, live)
 			} else {
 				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
-			}
-			if err := kl.killContainer(dockerContainer); err != nil {
-				glog.V(1).Infof("Failed to kill container %q: %v", dockerContainer.ID, err)
-				continue
-			}
-			containersInPod.RemoveContainerWithID(containerID)
-
-			if podChanged {
-				// Also kill associated pod infra container if the pod changed.
+				// Also kill associated pod infra container if the container changed.
 				if err := kl.killContainerByID(string(podInfraContainerID)); err != nil {
 					glog.V(1).Infof("Failed to kill pod infra container %q: %v", podInfraContainerID, err)
 					continue
 				}
 				containersInPod.RemoveContainerWithID(containerID)
 			}
-		}
-
-		// Check RestartPolicy for container
-		recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, podFullName, uid, container.Name)
-		if err != nil {
-			glog.Errorf("Error listing recent containers:%s", dockerContainerName)
-			// TODO(dawnchen): error handling here?
-		}
-		// set dead containers to unready state
-		for _, c := range recentContainers {
-			kl.readiness.remove(c.ID)
-		}
-
-		if len(recentContainers) > 0 && pod.Spec.RestartPolicy.Always == nil {
-			if pod.Spec.RestartPolicy.Never != nil {
-				glog.V(3).Infof("Already ran container with name %s, do nothing",
-					dockerContainerName)
+			containersInPod.RemoveContainerWithID(containerID)
+			if err := kl.killContainer(dockerContainer); err != nil {
+				glog.V(1).Infof("Failed to kill container %q: %v", dockerContainer.ID, err)
 				continue
 			}
-			if pod.Spec.RestartPolicy.OnFailure != nil {
-				// Check the exit code of last run
-				if recentContainers[0].State.ExitCode == 0 {
-					glog.V(3).Infof("Already successfully ran container with name %s, do nothing",
-						dockerContainerName)
-					continue
-				}
-			}
+		}
+
+		if !kl.shouldContainerBeRestarted(pod, container.Name, dockerContainerName, uid) {
+			continue
 		}
 
 		glog.V(3).Infof("Container with name %s doesn't exist, creating", dockerContainerName)
-		ref, err := containerRef(pod, &container)
-		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+
+		containerID, err := kl.pullImageAndRunContainer(pod, &container, &podVolumes, podInfraContainerID)
+		if err == nil {
+			containersInPod.RemoveContainerWithID(containerID)
 		}
-		if container.ImagePullPolicy != api.PullNever {
-			present, err := kl.dockerPuller.IsImagePresent(container.Image)
-			if err != nil {
-				if ref != nil {
-					kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
-				}
-				glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
-				continue
-			}
-			if container.ImagePullPolicy == api.PullAlways ||
-				(container.ImagePullPolicy == api.PullIfNotPresent && (!present)) {
-				if err := kl.pullImage(container.Image, ref); err != nil {
-					continue
-				}
-			}
-		}
-		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
-		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		containerID, err := kl.runContainer(pod, &container, podVolumes, namespaceMode, namespaceMode)
-		if err != nil {
-			// TODO(bburns) : Perhaps blacklist a container after N failures?
-			glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
-			continue
-		}
-		containersInPod.RemoveContainerWithID(containerID)
 	}
 
 	// Kill any remaining containers in this pod which were not identified above (guards against duplicates).
