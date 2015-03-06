@@ -866,11 +866,17 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	// - Schedule (scheduler)
 	// - Delete (apiserver)
 	_, err := bindingRegistry.Create(ctx, &api.Binding{PodID: "foo", Host: "machine", ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}})
+	if err == nil {
+		t.Fatalf("Expected not-found-error but got nothing")
+	}
 	if !errors.IsNotFound(etcderrors.InterpretGetError(err, "Pod", "foo")) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
 	_, err = registry.Get(ctx, "foo")
+	if err == nil {
+		t.Fatalf("Expected not-found-error but got nothing")
+	}
 	if !errors.IsNotFound(etcderrors.InterpretGetError(err, "Pod", "foo")) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
