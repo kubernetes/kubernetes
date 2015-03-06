@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -36,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
@@ -46,10 +48,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 // taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
@@ -60,6 +63,14 @@ const milliCPUToCPU = 1000
 // The oom_score_adj of the POD infrastructure container. The default is 0, so
 // any value below that makes it *less* likely to get OOM killed.
 const podOomScoreAdj = -100
+
+var (
+	// ErrNoKubeletContainers returned when there are not containers managed by the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
+	ErrNoKubeletContainers = errors.New("no containers managed by kubelet")
+
+	// ErrContainerNotFound returned when a container in the given pod with the given container name was not found, amongst those managed by the kubelet.
+	ErrContainerNotFound = errors.New("no matching container")
+)
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
@@ -92,7 +103,8 @@ func NewMainKubelet(
 	masterServiceNamespace string,
 	volumePlugins []volume.Plugin,
 	streamingConnectionIdleTimeout time.Duration,
-	recorder record.EventRecorder) (*Kubelet, error) {
+	recorder record.EventRecorder,
+	cadvisorInterface cadvisor.Interface) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -144,6 +156,7 @@ func NewMainKubelet(
 		readiness:                      newReadinessStates(),
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
+		cadvisor:                       cadvisorInterface,
 	}
 
 	dockerCache, err := dockertools.NewDockerCache(dockerClient)
@@ -213,9 +226,8 @@ type Kubelet struct {
 	// Optional, maximum burst QPS from the docker registry, must be positive if QPS is > 0.0
 	pullBurst int
 
-	// Optional, no statistics will be available if omitted
-	cadvisorClient cadvisorInterface
-	cadvisorLock   sync.RWMutex
+	// cAdvisor used for container information.
+	cadvisor cadvisor.Interface
 
 	// Optional, minimum age required for garbage collection.  If zero, no limit.
 	minimumGCAge      time.Duration
@@ -453,20 +465,6 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 		}
 	}
 	return nil
-}
-
-// SetCadvisorClient sets the cadvisor client in a thread-safe way.
-func (kl *Kubelet) SetCadvisorClient(c cadvisorInterface) {
-	kl.cadvisorLock.Lock()
-	defer kl.cadvisorLock.Unlock()
-	kl.cadvisorClient = c
-}
-
-// GetCadvisorClient gets the cadvisor client.
-func (kl *Kubelet) GetCadvisorClient() cadvisorInterface {
-	kl.cadvisorLock.RLock()
-	defer kl.cadvisorLock.RUnlock()
-	return kl.cadvisorClient
 }
 
 func (kl *Kubelet) getPodStatusFromCache(podFullName string) (api.PodStatus, bool) {
@@ -1289,7 +1287,7 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 			}
 		}
 	}
-	return errors.NewAggregate(errlist)
+	return utilErrors.NewAggregate(errlist)
 }
 
 // Compares the map of current volumes to the map of desired volumes.
@@ -1899,4 +1897,34 @@ func (kl *Kubelet) BirthCry() {
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return kl.streamingConnectionIdleTimeout
+}
+
+// GetContainerInfo returns stats (from Cadvisor) for a container.
+func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	if err != nil {
+		return nil, err
+	}
+	if len(dockerContainers) == 0 {
+		return nil, ErrNoKubeletContainers
+	}
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, containerName)
+	if !found {
+		return nil, ErrContainerNotFound
+	}
+
+	ci, err := kl.cadvisor.DockerContainer(dockerContainer.ID, req)
+	if err != nil {
+		return nil, err
+	}
+	return &ci, nil
+}
+
+// GetRootInfo returns stats (from Cadvisor) of current machine (root container).
+func (kl *Kubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	return kl.cadvisor.ContainerInfo("/", req)
+}
+
+func (kl *Kubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
+	return kl.cadvisor.MachineInfo()
 }
