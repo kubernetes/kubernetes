@@ -138,7 +138,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	}
 	rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
 	if service.Spec.CreateExternalLoadBalancer {
-		rs.deleteExternalLoadBalancer(service)
+		rs.deleteExternalLoadBalancer(ctx, service)
 	}
 	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
 }
@@ -201,7 +201,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if externalLoadBalancerNeedsUpdate(oldService, service) {
 		// TODO: support updating existing balancers
 		if oldService.Spec.CreateExternalLoadBalancer {
-			err = rs.deleteExternalLoadBalancer(oldService)
+			err = rs.deleteExternalLoadBalancer(ctx, oldService)
 			if err != nil {
 				return nil, false, err
 			}
@@ -232,6 +232,10 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 	return net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)), nil
 }
 
+func (rs *REST) getLoadbalancerName(ctx api.Context, service *api.Service) string {
+	return rs.clusterName + "-" + api.NamespaceValue(ctx) + "-" + service.Name
+}
+
 func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service) error {
 	if rs.cloud == nil {
 		return fmt.Errorf("requested an external service, but no cloud provider supplied.")
@@ -256,18 +260,19 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 	if err != nil {
 		return err
 	}
+	name := rs.getLoadbalancerName(ctx, service)
 	// TODO: We should be able to rely on valid input, and not do defaulting here.
 	var affinityType api.AffinityType = service.Spec.SessionAffinity
 	if len(service.Spec.PublicIPs) > 0 {
 		for _, publicIP := range service.Spec.PublicIPs {
-			_, err = balancer.CreateTCPLoadBalancer(rs.clusterName+"-"+service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+			_, err = balancer.CreateTCPLoadBalancer(name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 			if err != nil {
 				// TODO: have to roll-back any successful calls.
 				return err
 			}
 		}
 	} else {
-		ip, err := balancer.CreateTCPLoadBalancer(rs.clusterName+"-"+service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+		ip, err := balancer.CreateTCPLoadBalancer(name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 		if err != nil {
 			return err
 		}
@@ -276,7 +281,7 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 	return nil
 }
 
-func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
+func (rs *REST) deleteExternalLoadBalancer(ctx api.Context, service *api.Service) error {
 	if rs.cloud == nil {
 		return fmt.Errorf("requested an external service, but no cloud provider supplied.")
 	}
@@ -296,7 +301,7 @@ func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
 	if err != nil {
 		return err
 	}
-	if err := balancer.DeleteTCPLoadBalancer(rs.clusterName+"-"+service.Name, zone.Region); err != nil {
+	if err := balancer.DeleteTCPLoadBalancer(rs.getLoadbalancerName(ctx, service), zone.Region); err != nil {
 		return err
 	}
 	return nil

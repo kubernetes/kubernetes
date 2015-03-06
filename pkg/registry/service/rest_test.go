@@ -224,6 +224,9 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
 	}
+	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
+		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
+	}
 }
 
 func TestServiceRegistryExternalServiceError(t *testing.T) {
@@ -626,6 +629,9 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	_, _, err := rest.Update(ctx, update)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
+	}
+	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
+		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
 	}
 }
 
