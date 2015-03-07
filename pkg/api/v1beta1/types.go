@@ -112,7 +112,19 @@ type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
-type EmptyDirVolumeSource struct{}
+type EmptyDirVolumeSource struct {
+	// Optional: what type of storage medium should back this directory.
+	// The default is "" which means to use the node's default medium.
+	Medium StorageType `json:"medium" description:"type of storage used to back the volume; must be an empty string (default) or Memory"`
+}
+
+// StorageType defines ways that storage can be allocated to a volume.
+type StorageType string
+
+const (
+	StorageTypeDefault StorageType = ""       // use whatever the default is for the node
+	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
+)
 
 // Protocol defines network protocols supported for things like conatiner ports.
 type Protocol string
