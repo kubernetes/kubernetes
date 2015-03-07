@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -97,14 +98,13 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		controller.Spec.Replicas = 0
-		if _, err = c.ReplicationControllers(ns).Update(controller); err != nil {
-			Logf("Failed to resize replication controller %s to zero: %v", name, err)
+		By("Cleaning up the replication controller")
+		rcReaper, err := kubectl.ReaperFor("ReplicationController", c)
+		if err != nil {
+			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
-
-		// Delete the replication controller.
-		if err = c.ReplicationControllers(ns).Delete(name); err != nil {
-			Logf("Failed to delete replication controller %s: %v", name, err)
+		if _, err = rcReaper.Stop(ns, controller.Name); err != nil {
+			Logf("Failed to stop replication controller %v: %v.", controller.Name, err)
 		}
 	}()
 
