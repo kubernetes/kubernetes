@@ -266,3 +266,81 @@ func newWithContents(t *testing.T, contents string) (authorizer.Authorizer, erro
 	pl, err := NewFromFile(f.Name())
 	return pl, err
 }
+
+func TestPolicy(t *testing.T) {
+	tests := []struct {
+		policy  policy
+		attr    authorizer.Attributes
+		matches bool
+		name    string
+	}{
+		{
+			policy:  policy{},
+			attr:    authorizer.AttributesRecord{},
+			matches: true,
+			name:    "null",
+		},
+		{
+			policy: policy{
+				Readonly: true,
+			},
+			attr:    authorizer.AttributesRecord{},
+			matches: false,
+			name:    "read-only mismatch",
+		},
+		{
+			policy: policy{
+				User: "foo",
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name: "bar",
+				},
+			},
+			matches: false,
+			name:    "user name mis-match",
+		},
+		{
+			policy: policy{
+				Resource: "foo",
+			},
+			attr: authorizer.AttributesRecord{
+				Resource: "bar",
+			},
+			matches: false,
+			name:    "resource mis-match",
+		},
+		{
+			policy: policy{
+				User:      "foo",
+				Resource:  "foo",
+				Namespace: "foo",
+			},
+			attr: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name: "foo",
+				},
+				Resource:  "foo",
+				Namespace: "foo",
+			},
+			matches: true,
+			name:    "namespace mis-match",
+		},
+		{
+			policy: policy{
+				Namespace: "foo",
+			},
+			attr: authorizer.AttributesRecord{
+				Namespace: "bar",
+			},
+			matches: false,
+			name:    "resource mis-match",
+		},
+	}
+	for _, test := range tests {
+		matches := test.policy.matches(test.attr)
+		if test.matches != matches {
+			t.Errorf("unexpected value for %s, expected: %s, saw: %s", test.name, test.matches, matches)
+		}
+	}
+}

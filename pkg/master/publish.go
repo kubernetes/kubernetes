@@ -147,14 +147,13 @@ func (m *Master) ensureEndpointsContain(serviceName string, ip net.IP, port int)
 	}
 	if !found {
 		e.Endpoints = append(e.Endpoints, api.Endpoint{IP: ip.String(), Port: port})
+		if len(e.Endpoints) > m.masterCount {
+			// We append to the end and remove from the beginning, so this should
+			// converge rapidly with all masters performing this operation.
+			e.Endpoints = e.Endpoints[len(e.Endpoints)-m.masterCount:]
+		}
+		return m.endpointRegistry.UpdateEndpoints(ctx, e)
 	}
-	if len(e.Endpoints) > m.masterCount {
-		// We append to the end and remove from the beginning, so this should
-		// converge rapidly with all masters performing this operation.
-		e.Endpoints = e.Endpoints[len(e.Endpoints)-m.masterCount:]
-	} else if found {
-		// We didn't make any changes, no need to actually call update.
-		return nil
-	}
-	return m.endpointRegistry.UpdateEndpoints(ctx, e)
+	// We didn't make any changes, no need to actually call update.
+	return nil
 }

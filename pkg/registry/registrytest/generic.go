@@ -59,7 +59,13 @@ func (r *GenericRegistry) WatchPredicate(ctx api.Context, m generic.Matcher, res
 func (r *GenericRegistry) Get(ctx api.Context, id string) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Object, r.Err
+	if r.Err != nil {
+		return nil, r.Err
+	}
+	if r.Object != nil {
+		return r.Object, nil
+	}
+	panic("generic registry should either have an object or an error for Get")
 }
 
 func (r *GenericRegistry) CreateWithName(ctx api.Context, id string, obj runtime.Object) error {
