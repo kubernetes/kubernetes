@@ -41,7 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
-	info "github.com/google/cadvisor/info/v1"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -1258,34 +1258,34 @@ func (f *errorTestingDockerClient) ListContainers(options docker.ListContainersO
 }
 
 // ContainerInfo is a mock implementation of CadvisorInterface.ContainerInfo.
-func (c *mockCadvisorClient) ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (c *mockCadvisorClient) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)
-	return args.Get(0).(*info.ContainerInfo), args.Error(1)
+	return args.Get(0).(*cadvisorApi.ContainerInfo), args.Error(1)
 }
 
 // DockerContainer is a mock implementation of CadvisorInterface.DockerContainer.
-func (c *mockCadvisorClient) DockerContainer(name string, req *info.ContainerInfoRequest) (info.ContainerInfo, error) {
+func (c *mockCadvisorClient) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)
-	return args.Get(0).(info.ContainerInfo), args.Error(1)
+	return args.Get(0).(cadvisorApi.ContainerInfo), args.Error(1)
 }
 
 // MachineInfo is a mock implementation of CadvisorInterface.MachineInfo.
-func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
+func (c *mockCadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	args := c.Called()
-	return args.Get(0).(*info.MachineInfo), args.Error(1)
+	return args.Get(0).(*cadvisorApi.MachineInfo), args.Error(1)
 }
 
 func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
-	containerInfo := info.ContainerInfo{
-		ContainerReference: info.ContainerReference{
+	containerInfo := cadvisorApi.ContainerInfo{
+		ContainerReference: cadvisorApi.ContainerReference{
 			Name: containerPath,
 		},
 	}
 
 	mockCadvisor := &mockCadvisorClient{}
-	cadvisorReq := &info.ContainerInfoRequest{}
+	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet, fakeDocker, _ := newTestKubelet(t)
@@ -1311,15 +1311,15 @@ func TestGetContainerInfo(t *testing.T) {
 
 func TestGetRootInfo(t *testing.T) {
 	containerPath := "/"
-	containerInfo := &info.ContainerInfo{
-		ContainerReference: info.ContainerReference{
+	containerInfo := &cadvisorApi.ContainerInfo{
+		ContainerReference: cadvisorApi.ContainerReference{
 			Name: containerPath,
 		},
 	}
 	fakeDocker := dockertools.FakeDockerClient{}
 
 	mockCadvisor := &mockCadvisorClient{}
-	cadvisorReq := &info.ContainerInfoRequest{}
+	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
@@ -1357,9 +1357,9 @@ func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
 func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
 
-	containerInfo := info.ContainerInfo{}
+	containerInfo := cadvisorApi.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
-	cadvisorReq := &info.ContainerInfoRequest{}
+	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, ErrCadvisorApiFailure)
 
 	kubelet, fakeDocker, _ := newTestKubelet(t)

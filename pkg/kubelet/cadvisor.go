@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	cadvisor "github.com/google/cadvisor/info/v1"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 var (
@@ -38,16 +38,16 @@ var (
 
 // cadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type cadvisorInterface interface {
-	DockerContainer(name string, req *cadvisor.ContainerInfoRequest) (cadvisor.ContainerInfo, error)
-	ContainerInfo(name string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error)
-	MachineInfo() (*cadvisor.MachineInfo, error)
+	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
+	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	MachineInfo() (*cadvisorApi.MachineInfo, error)
 }
 
 // statsFromContainerPath takes a container's absolute path and returns the stats for the
 // container. The container's absolute path refers to its hierarchy in the
 // cgroup file system. e.g. The root container, which represents the whole
 // machine, has path "/"; all docker containers have path "/docker/<docker id>"
-func statsFromContainerPath(cc cadvisorInterface, containerPath string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func statsFromContainerPath(cc cadvisorInterface, containerPath string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	cinfo, err := cc.ContainerInfo(containerPath, req)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func statsFromContainerPath(cc cadvisorInterface, containerPath string, req *cad
 
 // statsFromDockerContainer takes a Docker container's ID and returns the stats for the
 // container.
-func statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	cinfo, err := cc.DockerContainer(containerId, req)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func statsFromDockerContainer(cc cadvisorInterface, containerId string, req *cad
 }
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	cc := kl.GetCadvisorClient()
 	if cc == nil {
 		return nil, fmt.Errorf("no cadvisor connection")
@@ -91,7 +91,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, container
 }
 
 // GetRootInfo returns stats (from Cadvisor) of current machine (root container).
-func (kl *Kubelet) GetRootInfo(req *cadvisor.ContainerInfoRequest) (*cadvisor.ContainerInfo, error) {
+func (kl *Kubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	cc := kl.GetCadvisorClient()
 	if cc == nil {
 		return nil, fmt.Errorf("no cadvisor connection")
@@ -99,7 +99,7 @@ func (kl *Kubelet) GetRootInfo(req *cadvisor.ContainerInfoRequest) (*cadvisor.Co
 	return statsFromContainerPath(cc, "/", req)
 }
 
-func (kl *Kubelet) GetMachineInfo() (*cadvisor.MachineInfo, error) {
+func (kl *Kubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	cc := kl.GetCadvisorClient()
 	if cc == nil {
 		return nil, fmt.Errorf("no cadvisor connection")
