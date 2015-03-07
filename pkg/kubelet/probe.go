@@ -86,16 +86,7 @@ func (kl *Kubelet) probeContainerLiveness(pod *api.BoundPod, status api.PodStatu
 	if time.Now().Unix()-dockerContainer.Created < p.InitialDelaySeconds {
 		return probe.Success, nil
 	}
-
-	var result probe.Result
-	var err error
-	for i := 0; i < maxProbeRetries; i++ {
-		result, err = kl.runProbe(p, pod, status, container)
-		if result == probe.Success {
-			return probe.Success, err
-		}
-	}
-	return result, err
+	return kl.runProbeWithRetries(p, pod, status, container, maxProbeRetries)
 }
 
 // probeContainerLiveness probes the readiness of a container.
@@ -108,13 +99,18 @@ func (kl *Kubelet) probeContainerReadiness(pod *api.BoundPod, status api.PodStat
 	if time.Now().Unix()-dockerContainer.Created < p.InitialDelaySeconds {
 		return probe.Failure, nil
 	}
+	return kl.runProbeWithRetries(p, pod, status, container, maxProbeRetries)
+}
 
-	var result probe.Result
+// runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
+// if it never succeeds.
+func (kl *Kubelet) runProbeWithRetries(p *api.Probe, pod *api.BoundPod, status api.PodStatus, container api.Container, retires int) (probe.Result, error) {
 	var err error
-	for i := 0; i < maxProbeRetries; i++ {
+	var result probe.Result
+	for i := 0; i < retires; i++ {
 		result, err = kl.runProbe(p, pod, status, container)
 		if result == probe.Success {
-			return probe.Success, err
+			return probe.Success, nil
 		}
 	}
 	return result, err
