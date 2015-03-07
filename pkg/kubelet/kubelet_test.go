@@ -40,6 +40,7 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/mock"
@@ -65,6 +66,7 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient, *syn
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {
 		kubelet.rootDirectory = tempDir
+		kubelet.mounter = &mount.FakeMounter{}
 	}
 	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
@@ -86,6 +88,9 @@ func newTestKubelet(t *testing.T) (*Kubelet, *dockertools.FakeDockerClient, *syn
 	kubelet.podStatuses = map[string]api.PodStatus{}
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
+	}
+	if _, err := os.Stat(kubelet.getTmpfsRootDir()); err != nil {
+		t.Fatalf("failed to stat tmpfs root directory: %v", err)
 	}
 
 	return kubelet, fakeDocker, waitGroup
@@ -177,6 +182,12 @@ func TestKubeletDirs(t *testing.T) {
 
 	got = kubelet.getPodVolumeDir("abc123", "plugin", "foobar")
 	exp = path.Join(root, "pods/abc123/volumes/plugin/foobar")
+	if got != exp {
+		t.Errorf("expected %q', got %q", exp, got)
+	}
+
+	got = kubelet.getTmpfsPodVolumeDir("abc123", "plugin", "tmpfsuser")
+	exp = path.Join(kubelet.getTmpfsRootDir(), "pods/abc123/volumes/plugin/tmpfsuser")
 	if got != exp {
 		t.Errorf("expected %q', got %q", exp, got)
 	}

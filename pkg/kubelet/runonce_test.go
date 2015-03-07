@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
@@ -69,6 +70,7 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{
 		rootDirectory: "/tmp/kubelet",
+		mounter:       &mount.FakeMounter{},
 		recorder:      &record.FakeRecorder{},
 	}
 	if err := kb.setupDataDirs(); err != nil {
