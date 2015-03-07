@@ -33,6 +33,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -108,7 +109,9 @@ func NewServer(host HostInterface, enableDebuggingHandlers bool) Server {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
-	s.mux.HandleFunc("/healthz", s.handleHealthz)
+	healthz.AddHealthzFunc("docker", s.dockerHealthCheck)
+	healthz.AddHealthzFunc("hostname", s.hostnameHealthCheck)
+	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
 	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
@@ -151,27 +154,25 @@ func isValidDockerVersion(ver []uint) (bool, string) {
 	return true, ""
 }
 
-// handleHealthz handles /healthz request and checks Docker version
-func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
+func (s *Server) dockerHealthCheck(req *http.Request) error {
 	versions, err := s.host.GetDockerVersion()
 	if err != nil {
-		s.error(w, errors.New("unknown Docker version"))
-		return
+		return errors.New("unknown Docker version")
 	}
 	valid, version := isValidDockerVersion(versions)
 	if !valid {
-		s.error(w, errors.New("Docker version is too old ("+version+")"))
-		return
+		return fmt.Errorf("Docker version is too old (%v)", version)
 	}
+	return nil
+}
 
+func (s *Server) hostnameHealthCheck(req *http.Request) error {
 	masterHostname, _, err := net.SplitHostPort(req.Host)
 	if err != nil {
 		if !strings.Contains(req.Host, ":") {
 			masterHostname = req.Host
 		} else {
-			msg := fmt.Sprintf("Could not parse hostname from http request: %v", err)
-			s.error(w, errors.New(msg))
-			return
+			return fmt.Errorf("Could not parse hostname from http request: %v", err)
 		}
 	}
 
@@ -179,10 +180,9 @@ func (s *Server) handleHealthz(w http.ResponseWriter, req *http.Request) {
 	// the kubelet knows
 	hostname := s.host.GetHostname()
 	if masterHostname != hostname && masterHostname != "127.0.0.1" && masterHostname != "localhost" {
-		s.error(w, errors.New("Kubelet hostname \""+hostname+"\" does not match the hostname expected by the master \""+masterHostname+"\""))
-		return
+		return fmt.Errorf("Kubelet hostname \"%v\" does not match the hostname expected by the master \"%v\"", hostname, masterHostname)
 	}
-	w.Write([]byte("ok"))
+	return nil
 }
 
 // handleContainerLogs handles containerLogs request against the Kubelet
