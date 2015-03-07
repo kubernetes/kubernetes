@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/google/gofuzz"
 )
 
 // For testing, bypass HandleCrash.
@@ -159,6 +160,18 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 		return json.Marshal(intstr.StrVal)
 	default:
 		return []byte{}, fmt.Errorf("impossible IntOrString.Kind")
+	}
+}
+
+func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
+	if c.RandBool() {
+		intstr.Kind = IntstrInt
+		c.Fuzz(&intstr.IntVal)
+		intstr.StrVal = ""
+	} else {
+		intstr.Kind = IntstrString
+		intstr.IntVal = 0
+		c.Fuzz(&intstr.StrVal)
 	}
 }
 
