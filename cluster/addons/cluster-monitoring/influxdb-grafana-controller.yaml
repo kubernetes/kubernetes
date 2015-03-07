@@ -28,12 +28,6 @@ desiredState:
                 value: "admin"
               - name: "HTTP_PASS"
                 value: "**None**"
-              - name: "INFLUXDB_PROTO"
-                value: "https"
-              - name: "INFLUXDB_HOST"
-                value: '"+window.location.hostname+"/api/v1beta1/proxy/services/monitoring-influxdb'
-              - name: "INFLUXDB_PORT"
-                value: ""
 labels:
   name: influxGrafana
   kubernetes.io/cluster-service: "true"
