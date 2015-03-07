@@ -1204,7 +1204,6 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 			if !containerChanged {
 				result, err := kl.probeContainer(pod, podStatus, container, dockerContainer)
 				if err != nil {
-					glog.V(1).Infof("liveness/readiness probe errored: %v", err)
 					containersInPod.RemoveContainerWithID(containerID)
 					continue
 				}

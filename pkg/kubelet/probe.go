@@ -45,12 +45,12 @@ func (kl *Kubelet) probeContainer(pod *api.BoundPod, status api.PodStatus, conta
 	// Probe liveness.
 	live, err := kl.probeContainerLiveness(pod, status, container, dockerContainer)
 	if err != nil {
-		glog.V(1).Infof("liveness probe errored: %v", err)
+		glog.V(1).Infof("Liveness probe errored: %v", err)
 		kl.readiness.set(dockerContainer.ID, false)
 		return probe.Unknown, err
 	}
 	if live != probe.Success {
-		glog.V(1).Infof("liveness probe unsuccessful: %v", live)
+		glog.V(1).Infof("Liveness probe unsuccessful: %v", live)
 		kl.readiness.set(dockerContainer.ID, false)
 		return live, nil
 	}
@@ -58,12 +58,12 @@ func (kl *Kubelet) probeContainer(pod *api.BoundPod, status api.PodStatus, conta
 	// Probe readiness.
 	ready, err := kl.probeContainerReadiness(pod, status, container, dockerContainer)
 	if err == nil && ready == probe.Success {
-		glog.V(1).Infof("readiness probe successful: %v", ready)
+		glog.V(3).Infof("Readiness probe successful: %v", ready)
 		kl.readiness.set(dockerContainer.ID, true)
 		return probe.Success, nil
 	}
 
-	glog.V(1).Infof("readiness probe failed/errored: %v, %v", ready, err)
+	glog.V(1).Infof("Readiness probe failed/errored: %v, %v", ready, err)
 	kl.readiness.set(dockerContainer.ID, false)
 
 	containerID := dockertools.DockerID(dockerContainer.ID)
