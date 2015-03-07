@@ -94,7 +94,7 @@ func slicesEqual(a, b []string) bool {
 
 func TestGetMountRefs(t *testing.T) {
 	fm := &FakeMounter{
-		[]MountPoint{
+		MountPoints: []MountPoint{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
 			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},

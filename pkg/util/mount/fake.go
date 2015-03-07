@@ -16,16 +16,35 @@ limitations under the License.
 
 package mount
 
-// FakeMounter implements mount.Interface.
+// FakeMounter implements mount.Interface for tests.
 type FakeMounter struct {
 	MountPoints []MountPoint
+	Log         []FakeAction
+}
+
+// Values for FakeAction.Action
+const FakeActionMount = "mount"
+const FakeActionUnmount = "unmount"
+
+// FakeAction objects are logged every time a fake mount or unmount is called.
+type FakeAction struct {
+	Action string // "mount" or "unmount"
+	Target string // applies to both mount and unmount actions
+	Source string // applies only to "mount" actions
+	FSType string // applies only to "mount" actions
+}
+
+func (f *FakeMounter) ResetLog() {
+	f.Log = []FakeAction{}
 }
 
 func (f *FakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})
 	return nil
 }
 
 func (f *FakeMounter) Unmount(target string, flags int) error {
+	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: target})
 	return nil
 }
 
