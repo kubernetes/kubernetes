@@ -27,7 +27,9 @@ import (
 )
 
 func TestMinionRegistryREST(t *testing.T) {
-	ms := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	registryNodeList := registrytest.MakeMinionList([]string{"foo", "bar"}, api.NodeResources{})
+	ms := NewREST(registrytest.NewMinionRegistry(registryNodeList))
+
 	ctx := api.NewContext()
 	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Node).Name != "foo" {
 		t.Errorf("missing expected object")
@@ -87,7 +89,8 @@ func TestMinionRegistryREST(t *testing.T) {
 }
 
 func TestMinionRegistryValidUpdate(t *testing.T) {
-	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	registryNodeList := registrytest.MakeMinionList([]string{"foo", "bar"}, api.NodeResources{})
+	storage := NewREST(registrytest.NewMinionRegistry(registryNodeList))
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
@@ -112,7 +115,8 @@ var (
 )
 
 func TestMinionRegistryValidatesCreate(t *testing.T) {
-	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	registryNodeList := registrytest.MakeMinionList([]string{"foo", "bar"}, api.NodeResources{})
+	storage := NewREST(registrytest.NewMinionRegistry(registryNodeList))
 	ctx := api.NewContext()
 	failureCases := map[string]api.Node{
 		"zero-length Name": {
@@ -154,7 +158,8 @@ func contains(nodes *api.NodeList, nodeID string) bool {
 }
 
 func TestCreate(t *testing.T) {
-	registry := registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{})
+	registryNodeList := registrytest.MakeMinionList([]string{"foo", "bar"}, api.NodeResources{})
+	registry := registrytest.NewMinionRegistry(registryNodeList)
 	test := resttest.New(t, NewREST(registry), registry.SetError).ClusterScope()
 	test.TestCreate(
 		// valid
@@ -171,4 +176,56 @@ func TestCreate(t *testing.T) {
 				Labels: invalidSelector,
 			},
 		})
+}
+
+func TestListNodeListSelection(t *testing.T) {
+	registryNodeList := &api.NodeList{
+		Items: []api.Node{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"name": "nginx",
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name: "bar",
+					Labels: map[string]string{
+						"name": "nginx",
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name: "baz",
+					Labels: map[string]string{
+						"name": "redis",
+					},
+				},
+			},
+		},
+	}
+	storage := NewREST(registrytest.NewMinionRegistry(registryNodeList))
+	ctx := api.NewContext()
+	label, err := labels.Parse("name=nginx")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	nodeListObj, err := storage.List(ctx, label, labels.Everything())
+	nodeList := nodeListObj.(*api.NodeList)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(nodeList.Items) != 2 {
+		t.Errorf("Unexpected node list: %#v", nodeList)
+	}
+	if nodeList.Items[0].Name != "foo" {
+		t.Errorf("Unexpected node list: %#v", nodeList)
+	}
+	if nodeList.Items[1].Name != "bar" {
+		t.Errorf("Unexpected node list: %#v", nodeList)
+	}
 }

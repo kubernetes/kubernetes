@@ -46,9 +46,9 @@ func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.Node
 	return &list
 }
 
-func NewMinionRegistry(minions []string, nodeResources api.NodeResources) *MinionRegistry {
+func NewMinionRegistry(nodes *api.NodeList) *MinionRegistry {
 	return &MinionRegistry{
-		Minions: *MakeMinionList(minions, nodeResources),
+		Minions: *nodes,
 	}
 }
 
