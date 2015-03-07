@@ -1202,36 +1202,17 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 			// look for changes in the container.
 			containerChanged := hash != 0 && hash != expectedHash
 			if !containerChanged {
-				// TODO: This should probably be separated out into a separate goroutine.
-				// If the container's liveness probe is unsuccessful, set readiness to false. If liveness is succesful, do a readiness check and set
-				// readiness accordingly. If the initalDelay since container creation on liveness probe has not passed the probe will return Success.
-				// If the initial delay on the readiness probe has not passed the probe will return Failure.
-				ready := probe.Unknown
-				live, err := kl.probeContainer(container.LivenessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Success)
-				if live == probe.Success {
-					ready, _ = kl.probeContainer(container.ReadinessProbe, podFullName, uid, podStatus, container, dockerContainer, probe.Failure)
-				}
+				result, err := kl.probeContainer(pod, podStatus, container, dockerContainer)
 				if err != nil {
 					glog.V(1).Infof("liveness/readiness probe errored: %v", err)
 					containersInPod.RemoveContainerWithID(containerID)
 					continue
 				}
-				if ready == probe.Success {
-					kl.readiness.set(dockerContainer.ID, true)
-				} else {
-					kl.readiness.set(dockerContainer.ID, false)
-				}
-				if live == probe.Success {
+				if result == probe.Success {
 					containersInPod.RemoveContainerWithID(containerID)
 					continue
 				}
-				ref, ok := kl.getRef(containerID)
-				if !ok {
-					glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
-				} else {
-					kl.recorder.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
-				}
-				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, live)
+				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, result)
 			} else {
 				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 				// Also kill associated pod infra container if the container changed.
