@@ -60,6 +60,7 @@ type KubeletServer struct {
 	EtcdServerList                 util.StringList
 	EtcdConfigFile                 string
 	RootDirectory                  string
+	MountTmpfs                     bool
 	AllowPrivileged                bool
 	RegistryPullQPS                float64
 	RegistryBurst                  int
@@ -95,6 +96,7 @@ func NewKubeletServer() *KubeletServer {
 		MaxContainerCount:       5,
 		CAdvisorPort:            4194,
 		OOMScoreAdj:             -900,
+		MountTmpfs:              true,
 		MasterServiceNamespace:  api.NamespaceDefault,
 	}
 }
@@ -130,6 +132,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.ClusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, crash with panics more often.")
+	fs.BoolVar(&s.MountTmpfs, "mount_tmpfs", s.MountTmpfs, "If true, kubelet will mount tmpfs storage")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
 }
 
@@ -152,6 +155,9 @@ func (s *KubeletServer) Run(_ []string) error {
 		s.EtcdServerList = util.StringList{}
 	}
 
+	glog.Infof("Using root directory: %v", s.RootDirectory)
+	glog.Infof("Mount tmpfs storage:  %v", s.MountTmpfs)
+
 	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
 	}
@@ -160,8 +166,6 @@ func (s *KubeletServer) Run(_ []string) error {
 	if err != nil && len(s.APIServerList) > 0 {
 		glog.Warningf("No API client: %v", err)
 	}
-
-	glog.Infof("Using root directory: %v", s.RootDirectory)
 
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
 
@@ -192,6 +196,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		EtcdClient:                     kubelet.EtcdClientOrDie(s.EtcdServerList, s.EtcdConfigFile),
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  ProbeVolumePlugins(),
+		MountTmpfs:                     s.MountTmpfs,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 	}
 
@@ -381,6 +386,7 @@ type KubeletConfig struct {
 	Runonce                        bool
 	MasterServiceNamespace         string
 	VolumePlugins                  []volume.Plugin
+	MountTmpfs                     bool
 	StreamingConnectionIdleTimeout time.Duration
 	Recorder                       record.EventRecorder
 	TLSOptions                     *kubelet.TLSOptions
@@ -415,6 +421,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
 		kc.VolumePlugins,
+		kc.MountTmpfs,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder)
 
