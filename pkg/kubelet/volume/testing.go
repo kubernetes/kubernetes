@@ -27,16 +27,21 @@ import (
 
 // FakeHost is useful for testing volume plugins.
 type FakeHost struct {
-	RootDir    string
-	KubeClient client.Interface
+	RootDir      string
+	TmpfsRootDir string
+	KubeClient   client.Interface
 }
 
-func (f *FakeHost) GetPluginDir(podUID string) string {
-	return path.Join(f.RootDir, "plugins", podUID)
+func (f *FakeHost) GetPluginDir(pluginName string) string {
+	return path.Join(f.RootDir, "plugins", pluginName)
 }
 
 func (f *FakeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return path.Join(f.RootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
+}
+
+func (f *FakeHost) GetTmpfsPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
+	return path.Join(f.TmpfsRootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
 }
 
 func (f *FakeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {

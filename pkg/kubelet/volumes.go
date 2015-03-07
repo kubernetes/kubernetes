@@ -41,8 +41,12 @@ func (vh *volumeHost) GetPluginDir(pluginName string) string {
 	return vh.kubelet.getPluginDir(pluginName)
 }
 
-func (vh *volumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
+func (vh *volumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return vh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
+}
+
+func (vh *volumeHost) GetTmpfsPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
+	return vh.kubelet.getTmpfsPodVolumeDir(podUID, pluginName, volumeName)
 }
 
 func (vh *volumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
