@@ -25,26 +25,49 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-// FakeHost is useful for testing volume plugins.
-type FakeHost struct {
-	RootDir    string
-	KubeClient client.Interface
+// fakeHost is useful for testing volume plugins.
+type fakeHost struct {
+	rootDir    string
+	kubeClient client.Interface
+	pluginMgr  PluginMgr
 }
 
-func (f *FakeHost) GetPluginDir(podUID string) string {
-	return path.Join(f.RootDir, "plugins", podUID)
+func NewFakeHost(rootDir string, kubeClient client.Interface, plugins []Plugin) *fakeHost {
+	host := &fakeHost{rootDir: rootDir, kubeClient: kubeClient}
+	host.pluginMgr.InitPlugins(plugins, host)
+	return host
 }
 
-func (f *FakeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
-	return path.Join(f.RootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
+func (f *fakeHost) GetPluginDir(podUID string) string {
+	return path.Join(f.rootDir, "plugins", podUID)
 }
 
-func (f *FakeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
-	return path.Join(f.RootDir, "pods", string(podUID), "plugins", pluginName)
+func (f *fakeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
+	return path.Join(f.rootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
 }
 
-func (f *FakeHost) GetKubeClient() client.Interface {
-	return f.KubeClient
+func (f *fakeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
+	return path.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
+}
+
+func (f *fakeHost) GetKubeClient() client.Interface {
+	return f.kubeClient
+}
+
+func (f *fakeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
+	plug, err := f.pluginMgr.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	return plug.NewBuilder(spec, podRef)
+}
+
+func (f *fakeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error) {
+	plug, err := f.pluginMgr.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	return plug.NewCleaner(spec.Name, podUID)
 }
 
 // FakePlugin is useful for for testing.  It tries to be a fully compliant
@@ -86,7 +109,11 @@ type FakeVolume struct {
 }
 
 func (fv *FakeVolume) SetUp() error {
-	return os.MkdirAll(fv.GetPath(), 0750)
+	return fv.SetUpAt(fv.GetPath())
+}
+
+func (fv *FakeVolume) SetUpAt(dir string) error {
+	return os.MkdirAll(dir, 0750)
 }
 
 func (fv *FakeVolume) GetPath() string {
@@ -94,5 +121,9 @@ func (fv *FakeVolume) GetPath() string {
 }
 
 func (fv *FakeVolume) TearDown() error {
-	return os.RemoveAll(fv.GetPath())
+	return fv.TearDownAt(fv.GetPath())
+}
+
+func (fv *FakeVolume) TearDownAt(dir string) error {
+	return os.RemoveAll(dir)
 }

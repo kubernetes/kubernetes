@@ -80,6 +80,17 @@ type Host interface {
 
 	// GetKubeClient returns a client interface
 	GetKubeClient() client.Interface
+
+	// NewWrapperBuilder finds an appropriate plugin with which to handle
+	// the provided spec.  This is used to implement volume plugins which
+	// "wrap" other plugins.  For example, the "secret" volume is
+	// implemented in terms of the "emptyDir" volume.
+	NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
+
+	// NewWrapperCleaner finds an appropriate plugin with which to handle
+	// the provided spec.  See comments on NewWrapperBuilder for more
+	// context.
+	NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error)
 }
 
 // PluginMgr tracks registered plugins.

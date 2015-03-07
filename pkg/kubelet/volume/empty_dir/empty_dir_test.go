@@ -33,7 +33,7 @@ const basePath = "/tmp/fake"
 // Construct an instance of a plugin, by name.
 func makePluginUnderTest(t *testing.T, plugName string) volume.Plugin {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{basePath, nil})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost(basePath, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {

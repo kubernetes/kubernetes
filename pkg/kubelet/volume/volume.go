@@ -33,17 +33,25 @@ type Interface interface {
 type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
 	Interface
-	// SetUp prepares and mounts/unpacks the volume to a directory path.
-	// This may be called more than once, so implementations must be
-	// idempotent.
+	// SetUp prepares and mounts/unpacks the volume to a self-determined
+	// directory path.  This may be called more than once, so
+	// implementations must be idempotent.
 	SetUp() error
+	// SetUpAt prepares and mounts/unpacks the volume to the specified
+	// directory path, which may or may not exist yet.  This may be called
+	// more than once, so implementations must be idempotent.
+	SetUpAt(dir string) error
 }
 
 // Cleaner interface provides method to cleanup/unmount the volumes.
 type Cleaner interface {
 	Interface
-	// TearDown unmounts the volume and removes traces of the SetUp procedure.
+	// TearDown unmounts the volume from a self-determined directory and
+	// removes traces of the SetUp procedure.
 	TearDown() error
+	// TearDown unmounts the volume from the specified directory and
+	// removes traces of the SetUp procedure.
+	TearDownAt(dir string) error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
