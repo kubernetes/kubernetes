@@ -27,7 +27,7 @@ import (
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{RootDir: "/tmp/fake"})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
 	if err != nil {
@@ -46,7 +46,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{RootDir: "/tmp/fake"})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
 	if err != nil {
@@ -100,7 +100,7 @@ func TestPlugin(t *testing.T) {
 
 func TestPluginBackCompat(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{RootDir: "/tmp/fake"})
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
 	if err != nil {
@@ -125,7 +125,7 @@ func TestPluginBackCompat(t *testing.T) {
 
 func TestPluginLegacy(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{RootDir: "/tmp/fake"})
 
 	plug, err := plugMgr.FindPluginByName("empty")
 	if err != nil {

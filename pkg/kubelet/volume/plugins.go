@@ -59,6 +59,9 @@ type Plugin interface {
 }
 
 // Host is an interface that plugins can use to access the kubelet.
+//
+// TODO: this interface should become more general once we have consensus
+// around the characteristic matching that has been discussed.
 type Host interface {
 	// GetPluginDir returns the absolute path to a directory under which
 	// a given plugin may store data.  This directory might not actually
@@ -66,11 +69,17 @@ type Host interface {
 	// GetPodPluginDir().
 	GetPluginDir(pluginName string) string
 
-	// GetPodVolumeDir returns the absolute path a directory which
+	// GetPodVolumeDir returns the absolute path to a directory which
 	// represents the named volume under the named plugin for the given
 	// pod.  If the specified pod does not exist, the result of this call
 	// might not exist.
-	GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string
+	GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string
+
+	// GetTmpfsPodVolumeDir returns the absolute path to a directory which
+	// represents the tmpfs storage for the named volume under the named
+	// plugin for the given pod.  If the specified pod does not exist, the result
+	// of this call might not exist.
+	GetTmpfsPodVolumeDir(podUID types.UID, pluginName, volumeName string) string
 
 	// GetPodPluginDir returns the absolute path to a directory under which
 	// a given plugin may store data for a given pod.  If the specified pod

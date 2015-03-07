@@ -36,7 +36,7 @@ func newTestHost(t *testing.T, fakeKubeClient client.Interface) volume.Host {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return &volume.FakeHost{tempDir, fakeKubeClient}
+	return &volume.FakeHost{TmpfsRootDir: tempDir, KubeClient: fakeKubeClient}
 }
 
 func TestCanSupport(t *testing.T) {
