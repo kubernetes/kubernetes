@@ -39,7 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/golang/glog"
-	info "github.com/google/cadvisor/info/v1"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -77,10 +77,10 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
-	GetMachineInfo() (*info.MachineInfo, error)
+	GetMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetBoundPods() ([]api.BoundPod, error)
 	GetPodByName(namespace, name string) (*api.BoundPod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
@@ -633,9 +633,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	// /stats/<podfullname>/<containerName> or /stats/<namespace>/<podfullname>/<uid>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
-	var stats *info.ContainerInfo
+	var stats *cadvisorApi.ContainerInfo
 	var err error
-	var query info.ContainerInfoRequest
+	var query cadvisorApi.ContainerInfoRequest
 	err = json.NewDecoder(req.Body).Decode(&query)
 	if err != nil && err != io.EOF {
 		s.error(w, err)
