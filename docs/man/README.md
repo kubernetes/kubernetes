@@ -1,7 +1,7 @@
 Kubernetes Documentation
 ====================
 
-This directory contains the Docker user manual in the Markdown format.
+This directory contains the Kubernetes user manual in the Markdown format.
 Do *not* edit the man pages in the man1 directory. Instead, amend the
 Markdown (*.md) files.
 
@@ -23,7 +23,7 @@ environment. This uses `go-md2man`, a pure Go Markdown to man page generator.
 
 ## Building the md2man image
 
-There is a `Dockerfile` provided in the `docker/docs/man` directory.
+There is a `Dockerfile` provided in the `kubernetes/docs/man` directory.
 
 Using this `Dockerfile`, create a Docker image tagged `docker/md2man`:
 
