@@ -32,7 +32,7 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 #### Describe available storage
 
-Cluster adminstrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the Kubernetes API for new volumes and adds them to its internal cache of volumes in the system. All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
+Cluster administrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the Kubernetes API for new volumes and adds them to its internal cache of volumes in the system. All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
 
 Many means of dynamic provisioning will be eventually be implemented for various storage types. 
 
