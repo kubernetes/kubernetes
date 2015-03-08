@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
@@ -1185,353 +1184,179 @@ func TestValidateBoundPods(t *testing.T) {
 
 func TestValidateService(t *testing.T) {
 	testCases := []struct {
-		name     string
-		svc      api.Service
-		existing api.ServiceList
-		numErrs  int
+		name    string
+		makeSvc func(svc *api.Service) // given a basic valid service, each test case can customize it
+		numErrs int
 	}{
 		{
-			name: "missing id",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			// Should fail because the ID is missing.
-			numErrs: 1,
-		},
-		{
-			name: "missing protocol",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					SessionAffinity: "None",
-				},
-			},
-			// Should fail because protocol is missing.
-			numErrs: 1,
-		},
-		{
-			name: "missing session affinity",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:     8675,
-					Selector: map[string]string{"foo": "bar"},
-					Protocol: "TCP",
-				},
-			},
-			// Should fail because the session affinity is missing.
-			numErrs: 1,
-		},
-		{
 			name: "missing namespace",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			makeSvc: func(s *api.Service) {
+				s.Namespace = ""
 			},
-			// Should fail because the Namespace is missing.
 			numErrs: 1,
 		},
 		{
-			name: "invalid id",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "-123abc", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			name: "invalid namespace",
+			makeSvc: func(s *api.Service) {
+				s.Namespace = "-123"
 			},
-			// Should fail because the ID is invalid.
 			numErrs: 1,
 		},
 		{
-			name: "invalid generate.base",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:         "valid",
-					GenerateName: "-123abc",
-					Namespace:    api.NamespaceDefault,
-				},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			name: "missing name",
+			makeSvc: func(s *api.Service) {
+				s.Name = ""
 			},
-			// Should fail because the Base value for generation is invalid
+			numErrs: 1,
+		},
+		{
+			name: "invalid name",
+			makeSvc: func(s *api.Service) {
+				s.Name = "-123"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "too long name",
+			makeSvc: func(s *api.Service) {
+				s.Name = strings.Repeat("a", 25)
+			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid generateName",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:         "valid",
-					GenerateName: "abc1234567abc1234567abc1234567abc1234567abc1234567abc1234567",
-					Namespace:    api.NamespaceDefault,
-				},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			makeSvc: func(s *api.Service) {
+				s.GenerateName = "-123"
 			},
-			// Should fail because the generate name type is invalid.
 			numErrs: 1,
 		},
 		{
-			name: "missing port",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			name: "too long generateName",
+			makeSvc: func(s *api.Service) {
+				s.GenerateName = strings.Repeat("a", 25)
 			},
-			// Should fail because the port number is missing/invalid.
 			numErrs: 1,
-		},
-		{
-			name: "invalid port",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            66536,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			// Should fail because the port number is invalid.
-			numErrs: 1,
-		},
-		{
-			name: "invalid protocol",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "INVALID",
-					SessionAffinity: "None",
-				},
-			},
-			// Should fail because the protocol is invalid.
-			numErrs: 1,
-		},
-		{
-			name: "missing selector",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			// Should be ok because the selector is missing.
-			numErrs: 0,
-		},
-		{
-			name: "valid 1",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			numErrs: 0,
-		},
-		{
-			name: "valid 2",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "UDP",
-					SessionAffinity: "None",
-				},
-			},
-			numErrs: 0,
-		},
-		{
-			name: "valid 3",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "UDP",
-					SessionAffinity: "None",
-				},
-			},
-			numErrs: 0,
-		},
-		{
-			name: "external port in use",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port: 80,
-					CreateExternalLoadBalancer: true,
-					Selector:                   map[string]string{"foo": "bar"},
-					Protocol:                   "TCP",
-					SessionAffinity:            "None",
-				},
-			},
-			existing: api.ServiceList{
-				Items: []api.Service{
-					{
-						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
-						Spec:       api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true, Protocol: "TCP"},
-					},
-				},
-			},
-			numErrs: 0,
-		},
-		{
-			name: "same port in use, but not external",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port: 80,
-					CreateExternalLoadBalancer: true,
-					Selector:                   map[string]string{"foo": "bar"},
-					Protocol:                   "TCP",
-					SessionAffinity:            "None",
-				},
-			},
-			existing: api.ServiceList{
-				Items: []api.Service{
-					{
-						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
-						Spec:       api.ServiceSpec{Port: 80, Protocol: "TCP"},
-					},
-				},
-			},
-			numErrs: 0,
-		},
-		{
-			name: "same port in use, but not external on input",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            80,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			existing: api.ServiceList{
-				Items: []api.Service{
-					{
-						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
-						Spec:       api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true, Protocol: "TCP"},
-					},
-				},
-			},
-			numErrs: 0,
-		},
-		{
-			name: "same port in use, but neither external",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Spec: api.ServiceSpec{
-					Port:            80,
-					Selector:        map[string]string{"foo": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
-			},
-			existing: api.ServiceList{
-				Items: []api.Service{
-					{
-						ObjectMeta: api.ObjectMeta{Name: "def123", Namespace: api.NamespaceDefault},
-						Spec:       api.ServiceSpec{Port: 80, Protocol: "TCP"},
-					},
-				},
-			},
-			numErrs: 0,
 		},
 		{
 			name: "invalid label",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "abc123",
-					Namespace: api.NamespaceDefault,
-					Labels: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			makeSvc: func(s *api.Service) {
+				s.Labels["NoUppercaseOrSpecialCharsLike=Equals"] = "bar"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid annotation",
+			makeSvc: func(s *api.Service) {
+				s.Annotations["NoSpecialCharsLike=Equals"] = "bar"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid selector",
-			svc: api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "abc123",
-					Namespace: api.NamespaceDefault,
-				},
-				Spec: api.ServiceSpec{
-					Port:            8675,
-					Selector:        map[string]string{"foo": "bar", "NoUppercaseOrSpecialCharsLike=Equals": "bar"},
-					Protocol:        "TCP",
-					SessionAffinity: "None",
-				},
+			makeSvc: func(s *api.Service) {
+				s.Spec.Selector["NoSpecialCharsLike=Equals"] = "bar"
 			},
 			numErrs: 1,
+		},
+		{
+			name: "missing session affinity",
+			makeSvc: func(s *api.Service) {
+				s.Spec.SessionAffinity = ""
+			},
+			numErrs: 1,
+		},
+		{
+			name: "missing protocol",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Protocol = ""
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid protocol",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Protocol = "INVALID"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "missing port",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Port = 0
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid port",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Port = 65536
+			},
+			numErrs: 1,
+		},
+		{
+			name: "missing destinationPort string",
+			makeSvc: func(s *api.Service) {
+				s.Spec.ContainerPort = util.NewIntOrStringFromString("")
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid destinationPort int",
+			makeSvc: func(s *api.Service) {
+				s.Spec.ContainerPort = util.NewIntOrStringFromInt(65536)
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nil selector",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Selector = nil
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid 1",
+			makeSvc: func(s *api.Service) {
+				// do nothing
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid 2",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Protocol = "UDP"
+				s.Spec.ContainerPort = util.NewIntOrStringFromInt(12345)
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid 3",
+			makeSvc: func(s *api.Service) {
+				s.Spec.ContainerPort = util.NewIntOrStringFromString("http")
+			},
+			numErrs: 0,
 		},
 	}
 
 	for _, tc := range testCases {
-		registry := registrytest.NewServiceRegistry()
-		registry.List = tc.existing
-		errs := ValidateService(&tc.svc)
+		svc := api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "valid",
+				Namespace:   "valid",
+				Labels:      map[string]string{},
+				Annotations: map[string]string{},
+			},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"key": "val"},
+				SessionAffinity: "None",
+				Port:            8675,
+				Protocol:        "TCP",
+			},
+		}
+		tc.makeSvc(&svc)
+		errs := ValidateService(&svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, utilerrors.NewAggregate(errs))
-		}
-	}
-
-	svc := api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec: api.ServiceSpec{
-			Port:            8675,
-			Selector:        map[string]string{"foo": "bar"},
-			Protocol:        "TCP",
-			SessionAffinity: "None",
-		},
-	}
-	errs := ValidateService(&svc)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
-		for i := range errs {
-			t.Errorf("Found error: %s", errs[i].Error())
 		}
 	}
 }
