@@ -181,8 +181,9 @@ combined_cover_profile="${cover_report_dir}/combined-coverage.out"
 
   # Include all coverage reach data in the combined profile, but exclude the
   # 'mode' lines, as there should be only one.
-  find "${cover_report_dir}" -name "${cover_profile}" |
-    xargs -r grep -h -v "^mode:" || true
+  for x in `find "${cover_report_dir}" -name "${cover_profile}"`; do
+    cat $x | grep -h -v "^mode:" || true
+  done
 } >"${combined_cover_profile}"
 
 coverage_html_file="${cover_report_dir}/combined-coverage.html"
