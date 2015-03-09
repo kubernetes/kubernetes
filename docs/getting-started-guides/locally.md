@@ -19,7 +19,7 @@ You need an [etcd](https://github.com/coreos/etcd/releases) in your path, please
 
 #### go
 
-You need [go](https://golang.org/doc/install) in your path, please make sure it is installed and in your ``$PATH``.
+You need [go](https://golang.org/doc/install) at least 1.3+ in your path, please make sure it is installed and in your ``$PATH``.
 
 ### Starting the cluster
 
