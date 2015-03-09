@@ -37,7 +37,7 @@ find_files() {
     \) -name '*.go'
 }
 
-files=`find_files | egrep "pkg/api/v.[^/]*/types\.go" | grep -v v1beta3`
+files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
 
 for file in $files
 do
