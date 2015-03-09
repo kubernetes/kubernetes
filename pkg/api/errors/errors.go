@@ -262,6 +262,18 @@ func IsServerTimeout(err error) bool {
 	return reasonForError(err) == api.StatusReasonServerTimeout
 }
 
+// IsStatusError determines if err is an API Status error received from the master.
+func IsStatusError(err error) bool {
+	_, ok := err.(*StatusError)
+	return ok
+}
+
+// IsUnexpectedObjectError determines if err is due to an unexpected object from the master.
+func IsUnexpectedObjectError(err error) bool {
+	_, ok := err.(*UnexpectedObjectError)
+	return ok
+}
+
 func reasonForError(err error) api.StatusReason {
 	switch t := err.(type) {
 	case *StatusError:

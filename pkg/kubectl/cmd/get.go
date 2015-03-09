@@ -81,7 +81,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 	mapper, typer := f.Object(cmd)
 
 	cmdNamespace, err := f.DefaultNamespace(cmd)
-	checkErr(err)
+	util.CheckErr(err)
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := util.GetFlagBool(cmd, "watch"), util.GetFlagBool(cmd, "watch-only")
@@ -92,30 +92,30 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Do()
-		checkErr(r.Err())
+		util.CheckErr(r.Err())
 
 		mapping, err := r.ResourceMapping()
-		checkErr(err)
+		util.CheckErr(err)
 
 		printer, err := f.PrinterForMapping(cmd, mapping)
-		checkErr(err)
+		util.CheckErr(err)
 
 		obj, err := r.Object()
-		checkErr(err)
+		util.CheckErr(err)
 
 		rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
-		checkErr(err)
+		util.CheckErr(err)
 
 		// print the current object
 		if !isWatchOnly {
 			if err := printer.PrintObj(obj, out); err != nil {
-				checkErr(fmt.Errorf("unable to output the provided object: %v", err))
+				util.CheckErr(fmt.Errorf("unable to output the provided object: %v", err))
 			}
 		}
 
 		// print watched changes
 		w, err := r.Watch(rv)
-		checkErr(err)
+		util.CheckErr(err)
 
 		kubectl.WatchLoop(w, func(e watch.Event) error {
 			return printer.PrintObj(e.Object, out)
@@ -129,11 +129,11 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		ResourceTypeOrNameArgs(true, args...).
 		Latest()
 	printer, generic, err := util.PrinterForCommand(cmd)
-	checkErr(err)
+	util.CheckErr(err)
 
 	if generic {
 		clientConfig, err := f.ClientConfig(cmd)
-		checkErr(err)
+		util.CheckErr(err)
 		defaultVersion := clientConfig.Version
 
 		// the outermost object will be converted to the output-version
@@ -141,7 +141,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 
 		r := b.Flatten().Do()
 		obj, err := r.Object()
-		checkErr(err)
+		util.CheckErr(err)
 
 		// try conversion to all the possible versions
 		// TODO: simplify by adding a ResourceBuilder mode
@@ -158,7 +158,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		printer := kubectl.NewVersionedPrinter(printer, api.Scheme, versions...)
 
 		err = printer.PrintObj(obj, out)
-		checkErr(err)
+		util.CheckErr(err)
 		return
 	}
 
@@ -170,5 +170,5 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		}
 		return printer.PrintObj(r.Object, out)
 	})
-	checkErr(err)
+	util.CheckErr(err)
 }

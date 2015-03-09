@@ -51,10 +51,10 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 		Example: update_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
-			checkErr(err)
+			cmdutil.CheckErr(err)
 
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			cmdutil.CheckErr(err)
 
 			patch := cmdutil.GetFlagString(cmd, "patch")
 			if len(flags.Filenames) == 0 && len(patch) == 0 {
@@ -78,7 +78,7 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
-			checkErr(r.Err())
+			cmdutil.CheckErr(r.Err())
 
 			err = r.Visit(func(info *resource.Info) error {
 				data, err := info.Mapping.Codec.Encode(info.Object)
@@ -96,7 +96,7 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 				fmt.Fprintf(out, "%s\n", info.Name)
 				return nil
 			})
-			checkErr(err)
+			cmdutil.CheckErr(err)
 
 		},
 	}
@@ -107,25 +107,25 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 
 func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string) string {
 	cmdNamespace, err := f.DefaultNamespace(cmd)
-	checkErr(err)
+	cmdutil.CheckErr(err)
 
 	mapper, _ := f.Object(cmd)
 	// TODO: use resource.Builder instead
 	mapping, namespace, name := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	client, err := f.RESTClient(cmd, mapping)
-	checkErr(err)
+	cmdutil.CheckErr(err)
 
 	helper := resource.NewHelper(client, mapping)
 	obj, err := helper.Get(namespace, name)
-	checkErr(err)
+	cmdutil.CheckErr(err)
 
 	patchedObj, err := cmdutil.Merge(obj, patch, mapping.Kind)
-	checkErr(err)
+	cmdutil.CheckErr(err)
 
 	data, err := helper.Codec.Encode(patchedObj)
-	checkErr(err)
+	cmdutil.CheckErr(err)
 
 	_, err = helper.Update(namespace, name, true, data)
-	checkErr(err)
+	cmdutil.CheckErr(err)
 	return name
 }

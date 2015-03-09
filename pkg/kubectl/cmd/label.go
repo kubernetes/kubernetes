@@ -63,28 +63,28 @@ func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
 			}
 			res := args[:2]
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			mapper, _ := f.Object(cmd)
 			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, res, mapper, cmdNamespace)
 			client, err := f.RESTClient(cmd, mapping)
-			checkErr(err)
+			util.CheckErr(err)
 
 			labels, remove, err := parseLabels(args[2:])
-			checkErr(err)
+			util.CheckErr(err)
 			overwrite := util.GetFlagBool(cmd, "overwrite")
 			resourceVersion := util.GetFlagString(cmd, "resource-version")
 
 			obj, err := updateObject(client, mapping, namespace, name, func(obj runtime.Object) runtime.Object {
 				outObj, err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
-				checkErr(err)
+				util.CheckErr(err)
 				return outObj
 			})
-			checkErr(err)
+			util.CheckErr(err)
 
 			printer, err := f.PrinterForMapping(cmd, mapping)
-			checkErr(err)
+			util.CheckErr(err)
 
 			printer.PrintObj(obj, out)
 		},

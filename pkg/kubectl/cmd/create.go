@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -48,10 +49,10 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			schema, err := f.Validator(cmd)
-			checkErr(err)
+			cmdutil.CheckErr(err)
 
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			cmdutil.CheckErr(err)
 
 			mapper, typer := f.Object(cmd)
 			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
@@ -60,7 +61,7 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 				FilenameParam(flags.Filenames...).
 				Flatten().
 				Do()
-			checkErr(r.Err())
+			cmdutil.CheckErr(r.Err())
 
 			count := 0
 			err = r.Visit(func(info *resource.Info) error {
@@ -80,9 +81,9 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 				fmt.Fprintf(out, "%s\n", info.Name)
 				return nil
 			})
-			checkErr(err)
+			cmdutil.CheckErr(err)
 			if count == 0 {
-				checkErr(fmt.Errorf("no objects passed to create"))
+				cmdutil.CheckErr(fmt.Errorf("no objects passed to create"))
 			}
 		},
 	}

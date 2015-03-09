@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 
 	"github.com/spf13/cobra"
@@ -41,12 +42,12 @@ func (f *Factory) NewCmdClusterInfo(out io.Writer) *cobra.Command {
 
 func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) {
 	client, err := factory.ClientConfig(cmd)
-	checkErr(err)
+	util.CheckErr(err)
 	fmt.Fprintf(out, "Kubernetes master is running at %v\n", client.Host)
 
 	mapper, typer := factory.Object(cmd)
 	cmdNamespace, err := factory.DefaultNamespace(cmd)
-	checkErr(err)
+	util.CheckErr(err)
 
 	// TODO: use generalized labels once they are implemented (#341)
 	b := resource.NewBuilder(mapper, typer, factory.ClientMapperForCommand(cmd)).

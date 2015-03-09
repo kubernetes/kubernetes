@@ -58,14 +58,14 @@ func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 			}
 
 			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			mapper, _ := f.Object(cmd)
 			// TODO: use resource.Builder instead
 			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 
 			resizer, err := f.Resizer(cmd, mapping)
-			checkErr(err)
+			util.CheckErr(err)
 
 			resourceVersion := util.GetFlagString(cmd, "resource-version")
 			currentSize := util.GetFlagInt(cmd, "current-replicas")
@@ -75,7 +75,7 @@ func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 			msg := "resized"
 			if err = wait.Poll(retryFrequency, retryTimeout, cond); err != nil {
 				msg = fmt.Sprintf("Failed to resize controller in spite of retrying for %s", retryTimeout)
-				checkErr(err)
+				util.CheckErr(err)
 			}
 			fmt.Fprintf(out, "%s\n", msg)
 		},

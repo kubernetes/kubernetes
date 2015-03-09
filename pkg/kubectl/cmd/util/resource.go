@@ -43,10 +43,10 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper,
 	}
 
 	version, kind, err := mapper.VersionAndKindForResource(resource)
-	checkErr(err)
+	CheckErr(err)
 
 	mapping, err = mapper.RESTMapping(kind, version)
-	checkErr(err)
+	CheckErr(err)
 	return
 }
 
@@ -56,37 +56,37 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper,
 // DEPRECATED: Use resource.Builder
 func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema, cmdVersion string) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
 	configData, err := ReadConfigData(filename)
-	checkErr(err)
+	CheckErr(err)
 	data = configData
 
 	objVersion, kind, err := typer.DataVersionAndKind(data)
-	checkErr(err)
+	CheckErr(err)
 
 	// TODO: allow unversioned objects?
 	if len(objVersion) == 0 {
-		checkErr(fmt.Errorf("the resource in the provided file has no apiVersion defined"))
+		CheckErr(fmt.Errorf("the resource in the provided file has no apiVersion defined"))
 	}
 
 	err = schema.ValidateBytes(data)
-	checkErr(err)
+	CheckErr(err)
 
 	// decode using the version stored with the object (allows codec to vary across versions)
 	mapping, err = mapper.RESTMapping(kind, objVersion)
-	checkErr(err)
+	CheckErr(err)
 
 	obj, err := mapping.Codec.Decode(data)
-	checkErr(err)
+	CheckErr(err)
 
 	meta := mapping.MetadataAccessor
 	namespace, err = meta.Namespace(obj)
-	checkErr(err)
+	CheckErr(err)
 	name, err = meta.Name(obj)
-	checkErr(err)
+	CheckErr(err)
 
 	// if the preferred API version differs, get a different mapper
 	if cmdVersion != objVersion {
 		mapping, err = mapper.RESTMapping(kind, cmdVersion)
-		checkErr(err)
+		CheckErr(err)
 	}
 
 	return

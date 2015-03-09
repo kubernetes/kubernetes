@@ -26,7 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/evanphx/json-patch"
@@ -34,9 +36,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func checkErr(err error) {
+func CheckErr(err error) {
 	if err != nil {
-		glog.FatalDepth(1, err.Error())
+		if errors.IsStatusError(err) {
+			glog.FatalDepth(1, fmt.Sprintf("Error received from API: %s", err.Error()))
+		}
+		if errors.IsUnexpectedObjectError(err) {
+			glog.FatalDepth(1, fmt.Sprintf("Unexpected object received from server: %s", err.Error()))
+		}
+		if client.IsUnexpectedStatusError(err) {
+			glog.FatalDepth(1, fmt.Sprintf("Unexpected status received from server: %s", err.Error()))
+		}
+		glog.FatalDepth(1, fmt.Sprintf("Client error processing command: %s", err.Error()))
 	}
 }
 
@@ -75,7 +86,7 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 	v, err := strconv.Atoi(f.Value.String())
 	// This is likely not a sufficiently friendly error message, but cobra
 	// should prevent non-integer values from reaching here.
-	checkErr(err)
+	CheckErr(err)
 	return v
 }
 
@@ -85,7 +96,7 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
 	}
 	v, err := time.ParseDuration(f.Value.String())
-	checkErr(err)
+	CheckErr(err)
 	return v
 }
 

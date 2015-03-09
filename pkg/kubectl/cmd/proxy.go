@@ -36,7 +36,7 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 			glog.Infof("Starting to serve on localhost:%d", port)
 
 			clientConfig, err := f.ClientConfig(cmd)
-			checkErr(err)
+			util.CheckErr(err)
 
 			staticPrefix := util.GetFlagString(cmd, "www-prefix")
 			if !strings.HasSuffix(staticPrefix, "/") {
@@ -49,7 +49,7 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 			}
 			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
 
-			checkErr(err)
+			util.CheckErr(err)
 			glog.Fatal(server.Serve(port))
 		},
 	}
