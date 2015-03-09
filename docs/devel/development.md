@@ -8,7 +8,7 @@ Official releases are built in Docker containers.  Details are [here](../../buil
 
 Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
 
-## Put kubernetes into GOPATH
+## Clone kubernetes into GOPATH
 
 We highly recommend to put kubernetes' code into your GOPATH. For example, the following commands will download kubernetes' code under the current user's GOPATH (Assuming there's only one directory in GOPATH.):
 
@@ -22,7 +22,9 @@ $ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 
 The commands above will not work if there are more than one directory in ``$GOPATH``.
 
-(Obviously, clone your own fork of Kubernetes if you plan to do development.)
+If you plan to do development, read about the
+[Kubernetes Github Flow](https://docs.google.com/presentation/d/1HVxKSnvlc2WJJq8b9KCYtact5ZRrzDzkWgKEfm0QO_o/pub?start=false&loop=false&delayms=3000),
+and then clone your own fork of Kubernetes as described there.
 
 ## godep and dependency management
 
