@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -367,5 +368,6 @@ func GeneratePodName(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	hostname = strings.ToLower(hostname)
 	return fmt.Sprintf("%s-%s", name, hostname), nil
 }
