@@ -333,7 +333,7 @@ func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(inst.Id), nil
+	return strconv.FormatUint(inst.Id, 10), nil
 }
 
 // fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
