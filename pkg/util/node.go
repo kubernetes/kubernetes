@@ -34,5 +34,5 @@ func GetHostname(hostnameOverride string) string {
 		}
 		hostname = fqdn
 	}
-	return strings.TrimSpace(string(hostname))
+	return strings.ToLower(strings.TrimSpace(string(hostname)))
 }

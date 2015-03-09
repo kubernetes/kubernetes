@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -118,6 +119,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 
 func TestExtractFromHTTP(t *testing.T) {
 	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
 
 	var testCases = []struct {
 		desc      string

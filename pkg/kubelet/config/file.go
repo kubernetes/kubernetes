@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -172,6 +173,7 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	if err != nil {
 		return pod, err
 	}
+	hostname = strings.ToLower(hostname)
 
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
