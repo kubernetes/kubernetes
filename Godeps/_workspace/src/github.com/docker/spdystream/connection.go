@@ -31,6 +31,7 @@ type AuthHandler func(header http.Header, slot uint8, parent uint32) bool
 type idleAwareFramer struct {
 	f              *spdy.Framer
 	conn           *Connection
+	writeLock      sync.Mutex
 	resetChan      chan struct{}
 	setTimeoutChan chan time.Duration
 	timeout        time.Duration
@@ -47,8 +48,9 @@ func newIdleAwareFramer(framer *spdy.Framer) *idleAwareFramer {
 
 func (i *idleAwareFramer) monitor() {
 	var (
-		timer   *time.Timer
-		expired <-chan time.Time
+		timer     *time.Timer
+		expired   <-chan time.Time
+		resetChan = i.resetChan
 	)
 Loop:
 	for {
@@ -67,7 +69,7 @@ Loop:
 					timer.Reset(timeout)
 				}
 			}
-		case <-i.resetChan:
+		case <-resetChan:
 			if timer != nil && i.timeout > 0 {
 				timer.Reset(i.timeout)
 			}
@@ -87,12 +89,25 @@ Loop:
 			if timer != nil {
 				timer.Stop()
 			}
+			i.writeLock.Lock()
+			close(resetChan)
+			i.resetChan = nil
+			i.writeLock.Unlock()
 			break Loop
 		}
+	}
+
+	// Drain resetChan
+	for _ = range resetChan {
 	}
 }
 
 func (i *idleAwareFramer) WriteFrame(frame spdy.Frame) error {
+	i.writeLock.Lock()
+	defer i.writeLock.Unlock()
+	if i.resetChan == nil {
+		return io.EOF
+	}
 	err := i.f.WriteFrame(frame)
 	if err != nil {
 		return err
@@ -109,15 +124,18 @@ func (i *idleAwareFramer) ReadFrame() (spdy.Frame, error) {
 		return nil, err
 	}
 
+	// resetChan should never be closed since it is only closed
+	// when the connection has closed its closeChan. This closure
+	// only occurs after all Reads have finished
+	// TODO (dmcgowan): refactor relationship into connection
 	i.resetChan <- struct{}{}
 
 	return frame, nil
 }
 
 type Connection struct {
-	conn      net.Conn
-	framer    *idleAwareFramer
-	writeLock sync.Mutex
+	conn   net.Conn
+	framer *idleAwareFramer
 
 	closeChan      chan bool
 	goneAway       bool
@@ -209,9 +227,7 @@ func (s *Connection) Ping() (time.Duration, error) {
 
 	frame := &spdy.PingFrame{Id: pid}
 	startTime := time.Now()
-	s.writeLock.Lock()
 	writeErr := s.framer.WriteFrame(frame)
-	s.writeLock.Unlock()
 	if writeErr != nil {
 		return time.Duration(0), writeErr
 	}
@@ -512,8 +528,6 @@ func (s *Connection) handleDataFrame(frame *spdy.DataFrame) error {
 
 func (s *Connection) handlePingFrame(frame *spdy.PingFrame) error {
 	if s.pingId&0x01 != frame.Id&0x01 {
-		s.writeLock.Lock()
-		defer s.writeLock.Unlock()
 		return s.framer.WriteFrame(frame)
 	}
 	pingChan, pingOk := s.pingChans[frame.Id]
@@ -663,9 +677,7 @@ func (s *Connection) Close() error {
 		Status:           spdy.GoAwayOK,
 	}
 
-	s.writeLock.Lock()
 	err := s.framer.WriteFrame(goAwayFrame)
-	s.writeLock.Unlock()
 	if err != nil {
 		return err
 	}
@@ -750,8 +762,6 @@ func (s *Connection) sendHeaders(headers http.Header, stream *Stream, fin bool) 
 		CFHeader: spdy.ControlFrameHeader{Flags: flags},
 	}
 
-	s.writeLock.Lock()
-	defer s.writeLock.Unlock()
 	return s.framer.WriteFrame(headerFrame)
 }
 
@@ -767,8 +777,6 @@ func (s *Connection) sendReply(headers http.Header, stream *Stream, fin bool) er
 		CFHeader: spdy.ControlFrameHeader{Flags: flags},
 	}
 
-	s.writeLock.Lock()
-	defer s.writeLock.Unlock()
 	return s.framer.WriteFrame(replyFrame)
 }
 
@@ -778,8 +786,6 @@ func (s *Connection) sendResetFrame(status spdy.RstStreamStatus, streamId spdy.S
 		Status:   status,
 	}
 
-	s.writeLock.Lock()
-	defer s.writeLock.Unlock()
 	return s.framer.WriteFrame(resetFrame)
 }
 
@@ -806,8 +812,6 @@ func (s *Connection) sendStream(stream *Stream, fin bool) error {
 		CFHeader:             spdy.ControlFrameHeader{Flags: flags},
 	}
 
-	s.writeLock.Lock()
-	defer s.writeLock.Unlock()
 	return s.framer.WriteFrame(streamFrame)
 }
 
