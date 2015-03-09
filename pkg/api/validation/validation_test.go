@@ -19,6 +19,7 @@ package validation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -50,6 +51,27 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 	}
 	if !strings.Contains(errs[0].Error(), "name-gen") {
 		t.Errorf("unexpected error message: %v", errs)
+	}
+}
+
+func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
+	if errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test"},
+	); len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test"},
+		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+	); len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if errs := ValidateObjectMetaUpdate(
+		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(11, 0))},
+		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+	); len(errs) != 0 {
+		t.Fatalf("unexpected errors: %v", errs)
 	}
 }
 
