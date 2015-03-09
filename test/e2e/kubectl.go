@@ -157,7 +157,7 @@ func validateController(c *client.Client, image string, replicas int) {
 			return
 		}
 	}
-	Failf("Timed out waiting for %s pods to reach valid state", updateDemoSelector)
+	Failf("Timed out after %d seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), updateDemoSelector)
 }
 
 type updateDemoData struct {
