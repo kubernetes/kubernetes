@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.4.1",
+	"GoVersion": "go1.3.3",
 	"Packages": [
 		"./..."
 	],
@@ -83,6 +83,11 @@
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/mount",
+			"Comment": "v1.4.1-656-g2115131",
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/pools",
 			"Comment": "v1.4.1-656-g2115131",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
@@ -111,6 +116,16 @@
 			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
 			"Comment": "v1.4.1-656-g2115131",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/selinux",
+			"Comment": "v1.4.0-335-g83663f8",
+			"Rev": "83663f82e3d76f57ea57faf80b8fd7eb96933b9b"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer/system",
+			"Comment": "v1.4.0-335-g83663f8",
+			"Rev": "83663f82e3d76f57ea57faf80b8fd7eb96933b9b"
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
