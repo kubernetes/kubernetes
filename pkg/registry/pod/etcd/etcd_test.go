@@ -850,7 +850,7 @@ func TestEtcdCreate(t *testing.T) {
 // Ensure that when scheduler creates a binding for a pod that has already been deleted
 // by the API server, API server returns not-found error.
 func TestEtcdCreateBindingNoPod(t *testing.T) {
-	registry, bindingRegistry, fakeClient, _ := newStorage(t)
+	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
