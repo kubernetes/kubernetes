@@ -33,9 +33,15 @@ export KUBECTL KUBE_CONFIG_FILE
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
+
+function teardown() {
+  ${KUBECTL} stop -f "${GUESTBOOK}"
+}
+
 prepare-e2e
 
-GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
+trap "teardown" EXIT
 
 echo "WARNING: this test is a no op that only attempts to launch guestbook resources."
 # Launch the guestbook example
