@@ -85,7 +85,7 @@ type HostInterface interface {
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
 	GetMachineInfo() (*cadvisorApi.MachineInfo, error)
-	GetPods() ([]api.Pod, util.StringSet, error)
+	GetPods() ([]api.Pod, util.StringSet)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
@@ -261,11 +261,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 
 // handlePods returns a list of pod bound to the Kubelet and their spec
 func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
-	pods, _, err := s.host.GetPods()
-	if err != nil {
-		s.error(w, err)
-		return
-	}
+	pods, _ := s.host.GetPods()
 	podList := &api.PodList{
 		Items: pods,
 	}

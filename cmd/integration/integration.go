@@ -716,7 +716,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("Failed to create service: %v, %v", svc1, err)
 	}
 
-	// create an identical service in the default namespace
+	// create an identical service in the non-default namespace
 	svc3 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service1"},
 		Spec: api.ServiceSpec{

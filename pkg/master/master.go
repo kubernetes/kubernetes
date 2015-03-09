@@ -378,13 +378,12 @@ func (m *Master) init(c *Config) {
 		nodeStorageClient.Nodes(),
 		podRegistry,
 	)
-	if c.SyncPodStatus {
-		go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
-	}
-	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
 
-	// TODO: refactor podCache to sit on top of podStorage via status calls
-	podStorage = podStorage.WithPodStatus(podCache)
+	if c.SyncPodStatus {
+		go util.Forever(podCache.UpdateAllContainers, m.cacheTimeout)
+		go util.Forever(podCache.GarbageCollectPodStatus, time.Minute*30)
+		podStorage = podStorage.WithPodStatus(podCache)
+	}
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
