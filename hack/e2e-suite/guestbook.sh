@@ -37,6 +37,10 @@ GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
 function teardown() {
   ${KUBECTL} stop -f "${GUESTBOOK}"
+  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+    gcloud compute forwarding-rules delete "${INSTANCE_PREFIX}-default-frontend" || true
+    gcloud compute target-pools delete "${INSTANCE_PREFIX}-default-frontend" || true
+  fi  
 }
 
 prepare-e2e
