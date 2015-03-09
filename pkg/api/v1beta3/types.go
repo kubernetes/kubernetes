@@ -940,16 +940,14 @@ type NamespaceList struct {
 	Items []Namespace `json:"items"  description:"items is the list of Namespace objects in the list"`
 }
 
-// Binding is written by a scheduler to cause a pod to be bound to a node. Name is not
-// required for Bindings.
+// Binding ties one object to another - for example, a pod is bound to a node by a scheduler.
 type Binding struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
+	// ObjectMeta describes the object that is being bound.
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
-	// PodID is a Pod name to be bound to a node.
-	PodID string `json:"podID" description:"name of the pod to be bound to a node"`
-	// Host is the name of a node to bind to.
-	Host string `json:"host" description:"name of the node to bind to"`
+	// Target is the object to bind to.
+	Target ObjectReference `json:"target" description:"an object to bind to"`
 }
 
 // Status is a return value for calls that don't return other objects.

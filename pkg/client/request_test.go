@@ -129,6 +129,16 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 	}
 }
 
+func TestRequestOrdersSubResource(t *testing.T) {
+	r := (&Request{
+		baseURL: &url.URL{},
+		path:    "/test/",
+	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
+	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
+		t.Errorf("namespace should be in order in path: %s", s)
+	}
+}
+
 func TestRequestSetTwiceError(t *testing.T) {
 	if (&Request{}).Name("bar").Name("baz").err == nil {
 		t.Errorf("setting name twice should result in error")
@@ -138,6 +148,9 @@ func TestRequestSetTwiceError(t *testing.T) {
 	}
 	if (&Request{}).Resource("bar").Resource("baz").err == nil {
 		t.Errorf("setting resource twice should result in error")
+	}
+	if (&Request{}).SubResource("bar").SubResource("baz").err == nil {
+		t.Errorf("setting subresource twice should result in error")
 	}
 }
 

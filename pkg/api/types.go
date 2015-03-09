@@ -918,13 +918,14 @@ type NamespaceList struct {
 	Items []Namespace `json:"items"`
 }
 
-// Binding is written by a scheduler to cause a pod to be bound to a host.
+// Binding ties one object to another - for example, a pod is bound to a node by a scheduler.
 type Binding struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
+	// ObjectMeta describes the object that is being bound.
 	ObjectMeta `json:"metadata,omitempty"`
 
-	PodID string `json:"podID"`
-	Host  string `json:"host"`
+	// Target is the object to bind to.
+	Target ObjectReference `json:"target"`
 }
 
 // Status is a return value for calls that don't return other objects.

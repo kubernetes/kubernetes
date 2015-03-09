@@ -52,3 +52,8 @@ func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-pod", Value: pod.Name})
 	return &api.Pod{}, nil
 }
+
+func (c *FakePods) Bind(bind *api.Binding) error {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "bind-pod", Value: bind.Name})
+	return nil
+}

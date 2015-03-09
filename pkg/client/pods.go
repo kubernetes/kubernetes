@@ -36,6 +36,8 @@ type PodInterface interface {
 	Delete(name string) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
+
+	Bind(binding *api.Binding) error
 }
 
 // pods implements PodsNamespacer interface
@@ -91,4 +93,9 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).Body(pod).Do().Into(result)
 	return
+}
+
+// Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
+func (c *pods) Bind(binding *api.Binding) error {
+	return c.r.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }

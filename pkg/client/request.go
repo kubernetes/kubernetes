@@ -105,6 +105,7 @@ type Request struct {
 	namespaceSet bool
 	resource     string
 	resourceName string
+	subresource  string
 	selector     labels.Selector
 	timeout      time.Duration
 
@@ -163,6 +164,21 @@ func (r *Request) Resource(resource string) *Request {
 		return r
 	}
 	r.resource = resource
+	return r
+}
+
+// SubResource sets a sub-resource path which can be multiple segments segment after the resource
+// name but before the suffix.
+func (r *Request) SubResource(subresources ...string) *Request {
+	if r.err != nil {
+		return r
+	}
+	subresource := path.Join(subresources...)
+	if len(r.subresource) != 0 {
+		r.err = fmt.Errorf("subresource already set to %q, cannot change to %q", r.resource, subresource)
+		return r
+	}
+	r.subresource = subresource
 	return r
 }
 
@@ -360,8 +376,8 @@ func (r *Request) finalURL() string {
 		p = path.Join(p, resource)
 	}
 	// Join trims trailing slashes, so preserve r.path's trailing slash for backwards compat if nothing was changed
-	if len(r.resourceName) != 0 || len(r.subpath) != 0 {
-		p = path.Join(p, r.resourceName, r.subpath)
+	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
+		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
 	}
 
 	finalURL := *r.baseURL

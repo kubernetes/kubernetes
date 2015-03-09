@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
@@ -55,7 +54,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -406,9 +404,10 @@ func (m *Master) init(c *Config) {
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods":        podStorage,
-		"pods/status": podStatusStorage,
-		"bindings":    bindingStorage,
+		"pods":         podStorage,
+		"pods/status":  podStatusStorage,
+		"pods/binding": bindingStorage,
+		"bindings":     bindingStorage,
 
 		"replicationControllers": controller.NewREST(registry, podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
@@ -425,14 +424,14 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1"); err != nil {
+	if err := m.api_v1beta1().InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup API v1beta1: %v", err)
 	}
-	if err := apiserver.NewAPIGroupVersion(m.api_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2"); err != nil {
+	if err := m.api_v1beta2().InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
 	if c.EnableV1Beta3 {
-		if err := apiserver.NewAPIGroupVersion(m.api_v1beta3()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta3"); err != nil {
+		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
@@ -569,26 +568,49 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
+func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
+	return &apiserver.APIGroupVersion{
+		Root: m.apiPrefix,
+
+		Mapper: latest.RESTMapper,
+
+		Creater: api.Scheme,
+		Typer:   api.Scheme,
+		Linker:  latest.SelfLinker,
+
+		Admit:   m.admissionControl,
+		Context: m.requestContextMapper,
+	}
+}
+
 // api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, api.RequestContextMapper, meta.RESTMapper) {
+func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta1.Codec, "api", "/api/v1beta1", latest.SelfLinker, m.admissionControl, m.requestContextMapper, latest.RESTMapper
+	version := m.defaultAPIGroupVersion()
+	version.Storage = storage
+	version.Version = "v1beta1"
+	version.Codec = v1beta1.Codec
+	return version
 }
 
 // api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, api.RequestContextMapper, meta.RESTMapper) {
+func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta2.Codec, "api", "/api/v1beta2", latest.SelfLinker, m.admissionControl, m.requestContextMapper, latest.RESTMapper
+	version := m.defaultAPIGroupVersion()
+	version.Storage = storage
+	version.Version = "v1beta2"
+	version.Codec = v1beta2.Codec
+	return version
 }
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec, string, string, runtime.SelfLinker, admission.Interface, api.RequestContextMapper, meta.RESTMapper) {
+func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		if k == "minions" {
@@ -596,5 +618,9 @@ func (m *Master) api_v1beta3() (map[string]apiserver.RESTStorage, runtime.Codec,
 		}
 		storage[strings.ToLower(k)] = v
 	}
-	return storage, v1beta3.Codec, "api", "/api/v1beta3", latest.SelfLinker, m.admissionControl, m.requestContextMapper, latest.RESTMapper
+	version := m.defaultAPIGroupVersion()
+	version.Storage = storage
+	version.Version = "v1beta3"
+	version.Codec = v1beta3.Codec
+	return version
 }
