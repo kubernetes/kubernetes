@@ -1,124 +1,210 @@
-# Kubernetes Proposal - Namespaces
+# Namespaces
 
-**Related PR:** 
+## Abstract
 
-| Topic | Link |
-| ---- | ---- |
-| Identifiers.md | https://github.com/GoogleCloudPlatform/kubernetes/pull/1216 |
-| Access.md | https://github.com/GoogleCloudPlatform/kubernetes/pull/891 |
-| Indexing | https://github.com/GoogleCloudPlatform/kubernetes/pull/1183 |
-| Cluster Subdivision | https://github.com/GoogleCloudPlatform/kubernetes/issues/442 |
+A Namespace is a mechanism to partition resources created by users into
+a logically named group.
 
-## Background
+## Motivation
 
-High level goals:
+A single cluster should be able to satisfy the needs of multiple user communities.
 
-* Enable an easy-to-use mechanism to logically scope Kubernetes resources
-* Ensure extension resources to Kubernetes can share the same logical scope as core Kubernetes resources
-* Ensure it aligns with access control proposal
-* Ensure system has log n scale with increasing numbers of scopes
+Each user community wants to be able to work in isolation from other communities.
+
+Each user community has its own:
+
+1. resources (pods, services, replication controllers, etc.)
+2. policies (who can or cannot perform actions in their community)
+3. constraints (this community is allowed this much quota, etc.)
+
+A cluster operator may create a Namespace for each unique user community.
+
+The Namespace provides a unique scope for: 
+
+1. named resources (to avoid basic naming collisions)
+2. delegated management authority to trusted users
+3. ability to limit community resource consumption
 
 ## Use cases
 
-Actors:
+1.  As a cluster operator, I want to support multiple user communities on a single cluster.
+2.  As a cluster operator, I want to delegate authority to partitions of the cluster to trusted users
+    in those communities.
+3.  As a cluster operator, I want to limit the amount of resources each community can consume in order
+    to limit the impact to other communities using the cluster.
+4.  As a cluster user, I want to interact with resources that are pertinent to my user community in
+    isolation of what other user communities are doing on the cluster.
 
-1. k8s admin - administers a kubernetes cluster
-2. k8s service - k8s daemon operates on behalf of another user (i.e. controller-manager)
-2. k8s policy manager - enforces policies imposed on k8s cluster
-3. k8s user - uses a kubernetes cluster to schedule pods
+## Design
 
-User stories:
+### Data Model
 
-1. Ability to set immutable namespace to k8s resources
-2. Ability to list k8s resource scoped to a namespace
-3. Restrict a namespace identifier to a DNS-compatible string to support compound naming conventions
-4. Ability for a k8s policy manager to enforce a k8s user's access to a set of namespaces
-5. Ability to set/unset a default namespace for use by kubecfg client
-6. Ability for a k8s service to monitor resource changes across namespaces
-7. Ability for a k8s service to list resources across namespaces
-
-## Proposed Design
-
-### Model Changes
-
-Introduce a new attribute *Namespace* for each resource that must be scoped in a Kubernetes cluster.
-
-A *Namespace* is a DNS compatible subdomain.
+A *Namespace* defines a logically named group for multiple *Kind*s of resources.
 
 ```
-// TypeMeta is shared by all objects sent to, or returned from the client
-type TypeMeta struct {
-  Kind              string    `json:"kind,omitempty"`
-  Uid               string    `json:"uid,omitempty"`
-  CreationTimestamp util.Time `json:"creationTimestamp,omitempty"`
-  SelfLink          string    `json:"selfLink,omitempty"`
-  ResourceVersion   uint64    `json:"resourceVersion,omitempty"`
-  APIVersion        string    `json:"apiVersion,omitempty"`
-  Namespace         string    `json:"namespace,omitempty"`
-  Name              string    `json:"name,omitempty"` 
+type Namespace struct {
+  TypeMeta   `json:",inline"`
+  ObjectMeta `json:"metadata,omitempty"`
+
+  Spec NamespaceSpec `json:"spec,omitempty"`
+  Status NamespaceStatus `json:"status,omitempty"`
 }
 ```
 
-An identifier, *UID*, is unique across time and space intended to distinguish between historical occurences of similar entities.
+A *Namespace* name is a DNS compatible subdomain.
 
-A *Name* is unique within a given *Namespace* at a particular time, used in resource URLs; provided by clients at creation time
-and encouraged to be human friendly; intended to facilitate creation idempotence and space-uniqueness of singleton objects, distinguish
-distinct entities, and reference particular entities across operations.
+A *Namespace* must exist prior to associating content with it.
 
-As of this writing, the following resources MUST have a *Namespace* and *Name*
+A *Namespace* must not be deleted if there is content associated with it.
 
-* pod
-* service
-* replicationController
-* endpoint
+To associate a resource with a *Namespace* the following conditions must be satisfied:
 
-A *policy* MAY be associated with a *Namespace*.
+1.  The resource's *Kind* must be registered as having *RESTScopeNamespace* with the server
+2.  The resource's *TypeMeta.Namespace* field must have a value that references an existing *Namespace*
 
-If a *policy* has an associated *Namespace*, the resource paths it enforces are scoped to a particular *Namespace*.
+The *Name* of a resource associated with a *Namespace* is unique to that *Kind* in that *Namespace*.
 
-## k8s API server
+It is intended to be used in resource URLs; provided by clients at creation time, and encouraged to be
+human friendly; intended to facilitate idempotent creation, space-uniqueness of singleton objects,
+distinguish distinct entities, and reference particular entities across operations.
 
-In support of namespace isolation, the Kubernetes API server will address resources by the following conventions:
+### Authorization
 
-The typical actors for the following requests are the k8s user or the k8s service.
+A *Namespace* provides an authorization scope for accessing content associated with the *Namespace*.
+
+See [Authorization plugins](../authorization.md)
+
+### Limit Resource Consumption
+
+A *Namespace* provides a scope to limit resource consumption.
+
+A *LimitRange* defines min/max constraints on the amount of resources a single entity can consume in
+a *Namespace*.
+
+See [Admission control: Limit Range](admission_control_limit_range.md)
+
+A *ResourceQuota* tracks aggregate usage of resources in the *Namespace* and allows cluster operators
+to define *Hard* resource usage limits that a *Namespace* may consume.
+
+See [Admission control: Resource Quota](admission_control_resource_quota.md)
+
+### Finalizers
+
+Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* objects.
+
+```
+type FinalizerName string
+
+// These are internal finalizers to Kubernetes, must be qualified name unless defined here
+const (
+  FinalizerKubernetes FinalizerName = "kubernetes"
+)
+
+// NamespaceSpec describes the attributes on a Namespace
+type NamespaceSpec struct {
+  // Finalizers is an opaque list of values that must be empty to permanently remove object from storage
+  Finalizers []FinalizerName
+}
+```
+
+A *FinalizerName* is a qualified name.
+
+The API Server enforces that a *Namespace* can only be deleted from storage if and only if 
+it's *Namespace.Spec.Finalizers* is empty.
+
+A *finalize* operation is the only mechanism to modify the *Namespace.Spec.Finalizers* field post creation.
+
+Each *Namespace* created has *kubernetes* as an item in its list of initial *Namespace.Spec.Finalizers*
+set by default.
+
+### Phases
+
+A *Namespace* may exist in the following phases.
+
+```
+type NamespacePhase string
+const(
+  NamespaceActive NamespacePhase = "Active"
+  NamespaceTerminating NamespaceTerminating = "Terminating"
+)
+
+type NamespaceStatus struct { 
+  ...
+  Phase NamespacePhase 
+}
+```
+
+A *Namespace* is in the **Active** phase if it does not have a *ObjectMeta.DeletionTimestamp*.
+
+A *Namespace* is in the **Terminating** phase if it has a *ObjectMeta.DeletionTimestamp*.
+
+**Active**
+
+Upon creation, a *Namespace* goes in the *Active* phase.  This means that content may be associated with
+a namespace, and all normal interactions with the namespace are allowed to occur in the cluster.
+
+If a DELETE request occurs for a *Namespace*, the *Namespace.ObjectMeta.DeletionTimestamp* is set
+to the current server time.  A *namespace controller* observes the change, and sets the *Namespace.Status.Phase*
+to *Terminating*.
+
+**Terminating**
+
+A *namespace controller* watches for *Namespace* objects that have a *Namespace.ObjectMeta.DeletionTimestamp*
+value set in order to know when to initiate graceful termination of the *Namespace* associated content that
+are known to the cluster.
+
+The *namespace controller* enumerates each known resource type in that namespace and deletes it one by one.
+
+Admission control blocks creation of new resources in that namespace in order to prevent a race-condition
+where the controller could believe all of a given resource type had been deleted from the namespace, 
+when in fact some other rogue client agent had created new objects.  Using admission control in this
+scenario allows each of registry implementations for the individual objects to not need to take into account Namespace life-cycle.
+
+Once all objects known to the *namespace controller* have been deleted, the *namespace controller*
+executes a *finalize* operation on the namespace that removes the *kubernetes* value from 
+the *Namespace.Spec.Finalizers* list.
+
+If the *namespace controller* sees a *Namespace* whose *ObjectMeta.DeletionTimestamp* is set, and
+whose *Namespace.Spec.Finalizers* list is empty, it will signal the server to permanently remove
+the *Namespace* from storage by sending a final DELETE action to the API server.
+
+### REST API
+
+To interact with the Namespace API:
+
+| Action | HTTP Verb | Path | Description |
+| ------ | --------- | ---- | ----------- |
+| CREATE | POST | /api/{version}/namespaces | Create a namespace |
+| LIST | GET | /api/{version}/namespaces | List all namespaces |
+| UPDATE | PUT | /api/{version}/namespaces/{namespace} | Update namespace {namespace} |
+| DELETE | DELETE | /api/{version}/namespaces/{namespace} | Delete namespace {namespace} |
+| FINALIZE | POST | /api/{version}/namespaces/{namespace}/finalize | Finalize namespace {namespace} |
+| WATCH | GET | /api/{version}/watch/namespaces | Watch all namespaces |
+
+This specification reserves the name *finalize* as a sub-resource to namespace.
+
+As a consequence, it is invalid to have a *resourceType* managed by a namespace whose kind is *finalize*.
+
+To interact with content associated with a Namespace:
 
 | Action | HTTP Verb | Path | Description |
 | ---- | ---- | ---- | ---- |
-| CREATE | POST | /api/{version}/ns/{ns}/{resourceType}/ | Create instance of {resourceType} in namespace {ns} |
-| GET | GET | /api/{version}/ns/{ns}/{resourceType}/{name} | Get instance of {resourceType} in namespace {ns} with {name} |
-| UPDATE | PUT | /api/{version}/ns/{ns}/{resourceType}/{name} | Update instance of {resourceType} in namespace {ns} with {name} |
-| DELETE | DELETE | /api/{version}/ns/{ns}/{resourceType}/{name} | Delete instance of {resourceType} in namespace {ns} with {name} |
-| LIST | GET | /api/{version}/ns/{ns}/{resourceType} | List instances of {resourceType} in namespace {ns} |
-| WATCH | GET | /api/{version}/watch/ns/{ns}/{resourceType} | Watch for changes to a {resourceType} in namespace {ns} |
-
-The typical actor for the following requests are the k8s service or k8s admin as enforced by k8s Policy.
-
-| Action | HTTP Verb | Path | Description |
-| ---- | ---- | ---- | ---- |
+| CREATE | POST | /api/{version}/namespaces/{namespace}/{resourceType}/ | Create instance of {resourceType} in namespace {namespace} |
+| GET | GET | /api/{version}/namespaces/{namespace}/{resourceType}/{name} | Get instance of {resourceType} in namespace {namespace} with {name} |
+| UPDATE | PUT | /api/{version}/namespaces/{namespace}/{resourceType}/{name} | Update instance of {resourceType} in namespace {namespace} with {name} |
+| DELETE | DELETE | /api/{version}/namespaces/{namespace}/{resourceType}/{name} | Delete instance of {resourceType} in namespace {namespace} with {name} |
+| LIST | GET | /api/{version}/namespaces/{namespace}/{resourceType} | List instances of {resourceType} in namespace {namespace} |
+| WATCH | GET | /api/{version}/watch/namespaces/{namespace}/{resourceType} | Watch for changes to a {resourceType} in namespace {namespace} |
 | WATCH | GET | /api/{version}/watch/{resourceType} | Watch for changes to a {resourceType} across all namespaces |
 | LIST | GET | /api/{version}/list/{resourceType} | List instances of {resourceType} across all namespaces |
 
-The legacy API patterns for k8s are an alias to interacting with the *default* namespace as follows.
+The API server verifies the *Namespace* on resource creation matches the *{namespace}* on the path.
 
-| Action | HTTP Verb | Path | Description |
-| ---- | ---- | ---- | ---- |
-| CREATE | POST | /api/{version}/{resourceType}/ | Create instance of {resourceType} in namespace *default* |
-| GET | GET | /api/{version}/{resourceType}/{name} | Get instance of {resourceType} in namespace *default* |
-| UPDATE | PUT | /api/{version}/{resourceType}/{name} | Update instance of {resourceType} in namespace *default* |
-| DELETE | DELETE | /api/{version}/{resourceType}/{name} | Delete instance of {resourceType} in namespace *default* |
-
-The k8s API server verifies the *Namespace* on resource creation matches the *{ns}* on the path.
-
-The k8s API server will enable efficient mechanisms to filter model resources based on the *Namespace*.  This may require
-the creation of an index on *Namespace* that could support query by namespace with optional label selectors.
-
-The k8s API server will associate a resource with a *Namespace* if not populated by the end-user based on the *Namespace* context
+The API server will associate a resource with a *Namespace* if not populated by the end-user based on the *Namespace* context
 of the incoming request.  If the *Namespace* of the resource being created, or updated does not match the *Namespace* on the request,
-then the k8s API server will reject the request.
+then the API server will reject the request.
 
-TODO: Update to discuss k8s api server proxy patterns
-
-## k8s storage
+### Storage
 
 A namespace provides a unique identifier space and therefore must be in the storage path of a resource.
 
@@ -126,68 +212,124 @@ In etcd, we want to continue to still support efficient WATCH across namespaces.
 
 Resources that persist content in etcd will have storage paths as follows:
 
-/registry/{resourceType}/{resource.Namespace}/{resource.Name} 
+/{k8s_storage_prefix}/{resourceType}/{resource.Namespace}/{resource.Name} 
 
-This enables k8s service to WATCH /registry/{resourceType} for changes across namespace of a particular {resourceType}.
+This enables consumers to WATCH /registry/{resourceType} for changes across namespace of a particular {resourceType}.
 
-Upon scheduling a pod to a particular host, the pod's namespace must be in the key path as follows:
+### Kubelet
 
-/host/{host}/pod/{pod.Namespace}/{pod.Name}
+The kubelet will register pod's it sources from a file or http source with a namespace associated with the 
+*cluster-id*
 
-## k8s Authorization service
+### Example: OpenShift Origin managing a Kubernetes Namespace
 
-This design assumes the existence of an authorization service that filters incoming requests to the k8s API Server in order
-to enforce user authorization to a particular k8s resource.  It performs this action by associating the *subject* of a request
-with a *policy* to an associated HTTP path and verb.  This design encodes the *namespace* in the resource path in order to enable
-external policy servers to function by resource path alone.  If a request is made by an identity that is not allowed by 
-policy to the resource, the request is terminated.  Otherwise, it is forwarded to the apiserver.
+In this example, we demonstrate how the design allows for agents built on-top of
+Kubernetes that manage their own set of resource types associated with a *Namespace*
+to take part in Namespace termination.
 
-## k8s controller-manager
-
-The controller-manager will provision pods in the same namespace as the associated replicationController.
-
-## k8s Kubelet
-
-There is no major change to the kubelet introduced by this proposal.
-
-### kubecfg client
-
-kubecfg supports following:
+OpenShift creates a Namespace in Kubernetes
 
 ```
-kubecfg [OPTIONS] ns {namespace}
+{
+  "apiVersion":"v1beta3",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "development",
+  },
+  "spec": {
+    "finalizers": ["openshift.com/origin", "kubernetes"],
+  },
+  "status": {
+    "phase": "Active",
+  },
+  "labels": {
+    "name": "development"
+  },
+}
 ```
 
-To set a namespace to use across multiple operations:
+OpenShift then goes and creates a set of resources (pods, services, etc) associated
+with the "development" namespace.  It also creates its own set of resources in its
+own storage associated with the "development" namespace unknown to Kubernetes.
+
+User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
 ```
-$ kubecfg ns ns1
+{
+  "apiVersion":"v1beta3",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "development",
+    "deletionTimestamp": "..."
+  },
+  "spec": {
+    "finalizers": ["openshift.com/origin", "kubernetes"],
+  },
+  "status": {
+    "phase": "Terminating",
+  },
+  "labels": {
+    "name": "development"
+  },
+}
 ```
 
-To view the current namespace:
+The Kubernetes *namespace controller* observes the namespace has a *deletionTimestamp*
+and begins to terminate all of the content in the namespace that it knows about.  Upon
+success, it executes a *finalize* action that modifies the *Namespace* by
+removing *kubernetes* from the list of finalizers:
 
 ```
-$ kubecfg ns
-Using namespace ns1
+{
+  "apiVersion":"v1beta3",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "development",
+    "deletionTimestamp": "..."
+  },
+  "spec": {
+    "finalizers": ["openshift.com/origin"],
+  },
+  "status": {
+    "phase": "Terminating",
+  },
+  "labels": {
+    "name": "development"
+  },
+}
 ```
 
-To reset to the default namespace:
+OpenShift Origin has its own *namespace controller* that is observing cluster state, and
+it observes the same namespace had a *deletionTimestamp* assigned to it.  It too will go
+and purge resources from its own storage that it manages associated with that namespace.
+Upon completion, it executes a *finalize* action and removes the reference to "openshift.com/origin"
+from the list of finalizers.
+
+This results in the following state:
 
 ```
-$ kubecfg ns default
+{
+  "apiVersion":"v1beta3",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "development",
+    "deletionTimestamp": "..."
+  },
+  "spec": {
+    "finalizers": [],
+  },
+  "status": {
+    "phase": "Terminating",
+  },
+  "labels": {
+    "name": "development"
+  },
+}
 ```
 
-In addition, each kubecfg request may explicitly specify a namespace for the operation via the following OPTION
+At this point, the Kubernetes *namespace controller* in its sync loop will see that the namespace
+has a deletion timestamp and that its list of finalizers is empty.  As a result, it knows all
+content associated from that namespace has been purged.  It performs a final DELETE action 
+to remove that Namespace from the storage.
 
---ns
-
-When loading resource files specified by the -c OPTION, the kubecfg client will ensure the namespace is set in the
-message body to match the client specified default.
-
-If no default namespace is applied, the client will assume the following default namespace:
-
-* default
-
-The kubecfg client would store default namespace information in the same manner it caches authentication information today
-as a file on user's file system.
-
+At this point, all content associated with that Namespace, and the Namespace itself are gone.
