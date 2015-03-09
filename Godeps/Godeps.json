@@ -190,6 +190,10 @@
 			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
 		},
 		{
+			"ImportPath": "github.com/mitchellh/goamz/elb",
+			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
+		},
+		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
