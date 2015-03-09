@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -30,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
@@ -38,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
+	cadvisorClient "github.com/google/cadvisor/client"
 	"github.com/spf13/pflag"
 )
 
@@ -398,6 +401,16 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 	} else {
 		kubeClient = kc.KubeClient
 	}
+
+	cc, err := cadvisorClient.NewClient("http://127.0.0.1:" + strconv.Itoa(int(kc.CAdvisorPort)))
+	if err != nil {
+		return nil, err
+	}
+	cadvisorInterface, err := cadvisor.New(cc)
+	if err != nil {
+		return nil, err
+	}
+
 	k, err := kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.DockerClient,
@@ -416,7 +429,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.MasterServiceNamespace,
 		kc.VolumePlugins,
 		kc.StreamingConnectionIdleTimeout,
-		kc.Recorder)
+		kc.Recorder,
+		cadvisorInterface)
 
 	if err != nil {
 		return nil, err
@@ -425,7 +439,6 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 	k.BirthCry()
 
 	go k.GarbageCollectLoop()
-	go kubelet.MonitorCAdvisor(k, kc.CAdvisorPort)
 
 	return k, nil
 }
