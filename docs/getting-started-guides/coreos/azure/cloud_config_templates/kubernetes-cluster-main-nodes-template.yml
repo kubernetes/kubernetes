@@ -306,7 +306,7 @@ coreos:
             --address=0.0.0.0 \
             --port=10250 \
             --hostname_override=%H \
-            --etcd_servers=http://etcd-00:4001,http://etcd-01:4001,http://etcd-02:4001 \
+            --api_servers=http://kube-00:8080 \
             --logtostderr=true
         Restart=always
         RestartSec=10
@@ -325,7 +325,7 @@ coreos:
         ConditionHost=!kube-00
         [Service]
         ExecStart=/opt/kubernetes/server/bin/kube-proxy \
-             --etcd_servers=http://etcd-00:4001,http://etcd-01:4001,http://etcd-02:4001 \
+             --master=http://kube-00:8080 \
              --logtostderr=true
         Restart=always
         RestartSec=10
