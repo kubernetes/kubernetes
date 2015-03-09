@@ -15,7 +15,7 @@ install:
   - ./hack/build-go.sh
 
 script:
-  - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 60s' KUBE_COVERPROCS=8 ./hack/test-go.sh -- -p=2
+  - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 ./hack/test-go.sh -- -p=2
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
