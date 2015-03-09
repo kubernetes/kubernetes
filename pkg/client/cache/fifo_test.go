@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -30,21 +31,21 @@ type testFifoObject struct {
 	val  interface{}
 }
 
-func TestFIFO_basic(t *testing.T) {
-	mkObj := func(name string, val interface{}) testFifoObject {
-		return testFifoObject{name: name, val: val}
-	}
+func mkFifoObj(name string, val interface{}) testFifoObject {
+	return testFifoObject{name: name, val: val}
+}
 
+func TestFIFO_basic(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
 	const amount = 500
 	go func() {
 		for i := 0; i < amount; i++ {
-			f.Add(mkObj(string([]rune{'a', rune(i)}), i+1))
+			f.Add(mkFifoObj(string([]rune{'a', rune(i)}), i+1))
 		}
 	}()
 	go func() {
 		for u := uint64(0); u < amount; u++ {
-			f.Add(mkObj(string([]rune{'b', rune(u)}), u+1))
+			f.Add(mkFifoObj(string([]rune{'b', rune(u)}), u+1))
 		}
 	}()
 
@@ -70,13 +71,17 @@ func TestFIFO_basic(t *testing.T) {
 }
 
 func TestFIFO_addUpdate(t *testing.T) {
-	mkObj := func(name string, val interface{}) testFifoObject {
-		return testFifoObject{name: name, val: val}
+	f := NewFIFO(testFifoObjectKeyFunc)
+	f.Add(mkFifoObj("foo", 10))
+	f.Update(mkFifoObj("foo", 15))
+
+	if e, a := []interface{}{mkFifoObj("foo", 15)}, f.List(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
+	}
+	if e, a := []string{"foo"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
 	}
 
-	f := NewFIFO(testFifoObjectKeyFunc)
-	f.Add(mkObj("foo", 10))
-	f.Update(mkObj("foo", 15))
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
@@ -93,20 +98,16 @@ func TestFIFO_addUpdate(t *testing.T) {
 		t.Errorf("Got second value %v", unexpected.val)
 	case <-time.After(50 * time.Millisecond):
 	}
-	_, exists, _ := f.Get(mkObj("foo", ""))
+	_, exists, _ := f.Get(mkFifoObj("foo", ""))
 	if exists {
 		t.Errorf("item did not get removed")
 	}
 }
 
 func TestFIFO_addReplace(t *testing.T) {
-	mkObj := func(name string, val interface{}) testFifoObject {
-		return testFifoObject{name: name, val: val}
-	}
-
 	f := NewFIFO(testFifoObjectKeyFunc)
-	f.Add(mkObj("foo", 10))
-	f.Replace([]interface{}{mkObj("foo", 15)})
+	f.Add(mkFifoObj("foo", 10))
+	f.Replace([]interface{}{mkFifoObj("foo", 15)})
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
@@ -123,30 +124,26 @@ func TestFIFO_addReplace(t *testing.T) {
 		t.Errorf("Got second value %v", unexpected.val)
 	case <-time.After(50 * time.Millisecond):
 	}
-	_, exists, _ := f.Get(mkObj("foo", ""))
+	_, exists, _ := f.Get(mkFifoObj("foo", ""))
 	if exists {
 		t.Errorf("item did not get removed")
 	}
 }
 
 func TestFIFO_detectLineJumpers(t *testing.T) {
-	mkObj := func(name string, val interface{}) testFifoObject {
-		return testFifoObject{name: name, val: val}
-	}
-
 	f := NewFIFO(testFifoObjectKeyFunc)
 
-	f.Add(mkObj("foo", 10))
-	f.Add(mkObj("bar", 1))
-	f.Add(mkObj("foo", 11))
-	f.Add(mkObj("foo", 13))
-	f.Add(mkObj("zab", 30))
+	f.Add(mkFifoObj("foo", 10))
+	f.Add(mkFifoObj("bar", 1))
+	f.Add(mkFifoObj("foo", 11))
+	f.Add(mkFifoObj("foo", 13))
+	f.Add(mkFifoObj("zab", 30))
 
 	if e, a := 13, f.Pop().(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
-	f.Add(mkObj("foo", 14)) // ensure foo doesn't jump back in line
+	f.Add(mkFifoObj("foo", 14)) // ensure foo doesn't jump back in line
 
 	if e, a := 1, f.Pop().(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
@@ -162,16 +159,12 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 }
 
 func TestFIFO_addIfNotPresent(t *testing.T) {
-	mkObj := func(name string, val interface{}) testFifoObject {
-		return testFifoObject{name: name, val: val}
-	}
-
 	f := NewFIFO(testFifoObjectKeyFunc)
 
-	f.Add(mkObj("a", 1))
-	f.Add(mkObj("b", 2))
-	f.AddIfNotPresent(mkObj("b", 3))
-	f.AddIfNotPresent(mkObj("c", 4))
+	f.Add(mkFifoObj("a", 1))
+	f.Add(mkFifoObj("b", 2))
+	f.AddIfNotPresent(mkFifoObj("b", 3))
+	f.AddIfNotPresent(mkFifoObj("c", 4))
 
 	if e, a := 3, len(f.items); a != e {
 		t.Fatalf("expected queue length %d, got %d", e, a)

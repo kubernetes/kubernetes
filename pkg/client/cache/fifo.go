@@ -24,8 +24,15 @@ import (
 // Queue is exactly like a Store, but has a Pop() method too.
 type Queue interface {
 	Store
+
 	// Pop blocks until it has something to return.
 	Pop() interface{}
+
+	// AddIfNotPresent adds a value previously
+	// returned by Pop back into the queue as long
+	// as nothing else (presumably more recent)
+	// has since been added.
+	AddIfNotPresent(interface{}) error
 }
 
 // FIFO receives adds and updates from a Reflector, and puts them in a queue for
@@ -121,6 +128,18 @@ func (f *FIFO) List() []interface{} {
 	list := make([]interface{}, 0, len(f.items))
 	for _, item := range f.items {
 		list = append(list, item)
+	}
+	return list
+}
+
+// ListKeys returns a list of all the keys of the objects currently
+// in the FIFO.
+func (f *FIFO) ListKeys() []string {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]string, 0, len(f.items))
+	for key := range f.items {
+		list = append(list, key)
 	}
 	return list
 }
