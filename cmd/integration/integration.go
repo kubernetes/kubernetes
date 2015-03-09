@@ -273,7 +273,7 @@ func podExists(c *client.Client, podNamespace string, podID string) wait.Conditi
 }
 
 func runReplicationControllerTest(c *client.Client) {
-	data, err := ioutil.ReadFile("api/examples/controller.json")
+	data, err := ioutil.ReadFile("cmd/integration/controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
