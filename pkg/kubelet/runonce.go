@@ -104,7 +104,9 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 			return nil
 		}
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
-		if err = kl.syncPod(&pod, dockerContainers); err != nil {
+		// We don't create mirror pods in this mode; pass a dummy boolean value
+		// to sycnPod.
+		if err = kl.syncPod(&pod, false, dockerContainers); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {

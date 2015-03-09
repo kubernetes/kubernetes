@@ -206,7 +206,7 @@ func extractFromFile(filename string) (api.Pod, error) {
 	if glog.V(4) {
 		glog.Infof("Got pod from file %q: %#v", filename, pod)
 	} else {
-		glog.V(1).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.Name, pod.UID)
+		glog.V(5).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.Name, pod.UID)
 	}
 	return pod, nil
 }

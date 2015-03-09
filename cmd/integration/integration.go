@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -34,13 +35,14 @@ import (
 
 	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
@@ -118,7 +120,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func startComponents(manifestURL string) (apiServerURL string) {
+func startComponents(manifestURL string) (string, string) {
 	// Setup
 	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -215,21 +217,24 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)
-	testRootDir := makeTempDirOrDie("kubelet_integ_1.")
+	testRootDir := makeTempDirOrDie("kubelet_integ_1.", "")
+	configFilePath := makeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	kubeletapp.SimpleRunKubelet(cl, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface)
+	kubeletapp.SimpleRunKubelet(cl, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	testRootDir = makeTempDirOrDie("kubelet_integ_2.")
+	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	kubeletapp.SimpleRunKubelet(cl, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface)
-
-	return apiServer.URL
+	kubeletapp.SimpleRunKubelet(cl, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "")
+	return apiServer.URL, configFilePath
 }
 
-func makeTempDirOrDie(prefix string) string {
-	tempDir, err := ioutil.TempDir("/tmp", prefix)
+func makeTempDirOrDie(prefix string, baseDir string) string {
+	if baseDir == "" {
+		baseDir = "/tmp"
+	}
+	tempDir, err := ioutil.TempDir(baseDir, prefix)
 	if err != nil {
 		glog.Fatalf("Can't make a temp rootdir: %v", err)
 	}
@@ -276,6 +281,60 @@ func podExists(c *client.Client, podNamespace string, podID string) wait.Conditi
 		_, err := c.Pods(podNamespace).Get(podID)
 		return err == nil, nil
 	}
+}
+
+func podNotFound(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
+	return func() (bool, error) {
+		_, err := c.Pods(podNamespace).Get(podID)
+		return apierrors.IsNotFound(err), nil
+	}
+}
+
+func podRunning(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.Pods(podNamespace).Get(podID)
+		if err != nil {
+			return false, err
+		}
+		if pod.Status.Phase != api.PodRunning {
+			return false, errors.New(fmt.Sprintf("Pod status is %q", pod.Status.Phase))
+		}
+		return true, nil
+	}
+}
+
+func runStaticPodTest(c *client.Client, configFilePath string) {
+	manifest := `version: v1beta2
+id: static-pod
+containers:
+    - name: static-container
+      image: kubernetes/pause`
+
+	manifestFile, err := ioutil.TempFile(configFilePath, "")
+	defer os.Remove(manifestFile.Name())
+	ioutil.WriteFile(manifestFile.Name(), []byte(manifest), 0600)
+
+	// Wait for the mirror pod to be created.
+	hostname, _ := os.Hostname()
+	podName := fmt.Sprintf("static-pod-%s", hostname)
+	namespace := kubelet.NamespaceDefault
+	if err := wait.Poll(time.Second, time.Second*30,
+		podRunning(c, namespace, podName)); err != nil {
+		glog.Fatalf("FAILED: mirror pod has not been created or is not running: %v", err)
+	}
+	// Delete the mirror pod, and wait for it to be recreated.
+	c.Pods(namespace).Delete(podName)
+	if err = wait.Poll(time.Second, time.Second*30,
+		podRunning(c, namespace, podName)); err != nil {
+		glog.Fatalf("FAILED: mirror pod has not been re-created or is not running: %v", err)
+	}
+	// Remove the manifest file, and wait for the mirror pod to be deleted.
+	os.Remove(manifestFile.Name())
+	if err = wait.Poll(time.Second, time.Second*30,
+		podNotFound(c, namespace, podName)); err != nil {
+		glog.Fatalf("FAILED: mirror pod has not been deleted: %v", err)
+	}
+
 }
 
 func runReplicationControllerTest(c *client.Client) {
@@ -447,7 +506,7 @@ func runAtomicPutTest(c *client.Client) {
 				glog.Infof("Posting update (%s, %s)", l, v)
 				err = c.Put().Resource("services").Name(svc.Name).Body(&tmpSvc).Do().Error()
 				if err != nil {
-					if errors.IsConflict(err) {
+					if apierrors.IsConflict(err) {
 						glog.Infof("Conflict: (%s, %s)", l, v)
 						// This is what we expect.
 						continue
@@ -733,7 +792,7 @@ func main() {
 
 	manifestURL := ServeCachedManifestFile()
 
-	apiServerURL := startComponents(manifestURL)
+	apiServerURL, configFilePath := startComponents(manifestURL)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
@@ -753,6 +812,9 @@ func main() {
 		func(c *client.Client) {
 			runSelfLinkTestOnNamespace(c, "")
 			runSelfLinkTestOnNamespace(c, "other")
+		},
+		func(c *client.Client) {
+			runStaticPodTest(c, configFilePath)
 		},
 	}
 	var wg sync.WaitGroup
@@ -782,11 +844,15 @@ func main() {
 			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 infra containers + 2 containers from the replication controller +
-	//              1 infra container + 2 containers from the URL +
-	//              1 infra container + 1 container from the service test.
-	if len(createdConts) != 9 {
-		glog.Fatalf("Expected 9 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
+	// We expect 9: 2 pod infra containers + 2 pods from the replication controller +
+	//              1 pod infra container + 2 pods from the URL +
+	//              1 pod infra container + 1 pod from the service test.
+	// In addition, runStaticPodTest creates 1 pod infra containers +
+	//                                       1 pod container from the mainfest file
+	// The total number of container created is 11
+
+	if len(createdConts) != 11 {
+		glog.Fatalf("Expected 11 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
 }

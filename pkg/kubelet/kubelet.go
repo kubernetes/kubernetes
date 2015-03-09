@@ -78,19 +78,23 @@ const (
 )
 
 var (
-	// ErrNoKubeletContainers returned when there are not containers managed by the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
+	// ErrNoKubeletContainers returned when there are not containers managed by
+	// the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
 	ErrNoKubeletContainers = errors.New("no containers managed by kubelet")
 
-	// ErrContainerNotFound returned when a container in the given pod with the given container name was not found, amongst those managed by the kubelet.
+	// ErrContainerNotFound returned when a container in the given pod with the
+	// given container name was not found, amongst those managed by the kubelet.
 	ErrContainerNotFound = errors.New("no matching container")
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
+
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
-	SyncPods(pods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
+	SyncPods(pods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods util.StringSet,
+		startTime time.Time) error
 }
 
 type SourcesReadyFn func() bool
@@ -206,6 +210,8 @@ func NewMainKubelet(
 
 	klet.podStatuses = make(map[string]api.PodStatus)
 
+	klet.mirrorManager = newBasicMirrorManager(klet.kubeClient)
+
 	return klet, nil
 }
 
@@ -235,6 +241,11 @@ type Kubelet struct {
 	// pods are immutable
 	podLock sync.RWMutex
 	pods    []api.Pod
+	// Record the set of mirror pods (see mirror_manager.go for more details);
+	// similar to pods, this is not immutable and is protected by the same podLock.
+	// Note that Kubelet.pods do not contain mirror pods as they are filtered
+	// out beforehand.
+	mirrorPods util.StringSet
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -288,6 +299,9 @@ type Kubelet struct {
 	// A pod status cache currently used to store rejected pods and their statuses.
 	podStatusesLock sync.RWMutex
 	podStatuses     map[string]api.PodStatus
+
+	// A mirror pod manager which provides helper functions.
+	mirrorManager mirrorManager
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1240,7 +1254,7 @@ type podContainerChangesSpec struct {
 	containersToKeep    map[dockertools.DockerID]int
 }
 
-func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, containersInPod dockertools.DockerContainers) (podContainerChangesSpec, error) {
+func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, hasMirrorPod bool, containersInPod dockertools.DockerContainers) (podContainerChangesSpec, error) {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
@@ -1343,10 +1357,10 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, containersInPod dock
 	}, nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.Pod, containersInPod dockertools.DockerContainers) error {
+func (kl *Kubelet) syncPod(pod *api.Pod, hasMirrorPod bool, containersInPod dockertools.DockerContainers) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
-	containerChanges, err := kl.computePodContainerChanges(pod, containersInPod)
+	containerChanges, err := kl.computePodContainerChanges(pod, hasMirrorPod, containersInPod)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
 		return err
@@ -1414,6 +1428,13 @@ func (kl *Kubelet) syncPod(pod *api.Pod, containersInPod dockertools.DockerConta
 	for container := range containerChanges.containersToStart {
 		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
 		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], &podVolumes, podInfraContainerID)
+	}
+
+	if !hasMirrorPod && isStaticPod(pod) {
+		glog.V(4).Infof("Creating a mirror pod %q", podFullName)
+		if err := kl.mirrorManager.CreateMirrorPod(*pod, kl.hostname); err != nil {
+			glog.Errorf("Failed creating a mirror pod %q: %#v", podFullName, err)
+		}
 	}
 
 	return nil
@@ -1496,7 +1517,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.Pod, running []*docker.Cont
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
+func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods util.StringSet, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -1543,7 +1564,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 		}
 
 		// Run the sync in an async manifest worker.
-		kl.podWorkers.UpdatePod(pod, func() {
+		kl.podWorkers.UpdatePod(pod, kl.mirrorPods.Has(podFullName), func() {
 			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
 		})
 
@@ -1603,6 +1624,9 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	if err != nil {
 		return err
 	}
+
+	// Remove any orphaned mirror pods.
+	deleteOrphanedMirrorPods(pods, mirrorPods, kl.mirrorManager)
 
 	return err
 }
@@ -1704,18 +1728,18 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 		}
 
-		pods, err := kl.GetPods()
+		pods, mirrorPods, err := kl.GetPods()
 		if err != nil {
 			glog.Errorf("Failed to get bound pods.")
 			return
 		}
-		if err := handler.SyncPods(pods, podSyncTypes, start); err != nil {
+		if err := handler.SyncPods(pods, podSyncTypes, mirrorPods, start); err != nil {
 			glog.Errorf("Couldn't sync containers: %v", err)
 		}
 	}
 }
 
-// Updated the Kubelet's internal pods with those provided by the update.
+// Update the Kubelet's internal pods with those provided by the update.
 // Records new and updated pods in newPods and updatedPods.
 func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType) {
 	kl.podLock.Lock()
@@ -1723,6 +1747,7 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 	switch u.Op {
 	case SET:
 		glog.V(3).Infof("SET: Containers changed")
+		newPods, newMirrorPods := filterAndCategorizePods(u.Pods)
 
 		// Store the new pods. Don't worry about filtering host ports since those
 		// pods will never be looked up.
@@ -1730,13 +1755,15 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		for i := range kl.pods {
 			existingPods[kl.pods[i].UID] = struct{}{}
 		}
-		for i := range u.Pods {
-			if _, ok := existingPods[u.Pods[i].UID]; !ok {
-				podSyncTypes[u.Pods[i].UID] = metrics.SyncPodCreate
+		for _, pod := range newPods {
+			if _, ok := existingPods[pod.UID]; !ok {
+				podSyncTypes[pod.UID] = metrics.SyncPodCreate
 			}
 		}
+		// Actually update the pods.
+		kl.pods = newPods
+		kl.mirrorPods = newMirrorPods
 
-		kl.pods = u.Pods
 		kl.handleHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
@@ -1746,7 +1773,8 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		for i := range u.Pods {
 			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodUpdate
 		}
-		kl.pods = updatePods(u.Pods, kl.pods)
+		allPods := updatePods(u.Pods, kl.pods)
+		kl.pods, kl.mirrorPods = filterAndCategorizePods(allPods)
 		kl.handleHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
@@ -1818,11 +1846,12 @@ func (kl *Kubelet) GetHostname() string {
 	return kl.hostname
 }
 
-// GetPods returns all pods bound to the kubelet and their spec.
-func (kl *Kubelet) GetPods() ([]api.Pod, error) {
+// GetPods returns all pods bound to the kubelet and their spec, and the mirror
+// pod map.
+func (kl *Kubelet) GetPods() ([]api.Pod, util.StringSet, error) {
 	kl.podLock.RLock()
 	defer kl.podLock.RUnlock()
-	return append([]api.Pod{}, kl.pods...), nil
+	return append([]api.Pod{}, kl.pods...), kl.mirrorPods, nil
 }
 
 // GetPodByName provides the first pod that matches namespace and name, as well as whether the node was found.

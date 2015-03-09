@@ -46,7 +46,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 
 	podWorkers := newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.Pod, containers dockertools.DockerContainers) error {
+		func(pod *api.Pod, hasMirrorPod bool, containers dockertools.DockerContainers) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -54,7 +54,8 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 			}()
 			return nil
 		},
-		recorder)
+		recorder,
+	)
 	return podWorkers, processed
 }
 
@@ -82,7 +83,7 @@ func TestUpdatePod(t *testing.T) {
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
-			podWorkers.UpdatePod(newPod(string(j), string(i)), func() {})
+			podWorkers.UpdatePod(newPod(string(j), string(i)), false, func() {})
 		}
 	}
 	drainWorkers(podWorkers, numPods)
@@ -115,7 +116,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		podWorkers.UpdatePod(newPod(string(i), "name"), func() {})
+		podWorkers.UpdatePod(newPod(string(i), "name"), false, func() {})
 	}
 	drainWorkers(podWorkers, numPods)
 
