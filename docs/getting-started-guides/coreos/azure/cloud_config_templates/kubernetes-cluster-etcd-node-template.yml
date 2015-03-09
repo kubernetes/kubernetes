@@ -10,11 +10,6 @@ coreos:
     snapshot: true
     max-retry-attempts: 50
   units:
-    - name: dhcpcd.service
-      enable: true
-      command: start
-    - name: systemd-resolved.service
-      command: stop
     - name: etcd.service
       command: start
   update:

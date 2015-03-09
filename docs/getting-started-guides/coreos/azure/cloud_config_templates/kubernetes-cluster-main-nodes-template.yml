@@ -29,30 +29,6 @@ coreos:
             [Service]
             Environment=DOCKER_OPTS='--bridge="weave" -r="false"'
 
-    - name: dhcpcd.service
-      enable: true
-      command: start
-
-    - name: systemd-resolved.service
-      command: stop
-
-    - name: wait-for-network-online.service
-      enable: true
-      command: start
-      content: |
-        [Unit]
-        After=network-online.target
-        Before=install-weave.service
-        Before=download-kubernetes.service
-        Description=Temporary hack, as the use of dhcpcd.service breaks nework-online.online
-        Documentation=https://github.com/coreos/bugs/issues/267
-        Requires=network-online.target
-        [Service]
-        Type=oneshot
-        ExecStart=/bin/sh -c 'until curl --silent --fail https://status.github.com/api/status.json | grep -q \"good\"; do sleep 2; done'
-        [Install]
-        WantedBy=network-online.target
-
     - name: weave-network.target
       enable: true
       content: |

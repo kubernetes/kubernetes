@@ -227,7 +227,7 @@ exports.create_config = function (name, nodes) {
     weave_salt: util.rand_string(),
     resources: {
       vnet: [name, 'internal-vnet', util.rand_suffix].join('-'),
-      service: [name, 'service-cluster', util.rand_suffix].join('-'),
+      service: [name, util.rand_suffix].join('-'),
       ssh_key: create_ssh_key(name),
     }
   };
