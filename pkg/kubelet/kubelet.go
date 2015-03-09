@@ -1074,11 +1074,12 @@ func (kl *Kubelet) makePodDataDirs(pod *api.BoundPod) error {
 	return nil
 }
 
-func (kl *Kubelet) shouldContainerBeRestarted(pod *api.BoundPod, containerName, dockerContainerName string, uid types.UID) bool {
+func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.BoundPod) bool {
+	podFullName := GetPodFullName(pod)
 	// Check RestartPolicy for dead container
-	recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, GetPodFullName(pod), uid, containerName)
+	recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, podFullName, pod.UID, container.Name)
 	if err != nil {
-		glog.Errorf("Error listing recent containers:%s", dockerContainerName)
+		glog.Errorf("Error listing recent containers for pod %q: %v", podFullName, err)
 		// TODO(dawnchen): error handling here?
 	}
 	// set dead containers to unready state
@@ -1088,16 +1089,14 @@ func (kl *Kubelet) shouldContainerBeRestarted(pod *api.BoundPod, containerName, 
 
 	if len(recentContainers) > 0 {
 		if pod.Spec.RestartPolicy.Never != nil {
-			glog.Infof("Already ran container with name %s, do nothing",
-				dockerContainerName)
+			glog.Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
 			return false
 
 		}
 		if pod.Spec.RestartPolicy.OnFailure != nil {
 			// Check the exit code of last run
 			if recentContainers[0].State.ExitCode == 0 {
-				glog.Infof("Already successfully ran container with name %s, do nothing",
-					dockerContainerName)
+				glog.Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
 				return false
 			}
 		}
@@ -1247,7 +1246,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.Docker
 			}
 		}
 
-		if !kl.shouldContainerBeRestarted(pod, container.Name, dockerContainerName, uid) {
+		if !kl.shouldContainerBeRestarted(&container, pod) {
 			continue
 		}
 
