@@ -56,46 +56,57 @@ $ kubectl delete pods --all`
 )
 
 func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
-	flags := &struct {
-		Filenames util.StringList
-	}{}
+	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "delete ([-f filename] | (<resource> [(<id> | -l <label> | --all)]",
 		Short:   "Delete a resource by filename, stdin, or resource and ID.",
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdNamespace, err := f.DefaultNamespace(cmd)
+			err := RunDelete(f, out, cmd, args, filenames)
 			cmdutil.CheckErr(err)
-			mapper, typer := f.Object(cmd)
-			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
-				ContinueOnError().
-				NamespaceParam(cmdNamespace).DefaultNamespace().
-				FilenameParam(flags.Filenames...).
-				SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
-				SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
-				ResourceTypeOrNameArgs(false, args...).
-				Flatten().
-				Do()
-			cmdutil.CheckErr(r.Err())
-
-			found := 0
-			err = r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
-				found++
-				if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
-					return err
-				}
-				fmt.Fprintf(out, "%s\n", r.Name)
-				return nil
-			})
-			cmdutil.CheckErr(err)
-			if found == 0 {
-				fmt.Fprintf(cmd.Out(), "No resources found\n")
-			}
 		},
 	}
-	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to a file containing the resource to delete")
+	cmd.Flags().VarP(&filenames, "filename", "f", "Filename, directory, or URL to a file containing the resource to delete")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd
+}
+
+func RunDelete(f *Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+	mapper, typer := f.Object(cmd)
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(filenames...).
+		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
+		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
+		ResourceTypeOrNameArgs(false, args...).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+
+	found := 0
+	err = r.IgnoreErrors(errors.IsNotFound).Visit(func(r *resource.Info) error {
+		found++
+		if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "%s\n", r.Name)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if found == 0 {
+		fmt.Fprintf(cmd.Out(), "No resources found\n")
+	}
+	return nil
 }

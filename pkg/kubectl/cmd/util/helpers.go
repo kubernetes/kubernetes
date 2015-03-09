@@ -31,10 +31,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-
 	"github.com/evanphx/json-patch"
+
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 func CheckErr(err error) {
@@ -52,25 +53,26 @@ func CheckErr(err error) {
 	}
 }
 
-func usageError(cmd *cobra.Command, format string, args ...interface{}) {
-	glog.Errorf(format, args...)
-	glog.Errorf("See '%s -h' for help.", cmd.CommandPath())
-	os.Exit(1)
+func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
+	msg := fmt.Sprintf(format, args...)
+	return fmt.Errorf("%s\nsee '%s -h' for help.", msg, cmd.CommandPath())
+}
+
+func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
+	f := cmd.Flags().Lookup(flag)
+	if f == nil {
+		glog.Fatalf("flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+	}
+	return f
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
+	f := getFlag(cmd, flag)
 	return f.Value.String()
 }
 
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
+	f := getFlag(cmd, flag)
 	result, err := strconv.ParseBool(f.Value.String())
 	if err != nil {
 		glog.Fatalf("Invalid value for a boolean flag: %s", f.Value.String())
@@ -80,24 +82,22 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 
 // Assumes the flag has a default value.
 func GetFlagInt(cmd *cobra.Command, flag string) int {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
+	f := getFlag(cmd, flag)
 	v, err := strconv.Atoi(f.Value.String())
 	// This is likely not a sufficiently friendly error message, but cobra
 	// should prevent non-integer values from reaching here.
-	CheckErr(err)
+	if err != nil {
+		glog.Fatalf("unable to convert flag value to int: %v", err)
+	}
 	return v
 }
 
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
+	f := getFlag(cmd, flag)
 	v, err := time.ParseDuration(f.Value.String())
-	CheckErr(err)
+	if err != nil {
+		glog.Fatalf("unable to convert flag value to Duration: %v", err)
+	}
 	return v
 }
 

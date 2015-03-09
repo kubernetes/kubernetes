@@ -30,17 +30,25 @@ func (f *Factory) NewCmdVersion(out io.Writer) *cobra.Command {
 		Use:   "version",
 		Short: "Print the client and server version information.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if util.GetFlagBool(cmd, "client") {
-				kubectl.GetClientVersion(out)
-				return
-			}
-
-			client, err := f.Client(cmd)
+			err := RunVersion(f, out, cmd)
 			util.CheckErr(err)
-
-			kubectl.GetVersion(out, client)
 		},
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	return cmd
+}
+
+func RunVersion(f *Factory, out io.Writer, cmd *cobra.Command) error {
+	if util.GetFlagBool(cmd, "client") {
+		kubectl.GetClientVersion(out)
+		return nil
+	}
+
+	client, err := f.Client(cmd)
+	if err != nil {
+		return err
+	}
+
+	kubectl.GetVersion(out, client)
+	return nil
 }

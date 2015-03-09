@@ -63,7 +63,8 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 		Long:    get_long,
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			RunGet(f, out, cmd, args)
+			err := RunGet(f, out, cmd, args)
+			util.CheckErr(err)
 		},
 	}
 	util.AddPrinterFlags(cmd)
@@ -75,13 +76,14 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-// TODO: return an error instead of using glog.Fatal and checkErr
-func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
+func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	selector := util.GetFlagString(cmd, "selector")
 	mapper, typer := f.Object(cmd)
 
 	cmdNamespace, err := f.DefaultNamespace(cmd)
-	util.CheckErr(err)
+	if err != nil {
+		return err
+	}
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := util.GetFlagBool(cmd, "watch"), util.GetFlagBool(cmd, "watch-only")
@@ -92,35 +94,47 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Do()
-		util.CheckErr(r.Err())
+		if err != nil {
+			return err
+		}
 
 		mapping, err := r.ResourceMapping()
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
 		printer, err := f.PrinterForMapping(cmd, mapping)
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
 		obj, err := r.Object()
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
 		rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
 		// print the current object
 		if !isWatchOnly {
 			if err := printer.PrintObj(obj, out); err != nil {
-				util.CheckErr(fmt.Errorf("unable to output the provided object: %v", err))
+				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 		}
 
 		// print watched changes
 		w, err := r.Watch(rv)
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
 		kubectl.WatchLoop(w, func(e watch.Event) error {
 			return printer.PrintObj(e.Object, out)
 		})
-		return
+		return nil
 	}
 
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
@@ -129,11 +143,15 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		ResourceTypeOrNameArgs(true, args...).
 		Latest()
 	printer, generic, err := util.PrinterForCommand(cmd)
-	util.CheckErr(err)
+	if err != nil {
+		return err
+	}
 
 	if generic {
 		clientConfig, err := f.ClientConfig(cmd)
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 		defaultVersion := clientConfig.Version
 
 		// the outermost object will be converted to the output-version
@@ -141,7 +159,9 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 
 		r := b.Flatten().Do()
 		obj, err := r.Object()
-		util.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
 		// try conversion to all the possible versions
 		// TODO: simplify by adding a ResourceBuilder mode
@@ -157,18 +177,15 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) {
 		// builder on initialization
 		printer := kubectl.NewVersionedPrinter(printer, api.Scheme, versions...)
 
-		err = printer.PrintObj(obj, out)
-		util.CheckErr(err)
-		return
+		return printer.PrintObj(obj, out)
 	}
 
 	// use the default printer for each object
-	err = b.Do().Visit(func(r *resource.Info) error {
+	return b.Do().Visit(func(r *resource.Info) error {
 		printer, err := f.PrinterForMapping(cmd, r.Mapping)
 		if err != nil {
 			return err
 		}
 		return printer.PrintObj(r.Object, out)
 	})
-	util.CheckErr(err)
 }

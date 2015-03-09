@@ -39,97 +39,105 @@ $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il`
 )
 
 func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
-	flags := &struct {
-		pod       string
-		container string
-		stdin     bool
-		tty       bool
-	}{}
-
 	cmd := &cobra.Command{
 		Use:     "exec -p <pod> -c <container> -- <command> [<args...>]",
 		Short:   "Execute a command in a container.",
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(flags.pod) == 0 {
-				usageError(cmd, "<pod> is required for exec")
-			}
-
-			if len(args) < 1 {
-				usageError(cmd, "<command> is required for exec")
-			}
-
-			namespace, err := f.DefaultNamespace(cmd)
-			util.CheckErr(err)
-
-			client, err := f.Client(cmd)
-			util.CheckErr(err)
-
-			pod, err := client.Pods(namespace).Get(flags.pod)
-			util.CheckErr(err)
-
-			if pod.Status.Phase != api.PodRunning {
-				glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
-			}
-
-			if len(flags.container) == 0 {
-				flags.container = pod.Spec.Containers[0].Name
-			}
-
-			var stdin io.Reader
-			if util.GetFlagBool(cmd, "stdin") {
-				stdin = cmdIn
-				if flags.tty {
-					if file, ok := cmdIn.(*os.File); ok {
-						inFd := file.Fd()
-						if term.IsTerminal(inFd) {
-							oldState, err := term.SetRawTerminal(inFd)
-							if err != nil {
-								glog.Fatal(err)
-							}
-							// this handles a clean exit, where the command finished
-							defer term.RestoreTerminal(inFd, oldState)
-
-							// SIGINT is handled by term.SetRawTerminal (it runs a goroutine that listens
-							// for SIGINT and restores the terminal before exiting)
-
-							// this handles SIGTERM
-							sigChan := make(chan os.Signal, 1)
-							signal.Notify(sigChan, syscall.SIGTERM)
-							go func() {
-								<-sigChan
-								term.RestoreTerminal(inFd, oldState)
-								os.Exit(0)
-							}()
-						} else {
-							glog.Warning("Stdin is not a terminal")
-						}
-					} else {
-						flags.tty = false
-						glog.Warning("Unable to use a TTY")
-					}
-				}
-			}
-
-			config, err := f.ClientConfig(cmd)
-			util.CheckErr(err)
-
-			req := client.RESTClient.Get().
-				Prefix("proxy").
-				Resource("minions").
-				Name(pod.Status.Host).
-				Suffix("exec", namespace, flags.pod, flags.container)
-
-			e := remotecommand.New(req, config, args, stdin, cmdOut, cmdErr, flags.tty)
-			err = e.Execute()
+			err := RunExec(f, cmdIn, cmdOut, cmdErr, cmd, args)
 			util.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringVarP(&flags.pod, "pod", "p", "", "Pod name")
+	cmd.Flags().StringP("pod", "p", "", "Pod name")
 	// TODO support UID
-	cmd.Flags().StringVarP(&flags.container, "container", "c", "", "Container name")
-	cmd.Flags().BoolVarP(&flags.stdin, "stdin", "i", false, "Pass stdin to the container")
-	cmd.Flags().BoolVarP(&flags.tty, "tty", "t", false, "Stdin is a TTY")
+	cmd.Flags().StringP("container", "c", "", "Container name")
+	cmd.Flags().BoolP("stdin", "i", false, "Pass stdin to the container")
+	cmd.Flags().BoolP("tty", "t", false, "Stdin is a TTY")
 	return cmd
+}
+
+func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+	podName := util.GetFlagString(cmd, "pod")
+	if len(podName) == 0 {
+		return util.UsageError(cmd, "<pod> is required for exec")
+	}
+
+	if len(args) < 1 {
+		return util.UsageError(cmd, "<command> is required for exec")
+	}
+
+	namespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+
+	client, err := f.Client(cmd)
+	if err != nil {
+		return err
+	}
+
+	pod, err := client.Pods(namespace).Get(podName)
+	if err != nil {
+		return err
+	}
+
+	if pod.Status.Phase != api.PodRunning {
+		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
+	}
+
+	containerName := util.GetFlagString(cmd, "container")
+	if len(containerName) == 0 {
+		containerName = pod.Spec.Containers[0].Name
+	}
+
+	var stdin io.Reader
+	tty := util.GetFlagBool(cmd, "tty")
+	if util.GetFlagBool(cmd, "stdin") {
+		stdin = cmdIn
+		if tty {
+			if file, ok := cmdIn.(*os.File); ok {
+				inFd := file.Fd()
+				if term.IsTerminal(inFd) {
+					oldState, err := term.SetRawTerminal(inFd)
+					if err != nil {
+						glog.Fatal(err)
+					}
+					// this handles a clean exit, where the command finished
+					defer term.RestoreTerminal(inFd, oldState)
+
+					// SIGINT is handled by term.SetRawTerminal (it runs a goroutine that listens
+					// for SIGINT and restores the terminal before exiting)
+
+					// this handles SIGTERM
+					sigChan := make(chan os.Signal, 1)
+					signal.Notify(sigChan, syscall.SIGTERM)
+					go func() {
+						<-sigChan
+						term.RestoreTerminal(inFd, oldState)
+						os.Exit(0)
+					}()
+				} else {
+					glog.Warning("Stdin is not a terminal")
+				}
+			} else {
+				tty = false
+				glog.Warning("Unable to use a TTY")
+			}
+		}
+	}
+
+	config, err := f.ClientConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	req := client.RESTClient.Get().
+		Prefix("proxy").
+		Resource("minions").
+		Name(pod.Status.Host).
+		Suffix("exec", namespace, podName, containerName)
+
+	e := remotecommand.New(req, config, args, stdin, cmdOut, cmdErr, tty)
+	return e.Execute()
 }

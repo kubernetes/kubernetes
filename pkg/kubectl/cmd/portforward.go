@@ -42,65 +42,75 @@ $ kubectl port-forward -p mypod 0:5000
 )
 
 func (f *Factory) NewCmdPortForward() *cobra.Command {
-	flags := &struct {
-		pod       string
-		container string
-	}{}
-
 	cmd := &cobra.Command{
 		Use:     "port-forward -p <pod> [<local port>:]<remote port> [<port>...]",
 		Short:   "Forward 1 or more local ports to a pod.",
 		Long:    "Forward 1 or more local ports to a pod.",
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(flags.pod) == 0 {
-				usageError(cmd, "<pod> is required for exec")
-			}
-
-			if len(args) < 1 {
-				usageError(cmd, "at least 1 <port> is required for port-forward")
-			}
-
-			namespace, err := f.DefaultNamespace(cmd)
-			util.CheckErr(err)
-
-			client, err := f.Client(cmd)
-			util.CheckErr(err)
-
-			pod, err := client.Pods(namespace).Get(flags.pod)
-			util.CheckErr(err)
-
-			if pod.Status.Phase != api.PodRunning {
-				glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
-			}
-
-			config, err := f.ClientConfig(cmd)
-			util.CheckErr(err)
-
-			signals := make(chan os.Signal, 1)
-			signal.Notify(signals, os.Interrupt)
-			defer signal.Stop(signals)
-
-			stopCh := make(chan struct{}, 1)
-			go func() {
-				<-signals
-				close(stopCh)
-			}()
-
-			req := client.RESTClient.Get().
-				Prefix("proxy").
-				Resource("minions").
-				Name(pod.Status.Host).
-				Suffix("portForward", namespace, flags.pod)
-
-			pf, err := portforward.New(req, config, args, stopCh)
-			util.CheckErr(err)
-
-			err = pf.ForwardPorts()
+			err := RunPortForward(f, cmd, args)
 			util.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringVarP(&flags.pod, "pod", "p", "", "Pod name")
+	cmd.Flags().StringP("pod", "p", "", "Pod name")
 	// TODO support UID
 	return cmd
+}
+
+func RunPortForward(f *Factory, cmd *cobra.Command, args []string) error {
+	podName := util.GetFlagString(cmd, "pod")
+	if len(podName) == 0 {
+		return util.UsageError(cmd, "<pod> is required for exec")
+	}
+
+	if len(args) < 1 {
+		return util.UsageError(cmd, "at least 1 <port> is required for port-forward")
+	}
+
+	namespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+
+	client, err := f.Client(cmd)
+	if err != nil {
+		return err
+	}
+
+	pod, err := client.Pods(namespace).Get(podName)
+	if err != nil {
+		return err
+	}
+
+	if pod.Status.Phase != api.PodRunning {
+		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
+	}
+
+	config, err := f.ClientConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	defer signal.Stop(signals)
+
+	stopCh := make(chan struct{}, 1)
+	go func() {
+		<-signals
+		close(stopCh)
+	}()
+
+	req := client.RESTClient.Get().
+		Prefix("proxy").
+		Resource("minions").
+		Name(pod.Status.Host).
+		Suffix("portForward", namespace, podName)
+
+	pf, err := portforward.New(req, config, args, stopCh)
+	if err != nil {
+		return err
+	}
+
+	return pf.ForwardPorts()
 }

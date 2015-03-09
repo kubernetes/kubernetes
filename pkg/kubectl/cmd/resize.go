@@ -52,36 +52,51 @@ func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 		Long:    resize_long,
 		Example: resize_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			count := util.GetFlagInt(cmd, "replicas")
-			if len(args) != 2 || count < 0 {
-				usageError(cmd, "--replicas=<count> <resource> <id>")
-			}
-
-			cmdNamespace, err := f.DefaultNamespace(cmd)
+			err := RunResize(f, out, cmd, args)
 			util.CheckErr(err)
-
-			mapper, _ := f.Object(cmd)
-			// TODO: use resource.Builder instead
-			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
-
-			resizer, err := f.Resizer(cmd, mapping)
-			util.CheckErr(err)
-
-			resourceVersion := util.GetFlagString(cmd, "resource-version")
-			currentSize := util.GetFlagInt(cmd, "current-replicas")
-			precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
-			cond := kubectl.ResizeCondition(resizer, precondition, namespace, name, uint(count))
-
-			msg := "resized"
-			if err = wait.Poll(retryFrequency, retryTimeout, cond); err != nil {
-				msg = fmt.Sprintf("Failed to resize controller in spite of retrying for %s", retryTimeout)
-				util.CheckErr(err)
-			}
-			fmt.Fprintf(out, "%s\n", msg)
 		},
 	}
 	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to resize.")
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	return cmd
+}
+
+func RunResize(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	count := util.GetFlagInt(cmd, "replicas")
+	if len(args) != 2 || count < 0 {
+		return util.UsageError(cmd, "--replicas=<count> <resource> <id>")
+	}
+
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+
+	mapper, _ := f.Object(cmd)
+	// TODO: use resource.Builder instead
+	mapping, namespace, name, err := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	if err != nil {
+		return err
+	}
+
+	resizer, err := f.Resizer(cmd, mapping)
+	if err != nil {
+		return err
+	}
+
+	resourceVersion := util.GetFlagString(cmd, "resource-version")
+	currentSize := util.GetFlagInt(cmd, "current-replicas")
+	precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
+	cond := kubectl.ResizeCondition(resizer, precondition, namespace, name, uint(count))
+
+	msg := "resized"
+	if err = wait.Poll(retryFrequency, retryTimeout, cond); err != nil {
+		msg = fmt.Sprintf("Failed to resize controller in spite of retrying for %s", retryTimeout)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(out, "%s\n", msg)
+	return nil
 }
