@@ -27,11 +27,30 @@ func init() {
 	err := newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "pods",
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "name":
-				fallthrough
-			case "status.phase":
-				fallthrough
-			case "spec.host":
+			case "name",
+				"status.phase",
+				"spec.host":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "events",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "involvedObject.kind",
+				"involvedObject.namespace",
+				"involvedObject.name",
+				"involvedObject.uid",
+				"involvedObject.apiVersion",
+				"involvedObject.resourceVersion",
+				"involvedObject.fieldPath",
+				"reason",
+				"source":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
