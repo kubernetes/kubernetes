@@ -234,7 +234,7 @@ func TestReadConfigData(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			config:    "http://some.non.existent.url",
+			config:    "http://some.non.existent.foobar",
 			expectErr: true,
 		},
 		{
