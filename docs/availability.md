@@ -53,7 +53,7 @@ Mitigations:
 
 - Action: Use Replicated APIserver feature (when complete: feature is planned but not implemented)
   - Mitigates: Apiserver VM shutdown or apiserver crashing
-    - Will tolerate one or more similtaneous apiserver failures.
+    - Will tolerate one or more simultaneous apiserver failures.
   - Mitigates: Apiserver backing storage lost
     - Each apiserver has independent storage.  Etcd will recover from loss of one member.  Risk of total data loss greatly reduced.
 
