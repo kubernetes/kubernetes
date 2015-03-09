@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -70,11 +71,11 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	if f == nil {
 		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
 	}
-	// Caseless compare.
-	if strings.ToLower(f.Value.String()) == "true" {
-		return true
+	result, err := strconv.ParseBool(f.Value.String())
+	if err != nil {
+		glog.Fatalf("Invalid value for a boolean flag: %s", f.Value.String())
 	}
-	return false
+	return result
 }
 
 // Assumes the flag has a default value.
@@ -100,6 +101,19 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return v
 }
 
+func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, fmt.Errorf(`Read from %s but no data found`, source)
+	}
+
+	return data, nil
+}
+
 // ReadConfigData reads the bytes from the specified filesytem or network
 // location or from stdin if location == "-".
 // TODO: replace with resource.Builder
@@ -110,16 +124,7 @@ func ReadConfigData(location string) ([]byte, error) {
 
 	if location == "-" {
 		// Read from stdin.
-		data, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data) == 0 {
-			return nil, fmt.Errorf(`Read from stdin specified ("-") but no data found`)
-		}
-
-		return data, nil
+		return ReadConfigDataFromReader(os.Stdin, "stdin ('-')")
 	}
 
 	// Use the location as a file path or URL.
@@ -138,17 +143,13 @@ func ReadConfigDataFromLocation(location string) ([]byte, error) {
 		if resp.StatusCode != 200 {
 			return nil, fmt.Errorf("unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
 		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read URL %s: %v\n", location, err)
-		}
-		return data, nil
+		return ReadConfigDataFromReader(resp.Body, location)
 	} else {
-		data, err := ioutil.ReadFile(location)
+		file, err := os.Open(location)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read %s: %v\n", location, err)
 		}
-		return data, nil
+		return ReadConfigDataFromReader(file, location)
 	}
 }
 

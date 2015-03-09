@@ -81,7 +81,7 @@ type svcStrategy struct {
 
 // Services is the default logic that applies when creating and updating Service
 // objects.
-var Services RESTCreateStrategy = svcStrategy{api.Scheme, api.SimpleNameGenerator}
+var Services = svcStrategy{api.Scheme, api.SimpleNameGenerator}
 
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {
@@ -98,6 +98,14 @@ func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
 func (svcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
+}
+
+func (svcStrategy) AllowCreateOnUpdate() bool {
+	return true
+}
+
+func (svcStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateServiceUpdate(old.(*api.Service), obj.(*api.Service))
 }
 
 // nodeStrategy implements behavior for nodes
