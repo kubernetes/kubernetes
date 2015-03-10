@@ -68,7 +68,8 @@ Kubernetes documentation is organized into several categories.
     - details of ```kube-proxy``` iptables
     - how to wire services to external internet
   - **Design Documentation**
-    - in [docs/design](docs/design)
+    - [Design Overview](DESIGN.md)
+    - More in [docs/design](docs/design)
     - for people who want to understand the design choices made
     - describes tradeoffs, alternative designs
     - descriptions of planned features that are too long for a github issue.
