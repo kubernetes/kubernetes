@@ -72,3 +72,6 @@ kubelet:
       - file: /etc/init.d/kubelet
 {% endif %}
       - file: /var/lib/kubelet/kubernetes_auth
+{% if pillar.get('enable_node_monitoring', '').lower() == 'true' %}
+      - file: /etc/kubernetes/manifests/cadvisor.manifest
+{% endif %}
