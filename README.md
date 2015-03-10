@@ -86,7 +86,9 @@ Kubernetes documentation is organized into several categories.
 
 If you have questions or want to start contributing please reach out.  We don't bite!
 
-The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers).  We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
+The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers). This client may be overloaded from time to time. If this happens you can use any [IRC client out there](http://en.wikipedia.org/wiki/Comparison_of_Internet_Relay_Chat_clients) to talk to us.
+
+We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
 
 If you are a company and are looking for a more formal engagement with Google around Kubernetes and containers at Google as a whole, please fill out [this form](https://docs.google.com/a/google.com/forms/d/1_RfwC8LZU4CKe4vKq32x5xpEJI5QZ-j0ShGmZVv9cm4/viewform) and we'll be in touch.
 
