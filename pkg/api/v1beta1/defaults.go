@@ -95,5 +95,10 @@ func init() {
 				obj.Path = "/"
 			}
 		},
+		func(obj *NamespaceStatus) {
+			if obj.Phase == "" {
+				obj.Phase = NamespaceActive
+			}
+		},
 	)
 }

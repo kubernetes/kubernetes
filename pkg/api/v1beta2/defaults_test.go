@@ -112,3 +112,13 @@ func TestSetDefaulEndpointsProtocol(t *testing.T) {
 		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
 	}
 }
+
+func TestSetDefaultNamespace(t *testing.T) {
+	s := &current.Namespace{}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*current.Namespace)
+
+	if s2.Status.Phase != current.NamespaceActive {
+		t.Errorf("Expected phase %v, got %v", current.NamespaceActive, s2.Status.Phase)
+	}
+}

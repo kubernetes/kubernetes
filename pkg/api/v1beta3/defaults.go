@@ -96,5 +96,10 @@ func init() {
 				obj.ContainerPort = util.NewIntOrStringFromInt(obj.Port)
 			}
 		},
+		func(obj *NamespaceStatus) {
+			if obj.Phase == "" {
+				obj.Phase = NamespaceActive
+			}
+		},
 	)
 }

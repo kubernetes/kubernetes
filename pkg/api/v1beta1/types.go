@@ -746,7 +746,19 @@ type NamespaceSpec struct {
 
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
+	// Phase is the current lifecycle phase of the namespace.
+	Phase NamespacePhase `json:"phase,omitempty" description:"phase is the current lifecycle phase of the namespace"`
 }
+
+type NamespacePhase string
+
+// These are the valid phases of a namespace.
+const (
+	// NamespaceActive means the namespace is available for use in the system
+	NamespaceActive NamespacePhase = "Active"
+	// NamespaceTerminating means the namespace is undergoing graceful termination
+	NamespaceTerminating NamespacePhase = "Terminating"
+)
 
 // A namespace provides a scope for Names.
 // Use of multiple namespaces is optional

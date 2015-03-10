@@ -699,6 +699,9 @@ func init() {
 			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
 				return err
 			}
