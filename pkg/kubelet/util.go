@@ -20,25 +20,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
-
-// TODO: move this into a pkg/tools/etcd_tools
-func EtcdClientOrDie(etcdServerList util.StringList, etcdConfigFile string) tools.EtcdClient {
-	if len(etcdServerList) > 0 {
-		return etcd.NewClient(etcdServerList)
-	} else if etcdConfigFile != "" {
-		etcdClient, err := etcd.NewClientFromFile(etcdConfigFile)
-		if err != nil {
-			glog.Fatalf("Error with etcd config file: %v", err)
-		}
-		return etcdClient
-	}
-	return nil
-}
 
 // TODO: move this into pkg/capabilities
 func SetupCapabilities(allowPrivileged bool) {
@@ -49,7 +32,6 @@ func SetupCapabilities(allowPrivileged bool) {
 
 // TODO: Split this up?
 func SetupLogging() {
-	etcd.SetLogger(util.NewLogger("etcd "))
 	// Log the events locally too.
 	record.StartLogging(glog.Infof)
 }
