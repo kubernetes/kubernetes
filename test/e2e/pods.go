@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -122,27 +123,70 @@ var _ = Describe("Pods", func() {
 			},
 		}
 
+		By("setting up watch")
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
+		}
+		Expect(len(pods.Items)).To(Equal(0))
+		w, err := podClient.Watch(
+			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), labels.Everything(), pods.ListMeta.ResourceVersion)
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to set up watch: %v", err))
+		}
+
 		By("submitting the pod to kubernetes")
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
 		defer podClient.Delete(pod.Name)
-		_, err := podClient.Create(pod)
+		_, err = podClient.Create(pod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
 		}
 		Expect(len(pods.Items)).To(Equal(1))
 
+		By("veryfying pod creation was observed")
+		select {
+		case event, _ := <-w.ResultChan():
+			if event.Type != watch.Added {
+				Fail(fmt.Sprintf("Failed to observe pod creation: %v", event))
+			}
+		case <-time.After(podStartTimeout):
+			Fail("Timeout while waiting for pod creation")
+		}
+
 		By("deleting the pod")
 		podClient.Delete(pod.Name)
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		if err != nil {
+			Fail(fmt.Sprintf("Failed to delete pod: %v", err))
+		}
 		Expect(len(pods.Items)).To(Equal(0))
+
+		By("veryfying pod deletion was observed")
+		deleted := false
+		timeout := false
+		timer := time.After(podStartTimeout)
+		for !deleted && !timeout {
+			select {
+			case event, _ := <-w.ResultChan():
+				if event.Type == watch.Deleted {
+					deleted = true
+				}
+			case <-timer:
+				timeout = true
+			}
+		}
+		if !deleted {
+			Fail("Failed to observe pod deletion")
+		}
 	})
 
 	It("should be updated", func() {
