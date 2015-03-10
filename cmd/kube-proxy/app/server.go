@@ -33,19 +33,16 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
 
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
 
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
-	EtcdServerList util.StringList
-	EtcdConfigFile string
-	BindAddress    util.IP
-	ClientConfig   client.Config
-	HealthzPort    int
-	OOMScoreAdj    int
+	BindAddress  util.IP
+	ClientConfig client.Config
+	HealthzPort  int
+	OOMScoreAdj  int
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -59,8 +56,6 @@ func NewProxyServer() *ProxyServer {
 
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
 func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&s.EtcdConfigFile, "etcd_config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd_servers")
-	fs.Var(&s.EtcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional). Mutually exclusive with -etcd_config")
 	fs.Var(&s.BindAddress, "bind_address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
@@ -109,33 +104,6 @@ func (s *ProxyServer) Run(_ []string) error {
 			serviceConfig.Channel("api"),
 			endpointsConfig.Channel("api"),
 		)
-	} else {
-		var etcdClient *etcd.Client
-
-		// Set up etcd client
-		if len(s.EtcdServerList) > 0 {
-			// Set up logger for etcd client
-			etcd.SetLogger(util.NewLogger("etcd "))
-			etcdClient = etcd.NewClient(s.EtcdServerList)
-		} else if s.EtcdConfigFile != "" {
-			// Set up logger for etcd client
-			etcd.SetLogger(util.NewLogger("etcd "))
-			var err error
-			etcdClient, err = etcd.NewClientFromFile(s.EtcdConfigFile)
-
-			if err != nil {
-				glog.Fatalf("Error with etcd config file: %v", err)
-			}
-		}
-
-		// Create a configuration source that handles configuration from etcd.
-		if etcdClient != nil {
-			glog.Infof("Using etcd servers %v", etcdClient.GetCluster())
-
-			config.NewConfigSourceEtcd(etcdClient,
-				serviceConfig.Channel("etcd"),
-				endpointsConfig.Channel("etcd"))
-		}
 	}
 
 	if s.HealthzPort > 0 {
