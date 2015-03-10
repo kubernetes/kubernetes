@@ -129,7 +129,6 @@ CTLRMGR_PID=$!
 KUBELET_LOG=/tmp/kubelet.log
 sudo -E "${GO_OUT}/kubelet" \
   --v=${LOG_LEVEL} \
-  --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
