@@ -123,12 +123,16 @@ func TestList(t *testing.T) {
 	instances := make([]ec2.Instance, 4)
 	instances[0].Tags = []ec2.Tag{{"Name", "foo"}}
 	instances[0].PrivateDNSName = "instance1"
+	instances[0].State.Name = "running"
 	instances[1].Tags = []ec2.Tag{{"Name", "bar"}}
 	instances[1].PrivateDNSName = "instance2"
+	instances[1].State.Name = "running"
 	instances[2].Tags = []ec2.Tag{{"Name", "baz"}}
 	instances[2].PrivateDNSName = "instance3"
+	instances[2].State.Name = "running"
 	instances[3].Tags = []ec2.Tag{{"Name", "quux"}}
 	instances[3].PrivateDNSName = "instance4"
+	instances[3].State.Name = "running"
 
 	aws := mockInstancesResp(instances)
 
@@ -158,8 +162,10 @@ func TestIPAddress(t *testing.T) {
 	instances := make([]ec2.Instance, 2)
 	instances[0].PrivateDNSName = "instance1"
 	instances[0].PrivateIpAddress = "192.168.0.1"
+	instances[0].State.Name = "running"
 	instances[1].PrivateDNSName = "instance1"
 	instances[1].PrivateIpAddress = "192.168.0.2"
+	instances[1].State.Name = "running"
 
 	aws1 := mockInstancesResp([]ec2.Instance{})
 	_, err1 := aws1.IPAddress("instance")

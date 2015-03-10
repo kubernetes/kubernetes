@@ -219,20 +219,46 @@ func (aws *AWSCloud) getInstancesByDnsName(name string) (*ec2.Instance, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.Reservations) == 0 {
-		return nil, fmt.Errorf("no reservations found for host: %s", name)
-	}
-	if len(resp.Reservations) > 1 {
-		return nil, fmt.Errorf("multiple reservations found for host: %s", name)
-	}
-	if len(resp.Reservations[0].Instances) == 0 {
-		return nil, fmt.Errorf("no instances found for host: %s", name)
-	}
-	if len(resp.Reservations[0].Instances) > 1 {
-		return nil, fmt.Errorf("multiple instances found for host: %s", name)
+
+	instances := []*ec2.Instance{}
+	for _, reservation := range resp.Reservations {
+		for _, instance := range reservation.Instances {
+			// TODO: Push running logic down into filter?
+			if !isAlive(&instance) {
+				continue
+			}
+
+			if instance.PrivateDNSName != name {
+				// TODO: Should we warn here? - the filter should have caught this
+				// (this will happen in the tests if they don't fully mock the EC2 API)
+				continue
+			}
+
+			instances = append(instances, &instance)
+		}
 	}
 
-	return &resp.Reservations[0].Instances[0], nil
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no instances found for host: %s", name)
+	}
+	if len(instances) > 1 {
+		return nil, fmt.Errorf("multiple instances found for host: %s", name)
+	}
+	return instances[0], nil
+}
+
+// Check if the instance is alive (running or pending)
+// We typically ignore instances that are not alive
+func isAlive(instance *ec2.Instance) bool {
+	switch instance.State.Name {
+	case "shutting-down", "terminated", "stopping", "stopped":
+		return false
+	case "pending", "running":
+		return true
+	default:
+		glog.Errorf("unknown EC2 instance state: %s", instance.State)
+		return false
+	}
 }
 
 // Return a list of instances matching regex string.
@@ -258,6 +284,12 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 	instances := []string{}
 	for _, reservation := range resp.Reservations {
 		for _, instance := range reservation.Instances {
+			// TODO: Push filtering down into EC2 API filter?
+			if !isAlive(&instance) {
+				glog.V(2).Infof("skipping EC2 instance (not alive): %s", instance.InstanceId)
+				continue
+			}
+
 			for _, tag := range instance.Tags {
 				if tag.Key == "Name" && re.MatchString(tag.Value) {
 					instances = append(instances, instance.PrivateDNSName)
@@ -266,6 +298,7 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 			}
 		}
 	}
+	glog.V(2).Infof("Matched EC2 instances: %s", instances)
 	return instances, nil
 }
 
