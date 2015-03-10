@@ -81,6 +81,13 @@ Scheduling constraints are to be handled similar to pod resource constraints.  P
 TBD
 
 
+#### Events
+
+The implementation of persistent storage will not require events to communicate to the user the state of their claim.  The CLI for bound claims contains a reference to the backing persistent volume.  This is always present in the API and CLI, making an event to communicate the same unnecessary. 
+
+Events that communicate the state of a mounted volume are left to the volume plugins.
+
+
 ### Example
 
 #### Admin provisions storage
