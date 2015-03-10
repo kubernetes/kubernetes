@@ -719,7 +719,7 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
 		return
 	}
-	if len(parts) < 6 {
+	if len(parts) < 5 {
 		// We have at least 5 fields.  We may have more in the future.
 		// Anything with less fields than this is not something we can
 		// manage.
