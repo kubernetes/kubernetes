@@ -34,4 +34,4 @@ RUN /usr/sbin/td-agent-gem install fluent-plugin-elasticsearch
 COPY td-agent.conf /etc/td-agent/td-agent.conf
 
 # Run the Fluentd service.
-CMD /usr/sbin/td-agent -qq > /var/log/td-agent/td-agent.log
+CMD /usr/sbin/td-agent "$FLUENTD_ARGS" > /var/log/td-agent/td-agent.log
