@@ -1,0 +1,11 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "simple key"
+  : !!map {
+    ? !!str "also simple"
+    : !!str "value",
+    ? !!str "not a simple key"
+    : !!str "any value"
+  }
+}

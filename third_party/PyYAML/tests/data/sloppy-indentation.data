@@ -1,0 +1,17 @@
+---
+in the block context:
+    indentation should be kept: { 
+    but in the flow context: [
+it may be violated]
+}
+---
+the parser does not require scalars
+to be indented with at least one space
+...
+---
+"the parser does not require scalars
+to be indented with at least one space"
+---
+foo:
+    bar: 'quoted scalars
+may not adhere indentation'

@@ -1,0 +1,5 @@
+canonical: 12345
+decimal: +12,345
+sexagesimal: 3:25:45
+octal: 014
+hexadecimal: 0xC

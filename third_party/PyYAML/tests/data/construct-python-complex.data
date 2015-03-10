@@ -1,0 +1,8 @@
+- !!python/complex 0.5+0j
+- !!python/complex 0.5+0.5j
+- !!python/complex 0.5j
+- !!python/complex -0.5+0.5j
+- !!python/complex -0.5+0j
+- !!python/complex -0.5-0.5j
+- !!python/complex -0.5j
+- !!python/complex 0.5-0.5j

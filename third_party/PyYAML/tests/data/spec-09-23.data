@@ -1,0 +1,11 @@
+ # Strip
+  # Comments:
+strip: |-
+  # text     # Clip
+  # comments:
+clip: |
+  # text   # Keep
+  # comments:
+keep: |+
+  # text  # Trail
+  # comments.

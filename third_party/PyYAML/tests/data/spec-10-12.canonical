@@ -1,0 +1,9 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "block"
+  : !!map {
+    ? !!str "key"
+    : !!str "value"
+  }
+}

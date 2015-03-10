@@ -1,0 +1,8 @@
+%YAML 1.1
+---
+!!seq [
+  !!str "detected\n",
+  !!str "\n\n# detected\n",
+  !!str " explicit\n",
+  !!str "\t\ndetected\n",
+]

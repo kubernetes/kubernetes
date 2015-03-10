@@ -1,0 +1,12 @@
+%YAML 1.1
+---
+!!seq [
+  !!str "::std::vector",
+  !!str "Up, up, and away!",
+  !!int "-123",
+  !!seq [
+    !!str "::std::vector",
+    !!str "Up, up, and away!",
+    !!int "-123",
+  ]
+]

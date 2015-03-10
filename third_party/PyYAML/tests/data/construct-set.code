@@ -1,0 +1,4 @@
+{
+    "baseball players": set(["Mark McGwire", "Sammy Sosa", "Ken Griffey"]),
+    "baseball teams": set(["Boston Red Sox", "Detroit Tigers", "New York Yankees"]),
+}

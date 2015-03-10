@@ -1,0 +1,11 @@
+%YAML 1.1
+---
+!!seq [
+  !!null "",
+  !!map {
+    ? !!str "foo"
+    : !!null "",
+    ? !!null ""
+    : !!str "bar",
+  }
+]

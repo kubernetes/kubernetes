@@ -1,0 +1,6 @@
+%YAML 1.1
+---
+!!seq [
+  !!str "first ",
+  !!str "first\nlast",
+]

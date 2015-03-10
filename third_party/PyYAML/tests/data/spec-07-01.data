@@ -1,0 +1,3 @@
+%FOO  bar baz # Should be ignored
+               # with a warning.
+--- "foo"

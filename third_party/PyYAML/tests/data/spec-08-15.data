@@ -1,0 +1,5 @@
+- # Empty plain scalar
+- ? foo
+  :
+  ?
+  : bar

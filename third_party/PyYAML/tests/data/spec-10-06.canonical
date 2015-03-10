@@ -1,0 +1,16 @@
+%YAML 1.1
+---
+!!seq [
+  !!map {
+    ? !!str "inner"
+    : !!str "entry",
+    ? !!str "also"
+    : !!str "inner"
+  },
+  !!map {
+    ? !!str "inner"
+    : !!str "entry",
+    ? !!str "last"
+    : !!str "entry"
+  }
+]

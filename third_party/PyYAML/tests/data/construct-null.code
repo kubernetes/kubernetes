@@ -1,0 +1,13 @@
+[
+    None,
+    { "empty": None, "canonical": None, "english": None, None: "null key" },
+    {
+        "sparse": [
+            None,
+            "2nd entry",
+            None,
+            "4th entry",
+            None,
+        ],
+    },
+]

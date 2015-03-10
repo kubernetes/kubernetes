@@ -1,0 +1,4 @@
+%YAML 1.1
+---
+!!str "literal\n\
+      \ttext\n"

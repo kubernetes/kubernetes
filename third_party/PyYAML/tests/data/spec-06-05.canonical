@@ -1,0 +1,16 @@
+%YAML 1.1
+---
+!!map {
+  ? !!map {
+    ? !!str "first"
+    : !!str "Sammy",
+    ? !!str "last"
+    : !!str "Sosa"
+  }
+  : !!map {
+    ? !!str "hr"
+    : !!int "65",
+    ? !!str "avg"
+    : !!float "0.278"
+  }
+}

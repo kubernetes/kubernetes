@@ -1,0 +1,21 @@
+- !!python/object:test_constructor.AnObject { foo: 1, bar: two, baz: [3,3,3] }
+- !!python/object:test_constructor.AnInstance { foo: 1, bar: two, baz: [3,3,3] }
+
+- !!python/object/new:test_constructor.AnObject { args: [1, two], kwds: {baz: [3,3,3]} }
+- !!python/object/apply:test_constructor.AnInstance { args: [1, two], kwds: {baz: [3,3,3]} }
+
+- !!python/object:test_constructor.AState { _foo: 1, _bar: two, _baz: [3,3,3] }
+- !!python/object/new:test_constructor.ACustomState { state: !!python/tuple [1, two, [3,3,3]] }
+
+- !!python/object/new:test_constructor.InitArgs [1, two, [3,3,3]]
+- !!python/object/new:test_constructor.InitArgsWithState { args: [1, two], state: [3,3,3] }
+
+- !!python/object/new:test_constructor.NewArgs [1, two, [3,3,3]]
+- !!python/object/new:test_constructor.NewArgsWithState { args: [1, two], state: [3,3,3] }
+
+- !!python/object/apply:test_constructor.Reduce [1, two, [3,3,3]]
+- !!python/object/apply:test_constructor.ReduceWithState { args: [1, two], state: [3,3,3] }
+
+- !!python/object/new:test_constructor.MyInt [3]
+- !!python/object/new:test_constructor.MyList { listitems: [~, ~, ~] }
+- !!python/object/new:test_constructor.MyDict { dictitems: {0, 1, 2} }

@@ -1,0 +1,9 @@
+%YAML 1.1
+---
+!!str "foo"
+%YAML 1.1
+---
+!!str "bar"
+%YAML 1.1
+---
+!!str "baz"

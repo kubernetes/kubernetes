@@ -1,0 +1,4 @@
+plain key: # empty value
+"quoted key":
+- one # explicit next-line
+- two # block value

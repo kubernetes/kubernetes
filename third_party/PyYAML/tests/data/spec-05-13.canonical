@@ -1,0 +1,5 @@
+%YAML 1.1
+--- !!str
+"Text containing \
+ both space and \
+ tab	characters"

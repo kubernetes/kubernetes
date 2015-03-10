@@ -1,0 +1,9 @@
+canonical: yes
+answer: NO
+logical: True
+option: on
+
+
+but:
+    y: is a string
+    n: is a string

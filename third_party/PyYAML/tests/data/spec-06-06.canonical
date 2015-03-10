@@ -1,0 +1,10 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "plain"
+  : !!str "text lines",
+  ? !!str "quoted"
+  : !!str "text lines",
+  ? !!str "block"
+  : !!str "text\n 	lines\n"
+}

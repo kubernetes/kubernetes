@@ -1,0 +1,15 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "foo"
+  : !!str "bar baz"
+}
+%YAML 1.1
+---
+!!str "foo bar"
+%YAML 1.1
+---
+!!str "foo bar"
+%YAML 1.1
+---
+!!str "foo\n"

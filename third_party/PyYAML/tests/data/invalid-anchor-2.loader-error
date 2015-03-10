@@ -1,0 +1,8 @@
+---
+- [
+    &correct foo,
+    *correct,
+    *correct]   # still correct
+- *correct: still correct
+- &correct-or-not[foo, bar]
+

@@ -1,0 +1,7 @@
+[
+? explicit key1 : explicit value,
+? explicit key2 : , # Explicit empty
+? explicit key3,     # Implicit empty
+simple key1 : explicit value,
+simple key2 : ,     # Explicit empty
+]

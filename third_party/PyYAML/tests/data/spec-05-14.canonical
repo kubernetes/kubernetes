@@ -1,0 +1,7 @@
+%YAML 1.1
+---
+"Fun with \x5C
+ \x22 \x07 \x08 \x1B \x0C
+ \x0A \x0D \x09 \x0B \x00
+ \x20 \xA0 \x85 \u2028 \u2029
+ A A A"

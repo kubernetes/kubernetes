@@ -1,0 +1,9 @@
+! "First document"
+---
+!foo "No directives"
+%TAG ! !foo
+---
+!bar "With directives"
+%YAML 1.1
+---
+!baz "Reset settings"

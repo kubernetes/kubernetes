@@ -1,0 +1,18 @@
+%YAML 1.1
+---
+!!map { 
+    ? !!str "in the block context"
+    : !!map {
+        ? !!str "indentation should be kept"
+        : !!map {
+            ? !!str "but in the flow context"
+            : !!seq [ !!str "it may be violated" ]
+        }
+    }
+}
+--- !!str
+"the parser does not require scalars to be indented with at least one space"
+--- !!str
+"the parser does not require scalars to be indented with at least one space"
+--- !!map
+{ ? !!str "foo": { ? !!str "bar" : !!str "quoted scalars may not adhere indentation" } }

@@ -1,0 +1,11 @@
+---
+scalars:
+  plain: !!str some text
+  quoted:
+    single: 'some text'
+    double: "some text"
+collections:
+  sequence: !!seq [ !!str entry,
+    # Mapping entry:
+      key: value ]
+  mapping: { key: value }

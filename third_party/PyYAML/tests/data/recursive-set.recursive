@@ -1,0 +1,7 @@
+try:
+    set
+except NameError:
+    from sets import Set as set
+value = set()
+value.add(AnInstance(foo=value, bar=value))
+value.add(AnInstance(foo=value, bar=value))

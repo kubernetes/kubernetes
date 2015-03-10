@@ -1,0 +1,5 @@
+ERROR:
+- A simple key is restricted
+  to only one line.
+- A simple key must not be
+  longer than 1024 characters.
