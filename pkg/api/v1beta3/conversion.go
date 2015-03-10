@@ -29,9 +29,9 @@ func init() {
 			switch label {
 			case "name":
 				fallthrough
-			case "Status.Phase":
+			case "status.phase":
 				fallthrough
-			case "Status.Host":
+			case "status.host":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
