@@ -77,6 +77,11 @@ type RESTUpdater interface {
 	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
 }
 
+type RESTPatcher interface {
+	RESTGetter
+	RESTUpdater
+}
+
 // RESTResult indicates the result of a REST transformation.
 type RESTResult struct {
 	// The result of this operation. May be nil if the operation has no meaningful

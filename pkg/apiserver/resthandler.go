@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
+	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 )
 
@@ -187,6 +188,83 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 	}
 }
 
+// PatchResource returns a function that will handle a resource patch
+// TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
+func PatchResource(r RESTPatcher, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		w := res.ResponseWriter
+		glog.Infof("hi")
+
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+
+		namespace, name, err := namer.Name(req)
+		if err != nil {
+			notFound(w, req.Request)
+			return
+		}
+
+		obj := r.New()
+		// PATCH requires same permission as UPDATE
+		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, resource, "UPDATE"))
+		if err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+
+		ctx := ctxFn(req)
+		ctx = api.WithNamespace(ctx, namespace)
+
+		original, err := r.Get(ctx, name)
+		if err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+
+		originalObjJs, err := codec.Encode(original)
+		if err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+		patchJs, err := readBody(req.Request)
+		if err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+		patchedObjJs, err := jsonpatch.MergePatch(originalObjJs, patchJs)
+		if err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+
+		if err := codec.DecodeInto(patchedObjJs, obj); err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+		if err := checkName(obj, name, namespace, namer); err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			// update should never create as previous get would fail
+			obj, _, err := r.Update(ctx, obj)
+			return obj, err
+		})
+		if err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+
+		if err := setSelfLink(result, req, namer); err != nil {
+			errorJSON(err, codec, w)
+			return
+		}
+
+		writeJSON(http.StatusOK, codec, result, w)
+	}
+}
+
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
@@ -216,18 +294,9 @@ func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 			return
 		}
 
-		// check the provided name against the request
-		if objNamespace, objName, err := namer.ObjectName(obj); err == nil {
-			if objName != name {
-				errorJSON(errors.NewBadRequest("the name of the object does not match the name on the URL"), codec, w)
-				return
-			}
-			if len(namespace) > 0 {
-				if len(objNamespace) > 0 && objNamespace != namespace {
-					errorJSON(errors.NewBadRequest("the namespace of the object does not match the namespace on the request"), codec, w)
-					return
-				}
-			}
+		if err := checkName(obj, name, namespace, namer); err != nil {
+			errorJSON(err, codec, w)
+			return
 		}
 
 		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, resource, "UPDATE"))
@@ -376,6 +445,21 @@ func setSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) err
 	newURL.Fragment = ""
 
 	return namer.SetSelfLink(obj, newURL.String())
+}
+
+// checkName checks the provided name against the request
+func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) error {
+	if objNamespace, objName, err := namer.ObjectName(obj); err == nil {
+		if objName != name {
+			return errors.NewBadRequest("the name of the object does not match the name on the URL")
+		}
+		if len(namespace) > 0 {
+			if len(objNamespace) > 0 && objNamespace != namespace {
+				return errors.NewBadRequest("the namespace of the object does not match the namespace on the request")
+			}
+		}
+	}
+	return nil
 }
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links

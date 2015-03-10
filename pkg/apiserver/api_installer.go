@@ -132,6 +132,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	getter, isGetter := storage.(RESTGetter)
 	deleter, isDeleter := storage.(RESTDeleter)
 	updater, isUpdater := storage.(RESTUpdater)
+	patcher, isPatcher := storage.(RESTPatcher)
 	_, isWatcher := storage.(ResourceWatcher)
 	_, isRedirector := storage.(Redirector)
 
@@ -167,6 +168,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
 		actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
@@ -196,6 +198,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
+			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
@@ -229,6 +232,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
+			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
@@ -278,6 +282,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 				Filter(m).
 				Doc("replace the specified " + kind).
 				Operation("replace" + kind).
+				Reads(versionedObject)
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "PATCH": // Partially update a resource
+			route := ws.PATCH(action.Path).To(PatchResource(patcher, ctxFn, action.Namer, mapping.Codec, a.group.Typer, resource, admit)).
+				Filter(m).
+				Doc("partially update the specified " + kind).
+				// TODO: toggle patch strategy by content type
+				// Consumes("application/merge-patch+json", "application/json-patch+json").
+				Operation("patch" + kind).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
