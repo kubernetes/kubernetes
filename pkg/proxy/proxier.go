@@ -44,6 +44,7 @@ type serviceInfo struct {
 	publicIPs           []string // TODO: make this net.IP
 	sessionAffinityType api.AffinityType
 	stickyMaxAgeMinutes int
+	externalLoadBalancer bool
 }
 
 // How long we wait for a connection to a backend in seconds
@@ -319,16 +320,19 @@ type Proxier struct {
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		glog.Errorf("Can't proxy only on localhost - iptables can't do it")
 		return nil
 	}
 
-	hostIP, err := util.ChooseHostInterface()
-	if err != nil {
-		glog.Errorf("Failed to select a host interface: %v", err)
-		return nil
+	if hostIP == nil {
+		var err error
+		hostIP, err = util.ChooseHostInterface()
+		if err != nil {
+			glog.Errorf("Failed to select a host interface: %v", err)
+			return nil
+		}
 	}
 	glog.Infof("Setting Proxy IP to %v", hostIP)
 	return CreateProxier(loadBalancer, listenIP, iptables, hostIP)
@@ -512,6 +516,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			info.portalPort = servicePort.Port
 			info.publicIPs = service.Spec.PublicIPs
 			info.sessionAffinityType = service.Spec.SessionAffinity
+			info.externalLoadBalancer = service.Spec.CreateExternalLoadBalancer
 			glog.V(4).Infof("info: %+v", info)
 
 			err = proxier.openPortal(serviceName, info)
@@ -551,6 +556,9 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if info.sessionAffinityType != service.Spec.SessionAffinity {
 		return false
 	}
+	if info.externalLoadBalancer != service.Spec.CreateExternalLoadBalancer {
+		return false
+	}
 	return true
 }
 
@@ -571,12 +579,33 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 	if err != nil {
 		return err
 	}
+
+	publicIpCount := 0
 	for _, publicIP := range info.publicIPs {
-		err = proxier.openOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		ip := net.ParseIP(publicIP)
+		if ip == nil {
+			glog.V(2).Info("Skipping non-address public endpoint: %s", publicIP)
+			continue
+		}
+		publicIpCount++
+		err = proxier.openOnePortal(ip, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 		if err != nil {
 			return err
 		}
 	}
+
+	// We have an external load balancer, but no specific IPs.
+	// This indicates that the load balancer is acting as TCP relay, targeting the machine's IP.
+	// We also treat DNS names the same way, because DNS names are used when we have multiple
+	// addresses for the external load balancer (e.g. AWS ELB)
+	if info.externalLoadBalancer && publicIpCount == 0 {
+		glog.V(2).Info("Forwarding node public ip for service:", service.Name)
+		err = proxier.openOnePortal(proxier.hostIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

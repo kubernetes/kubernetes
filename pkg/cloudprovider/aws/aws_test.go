@@ -24,6 +24,7 @@ import (
 
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/ec2"
+	"github.com/mitchellh/goamz/elb"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
@@ -208,6 +209,46 @@ func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVol
 }
 
 func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DescribeLoadBalancers(region string, name string) (map[string]elb.LoadBalancer, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateLoadBalancer(region string, request *elb.CreateLoadBalancer) (string, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) RegisterInstancesWithLoadBalancer(region string, request *elb.RegisterInstancesWithLoadBalancer) ([]elb.Instance, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DeregisterInstancesFromLoadBalancer(region string, request *elb.DeregisterInstancesFromLoadBalancer) ([]elb.Instance, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DeleteLoadBalancer(region string, name string) error {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DescribeSubnets(subnetIds []string, filterVpcId string) ([]ec2.Subnet, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DescribeSecurityGroups(groupIds []string, filterName string, filterVpcId string) ([]ec2.SecurityGroupInfo, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateSecurityGroup(vpcId string, name string, description string) (string, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(securityGroupId string, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) ListVpcs(filterName string) ([]ec2.VPC, error) {
 	panic("Not implemented")
 }
 
