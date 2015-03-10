@@ -104,6 +104,39 @@ coreos:
         ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
         ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
         ExecStart=/opt/bin/flanneld
+    - name: docker-cache.service
+      command: start
+      content: |
+        [Unit]
+        Description=Docker cache proxy
+        Requires=early-docker.service
+        After=early-docker.service
+        Before=early-docker.target
+
+        [Service]
+        Restart=always
+        TimeoutStartSec=0
+        RestartSec=5
+        Environment="TMPDIR=/var/tmp/"
+        Environment="DOCKER_HOST=unix:///var/run/early-docker.sock"
+        ExecStartPre=-/usr/bin/docker kill docker-registry
+        ExecStartPre=-/usr/bin/docker rm docker-registry
+        ExecStartPre=/usr/bin/docker pull quay.io/devops/docker-registry:latest
+        ExecStart=/usr/bin/docker run --rm --net host --name docker-registry \
+            -e STANDALONE=false \
+            -e MIRROR_SOURCE=https://registry-1.docker.io \
+            -e MIRROR_SOURCE_INDEX=https://index.docker.io \
+            -e MIRROR_TAGS_CACHE_TTL=1800 \
+            quay.io/devops/docker-registry:latest
+    - name: docker.service
+      drop-ins:
+        - name: 51-docker-mirror.conf
+          content: |
+            [Unit]
+            Requires=docker-cache.service
+            After=docker-cache.service
+            [Service]
+            Environment=DOCKER_OPTS='--registry-mirror=http://$private_ipv4:5000'
     - name: kube-apiserver.service
       command: start
       content: |

@@ -22,7 +22,7 @@ coreos:
       command: start
       content: |
         [Unit]
-        After=network-online.target 
+        After=network-online.target
         Wants=network-online.target
         Description=flannel is an etcd backed overlay network for containers
 
@@ -34,20 +34,11 @@ coreos:
         ExecStart=/opt/bin/flanneld -etcd-endpoints http://<master-private-ip>:4001
     - name: docker.service
       command: start
-      content: |
-        [Unit]
-        After=flannel.service
-        Wants=flannel.service
-        Description=Docker Application Container Engine
-        Documentation=http://docs.docker.io
-
-        [Service]
-        EnvironmentFile=/run/flannel/subnet.env
-        ExecStartPre=/bin/mount --make-rprivate /
-        ExecStart=/usr/bin/docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=overlay -H fd://
-
-        [Install]
-        WantedBy=multi-user.target
+      drop-ins:
+        - name: 51-docker-mirror.conf
+          content: |
+            [Service]
+            Environment=DOCKER_OPTS='--registry-mirror=http://<master-private-ip>:5000'
     - name: setup-network-environment.service
       command: start
       content: |
