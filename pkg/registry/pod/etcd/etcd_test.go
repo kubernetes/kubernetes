@@ -1090,28 +1090,28 @@ func TestEtcdCreateBinding(t *testing.T) {
 		"badKind": {
 			binding: api.Binding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine", Kind: "unknown"},
+				Target:     api.ObjectReference{Name: "machine1", Kind: "unknown"},
 			},
 			errOK: func(err error) bool { return errors.IsInvalid(err) },
 		},
 		"emptyKind": {
 			binding: api.Binding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine"},
+				Target:     api.ObjectReference{Name: "machine2"},
 			},
 			errOK: func(err error) bool { return err == nil },
 		},
 		"kindNode": {
 			binding: api.Binding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine", Kind: "Node"},
+				Target:     api.ObjectReference{Name: "machine3", Kind: "Node"},
 			},
 			errOK: func(err error) bool { return err == nil },
 		},
 		"kindMinion": {
 			binding: api.Binding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine", Kind: "Minion"},
+				Target:     api.ObjectReference{Name: "machine4", Kind: "Minion"},
 			},
 			errOK: func(err error) bool { return err == nil },
 		},
@@ -1124,13 +1124,22 @@ func TestEtcdCreateBinding(t *testing.T) {
 			},
 			E: tools.EtcdErrorNotFound,
 		}
-		fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
+		path := fmt.Sprintf("/registry/nodes/%v/boundpods", test.binding.Target.Name)
+		fakeClient.Set(path, runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 		if _, err := registry.Create(ctx, validNewPod()); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
+		fakeClient.Set(path, runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 		if _, err := bindingRegistry.Create(ctx, &test.binding); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
+		} else if err == nil {
+			// If bind succeeded, verify Host field in pod's Spec.
+			pod, err := registry.Get(ctx, validNewPod().ObjectMeta.Name)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", k, err)
+			} else if pod.(*api.Pod).Spec.Host != test.binding.Target.Name {
+				t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.Host, test.binding.Target.Name)
+			}
 		}
 	}
 }

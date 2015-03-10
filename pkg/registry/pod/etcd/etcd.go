@@ -173,9 +173,10 @@ func (r *BindingREST) setPodHostTo(ctx api.Context, podID, oldMachine, machine s
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
-		if pod.Status.Host != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.Name, pod.Status.Host)
+		if pod.Spec.Host != oldMachine || pod.Status.Host != oldMachine {
+			return nil, fmt.Errorf("pod %v is already assigned to host %v or %v", pod.Name, pod.Spec.Host, pod.Status.Host)
 		}
+		pod.Spec.Host = machine
 		pod.Status.Host = machine
 		finalPod = pod
 		return pod, nil
