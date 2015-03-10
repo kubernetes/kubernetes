@@ -2,7 +2,7 @@ version: v1beta2
 id: fluentd-to-elasticsearch
 containers:
   - name: fluentd-es
-    image: kubernetes/fluentd-elasticsearch:1.0
+    image: kubernetes/fluentd-elasticsearch:1.1
     volumeMounts:
       - name: containers
         mountPath: /var/lib/docker/containers
