@@ -33,8 +33,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/docker/docker/pkg/units"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -472,16 +472,16 @@ func printNodeList(list *api.NodeList, w io.Writer) error {
 
 func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 	claimRefUID := ""
-	if pv.ClaimRef != nil {
-		claimRefUID += pv.ClaimRef.Name
+	if pv.Spec.ClaimRef != nil {
+		claimRefUID += pv.Spec.ClaimRef.Name
 		claimRefUID += " / "
-		claimRefUID += string(pv.ClaimRef.UID)
+		claimRefUID += string(pv.Spec.ClaimRef.UID)
 	}
 
 	modes := volume.GetAccessModeType(pv.Spec.Source)
 	modesStr := volume.GetAccessModesAsString(modes)
 
-	aQty := pv.Spec.Resources[api.ResourceStorage]
+	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
 
 	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", pv.Name, pv.Labels, aSize, modesStr, pv.Status.Phase, claimRefUID)

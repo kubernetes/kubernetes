@@ -21,20 +21,27 @@ import (
 )
 
 func GetAccessModesAsString(modes []api.AccessModeType) string {
-
 	modesAsString := ""
 
 	if contains(modes, api.ReadWriteOnce) {
-		modesAsString += "RWO"
+		appendAccessMode(modesAsString, "RWO")
 	}
 	if contains(modes, api.ReadOnlyMany) {
-		modesAsString += "ROX"
+		appendAccessMode(modesAsString, "ROX")
 	}
 	if contains(modes, api.ReadWriteMany) {
-		modesAsString += "RWX"
+		appendAccessMode(modesAsString, "RWX")
 	}
 
 	return modesAsString
+}
+
+func appendAccessMode(modes, mode string) string {
+	if modes != "" {
+		modes += ","
+	}
+	modes += mode
+	return modes
 }
 
 func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
@@ -46,8 +53,8 @@ func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
 	return false
 }
 
+// TODO refactor this into a volume plugin interface method so that we're not hard-coding any volume names here
 func GetAccessModeType(source api.PersistentVolumeSource) []api.AccessModeType {
-
 	if source.AWSElasticBlockStore != nil || source.HostPath != nil {
 		return []api.AccessModeType{api.ReadWriteOnce}
 	}
