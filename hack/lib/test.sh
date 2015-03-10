@@ -50,3 +50,32 @@ kube::test::get_object_assert() {
       return 1
   fi
 }
+
+kube::test::describe_object_assert() {
+  local resource=$1
+  local object=$2
+  local matches=${@:3}
+
+  result=$(eval kubectl describe "${kube_flags[@]}" $resource $object)
+
+  for match in ${matches}; do
+    if [[ ! $(echo "$result" | grep ${match}) ]]; then
+      echo ${bold}${red}
+      echo "FAIL!"
+      echo "Describe $resource $object"
+      echo "  Expected Match: $match"
+      echo "  Not found in:"
+      echo "$result"
+      echo ${reset}${red}
+      caller
+      echo ${reset}
+      return 1
+    fi
+  done
+
+  echo -n ${green}
+  echo "Successful describe $resource $object:"
+  echo "$result"
+  echo -n ${reset}
+  return 0
+}
