@@ -349,6 +349,7 @@ function kube-up {
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
         echo "readonly PORTAL_NET='${PORTAL_NET}'"
+        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"

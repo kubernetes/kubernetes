@@ -314,6 +314,7 @@ function kube-up {
     echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
+    echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"    
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
