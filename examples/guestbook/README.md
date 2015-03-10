@@ -361,6 +361,8 @@ if (isset($_GET['cmd']) === true) {
 Just like the others, you want a service to group your frontend pods.
 The service is described in the file `examples/guestbook/frontend-service.json`:
 
+**NOTE** This json snippet has been modified, in that it adds the publicIPs field for illustration purposes only.
+
 ```js
 {
   "id": "frontend",
@@ -368,6 +370,7 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
   "apiVersion": "v1beta1",
   "port": 8000,
   "containerPort": "http-server",
+  "publicIPs":["10.11.22.33"],
   "selector": {
     "name": "frontend"
   },
@@ -377,6 +380,10 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
   "createExternalLoadBalancer": true
 }
 ```
+
+If running a single node local setup, or single VM, you don't need `createExternalLoadBalancer`, nor do you need `publicIPs`.
+Read the *Accessing the guestbook site externally* section below for details and set 10.11.22.33 accordingly (for now, you can 
+delete these parameters or run this - either way it won't hurt anything to have both parameters the way they are).
 
 ```shell
 $ kubectl create -f examples/guestbook/frontend-service.json
@@ -412,7 +419,14 @@ For GCE details about limiting traffic to specific sources, see the [GCE firewal
 [cloud-console]: https://console.developer.google.com
 [gce-firewall-docs]: https://cloud.google.com/compute/docs/networking#firewalls
 
-In other environments, you can get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
+### Accessing the guestbook site externally
+
+The pods that we have set up are reachable through the frontend service, but you'll notice that 10.0.93.211 (the IP of the frontend service) is unavailable from outside of kubernetes. 
+Of course, if you are running kubernetes minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:8000... but the beloved **localhost** solution obviously doesn't work in any real world scenario.
+
+Unless you have access to the `createExternalLoadBalancer` feature (cloud provider specific), you will want to set up a **publicIP on a minion**, so that the service can be accessed from outside of the internal kubernetes network. This is quite easy.  You simply look at you're list of kubelet IP addresses, and update the service file to include a `publicIPs` string, which is mapped to an IP address of any number of your existing kubelets.  This will allow all you're kubelets to act as external entry points to the service (translation: this will allow you to browse the guestbook site at your kubelet IP address from your browser).
+
+If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
 
 And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:8000.  
 
