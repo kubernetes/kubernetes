@@ -155,7 +155,7 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
 	if glog.V(2) {
-		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo))
+		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
 	}
 }
 
