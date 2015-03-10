@@ -71,18 +71,13 @@ type rawContainerHandler struct {
 	externalMounts []mount
 }
 
-func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory) (container.ContainerHandler, error) {
+func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
 	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
 	for key, val := range cgroupSubsystems.MountPoints {
 		cgroupPaths[key] = path.Join(val, name)
 	}
 
-	// TODO(vmarmol): Get from factory.
-	fsInfo, err := fs.NewFsInfo()
-	if err != nil {
-		return nil, err
-	}
 	cHints, err := getContainerHintsFromFile(*argContainerHints)
 	if err != nil {
 		return nil, err

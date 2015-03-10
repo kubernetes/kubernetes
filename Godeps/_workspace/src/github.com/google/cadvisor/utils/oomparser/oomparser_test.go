@@ -29,7 +29,7 @@ const systemLogFile = "systemOomExampleLog.txt"
 
 func createExpectedContainerOomInstance(t *testing.T) *OomInstance {
 	const longForm = "Jan _2 15:04:05 2006"
-	deathTime, err := time.Parse(longForm, "Jan  5 15:19:27 2015")
+	deathTime, err := time.ParseInLocation(longForm, "Jan  5 15:19:27 2015", time.Local)
 	if err != nil {
 		t.Fatalf("could not parse expected time when creating expected container oom instance. Had error %v", err)
 		return nil
@@ -44,7 +44,7 @@ func createExpectedContainerOomInstance(t *testing.T) *OomInstance {
 
 func createExpectedSystemOomInstance(t *testing.T) *OomInstance {
 	const longForm = "Jan _2 15:04:05 2006"
-	deathTime, err := time.Parse(longForm, "Jan 28 19:58:45 2015")
+	deathTime, err := time.ParseInLocation(longForm, "Jan 28 19:58:45 2015", time.Local)
 	if err != nil {
 		t.Fatalf("could not parse expected time when creating expected system oom instance. Had error %v", err)
 		return nil
@@ -86,7 +86,7 @@ func TestGetProcessNamePid(t *testing.T) {
 	}
 
 	const longForm = "Jan _2 15:04:05 2006"
-	correctTime, err := time.Parse(longForm, "Jan 21 22:01:49 2015")
+	correctTime, err := time.ParseInLocation(longForm, "Jan 21 22:01:49 2015", time.Local)
 	couldParseLine, err = getProcessNamePid(endLine, currentOomInstance)
 	if err != nil {
 		t.Errorf("good line fed to getProcessNamePid should yield no error, but had error %v", err)
@@ -146,6 +146,7 @@ func helpTestAnalyzeLines(oomCheckInstance *OomInstance, sysFile string, t *test
 		if *oomCheckInstance != *oomInstance {
 			t.Errorf("wrong instance returned. Expected %v and got %v",
 				oomCheckInstance, oomInstance)
+			t.Errorf("Container of one was %v and the other %v", oomCheckInstance.ContainerName, oomInstance.ContainerName)
 		}
 	case <-timeout:
 		t.Error(

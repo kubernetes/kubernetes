@@ -228,7 +228,7 @@ type LoadStats struct {
 	NrStopped uint64 `json:"nr_stopped"`
 
 	// Number of tasks in uninterruptible state
-	NrUinterruptible uint64 `json:"nr_uninterruptible"`
+	NrUninterruptible uint64 `json:"nr_uninterruptible"`
 
 	// Number of tasks waiting on IO
 	NrIoWait uint64 `json:"nr_io_wait"`

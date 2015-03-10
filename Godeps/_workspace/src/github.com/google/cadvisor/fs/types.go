@@ -53,4 +53,13 @@ type FsInfo interface {
 
 	// Returns the block device info of the filesystem on which 'dir' resides.
 	GetDirFsDevice(dir string) (*DeviceInfo, error)
+
+	// Returns the device name associated with a particular label.
+	GetDeviceForLabel(label string) (string, error)
+
+	// Returns all labels associated with a particular device name.
+	GetLabelsForDevice(device string) ([]string, error)
+
+	// Returns the mountpoint associated with a particular device.
+	GetMountpointForDevice(device string) (string, error)
 }

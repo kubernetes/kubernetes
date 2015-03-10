@@ -20,6 +20,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
+	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 )
 
@@ -29,6 +30,9 @@ type rawFactory struct {
 
 	// Information about the cgroup subsystems.
 	cgroupSubsystems *libcontainer.CgroupSubsystems
+
+	// Information about mounted filesystems.
+	fsInfo fs.FsInfo
 }
 
 func (self *rawFactory) String() string {
@@ -36,7 +40,7 @@ func (self *rawFactory) String() string {
 }
 
 func (self *rawFactory) NewContainerHandler(name string) (container.ContainerHandler, error) {
-	return newRawContainerHandler(name, self.cgroupSubsystems, self.machineInfoFactory)
+	return newRawContainerHandler(name, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo)
 }
 
 // The raw factory can handle any container.
@@ -44,7 +48,7 @@ func (self *rawFactory) CanHandle(name string) (bool, error) {
 	return true, nil
 }
 
-func Register(machineInfoFactory info.MachineInfoFactory) error {
+func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo) error {
 	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
@@ -56,6 +60,7 @@ func Register(machineInfoFactory info.MachineInfoFactory) error {
 	glog.Infof("Registering Raw factory")
 	factory := &rawFactory{
 		machineInfoFactory: machineInfoFactory,
+		fsInfo:             fsInfo,
 		cgroupSubsystems:   &cgroupSubsystems,
 	}
 	container.RegisterContainerHandlerFactory(factory)

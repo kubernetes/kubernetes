@@ -82,16 +82,11 @@ func newDockerContainerHandler(
 	client *docker.Client,
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
+	fsInfo fs.FsInfo,
 	dockerRootDir string,
 	usesAufsDriver bool,
 	cgroupSubsystems *containerLibcontainer.CgroupSubsystems,
 ) (container.ContainerHandler, error) {
-	// TODO(vmarmol): Get from factory.
-	fsInfo, err := fs.NewFsInfo()
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the cgroup paths.
 	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
 	for key, val := range cgroupSubsystems.MountPoints {

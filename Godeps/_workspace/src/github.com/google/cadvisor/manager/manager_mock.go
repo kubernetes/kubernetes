@@ -84,3 +84,8 @@ func (c *ManagerMock) GetVersionInfo() (*info.VersionInfo, error) {
 	args := c.Called()
 	return args.Get(0).(*info.VersionInfo), args.Error(1)
 }
+
+func (c *ManagerMock) GetFsInfo() ([]v2.FsInfo, error) {
+	args := c.Called()
+	return args.Get(0).([]v2.FsInfo), args.Error(1)
+}
