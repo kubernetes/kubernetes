@@ -197,6 +197,7 @@ func (i *recorderImpl) Event(object runtime.Object, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
+		return
 	}
 
 	e := makeEvent(ref, reason, message)
