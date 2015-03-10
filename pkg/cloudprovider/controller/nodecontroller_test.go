@@ -28,7 +28,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -64,9 +66,11 @@ func (m *FakeNodeHandler) Create(node *api.Node) (*api.Node, error) {
 		}
 	}
 	if m.CreateHook == nil || m.CreateHook(m, node) {
-		nodeCopy := *node
-		m.CreatedNodes = append(m.CreatedNodes, &nodeCopy)
-		return node, nil
+		nodeWithSelfLink := *node
+		nodeWithSelfLink.SelfLink = testapi.SelfLink("nodes", node.Name)
+		m.CreatedNodes = append(m.CreatedNodes, &nodeWithSelfLink)
+		nodeCopy := nodeWithSelfLink
+		return &nodeCopy, nil
 	} else {
 		return nil, errors.New("Create error.")
 	}
@@ -136,17 +140,17 @@ func TestRegisterNodes(t *testing.T) {
 		expectedRequestCount int
 		expectedCreateCount  int
 		expectedFail         bool
+		expectedEventReason  []string
 	}{
 		{
 			// Register two nodes normally.
-			machines: []string{"node0", "node1"},
-			fakeNodeHandler: &FakeNodeHandler{
-				CreateHook: func(fake *FakeNodeHandler, node *api.Node) bool { return true },
-			},
+			machines:             []string{"node0", "node1"},
+			fakeNodeHandler:      &FakeNodeHandler{},
 			retryCount:           1,
 			expectedRequestCount: 2,
 			expectedCreateCount:  2,
 			expectedFail:         false,
+			expectedEventReason:  []string{"created", "created"},
 		},
 		{
 			// Canonicalize node names.
@@ -163,6 +167,7 @@ func TestRegisterNodes(t *testing.T) {
 			expectedRequestCount: 2,
 			expectedCreateCount:  2,
 			expectedFail:         false,
+			expectedEventReason:  []string{"created", "created"},
 		},
 		{
 			// No machine to register.
@@ -174,6 +179,7 @@ func TestRegisterNodes(t *testing.T) {
 			expectedRequestCount: 0,
 			expectedCreateCount:  0,
 			expectedFail:         false,
+			expectedEventReason:  []string{},
 		},
 		{
 			// Fail the first two requests.
@@ -190,6 +196,7 @@ func TestRegisterNodes(t *testing.T) {
 			expectedRequestCount: 4,
 			expectedCreateCount:  2,
 			expectedFail:         false,
+			expectedEventReason:  []string{"created", "created"},
 		},
 		{
 			// One node already exists
@@ -207,6 +214,7 @@ func TestRegisterNodes(t *testing.T) {
 			expectedRequestCount: 2,
 			expectedCreateCount:  1,
 			expectedFail:         false,
+			expectedEventReason:  []string{"created"},
 		},
 		{
 			// The first node always fails.
@@ -223,6 +231,7 @@ func TestRegisterNodes(t *testing.T) {
 			expectedRequestCount: 3, // 2 for node0, 1 for node1
 			expectedCreateCount:  1,
 			expectedFail:         true,
+			expectedEventReason:  []string{"created"},
 		},
 	}
 
@@ -232,6 +241,17 @@ func TestRegisterNodes(t *testing.T) {
 			nodes.Items = append(nodes.Items, *newNode(machine))
 		}
 		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
+		called := make(chan struct{})
+		calledCount := 0
+		events := record.GetEvents(func(e *api.Event) {
+			if e, a := item.expectedEventReason[calledCount], e.Reason; e != a {
+				t.Errorf("expected event reason %v, but got %v.", e, a)
+			}
+			calledCount += 1
+			if len(item.expectedEventReason) == calledCount {
+				close(called)
+			}
+		})
 		err := nodeController.RegisterNodes(&nodes, item.retryCount, time.Millisecond)
 		if !item.expectedFail && err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -245,6 +265,10 @@ func TestRegisterNodes(t *testing.T) {
 		if len(item.fakeNodeHandler.CreatedNodes) != item.expectedCreateCount {
 			t.Errorf("expected %v nodes, but got %v.", item.expectedCreateCount, item.fakeNodeHandler.CreatedNodes)
 		}
+		if len(item.expectedEventReason) != 0 {
+			<-called
+		}
+		events.Stop()
 	}
 }
 
@@ -370,6 +394,7 @@ func TestSyncCloud(t *testing.T) {
 		expectedNameCreated  []string
 		expectedExtIDCreated []string
 		expectedDeleted      []string
+		expectedEventReason  []string
 	}{
 		{
 			// 1 existing node, 1 cloud nodes: do nothing.
@@ -388,6 +413,7 @@ func TestSyncCloud(t *testing.T) {
 			expectedNameCreated:  []string{},
 			expectedExtIDCreated: []string{},
 			expectedDeleted:      []string{},
+			expectedEventReason:  []string{},
 		},
 		{
 			// 1 existing node, 2 cloud nodes: create 1.
@@ -406,11 +432,12 @@ func TestSyncCloud(t *testing.T) {
 			expectedNameCreated:  []string{"node1"},
 			expectedExtIDCreated: []string{"ext-node1"},
 			expectedDeleted:      []string{},
+			expectedEventReason:  []string{"created"},
 		},
 		{
 			// 2 existing nodes, 1 cloud node: delete 1.
 			fakeNodeHandler: &FakeNodeHandler{
-				Existing: []*api.Node{newNode("node0"), newNode("node1")},
+				Existing: []*api.Node{newNodeWithSelfLink("node0"), newNodeWithSelfLink("node1")},
 			},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0"},
@@ -424,11 +451,12 @@ func TestSyncCloud(t *testing.T) {
 			expectedNameCreated:  []string{},
 			expectedExtIDCreated: []string{},
 			expectedDeleted:      []string{"node1"},
+			expectedEventReason:  []string{"deleted"},
 		},
 		{
 			// 1 existing node, 3 cloud nodes but only 2 match regex: delete 1.
 			fakeNodeHandler: &FakeNodeHandler{
-				Existing: []*api.Node{newNode("node0")},
+				Existing: []*api.Node{newNodeWithSelfLink("node0")},
 			},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0", "node1", "fake"},
@@ -443,11 +471,23 @@ func TestSyncCloud(t *testing.T) {
 			expectedNameCreated:  []string{"node1"},
 			expectedExtIDCreated: []string{"ext-node1"},
 			expectedDeleted:      []string{},
+			expectedEventReason:  []string{"created"},
 		},
 	}
 
 	for _, item := range table {
 		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute)
+		called := make(chan struct{})
+		calledCount := 0
+		events := record.GetEvents(func(e *api.Event) {
+			if e, a := item.expectedEventReason[calledCount], e.Reason; e != a {
+				t.Errorf("expected event reason %v, but got %v.", e, a)
+			}
+			calledCount += 1
+			if len(item.expectedEventReason) == calledCount {
+				close(called)
+			}
+		})
 		if err := nodeController.SyncCloud(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -466,6 +506,10 @@ func TestSyncCloud(t *testing.T) {
 		if !reflect.DeepEqual(item.expectedDeleted, nodes) {
 			t.Errorf("expected node list %+v, got %+v", item.expectedDeleted, nodes)
 		}
+		if len(item.expectedEventReason) != 0 {
+			<-called
+		}
+		events.Stop()
 	}
 }
 
@@ -548,12 +592,28 @@ func TestSyncCloudDeletePods(t *testing.T) {
 
 func TestHealthCheckNode(t *testing.T) {
 	table := []struct {
-		node               *api.Node
-		fakeKubeletClient  *FakeKubeletClient
-		expectedConditions []api.NodeCondition
+		node                *api.Node
+		fakeKubeletClient   *FakeKubeletClient
+		expectedConditions  []api.NodeCondition
+		expectedSent        bool
+		expectedEventReason string
 	}{
 		{
-			node: newNode("node0"),
+			// Node is ready, and current probe is ready.
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "node0"},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:               api.NodeReady,
+							Status:             api.ConditionFull,
+							Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+							LastProbeTime:      util.Now(),
+							LastTransitionTime: util.Now(),
+						},
+					},
+				},
+			},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Success,
 				Err:    nil,
@@ -565,9 +625,55 @@ func TestHealthCheckNode(t *testing.T) {
 					Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 				},
 			},
+			expectedSent:        false,
+			expectedEventReason: "",
 		},
 		{
-			node: newNode("node0"),
+			// Node is not ready, and current probe is ready.
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "node0", SelfLink: testapi.SelfLink("nodes", "node0")},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:               api.NodeReady,
+							Status:             api.ConditionNone,
+							Reason:             "Node health check failed: kubelet /healthz endpoint returns not ok",
+							LastProbeTime:      util.Now(),
+							LastTransitionTime: util.Now(),
+						},
+					},
+				},
+			},
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Success,
+				Err:    nil,
+			},
+			expectedConditions: []api.NodeCondition{
+				{
+					Type:   api.NodeReady,
+					Status: api.ConditionFull,
+					Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
+				},
+			},
+			expectedSent:        true,
+			expectedEventReason: "becomesReady",
+		},
+		{
+			// Node is ready, and current probe is not ready.
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "node0", SelfLink: testapi.SelfLink("nodes", "node0")},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:               api.NodeReady,
+							Status:             api.ConditionFull,
+							Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+							LastProbeTime:      util.Now(),
+							LastTransitionTime: util.Now(),
+						},
+					},
+				},
+			},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
 				Err:    nil,
@@ -579,8 +685,41 @@ func TestHealthCheckNode(t *testing.T) {
 					Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 				},
 			},
+			expectedSent:        true,
+			expectedEventReason: "becomesUnready",
 		},
 		{
+			// Node is not ready, and current probe is not ready.
+			node: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "node0"},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:               api.NodeReady,
+							Status:             api.ConditionNone,
+							Reason:             "Node health check failed: kubelet /healthz endpoint returns not ok",
+							LastProbeTime:      util.Now(),
+							LastTransitionTime: util.Now(),
+						},
+					},
+				},
+			},
+			fakeKubeletClient: &FakeKubeletClient{
+				Status: probe.Failure,
+				Err:    nil,
+			},
+			expectedConditions: []api.NodeCondition{
+				{
+					Type:   api.NodeReady,
+					Status: api.ConditionNone,
+					Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
+				},
+			},
+			expectedSent:        false,
+			expectedEventReason: "",
+		},
+		{
+			// Node is not ready, and current probe has error.
 			node: newNode("node0"),
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
@@ -593,11 +732,20 @@ func TestHealthCheckNode(t *testing.T) {
 					Reason: "Node health check error: Error",
 				},
 			},
+			expectedSent:        false,
+			expectedEventReason: "",
 		},
 	}
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient, 10, time.Minute)
+		called := make(chan struct{})
+		events := record.GetEvents(func(e *api.Event) {
+			if e, a := item.expectedEventReason, e.Reason; e != a {
+				t.Errorf("expected event reason %v, but got %v.", e, a)
+			}
+			close(called)
+		})
 		conditions := nodeController.DoCheck(item.node)
 		for i := range conditions {
 			if conditions[i].LastTransitionTime.IsZero() {
@@ -612,6 +760,10 @@ func TestHealthCheckNode(t *testing.T) {
 		if !reflect.DeepEqual(item.expectedConditions, conditions) {
 			t.Errorf("expected conditions %+v, got %+v", item.expectedConditions, conditions)
 		}
+		if item.expectedSent {
+			<-called
+		}
+		events.Stop()
 	}
 }
 
@@ -1095,6 +1247,10 @@ func TestSyncNodeStatus(t *testing.T) {
 
 func newNode(name string) *api.Node {
 	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
+}
+
+func newNodeWithSelfLink(name string) *api.Node {
+	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name, SelfLink: testapi.SelfLink("nodes", name)}}
 }
 
 func newPod(name, host string) *api.Pod {

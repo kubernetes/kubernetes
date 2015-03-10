@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -90,6 +91,9 @@ func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus 
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
+
+	record.StartRecording(s.kubeClient.Events(""), api.EventSource{Component: "nodecontroller"})
+
 	if s.isRunningCloudProvider() {
 		if syncNodeList {
 			nodes, err = s.GetCloudNodesWithSpec()
@@ -148,10 +152,14 @@ func (s *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, retr
 			if registered.Has(node.Name) {
 				continue
 			}
-			_, err := s.kubeClient.Nodes().Create(&node)
-			if err == nil || apierrors.IsAlreadyExists(err) {
+			createdNode, err := s.kubeClient.Nodes().Create(&node)
+			if err == nil {
 				registered.Insert(node.Name)
-				glog.Infof("Registered node in registry: %s", node.Name)
+				record.Eventf(createdNode, "created", "node %s created", createdNode.Name)
+				glog.Infof("Registered node %s in registry", node.Name)
+			} else if apierrors.IsAlreadyExists(err) {
+				registered.Insert(node.Name)
+				glog.Infof("Node %s already exists in registry", node.Name)
 			} else {
 				glog.Errorf("Error registering node %s, retrying: %s", node.Name, err)
 			}
@@ -189,9 +197,11 @@ func (s *NodeController) SyncCloud() error {
 	for _, node := range matches.Items {
 		if _, ok := nodeMap[node.Name]; !ok {
 			glog.Infof("Create node in registry: %s", node.Name)
-			_, err = s.kubeClient.Nodes().Create(&node)
+			createdNode, err := s.kubeClient.Nodes().Create(&node)
 			if err != nil {
 				glog.Errorf("Create node error: %s", node.Name)
+			} else {
+				record.Eventf(createdNode, "created", "node %s created", createdNode.Name)
 			}
 		}
 		delete(nodeMap, node.Name)
@@ -203,6 +213,8 @@ func (s *NodeController) SyncCloud() error {
 		err = s.kubeClient.Nodes().Delete(nodeID)
 		if err != nil {
 			glog.Errorf("Delete node error: %s", nodeID)
+		} else {
+			record.Eventf(nodeMap[nodeID], "deleted", "node %s deleted", nodeID)
 		}
 		s.deletePods(nodeID)
 	}
@@ -329,6 +341,11 @@ func (s *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 		// Set transition time to Now() if node status changes or `oldReadyCondition` is nil, which
 		// happens only when the node is checked for the first time.
 		newReadyCondition.LastTransitionTime = util.Now()
+		if newReadyCondition.Status == api.ConditionFull {
+			record.Eventf(node, "becomesReady", "node condition Ready changes to None")
+		} else {
+			record.Eventf(node, "becomesUnready", "node condition Ready changes to Full")
+		}
 	}
 
 	if newReadyCondition.Status != api.ConditionFull {

@@ -46,7 +46,7 @@ func DescriberFor(kind string, c *client.Client) (Describer, bool) {
 	case "Service":
 		return &ServiceDescriber{c}, true
 	case "Minion", "Node":
-		return &MinionDescriber{c}, true
+		return &NodeDescriber{c}, true
 	case "LimitRange":
 		return &LimitRangeDescriber{c}, true
 	case "ResourceQuota":
@@ -283,14 +283,14 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	})
 }
 
-// MinionDescriber generates information about a minion.
-type MinionDescriber struct {
+// NodeDescriber generates information about a node.
+type NodeDescriber struct {
 	client.Interface
 }
 
-func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
+func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	mc := d.Nodes()
-	minion, err := mc.Get(name)
+	node, err := mc.Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -307,13 +307,14 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 		pods = append(pods, pod)
 	}
 
-	events, _ := d.Events(namespace).Search(minion)
+	// Use api.Namespace for event search: node really doesn't have a namespace.
+	events, _ := d.Events(api.NamespaceNone).Search(node)
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", minion.Name)
-		if len(minion.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
-			for _, c := range minion.Status.Conditions {
+		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
+		if len(node.Status.Conditions) > 0 {
+			fmt.Fprint(out, "Conditions:\n  Kind\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
+			for _, c := range node.Status.Conditions {
 				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,

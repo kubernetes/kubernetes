@@ -144,7 +144,6 @@ var aEvent string = `
   "involvedObject": {
     "kind": "Minion",
     "name": "a",
-    "namespace": "default",
     "apiVersion": "v1beta1",
   }%s
 }

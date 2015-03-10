@@ -25,11 +25,20 @@ import (
 // ValidateEvent makes sure that the event makes sense.
 func ValidateEvent(event *api.Event) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if event.Namespace != event.InvolvedObject.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
-	}
+
 	if !util.IsDNSSubdomain(event.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", event.Namespace, ""))
+	}
+	// TODO: event.InvolvedObject is not versioned. References need to be normalizd to internal when converted from external and vice versa.
+	if event.InvolvedObject.Kind == "Minion" || event.InvolvedObject.Kind == "Node" {
+		// Do not check event Namespace with node namespace, they are likely different.
+		if event.InvolvedObject.Namespace != "" {
+			allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "involved node object namespace must be None"))
+		}
+	} else {
+		if event.Namespace != event.InvolvedObject.Namespace {
+			allErrs = append(allErrs, errs.NewFieldInvalid("involvedObject.namespace", event.InvolvedObject.Namespace, "namespace does not match involvedObject"))
+		}
 	}
 	return allErrs
 }
