@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -39,7 +40,8 @@ func (*IgnoredList) IsAnAPIObject() {}
 func TestSelectionPredicate(t *testing.T) {
 	table := map[string]struct {
 		labelSelector, fieldSelector string
-		labels, fields               labels.Set
+		labels                       labels.Set
+		fields                       fields.Set
 		err                          error
 		shouldMatch                  bool
 	}{
@@ -47,21 +49,21 @@ func TestSelectionPredicate(t *testing.T) {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
 			labels:        labels.Set{"name": "foo"},
-			fields:        labels.Set{"uid": "12345"},
+			fields:        fields.Set{"uid": "12345"},
 			shouldMatch:   true,
 		},
 		"B": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
 			labels:        labels.Set{"name": "foo"},
-			fields:        labels.Set{},
+			fields:        fields.Set{},
 			shouldMatch:   false,
 		},
 		"C": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
 			labels:        labels.Set{},
-			fields:        labels.Set{"uid": "12345"},
+			fields:        fields.Set{"uid": "12345"},
 			shouldMatch:   false,
 		},
 		"error": {
@@ -77,14 +79,14 @@ func TestSelectionPredicate(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		parsedField, err := labels.ParseSelector(item.fieldSelector)
+		parsedField, err := fields.ParseSelector(item.fieldSelector)
 		if err != nil {
 			panic(err)
 		}
 		sp := &SelectionPredicate{
 			Label: parsedLabel,
 			Field: parsedField,
-			GetAttrs: func(runtime.Object) (label, field labels.Set, err error) {
+			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
 				return item.labels, item.fields, item.err
 			},
 		}

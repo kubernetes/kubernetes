@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -69,7 +70,7 @@ func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.
 	})
 }
 
-func (r *PodRegistry) WatchPods(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *PodRegistry) WatchPods(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return r.broadcaster.Watch(), nil
 }
 

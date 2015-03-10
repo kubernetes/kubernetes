@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -421,7 +422,7 @@ func TestServiceRegistryList(t *testing.T) {
 		},
 	})
 	registry.List.ResourceVersion = "1"
-	s, _ := storage.List(ctx, labels.Everything(), labels.Everything())
+	s, _ := storage.List(ctx, labels.Everything(), fields.Everything())
 	sl := s.(*api.ServiceList)
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)

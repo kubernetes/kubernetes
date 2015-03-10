@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -81,7 +82,7 @@ func TestEndpointsRegistryList(t *testing.T) {
 		},
 	}
 	ctx := api.NewContext()
-	s, _ := storage.List(ctx, labels.Everything(), labels.Everything())
+	s, _ := storage.List(ctx, labels.Everything(), fields.Everything())
 	sl := s.(*api.EndpointsList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))

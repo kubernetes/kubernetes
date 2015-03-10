@@ -18,6 +18,7 @@ package minion
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -29,5 +30,5 @@ type Registry interface {
 	UpdateMinion(ctx api.Context, minion *api.Node) error
 	GetMinion(ctx api.Context, minionID string) (*api.Node, error)
 	DeleteMinion(ctx api.Context, minionID string) error
-	WatchMinions(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -93,7 +94,7 @@ func (r *Registry) ListControllers(ctx api.Context) (*api.ReplicationControllerL
 }
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
-func (r *Registry) WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *Registry) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selectors are not supported on replication controllers")
 	}
@@ -284,7 +285,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) (*api.Servic
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
-func (r *Registry) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, "service")
 	if err != nil {
 		return nil, err
@@ -329,7 +330,7 @@ func (r *Registry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) er
 }
 
 // WatchEndpoints begins watching for new, changed, or deleted endpoint configurations.
-func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *Registry) WatchEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, "endpoints")
 	if err != nil {
 		return nil, err
@@ -395,7 +396,7 @@ func (r *Registry) DeleteMinion(ctx api.Context, minionID string) error {
 	return nil
 }
 
-func (r *Registry) WatchMinions(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *Registry) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, "node")
 	if err != nil {
 		return nil, err

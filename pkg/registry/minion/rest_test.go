@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -69,7 +70,7 @@ func TestMinionRegistryREST(t *testing.T) {
 		t.Fatalf("delete returned wrong error")
 	}
 
-	list, err := ms.List(ctx, labels.Everything(), labels.Everything())
+	list, err := ms.List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Errorf("got error calling List")
 	}

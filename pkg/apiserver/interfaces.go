@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -38,7 +39,7 @@ type RESTLister interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
 	// List selects resources in the storage which match to the selector.
-	List(ctx api.Context, label, field labels.Selector) (runtime.Object, error)
+	List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error)
 }
 
 type RESTGetter interface {
@@ -100,7 +101,7 @@ type ResourceWatcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // Redirector know how to return a remote resource's location.

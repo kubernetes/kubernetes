@@ -31,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -255,20 +256,26 @@ func (r *Request) RequestURI(uri string) *Request {
 	return r
 }
 
-// ParseSelectorParam parses the given string as a resource label selector.
+// ParseSelectorParam parses the given string as a resource selector.
 // This is a convenience function so you don't have to first check that it's a
 // validly formatted selector.
 func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 	if r.err != nil {
 		return r
 	}
-	var sel labels.Selector
+	var selector string
 	var err error
 	switch paramName {
 	case "labels":
-		sel, err = labels.Parse(item)
+		var lsel labels.Selector
+		if lsel, err = labels.Parse(item); err == nil {
+			selector = lsel.String()
+		}
 	case "fields":
-		sel, err = labels.ParseSelector(item)
+		var fsel fields.Selector
+		if fsel, err = fields.ParseSelector(item); err == nil {
+			selector = fsel.String()
+		}
 	default:
 		err = fmt.Errorf("unknown parameter name '%s'", paramName)
 	}
@@ -276,7 +283,7 @@ func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 		r.err = err
 		return r
 	}
-	return r.setParam(paramName, sel.String())
+	return r.setParam(paramName, selector)
 }
 
 // SelectorParam adds the given selector as a query parameter with the name paramName.
@@ -537,7 +544,6 @@ func (r *Request) DoRaw() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		r.resp, err = client.Do(r.req)
 		if err != nil {
 			return nil, err

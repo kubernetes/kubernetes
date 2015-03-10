@@ -18,6 +18,7 @@ package service
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,7 +31,7 @@ type Registry interface {
 	GetService(ctx api.Context, name string) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
 	UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error)
-	WatchServices(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error)
+	WatchServices(ctx api.Context, labels labels.Selector, fields fields.Selector, resourceVersion string) (watch.Interface, error)
 
 	// TODO: endpoints and their implementation should be separated, setting endpoints should be
 	// supported via the API, and the endpoints-controller should use the API to update endpoints.
