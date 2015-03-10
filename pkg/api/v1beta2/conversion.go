@@ -619,6 +619,9 @@ func init() {
 			if err := s.Convert(&in.Status.Addresses, &out.Status.Addresses, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Status.NodeInfo, &out.Status.NodeInfo, 0); err != nil {
+				return err
+			}
 
 			for _, address := range in.Status.Addresses {
 				if address.Type == newer.NodeLegacyHostIP {
@@ -646,6 +649,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.Status.Addresses, &out.Status.Addresses, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Status.NodeInfo, &out.Status.NodeInfo, 0); err != nil {
 				return err
 			}
 

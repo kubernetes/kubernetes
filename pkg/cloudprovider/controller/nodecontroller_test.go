@@ -124,6 +124,10 @@ func (c *FakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	return api.PodStatusResult{}, errors.New("Not Implemented")
 }
 
+func (c *FakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
+	return api.NodeInfo{}, errors.New("Not Implemented")
+}
+
 func (c *FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return c.Status, c.Err
 }
