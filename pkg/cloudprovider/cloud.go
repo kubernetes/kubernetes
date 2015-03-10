@@ -47,8 +47,8 @@ type TCPLoadBalancer interface {
 	// TCPLoadBalancerExists returns whether the specified load balancer exists.
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	TCPLoadBalancerExists(name, region string) (bool, error)
-	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address of the balancer
-	CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (net.IP, error)
+	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address or hostname of the balancer
+	CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (string, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// DeleteTCPLoadBalancer deletes a specified load balancer.

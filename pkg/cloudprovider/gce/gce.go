@@ -222,10 +222,10 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 }
 
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (net.IP, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (string, error) {
 	pool, err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req := &compute.ForwardingRule{
 		Name:       name,
@@ -238,17 +238,17 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 	}
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	err = gce.waitForRegionOp(op, region)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return net.ParseIP(fwd.IPAddress), nil
+	return fwd.IPAddress, nil
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
