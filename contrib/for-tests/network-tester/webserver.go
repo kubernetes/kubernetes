@@ -218,7 +218,7 @@ func contactOthers(state *State) {
 		}
 
 		for _, e := range endpoints.Endpoints {
-			contactSingle("http://"+e, state)
+			contactSingle("http://"+e.IP+":"+string(e.Port), state)
 		}
 
 		time.Sleep(5 * time.Second)
