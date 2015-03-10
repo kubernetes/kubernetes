@@ -1,0 +1,362 @@
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Hierarchical RCU implementation.
+[    0.000000] 	RCU dyntick-idle grace-period acceleration is enabled.
+[    0.000000] 	RCU restricting CPUs from NR_CPUS=256 to nr_cpu_ids=1.
+[    0.000000] 	Offload RCU callbacks from all CPUs
+[    0.000000] 	Offload RCU callbacks from CPUs: 0.
+[    0.000000] NR_IRQS:16640 nr_irqs:256 16
+[    0.000000] Console: colour dummy device 80x25
+[    0.000000] console [ttyS0] enabled
+[    0.000000] allocated 7340032 bytes of page_cgroup
+[    0.000000] please try 'cgroup_disable=memory' option if you don't want memory cgroups
+[    0.000000] tsc: Detected 2500.000 MHz processor
+[    0.008000] Calibrating delay loop (skipped) preset value.. 5000.00 BogoMIPS (lpj=10000000)
+[    0.008000] pid_max: default: 32768 minimum: 301
+[    0.008000] Security Framework initialized
+[    0.008000] AppArmor: AppArmor initialized
+[    0.008000] Yama: becoming mindful.
+[    0.008200] Dentry cache hash table entries: 262144 (order: 9, 2097152 bytes)
+[    0.011365] Inode-cache hash table entries: 131072 (order: 8, 1048576 bytes)
+[    0.013066] Mount-cache hash table entries: 4096 (order: 3, 32768 bytes)
+[    0.014030] Mountpoint-cache hash table entries: 4096 (order: 3, 32768 bytes)
+[    0.016266] Initializing cgroup subsys memory
+[    0.016898] Initializing cgroup subsys devices
+[    0.017546] Initializing cgroup subsys freezer
+[    0.018193] Initializing cgroup subsys blkio
+[    0.018793] Initializing cgroup subsys perf_event
+[    0.019416] Initializing cgroup subsys hugetlb
+[    0.020067] Disabled fast string operations
+[    0.020681] CPU: Physical Processor ID: 0
+[    0.021238] CPU: Processor Core ID: 0
+[    0.022587] mce: CPU supports 32 MCE banks
+[    0.023260] Last level iTLB entries: 4KB 512, 2MB 0, 4MB 0
+[    0.023260] Last level dTLB entries: 4KB 512, 2MB 0, 4MB 0
+[    0.023260] tlb_flushall_shift: 6
+[    0.043758] Freeing SMP alternatives memory: 32K (ffffffff81e6c000 - ffffffff81e74000)
+[    0.048361] ACPI: Core revision 20131115
+[    0.049516] ACPI: All ACPI Tables successfully acquired
+[    0.050342] ftrace: allocating 28458 entries in 112 pages
+[    0.060327] Enabling x2apic
+[    0.060740] Enabled x2apic
+[    0.064005] Switched APIC routing to physical x2apic.
+[    0.065489] ..TIMER: vector=0x30 apic1=0 pin1=0 apic2=-1 pin2=-1
+[    0.066331] smpboot: CPU0: Intel(R) Xeon(R) CPU @ 2.50GHz (fam: 06, model: 3e, stepping: 04)
+[    0.072000] APIC calibration not consistent with PM-Timer: 227ms instead of 100ms
+[    0.072000] APIC delta adjusted to PM-Timer: 6250028 (14249259)
+[    0.074382] Performance Events: unsupported p6 CPU model 62 no PMU driver, software events only.
+[    0.077174] x86: Booted up 1 node, 1 CPUs
+[    0.077738] smpboot: Total of 1 processors activated (5000.00 BogoMIPS)
+[    0.078932] NMI watchdog: disabled (cpu0): hardware events not enabled
+[    0.079945] devtmpfs: initialized
+[    0.081784] EVM: security.selinux
+[    0.082251] EVM: security.SMACK64
+[    0.082720] EVM: security.ima
+[    0.083135] EVM: security.capability
+[    0.084729] pinctrl core: initialized pinctrl subsystem
+[    0.085517] regulator-dummy: no parameters
+[    0.086187] RTC time: 19:51:09, date: 01/28/15
+[    0.086869] NET: Registered protocol family 16
+[    0.087613] cpuidle: using governor ladder
+[    0.088009] cpuidle: using governor menu
+[    0.088580] ACPI: bus type PCI registered
+[    0.089191] acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
+[    0.090220] PCI: Using configuration type 1 for base access
+[    0.091749] bio: create slab <bio-0> at 0
+[    0.092215] ACPI: Added _OSI(Module Device)
+[    0.092799] ACPI: Added _OSI(Processor Device)
+[    0.093410] ACPI: Added _OSI(3.0 _SCP Extensions)
+[    0.094173] ACPI: Added _OSI(Processor Aggregator Device)
+[    0.096962] ACPI: Interpreter enabled
+[    0.097483] ACPI Exception: AE_NOT_FOUND, While evaluating Sleep State [\_S1_] (20131115/hwxface-580)
+[    0.098762] ACPI Exception: AE_NOT_FOUND, While evaluating Sleep State [\_S2_] (20131115/hwxface-580)
+[    0.100011] ACPI: (supports S0 S3 S4 S5)
+[    0.100555] ACPI: Using IOAPIC for interrupt routing
+[    0.101252] PCI: Using host bridge windows from ACPI; if necessary, use "pci=nocrs" and report a bug
+[    0.102545] ACPI: No dock devices found.
+[    0.105210] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+[    0.106060] acpi PNP0A03:00: _OSC: OS supports [ASPM ClockPM Segments MSI]
+[    0.108025] acpi PNP0A03:00: _OSC failed (AE_NOT_FOUND); disabling ASPM
+[    0.109116] acpi PNP0A03:00: fail to add MMCONFIG information, can't access extended PCI configuration space under this bridge.
+[    0.112685] PCI host bridge to bus 0000:00
+[    0.113294] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.114054] pci_bus 0000:00: root bus resource [io  0x0000-0x0cf7]
+[    0.115065] pci_bus 0000:00: root bus resource [io  0x0d00-0xffff]
+[    0.116004] pci_bus 0000:00: root bus resource [mem 0x000a0000-0x000bffff]
+[    0.116955] pci_bus 0000:00: root bus resource [mem 0x6cc00000-0xfebfffff]
+[    0.117916] pci 0000:00:01.0: [8086:7110] type 00 class 0x060100
+[    0.122089] pci 0000:00:01.3: [8086:7113] type 00 class 0x068000
+[    0.125713] pci 0000:00:01.3: quirk: [io  0xb000-0xb03f] claimed by PIIX4 ACPI
+[    0.127117] pci 0000:00:03.0: [1af4:1004] type 00 class 0x000000
+[    0.128752] pci 0000:00:03.0: reg 0x10: [io  0xc000-0xc03f]
+[    0.130322] pci 0000:00:03.0: reg 0x14: [mem 0xfebfe000-0xfebfe07f]
+[    0.133571] pci 0000:00:04.0: [1af4:1000] type 00 class 0x020000
+[    0.135267] pci 0000:00:04.0: reg 0x10: [io  0xc040-0xc07f]
+[    0.136777] pci 0000:00:04.0: reg 0x14: [mem 0xfebff000-0xfebff03f]
+[    0.140811] ACPI: PCI Interrupt Link [LNKA] (IRQs 5 *10 11)
+[    0.141879] ACPI: PCI Interrupt Link [LNKB] (IRQs 5 *10 11)
+[    0.142886] ACPI: PCI Interrupt Link [LNKC] (IRQs 5 10 *11)
+[    0.144086] ACPI: PCI Interrupt Link [LNKD] (IRQs 5 10 *11)
+[    0.145067] ACPI: PCI Interrupt Link [LNKS] (IRQs *9)
+[    0.146245] ACPI: Enabled 16 GPEs in block 00 to 0F
+[    0.147038] ACPI: \_SB_.PCI0: notify handler is installed
+[    0.147840] Found 1 acpi root devices
+[    0.148136] vgaarb: loaded
+[    0.148780] SCSI subsystem initialized
+[    0.149472] libata version 3.00 loaded.
+[    0.150070] ACPI: bus type USB registered
+[    0.150659] usbcore: registered new interface driver usbfs
+[    0.151536] usbcore: registered new interface driver hub
+[    0.152055] usbcore: registered new device driver usb
+[    0.153144] PCI: Using ACPI for IRQ routing
+[    0.153756] PCI: pci_cache_line_size set to 64 bytes
+[    0.154617] e820: reserve RAM buffer [mem 0x0009fc00-0x0009ffff]
+[    0.156004] e820: reserve RAM buffer [mem 0x6cbfe000-0x6fffffff]
+[    0.156993] NetLabel: Initializing
+[    0.157498] NetLabel:  domain hash size = 128
+[    0.158082] NetLabel:  protocols = UNLABELED CIPSOv4
+[    0.158815] NetLabel:  unlabeled traffic allowed by default
+[    0.160005] Switched to clocksource kvm-clock
+[    0.168695] AppArmor: AppArmor Filesystem Enabled
+[    0.169361] pnp: PnP ACPI init
+[    0.169853] ACPI: bus type PNP registered
+[    0.170499] pnp 00:00: Plug and Play ACPI device, IDs PNP0b00 (active)
+[    0.171591] pnp 00:01: Plug and Play ACPI device, IDs PNP0501 (active)
+[    0.172574] pnp 00:02: Plug and Play ACPI device, IDs PNP0501 (active)
+[    0.173782] pnp: PnP ACPI: found 3 devices
+[    0.174430] ACPI: bus type PNP unregistered
+[    0.181364] pci_bus 0000:00: resource 4 [io  0x0000-0x0cf7]
+[    0.182172] pci_bus 0000:00: resource 5 [io  0x0d00-0xffff]
+[    0.183049] pci_bus 0000:00: resource 6 [mem 0x000a0000-0x000bffff]
+[    0.184120] pci_bus 0000:00: resource 7 [mem 0x6cc00000-0xfebfffff]
+[    0.185051] NET: Registered protocol family 2
+[    0.185859] TCP established hash table entries: 16384 (order: 5, 131072 bytes)
+[    0.187117] TCP bind hash table entries: 16384 (order: 6, 262144 bytes)
+[    0.188393] TCP: Hash tables configured (established 16384 bind 16384)
+[    0.189429] TCP: reno registered
+[    0.189929] UDP hash table entries: 1024 (order: 3, 32768 bytes)
+[    0.190824] UDP-Lite hash table entries: 1024 (order: 3, 32768 bytes)
+[    0.191830] NET: Registered protocol family 1
+[    0.192585] PCI: CLS 0 bytes, default 64
+[    0.193412] Trying to unpack rootfs image as initramfs...
+[    0.897565] Freeing initrd memory: 18780K (ffff880035b42000 - ffff880036d99000)
+[    0.898982] microcode: CPU0 sig=0x306e4, pf=0x1, revision=0x1
+[    0.899884] microcode: Microcode Update Driver: v2.00 <tigran@aivazian.fsnet.co.uk>, Peter Oruba
+[    0.901196] Scanning for low memory corruption every 60 seconds
+[    0.902497] Initialise system trusted keyring
+[    0.903169] audit: initializing netlink socket (disabled)
+[    0.904016] type=2000 audit(1422474669.702:1): initialized
+[    0.926617] HugeTLB registered 2 MB page size, pre-allocated 0 pages
+[    0.928567] zbud: loaded
+[    0.929030] VFS: Disk quotas dquot_6.5.2
+[    0.929685] Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.931113] fuse init (API version 7.22)
+[    0.931781] msgmni has been set to 3390
+[    0.932595] Key type big_key registered
+[    0.933680] Key type asymmetric registered
+[    0.934332] Asymmetric key parser 'x509' registered
+[    0.935078] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+[    0.936224] io scheduler noop registered
+[    0.936858] io scheduler deadline registered (default)
+[    0.937675] io scheduler cfq registered
+[    0.938307] pci_hotplug: PCI Hot Plug PCI Core version: 0.5
+[    0.939158] pciehp: PCI Express Hot Plug Controller Driver version: 0.4
+[    0.940239] efifb: probing for efifb
+[    0.940788] efifb: framebuffer at 0xa0000, mapped to 0xffff8800000a0000, using 64k, total 64k
+[    0.942044] efifb: mode is 640x480x1, linelength=80, pages=1
+[    0.942964] efifb: scrolling: redraw
+[    0.943525] efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+[    0.945209] Console: switching to colour frame buffer device 80x30
+[    0.946826] fb0: EFI VGA frame buffer device
+[    0.947485] intel_idle: does not run on family 6 model 62
+[    0.948380] ipmi message handler version 39.2
+[    0.949036] input: Power Button as /devices/LNXSYSTM:00/LNXPWRBN:00/input/input0
+[    0.950135] ACPI: Power Button [PWRF]
+[    0.950722] input: Sleep Button as /devices/LNXSYSTM:00/LNXSLPBN:00/input/input1
+[    0.951773] ACPI: Sleep Button [SLPF]
+[    0.952529] GHES: HEST is not enabled!
+[    0.953921] ACPI: PCI Interrupt Link [LNKC] enabled at IRQ 11
+[    0.955783] ACPI: PCI Interrupt Link [LNKD] enabled at IRQ 10
+[    0.957395] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
+[    1.112167] 00:01: ttyS0 at I/O 0x3f8 (irq = 4, base_baud = 115200) is a 16550A
+[    1.134843] 00:02: ttyS1 at I/O 0x2f8 (irq = 3, base_baud = 115200) is a 16550A
+[    1.137110] Linux agpgart interface v0.103
+[    1.138975] brd: module loaded
+[    1.140117] loop: module loaded
+[    1.140923] libphy: Fixed MDIO Bus: probed
+[    1.141640] tun: Universal TUN/TAP device driver, 1.6
+[    1.142342] tun: (C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com>
+[    1.144063] virtio-pci 0000:00:04.0: irq 40 for MSI/MSI-X
+[    1.144871] virtio-pci 0000:00:04.0: irq 41 for MSI/MSI-X
+[    1.145670] virtio-pci 0000:00:04.0: irq 42 for MSI/MSI-X
+[    1.151673] PPP generic driver version 2.4.2
+[    1.152344] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    1.153399] ehci-pci: EHCI PCI platform driver
+[    1.154021] ehci-platform: EHCI generic platform driver
+[    1.154939] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[    1.155973] ohci-pci: OHCI PCI platform driver
+[    1.156675] ohci-platform: OHCI generic platform driver
+[    1.157423] uhci_hcd: USB Universal Host Controller Interface driver
+[    1.158352] i8042: PNP: No PS/2 controller found. Probing ports directly.
+[    3.646820] i8042: No controller found
+[    3.647493] tsc: Refined TSC clocksource calibration: 2500.002 MHz
+[    3.648490] mousedev: PS/2 mouse device common for all mice
+[    3.649499] rtc_cmos 00:00: RTC can wake from S4
+[    3.650595] rtc_cmos 00:00: rtc core: registered rtc_cmos as rtc0
+[    3.651521] rtc_cmos 00:00: alarms up to one day, 114 bytes nvram
+[    3.652422] device-mapper: uevent: version 1.0.3
+[    3.653131] device-mapper: ioctl: 4.27.0-ioctl (2013-10-30) initialised: dm-devel@redhat.com
+[    3.654281] ledtrig-cpu: registered to indicate activity on CPUs
+[    3.655182] TCP: cubic registered
+[    3.655704] NET: Registered protocol family 10
+[    3.656551] NET: Registered protocol family 17
+[    3.657183] Key type dns_resolver registered
+[    3.657931] Loading compiled-in X.509 certificates
+[    3.659264] Loaded X.509 cert 'Magrathea: Glacier signing key: 23984ac203784325ccf7b95b51f6c119380eb933'
+[    3.660726] registered taskstats version 1
+[    3.663211] Key type trusted registered
+[    3.665462] Key type encrypted registered
+[    3.667679] AppArmor: AppArmor sha1 policy hashing enabled
+[    3.668454] IMA: No TPM chip found, activating TPM-bypass!
+[    3.669388] regulator-dummy: disabling
+[    3.669971]   Magic number: 15:428:901
+[    3.670625] clocksource clocksource0: hash matches
+[    3.671311] acpi PNP0501:01: hash matches
+[    3.671953] rtc_cmos 00:00: setting system clock to 2015-01-28 19:51:13 UTC (1422474673)
+[    3.673268] BIOS EDD facility v0.16 2004-Jun-25, 0 devices found
+[    3.674088] EDD information not available.
+[    3.674668] PM: Hibernation image not present or could not be loaded.
+[    3.676577] Freeing unused kernel memory: 1332K (ffffffff81d1f000 - ffffffff81e6c000)
+[    3.678370] Write protecting the kernel read-only data: 12288k
+[    3.681251] Freeing unused kernel memory: 828K (ffff880001731000 - ffff880001800000)
+[    3.684444] Freeing unused kernel memory: 700K (ffff880001b51000 - ffff880001c00000)
+[    3.700162] systemd-udevd[90]: starting version 204
+[    3.866262] virtio-pci 0000:00:03.0: irq 43 for MSI/MSI-X
+[    3.867187] virtio-pci 0000:00:03.0: irq 44 for MSI/MSI-X
+[    3.867997] virtio-pci 0000:00:03.0: irq 45 for MSI/MSI-X
+[    3.876214] virtio-pci 0000:00:03.0: irq 46 for MSI/MSI-X
+[    3.880005] scsi0 : Virtio SCSI HBA
+[    3.912410] scsi 0:0:1:0: Direct-Access     Google   PersistentDisk   1    PQ: 0 ANSI: 6
+[    3.938957] sd 0:0:1:0: Attached scsi generic sg0 type 0
+[    3.939845] sd 0:0:1:0: [sda] 20971520 512-byte logical blocks: (10.7 GB/10.0 GiB)
+[    3.941149] sd 0:0:1:0: [sda] 4096-byte physical blocks
+[    3.942233] sd 0:0:1:0: [sda] Write Protect is off
+[    3.942988] sd 0:0:1:0: [sda] Mode Sense: 1f 00 00 08
+[    3.944398] sd 0:0:1:0: [sda] Write cache: enabled, read cache: enabled, doesn't support DPO or FUA
+[    3.961885]  sda: sda1
+[    3.963152] sd 0:0:1:0: [sda] Attached SCSI disk
+[    4.414649] EXT4-fs (sda1): mounted filesystem with ordered data mode. Opts: (null)
+[    5.293574] random: init urandom read with 73 bits of entropy available
+[    6.418187] random: nonblocking pool is initialized
+[    6.692508] EXT4-fs (sda1): re-mounted. Opts: errors=remount-ro
+[    7.121847] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+[    7.681714] systemd-udevd[293]: starting version 204
+[    8.437234] lp: driver loaded but no devices found
+[    9.164195] piix4_smbus 0000:00:01.3: SMBus base address uninitialized - upgrade BIOS or use force_addr=0xaddr
+[    9.648096] device-mapper: multipath: version 1.6.0 loaded
+[   10.434575] type=1400 audit(1422474680.256:2): apparmor="STATUS" operation="profile_load" profile="unconfined" name="/sbin/dhclient" pid=368 comm="apparmor_parser"
+[   10.437242] type=1400 audit(1422474680.260:3): apparmor="STATUS" operation="profile_load" profile="unconfined" name="/usr/lib/NetworkManager/nm-dhcp-client.action" pid=368 comm="apparmor_parser"
+[   10.439901] type=1400 audit(1422474680.260:4): apparmor="STATUS" operation="profile_load" profile="unconfined" name="/usr/lib/connman/scripts/dhclient-script" pid=368 comm="apparmor_parser"
+[   11.126295] type=1400 audit(1422474680.948:5): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/sbin/dhclient" pid=412 comm="apparmor_parser"
+[   11.129123] type=1400 audit(1422474680.952:6): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/NetworkManager/nm-dhcp-client.action" pid=412 comm="apparmor_parser"
+[   11.132139] type=1400 audit(1422474680.956:7): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/connman/scripts/dhclient-script" pid=412 comm="apparmor_parser"
+[   11.196173] type=1400 audit(1422474681.020:8): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/sbin/dhclient" pid=458 comm="apparmor_parser"
+[   11.198887] type=1400 audit(1422474681.020:9): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/NetworkManager/nm-dhcp-client.action" pid=458 comm="apparmor_parser"
+[   11.201484] type=1400 audit(1422474681.028:10): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/connman/scripts/dhclient-script" pid=458 comm="apparmor_parser"
+[   11.361371] init: udev-fallback-graphics main process (454) terminated with status 1
+[   11.378437] type=1400 audit(1422474681.200:11): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/NetworkManager/nm-dhcp-client.action" pid=458 comm="apparmor_parser"
+[   14.366411] init: failsafe main process (491) killed by TERM signal
+kateknister@kateknister-test3:~$ tail -f /var/log/syslog
+Jan 28 19:51:47 localhost ntpdate[1240]: adjust time server 169.254.169.254 offset -0.383723 sec
+Jan 28 19:51:47 localhost ntpd[1312]: ntpd 4.2.6p5@1.2349-o Wed Oct  9 19:08:06 UTC 2013 (1)
+Jan 28 19:51:47 localhost ntpd[1313]: proto: precision = 0.449 usec
+Jan 28 19:51:47 localhost ntpd[1313]: ntp_io: estimated max descriptors: 1024, initial socket boundary: 16
+Jan 28 19:51:47 localhost ntpd[1313]: Listen and drop on 0 v4wildcard 0.0.0.0 UDP 123
+Jan 28 19:51:47 localhost ntpd[1313]: Listen and drop on 1 v6wildcard :: UDP 123
+Jan 28 19:51:47 localhost ntpd[1313]: Listen normally on 2 lo 127.0.0.1 UDP 123
+Jan 28 19:51:47 localhost ntpd[1313]: Listen normally on 3 eth0 10.240.192.196 UDP 123
+Jan 28 19:51:47 localhost ntpd[1313]: peers refreshed
+Jan 28 19:51:47 localhost ntpd[1313]: Listening on routing socket on fd #20 for interface updates
+Jan 28 19:58:45 localhost kernel: [  455.498827] badsysprogram invoked oom-killer: gfp_mask=0x280da, order=0, oom_score_adj=0
+Jan 28 19:58:45 localhost kernel: [  455.500173] badsysprogram cpuset=/ mems_allowed=0
+Jan 28 19:58:45 localhost kernel: [  455.501007] CPU: 0 PID: 1532 Comm: badsysprogram Not tainted 3.13.0-27-generic #50-Ubuntu
+Jan 28 19:58:45 localhost kernel: [  455.502301] Hardware name: Google Google, BIOS Google 01/01/2011
+Jan 28 19:58:45 localhost kernel: [  455.503298]  0000000000000000 ffff880069715a90 ffffffff817199c4 ffff8800680d8000
+Jan 28 19:58:45 localhost kernel: [  455.504563]  ffff880069715b18 ffffffff817142ff 0000000000000000 0000000000000000
+Jan 28 19:58:45 localhost kernel: [  455.505779]  0000000000000000 0000000000000000 0000000000000000 0000000000000000
+Jan 28 19:58:45 localhost kernel: [  455.506971] Call Trace:
+Jan 28 19:58:45 localhost kernel: [  455.507353]  [<ffffffff817199c4>] dump_stack+0x45/0x56
+Jan 28 19:58:45 localhost kernel: [  455.508289]  [<ffffffff817142ff>] dump_header+0x7f/0x1f1
+Jan 28 19:58:45 localhost kernel: [  455.509112]  [<ffffffff8115196e>] oom_kill_process+0x1ce/0x330
+Jan 28 19:58:45 localhost kernel: [  455.510023]  [<ffffffff812d3395>] ? security_capable_noaudit+0x15/0x20
+Jan 28 19:58:45 localhost kernel: [  455.510994]  [<ffffffff811520a4>] out_of_memory+0x414/0x450
+Jan 28 19:58:45 localhost kernel: [  455.511820]  [<ffffffff81158377>] __alloc_pages_nodemask+0xa87/0xb20
+Jan 28 19:58:45 localhost kernel: [  455.512815]  [<ffffffff811985da>] alloc_pages_vma+0x9a/0x140
+Jan 28 19:58:45 localhost kernel: [  455.513647]  [<ffffffff8117909b>] handle_mm_fault+0xb2b/0xf10
+Jan 28 19:58:45 localhost kernel: [  455.514498]  [<ffffffff81725924>] __do_page_fault+0x184/0x560
+Jan 28 19:58:45 localhost kernel: [  455.515415]  [<ffffffff8101b7d9>] ? sched_clock+0x9/0x10
+Jan 28 19:58:45 localhost kernel: [  455.516318]  [<ffffffff8109d13d>] ? sched_clock_local+0x1d/0x80
+Jan 28 19:58:45 localhost kernel: [  455.517242]  [<ffffffff811112ec>] ? acct_account_cputime+0x1c/0x20
+Jan 28 19:58:45 localhost kernel: [  455.518141]  [<ffffffff8109d76b>] ? account_user_time+0x8b/0xa0
+Jan 28 19:58:45 localhost kernel: [  455.519014]  [<ffffffff8109dd84>] ? vtime_account_user+0x54/0x60
+Jan 28 19:58:45 localhost kernel: [  455.519910]  [<ffffffff81725d1a>] do_page_fault+0x1a/0x70
+Jan 28 19:58:45 localhost kernel: [  455.520712]  [<ffffffff81722188>] page_fault+0x28/0x30
+Jan 28 19:58:45 localhost kernel: [  455.521498] Mem-Info:
+Jan 28 19:58:45 localhost kernel: [  455.521873] Node 0 DMA per-cpu:
+Jan 28 19:58:45 localhost kernel: [  455.522388] CPU    0: hi:    0, btch:   1 usd:   0
+Jan 28 19:58:45 localhost kernel: [  455.598342] Node 0 DMA32 per-cpu:
+Jan 28 19:58:45 localhost kernel: [  455.598890] CPU    0: hi:  186, btch:  31 usd:  86
+Jan 28 19:58:45 localhost kernel: [  455.599687] active_anon:405991 inactive_anon:57 isolated_anon:0
+Jan 28 19:58:45 localhost kernel: [  455.599687]  active_file:35 inactive_file:69 isolated_file:0
+Jan 28 19:58:45 localhost kernel: [  455.599687]  unevictable:0 dirty:0 writeback:0 unstable:0
+Jan 28 19:58:45 localhost kernel: [  455.599687]  free:12929 slab_reclaimable:1635 slab_unreclaimable:1919
+Jan 28 19:58:45 localhost kernel: [  455.599687]  mapped:34 shmem:70 pagetables:1423 bounce:0
+Jan 28 19:58:45 localhost kernel: [  455.599687]  free_cma:0
+Jan 28 19:58:45 localhost kernel: [  455.604585] Node 0 DMA free:7124kB min:412kB low:512kB high:616kB active_anon:8508kB inactive_anon:4kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:15992kB managed:15908kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:4kB slab_reclaimable:16kB slab_unreclaimable:16kB kernel_stack:0kB pagetables:12kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
+Jan 28 19:58:45 localhost kernel: [  455.610811] lowmem_reserve[]: 0 1679 1679 1679
+Jan 28 19:58:45 localhost kernel: [  455.611600] Node 0 DMA32 free:44592kB min:44640kB low:55800kB high:66960kB active_anon:1615456kB inactive_anon:224kB active_file:140kB inactive_file:276kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:1765368kB managed:1722912kB mlocked:0kB dirty:0kB writeback:0kB mapped:136kB shmem:276kB slab_reclaimable:6524kB slab_unreclaimable:7660kB kernel_stack:592kB pagetables:5680kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:819 all_unreclaimable? yes
+Jan 28 19:58:45 localhost kernel: [  455.618372] lowmem_reserve[]: 0 0 0 0
+Jan 28 19:58:45 localhost kernel: [  455.619041] Node 0 DMA: 5*4kB (UM) 6*8kB (UEM) 7*16kB (UEM) 1*32kB (M) 2*64kB (UE) 3*128kB (UEM) 1*256kB (E) 2*512kB (EM) 3*1024kB (UEM) 1*2048kB (R) 0*4096kB = 7124kB
+Jan 28 19:58:45 localhost kernel: [  455.621861] Node 0 DMA32: 74*4kB (UEM) 125*8kB (UEM) 78*16kB (UEM) 26*32kB (UE) 12*64kB (UEM) 4*128kB (UE) 4*256kB (UE) 2*512kB (E) 11*1024kB (UE) 7*2048kB (UE) 3*4096kB (UR) = 44592kB
+Jan 28 19:58:45 localhost kernel: [  455.625174] Node 0 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+Jan 28 19:58:45 localhost kernel: [  455.626394] 204 total pagecache pages
+Jan 28 19:58:45 localhost kernel: [  455.626954] 0 pages in swap cache
+Jan 28 19:58:45 localhost kernel: [  455.627455] Swap cache stats: add 0, delete 0, find 0/0
+Jan 28 19:58:45 localhost kernel: [  455.628242] Free swap  = 0kB
+Jan 28 19:58:45 localhost kernel: [  455.628686] Total swap = 0kB
+Jan 28 19:58:45 localhost kernel: [  455.629147] 445340 pages RAM
+Jan 28 19:58:45 localhost kernel: [  455.629577] 0 pages HighMem/MovableOnly
+Jan 28 19:58:45 localhost kernel: [  455.630301] 10614 pages reserved
+Jan 28 19:58:45 localhost kernel: [  455.630787] [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+Jan 28 19:58:45 localhost kernel: [  455.631937] [  273]     0   273     4869       50      13        0             0 upstart-udev-br
+Jan 28 19:58:45 localhost kernel: [  455.633290] [  293]     0   293    12802      154      28        0         -1000 systemd-udevd
+Jan 28 19:58:45 localhost kernel: [  455.634671] [  321]     0   321     3819       54      12        0             0 upstart-file-br
+Jan 28 19:58:45 localhost kernel: [  455.636070] [  326]   102   326     9805      109      24        0             0 dbus-daemon
+Jan 28 19:58:45 localhost kernel: [  455.637373] [  334]   101   334    63960       94      26        0             0 rsyslogd
+Jan 28 19:58:45 localhost kernel: [  455.638761] [  343]     0   343    10863      102      26        0             0 systemd-logind
+Jan 28 19:58:45 localhost kernel: [  455.640158] [  546]     0   546     3815       60      13        0             0 upstart-socket-
+Jan 28 19:58:45 localhost kernel: [  455.641534] [  710]     0   710     2556      587       8        0             0 dhclient
+Jan 28 19:58:45 localhost kernel: [  455.642834] [  863]     0   863     3955       48      13        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.644139] [  865]     0   865     3955       50      13        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.645325] [  867]     0   867     3955       51      13        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.646621] [  868]     0   868     3955       51      12        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.647963] [  870]     0   870     3955       49      13        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.649234] [  915]     0   915     5914       61      16        0             0 cron
+Jan 28 19:58:45 localhost kernel: [  455.650439] [ 1015]     0  1015    10885     1524      25        0             0 manage_addresse
+Jan 28 19:58:45 localhost kernel: [  455.651817] [ 1028]     0  1028     3955       49      13        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.653091] [ 1033]     0  1033     3197       48      12        0             0 getty
+Jan 28 19:58:45 localhost kernel: [  455.654783] [ 1264]     0  1264    11031     1635      26        0             0 manage_accounts
+Jan 28 19:58:45 localhost kernel: [  455.656657] [ 1268]     0  1268    15341      180      33        0         -1000 sshd
+Jan 28 19:58:45 localhost kernel: [  455.657865] [ 1313]   104  1313     6804      154      17        0             0 ntpd
+Jan 28 19:58:45 localhost kernel: [  455.659085] [ 1389]     0  1389    25889      255      55        0             0 sshd
+Jan 28 19:58:45 localhost kernel: [  455.660440] [ 1407]  1020  1407    25889      255      52        0             0 sshd
+Jan 28 19:58:45 localhost kernel: [  455.661595] [ 1408]  1020  1408     5711      581      17        0             0 bash
+Jan 28 19:58:45 localhost kernel: [  455.662887] [ 1425]     0  1425    25889      256      53        0             0 sshd
+Jan 28 19:58:45 localhost kernel: [  455.664075] [ 1443]  1020  1443    25889      257      52        0             0 sshd
+Jan 28 19:58:45 localhost kernel: [  455.665330] [ 1444]  1020  1444     5711      581      16        0             0 bash
+Jan 28 19:58:45 localhost kernel: [  455.666450] [ 1476]  1020  1476     1809       25       9        0             0 tail
+Jan 28 19:58:45 localhost kernel: [  455.667682] [ 1532]  1020  1532   410347   398810     788        0             0 badsysprogram
+Jan 28 19:58:45 localhost kernel: [  455.669006] Out of memory: Kill process 1532 (badsysprogram) score 919 or sacrifice child
+Jan 28 19:58:45 localhost kernel: [  455.670291] Killed process 1532 (badsysprogram) total-vm:1641388kB, anon-rss:1595164kB, file-rss:76kB
+[    0.170499] pnp 00:00: Plug and Play ACPI device, IDs PNP0b00 (active)
+[    0.171591] pnp 00:01: Plug and Play ACPI device, IDs PNP0501 (active)
+[    0.172574] pnp 00:02: Plug and Play ACPI device, IDs PNP0501 (active)

@@ -20,6 +20,11 @@
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
 		},
 		{
+			"ImportPath": "code.google.com/p/go.exp/inotify",
+			"Comment": "null-75",
+			"Rev": "bd8df7009305d6ada223ea3c95b94c0f38bfa119"
+		},
+		{
 			"ImportPath": "code.google.com/p/go.net/spdy",
 			"Comment": "null-240",
 			"Rev": "937a34c9de13c766c814510f76bca091dee06028"
@@ -59,6 +64,11 @@
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
 		},
 		{
+			"ImportPath": "github.com/coreos/go-systemd/dbus",
+			"Comment": "v2-27-g97e243d",
+			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
+		},
+		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
 			"Comment": "v1.0.2-5-g2831f11",
 			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
@@ -83,12 +93,22 @@
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/mount",
+			"Comment": "v1.4.1-656-g2115131",
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/pools",
 			"Comment": "v1.4.1-656-g2115131",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/promise",
+			"Comment": "v1.4.1-656-g2115131",
+			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/symlink",
 			"Comment": "v1.4.1-656-g2115131",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
 		},
@@ -111,6 +131,11 @@
 			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
 			"Comment": "v1.4.1-656-g2115131",
 			"Rev": "211513156dc1ace48e630b4bf4ea0fcfdc8d9abf"
+		},
+		{
+			"ImportPath": "github.com/docker/libcontainer",
+			"Comment": "v1.4.0-52-gd7dea0e",
+			"Rev": "d7dea0e925315bab640115053204c16718839b1e"
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
@@ -138,6 +163,11 @@
 			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
 		},
 		{
+			"ImportPath": "github.com/godbus/dbus",
+			"Comment": "0-7-g939230d",
+			"Rev": "939230d2086a4f1870e04c52e0a376c25bae0ec4"
+		},
+		{
 			"ImportPath": "github.com/golang/glog",
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
 		},
@@ -151,13 +181,58 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
-			"Comment": "0.10.1-30-gb5e2f37",
-			"Rev": "b5e2f3788e4a39a0836c5490e6bf31832400c1f3"
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/container",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/events",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/fs",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info/v1",
-			"Comment": "0.10.1-30-gb5e2f37",
-			"Rev": "b5e2f3788e4a39a0836c5490e6bf31832400c1f3"
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/info/v2",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/manager",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/storage",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/summary",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/utils",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
+		},
+		{
+			"ImportPath": "github.com/google/cadvisor/version",
+			"Comment": "0.10.1-36-g62a1788",
+			"Rev": "62a1788621f4adee2dbf08c26060ed7fb8c0297d"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
