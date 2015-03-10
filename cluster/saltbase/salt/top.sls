@@ -6,6 +6,11 @@ base:
   'roles:kubernetes-pool':
     - match: grain
     - docker
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
+    - openvpn-client
+{% else %}
+    - sdn
+{% endif %}
     - kubelet
     - kube-proxy
 {% if pillar.get('enable_node_monitoring', '').lower() == 'true' %}
@@ -20,11 +25,6 @@ base:
   {% endif %}
 {% endif %}
     - logrotate
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
-    - openvpn-client
-{% else %}
-    - sdn
-{% endif %}
     - monit
 
   'roles:kubernetes-master':
