@@ -37,16 +37,22 @@ import (
 type EC2 interface {
 	// Query EC2 for instances matching the filter
 	Instances(instIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error)
+
+	// Query the EC2 metadata service (used to discover instance-id etc)
+	GetMetaData(key string) ([]byte, error)
 }
 
 // AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
 type AWSCloud struct {
-	ec2 EC2
-	cfg *AWSCloudConfig
+	ec2              EC2
+	cfg              *AWSCloudConfig
+	availabilityZone string
+	region           aws.Region
 }
 
 type AWSCloudConfig struct {
 	Global struct {
+		// TODO: Is there any use for this?  We can get it from the instance metadata service
 		Region string
 	}
 }
@@ -80,6 +86,14 @@ func (self *GoamzEC2) Instances(instanceIds []string, filter *ec2InstanceFilter)
 		}
 	}
 	return self.ec2.Instances(instanceIds, goamzFilter)
+}
+
+func (self *GoamzEC2) GetMetaData(key string) ([]byte, error) {
+	v, err := aws.GetMetaData(key)
+	if err != nil {
+		return nil, fmt.Errorf("Error querying AWS metadata for key %s: %v", key, err)
+	}
+	return v, nil
 }
 
 type AuthFunc func() (auth aws.Auth, err error)
@@ -125,16 +139,34 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 		return nil, err
 	}
 
+	// TODO: We can get the region very easily from the instance-metadata service
 	region, ok := aws.Regions[cfg.Global.Region]
 	if !ok {
 		return nil, fmt.Errorf("not a valid AWS region: %s", cfg.Global.Region)
 	}
 
-	ec2 := ec2.New(auth, region)
 	return &AWSCloud{
-		ec2: &GoamzEC2{ec2: ec2},
-		cfg: cfg,
+		ec2:    &GoamzEC2{ec2: ec2.New(auth, region)},
+		cfg:    cfg,
+		region: region,
 	}, nil
+}
+
+func (self *AWSCloud) getAvailabilityZone() (string, error) {
+	// TODO: Do we need sync.Mutex here?
+	availabilityZone := self.availabilityZone
+	if self.availabilityZone == "" {
+		availabilityZoneBytes, err := self.ec2.GetMetaData("placement/availability-zone")
+		if err != nil {
+			return "", err
+		}
+		if availabilityZoneBytes == nil || len(availabilityZoneBytes) == 0 {
+			return "", fmt.Errorf("Unable to determine availability-zone from instance metadata")
+		}
+		availabilityZone = string(availabilityZoneBytes)
+		self.availabilityZone = availabilityZone
+	}
+	return availabilityZone, nil
 }
 
 func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
@@ -153,7 +185,7 @@ func (aws *AWSCloud) Instances() (cloudprovider.Instances, bool) {
 
 // Zones returns an implementation of Zones for Amazon Web Services.
 func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
-	return nil, false
+	return aws, true
 }
 
 // IPAddress is an implementation of Instances.IPAddress.
@@ -245,4 +277,16 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 
 func (v *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
+}
+
+// GetZone implements Zones.GetZone
+func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
+	availabilityZone, err := self.getAvailabilityZone()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+	return cloudprovider.Zone{
+		FailureDomain: availabilityZone,
+		Region:        self.region.Name,
+	}, nil
 }
