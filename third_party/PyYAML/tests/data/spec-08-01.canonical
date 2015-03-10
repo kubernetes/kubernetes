@@ -1,8 +1,0 @@
-%YAML 1.1
----
-!!map {
-  ? &A1 !!str "foo"
-  : !!str "bar",
-  ? &A2 !!str "baz"
-  : *A1
-}

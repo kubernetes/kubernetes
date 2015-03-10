@@ -1,7 +1,0 @@
-- !StreamStart
-- !DocumentStart
-- !MappingStart
-- !Scalar { value: 'key' }
-- !MappingEnd
-- !DocumentEnd
-- !StreamEnd

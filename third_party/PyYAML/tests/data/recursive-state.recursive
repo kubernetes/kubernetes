@@ -1,2 +1,0 @@
-value = []
-value.append(AnInstanceWithState(value, value))

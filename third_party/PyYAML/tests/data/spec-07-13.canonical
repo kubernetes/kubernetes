@@ -1,9 +1,0 @@
-%YAML 1.1
----
-!!str "First document"
----
-!<!foo> "No directives"
----
-!<!foobar> "With directives"
----
-!<!baz> "Reset settings"

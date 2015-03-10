@@ -1,5 +1,0 @@
-- !StreamStart
-- !DocumentStart
-- !Scalar { anchor: '5*5=25', value: 'foo' }
-- !DocumentEnd
-- !StreamEnd

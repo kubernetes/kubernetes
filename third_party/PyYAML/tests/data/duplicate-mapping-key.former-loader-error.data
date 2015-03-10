@@ -1,6 +1,0 @@
----
-&anchor foo:
-    foo: bar
-    *anchor: duplicate key
-    baz: bat
-    *anchor: duplicate key

@@ -1,7 +1,0 @@
-%YAML 1.1
----
-!!seq [
-  !!str " last",
-  !!str " last",
-  !!str " \tfirst last",
-]

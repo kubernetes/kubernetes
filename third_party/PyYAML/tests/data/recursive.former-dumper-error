@@ -1,3 +1,0 @@
-data = []
-data.append(data)
-dump(data)

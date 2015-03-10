@@ -1,8 +1,0 @@
-ERROR:
- Tabs may appear inside
- comments and quoted or
- block scalar content.
- Tabs must not appear
- elsewhere, such as
- in indentation and
- separation spaces.

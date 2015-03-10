@@ -1,7 +1,0 @@
-unicode: "Sosa did fine.\u263A"
-control: "\b1998\t1999\t2000\n"
-hexesc:  "\x13\x10 is \r\n"
-
-single: '"Howdy!" he cried.'
-quoted: ' # not a ''comment''.'
-tie-fighter: '|\-*-/|'
