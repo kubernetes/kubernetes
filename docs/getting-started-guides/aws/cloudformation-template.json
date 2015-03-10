@@ -401,7 +401,7 @@
           "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-proxy\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy\n",
           "        ExecStart=/opt/bin/kube-proxy \\\n",
-          "        --etcd_servers=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":4001\\\n",
+          "        --master=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080\\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
