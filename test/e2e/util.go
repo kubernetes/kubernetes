@@ -25,8 +25,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -38,7 +38,6 @@ const (
 )
 
 type testContextType struct {
-	kubeConfig string
 	authConfig string
 	certDir    string
 	host       string
@@ -118,44 +117,32 @@ func waitForPodSuccess(c *client.Client, podName string, contName string) error 
 }
 
 func loadConfig() (*client.Config, error) {
-	switch {
-	case testContext.kubeConfig != "":
-		fmt.Printf(">>> testContext.kubeConfig: %s\n", testContext.kubeConfig)
-		c, err := clientcmd.LoadFromFile(testContext.kubeConfig)
-		if err != nil {
-			return nil, fmt.Errorf("error loading kubeConfig: %v", err.Error())
-		}
-		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
-	case testContext.authConfig != "":
-		config := &client.Config{
-			Host: testContext.host,
-		}
-		info, err := clientauth.LoadFromFile(testContext.authConfig)
-		if err != nil {
-			return nil, fmt.Errorf("error loading authConfig: %v", err.Error())
-		}
-		// If the certificate directory is provided, set the cert paths to be there.
-		if testContext.certDir != "" {
-			Logf("Expecting certs in %v.", testContext.certDir)
-			info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
-			info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
-			info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
-		}
-		mergedConfig, err := info.MergeWithConfig(*config)
-		return &mergedConfig, err
-	default:
-		return nil, fmt.Errorf("either kubeConfig or authConfig must be specified to load client config")
+	config := &client.Config{
+		Host: testContext.host,
 	}
+	info, err := clientauth.LoadFromFile(testContext.authConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Error loading auth: %v", err.Error())
+	}
+	// If the certificate directory is provided, set the cert paths to be there.
+	if testContext.certDir != "" {
+		Logf("Expecting certs in %v.", testContext.certDir)
+		info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
+		info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
+		info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
+	}
+	mergedConfig, err := info.MergeWithConfig(*config)
+	return &mergedConfig, err
 }
 
 func loadClient() (*client.Client, error) {
 	config, err := loadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
+		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
 	c, err := client.New(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
+		return nil, fmt.Errorf("Error creating client: %v", err.Error())
 	}
 	return c, nil
 }

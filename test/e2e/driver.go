@@ -53,8 +53,8 @@ func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
-func RunE2ETests(kubeConfig, authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
-	testContext = testContextType{kubeConfig, authConfig, certDir, host, repoRoot, provider, *gceConfig}
+func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
+	testContext = testContextType{authConfig, certDir, host, repoRoot, provider, *gceConfig}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
