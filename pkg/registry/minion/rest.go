@@ -91,7 +91,18 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 
 // List satisfies the RESTStorage interface.
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	return rs.registry.ListMinions(ctx)
+	nodes, err := rs.registry.ListMinions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	filtered := []api.Node{}
+	for _, node := range nodes.Items {
+		if label.Matches(labels.Set(node.Labels)) {
+			filtered = append(filtered, node)
+		}
+	}
+	nodes.Items = filtered
+	return nodes, err
 }
 
 func (rs *REST) New() runtime.Object {
