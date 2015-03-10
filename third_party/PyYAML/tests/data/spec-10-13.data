@@ -1,0 +1,5 @@
+? explicit key # implicit value
+? |
+  block key
+: - one # explicit in-line
+  - two # block value

@@ -1,0 +1,2 @@
+- { inner : entry , also: inner , }
+- {inner: entry,last : entry}

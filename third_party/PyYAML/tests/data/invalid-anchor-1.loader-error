@@ -1,0 +1,1 @@
+--- &?  foo # we allow only ascii and numeric characters in anchor names.

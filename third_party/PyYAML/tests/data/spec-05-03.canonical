@@ -1,0 +1,14 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "sequence"
+  : !!seq [
+    !!str "one", !!str "two"
+  ],
+  ? !!str "mapping"
+  : !!map {
+    ? !!str "sky" : !!str "blue",
+#    ? !!str "sea" : !!str "green",
+    ? !!map { ? !!str "sea" : !!str "green" } : !!null "",
+  }
+}

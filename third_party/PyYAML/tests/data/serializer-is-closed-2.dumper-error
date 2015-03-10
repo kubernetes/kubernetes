@@ -1,0 +1,4 @@
+dumper = yaml.Dumper(StringIO())
+dumper.open()
+dumper.close()
+dumper.serialize(yaml.ScalarNode(tag='!foo', value='bar'))

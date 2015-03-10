@@ -1,0 +1,11 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "block"
+  : !!seq [
+    !!str "one",
+    !!seq [
+      !!str "two"
+    ]
+  ]
+}

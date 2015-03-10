@@ -1,0 +1,7 @@
+{
+    "canonical": datetime.datetime(2001, 12, 15, 2, 59, 43, 100000),
+    "valid iso8601": datetime.datetime(2001, 12, 15, 2, 59, 43, 100000),
+    "space separated": datetime.datetime(2001, 12, 15, 2, 59, 43, 100000),
+    "no time zone (Z)": datetime.datetime(2001, 12, 15, 2, 59, 43, 100000),
+    "date (00:00:00Z)": datetime.date(2002, 12, 14),
+}

@@ -1,0 +1,24 @@
+%YAML 1.1
+---
+!!seq [
+  !!map {
+    ? !!str "explicit key1"
+    : !!str "explicit value",
+  },
+  !!map {
+    ? !!str "explicit key2"
+    : !!null "",
+  },
+  !!map {
+    ? !!str "explicit key3"
+    : !!null "",
+  },
+  !!map {
+    ? !!str "simple key1"
+    : !!str "explicit value",
+  },
+  !!map {
+    ? !!str "simple key2"
+    : !!null "",
+  },
+]

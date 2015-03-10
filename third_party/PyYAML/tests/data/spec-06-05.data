@@ -1,0 +1,6 @@
+{ first: Sammy, last: Sosa }:
+# Statistics:
+  hr:  # Home runs
+    65
+  avg: # Average
+    0.278

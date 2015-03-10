@@ -1,0 +1,6 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "foo"
+  : !!str "bar"
+}

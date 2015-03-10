@@ -1,0 +1,8 @@
+- !!python/list [1, 2, 3, 4]
+- !!python/tuple [1, 2, 3, 4]
+- !!python/dict {1: 2, 3: 4}
+- !!python/dict
+    !!python/tuple [0,0]: 0
+    !!python/tuple [0,1]: 1
+    !!python/tuple [1,0]: 1
+    !!python/tuple [1,1]: 0

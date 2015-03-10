@@ -1,0 +1,11 @@
+---
+"this --- is correct"
+---
+"this
+...is also
+correct"
+---
+"a quoted scalar
+cannot contain
+---
+document separators"

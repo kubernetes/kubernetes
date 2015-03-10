@@ -1,0 +1,10 @@
+%YAML 1.1
+---
+!!seq [
+  !!str "Without properties",
+  &A !!str "Anchored",
+  !!str "Tagged",
+  *A,
+  !!str "",
+  !!str "",
+]

@@ -1,0 +1,5 @@
+- !StreamStart
+- !DocumentStart { version: [5,6] }
+- !Scalar { value: foo }
+- !DocumentEnd
+- !StreamEnd

@@ -1,0 +1,7 @@
+%YAML 1.1
+---
+!!str "as space \
+  trimmed\n\
+  specific\L\n\
+  escaped\t\n\
+  none"

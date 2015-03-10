@@ -1,0 +1,10 @@
+%YAML 1.1
+---
+!!seq [
+  !!str "flow in block",
+  !!str "Block scalar\n",
+  !!map {
+    ? !!str "foo"
+    : !!str "bar"
+  }
+]

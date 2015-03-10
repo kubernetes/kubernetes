@@ -1,0 +1,3 @@
+value = {}
+instance = AnInstance(value, value)
+value[instance] = instance

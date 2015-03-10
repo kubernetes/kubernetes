@@ -1,0 +1,10 @@
+[
+    MyTestClass1(x=1),
+    MyTestClass1(x=1, y=2, z=3),
+    MyTestClass2(x=10),
+    MyTestClass2(x=10, y=20, z=30),
+    MyTestClass3(x=1),
+    MyTestClass3(x=1, y=2, z=3),
+    MyTestClass3(x=1, y=2, z=3),
+    YAMLObject1(my_parameter='foo', my_another_parameter=[1,2,3])
+]

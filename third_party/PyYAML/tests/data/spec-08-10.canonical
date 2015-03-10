@@ -1,0 +1,23 @@
+%YAML 1.1
+---
+!!map {
+  ? !!str "block styles" : !!map {
+    ? !!str "scalars" : !!map {
+      ? !!str "literal"
+      : !!str "#!/usr/bin/perl\n\
+          print \"Hello,
+          world!\\n\";\n",
+      ? !!str "folded"
+      : !!str "This sentence
+          is false.\n"
+    },
+    ? !!str "collections" : !!map {
+      ? !!str "sequence" : !!seq [
+        !!str "entry",
+        !!map {
+          ? !!str "key" : !!str "value"
+        }
+      ],
+      ? !!str "mapping" : !!map {
+        ? !!str "key" : !!str "value"
+} } } }

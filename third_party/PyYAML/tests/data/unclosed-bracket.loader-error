@@ -1,0 +1,6 @@
+test:
+    - [ foo: bar
+# comment the rest of the stream to let the scanner detect the problem.
+#    - baz
+#"we could have detected the unclosed bracket on the above line, but this would forbid such syntax as": {
+#}

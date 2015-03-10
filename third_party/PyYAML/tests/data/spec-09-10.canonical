@@ -1,0 +1,5 @@
+%YAML 1.1
+---
+!!str "first \
+  inner \
+  last"

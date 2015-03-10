@@ -16,6 +16,10 @@
 
 import os
 import sys
+
+filedir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(
+    0, os.path.normpath(os.path.join(filedir, "../../third_party/PyYAML/lib")))
 import yaml
 
 def mutate_env(path, var, value):

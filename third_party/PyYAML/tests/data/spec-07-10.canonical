@@ -1,0 +1,15 @@
+%YAML 1.1
+---
+!!str "Root flow scalar"
+%YAML 1.1
+---
+!!str "Root block scalar\n"
+%YAML 1.1
+---
+!!map {
+  ? !!str "foo"
+  : !!str "bar"
+}
+---
+#!!str ""
+!!null ""

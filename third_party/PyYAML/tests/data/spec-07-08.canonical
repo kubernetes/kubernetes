@@ -1,0 +1,7 @@
+%YAML 1.1
+---
+!!seq [
+  !<!foo> "bar",
+  !<tag:yaml.org,2002:str> "string",
+  !<tag:ben-kiki.org,2000:type> "baz"
+]

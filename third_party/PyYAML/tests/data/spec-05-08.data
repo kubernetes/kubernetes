@@ -1,0 +1,2 @@
+single: 'text'
+double: "text"

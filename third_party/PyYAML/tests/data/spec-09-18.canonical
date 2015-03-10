@@ -1,0 +1,8 @@
+%YAML 1.1
+---
+!!seq [
+  !!str "literal\n",
+  !!str " folded\n",
+  !!str "keep\n\n",
+  !!str " strip",
+]

@@ -1,0 +1,5 @@
+- !StreamStart
+- !DocumentStart { tags: { '!': '' } }
+- !Scalar { value: 'foo' }
+- !DocumentEnd
+- !StreamEnd

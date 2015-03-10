@@ -1,0 +1,5 @@
+#0.0:   # hash(0) == hash(nan) and 0 == nan in Python 2.3
+1.0: 1
++.inf: 10
+-.inf: -10
+.nan: 100

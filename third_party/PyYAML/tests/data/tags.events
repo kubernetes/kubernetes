@@ -1,0 +1,12 @@
+- !StreamStart
+- !DocumentStart
+- !SequenceStart
+- !Scalar { value: 'data' }
+#- !Scalar { tag: '!', value: 'data' }
+- !Scalar { tag: 'tag:yaml.org,2002:str', value: 'data' }
+- !Scalar { tag: '!myfunnytag', value: 'data' }
+- !Scalar { tag: '!my!ugly!tag', value: 'data' }
+- !Scalar { tag: 'tag:my.domain.org,2002:data!? #', value: 'data' }
+- !SequenceEnd
+- !DocumentEnd
+- !StreamEnd

@@ -1,0 +1,26 @@
+---
+- !tag1
+  x: 1
+- !tag1
+  x: 1
+  'y': 2
+  z: 3
+- !tag2
+  10
+- !tag2
+  =: 10
+  'y': 20
+  z: 30
+- !tag3
+  x: 1
+- !tag3
+  x: 1
+  'y': 2
+  z: 3
+- !tag3
+  =: 1
+  'y': 2
+  z: 3
+- !foo
+  my-parameter: foo
+  my-another-parameter: [1,2,3]

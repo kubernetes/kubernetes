@@ -1,0 +1,4 @@
+--- !!pairs
+- foo: bar
+- baz: bar
+  bar: bar

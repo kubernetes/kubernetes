@@ -1,0 +1,8 @@
+- !StreamStart
+- !DocumentStart
+- !SequenceStart
+- !Scalar { anchor: A, value: data }
+- !Alias { }
+- !SequenceEnd
+- !DocumentEnd
+- !StreamEnd

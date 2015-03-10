@@ -1,0 +1,6 @@
+ERROR:
+ The --- and ... document
+ start and end markers must
+ not be specified as the
+ first content line of a
+ non-indented plain scalar.

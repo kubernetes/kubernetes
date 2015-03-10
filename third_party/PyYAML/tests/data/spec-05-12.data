@@ -1,0 +1,9 @@
+# Tabs do's and don'ts:
+# comment: 	
+quoted: "Quoted		"
+block: |
+  void main() {
+  	printf("Hello, world!\n");
+  }
+elsewhere:	# separation
+	indentation, in	plain scalar

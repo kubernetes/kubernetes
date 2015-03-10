@@ -1,0 +1,12 @@
+%YAML 1.1
+---
+!!seq [
+  !!seq [
+    !!str "inner",
+    !!str "inner",
+  ],
+  !!seq [
+    !!str "inner",
+    !!str "last",
+  ],
+]

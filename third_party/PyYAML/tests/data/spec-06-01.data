@@ -1,0 +1,14 @@
+  # Leading comment line spaces are
+   # neither content nor indentation.
+    
+Not indented:
+ By one space: |
+    By four
+      spaces
+ Flow style: [    # Leading spaces
+   By two,        # in flow style
+  Also by two,    # are neither
+# Tabs are not allowed:
+#  	Still by two   # content nor
+    Still by two   # content nor
+    ]             # indentation.
