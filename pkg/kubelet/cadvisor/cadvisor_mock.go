@@ -25,19 +25,21 @@ type Mock struct {
 	mock.Mock
 }
 
-// ContainerInfo is a mock implementation of CadvisorInterface.ContainerInfo.
+var _ Interface = new(Mock)
+
+// ContainerInfo is a mock implementation of Interface.ContainerInfo.
 func (c *Mock) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)
 	return args.Get(0).(*cadvisorApi.ContainerInfo), args.Error(1)
 }
 
-// DockerContainer is a mock implementation of CadvisorInterface.DockerContainer.
+// DockerContainer is a mock implementation of Interface.DockerContainer.
 func (c *Mock) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)
 	return args.Get(0).(cadvisorApi.ContainerInfo), args.Error(1)
 }
 
-// MachineInfo is a mock implementation of CadvisorInterface.MachineInfo.
+// MachineInfo is a mock implementation of Interface.MachineInfo.
 func (c *Mock) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	args := c.Called()
 	return args.Get(0).(*cadvisorApi.MachineInfo), args.Error(1)

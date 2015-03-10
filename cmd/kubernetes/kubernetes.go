@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -146,7 +147,11 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP
 	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
 	dockerClient := dockertools.ConnectToDockerOrDie(*dockerEndpoint)
-	kubeletapp.SimpleRunKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil)
+	cadvisorInterface, err := cadvisor.New(0)
+	if err != nil {
+		glog.Fatalf("Failed to create cAdvisor: %v", err)
+	}
+	kubeletapp.SimpleRunKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface)
 }
 
 func newApiClient(addr net.IP, port int) *client.Client {
