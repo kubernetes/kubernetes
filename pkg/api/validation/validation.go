@@ -219,7 +219,10 @@ func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorLis
 	if len(meta.UID) == 0 {
 		meta.UID = old.UID
 	}
-	if meta.CreationTimestamp.IsZero() {
+	// ignore changes to timestamp
+	if old.CreationTimestamp.IsZero() {
+		old.CreationTimestamp = meta.CreationTimestamp
+	} else {
 		meta.CreationTimestamp = old.CreationTimestamp
 	}
 
