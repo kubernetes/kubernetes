@@ -722,7 +722,7 @@ type Minion struct {
 	// Resources available on the node
 	NodeResources NodeResources `json:"resources,omitempty" description:"characterization of node resources"`
 	// Pod IP range assigned to the node
-	PodCIDR string `json:"cidr,omitempty" description:"IP range assigned to the node"`
+	PodCIDR string `json:"podCIDR,omitempty" description:"IP range assigned to the node"`
 	// Status describes the current status of a node
 	Status NodeStatus `json:"status,omitempty" description:"current status of node"`
 	// Labels for the node
