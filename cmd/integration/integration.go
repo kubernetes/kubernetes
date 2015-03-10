@@ -780,7 +780,7 @@ func main() {
 	//              1 pod infra container + 2 pods from the URL +
 	//              1 pod infra container + 1 pod from the service test.
 	if len(createdPods) != 9 {
-		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
+		glog.Fatalf("Expected 9 pods; got %v\n\nlist of created pods:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdPods), createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created pods: %#v", createdPods.List())
 }

@@ -99,7 +99,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	builder, err := plugin.NewBuilder(volumeSpec, types.UID(testPodUID))
+	builder, err := plugin.NewBuilder(volumeSpec, &api.ObjectReference{UID: types.UID(testPodUID)})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

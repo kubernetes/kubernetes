@@ -137,6 +137,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
+						SelfLink:  "/api/v1beta1/boundPods/foo",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -177,6 +178,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
+						SelfLink:  "/api/v1beta1/boundPods/foo",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -204,6 +206,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
+						SelfLink:  "/api/v1beta1/boundPods/foo",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -220,6 +223,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						UID:       "222",
 						Name:      "bar" + "-" + hostname,
 						Namespace: "foobar",
+						SelfLink:  "/api/v1beta1/boundPods/bar",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},

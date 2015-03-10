@@ -56,7 +56,7 @@ func TestPlugin(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 	}
-	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestPluginBackCompat(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 	}
-	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestPluginLegacy(t *testing.T) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}, types.UID("poduid")); err == nil {
+	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

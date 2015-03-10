@@ -69,12 +69,12 @@ func (plugin *emptyDirPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
-	return &emptyDir{podUID, spec.Name, plugin, false}, nil
+	return &emptyDir{podRef.UID, spec.Name, plugin, false}, nil
 }
 
 func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {

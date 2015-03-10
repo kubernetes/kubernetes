@@ -71,8 +71,8 @@ func (plugin *FakePlugin) CanSupport(spec *api.Volume) bool {
 	return true
 }
 
-func (plugin *FakePlugin) NewBuilder(spec *api.Volume, podUID types.UID) (Builder, error) {
-	return &FakeVolume{podUID, spec.Name, plugin}, nil
+func (plugin *FakePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
+	return &FakeVolume{podRef.UID, spec.Name, plugin}, nil
 }
 
 func (plugin *FakePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
