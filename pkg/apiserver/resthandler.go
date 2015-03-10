@@ -84,7 +84,7 @@ func GetResource(r RESTGetter, ctxFn ContextFunc, namer ScopeNamer, codec runtim
 }
 
 func parseSelectorQueryParams(query url.Values, version, apiResource string) (label labels.Selector, field fields.Selector, err error) {
-	labelString := query.Get("labels")
+	labelString := query.Get(api.LabelSelectorQueryParam(version))
 	label, err = labels.Parse(labelString)
 	if err != nil {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'labels' selector parameter (%s) could not be parsed: %v", labelString, err))
@@ -93,7 +93,7 @@ func parseSelectorQueryParams(query url.Values, version, apiResource string) (la
 	convertToInternalVersionFunc := func(label, value string) (newLabel, newValue string, err error) {
 		return api.Scheme.ConvertFieldLabel(version, apiResource, label, value)
 	}
-	fieldString := query.Get("fields")
+	fieldString := query.Get(api.FieldSelectorQueryParam(version))
 	field, err = fields.ParseAndTransformSelector(fieldString, convertToInternalVersionFunc)
 	if err != nil {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'fields' selector parameter (%s) could not be parsed: %v", fieldString, err))

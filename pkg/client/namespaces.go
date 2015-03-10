@@ -58,7 +58,7 @@ func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 // List lists all the namespaces in the cluster.
 func (c *namespaces) List(selector labels.Selector) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
-	err := c.r.Get().Resource("namespaces").SelectorParam("labels", selector).Do().Into(result)
+	err := c.r.Get().Resource("namespaces").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return result, err
 }
 
@@ -95,7 +95,7 @@ func (c *namespaces) Watch(label, field labels.Selector, resourceVersion string)
 		Prefix("watch").
 		Resource("namespaces").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

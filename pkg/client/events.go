@@ -100,8 +100,8 @@ func (e *events) List(label, field labels.Selector) (*api.EventList, error) {
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(e.client.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(e.client.APIVersion()), field).
 		Do().
 		Into(result)
 	return result, err
@@ -130,8 +130,8 @@ func (e *events) Watch(label, field labels.Selector, resourceVersion string) (wa
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(e.client.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(e.client.APIVersion()), field).
 		Watch()
 }
 

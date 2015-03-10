@@ -54,7 +54,12 @@ func newServices(c *Client, namespace string) *services {
 // List takes a selector, and returns the list of services that match that selector
 func (c *services) List(selector labels.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
-	err = c.r.Get().Namespace(c.ns).Resource("services").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().
+		Namespace(c.ns).
+		Resource("services").
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
+		Do().
+		Into(result)
 	return
 }
 
@@ -99,7 +104,7 @@ func (c *services) Watch(label, field labels.Selector, resourceVersion string) (
 		Namespace(c.ns).
 		Resource("services").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

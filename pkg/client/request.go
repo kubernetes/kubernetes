@@ -110,6 +110,8 @@ type Request struct {
 	selector     labels.Selector
 	timeout      time.Duration
 
+	apiVersion string
+
 	// output
 	err  error
 	body io.Reader
@@ -120,7 +122,7 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL,
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
 	codec runtime.Codec, namespaceInQuery bool, preserveResourceCase bool) *Request {
 	return &Request{
 		client:  client,

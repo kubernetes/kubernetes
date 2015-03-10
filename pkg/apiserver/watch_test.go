@@ -188,13 +188,13 @@ func TestWatchParamParsing(t *testing.T) {
 			fieldSelector:   "",
 			namespace:       api.NamespaceAll,
 		}, {
-			rawQuery:        "namespace=default&resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			rawQuery:        "namespace=default&resourceVersion=314159&" + api.FieldSelectorQueryParam(testVersion) + "=Host%3D&" + api.LabelSelectorQueryParam(testVersion) + "=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       api.NamespaceDefault,
 		}, {
-			rawQuery:        "namespace=watchother&fields=id%3dfoo&resourceVersion=1492",
+			rawQuery:        "namespace=watchother&" + api.FieldSelectorQueryParam(testVersion) + "=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",

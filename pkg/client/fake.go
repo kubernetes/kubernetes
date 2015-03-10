@@ -21,6 +21,7 @@ import (
 	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -124,19 +125,19 @@ type FakeRESTClient struct {
 }
 
 func (c *FakeRESTClient) Get() *Request {
-	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
+	return NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec, c.Legacy, c.Legacy)
 }
 
 func (c *FakeRESTClient) Put() *Request {
-	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
+	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec, c.Legacy, c.Legacy)
 }
 
 func (c *FakeRESTClient) Post() *Request {
-	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
+	return NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec, c.Legacy, c.Legacy)
 }
 
 func (c *FakeRESTClient) Delete() *Request {
-	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, c.Codec, c.Legacy, c.Legacy)
+	return NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec, c.Legacy, c.Legacy)
 }
 
 func (c *FakeRESTClient) Do(req *http.Request) (*http.Response, error) {
