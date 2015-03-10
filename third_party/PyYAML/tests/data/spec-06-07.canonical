@@ -1,6 +1,0 @@
-%YAML 1.1
----
-!!seq [
-  !!str "foo\nbar",
-  !!str "foo\n\nbar"
-]

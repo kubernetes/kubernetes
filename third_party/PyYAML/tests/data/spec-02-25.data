@@ -1,7 +1,0 @@
-# sets are represented as a
-# mapping where each key is
-# associated with the empty string
---- !!set
-? Mark McGwire
-? Sammy Sosa
-? Ken Griff

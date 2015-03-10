@@ -44,6 +44,3 @@ network_closure.sh
 /third_party/etcd*
 
 .tags*
-
-# Any compiled python
-*.pyc

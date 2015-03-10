@@ -1,8 +1,0 @@
-- !StreamStart
-- !DocumentStart
-- !SequenceStart
-- !Scalar { anchor: 'myanchor', tag: '!mytag', value: 'data' }
-- !Alias { anchor: 'myanchor' }
-- !SequenceEnd
-- !DocumentEnd
-- !StreamEnd

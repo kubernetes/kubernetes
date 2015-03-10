@@ -1,7 +1,0 @@
-ERROR:
-- A leading all-space line must
-  not have too many spaces.
-- A following text line must
-  not be less indented.
-- The text is less indented
-  than the indicated level.

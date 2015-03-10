@@ -1,6 +1,0 @@
-- !StreamStart
-- !DocumentStart
-- !Scalar { value: 'data 1' }
-- !Scalar { value: 'data 2' }
-- !DocumentEnd
-- !StreamEnd

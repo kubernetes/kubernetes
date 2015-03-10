@@ -1,8 +1,0 @@
-[
-    datetime.datetime(2001, 12, 15, 3, 29, 43, 100000),
-    datetime.datetime(2001, 12, 14, 16, 29, 43, 100000),
-    datetime.datetime(2001, 12, 14, 21, 59, 43, 1010),
-    datetime.datetime(2001, 12, 14, 21, 59, 43, 0, FixedOffset(60, "+1")),
-    datetime.datetime(2001, 12, 14, 21, 59, 43, 0, FixedOffset(-90, "-1:30")),
-    datetime.datetime(2005, 7, 8, 17, 35, 4, 517600),
-]

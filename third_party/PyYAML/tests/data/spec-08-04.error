@@ -1,6 +1,0 @@
-ERROR:
-- Verbatim tags aren't resolved,
-  so ! is invalid.
-- The $:? tag is neither a global
-  URI tag nor a local tag starting
-  with “!”.

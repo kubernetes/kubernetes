@@ -1,6 +1,0 @@
-%YAML 1.1
----
-!!map {
-  ? !<tag:yaml.org,2002:str> "foo"
-  : !<!bar> "baz"
-}

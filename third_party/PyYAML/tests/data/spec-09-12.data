@@ -1,8 +1,0 @@
-# Outside flow collection:
-- ::std::vector
-- Up, up, and away!
-- -123
-# Inside flow collection:
-- [ '::std::vector',
-  "Up, up, and away!",
-  -123 ]

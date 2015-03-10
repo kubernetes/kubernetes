@@ -1,7 +1,0 @@
-plain: text
-  lines
-quoted: "text
-  	lines"
-block: |
-  text
-   	lines

@@ -1,8 +1,0 @@
-%YAML 1.1
----
-!!map {
-  ? !!str "First occurrence"
-  : &A !!str "Value",
-  ? !!str "Second occurrence"
-  : *A
-}

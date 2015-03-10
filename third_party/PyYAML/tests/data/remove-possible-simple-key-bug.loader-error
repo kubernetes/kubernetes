@@ -1,3 +1,0 @@
-foo: &A bar
-*A ]    # The ']' indicator triggers remove_possible_simple_key,
-        # which should raise an error.
