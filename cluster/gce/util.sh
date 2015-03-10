@@ -418,13 +418,13 @@ function add-instance-metadata-from-file {
   done
 }
 
-# Given a yaml file, add or mutate the given env variable
+# Quote something appropriate for a yaml string.
 #
-# TODO(zmerlynn): Yes, this is an O(n^2) build-up right now. If we end
-# up with so many environment variables feeding into Salt that this
-# matters, there's probably an issue...
-function add-to-env {
-  ${KUBE_ROOT}/cluster/gce/kube-env.py "$1" "$2" "$3"
+# TODO(zmerlynn): Note that this function doesn't so much "quote" as
+# "strip out quotes", and we really should be using a YAML library for
+# this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
+function yaml-quote {
+  echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
 }
 
 # $1: if 'true', we're building a master yaml, else a node
@@ -433,29 +433,34 @@ function build-kube-env {
   local file=$2
 
   rm -f ${file}
-  add-to-env ${file} ENV_TIMESTAMP "$(date -uIs)" # Just to track it
-  add-to-env ${file} KUBERNETES_MASTER "${master}"
-  add-to-env ${file} INSTANCE_PREFIX "${INSTANCE_PREFIX}"
-  add-to-env ${file} NODE_INSTANCE_PREFIX "${NODE_INSTANCE_PREFIX}"
-  add-to-env ${file} SERVER_BINARY_TAR_URL "${SERVER_BINARY_TAR_URL}"
-  add-to-env ${file} SALT_TAR_URL "${SALT_TAR_URL}"
-  add-to-env ${file} PORTAL_NET "${PORTAL_NET}"
-  add-to-env ${file} ENABLE_CLUSTER_MONITORING "${ENABLE_CLUSTER_MONITORING:-false}"
-  add-to-env ${file} ENABLE_NODE_MONITORING "${ENABLE_NODE_MONITORING:-false}"
-  add-to-env ${file} ENABLE_CLUSTER_LOGGING "${ENABLE_CLUSTER_LOGGING:-false}"
-  add-to-env ${file} ENABLE_NODE_LOGGING "${ENABLE_NODE_LOGGING:-false}"
-  add-to-env ${file} LOGGING_DESTINATION "${LOGGING_DESTINATION:-}"
-  add-to-env ${file} ELASTICSEARCH_LOGGING_REPLICAS "${ELASTICSEARCH_LOGGING_REPLICAS:-}"
-  add-to-env ${file} ENABLE_CLUSTER_DNS "${ENABLE_CLUSTER_DNS:-false}"
-  add-to-env ${file} DNS_REPLICAS "${DNS_REPLICAS:-}"
-  add-to-env ${file} DNS_SERVER_IP "${DNS_SERVER_IP:-}"
-  add-to-env ${file} DNS_DOMAIN "${DNS_DOMAIN:-}"
-  add-to-env ${file} MASTER_HTPASSWD "${MASTER_HTPASSWD}"
+  cat >$file <<EOF
+ENV_TIMESTAMP: $(yaml-quote $(date -uIs))
+KUBERNETES_MASTER: $(yaml-quote ${master})
+INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
+NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
+SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
+SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
+PORTAL_NET: $(yaml-quote ${PORTAL_NET})
+ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-false})
+ENABLE_NODE_MONITORING: $(yaml-quote ${ENABLE_NODE_MONITORING:-false})
+ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
+ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
+LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
+ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
+ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
+DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
+DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
+DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
+MASTER_HTPASSWD: $(yaml-quote ${MASTER_HTPASSWD})
+EOF
+
   if [[ "${master}" != "true" ]]; then
-    add-to-env ${file} KUBERNETES_MASTER_NAME "${MASTER_NAME}"
-    add-to-env ${file} ZONE "${ZONE}"
-    add-to-env ${file} EXTRA_DOCKER_OPTS "${EXTRA_DOCKER_OPTS}"
-    add-to-env ${file} ENABLE_DOCKER_REGISTRY_CACHE "${ENABLE_DOCKER_REGISTRY_CACHE:-false}"
+    cat >>$file <<EOF
+KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
+ZONE: $(yaml-quote ${ZONE})
+EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
+ENABLE_DOCKER_REGISTRY_CACHE: $(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
+EOF
   fi
 }
 
