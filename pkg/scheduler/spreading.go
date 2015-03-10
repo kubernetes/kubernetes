@@ -36,17 +36,22 @@ func NewServiceSpreadPriority(serviceLister ServiceLister) PriorityFunction {
 // on the same machine.
 func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var maxCount int
-	var pods []api.Pod
-	var err error
+	var nsServicePods []api.Pod
 
 	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
 		selector := labels.SelectorFromSet(services[0].Spec.Selector)
-		pods, err = podLister.List(selector)
+		pods, err := podLister.List(selector)
 		if err != nil {
 			return nil, err
+		}
+		// consider only the pods that belong to the same namespace
+		for _, nsPod := range pods {
+			if nsPod.Namespace == pod.Namespace {
+				nsServicePods = append(nsServicePods, nsPod)
+			}
 		}
 	}
 
@@ -56,8 +61,8 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister
 	}
 
 	counts := map[string]int{}
-	if len(pods) > 0 {
-		for _, pod := range pods {
+	if len(nsServicePods) > 0 {
+		for _, pod := range nsServicePods {
 			counts[pod.Status.Host]++
 			// Compute the maximum number of pods hosted on any minion
 			if counts[pod.Status.Host] > maxCount {
@@ -97,16 +102,22 @@ func NewServiceAntiAffinityPriority(serviceLister ServiceLister, label string) P
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
 func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	var pods []api.Pod
+	var nsServicePods []api.Pod
 
 	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
 		selector := labels.SelectorFromSet(services[0].Spec.Selector)
-		pods, err = podLister.List(selector)
+		pods, err := podLister.List(selector)
 		if err != nil {
 			return nil, err
+		}
+		// consider only the pods that belong to the same namespace
+		for _, nsPod := range pods {
+			if nsPod.Namespace == pod.Namespace {
+				nsServicePods = append(nsServicePods, nsPod)
+			}
 		}
 	}
 
@@ -128,7 +139,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podList
 	}
 
 	podCounts := map[string]int{}
-	for _, pod := range pods {
+	for _, pod := range nsServicePods {
 		label, exists := labeledMinions[pod.Status.Host]
 		if !exists {
 			continue
@@ -136,7 +147,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podList
 		podCounts[label]++
 	}
 
-	numServicePods := len(pods)
+	numServicePods := len(nsServicePods)
 	result := []HostPriority{}
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest

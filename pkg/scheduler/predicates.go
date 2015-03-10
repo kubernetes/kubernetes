@@ -264,9 +264,16 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.P
 			if err != nil {
 				return false, err
 			}
-			if len(servicePods) > 0 {
+			// consider only the pods that belong to the same namespace
+			nsServicePods := []api.Pod{}
+			for _, nsPod := range servicePods {
+				if nsPod.Namespace == pod.Namespace {
+					nsServicePods = append(nsServicePods, nsPod)
+				}
+			}
+			if len(nsServicePods) > 0 {
 				// consider any service pod and fetch the minion its hosted on
-				otherMinion, err := s.nodeInfo.GetNodeInfo(servicePods[0].Status.Host)
+				otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Status.Host)
 				if err != nil {
 					return false, err
 				}
