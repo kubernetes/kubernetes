@@ -303,6 +303,7 @@ function kube::build::build_image() {
     api
     build
     cmd
+    docs/getting-started-guides
     examples
     Godeps/_workspace/src
     Godeps/Godeps.json
