@@ -814,7 +814,7 @@ type NodeSpec struct {
 	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
 	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"`
 	// PodCIDR represents the pod IP range assigned to the node
-	PodCIDR string `json:"cidr,omitempty" description:"pod IP range assined to the node"`
+	PodCIDR string `json:"podCIDR,omitempty" description:"pod IP range assigned to the node"`
 	// External ID of the node assigned by some machine database (e.g. a cloud provider)
 	ExternalID string `json:"externalID,omitempty" description:"external ID assigned to the node by some machine database (e.g. a cloud provider)"`
 }
