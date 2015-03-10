@@ -70,9 +70,9 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
-func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podUID, &GCEDiskUtil{}, mount.New())
+	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mount.New())
 }
 
 func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {

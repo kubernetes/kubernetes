@@ -69,13 +69,13 @@ func (plugin *gitRepoPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
-func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
+func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 	return &gitRepo{
-		podUID:     podUID,
+		podUID:     podRef.UID,
 		volName:    spec.Name,
 		source:     spec.GitRepo.Repository,
 		revision:   spec.GitRepo.Revision,

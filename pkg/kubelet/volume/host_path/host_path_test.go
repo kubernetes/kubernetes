@@ -55,7 +55,7 @@ func TestPlugin(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/vol1"}},
 	}
-	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

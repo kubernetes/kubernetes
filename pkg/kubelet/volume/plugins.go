@@ -49,8 +49,8 @@ type Plugin interface {
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
-	// - podUID: The UID of the enclosing pod
-	NewBuilder(spec *api.Volume, podUID types.UID) (Builder, error)
+	// - podRef: a reference to the enclosing pod
+	NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.

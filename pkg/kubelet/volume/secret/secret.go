@@ -58,12 +58,12 @@ func (plugin *secretPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
-func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, podUID)
+func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, podRef)
 }
 
-func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
-	return &secretVolume{spec.Name, podUID, plugin, &spec.Secret.Target}, nil
+func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+	return &secretVolume{spec.Name, podRef, plugin, &spec.Secret.Target}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -71,14 +71,14 @@ func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume
 }
 
 func (plugin *secretPlugin) newCleanerInternal(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &secretVolume{volName, podUID, plugin, nil}, nil
+	return &secretVolume{volName, &api.ObjectReference{UID: podUID}, plugin, nil}, nil
 }
 
 // secretVolume handles retrieving secrets from the API server
 // and placing them into the volume on the host.
 type secretVolume struct {
 	volName   string
-	podUID    types.UID
+	podRef    *api.ObjectReference
 	plugin    *secretPlugin
 	secretRef *api.ObjectReference
 }
@@ -86,7 +86,7 @@ type secretVolume struct {
 func (sv *secretVolume) SetUp() error {
 	// TODO: explore tmpfs for secret volumes
 	hostPath := sv.GetPath()
-	glog.V(3).Infof("Setting up volume %v for pod %v at %v", sv.volName, sv.podUID, hostPath)
+	glog.V(3).Infof("Setting up volume %v for pod %v at %v", sv.volName, sv.podRef.UID, hostPath)
 	err := os.MkdirAll(hostPath, 0777)
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func (sv *secretVolume) SetUp() error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", sv)
 	}
 
-	secret, err := kubeClient.Secrets(sv.secretRef.Namespace).Get(sv.secretRef.Name)
+	secret, err := kubeClient.Secrets(sv.podRef.Namespace).Get(sv.secretRef.Name)
 	if err != nil {
 		glog.Errorf("Couldn't get secret %v/%v", sv.secretRef.Namespace, sv.secretRef.Name)
 		return err
@@ -116,11 +116,11 @@ func (sv *secretVolume) SetUp() error {
 }
 
 func (sv *secretVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, volume.EscapePluginName(secretPluginName), sv.volName)
+	return sv.plugin.host.GetPodVolumeDir(sv.podRef.UID, volume.EscapePluginName(secretPluginName), sv.volName)
 }
 
 func (sv *secretVolume) TearDown() error {
-	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", sv.volName, sv.podUID, sv.GetPath())
+	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", sv.volName, sv.podRef.UID, sv.GetPath())
 	tmpDir, err := volume.RenameDirectory(sv.GetPath(), sv.volName+".deleting~")
 	if err != nil {
 		return err
