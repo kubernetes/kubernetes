@@ -11,11 +11,9 @@ base:
 {% else %}
     - sdn
 {% endif %}
+    - cadvisor
     - kubelet
     - kube-proxy
-{% if pillar.get('enable_node_monitoring', '').lower() == 'true' %}
-    - cadvisor
-{% endif %}
 {% if pillar.get('enable_node_logging', '').lower() == 'true' %}
   {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es

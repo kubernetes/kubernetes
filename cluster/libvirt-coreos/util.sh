@@ -126,9 +126,6 @@ function initialize-pool {
   kube-push
 
   mkdir -p "$POOL_PATH/kubernetes/manifests"
-  if [[ "$ENABLE_NODE_MONITORING" == "true" ]]; then
-      cp "$KUBE_ROOT/cluster/saltbase/salt/cadvisor/cadvisor.manifest" "$POOL_PATH/kubernetes/manifests"
-  fi
   if [[ "$ENABLE_NODE_LOGGING" == "true" ]]; then
       if [[ "$LOGGING_DESTINATION" == "elasticsearch" ]]; then
           cp "$KUBE_ROOT/cluster/saltbase/salt/fluentd-es/fluentd-es.manifest" "$POOL_PATH/kubernetes/manifests"
