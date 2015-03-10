@@ -1337,12 +1337,12 @@ func init() {
 			case "name":
 				return "name", value, nil
 			case "DesiredState.Host":
-				return "Status.Host", value, nil
+				return "status.host", value, nil
 			case "DesiredState.Status":
 				podStatus := PodStatus(value)
 				var internalValue newer.PodPhase
 				newer.Scheme.Convert(&podStatus, &internalValue)
-				return "Status.Phase", string(internalValue), nil
+				return "status.phase", string(internalValue), nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}

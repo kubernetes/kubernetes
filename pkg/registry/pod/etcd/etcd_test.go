@@ -337,16 +337,16 @@ func TestListPodListSelection(t *testing.T) {
 			label:       "label=qux",
 			expectedIDs: util.NewStringSet("qux"),
 		}, {
-			field:       "Status.Phase=Failed",
+			field:       "status.phase=Failed",
 			expectedIDs: util.NewStringSet("baz"),
 		}, {
-			field:       "Status.Host=barhost",
+			field:       "status.host=barhost",
 			expectedIDs: util.NewStringSet("bar"),
 		}, {
-			field:       "Status.Host=",
+			field:       "status.host=",
 			expectedIDs: util.NewStringSet("foo", "baz", "qux", "zot"),
 		}, {
-			field:       "Status.Host!=",
+			field:       "status.host!=",
 			expectedIDs: util.NewStringSet("bar"),
 		},
 	}
