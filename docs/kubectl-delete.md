@@ -17,7 +17,7 @@ submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.
 ```
 
-kubectl delete ([-f filename] | (<resource> [(<id> | -l <label> | --all)]
+kubectl delete (-f filename | <resource> (<id> | -l <label> | --all))
 
 ### Examples
 

@@ -11,13 +11,16 @@ Attempts to shut down and delete a resource that supports graceful termination.
 If the resource is resizable it will be resized to 0 before deletion.
 ```
 
-kubectl stop (<resource> <id>|-f filename)
+kubectl stop (-f filename | <resource> (<id> | -l <label> | --all))
 
 ### Examples
 
 ```
 // Shut down foo.
 $ kubectl stop replicationcontroller foo
+
+// Stop pods and services with label name=myLabel.
+$ kubectl stop pods,services -l name=myLabel
 
 // Shut down the service defined in service.json
 $ kubectl stop -f service.json
@@ -29,7 +32,9 @@ $ kubectl stop -f path/to/resources
 ### Options
 
 ```
+      --all=false: [-all] to select all the specified resources
   -f, --filename=[]: Filename, directory, or URL to file of resource(s) to be stopped
+  -l, --selector="": Selector (label query) to filter on
 ```
 
 ### Options inherrited from parent commands
