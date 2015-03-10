@@ -69,7 +69,7 @@ func TestEnsureEndpointsContain(t *testing.T) {
 				},
 			},
 			masterCount:       1,
-			expectedEndpoints: []api.Endpoint{{"1.2.3.4", 8080}},
+			expectedEndpoints: []api.Endpoint{{"1.2.3.4", 8080, nil}},
 		},
 		{
 			serviceName:  "foo",
@@ -120,7 +120,7 @@ func TestEnsureEndpointsContain(t *testing.T) {
 				},
 			},
 			masterCount:       2,
-			expectedEndpoints: []api.Endpoint{{"4.3.2.1", 9090}, {"1.2.3.4", 8080}},
+			expectedEndpoints: []api.Endpoint{{"4.3.2.1", 9090, nil}, {"1.2.3.4", 8080, nil}},
 		},
 		{
 			serviceName:  "foo",
@@ -150,7 +150,7 @@ func TestEnsureEndpointsContain(t *testing.T) {
 				},
 			},
 			masterCount:       2,
-			expectedEndpoints: []api.Endpoint{{"1.2.3.4", 8000}, {"1.2.3.4", 8080}},
+			expectedEndpoints: []api.Endpoint{{"1.2.3.4", 8000, nil}, {"1.2.3.4", 8080, nil}},
 		},
 	}
 	for _, test := range tests {
@@ -170,7 +170,7 @@ func TestEnsureEndpointsContain(t *testing.T) {
 		}
 		if test.expectUpdate {
 			if test.expectedEndpoints == nil {
-				test.expectedEndpoints = []api.Endpoint{{test.ip, test.port}}
+				test.expectedEndpoints = []api.Endpoint{{test.ip, test.port, nil}}
 			}
 			expectedUpdate := api.Endpoints{
 				ObjectMeta: api.ObjectMeta{

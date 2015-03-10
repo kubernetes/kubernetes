@@ -607,6 +607,12 @@ type Service struct {
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
 }
 
+// EndpointObjectReference is a reference to an object exposing the endpoint
+type EndpointObjectReference struct {
+	Endpoint        string `json:"endpoint" description:"endpoint exposed by the referenced object"`
+	ObjectReference `json:"targetRef" description:"reference to the object providing the entry point"`
+}
+
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
@@ -615,6 +621,8 @@ type Endpoints struct {
 	// "UDP".  Defaults to "TCP".
 	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"`
 	Endpoints []string `json:"endpoints" description:"list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
+	// Optional: The kubernetes object related to the entry point.
+	TargetRefs []EndpointObjectReference `json:"targetRefs,omitempty" description:"list of references to objects providing the endpoints"`
 }
 
 // EndpointsList is a list of endpoints.

@@ -408,8 +408,15 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Protocol:  api.ProtocolTCP,
-		Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
+		Protocol: api.ProtocolTCP,
+		Endpoints: []api.Endpoint{{
+			IP:   "1.2.3.4",
+			Port: 8080,
+			TargetRef: &api.ObjectReference{
+				Kind: "Pod",
+				Name: "pod0",
+			},
+		}},
 	})
 	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=other", "PUT", &data)
 }
@@ -449,8 +456,15 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Protocol:  api.ProtocolTCP,
-		Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
+		Protocol: api.ProtocolTCP,
+		Endpoints: []api.Endpoint{{
+			IP:   "1.2.3.4",
+			Port: 8080,
+			TargetRef: &api.ObjectReference{
+				Kind: "Pod",
+				Name: "pod0",
+			},
+		}},
 	})
 	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=bar", "PUT", &data)
 }
@@ -475,8 +489,15 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Protocol:  api.ProtocolTCP,
-			Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
+			Protocol: api.ProtocolTCP,
+			Endpoints: []api.Endpoint{{
+				IP:   "1.2.3.4",
+				Port: 8080,
+				TargetRef: &api.ObjectReference{
+					Kind: "Pod",
+					Name: "pod0",
+				},
+			}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -514,8 +535,15 @@ func TestSyncEndpointsItems(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			ResourceVersion: "",
 		},
-		Protocol:  api.ProtocolTCP,
-		Endpoints: []api.Endpoint{{IP: "1.2.3.4", Port: 8080}},
+		Protocol: api.ProtocolTCP,
+		Endpoints: []api.Endpoint{{
+			IP:   "1.2.3.4",
+			Port: 8080,
+			TargetRef: &api.ObjectReference{
+				Kind: "Pod",
+				Name: "pod0",
+			},
+		}},
 	})
 	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints?namespace=other", "POST", &data)
 }

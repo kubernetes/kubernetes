@@ -36,6 +36,7 @@ func init() {
 	newer.Scheme.AddStructFieldConversion(newer.TypeMeta{}, "TypeMeta", TypeMeta{}, "TypeMeta")
 	newer.Scheme.AddStructFieldConversion(newer.ObjectMeta{}, "ObjectMeta", TypeMeta{}, "TypeMeta")
 	newer.Scheme.AddStructFieldConversion(newer.ListMeta{}, "ListMeta", TypeMeta{}, "TypeMeta")
+	newer.Scheme.AddStructFieldConversion(newer.Endpoints{}, "Endpoints", Endpoints{}, "Endpoints")
 
 	// TODO: scope this to a specific type once that becomes available and remove the Event conversion functions below
 	// newer.Scheme.AddStructFieldConversion(string(""), "Status", string(""), "Condition")
@@ -1093,7 +1094,17 @@ func init() {
 			}
 			for i := range in.Endpoints {
 				ep := &in.Endpoints[i]
-				out.Endpoints = append(out.Endpoints, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
+				hostPort := net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port))
+				out.Endpoints = append(out.Endpoints, hostPort)
+				if ep.TargetRef != nil {
+					target := EndpointObjectReference{
+						Endpoint: hostPort,
+					}
+					if err := s.Convert(ep.TargetRef, &target.ObjectReference, 0); err != nil {
+						return err
+					}
+					out.TargetRefs = append(out.TargetRefs, target)
+				}
 			}
 			return nil
 		},
@@ -1120,6 +1131,15 @@ func init() {
 					return err
 				}
 				ep.Port = pn
+				for j := range in.TargetRefs {
+					if in.TargetRefs[j].Endpoint != in.Endpoints[i] {
+						continue
+					}
+					ep.TargetRef = &newer.ObjectReference{}
+					if err := s.Convert(&in.TargetRefs[j], ep.TargetRef, 0); err != nil {
+						return err
+					}
+				}
 			}
 			return nil
 		},
