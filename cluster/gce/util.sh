@@ -216,9 +216,6 @@ function detect-master () {
     KUBE_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${MASTER_NAME}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
-    KUBE_MASTER_IP_INTERNAL=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-      "${MASTER_NAME}" --fields networkInterfaces[0].networkIP \
-      --format=text | awk '{ print $2 }')
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
@@ -455,7 +452,7 @@ function build-kube-env {
   add-to-env ${file} DNS_DOMAIN "${DNS_DOMAIN:-}"
   add-to-env ${file} MASTER_HTPASSWD "${MASTER_HTPASSWD}"
   if [[ "${master}" != "true" ]]; then
-    add-to-env ${file} KUBERNETES_MASTER_IP "${KUBE_MASTER_IP_INTERNAL}"
+    add-to-env ${file} KUBERNETES_MASTER_NAME "${MASTER_NAME}"
     add-to-env ${file} ZONE "${ZONE}"
     add-to-env ${file} EXTRA_DOCKER_OPTS "${EXTRA_DOCKER_OPTS}"
     add-to-env ${file} ENABLE_DOCKER_REGISTRY_CACHE "${ENABLE_DOCKER_REGISTRY_CACHE:-false}"
@@ -558,7 +555,6 @@ function kube-up {
 
   # Wait for last batch of jobs
   wait-for-jobs
-  detect-master # We need the KUBE_MASTER_IP_INTERNAL for the node startup script
   add-instance-metadata "${MASTER_NAME}" "kube-token=${KUBELET_TOKEN}"
 
   echo "Creating minions."
@@ -613,6 +609,8 @@ function kube-up {
 
   # Wait for last batch of jobs.
   wait-for-jobs
+
+  detect-master
 
   # Reserve the master's IP so that it can later be transferred to another VM
   # without disrupting the kubelets. IPs are associated with regions, not zones,

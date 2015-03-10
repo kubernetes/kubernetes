@@ -302,9 +302,15 @@ EOF
 }
 
 function salt-set-apiserver() {
+  local kube_master_ip
+  until kube_master_ip=$(getent hosts ${KUBERNETES_MASTER_NAME} | cut -f1 -d\ ); do
+    echo 'Waiting for DNS resolution of ${KUBERNETES_MASTER_NAME}...'
+    sleep 3
+  done
+
   cat <<EOF >>/etc/salt/minion.d/grains.conf
-  api_servers: '${KUBERNETES_MASTER_IP}'
-  apiservers: '${KUBERNETES_MASTER_IP}'
+  api_servers: '${kube_master_ip}'
+  apiservers: '${kube_master_ip}'
 EOF
 }
 
