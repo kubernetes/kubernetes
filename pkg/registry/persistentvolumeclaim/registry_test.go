@@ -42,18 +42,18 @@ func NewTestPersistentVolumeClaimEtcdRegistry(t *testing.T) (*tools.FakeEtcdClie
 }
 
 func TestPersistentVolumeClaimCreate(t *testing.T) {
-	storageDeviceA := &api.PersistentVolumeClaim{
+	claimA := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 
-	storageDeviceB := &api.PersistentVolumeClaim{
+	claimB := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 
 	nodeWithDeviceA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), storageDeviceA),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), claimA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -82,13 +82,13 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 		"normal": {
 			existing: emptyNode,
 			expect:   nodeWithDeviceA,
-			toCreate: storageDeviceA,
+			toCreate: claimA,
 			errOK:    func(err error) bool { return err == nil },
 		},
 		"preExisting": {
 			existing: nodeWithDeviceA,
 			expect:   nodeWithDeviceA,
-			toCreate: storageDeviceB,
+			toCreate: claimB,
 			errOK:    errors.IsAlreadyExists,
 		},
 	}
