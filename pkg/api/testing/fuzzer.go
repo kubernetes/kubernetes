@@ -198,6 +198,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			s.Type = api.SecretTypeOpaque
 		},
+		func(s *api.NamespaceStatus, c fuzz.Continue) {
+			s.Phase = api.NamespaceActive
+		},
 		func(ep *api.Endpoint, c fuzz.Continue) {
 			// TODO: If our API used a particular type for IP fields we could just catch that here.
 			ep.IP = fmt.Sprintf("%d.%d.%d.%d", c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256))

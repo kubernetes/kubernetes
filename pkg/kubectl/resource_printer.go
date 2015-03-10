@@ -237,7 +237,7 @@ var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
-var namespaceColumns = []string{"NAME", "LABELS"}
+var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "DATA"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
@@ -402,7 +402,7 @@ func printEndpointsList(list *api.EndpointsList, w io.Writer) error {
 }
 
 func printNamespace(item *api.Namespace, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", item.Name, formatLabels(item.Labels))
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", item.Name, formatLabels(item.Labels), item.Status.Phase)
 	return err
 }
 
