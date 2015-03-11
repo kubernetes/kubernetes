@@ -28,9 +28,13 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-if [[ $(find . | wc -l) != 1 ]]; then
-    echo $PWD not empty, bailing!
-    exit 1
+if [[ "${CIRCLECI:-}" == "true" ]]; then
+    JOB_NAME="circleci-${CIRCLE_PROJECT_USERNAME}-${CIRCLE_PROJECT_REPONAME}"
+    BUILD_NUMBER=${CIRCLE_BUILD_NUM}
+    WORKSPACE=`pwd`
+else
+    # Jenkins?
+    export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 fi
 
 # Unlike the kubernetes-build script, we expect some environment
@@ -49,6 +53,11 @@ echo "E2E_OPT: ${E2E_OPT}"                         # hack/e2e.go options
 echo "E2E_SET_CLUSTER_API_VERSION: ${E2E_SET_CLUSTER_API_VERSION:-<not set>}" # optional, for GKE, set CLUSTER_API_VERSION to git hash
 echo "--------------------------------------------------------------------------------"
 
+
+# AWS variables
+export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
+export KUBE_AWS_ZONE=${E2E_ZONE}
+
 # GCE variables
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
 export KUBE_GCE_ZONE=${E2E_ZONE}
@@ -60,13 +69,24 @@ export ZONE=${E2E_ZONE}
 export KUBE_GKE_NETWORK=${E2E_NETWORK}
 
 export PATH=${PATH}:/usr/local/go/bin
-export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export KUBE_SKIP_CONFIRMATIONS=y
 
-# sudo gcloud components update -q
+if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
+    echo "Found KUBE_RUN_FROM_OUTPUT=y; will use binaries from _output"
+    cp _output/release-tars/kubernetes*.tar.gz .
+else
+    echo "Pulling binaries from GCS"
+    if [[ $(find . | wc -l) != 1 ]]; then
+        echo $PWD not empty, bailing!
+        exit 1
+    fi
 
-GITHASH=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
-gsutil -m cp gs://kubernetes-release/ci/${GITHASH}/kubernetes.tar.gz gs://kubernetes-release/ci/${GITHASH}/kubernetes-test.tar.gz .
+    # sudo gcloud components update -q
+
+    GITHASH=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
+    gsutil -m cp gs://kubernetes-release/ci/${GITHASH}/kubernetes.tar.gz gs://kubernetes-release/ci/${GITHASH}/kubernetes-test.tar.gz .
+fi
+
 md5sum kubernetes*.tar.gz
 tar -xzf kubernetes.tar.gz
 tar -xzf kubernetes-test.tar.gz
