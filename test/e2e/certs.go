@@ -41,7 +41,7 @@ var _ = Describe("MasterCerts", func() {
 			return
 		}
 
-		for _, certFile := range []string{"kubecfg.key", "kubecfg.crt", "ca.crt"} {
+		for _, certFile := range []string{"server.key", "server.cert", "ca.crt"} {
 			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.gceConfig.ProjectID,
 				"--zone", testContext.gceConfig.Zone, testContext.gceConfig.MasterName,
 				"--command", fmt.Sprintf("ls /srv/kubernetes/%s", certFile))
