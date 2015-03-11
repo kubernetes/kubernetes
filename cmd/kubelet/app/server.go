@@ -187,7 +187,8 @@ func (s *KubeletServer) Run(_ []string) error {
 
 func (s *KubeletServer) setupRunOnce() {
 	if s.RunOnce {
-		// Don't use remote (etcd or apiserver) sources
+		// Don't use apiserver source, on the presumption that this flag is used
+		// for bootstrapping some system pods.
 		if len(s.APIServerList) > 0 {
 			glog.Fatalf("invalid option: --runonce and --api_servers are mutually exclusive")
 		}
@@ -227,7 +228,7 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 	return c, nil
 }
 
-// SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an etcdClient.
+// SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
 // Under the hood it calls RunKubelet (below)
 func SimpleRunKubelet(client *client.Client,
 	dockerClient dockertools.DockerInterface,

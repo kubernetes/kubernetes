@@ -1390,7 +1390,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
 		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
@@ -1412,7 +1412,7 @@ func TestRunInContainer(t *testing.T) {
 
 	containerID := "abc1234"
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -1452,7 +1452,7 @@ func TestRunHandlerExec(t *testing.T) {
 
 	containerID := "abc1234"
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -1499,7 +1499,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	kubelet.httpClient = &fakeHttp
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -2694,7 +2694,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	err := kubelet.ExecInContainer(
 		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
@@ -2720,7 +2720,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerID := "containerFoo"
 
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -2772,7 +2772,7 @@ func TestExecInContainer(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerID := "containerFoo"
 	command := []string{"ls"}
 	stdin := &bytes.Buffer{}
@@ -2831,7 +2831,7 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	var port uint16 = 5000
 
 	err := kubelet.PortForward(
@@ -2854,7 +2854,7 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	var port uint16 = 5000
 
 	fakeDocker.ContainerList = []docker.APIContainers{
@@ -2888,7 +2888,7 @@ func TestPortForward(t *testing.T) {
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
-	podNamespace := "etcd"
+	podNamespace := "nsFoo"
 	containerID := "containerFoo"
 	var port uint16 = 5000
 	stream := &fakeReadWriteCloser{}

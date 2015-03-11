@@ -1534,7 +1534,7 @@ func (kl *Kubelet) handleUpdate(u PodUpdate) {
 }
 
 // syncLoop is the main loop for processing changes. It watches for changes from
-// four channels (file, etcd, server, and http) and creates a union of them. For
+// three channels (file, apiserver, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync_frequency seconds. Never returns.
