@@ -43,7 +43,7 @@ func TestMakeFuncs(t *testing.T) {
 			ValidationErrorTypeNotFound,
 		},
 		{
-			func() *ValidationError { return NewFieldRequired("f", "v") },
+			func() *ValidationError { return NewFieldRequired("f") },
 			ValidationErrorTypeRequired,
 		},
 	}

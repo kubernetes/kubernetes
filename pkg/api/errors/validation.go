@@ -104,9 +104,8 @@ func (v *ValidationError) Error() string {
 }
 
 // NewFieldRequired returns a *ValidationError indicating "value required"
-// TODO: remove "value"
-func NewFieldRequired(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeRequired, field, value, ""}
+func NewFieldRequired(field string) *ValidationError {
+	return &ValidationError{ValidationErrorTypeRequired, field, "", ""}
 }
 
 // NewFieldInvalid returns a *ValidationError indicating "invalid value"

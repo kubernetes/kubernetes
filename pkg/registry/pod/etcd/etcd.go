@@ -145,7 +145,7 @@ func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.O
 		return nil, errors.NewInvalid("binding", binding.Name, errors.ValidationErrorList{errors.NewFieldInvalid("to.kind", binding.Target.Kind, "must be empty, 'Node', or 'Minion'")})
 	}
 	if len(binding.Target.Name) == 0 {
-		return nil, errors.NewInvalid("binding", binding.Name, errors.ValidationErrorList{errors.NewFieldRequired("to.name", binding.Target.Name)})
+		return nil, errors.NewInvalid("binding", binding.Name, errors.ValidationErrorList{errors.NewFieldRequired("to.name")})
 	}
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
 	out = &api.Status{Status: api.StatusSuccess}

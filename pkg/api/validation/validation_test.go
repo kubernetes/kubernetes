@@ -244,8 +244,8 @@ func TestValidateVolumes(t *testing.T) {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
 			detail := errs[i].(*errors.ValidationError).Detail
-			if detail != "" && detail != dnsLabelErrorMsg {
-				t.Errorf("%s: expected error detail either empty or %s, got %s", k, dnsLabelErrorMsg, detail)
+			if detail != "" && detail != dns1123LabelErrorMsg {
+				t.Errorf("%s: expected error detail either empty or %s, got %s", k, dns1123LabelErrorMsg, detail)
 			}
 		}
 	}
@@ -277,8 +277,8 @@ func TestValidatePorts(t *testing.T) {
 		F string
 		D string
 	}{
-		"name > 63 characters": {[]api.ContainerPort{{Name: strings.Repeat("a", 64), ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
-		"name not a DNS label": {[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dnsLabelErrorMsg},
+		"name > 63 characters": {[]api.ContainerPort{{Name: strings.Repeat("a", 64), ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dns1123LabelErrorMsg},
+		"name not a DNS label": {[]api.ContainerPort{{Name: "a.b.c", ContainerPort: 80, Protocol: "TCP"}}, errors.ValidationErrorTypeInvalid, "[0].name", dns1123LabelErrorMsg},
 		"name not unique": {[]api.ContainerPort{
 			{Name: "abc", ContainerPort: 80, Protocol: "TCP"},
 			{Name: "abc", ContainerPort: 81, Protocol: "TCP"},
