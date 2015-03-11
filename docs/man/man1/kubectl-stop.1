@@ -22,8 +22,16 @@ If the resource is resizable it will be resized to 0 before deletion.
 
 .SH OPTIONS
 .PP
+\fB\-\-all\fP=false
+    [\-all] to select all the specified resources
+
+.PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
     Filename, directory, or URL to file of resource(s) to be stopped
+
+.PP
+\fB\-l\fP, \fB\-\-selector\fP=""
+    Selector (label query) to filter on
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -139,6 +147,9 @@ If the resource is resizable it will be resized to 0 before deletion.
 .nf
 // Shut down foo.
 $ kubectl stop replicationcontroller foo
+
+// Stop pods and services with label name=myLabel.
+$ kubectl stop pods,services \-l name=myLabel
 
 // Shut down the service defined in service.json
 $ kubectl stop \-f service.json

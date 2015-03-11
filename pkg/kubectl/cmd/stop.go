@@ -34,6 +34,9 @@ If the resource is resizable it will be resized to 0 before deletion.`
 	stop_example = `// Shut down foo.
 $ kubectl stop replicationcontroller foo
 
+// Stop pods and services with label name=myLabel.
+$ kubectl stop pods,services -l name=myLabel
+
 // Shut down the service defined in service.json
 $ kubectl stop -f service.json
 
@@ -46,7 +49,7 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:     "stop (<resource> <id>|-f filename)",
+		Use:     "stop (-f filename | <resource> (<id> | -l <label> | --all))",
 		Short:   "Gracefully shut down a resource by id or filename.",
 		Long:    stop_long,
 		Example: stop_example,
@@ -59,6 +62,8 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 				NamespaceParam(cmdNamespace).RequireNamespace().
 				ResourceTypeOrNameArgs(false, args...).
 				FilenameParam(flags.Filenames...).
+				SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
+				SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
 				Flatten().
 				Do()
 			cmdutil.CheckErr(r.Err())
@@ -76,5 +81,7 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file of resource(s) to be stopped")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd
 }
