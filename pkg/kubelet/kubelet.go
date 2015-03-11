@@ -45,7 +45,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -93,7 +92,6 @@ type volumeMap map[string]volume.Interface
 func NewMainKubelet(
 	hostname string,
 	dockerClient dockertools.DockerInterface,
-	etcdClient tools.EtcdClient,
 	kubeClient client.Interface,
 	rootDirectory string,
 	podInfraContainerImage string,
@@ -156,7 +154,6 @@ func NewMainKubelet(
 	klet := &Kubelet{
 		hostname:                       hostname,
 		dockerClient:                   dockerClient,
-		etcdClient:                     etcdClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
@@ -232,8 +229,6 @@ type Kubelet struct {
 	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
 	refLock       sync.RWMutex
 
-	// Optional, no events will be sent without it
-	etcdClient tools.EtcdClient
 	// Optional, defaults to simple Docker implementation
 	dockerPuller dockertools.DockerPuller
 	// Optional, defaults to /logs/ from /var/log
@@ -1539,7 +1534,7 @@ func (kl *Kubelet) handleUpdate(u PodUpdate) {
 }
 
 // syncLoop is the main loop for processing changes. It watches for changes from
-// four channels (file, etcd, server, and http) and creates a union of them. For
+// three channels (file, apiserver, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync_frequency seconds. Never returns.
