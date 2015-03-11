@@ -1,18 +1,16 @@
-/*
-Copyright 2013 CoreOS Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2015 CoreOS, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package dbus
 
@@ -46,7 +44,7 @@ func findFixture(target string, t *testing.T) string {
 
 func setupUnit(target string, conn *Conn, t *testing.T) {
 	// Blindly stop the unit in case it is running
-	conn.StopUnit(target, "replace")
+	conn.StopUnit(target, "replace", nil)
 
 	// Blindly remove the symlink in case it exists
 	targetRun := filepath.Join("/run/systemd/system/", target)
@@ -81,11 +79,13 @@ func TestStartStopUnit(t *testing.T) {
 	linkUnit(target, conn, t)
 
 	// 2. Start the unit
-	job, err := conn.StartUnit(target, "replace")
+	reschan := make(chan string)
+	_, err := conn.StartUnit(target, "replace", reschan)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	job := <-reschan
 	if job != "done" {
 		t.Fatal("Job is not done:", job)
 	}
@@ -108,10 +108,13 @@ func TestStartStopUnit(t *testing.T) {
 	}
 
 	// 3. Stop the unit
-	job, err = conn.StopUnit(target, "replace")
+	_, err = conn.StopUnit(target, "replace", reschan)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// wait for StopUnit job to complete
+	<-reschan
 
 	units, err = conn.ListUnits()
 
@@ -260,11 +263,13 @@ func TestStartStopTransientUnit(t *testing.T) {
 	target := fmt.Sprintf("testing-transient-%d.service", rand.Int())
 
 	// Start the unit
-	job, err := conn.StartTransientUnit(target, "replace", props...)
+	reschan := make(chan string)
+	_, err := conn.StartTransientUnit(target, "replace", props, reschan)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	job := <-reschan
 	if job != "done" {
 		t.Fatal("Job is not done:", job)
 	}
@@ -287,10 +292,13 @@ func TestStartStopTransientUnit(t *testing.T) {
 	}
 
 	// 3. Stop the unit
-	job, err = conn.StopUnit(target, "replace")
+	_, err = conn.StopUnit(target, "replace", reschan)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// wait for StopUnit job to complete
+	<-reschan
 
 	units, err = conn.ListUnits()
 
@@ -315,15 +323,20 @@ func TestConnJobListener(t *testing.T) {
 
 	jobSize := len(conn.jobListener.jobs)
 
-	_, err := conn.StartUnit(target, "replace")
+	reschan := make(chan string)
+	_, err := conn.StartUnit(target, "replace", reschan)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = conn.StopUnit(target, "replace")
+	<-reschan
+
+	_, err = conn.StopUnit(target, "replace", reschan)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	<-reschan
 
 	currentJobSize := len(conn.jobListener.jobs)
 	if jobSize != currentJobSize {

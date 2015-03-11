@@ -70,8 +70,13 @@
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
 			"Comment": "v2-27-g97e243d",
-			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
+			"Rev": "2d21675230a81a503f4363f4aa3490af06d52bb8"
 		},
+		{
+			"ImportPath": "github.com/coreos/go-systemd/unit",
+			"Comment": "v2-27-g97e243d",
+			"Rev": "2d21675230a81a503f4363f4aa3490af06d52bb8"
+		},          
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
 			"Comment": "v1.0.2-5-g2831f11",
