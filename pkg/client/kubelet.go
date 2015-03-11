@@ -111,7 +111,7 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	status := api.PodStatusResult{}
 	query := url.Values{"podID": {podID}, "podNamespace": {podNamespace}}
 	response, err := c.getEntity(host, "/api/v1beta1/podInfo", query.Encode(), &status)
-	if response.StatusCode == http.StatusNotFound {
+	if response != nil && response.StatusCode == http.StatusNotFound {
 		return status, ErrPodInfoNotAvailable
 	}
 	return status, err
@@ -124,6 +124,7 @@ func (c *HTTPKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
 	return info, err
 }
 
+// getEntity might return a nil response.
 func (c *HTTPKubeletClient) getEntity(host, path, query string, entity runtime.Object) (*http.Response, error) {
 	request, err := http.NewRequest("GET", c.url(host, path, query), nil)
 	if err != nil {

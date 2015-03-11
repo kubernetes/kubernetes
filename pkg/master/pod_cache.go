@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 )
@@ -264,6 +265,7 @@ func (p *PodCache) UpdateAllContainers() {
 		pod := &pods.Items[i]
 		wg.Add(1)
 		go func() {
+			defer util.HandleCrash()
 			defer wg.Done()
 			err := p.updatePodStatus(pod)
 			if err != nil && err != client.ErrPodInfoNotAvailable {
