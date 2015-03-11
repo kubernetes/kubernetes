@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
@@ -245,4 +246,8 @@ func NewFakeDockerCache(client DockerInterface) DockerCache {
 
 func (f *FakeDockerCache) RunningContainers() (DockerContainers, error) {
 	return GetKubeletDockerContainers(f.client, false)
+}
+
+func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {
+	return nil
 }
