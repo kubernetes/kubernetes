@@ -49,7 +49,7 @@ MASTER_USER=vagrant
 MASTER_PASSWD=vagrant
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceExists,LimitRanger,ResourceQuota,AlwaysAdmit
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota
 
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING=true

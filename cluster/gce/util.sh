@@ -452,6 +452,7 @@ DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 MASTER_HTPASSWD: $(yaml-quote ${MASTER_HTPASSWD})
+ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 EOF
 
   if [[ "${master}" != "true" ]]; then

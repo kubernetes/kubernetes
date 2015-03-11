@@ -65,3 +65,6 @@ ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="kubernetes.local"
 DNS_REPLICAS=1
+
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota

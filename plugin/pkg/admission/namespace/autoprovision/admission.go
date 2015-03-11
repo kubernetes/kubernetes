@@ -45,6 +45,10 @@ type provision struct {
 }
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
+	// only handle create requests
+	if a.GetOperation() != "CREATE" {
+		return nil
+	}
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
 		return err

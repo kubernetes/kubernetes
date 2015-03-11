@@ -200,6 +200,7 @@ enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
 dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
+admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'  
 EOF
 
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then

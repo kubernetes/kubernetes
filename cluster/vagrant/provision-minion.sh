@@ -64,6 +64,7 @@ EOF
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
+  cloud: vagrant
   network_mode: openvswitch
   node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
   etcd_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'

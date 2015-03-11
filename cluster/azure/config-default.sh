@@ -44,3 +44,6 @@ LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
 ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
+
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota
