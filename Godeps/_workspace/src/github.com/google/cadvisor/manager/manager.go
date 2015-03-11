@@ -127,7 +127,7 @@ func New(memoryStorage *memory.InMemoryStorage, sysfs sysfs.SysFs) (Manager, err
 	// Register the raw driver.
 	err = raw.Register(newManager)
 	if err != nil {
-		return nil, fmt.Errorf("registration of the raw container factory failed: %v", err)
+		glog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
 
 	return newManager, nil
