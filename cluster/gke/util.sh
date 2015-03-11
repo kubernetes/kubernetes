@@ -114,12 +114,6 @@ function kube-up() {
     --network="${NETWORK}"
 }
 
-# Called during cluster/kube-up.sh
-function setup-monitoring-firewall() {
-  echo "... in setup-monitoring-firewall()" >&2
-  # TODO(mbforbes): This isn't currently supported in GKE.
-}
-
 # Execute prior to running tests to initialize required structure. This is
 # called from hack/e2e-go only when running -up (it is run after kube-up, so
 # the cluster already exists at this point).
@@ -259,12 +253,6 @@ function test-teardown() {
 
   # Then actually turn down the cluster.
   "${KUBE_ROOT}/cluster/kube-down.sh"
-}
-
-# Tears down monitoring.
-function teardown-monitoring-firewall() {
-  echo "... in teardown-monitoring-firewall()" >&2
-  # TODO(mbforbes): This isn't currently supported in GKE.
 }
 
 # Actually take down the cluster. This is called from test-teardown.

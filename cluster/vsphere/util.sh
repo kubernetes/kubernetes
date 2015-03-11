@@ -479,14 +479,6 @@ function test-teardown {
 	echo "TODO"
 }
 
-function setup-monitoring-firewall {
-    echo "TODO"
-}
-
-function teardown-monitoring-firewall {
-  echo "TODO"
-}
-
 function setup-logging-firewall {
   echo "TODO: setup logging"
 }

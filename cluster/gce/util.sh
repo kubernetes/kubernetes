@@ -925,32 +925,6 @@ function restart-apiserver {
   ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
 
-# Setup monitoring firewalls using heapster and InfluxDB
-function setup-monitoring-firewall {
-  if [[ "${ENABLE_CLUSTER_MONITORING}" != "true" ]]; then
-    return
-  fi
-
-  echo "Setting up firewalls to Heapster based cluster monitoring."
-
-  detect-project
-  gcloud compute firewall-rules create "${INSTANCE_PREFIX}-monitoring-heapster" --project "${PROJECT}" \
-    --allow tcp:80 tcp:8083 tcp:8086 --target-tags="${MINION_TAG}" --network="${NETWORK}"
-
-  echo
-  echo -e "${color_green}Grafana dashboard will be available at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/monitoring-grafana/${color_green}. Wait for the monitoring dashboard to be online.${color_norm}"
-  echo
-}
-
-function teardown-monitoring-firewall {
-  if [[ "${ENABLE_CLUSTER_MONITORING}" != "true" ]]; then
-    return
-  fi
-
-  detect-project
-  gcloud compute firewall-rules delete -q "${INSTANCE_PREFIX}-monitoring-heapster" --project "${PROJECT}" || true
-}
-
 function setup-logging-firewall {
   # If logging with Fluentd to Elasticsearch is enabled then create pods
   # and services for Elasticsearch (for ingesting logs) and Kibana (for
