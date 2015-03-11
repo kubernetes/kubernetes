@@ -270,12 +270,11 @@ func (s *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList, 
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			hostIP, err := instances.IPAddress(node.Name)
+			nodeAddresses, err := instances.NodeAddresses(node.Name)
 			if err != nil {
-				glog.Errorf("error getting instance ip address for %s: %v", node.Name, err)
+				glog.Errorf("error getting instance addresses for %s: %v", node.Name, err)
 			} else {
-				address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: hostIP.String()}
-				api.AddToNodeAddresses(&node.Status.Addresses, address)
+				api.AddToNodeAddresses(&node.Status.Addresses, nodeAddresses...)
 			}
 		}
 	} else {

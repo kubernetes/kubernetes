@@ -314,8 +314,8 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 	return res, nil
 }
 
-// IPAddress is an implementation of Instances.IPAddress.
-func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
+// NodeAddresses is an implementation of Instances.NodeAddresses.
+func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return nil, err
@@ -324,7 +324,7 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
-	return ip, nil
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
