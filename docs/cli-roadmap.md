@@ -5,14 +5,10 @@ See also issues with the following labels:
 * [component/CLI](https://github.com/GoogleCloudPlatform/kubernetes/labels/component%2FCLI)
 * [component/client](https://github.com/GoogleCloudPlatform/kubernetes/labels/component%2Fclient)
 
-At least the first three issues should block 1.0.
-
-1. stop command in kubectl [#2144](https://github.com/GoogleCloudPlatform/kubernetes/issues/2144): Gracefully terminate any object(s), to the extent currently possible. We also eventually want first-class support in the API for graceful termination. [#1535](https://github.com/GoogleCloudPlatform/kubernetes/issues/1535)
 1. Kind-based filtering on object streams -- only operate on the kinds of objects specified. This would make directory-based kubectl operations much more useful. Users should be able to instantiate the example applications using `kubectl create -f <example-dir> ...`
 1. Create services before other objects, or at least before objects that depend upon them. Namespace-relative DNS mitigates this some, but most users are still using service environment variables. [#1768](https://github.com/GoogleCloudPlatform/kubernetes/issues/1768)
 1. Pretty printing of endpoints
 1. Service address/port lookup command(s)
-1. Multiple objects on command line [#3050](https://github.com/GoogleCloudPlatform/kubernetes/issues/3050)
 1. Finish rolling update [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
   1. Friendly to auto-scaling [#2863](https://github.com/GoogleCloudPlatform/kubernetes/pull/2863#issuecomment-69701562)
   1. Rollback (make rollingupdate reversible, and complete an in-progress rolling update by taking 2 replication controller names rather than always taking a file)
@@ -29,8 +25,7 @@ At least the first three issues should block 1.0.
 1. --annotations and opinionated annotation injection: --description, --revision
 1. Bulk updates (similar to get, create, delete)
 1. Imperative updates. We'll want to optionally make these safe(r) by supporting preconditions based on the current value and resourceVersion.
-  1. label updates: addlabel, rmlabel, changelabel
-  1. annotation updates: addannotation, rmannotation, changeannotation
+  1. annotation updates similar to label updates
   1. more user-friendly on-command-line json for patch
 1. We also want to support the following flavors of more general updates:
   1. whichever we don’t support:
@@ -49,9 +44,9 @@ At least the first three issues should block 1.0.
   1. pod clone
   1. rc from pod
   1. --labels-from (services from pods or rcs)
-1. Kind discovery (i.e., operate on objects of all kinds) [#3233](https://github.com/GoogleCloudPlatform/kubernetes/pull/3233)
+1. Kind discovery (i.e., operate on objects of all kinds) [#5278](https://github.com/GoogleCloudPlatform/kubernetes/issues/5278)
 1. A fairly general-purpose way to specify fields on the command line during creation and update, not just from a config file
-1. Extensible API-based generator framework (i.e. invoke generators via an API/URL rather than building them into kubectl), so that complex client libraries don’t need to be rewritten in multiple languages, and so that the abstractions are available through all interfaces: API, CLI, UI, logs, ...
+1. Extensible API-based generator framework (i.e. invoke generators via an API/URL rather than building them into kubectl), so that complex client libraries don’t need to be rewritten in multiple languages, and so that the abstractions are available through all interfaces: API, CLI, UI, logs, ... [#5280](https://github.com/GoogleCloudPlatform/kubernetes/issues/5280)
   1. Need schema registry, and some way to invoke generator (e.g., using a container)
   1. Convert run-container to API-based generator
 1. Transformation framework
