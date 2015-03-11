@@ -44,6 +44,9 @@ LOGGING_DESTINATION=elasticsearch
 ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
+# Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.244.240.240"
