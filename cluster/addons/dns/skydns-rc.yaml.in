@@ -35,7 +35,7 @@ desiredState:
                     "-domain={{ pillar['dns_domain'] }}",
             ]
           - name: skydns
-            image: kubernetes/skydns:2014-12-23-001
+            image: kubernetes/skydns:2015-03-11-001
             command: [
                     # entrypoint = "/skydns",
                     "-machines=http://localhost:4001",
