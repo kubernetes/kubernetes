@@ -763,29 +763,29 @@ func main() {
 	}
 	wg.Wait()
 
-	// Check that kubelet tried to make the pods.
+	// Check that kubelet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
 	// really stupid, so kubelet tries to create these multiple times.
-	createdPods := util.StringSet{}
+	createdConts := util.StringSet{}
 	for _, p := range fakeDocker1.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {
-			createdPods.Insert(p[:n-8])
+			createdConts.Insert(p[:n-8])
 		}
 	}
 	for _, p := range fakeDocker2.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {
-			createdPods.Insert(p[:n-8])
+			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 pod infra containers + 2 pods from the replication controller +
-	//              1 pod infra container + 2 pods from the URL +
-	//              1 pod infra container + 1 pod from the service test.
-	if len(createdPods) != 9 {
-		glog.Fatalf("Expected 9 pods; got %v\n\nlist of created pods:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdPods), createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
+	// We expect 9: 2 infra containers + 2 containers from the replication controller +
+	//              1 infra container + 2 containers from the URL +
+	//              1 infra container + 1 container from the service test.
+	if len(createdConts) != 9 {
+		glog.Fatalf("Expected 9 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
-	glog.Infof("OK - found created pods: %#v", createdPods.List())
+	glog.Infof("OK - found created containers: %#v", createdConts.List())
 }
 
 // ServeCachedManifestFile serves a file for kubelet to read.
