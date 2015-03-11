@@ -45,11 +45,18 @@ type SpdyRoundTripper struct {
 	*/
 	// conn is the underlying network connection to the remote server.
 	conn net.Conn
+
+	// Dialer is the dialer used to connect.  Used if non-nil.
+	Dialer *net.Dialer
 }
 
 // NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
 func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
+	return NewSpdyRoundTripper(tlsConfig)
+}
+
+func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 	return &SpdyRoundTripper{tlsConfig: tlsConfig}
 }
 
@@ -58,11 +65,21 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(req.URL)
 
 	if req.URL.Scheme == "http" {
-		return net.Dial("tcp", dialAddr)
+		if s.Dialer == nil {
+			return net.Dial("tcp", dialAddr)
+		} else {
+			return s.Dialer.Dial("tcp", dialAddr)
+		}
 	}
 
 	// TODO validate the TLSClientConfig is set up?
-	conn, err := tls.Dial("tcp", dialAddr, s.tlsConfig)
+	var conn *tls.Conn
+	var err error
+	if s.Dialer == nil {
+		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
+	} else {
+		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
+	}
 	if err != nil {
 		return nil, err
 	}
