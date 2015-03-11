@@ -55,6 +55,12 @@ var _ = Describe("PD", func() {
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
+		if testContext.provider != "gce" {
+			By(fmt.Sprintf("Skipping PD test, which is only supported for provider gce (not %s)",
+				testContext.provider))
+			return
+		}
+
 		host0Pod := testPDPod(diskName, host0Name, false)
 		host1Pod := testPDPod(diskName, host1Name, false)
 
@@ -104,6 +110,12 @@ var _ = Describe("PD", func() {
 	})
 
 	It("should schedule a pod w/ a readonly PD on two hosts, then remove both.", func() {
+		if testContext.provider != "gce" {
+			By(fmt.Sprintf("Skipping PD test, which is only supported for provider gce (not %s)",
+				testContext.provider))
+			return
+		}
+
 		rwPod := testPDPod(diskName, host0Name, false)
 		host0ROPod := testPDPod(diskName, host0Name, true)
 		host1ROPod := testPDPod(diskName, host1Name, true)
