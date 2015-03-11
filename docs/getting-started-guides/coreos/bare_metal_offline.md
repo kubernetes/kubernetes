@@ -1,0 +1,646 @@
+# Bare Metal CoreOS with Kubernetes (OFFLINE)
+Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
+
+
+## Goal
+At this point in the community we can not and should not try and solve any of the current issues at hand in the Docker space. 
+Instead, try to add ease of use for enterprise customers looking to develop or deploy applications into the new container ecosystem offline.
+
+The goal for this walk through is to deploy and configure CoreOS with Kubernetes to establish a full ecosystem to run containers in. 
+In this case we are building this system in a real world scenario using pxelinux and have no guaranteed connection to the internet.
+
+
+## High Level Design
+1. Manage the tftp directory 
+  * /tftpboot/(coreos)(centos)(RHEL)
+  * /tftpboot/pxelinux.0/(MAC) -> linked to linux image config file
+2. Update per install the link for pxelinux
+3. Update the DHCP config to reflect the host needing deployment
+4. Setup nodes to deploy CoreOS creating a etcd cluster. 
+5. We don't have access to the public [etcd discovery tool](https://discovery.etcd.io/). 
+5. CoreOS etcd master has been created we move on to installing the CoreOS slaves to become our Kubernetes minions.
+
+## Pre-requisites
+1. Installed *CentOS 6* for our PXE server
+2. At least two bare metal nodes to work with
+
+## This Guides variables
+| Node Description              | MAC               | IP          |
+| :---------------------------- | :---------------: | :---------: |
+| CoreOS/etcd/Kubernetes Master | d0:00:67:13:0d:00 | 10.20.30.40 |
+| CoreOS Slave 1                | d0:00:67:13:0d:01 | 10.20.30.41 |
+| CoreOS Slave 2                | d0:00:67:13:0d:02 | 10.20.30.42 |
+
+## Setup PXELINUX CentOS
+To setup CentOS PXELINUX environment there is a complete [guide here](http://docs.fedoraproject.org/en-US/Fedora/7/html/Installation_Guide/ap-pxe-server.html). This section is the abbreviated version.
+
+1. Install packages needed on CentOS
+
+        sudo yum install tftp-server dhcp syslinux
+
+2. ```vi /etc/xinetd.d/tftp``` to enable tftp service and change disable to 'no'
+        disable = no
+
+3. Copy over the syslinux images we will need.
+
+        su -
+        mkdir -p /tftpboot
+        cd /tftpboot
+        cp /usr/share/syslinux/pxelinux.0 /tftpboot
+        cp /usr/share/syslinux/menu.c32 /tftpboot
+        cp /usr/share/syslinux/memdisk /tftpboot
+        cp /usr/share/syslinux/mboot.c32 /tftpboot
+        cp /usr/share/syslinux/chain.c32 /tftpboot
+
+        /sbin/service dhcpd start
+        /sbin/service xinetd start
+        /sbin/chkconfig tftp on
+
+4. Setup default boot menu
+
+        mkdir /tftpboot/pxelinux.cfg
+        touch /tftpboot/pxelinux.cfg/default
+
+5. Edit the menu ```vi /tftpboot/pxelinux.cfg/default```
+
+        default menu.c32
+        prompt 0
+        timeout 15
+        ONTIMEOUT local
+        display boot.msg
+        
+        MENU TITLE Main Menu
+
+        LABEL local
+                MENU LABEL Boot local hard drive
+                LOCALBOOT 0
+
+Now you should have a working PXELINUX setup for us to use to image our CoreOS nodes. You can test this our using VirtualBox locally or with your bare metal server at hand for this guide.
+
+## Adding CoreOS to PXE
+We want to make sure that we either have an expandable pxelinux config or we are just doing a deploy setup alongside a pre-existing pxelinux setup. This portion takes you to the point were you can pxe a non-cluster bare CoreOS install.
+
+1. Find or create your TFTP root directory that everything will be based off of.
+    * For this document we will assume ```/tftpboot/``` is our root dir.
+2. Once we know and have our tftp root directory we will create a new folder under here for our CoreOS installer bits.
+3. Download and/or copy the CoreOS PXE files provided by the CoreOS team.
+
+        MY_TFTPROOT_DIR=/tftpboot
+        mkdir -p $MY_TFTPROOT_DIR/images/coreos/
+        cd $MY_TFTPROOT_DIR/images/coreos/
+        wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_pxe.vmlinuz
+        wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_pxe.vmlinuz.sig
+        wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_pxe_image.cpio.gz
+        wget http://stable.release.core-os.net/amd64-usr/current/coreos_production_pxe_image.cpio.gz.sig
+        gpg --verify coreos_production_pxe.vmlinuz.sig
+        gpg --verify coreos_production_pxe_image.cpio.gz.sig
+
+4. Edit the menu ```vi /tftpboot/pxelinux.cfg/default``` again
+
+        default menu.c32
+        prompt 0
+        timeout 300
+        ONTIMEOUT local
+        display boot.msg
+
+        MENU TITLE Main Menu
+
+        LABEL local
+                MENU LABEL Boot local hard drive
+                LOCALBOOT 0
+
+        MENU BEGIN CoreOS Menu
+
+            LABEL coreos-master
+                MENU LABEL CoreOS Master
+                KERNEL images/coreos/coreos_production_pxe.vmlinuz
+                APPEND initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<xxx.xxx.xxx.xxx>/pxe-cloud-config-single-master.yml
+
+            LABEL coreos-slave
+                MENU LABEL CoreOS Slave
+                KERNEL images/coreos/coreos_production_pxe.vmlinuz
+                APPEND initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<xxx.xxx.xxx.xxx>/pxe-cloud-config-slave.yml
+        MENU END
+
+This setup will get you to the point of being able to now boot from local drive but have the option to PXE the CoreOS image. 
+
+## DHCP configuration 
+We now need to configure the DHCP server to hand out our images. In this case we are assuming that there are other servers that will boot alongside other images. We will solve this by setting up a linking system to point specific MAC addresses to a specific pxelinix.cfg file.
+
+1. The filename for the servers in question here will be pxelinux.0 
+
+        filename "/tftpboot/pxelinux.0";
+
+2. At this point we want to make a few pxelinux config files that will be the templates for the different CoreOS deployments.
+
+        subnet 10.20.30.0 netmask 255.255.255.0 {
+                next-server 10.20.30.242;
+                option broadcast-address 10.20.30.255;
+                filename "<other default image>";
+        
+                ...
+                # http://www.syslinux.org/wiki/index.php/PXELINUX
+                host core_os_master {
+                        hardware ethernet d0:00:67:13:0d:00;
+                        option routers 10.20.30.1;
+                        fixed-address 10.20.30.40;
+                        option domain-name-servers 10.20.30.242;
+                        filename "/pxelinux.0";        
+                }
+                host core_os_slave {
+                        hardware ethernet d0:00:67:13:0d:01;
+                        option routers 10.20.30.1;
+                        fixed-address 10.20.30.41;
+                        option domain-name-servers 10.20.30.242;
+                        filename "/pxelinux.0";
+                }
+                host core_os_slave2 {
+                        hardware ethernet d0:00:67:13:0d:02;
+                        option routers 10.20.30.1;
+                        fixed-address 10.20.30.42;
+                        option domain-name-servers 10.20.30.242;
+                        filename "/pxelinux.0";
+                }
+                ...
+        }
+
+We will be specifying the node configuration later in the guide.
+
+# Kubernetes
+To deploy our configuration we need to create an ```etcd``` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
+1. Is to template the cloud config file and programmatically create new static configs for different cluster setups.
+2. Have a service discovery protocol running in our stack to do auto discovery.
+
+This demo we just make a static single ```etcd``` server to host our Kubernetes and ```etcd``` master servers.
+
+Since we are OFFLINE here most of the helping processes in CoreOS and Kubernetes are then limited. To do our setup we will then have to download and serve up our binaries for Kubernetes in our local environment.
+
+An easy solution is to host a small web server on the DHCP/TFTP host for all our binaries to make them available to the local CoreOS PXE machines.
+
+To get this up and running we are going to setup a simple ```apache``` server to serve our binaries needed to bootstrap Kubernetes.
+
+This is on the PXE server from the previous section:
+
+    rm /etc/httpd/conf.d/welcome.conf
+    cd /var/www/html/
+    wget -O kube-register https://github.com/jeffbean/kube-register/releases/download/v0.5/kube-register
+    wget -O setup-network-environment https://github.com/kelseyhightower/setup-network-environment/releases/download/v1.0.0/setup-network-environment
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubernetes --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-apiserver --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-controller-manager --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-scheduler --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubectl --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubecfg --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubelet --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-proxy --no-check-certificate
+    wget -O flanneld https://storage.googleapis.com/k8s/flanneld --no-check-certificate
+
+This sets up our binaries we need to run Kubernetes. This would need to be enhanced to download from the internet for updates in the future.
+
+Now for the good stuff!
+
+## Cloud Configs
+The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
+
+These are based on the work found here: [master.yml](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/cloud-configs/node.yaml)
+
+
+### master.yml
+On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-master.yml```.
+
+
+    #cloud-config
+    ---
+    write_files:
+      - path: /opt/bin/waiter.sh
+        owner: root
+        content: |
+          #! /usr/bin/bash
+          until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
+      - path: /opt/bin/kubernetes-download.sh
+        owner: root
+        permissions: 0755
+        content: |
+          #! /usr/bin/bash
+          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubectl"
+          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubernetes"
+          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubecfg"
+          chmod +x /opt/bin/*
+      - path: /etc/profile.d/opt-path.sh
+        owner: root
+        permissions: 0755
+        content: |
+          #! /usr/bin/bash
+          PATH=$PATH/opt/bin
+    coreos:
+      units:
+        - name: 10-eno1.network
+          runtime: true
+          content: |
+            [Match]
+            Name=eno1
+            [Network]
+            DHCP=yes
+        - name: 20-nodhcp.network
+          runtime: true
+          content: |
+            [Match]
+            Name=en*
+            [Network]
+            DHCP=none
+        - name: get-kube-tools.service
+          runtime: true
+          command: start
+          content: |
+            [Service]
+            ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+            ExecStart=/opt/bin/kubernetes-download.sh
+            RemainAfterExit=yes
+            Type=oneshot
+        - name: setup-network-environment.service
+          command: start
+          content: |
+            [Unit]
+            Description=Setup Network Environment
+            Documentation=https://github.com/kelseyhightower/setup-network-environment
+            Requires=network-online.target
+            After=network-online.target
+            [Service]
+            ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/setup-network-environment 
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment
+            ExecStart=/opt/bin/setup-network-environment
+            RemainAfterExit=yes
+            Type=oneshot
+        - name: etcd.service
+          command: start
+          content: |
+            [Unit]
+            Description=etcd
+            Requires=setup-network-environment.service
+            After=setup-network-environment.service
+            [Service]
+            EnvironmentFile=/etc/network-environment
+            User=etcd
+            PermissionsStartOnly=true
+            ExecStart=/usr/bin/etcd \
+            --name ${DEFAULT_IPV4} \
+            --addr ${DEFAULT_IPV4}:4001 \
+            --bind-addr 0.0.0.0 \
+            --cluster-active-size 1 \
+            --data-dir /var/lib/etcd \
+            --http-read-timeout 86400 \
+            --peer-addr ${DEFAULT_IPV4}:7001 \
+            --snapshot true
+            Restart=always
+            RestartSec=10s
+        - name: fleet.socket
+          command: start
+          content: |
+            [Socket]
+            ListenStream=/var/run/fleet.sock
+        - name: fleet.service
+          command: start
+          content: |
+            [Unit]
+            Description=fleet daemon
+            Wants=etcd.service
+            After=etcd.service
+            Wants=fleet.socket
+            After=fleet.socket
+            [Service]
+            Environment="FLEET_ETCD_SERVERS=http://127.0.0.1:4001"
+            Environment="FLEET_METADATA=role=master"
+            ExecStart=/usr/bin/fleetd
+            Restart=always
+            RestartSec=10s
+        - name: etcd-waiter.service
+          command: start
+          content: |
+            [Unit]
+            Description=etcd waiter
+            Wants=network-online.target
+            Wants=etcd.service
+            After=etcd.service
+            After=network-online.target
+            Before=flannel.service
+            Before=setup-network-environment.service
+            [Service]
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/waiter.sh
+            ExecStart=/usr/bin/bash /opt/bin/waiter.sh
+            RemainAfterExit=true
+            Type=oneshot
+        - name: flannel.service
+          command: start
+          content: |
+            [Unit]
+            Wants=etcd-waiter.service
+            After=etcd-waiter.service
+            Requires=etcd.service
+            After=etcd.service
+            After=network-online.target
+            Wants=network-online.target
+            Description=flannel is an etcd backed overlay network for containers
+            [Service]
+            Type=notify
+            ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/flanneld
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
+            ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"10.100.0.0/16", "Backend": {"Type": "vxlan"}}'
+            ExecStart=/opt/bin/flanneld
+        - name: kube-apiserver.service
+          command: start
+          content: |
+            [Unit]
+            Description=Kubernetes API Server
+            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Requires=etcd.service
+            After=etcd.service
+            [Service]
+            ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-apiserver
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
+            ExecStart=/opt/bin/kube-apiserver \
+            --address=0.0.0.0 \
+            --port=8080 \
+            --portal_net=10.100.0.0/16 \
+            --etcd_servers=http://127.0.0.1:4001 \
+            --logtostderr=true
+            Restart=always
+            RestartSec=10
+        - name: kube-controller-manager.service 
+          command: start
+          content: |
+            [Unit]
+            Description=Kubernetes Controller Manager
+            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Requires=kube-apiserver.service
+            After=kube-apiserver.service
+            [Service]
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-controller-manager
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
+            ExecStart=/opt/bin/kube-controller-manager \
+            --master=127.0.0.1:8080 \
+            --logtostderr=true
+            Restart=always
+            RestartSec=10
+        - name: kube-scheduler.service
+          command: start
+          content: |
+            [Unit]
+            Description=Kubernetes Scheduler
+            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Requires=kube-apiserver.service
+            After=kube-apiserver.service
+            [Service]
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-scheduler
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
+            ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
+            Restart=always
+            RestartSec=10
+        - name: kube-register.service
+          command: start
+          content: |
+            [Unit]
+            Description=Kubernetes Registration Service
+            Documentation=https://github.com/kelseyhightower/kube-register
+            Requires=kube-apiserver.service
+            After=kube-apiserver.service
+            Requires=fleet.service
+            After=fleet.service
+            [Service]
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-register
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
+            ExecStart=/opt/bin/kube-register \
+            --metadata=role=node \
+            --fleet-endpoint=unix:///var/run/fleet.sock \
+            --api-endpoint=http://127.0.0.1:8080
+            Restart=always
+            RestartSec=10
+      update:
+        group: stable
+        reboot-strategy: off
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAAD...
+
+
+### node.yml
+On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-slave.yml```.
+
+    #cloud-config
+    ---
+    write_files:
+      - path: /etc/default/docker
+        content: |
+          DOCKER_EXTRA_OPTS='--insecure-registry="rdocker.example.com:5000"'
+    coreos:
+      units:
+        - name: 10-eno1.network
+          runtime: true
+          content: |
+            [Match]
+            Name=eno1
+            [Network]
+            DHCP=yes
+        - name: 20-nodhcp.network
+          runtime: true
+          content: |
+            [Match]
+            Name=en*
+            [Network]
+            DHCP=none
+        - name: etcd.service
+          mask: true
+        - name: docker.service
+          drop-ins:
+            - name: 50-insecure-registry.conf
+              content: |
+                [Service]
+                Environment="HTTP_PROXY=http://rproxy.example.com:3128/" "NO_PROXY=localhost,127.0.0.0/8,rdocker.example.com"
+        - name: fleet.service
+          command: start
+          content: |
+            [Unit]
+            Description=fleet daemon
+            Wants=fleet.socket
+            After=fleet.socket
+            [Service]
+            Environment="FLEET_ETCD_SERVERS=http://10.20.30.40:4001"
+            Environment="FLEET_METADATA=role=node"
+            ExecStart=/usr/bin/fleetd
+            Restart=always
+            RestartSec=10s
+        - name: flannel.service
+          command: start
+          content: |
+            [Unit]
+            After=network-online.target 
+            Wants=network-online.target
+            Description=flannel is an etcd backed overlay network for containers
+            [Service]
+            Type=notify
+            ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/flanneld
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
+            ExecStart=/opt/bin/flanneld -etcd-endpoints http://10.20.30.40:4001
+        - name: docker.service
+          command: start
+          content: |
+            [Unit]
+            After=flannel.service
+            Wants=flannel.service
+            Description=Docker Application Container Engine
+            Documentation=http://docs.docker.io
+            [Service]
+            EnvironmentFile=-/etc/default/docker
+            EnvironmentFile=/run/flannel/subnet.env
+            ExecStartPre=/bin/mount --make-rprivate /
+            ExecStart=/usr/bin/docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=overlay -H fd:// ${DOCKER_EXTRA_OPTS}
+            [Install]
+            WantedBy=multi-user.target
+        - name: setup-network-environment.service
+          command: start
+          content: |
+            [Unit]
+            Description=Setup Network Environment
+            Documentation=https://github.com/kelseyhightower/setup-network-environment
+            Requires=network-online.target
+            After=network-online.target
+            [Service]
+            ExecStartPre=-/usr/bin/mkdir -p /opt/bin
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/setup-network-environment 
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment
+            ExecStart=/opt/bin/setup-network-environment
+            RemainAfterExit=yes
+            Type=oneshot
+        - name: kube-proxy.service
+          command: start
+          content: |
+            [Unit]
+            Description=Kubernetes Proxy
+            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Requires=setup-network-environment.service
+            After=setup-network-environment.service
+            [Service]
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/kube-proxy
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
+            ExecStart=/opt/bin/kube-proxy \
+            --etcd_servers=http://10.20.30.40:4001 \
+            --logtostderr=true
+            Restart=always
+            RestartSec=10
+        - name: kube-kubelet.service
+          command: start
+          content: |
+            [Unit]
+            Description=Kubernetes Kubelet
+            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Requires=setup-network-environment.service
+            After=setup-network-environment.service
+            [Service]
+            EnvironmentFile=/etc/network-environment
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/kubelet
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
+            ExecStart=/opt/bin/kubelet \
+            --address=0.0.0.0 \
+            --port=10250 \
+            --hostname_override=${DEFAULT_IPV4} \
+            --etcd_servers=http://10.20.30.40:4001 \
+            --logtostderr=true
+            Restart=always
+            RestartSec=10
+      update:
+        group: stable
+        reboot-strategy: off
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAAD...
+
+
+## New pxelinux.cfg file
+To control  what nodes are using what pxe-config file we will use the pxelinux MAC targets to specify the slaves from master.
+
+First create a new pxelinux target file ```vi /tftpboot/pxelinux.cfg/coreos-node-slave```
+
+    default coreos
+    prompt 1
+    timeout 15
+
+    display boot.msg
+
+    label coreos
+      menu default
+      kernel images/coreos/coreos_production_pxe.vmlinuz
+      append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-slave.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
+
+And one for the master: ```vi /tftpboot/pxelinux.cfg/coreos-node-master```
+
+    default coreos
+    prompt 1
+    timeout 15
+
+    display boot.msg
+
+    label coreos
+      menu default
+      kernel images/coreos/coreos_production_pxe.vmlinuz
+      append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-master.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
+
+## Specify pxelinux target
+Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets.
+
+In this walkthrough I will show with fake MAC addresses. documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
+
+    cd /tftpboot/pxelinux.cfg
+    ln -s coreos-node-master 01-d0-00-67-13-0d-00
+    ln -s coreos-node-slave 01-d0-00-67-13-0d-01
+    ln -s coreos-node-slave 01-d0-00-67-13-0d-02
+
+
+Reboot these servers to get the images PXEd and ready for running containers!
+
+## Creating test pod
+Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
+
+Here is a fork where you can do a full walkthrough by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick version.
+
+
+On the Kubernetes Master node lets create the '''nginx.yml'''
+    
+    apiVersion: v1beta1
+    kind: Pod
+    id: www
+    desiredState:
+      manifest:
+        version: v1beta1
+        id: www
+        containers:
+          - name: nginx
+            image: dockerfile/nginx
+    
+
+Now add the pod to Kubernetes:
+
+     kubectl create -f nginx.yml
+
+This might take a while to download depending on the environment.
+
+    
+
+## Helping commands for debugging
+
+List all keys in etcd:
+
+     etcdctl ls --recursive
+
+List fleet machines
+
+    fleetctl list-machines
+
+List Kubernetes
+
+    kubecfg list pods
+    kubecfg list minions
+
+Kill all pods:
+
+    for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
