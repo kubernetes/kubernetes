@@ -52,7 +52,7 @@ import (
 type TypeMeta struct {
 	// Kind is a string value representing the REST resource this object represents.
 	// Servers may infer this from the endpoint the client submits requests to.
-	Kind string `json:"kind,omitempty" description:"kind of object, in CamelCase"`
+	Kind string `json:"kind,omitempty" description:"kind of object, in CamelCase; cannot be updated"`
 
 	// APIVersion defines the versioned schema of this representation of an object.
 	// Servers should convert recognized schemas to the latest internal value, and
@@ -80,7 +80,7 @@ type ObjectMeta struct {
 	// some resources may allow a client to request the generation of an appropriate name
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
-	Name string `json:"name,omitempty" description:"string that identifies an object. Must be unique within a namespace"`
+	Name string `json:"name,omitempty" description:"string that identifies an object. Must be unique within a namespace; cannot be updated"`
 
 	// GenerateName indicates that the name should be made unique by the server prior to persisting
 	// it. A non-empty value for the field indicates the name will be made unique (and the name
@@ -99,7 +99,7 @@ type ObjectMeta struct {
 	// equivalent to the "default" namespace, but "default" is the canonical representation.
 	// Not all objects are required to be scoped to a namespace - the value of this field for
 	// those objects will be empty.
-	Namespace string `json:"namespace,omitempty" description:"namespace of the object"`
+	Namespace string `json:"namespace,omitempty" description:"namespace of the object; cannot be updated"`
 
 	// SelfLink is a URL representing this object.
 	SelfLink string `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
@@ -360,28 +360,28 @@ const (
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
-	Name string `json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod"`
+	Name string `json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
 	// Required.
 	Image string `json:"image" description:"Docker image name"`
 	// Optional: Defaults to whatever is defined in the image.
-	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; defaults to entrypoint or command in the image"`
+	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir     string               `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default"`
-	Ports          []ContainerPort      `json:"ports,omitempty" description:"list of ports to expose from the container"`
-	Env            []EnvVar             `json:"env,omitempty" description:"list of environment variables to set in the container"`
-	Resources      ResourceRequirements `json:"resources,omitempty" description:"Compute Resources required by this container"`
-	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesystem"`
-	LivenessProbe  *Probe               `json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails"`
-	ReadinessProbe *Probe               `json:"readinessProbe,omitempty" description:"periodic probe of container service readiness; container will be removed from service endpoints if the probe fails"`
-	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events"`
+	WorkingDir     string               `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default; cannot be updated"`
+	Ports          []ContainerPort      `json:"ports,omitempty" description:"list of ports to expose from the container; cannot be updated"`
+	Env            []EnvVar             `json:"env,omitempty" description:"list of environment variables to set in the container; cannot be updated"`
+	Resources      ResourceRequirements `json:"resources,omitempty" description:"Compute Resources required by this container; cannot be updated"`
+	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesyste; cannot be updated"`
+	LivenessProbe  *Probe               `json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated"`
+	ReadinessProbe *Probe               `json:"readinessProbe,omitempty" description:"periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated"`
+	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events; cannot be updated"`
 	// Optional: Defaults to /dev/termination-log
-	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log"`
+	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated"`
 	// Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false"`
+	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false; cannot be updated"`
 	// Optional: Policy for pulling images for this container
-	ImagePullPolicy PullPolicy `json:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise"`
+	ImagePullPolicy PullPolicy `json:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"`
 	// Optional: Capabilities for container.
-	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container"`
+	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated"`
 }
 
 // Handler defines a specific action that should be taken
@@ -544,7 +544,7 @@ const (
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
-	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod"`
+	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
@@ -567,7 +567,7 @@ type PodStatus struct {
 
 	// Host is the name of the node that this Pod is currently bound to, or empty if no
 	// assignment has been done.
-	Host   string `json:"host,omitempty" description:"host to which the pod is assigned; empty if not yet scheduled"`
+	Host   string `json:"host,omitempty" description:"host to which the pod is assigned; empty if not yet scheduled; cannot be updated"`
 	HostIP string `json:"hostIP,omitempty" description:"IP address of the host to which the pod is assigned; empty if not yet scheduled"`
 	PodIP  string `json:"podIP,omitempty" description:"IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"`
 
@@ -737,7 +737,7 @@ type ServiceSpec struct {
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
 	// not be changed by updates.
-	PortalIP string `json:"portalIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise"`
+	PortalIP string `json:"portalIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated"`
 
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`

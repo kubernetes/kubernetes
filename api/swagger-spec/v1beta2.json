@@ -5,29 +5,21 @@
   "resourcePath": "/api/v1beta2",
   "apis": [
    {
-    "path": "/api/v1beta2/services/{name}",
+    "path": "/api/v1beta2/namespaces/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Service",
+      "type": "v1beta2.Namespace",
       "method": "GET",
-      "summary": "read the specified Service",
-      "nickname": "readService",
+      "summary": "read the specified Namespace",
+      "nickname": "readNamespace",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the Namespace",
         "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
         "allowMultiple": false
        }
       ],
@@ -41,27 +33,49 @@
      {
       "type": "void",
       "method": "PUT",
-      "summary": "update the specified Service",
-      "nickname": "updateService",
+      "summary": "replace the specified Namespace",
+      "nickname": "replaceNamespace",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the Namespace",
         "required": true,
         "allowMultiple": false
        },
        {
+        "type": "v1beta2.Namespace",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Namespace",
+      "nickname": "patchNamespace",
+      "parameters": [
+       {
         "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Namespace",
+        "required": true,
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Service",
+        "type": "v1beta2.Namespace",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -79,23 +93,15 @@
      {
       "type": "void",
       "method": "DELETE",
-      "summary": "delete a Service",
-      "nickname": "deleteService",
+      "summary": "delete a Namespace",
+      "nickname": "deleteNamespace",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the Namespace",
         "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
         "allowMultiple": false
        }
       ],
@@ -109,441 +115,7 @@
     ]
    },
    {
-    "path": "/api/v1beta2/watch/secrets",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.SecretList",
-      "method": "GET",
-      "summary": "watch a list of Secret",
-      "nickname": "watchSecretlist",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/resourceQuotas/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ResourceQuota",
-      "method": "GET",
-      "summary": "watch a particular ResourceQuota",
-      "nickname": "watchResourceQuota",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ResourceQuota",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/limitRanges/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.LimitRange",
-      "method": "GET",
-      "summary": "read the specified LimitRange",
-      "nickname": "readLimitRange",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the LimitRange",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "update the specified LimitRange",
-      "nickname": "updateLimitRange",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the LimitRange",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.LimitRange",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "delete a LimitRange",
-      "nickname": "deleteLimitRange",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the LimitRange",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/proxy/services/{name}/{path:*}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "void",
-      "method": "GET",
-      "summary": "proxy GET requests to Service",
-      "nickname": "proxyGETService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Service",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "proxy PUT requests to Service",
-      "nickname": "proxyPUTService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Service",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "proxy POST requests to Service",
-      "nickname": "proxyPOSTService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Service",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "proxy DELETE requests to Service",
-      "nickname": "proxyDELETEService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Service",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/resourceQuotas/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ResourceQuota",
-      "method": "GET",
-      "summary": "read the specified ResourceQuota",
-      "nickname": "readResourceQuota",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ResourceQuota",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "update the specified ResourceQuota",
-      "nickname": "updateResourceQuota",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ResourceQuota",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.ResourceQuota",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "delete a ResourceQuota",
-      "nickname": "deleteResourceQuota",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ResourceQuota",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/replicationControllers/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ReplicationController",
-      "method": "GET",
-      "summary": "watch a particular ReplicationController",
-      "nickname": "watchReplicationController",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ReplicationController",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/minions",
+    "path": "/api/v1beta2/watch/nodes",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
@@ -562,48 +134,26 @@
     ]
    },
    {
-    "path": "/api/v1beta2/proxy/minions/{name}",
+    "path": "/api/v1beta2/endpoints",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.EndpointsList",
       "method": "GET",
-      "summary": "proxy GET requests to Node",
-      "nickname": "proxyGETNode",
+      "summary": "list objects of kind Endpoints",
+      "nickname": "listEndpoints",
       "parameters": [
        {
         "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
       "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "proxy PUT requests to Node",
-      "nickname": "proxyPUTNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -612,42 +162,28 @@
      {
       "type": "void",
       "method": "POST",
-      "summary": "proxy POST requests to Node",
-      "nickname": "proxyPOSTNode",
+      "summary": "create a Endpoints",
+      "nickname": "createEndpoints",
       "parameters": [
        {
         "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
       ],
       "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "proxy DELETE requests to Node",
-      "nickname": "proxyDELETENode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -656,23 +192,15 @@
     ]
    },
    {
-    "path": "/api/v1beta2/proxy/pods/{name}/{path:*}",
+    "path": "/api/v1beta2/watch/resourceQuotas",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.ResourceQuotaList",
       "method": "GET",
-      "summary": "proxy GET requests to Pod",
-      "nickname": "proxyGETPod",
+      "summary": "watch a list of ResourceQuota",
+      "nickname": "watchResourceQuotalist",
       "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Pod",
-        "required": true,
-        "allowMultiple": false
-       },
        {
         "type": "string",
         "paramType": "query",
@@ -683,97 +211,7 @@
        }
       ],
       "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "proxy PUT requests to Pod",
-      "nickname": "proxyPUTPod",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Pod",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "proxy POST requests to Pod",
-      "nickname": "proxyPOSTPod",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Pod",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "proxy DELETE requests to Pod",
-      "nickname": "proxyDELETEPod",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Pod",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -876,487 +314,20 @@
     ]
    },
    {
-    "path": "/api/v1beta2/redirect/minions/{name}",
+    "path": "/api/v1beta2/watch/minions/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "GET",
-      "summary": "redirect GET request to Node",
-      "nickname": "redirectNode",
+      "summary": "watch a particular Node",
+      "nickname": "watchNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/pods",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.PodList",
-      "method": "GET",
-      "summary": "watch a list of Pod",
-      "nickname": "watchPodlist",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/pods/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Pod",
-      "method": "GET",
-      "summary": "watch a particular Pod",
-      "nickname": "watchPod",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Pod",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/replicationControllers/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ReplicationController",
-      "method": "GET",
-      "summary": "read the specified ReplicationController",
-      "nickname": "readReplicationController",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ReplicationController",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "update the specified ReplicationController",
-      "nickname": "updateReplicationController",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ReplicationController",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.ReplicationController",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "delete a ReplicationController",
-      "nickname": "deleteReplicationController",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the ReplicationController",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/resourceQuotas",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ResourceQuotaList",
-      "method": "GET",
-      "summary": "watch a list of ResourceQuota",
-      "nickname": "watchResourceQuotalist",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/replicationControllers",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ReplicationControllerList",
-      "method": "GET",
-      "summary": "watch a list of ReplicationController",
-      "nickname": "watchReplicationControllerlist",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/proxy/minions/{name}/{path:*}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "void",
-      "method": "GET",
-      "summary": "proxy GET requests to Node",
-      "nickname": "proxyGETNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "proxy PUT requests to Node",
-      "nickname": "proxyPUTNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "proxy POST requests to Node",
-      "nickname": "proxyPOSTNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "proxy DELETE requests to Node",
-      "nickname": "proxyDELETENode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/nodes",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.MinionList",
-      "method": "GET",
-      "summary": "watch a list of Node",
-      "nickname": "watchNodelist",
-      "parameters": [],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/limitRanges/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.LimitRange",
-      "method": "GET",
-      "summary": "watch a particular LimitRange",
-      "nickname": "watchLimitRange",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the LimitRange",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/secrets/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Secret",
-      "method": "GET",
-      "summary": "watch a particular Secret",
-      "nickname": "watchSecret",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Secret",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/services",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ServiceList",
-      "method": "GET",
-      "summary": "list objects of kind Service",
-      "nickname": "listService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "create a Service",
-      "nickname": "createService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.Service",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -1497,92 +468,34 @@
     ]
    },
    {
-    "path": "/api/v1beta2/proxy/nodes/{name}/{path:*}",
+    "path": "/api/v1beta2/watch/resourceQuotas/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.ResourceQuota",
       "method": "GET",
-      "summary": "proxy GET requests to Node",
-      "nickname": "proxyGETNode",
+      "summary": "watch a particular ResourceQuota",
+      "nickname": "watchResourceQuota",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the ResourceQuota",
         "required": true,
         "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "proxy PUT requests to Node",
-      "nickname": "proxyPUTNode",
-      "parameters": [
+       },
        {
         "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
       "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "proxy POST requests to Node",
-      "nickname": "proxyPOSTNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "proxy DELETE requests to Node",
-      "nickname": "proxyDELETENode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -1591,20 +504,20 @@
     ]
    },
    {
-    "path": "/api/v1beta2/namespaces/{name}",
+    "path": "/api/v1beta2/nodes/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Namespace",
+      "type": "v1beta2.Minion",
       "method": "GET",
-      "summary": "read the specified Namespace",
-      "nickname": "readNamespace",
+      "summary": "read the specified Node",
+      "nickname": "readNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Namespace",
+        "description": "name of the Node",
         "required": true,
         "allowMultiple": false
        }
@@ -1619,19 +532,49 @@
      {
       "type": "void",
       "method": "PUT",
-      "summary": "update the specified Namespace",
-      "nickname": "updateNamespace",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Namespace",
+        "description": "name of the Node",
         "required": true,
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Namespace",
+        "type": "v1beta2.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Node",
+      "nickname": "patchNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Minion",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1649,14 +592,14 @@
      {
       "type": "void",
       "method": "DELETE",
-      "summary": "delete a Namespace",
-      "nickname": "deleteNamespace",
+      "summary": "delete a Node",
+      "nickname": "deleteNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Namespace",
+        "description": "name of the Node",
         "required": true,
         "allowMultiple": false
        }
@@ -1671,21 +614,313 @@
     ]
    },
    {
-    "path": "/api/v1beta2/watch/minions/{name}",
+    "path": "/api/v1beta2/replicationControllers/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Minion",
+      "type": "v1beta2.ReplicationController",
       "method": "GET",
-      "summary": "watch a particular Node",
-      "nickname": "watchNode",
+      "summary": "read the specified ReplicationController",
+      "nickname": "readReplicationController",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the ReplicationController",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified ReplicationController",
+      "nickname": "replaceReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified ReplicationController",
+      "nickname": "patchReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a ReplicationController",
+      "nickname": "deleteReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/pods/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Pod",
+      "method": "GET",
+      "summary": "watch a particular Pod",
+      "nickname": "watchPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/limitRanges/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.LimitRange",
+      "method": "GET",
+      "summary": "read the specified LimitRange",
+      "nickname": "readLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the LimitRange",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified LimitRange",
+      "nickname": "replaceLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the LimitRange",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.LimitRange",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified LimitRange",
+      "nickname": "patchLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the LimitRange",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.LimitRange",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a LimitRange",
+      "nickname": "deleteLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the LimitRange",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -1757,286 +992,15 @@
     ]
    },
    {
-    "path": "/api/v1beta2/events/{name}",
+    "path": "/api/v1beta2/watch/minions",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Event",
+      "type": "v1beta2.MinionList",
       "method": "GET",
-      "summary": "read the specified Event",
-      "nickname": "readEvent",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Event",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "update the specified Event",
-      "nickname": "updateEvent",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Event",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.Event",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "delete a Event",
-      "nickname": "deleteEvent",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Event",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/events/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Event",
-      "method": "GET",
-      "summary": "watch a particular Event",
-      "nickname": "watchEvent",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Event",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/limitRanges",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.LimitRangeList",
-      "method": "GET",
-      "summary": "list objects of kind LimitRange",
-      "nickname": "listLimitRange",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "create a LimitRange",
-      "nickname": "createLimitRange",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.LimitRange",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/services",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ServiceList",
-      "method": "GET",
-      "summary": "watch a list of Service",
-      "nickname": "watchServicelist",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/nodes/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Minion",
-      "method": "GET",
-      "summary": "watch a particular Node",
-      "nickname": "watchNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/resourceQuotaUsages",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "create a ResourceQuotaUsage",
-      "nickname": "createResourceQuotaUsage",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.ResourceQuotaUsage",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
+      "summary": "watch a list of Node",
+      "nickname": "watchNodelist",
+      "parameters": [],
       "produces": [
        "application/json"
       ],
@@ -2083,8 +1047,46 @@
      {
       "type": "void",
       "method": "PUT",
-      "summary": "update the specified Pod",
-      "nickname": "updatePod",
+      "summary": "replace the specified Pod",
+      "nickname": "replacePod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Pod",
+      "nickname": "patchPod",
       "parameters": [
        {
         "type": "string",
@@ -2151,66 +1153,20 @@
     ]
    },
    {
-    "path": "/api/v1beta2/endpoints/{name}",
+    "path": "/api/v1beta2/watch/namespaces/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Endpoints",
+      "type": "v1beta2.Namespace",
       "method": "GET",
-      "summary": "read the specified Endpoints",
-      "nickname": "readEndpoints",
+      "summary": "watch a particular Namespace",
+      "nickname": "watchNamespace",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Endpoints",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "PUT",
-      "summary": "update the specified Endpoints",
-      "nickname": "updateEndpoints",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Endpoints",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.Endpoints",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
+        "description": "name of the Namespace",
         "required": true,
         "allowMultiple": false
        }
@@ -2225,21 +1181,65 @@
     ]
    },
    {
-    "path": "/api/v1beta2/minions/{name}",
+    "path": "/api/v1beta2/watch/secrets/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Minion",
+      "type": "v1beta2.Secret",
       "method": "GET",
-      "summary": "read the specified Node",
-      "nickname": "readNode",
+      "summary": "watch a particular Secret",
+      "nickname": "watchSecret",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the Secret",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/secrets/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Secret",
+      "method": "GET",
+      "summary": "read the specified Secret",
+      "nickname": "readSecret",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Secret",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -2253,19 +1253,65 @@
      {
       "type": "void",
       "method": "PUT",
-      "summary": "update the specified Node",
-      "nickname": "updateNode",
+      "summary": "replace the specified Secret",
+      "nickname": "replaceSecret",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the Secret",
         "required": true,
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Minion",
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Secret",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Secret",
+      "nickname": "patchSecret",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Secret",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Secret",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2283,15 +1329,23 @@
      {
       "type": "void",
       "method": "DELETE",
-      "summary": "delete a Node",
-      "nickname": "deleteNode",
+      "summary": "delete a Secret",
+      "nickname": "deleteSecret",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the Secret",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -2305,14 +1359,14 @@
     ]
    },
    {
-    "path": "/api/v1beta2/watch/events",
+    "path": "/api/v1beta2/watch/services",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.EventList",
+      "type": "v1beta2.ServiceList",
       "method": "GET",
-      "summary": "watch a list of Event",
-      "nickname": "watchEventlist",
+      "summary": "watch a list of Service",
+      "nickname": "watchServicelist",
       "parameters": [
        {
         "type": "string",
@@ -2333,14 +1387,14 @@
     ]
    },
    {
-    "path": "/api/v1beta2/redirect/services/{name}",
+    "path": "/api/v1beta2/watch/services/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Service",
       "method": "GET",
-      "summary": "redirect GET request to Service",
-      "nickname": "redirectService",
+      "summary": "watch a particular Service",
+      "nickname": "watchService",
       "parameters": [
        {
         "type": "string",
@@ -2360,7 +1414,7 @@
        }
       ],
       "produces": [
-       "*/*"
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -2495,14 +1549,14 @@
     ]
    },
    {
-    "path": "/api/v1beta2/nodes/{name}",
+    "path": "/api/v1beta2/redirect/nodes/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Minion",
+      "type": "void",
       "method": "GET",
-      "summary": "read the specified Node",
-      "nickname": "readNode",
+      "summary": "redirect GET request to Node",
+      "nickname": "redirectNode",
       "parameters": [
        {
         "type": "string",
@@ -2514,32 +1568,38 @@
        }
       ],
       "produces": [
-       "application/json"
+       "*/*"
       ],
       "consumes": [
        "*/*"
       ]
-     },
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/events/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
      {
-      "type": "void",
-      "method": "PUT",
-      "summary": "update the specified Node",
-      "nickname": "updateNode",
+      "type": "v1beta2.Event",
+      "method": "GET",
+      "summary": "watch a particular Event",
+      "nickname": "watchEvent",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the Event",
         "required": true,
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Minion",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -2549,41 +1609,27 @@
       "consumes": [
        "*/*"
       ]
-     },
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/redirect/pods/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
      {
       "type": "void",
-      "method": "DELETE",
-      "summary": "delete a Node",
-      "nickname": "deleteNode",
+      "method": "GET",
+      "summary": "redirect GET request to Pod",
+      "nickname": "redirectPod",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the Pod",
         "required": true,
         "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/limitRanges",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.LimitRangeList",
-      "method": "GET",
-      "summary": "watch a list of LimitRange",
-      "nickname": "watchLimitRangelist",
-      "parameters": [
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2594,7 +1640,7 @@
        }
       ],
       "produces": [
-       "application/json"
+       "*/*"
       ],
       "consumes": [
        "*/*"
@@ -2603,36 +1649,14 @@
     ]
    },
    {
-    "path": "/api/v1beta2/pods",
+    "path": "/api/v1beta2/pods/{name}/binding",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
-     {
-      "type": "v1beta2.PodList",
-      "method": "GET",
-      "summary": "list objects of kind Pod",
-      "nickname": "listPod",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
      {
       "type": "void",
       "method": "POST",
-      "summary": "create a Pod",
-      "nickname": "createPod",
+      "summary": "create a Binding",
+      "nickname": "createBinding",
       "parameters": [
        {
         "type": "string",
@@ -2643,39 +1667,11 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Pod",
+        "type": "v1beta2.Binding",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/endpoints",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.EndpointsList",
-      "method": "GET",
-      "summary": "watch a list of Endpoints",
-      "nickname": "watchEndpointslist",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
         "allowMultiple": false
        }
       ],
@@ -2788,34 +1784,26 @@
     ]
    },
    {
-    "path": "/api/v1beta2/secrets/{name}",
+    "path": "/api/v1beta2/proxy/nodes/{name}/{path:*}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Secret",
+      "type": "void",
       "method": "GET",
-      "summary": "read the specified Secret",
-      "nickname": "readSecret",
+      "summary": "proxy GET requests to Node",
+      "nickname": "proxyGETNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Secret",
+        "description": "name of the Node",
         "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
         "allowMultiple": false
        }
       ],
       "produces": [
-       "application/json"
+       "*/*"
       ],
       "consumes": [
        "*/*"
@@ -2824,158 +1812,20 @@
      {
       "type": "void",
       "method": "PUT",
-      "summary": "update the specified Secret",
-      "nickname": "updateSecret",
+      "summary": "proxy PUT requests to Node",
+      "nickname": "proxyPUTNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Secret",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.Secret",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
+        "description": "name of the Node",
         "required": true,
         "allowMultiple": false
        }
       ],
       "produces": [
-       "application/json"
-      ],
-      "consumes": [
        "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "DELETE",
-      "summary": "delete a Secret",
-      "nickname": "deleteSecret",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Secret",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/namespaces/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Namespace",
-      "method": "GET",
-      "summary": "watch a particular Namespace",
-      "nickname": "watchNamespace",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Namespace",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/services/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Service",
-      "method": "GET",
-      "summary": "watch a particular Service",
-      "nickname": "watchService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Service",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/endpoints",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.EndpointsList",
-      "method": "GET",
-      "summary": "list objects of kind Endpoints",
-      "nickname": "listEndpoints",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -2984,64 +1834,42 @@
      {
       "type": "void",
       "method": "POST",
-      "summary": "create a Endpoints",
-      "nickname": "createEndpoints",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.Endpoints",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/endpoints/{name}",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.Endpoints",
-      "method": "GET",
-      "summary": "watch a particular Endpoints",
-      "nickname": "watchEndpoints",
+      "summary": "proxy POST requests to Node",
+      "nickname": "proxyPOSTNode",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Endpoints",
+        "description": "name of the Node",
         "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
         "allowMultiple": false
        }
       ],
       "produces": [
-       "application/json"
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "proxy DELETE requests to Node",
+      "nickname": "proxyDELETENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
       ],
       "consumes": [
        "*/*"
@@ -3050,14 +1878,14 @@
     ]
    },
    {
-    "path": "/api/v1beta2/redirect/pods/{name}",
+    "path": "/api/v1beta2/pods/{name}/status",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
       "type": "void",
-      "method": "GET",
-      "summary": "redirect GET request to Pod",
-      "nickname": "redirectPod",
+      "method": "PUT",
+      "summary": "replace the specified Pod",
+      "nickname": "replacePod",
       "parameters": [
        {
         "type": "string",
@@ -3074,59 +1902,9 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/resourceQuotas",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.ResourceQuotaList",
-      "method": "GET",
-      "summary": "list objects of kind ResourceQuota",
-      "nickname": "listResourceQuota",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "void",
-      "method": "POST",
-      "summary": "create a ResourceQuota",
-      "nickname": "createResourceQuota",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
        },
        {
-        "type": "v1beta2.ResourceQuota",
+        "type": "v1beta2.Pod",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3144,21 +1922,29 @@
     ]
    },
    {
-    "path": "/api/v1beta2/redirect/nodes/{name}",
+    "path": "/api/v1beta2/redirect/services/{name}",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
       "type": "void",
       "method": "GET",
-      "summary": "redirect GET request to Node",
-      "nickname": "redirectNode",
+      "summary": "redirect GET request to Service",
+      "nickname": "redirectService",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the Service",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -3203,25 +1989,6 @@
         "allowMultiple": false
        }
       ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta2/watch/namespaces",
-    "description": "API at /api/v1beta2 version v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.NamespaceList",
-      "method": "GET",
-      "summary": "watch a list of Namespace",
-      "nickname": "watchNamespacelist",
-      "parameters": [],
       "produces": [
        "application/json"
       ],
@@ -3290,6 +2057,204 @@
     ]
    },
    {
+    "path": "/api/v1beta2/watch/endpoints",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.EndpointsList",
+      "method": "GET",
+      "summary": "watch a list of Endpoints",
+      "nickname": "watchEndpointslist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/services/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Service",
+      "method": "GET",
+      "summary": "read the specified Service",
+      "nickname": "readService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Service",
+      "nickname": "replaceService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Service",
+      "nickname": "patchService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a Service",
+      "nickname": "deleteService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/limitRanges",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.LimitRangeList",
+      "method": "GET",
+      "summary": "watch a list of LimitRange",
+      "nickname": "watchLimitRangelist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta2/bindings",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
@@ -3316,6 +2281,373 @@
         "allowMultiple": false
        }
       ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/secrets",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.SecretList",
+      "method": "GET",
+      "summary": "watch a list of Secret",
+      "nickname": "watchSecretlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/limitRanges/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.LimitRange",
+      "method": "GET",
+      "summary": "watch a particular LimitRange",
+      "nickname": "watchLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the LimitRange",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/events",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.EventList",
+      "method": "GET",
+      "summary": "watch a list of Event",
+      "nickname": "watchEventlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/endpoints/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Endpoints",
+      "method": "GET",
+      "summary": "watch a particular Endpoints",
+      "nickname": "watchEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/resourceQuotaUsages",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a ResourceQuotaUsage",
+      "nickname": "createResourceQuotaUsage",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.ResourceQuotaUsage",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/services",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.ServiceList",
+      "method": "GET",
+      "summary": "list objects of kind Service",
+      "nickname": "listService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Service",
+      "nickname": "createService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/proxy/pods/{name}/{path:*}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "proxy GET requests to Pod",
+      "nickname": "proxyGETPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "proxy PUT requests to Pod",
+      "nickname": "proxyPUTPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "proxy POST requests to Pod",
+      "nickname": "proxyPOSTPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "proxy DELETE requests to Pod",
+      "nickname": "proxyDELETEPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/namespaces",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.NamespaceList",
+      "method": "GET",
+      "summary": "watch a list of Namespace",
+      "nickname": "watchNamespacelist",
+      "parameters": [],
       "produces": [
        "application/json"
       ],
@@ -3365,6 +2697,1148 @@
       ]
      }
     ]
+   },
+   {
+    "path": "/api/v1beta2/watch/nodes/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Minion",
+      "method": "GET",
+      "summary": "watch a particular Node",
+      "nickname": "watchNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/minions/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Minion",
+      "method": "GET",
+      "summary": "read the specified Node",
+      "nickname": "readNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Node",
+      "nickname": "patchNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a Node",
+      "nickname": "deleteNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/endpoints/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Endpoints",
+      "method": "GET",
+      "summary": "read the specified Endpoints",
+      "nickname": "readEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Endpoints",
+      "nickname": "replaceEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Endpoints",
+      "nickname": "patchEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/pods",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.PodList",
+      "method": "GET",
+      "summary": "list objects of kind Pod",
+      "nickname": "listPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a Pod",
+      "nickname": "createPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/redirect/minions/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "redirect GET request to Node",
+      "nickname": "redirectNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/proxy/services/{name}/{path:*}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "proxy GET requests to Service",
+      "nickname": "proxyGETService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "proxy PUT requests to Service",
+      "nickname": "proxyPUTService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "proxy POST requests to Service",
+      "nickname": "proxyPOSTService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "proxy DELETE requests to Service",
+      "nickname": "proxyDELETEService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/limitRanges",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.LimitRangeList",
+      "method": "GET",
+      "summary": "list objects of kind LimitRange",
+      "nickname": "listLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a LimitRange",
+      "nickname": "createLimitRange",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.LimitRange",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/events/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.Event",
+      "method": "GET",
+      "summary": "read the specified Event",
+      "nickname": "readEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Event",
+      "nickname": "replaceEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified Event",
+      "nickname": "patchEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a Event",
+      "nickname": "deleteEvent",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Event",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/proxy/minions/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "proxy GET requests to Node",
+      "nickname": "proxyGETNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "proxy PUT requests to Node",
+      "nickname": "proxyPUTNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "proxy POST requests to Node",
+      "nickname": "proxyPOSTNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "proxy DELETE requests to Node",
+      "nickname": "proxyDELETENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/replicationControllers",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.ReplicationControllerList",
+      "method": "GET",
+      "summary": "watch a list of ReplicationController",
+      "nickname": "watchReplicationControllerlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/resourceQuotas/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.ResourceQuota",
+      "method": "GET",
+      "summary": "read the specified ResourceQuota",
+      "nickname": "readResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ResourceQuota",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified ResourceQuota",
+      "nickname": "replaceResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ResourceQuota",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.ResourceQuota",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified ResourceQuota",
+      "nickname": "patchResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ResourceQuota",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.ResourceQuota",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a ResourceQuota",
+      "nickname": "deleteResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ResourceQuota",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/pods",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.PodList",
+      "method": "GET",
+      "summary": "watch a list of Pod",
+      "nickname": "watchPodlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/proxy/minions/{name}/{path:*}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "summary": "proxy GET requests to Node",
+      "nickname": "proxyGETNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "proxy PUT requests to Node",
+      "nickname": "proxyPUTNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "proxy POST requests to Node",
+      "nickname": "proxyPOSTNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "proxy DELETE requests to Node",
+      "nickname": "proxyDELETENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/watch/replicationControllers/{name}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.ReplicationController",
+      "method": "GET",
+      "summary": "watch a particular ReplicationController",
+      "nickname": "watchReplicationController",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ReplicationController",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/resourceQuotas",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.ResourceQuotaList",
+      "method": "GET",
+      "summary": "list objects of kind ResourceQuota",
+      "nickname": "listResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a ResourceQuota",
+      "nickname": "createResourceQuota",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.ResourceQuota",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
    }
   ],
   "models": {
@@ -3385,7 +3859,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -3397,15 +3871,15 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "podID": {
       "type": "string",
@@ -3413,15 +3887,15 @@
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -3462,7 +3936,7 @@
     "properties": {
      "capabilities": {
       "type": "v1beta2.Capabilities",
-      "description": "capabilities for container"
+      "description": "capabilities for container; cannot be updated"
      },
      "command": {
       "type": "array",
@@ -3471,12 +3945,12 @@
         "$ref": "string"
        }
       ],
-      "description": "command argv array; not executed within a shell; defaults to entrypoint or command in the image"
+      "description": "command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"
      },
      "cpu": {
       "type": "integer",
       "format": "int32",
-      "description": "CPU share in thousandths of a core"
+      "description": "CPU share in thousandths of a core; cannot be updated"
      },
      "env": {
       "type": "array",
@@ -3485,7 +3959,7 @@
         "$ref": "v1beta2.EnvVar"
        }
       ],
-      "description": "list of environment variables to set in the container"
+      "description": "list of environment variables to set in the container; cannot be updated"
      },
      "image": {
       "type": "string",
@@ -3493,49 +3967,49 @@
      },
      "imagePullPolicy": {
       "type": "v1beta2.PullPolicy",
-      "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise"
+      "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"
      },
      "lifecycle": {
       "type": "v1beta2.Lifecycle",
-      "description": "actions that the management system should take in response to container lifecycle events"
+      "description": "actions that the management system should take in response to container lifecycle events; cannot be updated"
      },
      "livenessProbe": {
       "type": "v1beta2.LivenessProbe",
-      "description": "periodic probe of container liveness; container will be restarted if the probe fails"
+      "description": "periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated"
      },
      "memory": {
       "type": "integer",
       "format": "int64",
-      "description": "memory limit in bytes; defaults to unlimited"
+      "description": "memory limit in bytes; defaults to unlimited; cannot be updated"
      },
      "name": {
       "type": "string",
-      "description": "name of the container; must be a DNS_LABEL and unique within the pod"
+      "description": "name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"
      },
      "ports": {
       "type": "array",
       "items": [
        {
-        "$ref": "v1beta2.Port"
+        "$ref": "v1beta2.ContainerPort"
        }
       ],
-      "description": "list of ports to expose from the container"
+      "description": "list of ports to expose from the container; cannot be updated"
      },
      "privileged": {
       "type": "boolean",
-      "description": "whether or not the container is granted privileged status; defaults to false"
+      "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated"
      },
      "readinessProbe": {
       "type": "v1beta2.LivenessProbe",
-      "description": "periodic probe of container service readiness; container will be removed from service endpoints if the probe fails"
+      "description": "periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated"
      },
      "resources": {
       "type": "v1beta2.ResourceRequirements",
-      "description": "Compute Resources required by this container"
+      "description": "Compute Resources required by this container; cannot be updated"
      },
      "terminationMessagePath": {
       "type": "string",
-      "description": "path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log"
+      "description": "path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated"
      },
      "volumeMounts": {
       "type": "array",
@@ -3544,11 +4018,11 @@
         "$ref": "v1beta2.VolumeMount"
        }
       ],
-      "description": "pod volumes to mount into the container's filesystem"
+      "description": "pod volumes to mount into the container's filesystem; cannot be updated"
      },
      "workingDir": {
       "type": "string",
-      "description": "container's working directory; defaults to image's default"
+      "description": "container's working directory; defaults to image's default; cannot be updated"
      }
     }
    },
@@ -3568,7 +4042,7 @@
         "$ref": "v1beta2.Container"
        }
       ],
-      "description": "list of containers belonging to the pod"
+      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed"
      },
      "dnsPolicy": {
       "type": "v1beta2.DNSPolicy",
@@ -3576,7 +4050,7 @@
      },
      "id": {
       "type": "string",
-      "description": "manifest name; must be a DNS_SUBDOMAIN"
+      "description": "manifest name; must be a DNS_SUBDOMAIN; cannot be updated"
      },
      "restartPolicy": {
       "type": "v1beta2.RestartPolicy",
@@ -3584,7 +4058,7 @@
      },
      "uuid": {
       "type": "types.UID",
-      "description": "manifest UUID"
+      "description": "manifest UUID; cannot be updated"
      },
      "version": {
       "type": "string",
@@ -3601,9 +4075,79 @@
      }
     }
    },
+   "v1beta2.ContainerPort": {
+    "id": "v1beta2.ContainerPort",
+    "required": [
+     "containerPort"
+    ],
+    "properties": {
+     "containerPort": {
+      "type": "integer",
+      "format": "int32",
+      "description": "number of port to expose on the pod's IP address"
+     },
+     "hostIP": {
+      "type": "string",
+      "description": "host IP to bind the port to"
+     },
+     "hostPort": {
+      "type": "integer",
+      "format": "int32",
+      "description": "number of port to expose on the host; most containers do not need this"
+     },
+     "name": {
+      "type": "string",
+      "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
+     },
+     "protocol": {
+      "type": "v1beta2.Protocol",
+      "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
+     }
+    }
+   },
    "v1beta2.EmptyDirVolumeSource": {
     "id": "v1beta2.EmptyDirVolumeSource",
     "properties": {}
+   },
+   "v1beta2.EndpointObjectReference": {
+    "id": "v1beta2.EndpointObjectReference",
+    "required": [
+     "endpoint"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent"
+     },
+     "endpoint": {
+      "type": "string",
+      "description": "endpoint exposed by the referenced object"
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of the referent"
+     },
+     "name": {
+      "type": "string",
+      "description": "id of the referent"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace of the referent"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "uid": {
+      "type": "types.UID",
+      "description": "uid of the referent"
+     }
+    }
    },
    "v1beta2.Endpoints": {
     "id": "v1beta2.Endpoints",
@@ -3621,7 +4165,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "endpoints": {
       "type": "array",
@@ -3638,15 +4182,15 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "protocol": {
       "type": "v1beta2.Protocol",
@@ -3654,15 +4198,24 @@
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "targetRefs": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta2.EndpointObjectReference"
+       }
+      ],
+      "description": "list of references to objects providing the endpoints"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -3682,7 +4235,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -3690,7 +4243,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -3703,23 +4256,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -3757,7 +4310,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "firstTimestamp": {
       "type": "string",
@@ -3773,7 +4326,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "involvedObject": {
       "type": "v1beta2.ObjectReference",
@@ -3781,7 +4334,7 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "lastTimestamp": {
       "type": "string",
@@ -3793,7 +4346,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "reason": {
       "type": "string",
@@ -3801,11 +4354,11 @@
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "source": {
       "type": "string",
@@ -3821,7 +4374,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -3841,7 +4394,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -3849,7 +4402,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -3862,23 +4415,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4010,7 +4563,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4018,23 +4571,23 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
       "type": "v1beta2.LimitRangeSpec",
@@ -4042,7 +4595,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4079,7 +4632,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4087,7 +4640,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -4100,23 +4653,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4175,13 +4728,13 @@
       "type": "string",
       "description": "version of the schema the object should have"
      },
-     "cidr": {
-      "type": "string",
-      "description": "IP range assigned to the node"
-     },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "externalID": {
+      "type": "string",
+      "description": "external id of the node assigned by some machine database (e.g. a cloud provider)"
      },
      "generateName": {
       "type": "string",
@@ -4193,11 +4746,11 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
       "type": "v1beta2.Minion.labels",
@@ -4205,11 +4758,15 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "podCIDR": {
+      "type": "string",
+      "description": "IP range assigned to the node"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "resources": {
       "type": "v1beta2.NodeResources",
@@ -4217,7 +4774,7 @@
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "status": {
       "type": "v1beta2.NodeStatus",
@@ -4225,7 +4782,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4249,7 +4806,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4257,7 +4814,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -4270,23 +4827,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4303,7 +4860,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4311,11 +4868,11 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
       "type": "v1beta2.Namespace.labels",
@@ -4323,15 +4880,15 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
       "type": "v1beta2.NamespaceSpec",
@@ -4339,11 +4896,11 @@
      },
      "status": {
       "type": "v1beta2.NamespaceStatus",
-      "description": "status describes the current status of a Namespace"
+      "description": "status describes the current status of a Namespace; read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4367,7 +4924,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4375,7 +4932,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -4388,23 +4945,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4414,7 +4971,29 @@
    },
    "v1beta2.NamespaceStatus": {
     "id": "v1beta2.NamespaceStatus",
-    "properties": {}
+    "properties": {
+     "phase": {
+      "type": "v1beta2.NamespacePhase",
+      "description": "phase is the current lifecycle phase of the namespace"
+     }
+    }
+   },
+   "v1beta2.NodeAddress": {
+    "id": "v1beta2.NodeAddress",
+    "required": [
+     "type",
+     "address"
+    ],
+    "properties": {
+     "address": {
+      "type": "string",
+      "description": "string representation of the address"
+     },
+     "type": {
+      "type": "v1beta2.NodeAddressType",
+      "description": "type of the node address, e.g. external ip, internal ip, hostname, etc"
+     }
+    }
    },
    "v1beta2.NodeCondition": {
     "id": "v1beta2.NodeCondition",
@@ -4461,6 +5040,15 @@
    "v1beta2.NodeStatus": {
     "id": "v1beta2.NodeStatus",
     "properties": {
+     "addresses": {
+      "type": "array",
+      "items": [
+       {
+        "$ref": "v1beta2.NodeAddress"
+       }
+      ],
+      "description": "list of addresses reachable to the node"
+     },
      "conditions": {
       "type": "array",
       "items": [
@@ -4470,9 +5058,30 @@
       ],
       "description": "conditions is an array of current node conditions"
      },
+     "nodeInfo": {
+      "type": "v1beta2.NodeSystemInfo",
+      "description": "node identity is a set of ids/uuids to uniquely identify the node"
+     },
      "phase": {
       "type": "v1beta2.NodePhase",
       "description": "node phase is the current lifecycle phase of the node"
+     }
+    }
+   },
+   "v1beta2.NodeSystemInfo": {
+    "id": "v1beta2.NodeSystemInfo",
+    "required": [
+     "machineID",
+     "systemUUID"
+    ],
+    "properties": {
+     "machineID": {
+      "type": "string",
+      "description": "machine id is the machine-id reported by the node"
+     },
+     "systemUUID": {
+      "type": "string",
+      "description": "system uuid is the system-uuid reported by the node"
      }
     }
    },
@@ -4501,7 +5110,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any"
+      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
       "type": "types.UID",
@@ -4522,11 +5131,11 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "currentState": {
       "type": "v1beta2.PodState",
-      "description": "current state of the pod"
+      "description": "current state of the pod; populated by the system, read-only"
      },
      "desiredState": {
       "type": "v1beta2.PodState",
@@ -4538,11 +5147,11 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
       "type": "v1beta2.Pod.labels",
@@ -4550,7 +5159,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "nodeSelector": {
       "type": "v1beta2.Pod.nodeSelector",
@@ -4558,15 +5167,15 @@
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4611,7 +5220,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4619,7 +5228,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -4632,23 +5241,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4666,7 +5275,7 @@
      },
      "host": {
       "type": "string",
-      "description": "host to which the pod is assigned; empty if not yet scheduled"
+      "description": "host to which the pod is assigned; empty if not yet scheduled; cannot be updated"
      },
      "hostIP": {
       "type": "string",
@@ -4727,36 +5336,6 @@
     "id": "v1beta2.PodTemplate.nodeSelector",
     "properties": {}
    },
-   "v1beta2.Port": {
-    "id": "v1beta2.Port",
-    "required": [
-     "containerPort"
-    ],
-    "properties": {
-     "containerPort": {
-      "type": "integer",
-      "format": "int32",
-      "description": "number of port to expose on the pod's IP address"
-     },
-     "hostIP": {
-      "type": "string",
-      "description": "host IP to bind the port to"
-     },
-     "hostPort": {
-      "type": "integer",
-      "format": "int32",
-      "description": "number of port to expose on the host; most containers do not need this"
-     },
-     "name": {
-      "type": "string",
-      "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
-     },
-     "protocol": {
-      "type": "v1beta2.Protocol",
-      "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
-     }
-    }
-   },
    "v1beta2.ReplicationController": {
     "id": "v1beta2.ReplicationController",
     "properties": {
@@ -4770,11 +5349,11 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "currentState": {
       "type": "v1beta2.ReplicationControllerState",
-      "description": "current state of the replication controller"
+      "description": "current state of the replication controller; populated by the system, read-only"
      },
      "desiredState": {
       "type": "v1beta2.ReplicationControllerState",
@@ -4786,11 +5365,11 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
       "type": "v1beta2.ReplicationController.labels",
@@ -4798,19 +5377,19 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4834,7 +5413,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4842,7 +5421,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -4855,23 +5434,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4913,7 +5492,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4921,23 +5500,23 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
       "type": "v1beta2.ResourceQuotaSpec",
@@ -4949,7 +5528,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -4969,7 +5548,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -4977,7 +5556,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -4990,23 +5569,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -5045,7 +5624,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -5053,23 +5632,23 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "status": {
       "type": "v1beta2.ResourceQuotaStatus",
@@ -5077,7 +5656,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -5132,7 +5711,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
       "type": "v1beta2.Secret.data",
@@ -5144,23 +5723,23 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "type": {
       "type": "v1beta2.SecretType",
@@ -5168,7 +5747,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -5192,7 +5771,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -5200,7 +5779,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -5213,23 +5792,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -5270,7 +5849,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -5278,11 +5857,11 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
       "type": "v1beta2.Service.labels",
@@ -5290,7 +5869,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "port": {
       "type": "integer",
@@ -5317,11 +5896,11 @@
         "$ref": "string"
        }
       ],
-      "description": "externally visible IPs from which to select the address for the external load balancer"
+      "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selector": {
       "type": "v1beta2.Service.selector",
@@ -5329,7 +5908,7 @@
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "sessionAffinity": {
       "type": "v1beta2.AffinityType",
@@ -5337,7 +5916,7 @@
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -5365,7 +5944,7 @@
      },
      "creationTimestamp": {
       "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; recorded by the system; null for lists"
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "generateName": {
       "type": "string",
@@ -5373,7 +5952,7 @@
      },
      "id": {
       "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs"
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "items": {
       "type": "array",
@@ -5386,23 +5965,23 @@
      },
      "kind": {
       "type": "string",
-      "description": "kind of object, in CamelCase"
+      "description": "kind of object, in CamelCase; cannot be updated"
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default"
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; value must be treated as opaque by clients and passed unmodified back to the server"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
-      "description": "URL for the object"
+      "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
       "type": "types.UID",
-      "description": "UUID assigned by the system upon creation, unique across space and time"
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
