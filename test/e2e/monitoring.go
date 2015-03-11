@@ -39,7 +39,12 @@ var _ = Describe("Monitoring", func() {
 		expectNoError(err)
 	})
 
-	It("pod and node resource usage metrics are available on influxdb using heapster.", func() {
+	It("verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
+		if testContext.provider != "gce" {
+			By(fmt.Sprintf("Skipping Monitoring test, which is only supported for provider gce (not %s)",
+				testContext.provider))
+			return
+		}
 		testMonitoringUsingHeapsterInfluxdb(c)
 	})
 })
@@ -51,8 +56,8 @@ const (
 	influxdbPW           = "root"
 	podlistQuery         = "select distinct(pod) from stats"
 	nodelistQuery        = "select distinct(hostname) from machine"
-	sleepBetweenAttempts = 30 * time.Second
-	maxAttempts          = 10 // Total sleep time of 5 minutes for this test.
+	sleepBetweenAttempts = 5 * time.Second
+	testTimeout          = 5 * time.Minute
 )
 
 var (
@@ -67,27 +72,40 @@ var (
 	}
 )
 
-func expectedRcsExist(c *client.Client) {
+func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error) {
 	rcList, err := c.ReplicationControllers(api.NamespaceDefault).List(labels.Everything())
-	expectNoError(err)
+	if err != nil {
+		return nil, err
+	}
+	expectedPods := []string{}
 	for _, rc := range rcList.Items {
 		if _, ok := expectedRcs[rc.Name]; ok {
 			if rc.Status.Replicas != 1 {
-				Failf("expected to find only one replica for rc %q, found %d", rc.Name, rc.Status.Replicas)
+				return nil, fmt.Errorf("expected to find only one replica for rc %q, found %d", rc.Name, rc.Status.Replicas)
 			}
 			expectedRcs[rc.Name] = true
+			podList, err := c.Pods(api.NamespaceDefault).List(labels.Set(rc.Spec.Selector).AsSelector())
+			if err != nil {
+				return nil, err
+			}
+			for _, pod := range podList.Items {
+				expectedPods = append(expectedPods, pod.Name)
+			}
 		}
 	}
 	for rc, found := range expectedRcs {
 		if !found {
-			Failf("Replication Controller %q not found.", rc)
+			return nil, fmt.Errorf("Replication Controller %q not found.", rc)
 		}
 	}
+	return expectedPods, nil
 }
 
-func expectedServicesExist(c *client.Client) {
+func expectedServicesExist(c *client.Client) error {
 	serviceList, err := c.Services(api.NamespaceDefault).List(labels.Everything())
-	expectNoError(err)
+	if err != nil {
+		return err
+	}
 	for _, service := range serviceList.Items {
 		if _, ok := expectedServices[service.Name]; ok {
 			expectedServices[service.Name] = true
@@ -95,29 +113,22 @@ func expectedServicesExist(c *client.Client) {
 	}
 	for service, found := range expectedServices {
 		if !found {
-			Failf("Service %q not found", service)
+			return fmt.Errorf("Service %q not found", service)
 		}
 	}
+	return nil
 }
 
-func getAllPodsInCluster(c *client.Client) []string {
-	podList, err := c.Pods(api.NamespaceAll).List(labels.Everything())
-	expectNoError(err)
-	result := []string{}
-	for _, pod := range podList.Items {
-		result = append(result, pod.Name)
-	}
-	return result
-}
-
-func getAllNodesInCluster(c *client.Client) []string {
+func getAllNodesInCluster(c *client.Client) ([]string, error) {
 	nodeList, err := c.Nodes().List()
-	expectNoError(err)
+	if err != nil {
+		return nil, err
+	}
 	result := []string{}
 	for _, node := range nodeList.Items {
 		result = append(result, node.Name)
 	}
-	return result
+	return result, nil
 }
 
 func getInfluxdbData(c *influxdb.Client, query string) (map[string]bool, error) {
@@ -133,6 +144,9 @@ func getInfluxdbData(c *influxdb.Client, query string) (map[string]bool, error) 
 	}
 	result := map[string]bool{}
 	for _, point := range series[0].GetPoints() {
+		if len(point) != 2 {
+			Failf("Expected only two entries in a point for query %q. Got %v", query, point)
+		}
 		name, ok := point[1].(string)
 		if !ok {
 			Failf("expected %v to be a string, but it is %T", point[1], point[1])
@@ -143,6 +157,9 @@ func getInfluxdbData(c *influxdb.Client, query string) (map[string]bool, error) 
 }
 
 func expectedItemsExist(expectedItems []string, actualItems map[string]bool) bool {
+	if len(actualItems) < len(expectedItems) {
+		return false
+	}
 	for _, item := range expectedItems {
 		if _, found := actualItems[item]; !found {
 			return false
@@ -182,8 +199,9 @@ func getMasterHost() string {
 
 func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	// Check if heapster pods and services are up.
-	expectedRcsExist(c)
-	expectedServicesExist(c)
+	expectedPods, err := verifyExpectedRcsExistAndGetExpectedPods(c)
+	expectNoError(err)
+	expectNoError(expectedServicesExist(c))
 	// TODO: Wait for all pods and services to be running.
 	kubeMasterHttpClient, ok := c.Client.(*http.Client)
 	if !ok {
@@ -202,14 +220,14 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	influxdbClient, err := influxdb.NewClient(config)
 	expectNoError(err, "failed to create influxdb client")
 
-	expectedPods := getAllPodsInCluster(c)
-	expectedNodes := getAllNodesInCluster(c)
-	attempt := maxAttempts
+	expectedNodes, err := getAllNodesInCluster(c)
+	expectNoError(err)
+	startTime := time.Now()
 	for {
 		if validatePodsAndNodes(influxdbClient, expectedPods, expectedNodes) {
 			return
 		}
-		if attempt--; attempt <= 0 {
+		if time.Since(startTime) >= testTimeout {
 			break
 		}
 		time.Sleep(sleepBetweenAttempts)
