@@ -47,7 +47,7 @@ $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`
 
 func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>",
+		Use:     "resize [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE ID",
 		Short:   "Set a new size for a Replication Controller.",
 		Long:    resize_long,
 		Example: resize_example,
@@ -65,7 +65,7 @@ func (f *Factory) NewCmdResize(out io.Writer) *cobra.Command {
 func RunResize(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	count := util.GetFlagInt(cmd, "replicas")
 	if len(args) != 2 || count < 0 {
-		return util.UsageError(cmd, "--replicas=<count> <resource> <id>")
+		return util.UsageError(cmd, "--replicas=COUNT RESOURCE ID")
 	}
 
 	cmdNamespace, err := f.DefaultNamespace(cmd)

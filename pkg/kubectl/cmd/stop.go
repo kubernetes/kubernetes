@@ -49,7 +49,7 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 		Filenames util.StringList
 	}{}
 	cmd := &cobra.Command{
-		Use:     "stop (-f filename | <resource> (<id> | -l <label> | --all))",
+		Use:     "stop (-f FILENAME | RESOURCE (ID | -l label | --all))",
 		Short:   "Gracefully shut down a resource by id or filename.",
 		Long:    stop_long,
 		Example: stop_example,

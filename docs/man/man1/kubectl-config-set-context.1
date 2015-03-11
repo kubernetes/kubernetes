@@ -14,10 +14,7 @@ kubectl config set\-context \- Sets a context entry in .kubeconfig
 .SH DESCRIPTION
 .PP
 Sets a context entry in .kubeconfig
-    Specifying a name that already exists will merge new fields on top of existing values for those fields.
-    e.g.
-        kubectl config set\-context gce \-\-user=cluster\-admin
-        only sets the user field on the gce context entry without touching other values.
+Specifying a name that already exists will merge new fields on top of existing values for those fields.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -136,6 +133,18 @@ Sets a context entry in .kubeconfig
 .PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+// Set the user field on the gce context entry without touching other values
+$ kubectl config set\-context gce \-\-user=cluster\-admin
+
+.fi
+.RE
 
 
 .SH SEE ALSO

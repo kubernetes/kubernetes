@@ -4,7 +4,7 @@ Display one or many resources
 
 ### Synopsis
 
-```
+
 Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
@@ -12,9 +12,10 @@ Possible resources include pods (po), replication controllers (rc), services
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).
-```
 
-kubectl get [(-o|--output=)json|yaml|template|...] <resource> [<id>]
+```
+kubectl get [(-o|--output=)json|yaml|template|...] RESOURCE [ID]
+```
 
 ### Examples
 

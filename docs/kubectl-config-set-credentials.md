@@ -4,14 +4,9 @@ Sets a user entry in .kubeconfig
 
 ### Synopsis
 
-```
+
 Sets a user entry in .kubeconfig
-
-  Specifying a name that already exists will merge new fields on top of existing
-  values. For example, the following only sets the "client-key" field on the 
-  "cluster-admin" entry, without touching other values:
-
-    set-credentials cluster-admin --client-key=~/.kube/admin.key
+Specifying a name that already exists will merge new fields on top of existing values.
 
   Client-certificate flags:
     --client-certificate=certfile --client-key=keyfile
@@ -24,9 +19,24 @@ Sets a user entry in .kubeconfig
 
   Bearer token and basic auth are mutually exclusive.
 
+
+```
+kubectl config set-credentials NAME [--auth-path=/path/to/authfile] [--client-certificate=path/to/certfile] [--client-key=path/to/keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
 ```
 
-kubectl config set-credentials name [--auth-path=authfile] [--client-certificate=certfile] [--client-key=keyfile] [--token=bearer_token] [--username=basic_user] [--password=basic_password]
+### Examples
+
+```
+// Set only the "client-key" field on the "cluster-admin"
+// entry, without touching other values:
+$ kubectl set-credentials cluster-admin --client-key=~/.kube/admin.key
+
+// Set basic auth for the "cluster-admin" entry
+$ kubectl set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+
+// Embed client certificate data in the "cluster-admin" entry
+$ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
+```
 
 ### Options
 

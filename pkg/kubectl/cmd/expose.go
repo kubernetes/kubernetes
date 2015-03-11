@@ -28,7 +28,7 @@ import (
 
 const (
 	expose_long = `Take a replicated application and expose it as Kubernetes Service.
-		
+
 Looks up a ReplicationController by name, and uses the selector for that replication controller
 as the selector for a new Service on the specified port.`
 
@@ -41,7 +41,7 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 
 func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer]",
+		Use:     "expose NAME --port=port [--protocol=TCP|UDP] [--container-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,

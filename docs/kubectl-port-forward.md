@@ -4,26 +4,28 @@ Forward 1 or more local ports to a pod.
 
 ### Synopsis
 
-```
-Forward 1 or more local ports to a pod.
-```
 
-kubectl port-forward -p <pod> [<local port>:]<remote port> [<port>...]
+Forward 1 or more local ports to a pod.
+
+```
+kubectl port-forward -p POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]
+```
 
 ### Examples
 
 ```
+
+// listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
 $ kubectl port-forward -p mypod 5000 6000
-<listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod>
 
+// listens on port 8888 locally, forwarding to 5000 in the pod
 $ kubectl port-forward -p mypod 8888:5000
-<listens on port 8888 locally, forwarding to 5000 in the pod>
 
+// listens on a random port locally, forwarding to 5000 in the pod
 $ kubectl port-forward -p mypod :5000
-<listens on a random port locally, forwarding to 5000 in the pod>
 
+// listens on a random port locally, forwarding to 5000 in the pod
 $ kubectl port-forward -p mypod 0:5000
-<listens on a random port locally, forwarding to 5000 in the pod> 
 ```
 
 ### Options

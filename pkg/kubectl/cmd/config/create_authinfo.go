@@ -42,19 +42,8 @@ type createAuthInfoOptions struct {
 	embedCertData     util.BoolFlag
 }
 
-func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Command {
-	options := &createAuthInfoOptions{pathOptions: pathOptions}
-
-	cmd := &cobra.Command{
-		Use:   fmt.Sprintf("set-credentials name [--%v=authfile] [--%v=certfile] [--%v=keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password]", clientcmd.FlagAuthPath, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
-		Short: "Sets a user entry in .kubeconfig",
-		Long: fmt.Sprintf(`Sets a user entry in .kubeconfig
-
-  Specifying a name that already exists will merge new fields on top of existing
-  values. For example, the following only sets the "client-key" field on the 
-  "cluster-admin" entry, without touching other values:
-
-    set-credentials cluster-admin --client-key=~/.kube/admin.key
+var create_authinfo_long = fmt.Sprintf(`Sets a user entry in .kubeconfig
+Specifying a name that already exists will merge new fields on top of existing values.
 
   Client-certificate flags:
     --%v=certfile --%v=keyfile
@@ -66,7 +55,26 @@ func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Com
     --%v=basic_user --%v=basic_password
 
   Bearer token and basic auth are mutually exclusive.
-`, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
+`, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
+
+const create_authinfo_example = `// Set only the "client-key" field on the "cluster-admin"
+// entry, without touching other values:
+$ kubectl set-credentials cluster-admin --client-key=~/.kube/admin.key
+
+// Set basic auth for the "cluster-admin" entry
+$ kubectl set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
+
+// Embed client certificate data in the "cluster-admin" entry
+$ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
+
+func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+	options := &createAuthInfoOptions{pathOptions: pathOptions}
+
+	cmd := &cobra.Command{
+		Use:     fmt.Sprintf("set-credentials NAME [--%v=/path/to/authfile] [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password]", clientcmd.FlagAuthPath, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
+		Short:   "Sets a user entry in .kubeconfig",
+		Long:    create_authinfo_long,
+		Example: create_authinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return

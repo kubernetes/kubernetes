@@ -4,13 +4,14 @@ Create a resource by filename or stdin
 
 ### Synopsis
 
-```
+
 Create a resource by filename or stdin.
 
 JSON and YAML formats are accepted.
-```
 
-kubectl create -f filename
+```
+kubectl create -f FILENAME
+```
 
 ### Examples
 

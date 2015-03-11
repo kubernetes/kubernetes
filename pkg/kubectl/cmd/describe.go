@@ -26,7 +26,7 @@ import (
 
 func (f *Factory) NewCmdDescribe(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "describe <resource> <id>",
+		Use:   "describe RESOURCE ID",
 		Short: "Show details of a specific resource",
 		Long: `Show details of a specific resource.
 

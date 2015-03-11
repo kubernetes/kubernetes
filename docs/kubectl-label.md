@@ -4,14 +4,15 @@ Update the labels on a resource
 
 ### Synopsis
 
-```
+
 Update the labels on a resource.
 
 If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
 If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
-```
 
-kubectl label [--overwrite] <resource> <name> <key-1>=<val-1> ... <key-n>=<val-n> [--resource-version=<version>]
+```
+kubectl label [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]
+```
 
 ### Examples
 

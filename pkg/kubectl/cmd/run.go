@@ -44,7 +44,7 @@ $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersio
 
 func (f *Factory) NewCmdRunContainer(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>]",
+		Use:     "run-container NAME --image=image [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]",
 		Short:   "Run a particular image on the cluster.",
 		Long:    run_long,
 		Example: run_example,
@@ -66,7 +66,7 @@ func (f *Factory) NewCmdRunContainer(out io.Writer) *cobra.Command {
 
 func RunRunContainer(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
-		return util.UsageError(cmd, "<name> is required for run-container")
+		return util.UsageError(cmd, "NAME is required for run-container")
 	}
 
 	namespace, err := f.DefaultNamespace(cmd)

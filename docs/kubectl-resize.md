@@ -4,16 +4,17 @@ Set a new size for a Replication Controller.
 
 ### Synopsis
 
-```
+
 Set a new size for a Replication Controller.
 
 Resize also allows users to specify one or more preconditions for the resize action.
 If --current-replicas or --resource-version is specified, it is validated before the
 resize is attempted, and it is guaranteed that the precondition holds true when the
 resize is sent to the server.
-```
 
-kubectl resize [--resource-version=<version>] [--current-replicas=<count>] --replicas=<count> <resource> <id>
+```
+kubectl resize [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE ID
+```
 
 ### Examples
 

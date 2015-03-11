@@ -59,7 +59,7 @@ func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
 
 func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "log [-f] <pod> [<container>]",
+		Use:     "log [-f] POD [CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
@@ -75,11 +75,11 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 
 func RunLog(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return util.UsageError(cmd, "<pod> is required for log")
+		return util.UsageError(cmd, "POD is required for log")
 	}
 
 	if len(args) > 2 {
-		return util.UsageError(cmd, "log <pod> [<container>]")
+		return util.UsageError(cmd, "log POD [CONTAINER]")
 	}
 
 	namespace, err := f.DefaultNamespace(cmd)

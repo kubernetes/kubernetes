@@ -39,18 +39,17 @@ type setOptions struct {
 	propertyValue string
 }
 
+const set_long = `Sets an individual value in a .kubeconfig file
+PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
+PROPERTY_VALUE is the new value you wish to set.`
+
 func NewCmdConfigSet(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	options := &setOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
-		Use:   "set property-name property-value",
+		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
 		Short: "Sets an individual value in a .kubeconfig file",
-		Long: `Sets an individual value in a .kubeconfig file
-
-		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-		property-value is the new value you wish to set.
-
-		`,
+		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return

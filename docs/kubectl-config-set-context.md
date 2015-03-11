@@ -4,15 +4,20 @@ Sets a context entry in .kubeconfig
 
 ### Synopsis
 
-```
+
 Sets a context entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
-		kubectl config set-context gce --user=cluster-admin
-		only sets the user field on the gce context entry without touching other values.
+Specifying a name that already exists will merge new fields on top of existing values for those fields.
+
+```
+kubectl config set-context NAME [--cluster=cluster_nickname] [--user=user_nickname] [--namespace=namespace]
 ```
 
-kubectl config set-context name [--cluster=cluster-nickname] [--user=user-nickname] [--namespace=namespace]
+### Examples
+
+```
+// Set the user field on the gce context entry without touching other values
+$ kubectl config set-context gce --user=cluster-admin
+```
 
 ### Options inherrited from parent commands
 

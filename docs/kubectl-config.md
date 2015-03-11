@@ -4,11 +4,12 @@ config modifies .kubeconfig files
 
 ### Synopsis
 
-```
-config modifies .kubeconfig files using subcommands like "kubectl config set current-context my-context"
-```
 
-kubectl config <subcommand>
+config modifies .kubeconfig files using subcommands like "kubectl config set current-context my-context"
+
+```
+kubectl config SUBCOMMAND
+```
 
 ### Options
 

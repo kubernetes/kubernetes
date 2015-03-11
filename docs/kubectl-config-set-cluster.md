@@ -4,16 +4,26 @@ Sets a cluster entry in .kubeconfig
 
 ### Synopsis
 
+
+Sets a cluster entry in .kubeconfig.
+Specifying a name that already exists will merge new fields on top of existing values for those fields.
+
 ```
-Sets a cluster entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g.
-		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/.kubernetes.ca.cert
-		only sets the certificate-authority field on the e2e cluster entry without touching other values.
-		
+kubectl config set-cluster NAME [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]
 ```
 
-kubectl config set-cluster name [--server=server] [--certificate-authority=path/to/certficate/authority] [--api-version=apiversion] [--insecure-skip-tls-verify=true]
+### Examples
+
+```
+// Set only the server field on the e2e cluster entry without touching other values.
+$ kubectl config set-cluster e2e --server=https://1.2.3.4
+
+// Embed certificate authority data for the e2e cluster entry
+$ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
+
+// Disable cert checking for the dev cluster entry
+$ kubectl config set-cluster e2e --insecure-skip-tls-verify=true
+```
 
 ### Options
 

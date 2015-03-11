@@ -4,11 +4,12 @@ Display cluster info
 
 ### Synopsis
 
-```
-Display addresses of the master and services with label kubernetes.io/cluster-service=true
-```
 
+Display addresses of the master and services with label kubernetes.io/cluster-service=true
+
+```
 kubectl clusterinfo
+```
 
 ### Options inherrited from parent commands
 

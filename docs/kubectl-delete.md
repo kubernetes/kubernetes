@@ -4,7 +4,7 @@ Delete a resource by filename, stdin, or resource and ID.
 
 ### Synopsis
 
-```
+
 Delete a resource by filename, stdin, resource and ID, or by resources and label selector.
 
 JSON and YAML formats are accepted.
@@ -15,9 +15,10 @@ arguments are used and the filename is ignored.
 Note that the delete command does NOT do resource version checks, so if someone
 submits an update to a resource right when you submit a delete, their update
 will be lost along with the rest of the resource.
-```
 
-kubectl delete (-f filename | <resource> (<id> | -l <label> | --all))
+```
+kubectl delete ([-f FILENAME] | (RESOURCE [(ID | -l label | --all)]
+```
 
 ### Examples
 

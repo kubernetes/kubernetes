@@ -40,7 +40,7 @@ $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il`
 
 func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "exec -p <pod> -c <container> -- <command> [<args...>]",
+		Use:     "exec -p POD -c CONTAINER -- COMMAND [args...]",
 		Short:   "Execute a command in a container.",
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
@@ -60,11 +60,11 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	podName := util.GetFlagString(cmd, "pod")
 	if len(podName) == 0 {
-		return util.UsageError(cmd, "<pod> is required for exec")
+		return util.UsageError(cmd, "POD is required for exec")
 	}
 
 	if len(args) < 1 {
-		return util.UsageError(cmd, "<command> is required for exec")
+		return util.UsageError(cmd, "COMMAND is required for exec")
 	}
 
 	namespace, err := f.DefaultNamespace(cmd)

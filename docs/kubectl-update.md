@@ -4,13 +4,14 @@ Update a resource by filename or stdin.
 
 ### Synopsis
 
-```
+
 Update a resource by filename or stdin.
 
 JSON and YAML formats are accepted.
-```
 
-kubectl update -f filename
+```
+kubectl update -f FILENAME
+```
 
 ### Examples
 
