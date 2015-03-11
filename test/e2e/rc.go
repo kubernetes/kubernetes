@@ -18,8 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -65,7 +63,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	replicas := 2
 
 	// Create a replication controller for a service
-	// that serves its hostname on port 8080.
+	// that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
@@ -87,7 +85,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 						{
 							Name:  name,
 							Image: image,
-							Ports: []api.ContainerPort{{ContainerPort: 9376, HostPort: 8080}},
+							Ports: []api.ContainerPort{{ContainerPort: 9376}},
 						},
 					},
 				},
@@ -165,18 +163,14 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	By("Trying to dial each unique pod")
 
 	for i, pod := range pods.Items {
-		resp, err := http.Get(fmt.Sprintf("http://%s:8080", pod.Status.HostIP))
+		body, err := c.Get().
+			Prefix("proxy").
+			Resource("pods").
+			Name(string(pod.Name)).
+			Do().
+			Raw()
 		if err != nil {
 			Failf("Controller %s: Failed to GET from replica %d: %v", name, i+1, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			Failf("Controller %s: Expected OK status code for replica %d but got %d", name, i+1, resp.StatusCode)
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			Failf("Controller %s: Failed to read the body of the GET response from replica %d: %v",
-				name, i+1, err)
 		}
 		// The body should be the pod name.
 		if string(body) != pod.Name {
