@@ -71,7 +71,7 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, condition p
 		if done {
 			return err
 		}
-		Logf("Waiting for pod %s status to be %q (found %q) (%.2f seconds)", podName, api.PodRunning, pod.Status.Phase, time.Since(start).Seconds())
+		Logf("Waiting for pod %s status to be %q (found %q) (%.2f seconds)", podName, desc, pod.Status.Phase, time.Since(start).Seconds())
 	}
 	return fmt.Errorf("gave up waiting for pod %s to be %s after %.2f seconds", podName, desc, podStartTimeout.Seconds())
 }
