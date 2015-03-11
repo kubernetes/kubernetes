@@ -196,7 +196,8 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 		return err
 	}
 	filteredList := FilterActivePods(podList.Items)
-	diff := len(filteredList) - controller.Spec.Replicas
+	activePods := len(filteredList)
+	diff := activePods - controller.Spec.Replicas
 	if diff < 0 {
 		diff *= -1
 		wait := sync.WaitGroup{}
@@ -220,6 +221,13 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 			}(i)
 		}
 		wait.Wait()
+	}
+	if controller.Status.Replicas != activePods {
+		controller.Status.Replicas = activePods
+		_, err = rm.kubeClient.ReplicationControllers(controller.Namespace).Update(&controller)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
