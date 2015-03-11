@@ -31,3 +31,26 @@ You can use the kube-version-change utility to convert config files between diff
 $ hack/build-go.sh cmd/kube-version-change
 $ _output/go/bin/kube-version-change -i myPod.v1beta1.yaml -o myPod.v1beta3.yaml
 ```
+
+### Maintenance on a Node
+
+If you need to reboot a node (such as for a kernel upgrade, libc upgrade, hardware repair, etc.), and the downtime is
+brief, then when the Kubelet restarts, it will attempt to restart the pods scheduled to it.  If the reboot takes longer,
+then the node controller will terminate the pods that are bound to the unavailable node.  If there is a corresponding
+replication controller, the a new copy of the pod will be started on a different node.  So, in the the case where all
+pods are replicated, upgrades can be done without special coordination.
+
+If you want more control over the upgrading process, you may use the following workflow:
+  1. Mark the node to be rebooted as unschedulable:
+    `kubectl update nodes $NODENAME --patch='{"apiVersion": "v1beta1", "unschedulable": true}'`. 
+    This keeps new pods from landing on the node while you are trying to get them off.
+  1. Get the pods off the machine, via any of the following strategies:
+    1. wait for finite-duration pods to complete
+    1. for pods with a replication controller, delete the pod with `kubectl delete pods $PODNAME`
+    1. for pods which are not replicated, bring up a new copy of the pod, and redirect clients to it.
+  1. Work on the node
+  1. Make the node schedulable again:
+    `kubectl update nodes $NODENAME --patch='{"apiVersion": "v1beta1", "unschedulable": false}'`.
+     Or, if you deleted the VM instance and created a new one, and are using `--sync_nodes=true` on the apiserver
+     (the default), then a new schedulable node resource will be created automatically when you create a new
+     VM instance.  See [Node](node.md).
