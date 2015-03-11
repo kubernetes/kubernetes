@@ -19,6 +19,7 @@ package kubelet
 import (
 	"errors"
 	"fmt"
+	"hash/adler32"
 	"io"
 	"io/ioutil"
 	"net"
@@ -39,9 +40,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/rocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -188,6 +191,18 @@ func NewMainKubelet(
 		cadvisor:                       cadvisorInterface,
 	}
 
+	containerRuntime, err := rocket.New(nil)
+	if err != nil {
+		return nil, err
+	}
+	klet.containerRuntime = containerRuntime
+
+	containerRuntimeCache, err := container.NewRuntimeCache(containerRuntime)
+	if err != nil {
+		return nil, err
+	}
+	klet.containerRuntimeCache = containerRuntimeCache
+
 	dockerCache, err := dockertools.NewDockerCache(dockerClient)
 	if err != nil {
 		return nil, err
@@ -220,6 +235,8 @@ type serviceLister interface {
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname               string
+	containerRuntime       container.Runtime
+	containerRuntimeCache  container.RuntimeCache
 	dockerClient           dockertools.DockerInterface
 	dockerCache            dockertools.DockerCache
 	kubeClient             client.Interface
@@ -2148,4 +2165,217 @@ func (kl *Kubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisor
 
 func (kl *Kubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return kl.cadvisor.MachineInfo()
+}
+
+func (kl *Kubelet) SyncRocketPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
+	defer func() {
+		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
+	}()
+
+	// Remove obsolete entries in podStatus where the pod is no longer considered bound to this node.
+	podFullNames := make(map[string]bool)
+	for _, pod := range allPods {
+		podFullNames[GetPodFullName(&pod)] = true
+	}
+	kl.removeOrphanedStatuses(podFullNames)
+
+	// Create a pod list with the the failed pods filtered out.
+	var pods []api.BoundPod
+	for _, pod := range allPods {
+		status, ok := kl.getPodStatusFromCache(GetPodFullName(&pod))
+		if ok && status.Phase == api.PodFailed {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+
+	glog.V(4).Infof("Desired: %#v", pods)
+	var err error
+	desiredPods := make(map[types.UID]empty)
+
+	runningPods, err := kl.containerRuntimeCache.ListPods()
+	if err != nil {
+		glog.Errorf("Error listing pods: %#v", runningPods)
+		return err
+	}
+
+	// Check for any containers that need starting
+	for ix := range pods {
+		pod := &pods[ix]
+		desiredPods[pod.UID] = empty{}
+
+		// Run the sync in an async manifest worker.
+		kl.podWorkers.UpdatePod(pod, func() {
+			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
+		})
+
+		// Note the number of containers for new pods.
+		if val, ok := podSyncTypes[pod.UID]; ok && (val == metrics.SyncPodCreate) {
+			metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
+		}
+	}
+	// Stop the workers for no-longer existing pods.
+	kl.podWorkers.ForgetNonExistingPodWorkers(desiredPods)
+
+	if !kl.sourcesReady() {
+		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
+		// for sources that haven't reported yet.
+		glog.V(4).Infof("Skipping deletes, sources aren't ready yet.")
+		return nil
+	}
+
+	// Kill any containers we don't need.
+	for _, pod := range runningPods {
+		if _, found := desiredPods[pod.UID]; found {
+			// syncRocketPod() will handle this one.
+			continue
+		}
+
+		glog.V(1).Infof("Killing unwanted pod %+v", pod)
+		if err = kl.containerRuntime.KillPod(pod); err != nil {
+			glog.Errorf("Error killing pod %+v: %v", pod, err)
+		}
+	}
+
+	// Remove any orphaned pods.
+	err = kl.cleanupOrphanedPods(pods)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (kl *Kubelet) syncRocketPod(pod *api.BoundPod, runningPod *api.Pod) error {
+	podFullName := GetPodFullName(pod)
+	uid := pod.UID
+	glog.V(4).Infof("Syncing Pod, podFullName: %q, uid: %q", podFullName, uid)
+
+	err := kl.makePodDataDirs(pod)
+	if err != nil {
+		return err
+	}
+
+	ref, err := api.GetReference(pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	}
+
+	podVolumes, err := kl.mountExternalVolumes(pod)
+	if err != nil {
+		if ref != nil {
+			kl.recorder.Eventf(ref, "failedMount",
+				"Unable to mount volumes for pod %q: %v", podFullName, err)
+		}
+		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
+		return err
+	}
+
+	if runningPod == nil {
+		glog.V(4).Infof("Pod is not running, let's start the pod")
+		return kl.containerRuntime.RunPod(pod, podVolumes)
+	}
+
+	// Add references to all containers.
+	// TODO(yifan): This can potentially cause unefficiency, for example:
+	// Both container are named "foo" with hash "hashA" and "hashB", and our expecting
+	// hash is "hashB". In this case we will kill and restart the first container in the
+	// for loop (since its hash is different than expected). But we will also treat the
+	// second one as duplicated and kill it.
+	containersInPod := make(Containers)
+	for i := range runningPod.Spec.Containers {
+		containersInPod[i] = &runningPod.Spec.Containers[i]
+	}
+
+	for _, ctnr := range pod.Spec.Containers {
+		index, runningContainer := containersInPod.findContainerByName(ctnr.Name)
+		if index < 0 {
+			glog.V(3).Infof("pod %q container %q does not exist, creating...", podFullName, ctnr.Name)
+			if err := kl.containerRuntime.RunContainerInPod(ctnr, runningPod, podVolumes); err != nil {
+				glog.Errorf("Error running pod %q container %q: %v", podFullName, ctnr.Name, err)
+			}
+			continue
+		}
+
+		expectedHash := hashContainer(&ctnr)
+		hash := hashContainer(runningContainer)
+		containerChanged := expectedHash != hash
+		containerHealthy, err := probeContainer(runningContainer, runningPod) // TODO(yifan): Should be a no-op if the container has already exited.
+		if err != nil {
+			glog.V(1).Infof("liveness/readiness probe errored: %v", err)
+			containersInPod.removeContainerByName(ctnr.Name)
+			continue
+		}
+		glog.V(4).Infof("containerChanged: %v, containerHealthy: %v", containerChanged, containerHealthy)
+
+		// TODO(yifan): should find a way to know whether it exits normally.
+		if containerChanged || !containerHealthy {
+			// if need restart.
+			if err = kl.RestartContainerInPod(ctnr, runningPod, podVolumes); err != nil {
+				glog.V(1).Infof("Failed to restart container %q: %v", runningContainer.Name, err)
+			}
+		}
+		containersInPod.removeContainerByName(ctnr.Name)
+	}
+	// Kill all unidentified containers.
+	for _, ctnr := range containersInPod {
+		if err = kl.containerRuntime.KillContainerInPod(*ctnr, runningPod); err != nil {
+			glog.V(1).Infof("Failed to kill container %q: %v", ctnr.Name, err)
+		}
+	}
+	return nil
+}
+
+// RestartContainersInPod invokes container.Runtime.KillContainerInPod and container.Runtime.RunContainerInPod
+// to restart the container.
+func (kl *Kubelet) RestartContainerInPod(container api.Container, pod *api.Pod, volumeMap map[string]volume.Interface) error {
+	if err := kl.containerRuntime.KillContainerInPod(container, pod); err != nil {
+		return err
+	}
+	// TODO(yifan): Check restart policy.
+	if err := kl.containerRuntime.RunContainerInPod(container, pod, volumeMap); err != nil {
+		return err
+	}
+	return nil
+}
+
+type Containers map[int]*api.Container
+
+// findContainerByName returns the first container that has the given name in the set.
+func (c Containers) findContainerByName(containerName string) (int, *api.Container) {
+	for i, ctnr := range c {
+		if ctnr.Name == containerName {
+			return i, ctnr
+		}
+	}
+	return -1, nil
+}
+
+// removeContainerByName removes the first container with the given name in the set.
+func (c Containers) removeContainerByName(containerName string) {
+	for i, ctnr := range c {
+		if ctnr.Name == containerName {
+			delete(c, i)
+			return
+		}
+	}
+}
+
+func hashContainer(container *api.Container) uint64 {
+	hash := adler32.New()
+	util.DeepHashObject(hash, *container)
+	return uint64(hash.Sum32())
+}
+
+func findPodByID(uid types.UID, pods []*api.Pod) *api.Pod {
+	for _, pod := range pods {
+		if pod.UID == uid {
+			return pod
+		}
+	}
+	return nil
+}
+
+func probeContainer(c *api.Container, pod *api.Pod) (bool, error) {
+	return true, nil
 }
