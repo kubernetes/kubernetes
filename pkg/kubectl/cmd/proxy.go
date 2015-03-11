@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -32,25 +33,8 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 		Short: "Run a proxy to the Kubernetes API server",
 		Long:  `Run a proxy to the Kubernetes API server.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			port := util.GetFlagInt(cmd, "port")
-			glog.Infof("Starting to serve on localhost:%d", port)
-
-			clientConfig, err := f.ClientConfig(cmd)
+			err := RunProxy(f, out, cmd)
 			util.CheckErr(err)
-
-			staticPrefix := util.GetFlagString(cmd, "www-prefix")
-			if !strings.HasSuffix(staticPrefix, "/") {
-				staticPrefix += "/"
-			}
-
-			apiProxyPrefix := util.GetFlagString(cmd, "api-prefix")
-			if !strings.HasSuffix(apiProxyPrefix, "/") {
-				apiProxyPrefix += "/"
-			}
-			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
-
-			util.CheckErr(err)
-			glog.Fatal(server.Serve(port))
 		},
 	}
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
@@ -58,4 +42,31 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("api-prefix", "", "/api/", "Prefix to serve the proxied API under.")
 	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
 	return cmd
+}
+
+func RunProxy(f *Factory, out io.Writer, cmd *cobra.Command) error {
+	port := util.GetFlagInt(cmd, "port")
+	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
+
+	clientConfig, err := f.ClientConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	staticPrefix := util.GetFlagString(cmd, "www-prefix")
+	if !strings.HasSuffix(staticPrefix, "/") {
+		staticPrefix += "/"
+	}
+
+	apiProxyPrefix := util.GetFlagString(cmd, "api-prefix")
+	if !strings.HasSuffix(apiProxyPrefix, "/") {
+		apiProxyPrefix += "/"
+	}
+	server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+	if err != nil {
+		return err
+	}
+
+	glog.Fatal(server.Serve(port))
+	return nil
 }

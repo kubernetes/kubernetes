@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -253,7 +252,9 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 	}
 	if ok {
 		clientConfig, err := f.ClientConfig(cmd)
-		cmdutil.CheckErr(err)
+		if err != nil {
+			return nil, err
+		}
 		defaultVersion := clientConfig.Version
 
 		version := cmdutil.OutputVersion(cmd, defaultVersion)
@@ -327,12 +328,6 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
-}
-
-func usageError(cmd *cobra.Command, format string, args ...interface{}) {
-	glog.Errorf(format, args...)
-	glog.Errorf("See '%s -h' for help.", cmd.CommandPath())
-	os.Exit(1)
 }
 
 func runHelp(cmd *cobra.Command, args []string) {

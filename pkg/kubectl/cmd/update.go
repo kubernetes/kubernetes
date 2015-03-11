@@ -41,91 +41,115 @@ $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState":
 )
 
 func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
-	flags := &struct {
-		Filenames util.StringList
-	}{}
+	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "update -f filename",
 		Short:   "Update a resource by filename or stdin.",
 		Long:    update_long,
 		Example: update_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			schema, err := f.Validator(cmd)
+			err := RunUpdate(f, out, cmd, args, filenames)
 			cmdutil.CheckErr(err)
-
-			cmdNamespace, err := f.DefaultNamespace(cmd)
-			cmdutil.CheckErr(err)
-
-			patch := cmdutil.GetFlagString(cmd, "patch")
-			if len(flags.Filenames) == 0 && len(patch) == 0 {
-				usageError(cmd, "Must specify --filename or --patch to update")
-			}
-			if len(flags.Filenames) != 0 && len(patch) != 0 {
-				usageError(cmd, "Can not specify both --filename and --patch")
-			}
-
-			// TODO: Make patching work with -f, updating with patched JSON input files
-			if len(flags.Filenames) == 0 {
-				name := updateWithPatch(cmd, args, f, patch)
-				fmt.Fprintf(out, "%s\n", name)
-				return
-			}
-
-			mapper, typer := f.Object(cmd)
-			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
-				ContinueOnError().
-				NamespaceParam(cmdNamespace).RequireNamespace().
-				FilenameParam(flags.Filenames...).
-				Flatten().
-				Do()
-			cmdutil.CheckErr(r.Err())
-
-			err = r.Visit(func(info *resource.Info) error {
-				data, err := info.Mapping.Codec.Encode(info.Object)
-				if err != nil {
-					return err
-				}
-				if err := schema.ValidateBytes(data); err != nil {
-					return err
-				}
-				obj, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, true, data)
-				if err != nil {
-					return err
-				}
-				info.Refresh(obj, true)
-				fmt.Fprintf(out, "%s\n", info.Name)
-				return nil
-			})
-			cmdutil.CheckErr(err)
-
 		},
 	}
-	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file to use to update the resource.")
+	cmd.Flags().VarP(&filenames, "filename", "f", "Filename, directory, or URL to file to use to update the resource.")
 	cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
 	return cmd
 }
 
-func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string) string {
+func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+	schema, err := f.Validator(cmd)
+	if err != nil {
+		return err
+	}
+
 	cmdNamespace, err := f.DefaultNamespace(cmd)
-	cmdutil.CheckErr(err)
+	if err != nil {
+		return err
+	}
+
+	patch := cmdutil.GetFlagString(cmd, "patch")
+	if len(filenames) == 0 && len(patch) == 0 {
+		return cmdutil.UsageError(cmd, "Must specify --filename or --patch to update")
+	}
+	if len(filenames) != 0 && len(patch) != 0 {
+		return cmdutil.UsageError(cmd, "Can not specify both --filename and --patch")
+	}
+
+	// TODO: Make patching work with -f, updating with patched JSON input files
+	if len(filenames) == 0 {
+		name, err := updateWithPatch(cmd, args, f, patch)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "%s\n", name)
+		return nil
+	}
+
+	mapper, typer := f.Object(cmd)
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).RequireNamespace().
+		FilenameParam(filenames...).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+
+	return r.Visit(func(info *resource.Info) error {
+		data, err := info.Mapping.Codec.Encode(info.Object)
+		if err != nil {
+			return err
+		}
+		if err := schema.ValidateBytes(data); err != nil {
+			return err
+		}
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, true, data)
+		if err != nil {
+			return err
+		}
+		info.Refresh(obj, true)
+		fmt.Fprintf(out, "%s\n", info.Name)
+		return nil
+	})
+
+}
+
+func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string) (string, error) {
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return "", err
+	}
 
 	mapper, _ := f.Object(cmd)
 	// TODO: use resource.Builder instead
-	mapping, namespace, name := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	mapping, namespace, name, err := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	if err != nil {
+		return "", err
+	}
 	client, err := f.RESTClient(cmd, mapping)
-	cmdutil.CheckErr(err)
+	if err != nil {
+		return "", err
+	}
 
 	helper := resource.NewHelper(client, mapping)
 	obj, err := helper.Get(namespace, name)
-	cmdutil.CheckErr(err)
+	if err != nil {
+		return "", err
+	}
 
 	patchedObj, err := cmdutil.Merge(obj, patch, mapping.Kind)
-	cmdutil.CheckErr(err)
+	if err != nil {
+		return "", err
+	}
 
 	data, err := helper.Codec.Encode(patchedObj)
-	cmdutil.CheckErr(err)
+	if err != nil {
+		return "", err
+	}
 
 	_, err = helper.Update(namespace, name, true, data)
-	cmdutil.CheckErr(err)
-	return name
+	return name, err
 }

@@ -34,20 +34,25 @@ func (f *Factory) NewCmdClusterInfo(out io.Writer) *cobra.Command {
 		Short: "Display cluster info",
 		Long:  "Display addresses of the master and services with label kubernetes.io/cluster-service=true",
 		Run: func(cmd *cobra.Command, args []string) {
-			RunClusterInfo(f, out, cmd)
+			err := RunClusterInfo(f, out, cmd)
+			util.CheckErr(err)
 		},
 	}
 	return cmd
 }
 
-func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) {
+func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
 	client, err := factory.ClientConfig(cmd)
-	util.CheckErr(err)
+	if err != nil {
+		return err
+	}
 	fmt.Fprintf(out, "Kubernetes master is running at %v\n", client.Host)
 
 	mapper, typer := factory.Object(cmd)
 	cmdNamespace, err := factory.DefaultNamespace(cmd)
-	util.CheckErr(err)
+	if err != nil {
+		return err
+	}
 
 	// TODO: use generalized labels once they are implemented (#341)
 	b := resource.NewBuilder(mapper, typer, factory.ClientMapperForCommand(cmd)).
@@ -68,6 +73,7 @@ func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) {
 		}
 		return nil
 	})
+	return nil
 
 	// TODO: consider printing more information about cluster
 }

@@ -55,38 +55,8 @@ func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
 		Long:    label_long,
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) < 2 {
-				usageError(cmd, "<resource> <name> is required")
-			}
-			if len(args) < 3 {
-				usageError(cmd, "at least one label update is required.")
-			}
-			res := args[:2]
-			cmdNamespace, err := f.DefaultNamespace(cmd)
+			err := RunLabel(f, out, cmd, args)
 			util.CheckErr(err)
-
-			mapper, _ := f.Object(cmd)
-			// TODO: use resource.Builder instead
-			mapping, namespace, name := util.ResourceFromArgs(cmd, res, mapper, cmdNamespace)
-			client, err := f.RESTClient(cmd, mapping)
-			util.CheckErr(err)
-
-			labels, remove, err := parseLabels(args[2:])
-			util.CheckErr(err)
-			overwrite := util.GetFlagBool(cmd, "overwrite")
-			resourceVersion := util.GetFlagString(cmd, "resource-version")
-
-			obj, err := updateObject(client, mapping, namespace, name, func(obj runtime.Object) runtime.Object {
-				outObj, err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
-				util.CheckErr(err)
-				return outObj
-			})
-			util.CheckErr(err)
-
-			printer, err := f.PrinterForMapping(cmd, mapping)
-			util.CheckErr(err)
-
-			printer.PrintObj(obj, out)
 		},
 	}
 	util.AddPrinterFlags(cmd)
@@ -95,7 +65,7 @@ func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func updateObject(client resource.RESTClient, mapping *meta.RESTMapping, namespace, name string, updateFn func(runtime.Object) runtime.Object) (runtime.Object, error) {
+func updateObject(client resource.RESTClient, mapping *meta.RESTMapping, namespace, name string, updateFn func(runtime.Object) (runtime.Object, error)) (runtime.Object, error) {
 	helper := resource.NewHelper(client, mapping)
 
 	obj, err := helper.Get(namespace, name)
@@ -103,7 +73,10 @@ func updateObject(client resource.RESTClient, mapping *meta.RESTMapping, namespa
 		return nil, err
 	}
 
-	obj = updateFn(obj)
+	obj, err = updateFn(obj)
+	if err != nil {
+		return nil, err
+	}
 
 	data, err := helper.Codec.Encode(obj)
 	if err != nil {
@@ -176,4 +149,55 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 		meta.ResourceVersion = resourceVersion
 	}
 	return obj, nil
+}
+
+func RunLabel(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	if len(args) < 2 {
+		return util.UsageError(cmd, "<resource> <name> is required")
+	}
+	if len(args) < 3 {
+		return util.UsageError(cmd, "at least one label update is required.")
+	}
+	res := args[:2]
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+
+	mapper, _ := f.Object(cmd)
+	// TODO: use resource.Builder instead
+	mapping, namespace, name, err := util.ResourceFromArgs(cmd, res, mapper, cmdNamespace)
+	if err != nil {
+		return err
+	}
+	client, err := f.RESTClient(cmd, mapping)
+	if err != nil {
+		return err
+	}
+
+	labels, remove, err := parseLabels(args[2:])
+	if err != nil {
+		return err
+	}
+	overwrite := util.GetFlagBool(cmd, "overwrite")
+	resourceVersion := util.GetFlagString(cmd, "resource-version")
+
+	obj, err := updateObject(client, mapping, namespace, name, func(obj runtime.Object) (runtime.Object, error) {
+		outObj, err := labelFunc(obj, overwrite, resourceVersion, labels, remove)
+		if err != nil {
+			return nil, err
+		}
+		return outObj, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	printer, err := f.PrinterForMapping(cmd, mapping)
+	if err != nil {
+		return err
+	}
+
+	printer.PrintObj(obj, out)
+	return nil
 }

@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -65,60 +64,63 @@ func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				usageError(cmd, "<pod> is required for log")
-			}
-
-			if len(args) > 2 {
-				usageError(cmd, "log <pod> [<container>]")
-			}
-
-			namespace, err := f.DefaultNamespace(cmd)
-			util.CheckErr(err)
-			client, err := f.Client(cmd)
-			util.CheckErr(err)
-
-			podID := args[0]
-
-			pod, err := client.Pods(namespace).Get(podID)
-			util.CheckErr(err)
-
-			var container string
-			if len(args) == 1 {
-				if len(pod.Spec.Containers) != 1 {
-					if !util.GetFlagBool(cmd, "interactive") {
-						usageError(cmd, "<container> is required for pods with multiple containers")
-					} else {
-						container = selectContainer(pod, os.Stdin, out)
-					}
-				} else {
-					// Get logs for the only container in the pod
-					container = pod.Spec.Containers[0].Name
-				}
-			} else {
-				container = args[1]
-			}
-
-			follow := false
-			if util.GetFlagBool(cmd, "follow") {
-				follow = true
-			}
-
-			readCloser, err := client.RESTClient.Get().
-				Prefix("proxy").
-				Resource("minions").
-				Name(pod.Status.Host).
-				Suffix("containerLogs", namespace, podID, container).
-				Param("follow", strconv.FormatBool(follow)).
-				Stream()
-			util.CheckErr(err)
-
-			defer readCloser.Close()
-			_, err = io.Copy(out, readCloser)
+			err := RunLog(f, out, cmd, args)
 			util.CheckErr(err)
 		},
 	}
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
 	return cmd
+}
+
+func RunLog(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return util.UsageError(cmd, "<pod> is required for log")
+	}
+
+	if len(args) > 2 {
+		return util.UsageError(cmd, "log <pod> [<container>]")
+	}
+
+	namespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+	client, err := f.Client(cmd)
+	if err != nil {
+		return err
+	}
+
+	podID := args[0]
+
+	pod, err := client.Pods(namespace).Get(podID)
+	if err != nil {
+		return err
+	}
+
+	var container string
+	if len(args) == 1 {
+	} else {
+		container = args[1]
+	}
+
+	follow := false
+	if util.GetFlagBool(cmd, "follow") {
+		follow = true
+	}
+
+	readCloser, err := client.RESTClient.Get().
+		Prefix("proxy").
+		Resource("minions").
+		Name(pod.Status.Host).
+		Suffix("containerLogs", namespace, podID, container).
+		Param("follow", strconv.FormatBool(follow)).
+		Stream()
+	if err != nil {
+		return err
+	}
+
+	defer readCloser.Close()
+	_, err = io.Copy(out, readCloser)
+	return err
 }

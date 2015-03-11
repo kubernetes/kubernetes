@@ -27,26 +27,29 @@ import (
 )
 
 // ResourceFromArgs expects two arguments with a given type, and extracts the fields necessary
-// to uniquely locate a resource. Displays a usageError if that contract is not satisfied, or
+// to uniquely locate a resource. Displays a UsageError if that contract is not satisfied, or
 // a generic error if any other problems occur.
 // DEPRECATED: Use resource.Builder
-func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper, cmdNamespace string) (mapping *meta.RESTMapping, namespace, name string) {
+func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper, cmdNamespace string) (mapping *meta.RESTMapping, namespace, name string, err error) {
 	if len(args) != 2 {
-		usageError(cmd, "Must provide resource and name command line params")
+		err = UsageError(cmd, "Must provide resource and name command line params")
+		return
 	}
 
 	resource := args[0]
 	namespace = cmdNamespace
 	name = args[1]
 	if len(name) == 0 || len(resource) == 0 {
-		usageError(cmd, "Must provide resource and name command line params")
+		err = UsageError(cmd, "Must provide resource and name command line params")
+		return
 	}
 
 	version, kind, err := mapper.VersionAndKindForResource(resource)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 
 	mapping, err = mapper.RESTMapping(kind, version)
-	CheckErr(err)
 	return
 }
 
@@ -54,41 +57,52 @@ func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper,
 // resolve to a known type an error is returned. The returned mapping can be used to determine
 // the correct REST endpoint to modify this resource with.
 // DEPRECATED: Use resource.Builder
-func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema, cmdVersion string) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
-	configData, err := ReadConfigData(filename)
-	CheckErr(err)
-	data = configData
+func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper, schema validation.Schema, cmdVersion string) (mapping *meta.RESTMapping, namespace, name string, data []byte, err error) {
+	data, err = ReadConfigData(filename)
+	if err != nil {
+		return
+	}
 
 	objVersion, kind, err := typer.DataVersionAndKind(data)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 
 	// TODO: allow unversioned objects?
 	if len(objVersion) == 0 {
-		CheckErr(fmt.Errorf("the resource in the provided file has no apiVersion defined"))
+		err = fmt.Errorf("the resource in the provided file has no apiVersion defined")
 	}
 
 	err = schema.ValidateBytes(data)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 
 	// decode using the version stored with the object (allows codec to vary across versions)
 	mapping, err = mapper.RESTMapping(kind, objVersion)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 
 	obj, err := mapping.Codec.Decode(data)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 
 	meta := mapping.MetadataAccessor
 	namespace, err = meta.Namespace(obj)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 	name, err = meta.Name(obj)
-	CheckErr(err)
+	if err != nil {
+		return
+	}
 
 	// if the preferred API version differs, get a different mapper
 	if cmdVersion != objVersion {
 		mapping, err = mapper.RESTMapping(kind, cmdVersion)
-		CheckErr(err)
 	}
-
 	return
 }
 
