@@ -669,30 +669,6 @@ func TestResourceLocation(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.ChangeIndex = 1
-	fakeEtcdClient.Data["/registry/nodes/machine/boundpods"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
-					Items: []api.BoundPod{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "foo",
-								Namespace: "other",
-							},
-						},
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      "foo",
-								Namespace: api.NamespaceDefault,
-							},
-						},
-					},
-				}),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
-		},
-	}
 	fakeEtcdClient.Data["/registry/pods/default/foo"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -718,15 +694,6 @@ func TestDeletePod(t *testing.T) {
 	}
 	if cache.clearedNamespace != "default" || cache.clearedName != "foo" {
 		t.Fatalf("Unexpected cache delete: %s %s %#v", cache.clearedName, cache.clearedNamespace, result)
-	}
-
-	actual := &api.BoundPods{}
-	if err := helper.ExtractObj("/registry/nodes/machine/boundpods", actual, false); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// verify bound pods removes the correct namsepace
-	if len(actual.Items) != 1 || actual.Items[0].Namespace != "other" {
-		t.Errorf("bound pods should be empty: %#v", actual)
 	}
 }
 
@@ -811,7 +778,6 @@ func TestEtcdCreate(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 	_, err := registry.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -839,16 +805,7 @@ func TestEtcdCreate(t *testing.T) {
 	if pod.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var boundPods api.BoundPods
-	resp, err = fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 
-	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &boundPods)
-	if len(boundPods.Items) != 1 || boundPods.Items[0].Name != "foo" {
-		t.Errorf("Unexpected boundPod list: %#v", boundPods)
-	}
 }
 
 // Ensure that when scheduler creates a binding for a pod that has already been deleted
@@ -919,59 +876,12 @@ func TestEtcdCreateAlreadyExisting(t *testing.T) {
 	}
 }
 
-func TestEtcdCreateWithContainersError(t *testing.T) {
-	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
-	ctx := api.NewDefaultContext()
-	fakeClient.TestIndex = true
-	key, _ := registry.store.KeyFunc(ctx, "foo")
-	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
-	fakeClient.Data["/registry/nodes/machine/boundpods"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNodeExist, // validate that ApplyBinding is translating Create errors
-	}
-	_, err := registry.Create(ctx, validNewPod())
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	// Suddenly, a wild scheduler appears:
-	_, err = bindingRegistry.Create(ctx, &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-		Target:     api.ObjectReference{Name: "machine"},
-	})
-	if !errors.IsAlreadyExists(err) {
-		t.Fatalf("Unexpected error returned: %#v", err)
-	}
-
-	obj, err := registry.Get(ctx, "foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	existingPod := obj.(*api.Pod)
-	if existingPod.Status.Host == "machine" {
-		t.Fatal("Pod's host changed in response to an non-apply-able binding.")
-	}
-}
-
 func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 	key, _ := registry.store.KeyFunc(ctx, "foo")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
-	fakeClient.Data["/registry/nodes/machine/boundpods"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -1003,16 +913,6 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 
 	if pod.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
-	}
-	var boundPods api.BoundPods
-	resp, err = fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &boundPods)
-	if len(boundPods.Items) != 1 || boundPods.Items[0].Name != "foo" {
-		t.Errorf("Unexpected boundPod list: %#v", boundPods)
 	}
 }
 
@@ -1027,11 +927,6 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
-		Items: []api.BoundPod{
-			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
-		},
-	}), 0)
 	_, err := registry.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1058,16 +953,6 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 
 	if pod.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
-	}
-	var boundPods api.BoundPods
-	resp, err = fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &boundPods)
-	if len(boundPods.Items) != 2 || boundPods.Items[1].Name != "foo" {
-		t.Errorf("Unexpected boundPod list: %#v", boundPods)
 	}
 }
 
@@ -1124,12 +1009,9 @@ func TestEtcdCreateBinding(t *testing.T) {
 			},
 			E: tools.EtcdErrorNotFound,
 		}
-		path := fmt.Sprintf("/registry/nodes/%v/boundpods", test.binding.Target.Name)
-		fakeClient.Set(path, runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 		if _, err := registry.Create(ctx, validNewPod()); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		fakeClient.Set(path, runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 		if _, err := bindingRegistry.Create(ctx, &test.binding); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
@@ -1218,37 +1100,6 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		},
 	}), 1)
 
-	contKey := "/registry/nodes/machine/boundpods"
-	fakeClient.Set(contKey, runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
-		Items: []api.BoundPod{
-			{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: "other",
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Image: "foo:v1",
-						},
-					},
-				},
-			}, {
-				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: api.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Image: "foo:v1",
-						},
-					},
-				},
-			},
-		},
-	}), 0)
-
 	podIn := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
@@ -1286,18 +1137,6 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		t.Errorf("expected: %#v, got: %#v", podOut, podIn)
 	}
 
-	response, err = fakeClient.Get(contKey, false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	var list api.BoundPods
-	if err := latest.Codec.DecodeInto([]byte(response.Node.Value), &list); err != nil {
-		t.Fatalf("unexpected error decoding response: %v", err)
-	}
-
-	if len(list.Items) != 2 || !api.Semantic.DeepEqual(list.Items[1].Spec, podIn.Spec) {
-		t.Errorf("unexpected container list: %d\n items[0] -   %#v\n podin.spec - %#v\n", len(list.Items), list.Items[0].Spec, podIn.Spec)
-	}
 }
 
 func TestEtcdUpdateStatus(t *testing.T) {
@@ -1382,11 +1221,6 @@ func TestEtcdDeletePod(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Status:     api.PodStatus{Host: "machine"},
 	}), 0)
-	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
-		Items: []api.BoundPod{
-			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-		},
-	}), 0)
 	_, err := registry.Delete(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1396,15 +1230,6 @@ func TestEtcdDeletePod(t *testing.T) {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	} else if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-	response, err := fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var boundPods api.BoundPods
-	latest.Codec.DecodeInto([]byte(response.Node.Value), &boundPods)
-	if len(boundPods.Items) != 0 {
-		t.Errorf("Unexpected container set: %s, expected empty", response.Node.Value)
 	}
 }
 
@@ -1417,12 +1242,6 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Status:     api.PodStatus{Host: "machine"},
 	}), 0)
-	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
-		Items: []api.BoundPod{
-			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
-		},
-	}), 0)
 	_, err := registry.Delete(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1433,18 +1252,6 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	}
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
-	}
-	response, err := fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	var boundPods api.BoundPods
-	latest.Codec.DecodeInto([]byte(response.Node.Value), &boundPods)
-	if len(boundPods.Items) != 1 {
-		t.Fatalf("Unexpected boundPod set: %#v, expected empty", boundPods)
-	}
-	if boundPods.Items[0].Name != "bar" {
-		t.Errorf("Deleted wrong boundPod: %#v", boundPods)
 	}
 }
 
