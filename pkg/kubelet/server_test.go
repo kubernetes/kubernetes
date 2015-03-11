@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -639,7 +640,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil)
+	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Get(url)
@@ -648,6 +649,10 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
+	upgradeRoundTripper.Dialer = &net.Dialer{
+		Deadline: time.Now().Add(60 * time.Second),
+		Timeout:  60 * time.Second,
+	}
 	conn, err := upgradeRoundTripper.NewConnection(resp)
 	if err != nil {
 		t.Fatalf("Unexpected error creating streaming connection: %s", err)
