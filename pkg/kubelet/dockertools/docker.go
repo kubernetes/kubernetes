@@ -221,7 +221,6 @@ func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd [
 	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
 	args = append(args, container.Config.Env...)
 	args = append(args, cmd...)
-	glog.Infof("ARGS %#v", args)
 	command := exec.Command("nsenter", args...)
 	// TODO use exec.LookPath
 	if tty {
