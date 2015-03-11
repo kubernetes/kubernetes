@@ -11,7 +11,7 @@ The web front end interacts with the redis master via javascript redis API calls
 ### Step Zero: Prerequisites
 
 This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
-This example requires a kubernetes cluster.  
+This example requires a kubernetes cluster.
 
 See the companion [Setup Kubernetes](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/SETUP.md) for some quick notes on how to get started.
 
@@ -80,7 +80,7 @@ $ kubectl get pods
 You'll see all kubernetes components, most importantly the redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
 
 ```shell
-POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS                                                                                                                               
+POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
 redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
 ```
 
@@ -91,13 +91,13 @@ me@workstation$ gcloud compute ssh kubernetes-minion-7agi
 
 me@kubernetes-minion-7agi:~$ sudo docker ps
 CONTAINER ID        IMAGE                                  COMMAND                CREATED              STATUS              PORTS                    NAMES
-0ffef9649265        dockerfile/redis:latest                "redis-server /etc/r   About a minute ago   Up About a minute                            k8s_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964                   
+0ffef9649265        dockerfile/redis:latest                "redis-server /etc/r   About a minute ago   Up About a minute                            k8s_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964
 ```
 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.  You can monitor the status of this by running `journalctl -f -u docker` to check when the image is being downloaded.  Of course, you can also run `journalctl -f -u kubelet` to see what state the kubelet is in as well during this time.
 
 ### Step Two: Fire up the master service
-A Kubernetes 'service' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.  
+A Kubernetes 'service' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
 
 The services in a Kubernetes cluster are discoverable inside other containers via environment variables. 
 
@@ -161,7 +161,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`, which looks like 
            "id": "redis-slave",
            "containers": [{
              "name": "redis-slave",
-             "image": "brendanburns/redis-slave",
+             "image": "kubernetes/redis-slave:v2",
              "cpu": 200,
              "ports": [{"containerPort": 6379}]
            }]
@@ -187,16 +187,14 @@ redis-slave-controller
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master-controller                redis-master            dockerfile/redis                         name=redis-master            1
-redis-slave-controller                 redis-slave             brendanburns/redis-slave                 name=redis-slave             2
+redis-slave-controller                 redis-slave             kubernetes/redis-slave:v2                name=redis-slave             2
 ```
 
-The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment. In particular, the redis slave is started with the following command:
+The redis slave is started with the following command:
 
 ```shell
-redis-server --slaveof ${REDIS_MASTER_SERVICE_HOST:-$SERVICE_HOST} $REDIS_MASTER_SERVICE_PORT
+redis-server --slaveof redis-master 6379
 ```
-
-You might be curious about where the *REDIS_MASTER_SERVICE_HOST* is coming from.  It is provided to this container when it is launched via the kubernetes services, which create environment variables (there is a well defined syntax for how service names get transformed to environment variable names in the documentation linked above).
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
@@ -204,8 +202,8 @@ Once that's up you can list the pods in the cluster, to verify that the master a
 $ kubectl get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
 redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
-redis-slave-controller-182tv                 10.244.3.6          redis-slave             brendanburns/redis-slave                 kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
-redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             brendanburns/redis-slave                 kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
+redis-slave-controller-182tv                 10.244.3.6          redis-slave             kubernetes/redis-slave:v2                kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
+redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             kubernetes/redis-slave:v2                kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
 ```
 
 You will see a single redis master pod and two redis slave pods.
@@ -218,7 +216,7 @@ The service specification for the slaves is in `examples/guestbook/redis-slave-s
 
 ```js
 {
-  "id": "redisslave",
+  "id": "redis-slave",
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 6379,
@@ -238,12 +236,12 @@ Now that you have created the service specification, create it in your cluster b
 
 ```shell
 $ kubectl create -f examples/guestbook/redis-slave-service.json
-redisslave
+redis-slave
 
 $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
-redisslave              name=redis-slave                          name=redis-slave             10.0.72.62          6379
+redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379
 ```
 
 ### Step Five: Create the frontend pod
@@ -269,7 +267,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
            "id": "frontend",
            "containers": [{
              "name": "php-redis",
-             "image": "kubernetes/example-guestbook-php-redis",
+             "image": "kubernetes/example-guestbook-php-redis:v2",
              "cpu": 100,
              "memory": 50000000,
              "ports": [{"name": "http-server", "containerPort": 80}]
@@ -293,23 +291,23 @@ $ kubectl create -f examples/guestbook/frontend-controller.json
 frontend-controller
 
 $ kubectl get rc
-CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
-frontend-controller                    php-redis               kubernetes/example-guestbook-php-redis   name=frontend                3
-redis-master-controller                redis-master            dockerfile/redis                         name=redis-master            1
-redis-slave-controller                 redis-slave             brendanburns/redis-slave                 name=redis-slave             2
+CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
+frontend-controller                    php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
+redis-master-controller                redis-master            dockerfile/redis                           name=redis-master            1
+redis-slave-controller                 redis-slave             kubernetes/redis-slave:v2                  name=redis-slave             2
 ```
 
 Once that's up (it may take ten to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
 ```shell
 $ kubectl get pods
-POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
-frontend-controller-5m1zc                    10.244.1.131        php-redis               kubernetes/example-guestbook-php-redis   kubernetes-minion-3vxa.c.hazel-mote-834.internal/146.148.71.71    app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-frontend-controller-ckn42                    10.244.2.134        php-redis               kubernetes/example-guestbook-php-redis   kubernetes-minion-by92.c.hazel-mote-834.internal/104.154.54.6     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-frontend-controller-v5drx                    10.244.0.128        php-redis               kubernetes/example-guestbook-php-redis   kubernetes-minion-wilb.c.hazel-mote-834.internal/23.236.61.63     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
-redis-slave-controller-182tv                 10.244.3.6          redis-slave             brendanburns/redis-slave                 kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
-redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             brendanburns/redis-slave                 kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
+POD                                          IP                  CONTAINER(S)            IMAGE(S)                                   HOST                                                              LABELS                                                     STATUS
+frontend-controller-5m1zc                    10.244.1.131        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-3vxa.c.hazel-mote-834.internal/146.148.71.71    app=frontend,name=frontend,uses=redis-slave,redis-master   Running
+frontend-controller-ckn42                    10.244.2.134        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-by92.c.hazel-mote-834.internal/104.154.54.6     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
+frontend-controller-v5drx                    10.244.0.128        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-wilb.c.hazel-mote-834.internal/23.236.61.63     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                           kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-slave-controller-182tv                 10.244.3.6          redis-slave             kubernetes/redis-slave:v2                  kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
+redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             kubernetes/redis-slave:v2                  kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
 ```
 
 You will see a single redis master pod, two redis slaves, and three frontend pods.
@@ -331,21 +329,17 @@ if (isset($_GET['cmd']) === true) {
   if ($_GET['cmd'] == 'set') {
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => getenv('REDIS_MASTER_SERVICE_HOST') ?: getenv('SERVICE_HOST'),
-      'port'   => getenv('REDIS_MASTER_SERVICE_PORT'),
+      'host'   => 'redis-master',
+      'port'   => 6379,
     ]);
+    
     $client->set($_GET['key'], $_GET['value']);
     print('{"message": "Updated"}');
   } else {
-    $read_port = getenv('REDIS_MASTER_SERVICE_PORT');
-
-    if (isset($_ENV['REDISSLAVE_SERVICE_PORT'])) {
-      $read_port = getenv('REDISSLAVE_SERVICE_PORT');
-    }
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => getenv('REDIS_MASTER_SERVICE_HOST') ?: getenv('SERVICE_HOST'),
-      'port'   => $read_port,
+      'host'   => 'redis-slave',
+      'port'   => 6379,
     ]);
 
     $value = $client->get($_GET['key']);
@@ -393,7 +387,7 @@ $ kubectl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 frontend                name=frontend                             name=frontend                10.0.93.211         8000
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
-redisslave              name=redis-slave                          name=redis-slave             10.0.72.62          6379
+redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379
 ```
 
 ### A few Google Container Engine specifics for playing around with the services.
@@ -428,7 +422,7 @@ Unless you have access to the `createExternalLoadBalancer` feature (cloud provid
 
 If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
 
-And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:8000.  
+And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:8000.
 
 ### Step Seven: Cleanup
 
@@ -487,15 +481,7 @@ $> watch -n 1 docker ps
 
 If you run this on a node to which the frontend is assigned, you will eventually see the frontend container turns on.  At that point, this basic error will likely go away.
 
-2) *When Redis can't connect to master*:
-
-```shell
-<b>Fatal error</b>:  Uncaught exception 'Predis\Connection\ConnectionException' with message 'php_network_getaddresses: getaddrinfo failed: Name or service not known [tcp://:0]' in /vendor/predis/predis/lib/Predis/Connection/AbstractConnection.php:141
-```
-
-The fix: Make sure that environmental variables are being set correctly.  In particular, the PHP containers need to be started with the environment variables for the redis master (i.e. REDIS_MASTER_SERVICE_HOST and REDIS_MASTER_PORT).  
-
-3) *Temporarily, while waiting for the app to come up* , you might see a few of these:
+2) *Temporarily, while waiting for the app to come up* , you might see a few of these:
 
 ```shell
 ==> default: <br />
@@ -513,7 +499,7 @@ $> docker logs 26af6bd5ac12
 [9] 20 Feb 23:47:52.005 * MASTER <-> SLAVE sync started
 ```
 
-4) *When security issues cause redis writes to fail* you may have to run *docker logs* on the redis containers:
+3) *When security issues cause redis writes to fail* you may have to run *docker logs* on the redis containers:
 
 ```shell
 ==> default: <b>Fatal error</b>:  Uncaught exception 'Predis\ServerException' with message 'MISCONF Redis is configured to save RDB snapshots, but is currently not able to persist on disk. Commands that may modify the data set are disabled. Please check Redis logs for details about the error.' in /vendor/predis/predis/lib/Predis/Client.php:282" 

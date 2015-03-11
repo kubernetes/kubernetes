@@ -419,13 +419,13 @@ __EOF__
   kubectl create -f examples/guestbook/redis-master-service.json "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-service.json "${kube_flags[@]}"
   # Post-condition: redis-master and redis-slave services are running
-  kube::test::get_object_assert services "{{range.items}}{{.$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:redisslave:'
+  kube::test::get_object_assert services "{{range.items}}{{.$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:redis-slave:'
 
   ### Delete multiple services at once
   # Pre-condition: redis-master and redis-slave services are running
-  kube::test::get_object_assert services "{{range.items}}{{.$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:redisslave:'
+  kube::test::get_object_assert services "{{range.items}}{{.$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:redis-slave:'
   # Command
-  kubectl delete services redis-master redisslave "${kube_flags[@]}" # delete multiple services at once
+  kubectl delete services redis-master redis-slave "${kube_flags[@]}" # delete multiple services at once
   # Post-condition: Only the default kubernetes services are running
   kube::test::get_object_assert services "{{range.items}}{{.$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:'
 
