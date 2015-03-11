@@ -36,7 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -231,7 +230,6 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an etcdClient.
 // Under the hood it calls RunKubelet (below)
 func SimpleRunKubelet(client *client.Client,
-	etcdClient tools.EtcdClient,
 	dockerClient dockertools.DockerInterface,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
@@ -240,7 +238,6 @@ func SimpleRunKubelet(client *client.Client,
 	tlsOptions *kubelet.TLSOptions) {
 	kcfg := KubeletConfig{
 		KubeClient:             client,
-		EtcdClient:             etcdClient,
 		DockerClient:           dockerClient,
 		HostnameOverride:       hostname,
 		RootDirectory:          rootDir,
@@ -321,10 +318,6 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
 		config.NewSourceURL(kc.ManifestURL, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
-	if kc.EtcdClient != nil {
-		glog.Infof("Watching for etcd configs at %v", kc.EtcdClient.GetCluster())
-		config.NewSourceEtcd(config.EtcdKeyForHost(kc.Hostname), kc.EtcdClient, cfg.Channel(kubelet.EtcdSource))
-	}
 	if kc.KubeClient != nil {
 		glog.Infof("Watching apiserver")
 		config.NewSourceApiserver(kc.KubeClient, kc.Hostname, cfg.Channel(kubelet.ApiserverSource))
@@ -335,7 +328,6 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
 type KubeletConfig struct {
-	EtcdClient                     tools.EtcdClient
 	KubeClient                     *client.Client
 	DockerClient                   dockertools.DockerInterface
 	CAdvisorPort                   uint
@@ -392,7 +384,6 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 	k, err := kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.DockerClient,
-		kc.EtcdClient,
 		kubeClient,
 		kc.RootDirectory,
 		kc.PodInfraContainerImage,

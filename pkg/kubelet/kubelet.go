@@ -45,7 +45,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -93,7 +92,6 @@ type volumeMap map[string]volume.Interface
 func NewMainKubelet(
 	hostname string,
 	dockerClient dockertools.DockerInterface,
-	etcdClient tools.EtcdClient,
 	kubeClient client.Interface,
 	rootDirectory string,
 	podInfraContainerImage string,
@@ -156,7 +154,6 @@ func NewMainKubelet(
 	klet := &Kubelet{
 		hostname:                       hostname,
 		dockerClient:                   dockerClient,
-		etcdClient:                     etcdClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
@@ -232,8 +229,6 @@ type Kubelet struct {
 	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
 	refLock       sync.RWMutex
 
-	// Optional, no events will be sent without it
-	etcdClient tools.EtcdClient
 	// Optional, defaults to simple Docker implementation
 	dockerPuller dockertools.DockerPuller
 	// Optional, defaults to /logs/ from /var/log

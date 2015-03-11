@@ -41,7 +41,7 @@ const (
 	// Updates from a file
 	FileSource = "file"
 	// Updates from etcd
-	EtcdSource = "etcd"
+	EtcdSource = "etcd" // Not supported by current kubelets.
 	// Updates from querying a web page
 	HTTPSource = "http"
 	// Updates received to the kubelet server
