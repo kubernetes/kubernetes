@@ -87,7 +87,7 @@ func NewAPIServer() *APIServer {
 		APIBurst:               200,
 		SecurePort:             6443,
 		APIPrefix:              "/api",
-		EventTTL:               48 * time.Hour,
+		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
 		EnableLogsSupport:      true,
@@ -136,7 +136,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.StorageVersion, "storage_version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.DurationVar(&s.EventTTL, "event_ttl", s.EventTTL, "Amount of time to retain events. Default 2 days.")
+	fs.DurationVar(&s.EventTTL, "event_ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
 	fs.StringVar(&s.TokenAuthFile, "token_auth_file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
 	fs.StringVar(&s.AuthorizationMode, "authorization_mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationPolicyFile, "authorization_policy_file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization_mode=ABAC, on the secure port.")
