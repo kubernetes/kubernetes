@@ -13,6 +13,7 @@ install:
   - ./hack/verify-description.sh
   - ./hack/travis/install-std-race.sh
   - ./hack/build-go.sh
+  - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
 
 script:
   - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 ./hack/test-go.sh -- -p=2
