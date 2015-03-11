@@ -1,6 +1,7 @@
 [Unit]
 Description=Kubernetes Kube-Proxy Server
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
 
 [Service]
 EnvironmentFile=-/etc/kubernetes/config
