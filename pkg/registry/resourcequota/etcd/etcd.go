@@ -34,7 +34,7 @@ type REST struct {
 
 // NewStorage returns a RESTStorage object that will work against ResourceQuota objects.
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
-	prefix := "/registry/resourcequotas"
+	prefix := "/resourcequotas"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
 		NewListFunc: func() runtime.Object { return &api.ResourceQuotaList{} },

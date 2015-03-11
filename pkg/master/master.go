@@ -71,6 +71,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	DefaultEtcdPathPrefix = "/registry"
+)
+
 // Config is a structure used to configure a Master.
 type Config struct {
 	EtcdHelper        tools.EtcdHelper
@@ -178,7 +182,7 @@ type Master struct {
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHelper, err error) {
+func NewEtcdHelper(client tools.EtcdGetSet, version string, prefix string) (helper tools.EtcdHelper, err error) {
 	if version == "" {
 		version = latest.Version
 	}
@@ -186,7 +190,7 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHe
 	if err != nil {
 		return helper, err
 	}
-	return tools.NewEtcdHelper(client, versionInterfaces.Codec), nil
+	return tools.NewEtcdHelper(client, versionInterfaces.Codec, prefix), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -363,7 +367,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 func (m *Master) init(c *Config) {
 	// TODO: make initialization of the helper part of the Master, and allow some storage
 	// objects to have a newer storage version than the user's default.
-	newerHelper, err := NewEtcdHelper(c.EtcdHelper.Client, "v1beta3")
+	newerHelper, err := NewEtcdHelper(c.EtcdHelper.Client, "v1beta3", DefaultEtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Unable to setup storage for v1beta3: %v", err)
 	}

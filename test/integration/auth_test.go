@@ -46,6 +46,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 )
@@ -377,7 +378,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -516,8 +517,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	deleteAllEtcdKeys()
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -583,8 +583,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -672,8 +671,7 @@ func TestBobIsForbidden(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -733,8 +731,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -810,8 +807,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -925,8 +921,7 @@ func TestKindAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1028,8 +1023,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

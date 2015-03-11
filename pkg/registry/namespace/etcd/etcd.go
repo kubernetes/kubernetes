@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -48,14 +49,15 @@ type FinalizeREST struct {
 
 // NewStorage returns a RESTStorage object that will work against namespaces
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
+	prefix := "/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
 		KeyRootFunc: func(ctx api.Context) string {
-			return "/registry/namespaces"
+			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return "/registry/namespaces/" + name, nil
+			return path.Join(prefix, name), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Namespace).Name, nil

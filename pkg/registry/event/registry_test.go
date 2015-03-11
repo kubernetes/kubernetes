@@ -27,6 +27,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -37,7 +38,8 @@ var testTTL uint64 = 60
 func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.NewEtcdHelper(f, testapi.Codec())
+
+	h := tools.NewEtcdHelper(f, testapi.Codec(), etcdtest.PathPrefix())
 	return f, NewEtcdRegistry(h, testTTL)
 }
 
@@ -70,7 +72,8 @@ func TestEventCreate(t *testing.T) {
 
 	ctx := api.NewDefaultContext()
 	key := "foo"
-	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/registry/events", key)
+	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/events", key)
+	path = etcdtest.AddPrefix(path)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -166,7 +169,8 @@ func TestEventUpdate(t *testing.T) {
 
 	ctx := api.NewDefaultContext()
 	key := "foo"
-	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/registry/events", key)
+	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/events", key)
+	path = etcdtest.AddPrefix(path)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

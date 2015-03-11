@@ -71,6 +71,7 @@ type APIServer struct {
 	AdmissionControlConfigFile string
 	EtcdServerList             util.StringList
 	EtcdConfigFile             string
+	EtcdPathPrefix             string
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	PortalNet                  util.IPNet // TODO: make this a list
@@ -98,6 +99,7 @@ func NewAPIServer() *APIServer {
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
+		EtcdPathPrefix:         master.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
@@ -161,6 +163,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.AdmissionControlConfigFile, "admission_control_config_file", s.AdmissionControlConfigFile, "File with admission control configuration.")
 	fs.Var(&s.EtcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	fs.StringVar(&s.EtcdConfigFile, "etcd_config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
+	fs.StringVar(&s.EtcdPathPrefix, "etcd_prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
 	fs.Var(&s.CorsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow_privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.PortalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
@@ -181,7 +184,7 @@ func (s *APIServer) verifyPortalFlags() {
 	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string) (helper tools.EtcdHelper, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (helper tools.EtcdHelper, err error) {
 	var client tools.EtcdGetSet
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
@@ -192,7 +195,7 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 		client = etcd.NewClient(etcdServerList)
 	}
 
-	return master.NewEtcdHelper(client, storageVersion)
+	return master.NewEtcdHelper(client, storageVersion, pathPrefix)
 }
 
 // Run runs the specified APIServer.  This should never exit.
@@ -232,7 +235,7 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion)
+	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}

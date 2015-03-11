@@ -53,6 +53,9 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Comma separated list of API Versions that should be tested.
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
+# Prefixes for etcd paths (standard and customized)
+ETCD_STANDARD_PREFIX="registry"
+ETCD_CUSTOM_PREFIX="kubernetes.io/registry"
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -203,10 +206,13 @@ reportCoverageToCoveralls() {
 
 # Convert the CSV to an array of API versions to test
 IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+ETCD_PREFIX=${ETCD_STANDARD_PREFIX}
 for apiVersion in "${apiVersions[@]}"; do
   echo "Running tests for APIVersion: $apiVersion"
-  KUBE_API_VERSION="${apiVersion}" runTests "$@"
+  KUBE_API_VERSION="${apiVersion}" ETCD_PREFIX=${ETCD_STANDARD_PREFIX} runTests "$@"
 done
+echo "Using custom etcd path prefix: ${ETCD_CUSTOM_PREFIX}"
+KUBE_API_VERSION="${apiVersions[-1]}" ETCD_PREFIX=${ETCD_CUSTOM_PREFIX} runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.

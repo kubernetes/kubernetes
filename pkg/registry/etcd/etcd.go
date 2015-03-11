@@ -35,9 +35,9 @@ import (
 
 const (
 	// ControllerPath is the path to controller resources in etcd
-	ControllerPath string = "/registry/controllers"
+	ControllerPath string = "/controllers"
 	// ServicePath is the path to service resources in etcd
-	ServicePath string = "/registry/services/specs"
+	ServicePath string = "/services/specs"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into

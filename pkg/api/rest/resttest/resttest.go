@@ -271,7 +271,6 @@ func (t *Tester) TestDeleteNoGraceful(createFn func() runtime.Object, wasGracefu
 	if err != nil {
 		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
 	}
-
 	ctx := api.WithNamespace(api.NewContext(), objectMeta.Namespace)
 	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(10))
 	if err != nil {

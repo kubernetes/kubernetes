@@ -34,7 +34,7 @@ type REST struct {
 
 // NewStorage returns a RESTStorage object that will work against endpoints.
 func NewStorage(h tools.EtcdHelper) *REST {
-	prefix := "/registry/services/endpoints"
+	prefix := "/services/endpoints"
 	return &REST{
 		&etcdgeneric.Etcd{
 			NewFunc:     func() runtime.Object { return &api.Endpoints{} },

@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -49,7 +50,7 @@ func (fakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, ht
 func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec)
+	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
 	return fakeEtcdClient, helper
 }
 
@@ -107,6 +108,7 @@ func TestDelete(t *testing.T) {
 
 	node := validChangedNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)
+	key = etcdtest.AddPrefix(key)
 	createFn := func() runtime.Object {
 		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 			R: &etcd.Response{
@@ -131,6 +133,7 @@ func TestEtcdListNodes(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
 	key := storage.KeyRootFunc(ctx)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -165,6 +168,7 @@ func TestEtcdListNodesMatch(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
 	key := storage.KeyRootFunc(ctx)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -209,6 +213,7 @@ func TestEtcdGetNode(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	node := validNewNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)
+	key = etcdtest.AddPrefix(key)
 
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, node), 0)
 	nodeObj, err := storage.Get(ctx, node.Name)
@@ -229,6 +234,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	node := validChangedNode()
 
 	key, _ := storage.KeyFunc(ctx, node.Name)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, validNewNode()), 0)
 
 	_, _, err := storage.Update(ctx, node)
@@ -255,7 +261,8 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 func TestEtcdGetNodeNotFound(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
-	fakeClient.Data["/registry/minions/foo"] = tools.EtcdResponseWithError{
+	key := etcdtest.AddPrefix("minions/foo")
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -273,6 +280,7 @@ func TestEtcdDeleteNode(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	node := validNewNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)
+	key = etcdtest.AddPrefix(key)
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, node), 0)
 	_, err := storage.Delete(ctx, node.Name, nil)
 	if err != nil {

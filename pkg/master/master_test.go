@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
 func TestGetServersToValidate(t *testing.T) {
@@ -30,7 +31,7 @@ func TestGetServersToValidate(t *testing.T) {
 	config := Config{}
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
-	config.EtcdHelper = tools.EtcdHelper{fakeClient, latest.Codec, nil}
+	config.EtcdHelper = tools.EtcdHelper{fakeClient, latest.Codec, nil, etcdtest.PathPrefix()}
 
 	master.nodeRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
