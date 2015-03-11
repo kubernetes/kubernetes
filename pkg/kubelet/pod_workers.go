@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -29,6 +30,8 @@ import (
 )
 
 type syncPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
+
+type syncRocketPodFnType func(*api.BoundPod, *api.Pod) error
 
 type podWorkers struct {
 	// Protects podUpdates field.
@@ -52,6 +55,10 @@ type podWorkers struct {
 	// different pods at the same time.
 	syncPodFn syncPodFnType
 
+	// containerRuntimeCache is used for listing running pods.
+	containerRuntimeCache container.RuntimeCache
+
+	syncRocketPodFn syncRocketPodFnType
 	// The EventRecorder to use
 	recorder record.EventRecorder
 }
@@ -99,6 +106,36 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 			minDockerCacheTime = time.Now()
+
+			newWork.updateCompleteFn()
+		}()
+	}
+}
+
+func (p *podWorkers) manageRocketPodLoop(podUpdates <-chan workUpdate) {
+	var minContainerRuntimeCache time.Time
+	for newWork := range podUpdates {
+		func() {
+			defer p.checkForUpdates(newWork.pod.UID, newWork.updateCompleteFn)
+			// We would like to have the state of Docker from at least the moment
+			// when we finished the previous processing of that pod.
+			if err := p.containerRuntimeCache.ForceUpdateIfOlder(minContainerRuntimeCache); err != nil {
+				glog.Errorf("Error updating docker cache: %v", err)
+				return
+			}
+			runningPods, err := p.containerRuntimeCache.ListPods()
+			if err != nil {
+				glog.Errorf("Error listing containers while syncing pod: %v", err)
+				return
+			}
+
+			err = p.syncRocketPodFn(newWork.pod, findPodByID(newWork.pod.UID, runningPods))
+			if err != nil {
+				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
+				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
+				return
+			}
+			minContainerRuntimeCache = time.Now()
 
 			newWork.updateCompleteFn()
 		}()
