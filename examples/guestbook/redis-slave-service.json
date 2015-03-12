@@ -1,5 +1,5 @@
 {
-  "id": "redisslave",
+  "id": "redis-slave",
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 6379,
