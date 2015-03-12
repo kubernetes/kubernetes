@@ -33,15 +33,18 @@ func compareJson(t *testing.T, flatCompare bool, value interface{}, expectedJson
 		return
 	}
 	actual := string(output)
-	if actual != expectedJsonAsString {
-		t.Errorf("First mismatch JSON doc at line:%d", indexOfNonMatchingLine(actual, expectedJsonAsString))
-		// Use simple fmt to create a pastable output :-)
+	var actualMap map[string]interface{}
+	var expectedMap map[string]interface{}
+	json.Unmarshal(output, &actualMap)
+	json.Unmarshal([]byte(expectedJsonAsString), &expectedMap)
+	if !reflect.DeepEqual(actualMap, expectedMap) {
 		fmt.Println("---- expected -----")
 		fmt.Println(withLineNumbers(expectedJsonAsString))
 		fmt.Println("---- actual -----")
 		fmt.Println(withLineNumbers(actual))
 		fmt.Println("---- raw -----")
 		fmt.Println(actual)
+		t.Error("there are differences")
 	}
 }
 

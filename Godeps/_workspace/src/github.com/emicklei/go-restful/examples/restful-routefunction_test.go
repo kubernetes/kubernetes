@@ -12,7 +12,7 @@ import (
 // It uses the httptest.ResponseRecorder to capture output
 
 func getIt(req *restful.Request, resp *restful.Response) {
-	resp.WriteHeader(404)
+	resp.WriteHeader(204)
 }
 
 func TestCallFunction(t *testing.T) {
@@ -20,10 +20,10 @@ func TestCallFunction(t *testing.T) {
 	req := restful.NewRequest(httpReq)
 
 	recorder := new(httptest.ResponseRecorder)
-	resp := restful.NewResponse(recoder)
+	resp := restful.NewResponse(recorder)
 
 	getIt(req, resp)
-	if recorder.Code != 404 {
-		t.Logf("Missing or wrong status code:%d", recorder.Code)
+	if recorder.Code != 204 {
+		t.Fatalf("Missing or wrong status code:%d", recorder.Code)
 	}
 }

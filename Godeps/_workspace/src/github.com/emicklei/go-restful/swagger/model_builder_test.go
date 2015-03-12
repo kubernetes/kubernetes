@@ -95,11 +95,9 @@ func TestS2(t *testing.T) {
    "properties": {
     "Ids": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "string"
-      }
-     ]
+     "items": {
+      "$ref": "string"
+     }
     }
    }
   }
@@ -177,11 +175,9 @@ func TestSampleToModelAsJson(t *testing.T) {
     },
     "items": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "swagger.item"
-      }
-     ]
+     "items": {
+      "$ref": "swagger.item"
+     }
     },
     "root": {
      "type": "swagger.item",
@@ -361,11 +357,9 @@ func TestAnonymousArrayStruct(t *testing.T) {
    "properties": {
     "A": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "swagger.X.A"
-      }
-     ]
+     "items": {
+      "$ref": "swagger.X.A"
+     }
     }
    }
   },
@@ -402,11 +396,9 @@ func TestAnonymousPtrArrayStruct(t *testing.T) {
    "properties": {
     "A": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "swagger.X.A"
-      }
-     ]
+     "items": {
+      "$ref": "swagger.X.A"
+     }
     }
    }
   },
@@ -467,11 +459,9 @@ func TestIssue85(t *testing.T) {
    "properties": {
     "Datasets": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "swagger.Dataset"
-      }
-     ]
+     "items": {
+      "$ref": "swagger.Dataset"
+     }
     }
    }
   },
@@ -483,11 +473,9 @@ func TestIssue85(t *testing.T) {
    "properties": {
     "Names": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "string"
-      }
-     ]
+     "items": {
+      "$ref": "string"
+     }
     }
    }
   }
@@ -511,25 +499,17 @@ func TestRecursiveStructure(t *testing.T) {
    "properties": {
     "History": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "swagger.File"
-      }
-     ]
+     "items": {
+      "$ref": "swagger.File"
+     }
     },
     "HistoryPtrs": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "swagger.File.HistoryPtrs"
-      }
-     ]
+     "items": {
+      "$ref": "swagger.File"
+     }
     }
    }
-  },
-  "swagger.File.HistoryPtrs": {
-   "id": "swagger.File.HistoryPtrs",
-   "properties": {}
   }
  }`)
 }
@@ -669,11 +649,9 @@ func TestRegion_Issue113(t *testing.T) {
    "properties": {
     "id": {
      "type": "array",
-     "items": [
-      {
-       "$ref": "integer"
-      }
-     ]
+     "items": {
+      "$ref": "integer"
+     }
     },
     "name": {
      "type": "string"
@@ -726,4 +704,54 @@ func TestIssue158(t *testing.T) {
   }
  }`
 	testJsonFromStruct(t, Customer{}, expected)
+}
+
+func TestSlices(t *testing.T) {
+	type Address struct {
+		Country string `json:"country,omitempty"`
+	}
+	expected := `{
+  "swagger.Address": {
+   "id": "swagger.Address",
+   "properties": {
+    "country": {
+     "type": "string"
+    }
+   }
+  },
+  "swagger.Customer": {
+   "id": "swagger.Customer",
+   "required": [
+    "name",
+    "addresses"
+   ],
+   "properties": {
+    "addresses": {
+     "type": "array",
+     "items": {
+      "$ref": "swagger.Address"
+     }
+    },
+    "name": {
+     "type": "string"
+    }
+   }
+  }
+ }`
+	// both slices (with pointer value and with type value) should have equal swagger representation
+	{
+		type Customer struct {
+			Name      string    `json:"name"`
+			Addresses []Address `json:"addresses"`
+		}
+		testJsonFromStruct(t, Customer{}, expected)
+	}
+	{
+		type Customer struct {
+			Name      string     `json:"name"`
+			Addresses []*Address `json:"addresses"`
+		}
+		testJsonFromStruct(t, Customer{}, expected)
+	}
+
 }

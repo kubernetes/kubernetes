@@ -22,6 +22,7 @@ type Container struct {
 	containerFilters       []FilterFunction
 	doNotRecover           bool // default is false
 	recoverHandleFunc      RecoverHandleFunction
+	serviceErrorHandleFunc ServiceErrorHandleFunction
 	router                 RouteSelector // default is a RouterJSR311, CurlyRouter is the faster alternative
 	contentEncodingEnabled bool          // default is false
 }
@@ -35,6 +36,7 @@ func NewContainer() *Container {
 		containerFilters:       []FilterFunction{},
 		doNotRecover:           false,
 		recoverHandleFunc:      logStackOnRecover,
+		serviceErrorHandleFunc: writeServiceError,
 		router:                 RouterJSR311{},
 		contentEncodingEnabled: false}
 }
@@ -47,6 +49,16 @@ type RecoverHandleFunction func(interface{}, http.ResponseWriter)
 // when a panic is detected. DoNotRecover must be have its default value (=false).
 func (c *Container) RecoverHandler(handler RecoverHandleFunction) {
 	c.recoverHandleFunc = handler
+}
+
+// ServiceErrorHandleFunction declares functions that can be used to handle a service error situation.
+// The first argument is the service error. The second must be used to communicate an error response.
+type ServiceErrorHandleFunction func(ServiceError, *Response)
+
+// ServiceErrorHandler changes the default function (writeServiceError) to be called
+// when a ServiceError is detected.
+func (c *Container) ServiceErrorHandler(handler ServiceErrorHandleFunction) {
+	c.serviceErrorHandleFunc = handler
 }
 
 // DoNotRecover controls whether panics will be caught to return HTTP 500.
@@ -125,6 +137,13 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	httpWriter.Write(buffer.Bytes())
 }
 
+// writeServiceError is the default ServiceErrorHandleFunction and is called
+// when a ServiceError is returned during route selection. Default implementation
+// calls resp.WriteErrorString(err.Code, err.Message)
+func writeServiceError(err ServiceError, resp *Response) {
+	resp.WriteErrorString(err.Code, err.Message)
+}
+
 // Dispatch the incoming Http Request to a matching WebService.
 func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
 	// Instal panic recovery unless told otherwise
@@ -172,7 +191,7 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 			switch err.(type) {
 			case ServiceError:
 				ser := err.(ServiceError)
-				resp.WriteErrorString(ser.Code, ser.Message)
+				c.serviceErrorHandleFunc(ser, resp)
 			}
 			// TODO
 		}}
@@ -215,6 +234,25 @@ func (c Container) ServeHTTP(httpwriter http.ResponseWriter, httpRequest *http.R
 // Handle registers the handler for the given pattern. If a handler already exists for pattern, Handle panics.
 func (c Container) Handle(pattern string, handler http.Handler) {
 	c.ServeMux.Handle(pattern, handler)
+}
+
+// HandleWithFilter registers the handler for the given pattern.
+// Container's filter chain is applied for handler.
+// If a handler already exists for pattern, HandleWithFilter panics.
+func (c Container) HandleWithFilter(pattern string, handler http.Handler) {
+	f := func(httpResponse http.ResponseWriter, httpRequest *http.Request) {
+		if len(c.containerFilters) == 0 {
+			handler.ServeHTTP(httpResponse, httpRequest)
+			return
+		}
+
+		chain := FilterChain{Filters: c.containerFilters, Target: func(req *Request, resp *Response) {
+			handler.ServeHTTP(httpResponse, httpRequest)
+		}}
+		chain.ProcessFilter(NewRequest(httpRequest), NewResponse(httpResponse))
+	}
+
+	c.Handle(pattern, http.HandlerFunc(f))
 }
 
 // Filter appends a container FilterFunction. These are called before dispatching

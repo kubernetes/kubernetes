@@ -22,4 +22,6 @@ type Config struct {
 	StaticHandler http.Handler
 	// [optional] on default CORS (Cross-Origin-Resource-Sharing) is enabled.
 	DisableCORS bool
+	// Top-level API version. Is reflected in the resource listing.
+	ApiVersion string
 }
