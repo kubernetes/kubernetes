@@ -10,7 +10,7 @@ The following terms are defined:
 * **Kind** the name of a particular object schema (e.g. the "Cat" and "Dog" kinds would have different attributes and properties)
 * **Resource** a representation of a system entity, sent or retrieved as JSON via HTTP to the server. Resources are exposed via:
   * Collections - a list of resources of the same type, which may be queryable
-  * Elements - an individual resource, addressible via a URL
+  * Elements - an individual resource, addressable via a URL
 
 Each resource typically accepts and returns data of a single kind.  A kind may be accepted or returned by multiple resources that reflect specific use cases. For instance, the kind "pod" is exposed as a "pods" resource that allows end users to create, update, and delete pods, while a separate "pod status" resource (that acts on "pod" kind) allows automated processes to update a subset of the fields in that resource. A "restart" resource might be exposed for a number of different resources to allow the same action to have different results for each object.
 
@@ -121,7 +121,7 @@ Every list or simple kind SHOULD have the following metadata in a nested object 
 
 * resourceVersion: a string that identifies the common version of the objects returned by in a list. This value MUST be treated as opaque by clients and passed unmodified back to the server. A resource version is only valid within a single namespace on a single kind of resource.
 
-Every simple kind returned by the server, and any simple kind sent to the server that must support idempotency or optimistic concurency should return this value.Since simple resources are often used as input alternate actions that modify objects, the resource version of the simple resource should correspond to the resource version of the object.
+Every simple kind returned by the server, and any simple kind sent to the server that must support idempotency or optimistic concurrency should return this value.Since simple resources are often used as input alternate actions that modify objects, the resource version of the simple resource should correspond to the resource version of the object.
 
 
 Differing Representations
@@ -183,11 +183,11 @@ achieve the state, and for the user to know what to anticipate.
 Concurrency Control and Consistency
 -----------------------------------
 
-Kubernetes leverages the concept of *resource versions* to achieve optimistic concurrency. All kubernetes resources have a "resourceVersion" field as part of their metadata. This resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. When a record is about to be updated, it's version is checked against a pre-saved value, and if it doesn't match, the update fails with a StatusConflict (HTTP status code 409).
+Kubernetes leverages the concept of *resource versions* to achieve optimistic concurrency. All Kubernetes resources have a "resourceVersion" field as part of their metadata. This resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. When a record is about to be updated, it's version is checked against a pre-saved value, and if it doesn't match, the update fails with a StatusConflict (HTTP status code 409).
 
 The resourceVersion is changed by the server every time an object is modified. If resourceVersion is included with the PUT operation the system will verify that there have not been other successful mutations to the resource during a read/modify/write cycle, by verifying that the current value of resourceVersion matches the specified value.
 
-The resourceVersion is currently backed by [etcd's modifiedIndex](https://coreos.com/docs/distributed-configuration/etcd-api/). However, it's important to note that the application should *not* rely on the implementation details of the versioning system maintained by kubernetes. We may change the implementation of resourceVersion in the future, such as to change it to a timestamp or per-object counter.
+The resourceVersion is currently backed by [etcd's modifiedIndex](https://coreos.com/docs/distributed-configuration/etcd-api/). However, it's important to note that the application should *not* rely on the implementation details of the versioning system maintained by Kubernetes. We may change the implementation of resourceVersion in the future, such as to change it to a timestamp or per-object counter.
 
 The only way for a client to know the expected value of resourceVersion is to have received it from the server in response to a prior operation, typically a GET. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. Currently, the value of resourceVersion is set to match etcd's sequencer. You could think of it as a logical clock the API server can use to order requests. However, we expect the implementation of resourceVersion to change in the future, such as in the case we shard the state by kind and/or namespace, or port to another storage system.
 
@@ -237,11 +237,11 @@ The following HTTP status codes may be returned by the API.
 #### Success codes
 
 * `200 StatusOK`
-  * Indicates that the request completed succesfully.
+  * Indicates that the request completed successfully.
 * `201 StatusCreated`
-  * Indicates that the request to create kind completed succesfully.
+  * Indicates that the request to create kind completed successfully.
 * `204 StatusNoContent`
-  * Indicates that the request completed succesfully, and the response contains no body.
+  * Indicates that the request completed successfully, and the response contains no body.
   * Returned in response to HTTP OPTIONS requests.
 
 #### Error codes
@@ -278,7 +278,7 @@ The following HTTP status codes may be returned by the API.
   * Suggested client recovery behavior
     * Do not retry. Fix the request.
 * `429 StatusTooManyRequests`
-  * Indicates that the either the client rate limit has been exceeded or the server has recieved more requests then it can process.
+  * Indicates that the either the client rate limit has been exceeded or the server has received more requests then it can process.
   * Suggested client recovery behavior:
     * Read the ```Retry-After``` HTTP header from the response, and wait at least that long before retrying.
 * `500 StatusInternalServerError`
