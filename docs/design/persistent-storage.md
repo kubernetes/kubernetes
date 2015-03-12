@@ -34,6 +34,8 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 Cluster administrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the Kubernetes API for new volumes and adds them to its internal cache of volumes in the system. All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
 
+PVs are system objects and, thus, have no namespace.
+
 Many means of dynamic provisioning will be eventually be implemented for various storage types. 
 
 
@@ -41,12 +43,12 @@ Many means of dynamic provisioning will be eventually be implemented for various
 
 | Action | HTTP Verb | Path | Description |
 | ---- | ---- | ---- | ---- |
-| CREATE | POST | /api/{version}/persistentvolumes/ | Create instance of PersistentVolume in system namespace  |
-| GET | GET | /api/{version}persistentvolumes/{name} | Get instance of PersistentVolume in system namespace with {name} |
-| UPDATE | PUT | /api/{version}/persistentvolumes/{name} | Update instance of PersistentVolume in system namespace with {name} |
-| DELETE | DELETE | /api/{version}/persistentvolumes/{name} | Delete instance of PersistentVolume in system namespace with {name} |
-| LIST | GET | /api/{version}/persistentvolumes | List instances of PersistentVolume in system namespace |
-| WATCH | GET | /api/{version}/watch/persistentvolumes | Watch for changes to a PersistentVolume in system namespace |
+| CREATE | POST | /api/{version}/persistentvolumes/ | Create instance of PersistentVolume |
+| GET | GET | /api/{version}persistentvolumes/{name} | Get instance of PersistentVolume with {name} |
+| UPDATE | PUT | /api/{version}/persistentvolumes/{name} | Update instance of PersistentVolume with {name} |
+| DELETE | DELETE | /api/{version}/persistentvolumes/{name} | Delete instance of PersistentVolume with {name} |
+| LIST | GET | /api/{version}/persistentvolumes | List instances of PersistentVolume |
+| WATCH | GET | /api/{version}/watch/persistentvolumes | Watch for changes to a PersistentVolume |
 
 
 #### Request Storage
@@ -77,6 +79,13 @@ Users attach their claim to their pod using a new ```PersistentVolumeClaimVolume
 Scheduling constraints are to be handled similar to pod resource constraints.  Pods will need to be annotated or decorated with the number of resources it requires on a node.  Similarly, a node will need to list how many it has used or available.
 
 TBD
+
+
+#### Events
+
+The implementation of persistent storage will not require events to communicate to the user the state of their claim.  The CLI for bound claims contains a reference to the backing persistent volume.  This is always present in the API and CLI, making an event to communicate the same unnecessary. 
+
+Events that communicate the state of a mounted volume are left to the volume plugins.
 
 
 ### Example
