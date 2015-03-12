@@ -33,6 +33,7 @@ INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
+MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 
 # Compute IP addresses for nodes.
 function increment_ipv4 {

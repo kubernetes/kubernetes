@@ -48,6 +48,10 @@ base:
     - docker
     - sdn
 {% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
+    - docker
+{% endif %}
+
 
   'roles:kubernetes-pool-vsphere':
     - match: grain
