@@ -112,7 +112,7 @@ func (kl *Kubelet) runPod(pod api.BoundPod) error {
 		}
 		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
 		glog.Infof("pod %q containers synced, waiting for %v", pod.Name, delay)
-		<-time.After(delay)
+		time.Sleep(delay)
 		retry++
 		delay *= RunOnceRetryDelayBackoff
 	}
