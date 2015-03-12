@@ -124,16 +124,6 @@ Every list or simple kind SHOULD have the following metadata in a nested object 
 Every simple kind returned by the server, and any simple kind sent to the server that must support idempotency or optimistic concurency should return this value.Since simple resources are often used as input alternate actions that modify objects, the resource version of the simple resource should correspond to the resource version of the object.
 
 
-Returning Errors
-----------------
-
-Kubernetes MAY return the Status kind from any API endpoint. Clients SHOULD handle these types of objects when appropriate.
-
-A Status kind SHOULD be returned by an API when an operation is not successful (when the server would return a non 2xx HTTP status code). The status object contains fields for humans and machine consumers of the API to determine failures. The information in the status object supplements, but does not override, the HTTP status code's meaning.
-
-TODO: More details (refer to another doc for details)
-
-
 Differing Representations
 -------------------------
 
@@ -239,37 +229,182 @@ Examples:
 TODO: Plugins, extensions, nested kinds, headers
 
 
-Status codes
-------------
+HTTP Status codes
+-----------------
 
-The following status codes may be returned by the API.
-
-TODO: Document when each of these codes is returned
+The following HTTP status codes may be returned by the API.
 
 #### Success codes
 
-* `StatusOK`
-* `StatusCreated`
-* `StatusAccepted`
-* `StatusNoContent`
+* `200 StatusOK`
+  * Indicates that the request completed succesfully.
+* `201 StatusCreated`
+  * Indicates that the request to create kind completed succesfully.
+* `204 StatusNoContent`
+  * Indicates that the request completed succesfully, and the response contains no body.
+  * Returned in response to HTTP OPTIONS requests.
 
 #### Error codes
+* `307 StatusTemporaryRedirect`
+  * Indicates that the address for the requested resource has changed.
+  * Suggested client recovery behavior
+    * Follow the redirect.
+* `400 StatusBadRequest`
+  * Indicates the requested is invalid.
+  * Suggested client recovery behavior:
+    * Do not retry. Fix the request.
+* `403 StatusForbidden`
+  * Indicates that the server can be reached and understood the request, but refuses to take any further action, because it is configured to deny access for some reason to the requested resource by the client.
+  * Suggested client recovery behavior
+    * Do not retry. Fix the request.
+* `404 StatusNotFound`
+  * Indicates that the requested resource does not exist.
+  * Suggested client recovery behavior
+    * Do not retry. Fix the request.
+* `405 StatusMethodNotAllowed`
+  * Indicates that that the action the client attempted to perform on the resource was not supported by the code.
+  * Suggested client recovery behavior
+    * Do not retry. Fix the request.
+* `409 StatusConflict`
+  * Indicates that either the resource the client attempted to create already exists or the requested update operation cannot be completed due to a conflict.
+  * Suggested client recovery behavior
+  * * If creating a new resource
+  *   * Either change the identifier and try again, or GET and compare the fields in the pre-existing object and issue a PUT/update to modify the existing object.
+  * * If updating an existing resource:
+      * See `Conflict` from the `status` response section below on how to retrieve more information about the nature of the conflict.
+      * GET and compare the fields in the pre-existing object, merge changes (if still valid according to preconditions), and retry with the updated request (including `ResourceVersion`).
+* `422 StatusUnprocessableEntity`
+  * Indicates that the requested create or update operation cannot be completed due to invalid data provided as part of the request.
+  * Suggested client recovery behavior
+    * Do not retry. Fix the request.
+* `429 StatusTooManyRequests`
+  * Indicates that the either the client rate limit has been exceeded or the server has recieved more requests then it can process.
+  * Suggested client recovery behavior:
+    * Read the ```Retry-After``` HTTP header from the response, and wait at least that long before retrying.
+* `500 StatusInternalServerError`
+  * Indicates that the server can be reached and understood the request, but either an unexpected internal error occurred and the outcome of the call is unknown, or the server cannot complete the action in a reasonable time (this maybe due to temporary server load or a transient communication issue with another server).
+  * Suggested client recovery behavior:
+    * Retry with exponential backoff.
+* `503 StatusServiceUnavailable`
+  * Indicates that required service is unavailable.
+  * Suggested client recovery behavior:
+    * Retry with exponential backoff.
+* `504 StatusServerTimeout`
+  * Indicates that the request could not be completed within the given time. Clients can get this response ONLY when they specified a timeout param in the request.
+  * Suggested client recovery behavior:
+    * Increase the value of the timeout param and retry with exponential backoff
 
-* `StatusNotFound`
-* `StatusMethodNotAllowed`
-* `StatusUnsupportedMediaType`
-* `StatusNotAcceptable`
-* `StatusBadRequest`
-* `StatusUnauthorized`
-* `StatusForbidden`
-* `StatusRequestTimeout`
-* `StatusConflict`
-* `StatusPreconditionFailed`
-* `StatusUnprocessableEntity`
-* `StatusInternalServerError`
-* `StatusServiceUnavailable`
+Response Status Kind
+---------------------
 
-TODO: also document API status strings, reasons, and causes
+Kubernetes MAY return the ```Status``` kind from any API endpoint. Clients SHOULD handle these types of objects when appropriate.
+
+A ```Status``` kind MAY be returned by an API when an operation is successful (i.e. when an HTTP 200 status code is returned). In particular, delete APIs return the ```Status``` kind. The success status object simply contains a ```Status``` field set to ```Successs```.
+
+A ```Status``` kind SHOULD be returned by an API when an operation is not successful (i.e. when the server would return a non 2xx HTTP status code). The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning.
+
+**Example:**
+```JSON
+>HTTP Requst:
+POST /api/v1beta1/events/ HTTP/1.1
+Authorization: Basic ...
+
+{empty body}
+
+>HTTP Response:
+HTTP/1.1 500 Internal Server Error
+Server: nginx/1.2.1
+Content-Type: application/json
+Content-Length: 144
+
+{
+  "kind": "Status",
+  "creationTimestamp": null,
+  "apiVersion": "v1beta1",
+  "status": "Failure",
+  "message": "empty input",
+  "code": 500
+}
+```
+
+```status``` field contains one of two possible values:
+* `Success`
+* `Failure`
+
+`message` may contain human-readable description of the error
+
+```reason``` may contain a machine-readable description of why this operation is in the `Failure` status. If this value is empty there is no information available. The `reason` clarifies an HTTP status code but does not override it.
+
+```details``` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
+
+Possible values for the ```reason``` and ```details``` fields:
+* `Forbidden`
+  * Indicates that the server can be reached and understood the request, but refuses to take any further action, because it is configured to deny access for some reason to the requested resource by the client.
+  * Details (optional):
+    * `kind string`
+      * The kind attribute of the forbidden resource (on some operations may differ from the requested resource).
+    * `id   string`
+      * The identifier of the forbidden resource.
+	 * HTTP status code: `403 StatusForbidden`
+* `NotFound`
+  * Indicates that one or more resources required for this operation could not be found.
+  * Details (optional):
+    * `kind string`
+      * The kind attribute of the missing resource (on some operations may differ from the requested resource).
+    * `id   string`
+      * The identifier of the missing resource.
+  * HTTP status code: `404 StatusNotFound`
+* `AlreadyExists`
+  * Indicates that the resource you are creating already exists.
+  * Details (optional):
+    * `kind string`
+      * The kind attribute of the conflicting resource.
+    * `id   string`
+      * The identifier of the conflicting resource.
+  * HTTP status code: `409 StatusConflict`
+* `Conflict`
+  * Indicates that the requested update operation cannot be completed due to a conflict. The client may need to alter the request. Each resource may define custom details that indicate the nature of the conflict.
+  * HTTP status code: `409 StatusConflict`
+* `Invalid`
+  * Indicates that the requested create or update operation cannot be completed due to invalid data provided as part of the request.
+  * Details (optional):
+    * `kind string`
+      * the kind attribute of the invalid resource
+    * `id   string`
+      * the identifier of the invalid resource
+    * `causes`
+      * One or more `StatusCause` entries indicating the data in the provided resource that was invalid. The `reason`, `message`, and `field` attributes will be set.
+  * HTTP status code: `422 StatusUnprocessableEntity`
+* `ServerTimeout`
+  * Indicates that the server can be reached and understood the request, but cannot complete the action in a reasonable time. This maybe due to temporary server load or a transient communication issue with another server.
+    * Details (optional):
+      * `kind string`
+        * The kind attribute of the resource being acted on.
+      * `id   string`
+        * The operation that is being attempted.
+  * Http status code: `500 StatusInternalServerError`
+* `Timeout`
+  * Indicates that the request could not be completed within the given time. Clients can get this response ONLY when they specified a timeout param in the request. The request might succeed with an increased value of timeout param.
+  * Http status code: `504 StatusServerTimeout`
+* `BadRequest`
+  * Indicates that the request itself was invalid, because the request doesn't make any sense, for example deleting a read-only object.
+  * This is different than `status reason` `Invalid` above which indicates that the API call could possibly succeed, but the data was invalid.
+  * API calls that return BadRequest can never succeed.
+  * Http status code: `400 StatusBadRequest`
+* `MethodNotAllowed`
+  * Indicates that that the action the client attempted to perform on the resource was not supported by the code.
+  * For instance, attempting to delete a resource that can only be created.
+  * API calls that return MethodNotAllowed can never succeed.
+  * Http status code: `405 StatusMethodNotAllowed`
+* `InternalError`
+  * Indicates that an internal error occurred, it is unexpected and the outcome of the call is unknown.
+  * Details (optional):
+    * `causes`
+      * The original error.
+  * Http status code: `500 StatusInternalServerError`
+
+`code` may contain the suggested HTTP return code for this status.
+
 
 Events
 ------
@@ -281,4 +416,5 @@ API Documentation
 -----------------
 
 API documentation can be found at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+
 
