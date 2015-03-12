@@ -130,6 +130,8 @@ do
     item="$name=http://$i:2380"
     if [ "$ii" == 1 ]; then 
         cluster=$item
+        #record the masterIP for later use.
+        masterIP=$i
     else
         cluster="$cluster,$item"
         if [ "$ii" -gt 2 ]; then
@@ -162,6 +164,8 @@ while true; do
             configEtcd $etcdName $myIP $cluster
             # For minion set MINION IP in default_scripts/kubelet
             sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
+            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kubelet         
+            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kube-proxy        
             
             # For master set MINION IPs in kube-controller-manager
 	        minionIPs="$minionIPs,$myIP"
