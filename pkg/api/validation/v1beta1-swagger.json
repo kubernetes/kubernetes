@@ -943,11 +943,9 @@
     "properties": {
      "command": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "string"
        }
-      ]
      },
      "cpu": {
       "type": "integer",
@@ -955,11 +953,9 @@
      },
      "env": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.EnvVar"
        }
-      ]
      },
      "image": {
       "type": "string"
@@ -982,11 +978,9 @@
      },
      "ports": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Port"
        }
-      ]
      },
      "privileged": {
       "type": "boolean"
@@ -996,11 +990,9 @@
      },
      "volumeMounts": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.VolumeMount"
        }
-      ]
      },
      "workingDir": {
       "type": "string"
@@ -1018,11 +1010,9 @@
     "properties": {
      "containers": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Container"
        }
-      ]
      },
      "id": {
       "type": "string"
@@ -1038,11 +1028,9 @@
      },
      "volumes": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Volume"
        }
-      ]
      }
     }
    },
@@ -1075,11 +1063,9 @@
      },
      "endpoints": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "string"
        }
-      ]
      },
      "id": {
       "type": "string"
@@ -1130,11 +1116,9 @@
      },
      "items": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Endpoints"
        }
-      ]
      },
      "kind": {
       "type": "string"
@@ -1260,11 +1244,9 @@
      },
      "items": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Event"
        }
-      ]
      },
      "kind": {
       "type": "string"
@@ -1288,11 +1270,9 @@
     "properties": {
      "command": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "string"
        }
-      ]
      }
     }
    },
@@ -1482,22 +1462,18 @@
      },
      "items": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Minion"
        }
-      ]
      },
      "kind": {
       "type": "string"
      },
      "minions": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Minion"
        }
-      ]
      },
      "namespace": {
       "type": "string"
@@ -1639,11 +1615,9 @@
      },
      "items": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Pod"
        }
-      ]
      },
      "kind": {
       "type": "string"
@@ -1813,11 +1787,9 @@
      },
      "items": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.ReplicationController"
        }
-      ]
      },
      "kind": {
       "type": "string"
@@ -1942,11 +1914,9 @@
      },
      "publicIPs": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "string"
        }
-      ]
      },
      "resourceVersion": {
       "type": "uint64"
@@ -1999,11 +1969,9 @@
      },
      "items": {
       "type": "array",
-      "items": [
-       {
+      "items": {
         "$ref": "v1beta1.Service"
        }
-      ]
      },
      "kind": {
       "type": "string"
