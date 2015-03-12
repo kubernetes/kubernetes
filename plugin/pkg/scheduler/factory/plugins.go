@@ -28,12 +28,26 @@ import (
 	"github.com/golang/glog"
 )
 
+// PluginFactoryArgs are passed to all plugin factory functions.
+type PluginFactoryArgs struct {
+	algorithm.PodLister
+	algorithm.ServiceLister
+	NodeLister algorithm.MinionLister
+	NodeInfo   algorithm.NodeInfo
+}
+
+// A FitPredicateFactory produces a FitPredicate from the given args.
+type FitPredicateFactory func(PluginFactoryArgs) algorithm.FitPredicate
+
+// A PriorityFunctionFactory produces a PriorityConfig from the given args.
+type PriorityConfigFactory func(PluginFactoryArgs) algorithm.PriorityConfig
+
 var (
 	schedulerFactoryMutex sync.Mutex
 
 	// maps that hold registered algorithm types
-	fitPredicateMap      = make(map[string]algorithm.FitPredicate)
-	priorityFunctionMap  = make(map[string]algorithm.PriorityConfig)
+	fitPredicateMap      = make(map[string]FitPredicateFactory)
+	priorityFunctionMap  = make(map[string]PriorityConfigFactory)
 	algorithmProviderMap = make(map[string]AlgorithmProviderConfig)
 )
 
@@ -46,20 +60,26 @@ type AlgorithmProviderConfig struct {
 	PriorityFunctionKeys util.StringSet
 }
 
-// Registers a fit predicate with the algorithm registry. Returns the name,
-// with which the predicate was registered.
+// RegisterFitPredicate registers a fit predicate with the algorithm
+// registry. Returns the name with which the predicate was registered.
 func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string {
+	return RegisterFitPredicateFactory(name, func(PluginFactoryArgs) algorithm.FitPredicate { return predicate })
+}
+
+// RegisterFitPredicateFactory registers a fit predicate factory with the
+// algorithm registry. Returns the name with which the predicate was registered.
+func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFactory) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	fitPredicateMap[name] = predicate
+	fitPredicateMap[name] = predicateFactory
 	return name
 }
 
 // Registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
 func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
-	var predicate algorithm.FitPredicate
+	var predicateFactory FitPredicateFactory
 	var ok bool
 
 	validatePredicateOrDie(policy)
@@ -67,20 +87,33 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	// generate the predicate function, if a custom type is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAffinity != nil {
-			predicate = algorithm.NewServiceAffinityPredicate(PodLister, ServiceLister, MinionLister, policy.Argument.ServiceAffinity.Labels)
+			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
+				return algorithm.NewServiceAffinityPredicate(
+					args.PodLister,
+					args.ServiceLister,
+					args.NodeInfo,
+					policy.Argument.ServiceAffinity.Labels,
+				)
+			}
 		} else if policy.Argument.LabelsPresence != nil {
-			predicate = algorithm.NewNodeLabelPredicate(MinionLister, policy.Argument.LabelsPresence.Labels, policy.Argument.LabelsPresence.Presence)
+			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
+				return algorithm.NewNodeLabelPredicate(
+					args.NodeInfo,
+					policy.Argument.LabelsPresence.Labels,
+					policy.Argument.LabelsPresence.Presence,
+				)
+			}
 		}
-	} else if predicate, ok = fitPredicateMap[policy.Name]; ok {
+	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
 		glog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
 	}
 
-	if predicate == nil {
+	if predicateFactory == nil {
 		glog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
 	}
 
-	return RegisterFitPredicate(policy.Name, predicate)
+	return RegisterFitPredicateFactory(policy.Name, predicateFactory)
 }
 
 // This check is useful for testing providers.
@@ -94,37 +127,59 @@ func IsFitPredicateRegistered(name string) bool {
 // Registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
+	return RegisterPriorityConfigFactory(name, func(PluginFactoryArgs) algorithm.PriorityConfig {
+		return algorithm.PriorityConfig{Function: function, Weight: weight}
+	})
+}
+
+func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	priorityFunctionMap[name] = algorithm.PriorityConfig{Function: function, Weight: weight}
+	priorityFunctionMap[name] = pcf
 	return name
 }
 
 // Registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
 func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
-	var priority algorithm.PriorityFunction
+	var pcf PriorityConfigFactory
 
 	validatePriorityOrDie(policy)
 
 	// generate the priority function, if a custom priority is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAntiAffinity != nil {
-			priority = algorithm.NewServiceAntiAffinityPriority(ServiceLister, policy.Argument.ServiceAntiAffinity.Label)
+			pcf = func(args PluginFactoryArgs) algorithm.PriorityConfig {
+				return algorithm.PriorityConfig{
+					Function: algorithm.NewServiceAntiAffinityPriority(
+						args.ServiceLister,
+						policy.Argument.ServiceAntiAffinity.Label,
+					),
+					Weight: policy.Weight,
+				}
+			}
 		} else if policy.Argument.LabelPreference != nil {
-			priority = algorithm.NewNodeLabelPriority(policy.Argument.LabelPreference.Label, policy.Argument.LabelPreference.Presence)
+			pcf = func(args PluginFactoryArgs) algorithm.PriorityConfig {
+				return algorithm.PriorityConfig{
+					Function: algorithm.NewNodeLabelPriority(
+						policy.Argument.LabelPreference.Label,
+						policy.Argument.LabelPreference.Presence,
+					),
+					Weight: policy.Weight,
+				}
+			}
 		}
-	} else if priorityConfig, ok := priorityFunctionMap[policy.Name]; ok {
+	} else if _, ok := priorityFunctionMap[policy.Name]; ok {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
-		priority = priorityConfig.Function
+		return policy.Name
 	}
 
-	if priority == nil {
+	if pcf == nil {
 		glog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
 	}
 
-	return RegisterPriorityFunction(policy.Name, priority, policy.Weight)
+	return RegisterPriorityConfigFactory(policy.Name, pcf)
 }
 
 // This check is useful for testing providers.
@@ -133,19 +188,6 @@ func IsPriorityFunctionRegistered(name string) bool {
 	defer schedulerFactoryMutex.Unlock()
 	_, ok := priorityFunctionMap[name]
 	return ok
-}
-
-// Sets the weight of an already registered priority function.
-func SetPriorityFunctionWeight(name string, weight int) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-	config, ok := priorityFunctionMap[name]
-	if !ok {
-		glog.Errorf("Invalid priority name %s specified - no corresponding function found", name)
-		return
-	}
-	config.Weight = weight
-	priorityFunctionMap[name] = config
 }
 
 // Registers a new algorithm provider with the algorithm registry. This should
@@ -175,32 +217,32 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(names util.StringSet) (map[string]algorithm.FitPredicate, error) {
+func getFitPredicateFunctions(names util.StringSet, args PluginFactoryArgs) (map[string]algorithm.FitPredicate, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	predicates := map[string]algorithm.FitPredicate{}
 	for _, name := range names.List() {
-		function, ok := fitPredicateMap[name]
+		factory, ok := fitPredicateMap[name]
 		if !ok {
 			return nil, fmt.Errorf("Invalid predicate name %q specified - no corresponding function found", name)
 		}
-		predicates[name] = function
+		predicates[name] = factory(args)
 	}
 	return predicates, nil
 }
 
-func getPriorityFunctionConfigs(names util.StringSet) ([]algorithm.PriorityConfig, error) {
+func getPriorityFunctionConfigs(names util.StringSet, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	configs := []algorithm.PriorityConfig{}
 	for _, name := range names.List() {
-		config, ok := priorityFunctionMap[name]
+		factory, ok := priorityFunctionMap[name]
 		if !ok {
 			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
-		configs = append(configs, config)
+		configs = append(configs, factory(args))
 	}
 	return configs, nil
 }
