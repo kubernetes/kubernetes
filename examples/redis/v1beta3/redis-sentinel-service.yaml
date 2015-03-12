@@ -1,0 +1,12 @@
+apiVersion: v1beta3
+kind: Service
+metadata:
+  labels:
+    name: sentinel
+    role: service
+  name: redis-sentinel
+spec:
+  containerPort: 26379
+  port: 26379
+  selector:
+    redis-sentinel: "true"
