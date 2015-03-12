@@ -59,6 +59,9 @@ type podWorkers struct {
 	containerRuntimeCache container.RuntimeCache
 
 	syncRocketPodFn syncRocketPodFnType
+
+	containerRuntimeChoice string
+
 	// The EventRecorder to use
 	recorder record.EventRecorder
 }
@@ -71,7 +74,8 @@ type workUpdate struct {
 	updateCompleteFn func()
 }
 
-func newPodWorkers(dockerCache dockertools.DockerCache,
+func newPodWorkers(containerRuntimeChoice string,
+	dockerCache dockertools.DockerCache,
 	syncPodFn syncPodFnType,
 	containerRuntimeCache container.RuntimeCache,
 	syncRocketPodFn syncRocketPodFnType,
@@ -84,6 +88,7 @@ func newPodWorkers(dockerCache dockertools.DockerCache,
 		syncPodFn:                 syncPodFn,
 		containerRuntimeCache:     containerRuntimeCache,
 		syncRocketPodFn:           syncRocketPodFn,
+		containerRuntimeChoice:    containerRuntimeChoice,
 		recorder:                  recorder,
 	}
 }
@@ -165,7 +170,11 @@ func (p *podWorkers) UpdatePod(pod *api.BoundPod, updateComplete func()) {
 		p.podUpdates[uid] = podUpdates
 		go func() {
 			defer util.HandleCrash()
-			p.managePodLoop(podUpdates)
+			if p.containerRuntimeChoice == "rocket" {
+				p.manageRocketPodLoop(podUpdates)
+			} else {
+				p.managePodLoop(podUpdates)
+			}
 		}()
 	}
 	if !p.isWorking[pod.UID] {

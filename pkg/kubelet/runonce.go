@@ -61,7 +61,12 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (resul
 	for i := range pods {
 		pod := pods[i] // Make a copy
 		go func() {
-			err := kl.runPod(pod, retryDelay)
+			var err error
+			if kl.containerRuntimeChoice == "rocket" {
+				err = kl.runRocketPod(pod)
+			} else {
+				err = kl.runPod(pod)
+			}
 			ch <- RunPodResult{&pod, err}
 		}()
 	}

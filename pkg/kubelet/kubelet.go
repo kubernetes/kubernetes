@@ -103,6 +103,7 @@ type volumeMap map[string]volume.Interface
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
 	hostname string,
+	containerRuntimeChoice string,
 	dockerClient dockertools.DockerInterface,
 	kubeClient client.Interface,
 	rootDirectory string,
@@ -131,20 +132,23 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
 	}
 
-	// Wait for the Docker daemon to be up (with a timeout).
-	waitStart := time.Now()
-	dockerUp := false
-	for time.Since(waitStart) < maxWaitForDocker {
-		_, err := dockerClient.Version()
-		if err == nil {
-			dockerUp = true
-			break
-		}
+	// TODO(yifan): Should be put into a separate function for readability.
+	if containerRuntimeChoice == "docker" {
+		// Wait for the Docker daemon to be up (with a timeout).
+		waitStart := time.Now()
+		dockerUp := false
+		for time.Since(waitStart) < maxWaitForDocker {
+			_, err := dockerClient.Version()
+			if err == nil {
+				dockerUp = true
+				break
+			}
 
-		time.Sleep(100 * time.Millisecond)
-	}
-	if !dockerUp {
-		return nil, fmt.Errorf("timed out waiting for Docker to come up")
+			time.Sleep(100 * time.Millisecond)
+		}
+		if !dockerUp {
+			return nil, fmt.Errorf("timed out waiting for Docker to come up")
+		}
 	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -166,6 +170,7 @@ func NewMainKubelet(
 	dockerClient = metrics.NewInstrumentedDockerInterface(dockerClient)
 	klet := &Kubelet{
 		hostname:                       hostname,
+		containerRuntimeChoice:         containerRuntimeChoice,
 		dockerClient:                   dockerClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
@@ -208,7 +213,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.dockerCache = dockerCache
-	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod, containerRuntimeCache, klet.syncRocketPod, recorder)
+	klet.podWorkers = newPodWorkers(klet.containerRuntimeChoice, dockerCache, klet.syncPod, containerRuntimeCache, klet.syncRocketPod, recorder)
 
 	metrics.Register(dockerCache)
 
@@ -235,6 +240,7 @@ type serviceLister interface {
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname               string
+	containerRuntimeChoice string
 	containerRuntime       container.Runtime
 	containerRuntimeCache  container.RuntimeCache
 	dockerClient           dockertools.DockerInterface
@@ -1514,6 +1520,9 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
+	if kl.containerRuntimeChoice == "rocket" {
+		return kl.SyncRocketPods(allPods, podSyncTypes, start)
+	}
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -1721,12 +1730,20 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 		}
 
-		pods, err := kl.GetBoundPods()
+		var pods []api.BoundPod
+		var err error
+		pods, err = kl.GetBoundPods()
 		if err != nil {
 			glog.Errorf("Failed to get bound pods.")
 			return
 		}
-		if err := handler.SyncPods(pods, podSyncTypes, start); err != nil {
+		if kl.containerRuntimeChoice == "docker" {
+			err = handler.SyncDockerPods(pods, podSyncTypes, start)
+		} else {
+			err = handler.SyncPods(pods, podSyncTypes, start)
+		}
+
+		if err != nil {
 			glog.Errorf("Couldn't sync containers: %v", err)
 		}
 	}
@@ -2190,7 +2207,6 @@ func (kl *Kubelet) SyncRocketPods(allPods []api.BoundPod, podSyncTypes map[types
 	}
 
 	glog.V(4).Infof("Desired: %#v", pods)
-	var err error
 	desiredPods := make(map[types.UID]empty)
 
 	runningPods, err := kl.containerRuntimeCache.ListPods()
