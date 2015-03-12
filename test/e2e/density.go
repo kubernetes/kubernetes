@@ -187,8 +187,14 @@ var _ = PDescribe("Density", func() {
 	})
 
 	AfterEach(func() {
-		// Remove any remaining pods from this test
-		DeleteRC(c, ns, RCName)
+		// Remove any remaining pods from this test if the
+		// replication controller still exists and the replica count
+		// isn't 0.  This means the controller wasn't cleaned up
+		// during the test so clean it up here
+		rc, err := c.ReplicationControllers(ns).Get(RCName)
+		if err == nil && rc.Spec.Replicas != 0 {
+			DeleteRC(c, ns, RCName)
+		}
 	})
 
 	It("should allow starting 100 pods per node", func() {
