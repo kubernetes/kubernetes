@@ -8,6 +8,9 @@ write_files:
     #! /usr/bin/bash
     until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
 coreos:
+  fleet:
+    etcd-servers: http://localhost:4001
+    metadata: "role=master"
   units:
     - name: setup-network-environment.service
       command: start
@@ -48,27 +51,8 @@ coreos:
         --snapshot true
         Restart=always
         RestartSec=10s
-    - name: fleet.socket
-      command: start
-      content: |
-        [Socket]
-        ListenStream=/var/run/fleet.sock
     - name: fleet.service
       command: start
-      content: |
-        [Unit]
-        Description=fleet daemon
-        Wants=etcd.service
-        After=etcd.service
-        Wants=fleet.socket
-        After=fleet.socket
-
-        [Service]
-        Environment="FLEET_ETCD_SERVERS=http://127.0.0.1:4001"
-        Environment="FLEET_METADATA=role=master"
-        ExecStart=/usr/bin/fleetd
-        Restart=always
-        RestartSec=10s
     - name: etcd-waiter.service
       command: start
       content: |
@@ -159,7 +143,7 @@ coreos:
         --logtostderr=true
         Restart=always
         RestartSec=10
-    - name: kube-controller-manager.service 
+    - name: kube-controller-manager.service
       command: start
       content: |
         [Unit]

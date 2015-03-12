@@ -1,23 +1,14 @@
 #cloud-config
 
 coreos:
+  fleet:
+    etcd-servers: http://<master-private-ip>:4001
+    metadata: "role=node"
   units:
     - name: etcd.service
       mask: true
     - name: fleet.service
       command: start
-      content: |
-        [Unit]
-        Description=fleet daemon
-        Wants=fleet.socket
-        After=fleet.socket
-
-        [Service]
-        Environment="FLEET_ETCD_SERVERS=http://<master-private-ip>:4001"
-        Environment="FLEET_METADATA=role=node"
-        ExecStart=/usr/bin/fleetd
-        Restart=always
-        RestartSec=10s
     - name: flannel.service
       command: start
       content: |
