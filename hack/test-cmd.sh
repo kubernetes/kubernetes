@@ -69,7 +69,6 @@ kube::log::status "Starting kubelet in masterful mode"
   --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
   --docker_endpoint="fake://" \
-  --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
