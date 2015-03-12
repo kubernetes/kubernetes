@@ -250,6 +250,7 @@ var _ = Describe("Pods", func() {
 		pod.Labels["time"] = value
 		pod.ResourceVersion = podOut.ResourceVersion
 		pod.UID = podOut.UID
+		pod.Spec.Host = podOut.Spec.Host
 		pod, err = podClient.Update(pod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to update pod: %v", err))
