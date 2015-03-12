@@ -45,10 +45,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
+	namespaceetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
@@ -159,7 +159,7 @@ type Master struct {
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
 	nodeRegistry      minion.Registry
-	namespaceRegistry generic.Registry
+	namespaceRegistry namespace.Registry
 	serviceRegistry   service.Registry
 	endpointRegistry  endpoint.Registry
 
@@ -379,7 +379,9 @@ func (m *Master) init(c *Config) {
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
-	m.namespaceRegistry = namespace.NewEtcdRegistry(c.EtcdHelper)
+
+	namespaceStorage := namespaceetcd.NewREST(c.EtcdHelper)
+	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
 	// TODO: split me up into distinct storage registries
 	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry)
@@ -421,7 +423,7 @@ func (m *Master) init(c *Config) {
 		"limitRanges":           limitrange.NewREST(limitRangeRegistry),
 		"resourceQuotas":        resourceQuotaStorage,
 		"resourceQuotas/status": resourceQuotaStatusStorage,
-		"namespaces":            namespace.NewREST(m.namespaceRegistry),
+		"namespaces":            namespaceStorage,
 		"secrets":               secret.NewREST(secretRegistry),
 	}
 

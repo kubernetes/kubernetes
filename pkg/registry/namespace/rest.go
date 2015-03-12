@@ -20,108 +20,81 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// REST provides the RESTStorage access patterns to work with Namespace objects.
-type REST struct {
-	registry generic.Registry
+// namespaceStrategy implements behavior for Namespaces
+type namespaceStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
 }
 
-// NewREST returns a new REST. You must use a registry created by
-// NewEtcdRegistry unless you're testing.
-func NewREST(registry generic.Registry) *REST {
-	return &REST{
-		registry: registry,
-	}
+// Strategy is the default logic that applies when creating and updating Namespace
+// objects via the REST API.
+var Strategy = namespaceStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for namespaces.
+func (namespaceStrategy) NamespaceScoped() bool {
+	return false
 }
 
-// Create creates a Namespace object
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
 	namespace := obj.(*api.Namespace)
-	if err := rest.BeforeCreate(rest.Namespaces, ctx, obj); err != nil {
-		return nil, err
+	namespace.Status = api.NamespaceStatus{
+		Phase: api.NamespaceActive,
 	}
-	if err := rs.registry.CreateWithName(ctx, namespace.Name, namespace); err != nil {
-		err = rest.CheckGeneratedNameError(rest.Namespaces, err, namespace)
-		return nil, err
-	}
-	return rs.registry.Get(ctx, namespace.Name)
 }
 
-// Update updates a Namespace object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	namespace, ok := obj.(*api.Namespace)
-	if !ok {
-		return nil, false, fmt.Errorf("not a namespace: %#v", obj)
-	}
-
-	oldObj, err := rs.registry.Get(ctx, namespace.Name)
-	if err != nil {
-		return nil, false, err
-	}
-
-	oldNamespace := oldObj.(*api.Namespace)
-	if errs := validation.ValidateNamespaceUpdate(oldNamespace, namespace); len(errs) > 0 {
-		return nil, false, kerrors.NewInvalid("namespace", namespace.Name, errs)
-	}
-
-	if err := rs.registry.UpdateWithName(ctx, oldNamespace.Name, oldNamespace); err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.Get(ctx, oldNamespace.Name)
-	return out, false, err
+// Validate validates a new namespace.
+func (namespaceStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	namespace := obj.(*api.Namespace)
+	return validation.ValidateNamespace(namespace)
 }
 
-// Delete deletes the Namespace with the specified name
-func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
+// AllowCreateOnUpdate is false for namespaces.
+func (namespaceStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+// ValidateUpdate is the default update validation for an end user.
+func (namespaceStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+}
+
+type namespaceStatusStrategy struct {
+	namespaceStrategy
+}
+
+var StatusStrategy = namespaceStatusStrategy{Strategy}
+
+func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	// TODO: merge valid fields after update
+	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+}
+
+// MatchNamespace returns a generic matcher for a given label and field selector.
+func MatchNamespace(label labels.Selector, field fields.Selector) generic.Matcher {
+	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
+		namespaceObj, ok := obj.(*api.Namespace)
+		if !ok {
+			return false, fmt.Errorf("not a namespace")
+		}
+		fields := NamespaceToSelectableFields(namespaceObj)
+		return label.Matches(labels.Set(namespaceObj.Labels)) && field.Matches(fields), nil
+	})
+}
+
+// NamespaceToSelectableFields returns a label set that represents the object
+// TODO: fields are not labels, and the validation rules for them do not apply.
+func NamespaceToSelectableFields(namespace *api.Namespace) labels.Set {
+	return labels.Set{
+		"name":         namespace.Name,
+		"status.phase": string(namespace.Status.Phase),
 	}
-	_, ok := obj.(*api.Namespace)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return rs.registry.Delete(ctx, name)
-}
-
-func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	namespace, ok := obj.(*api.Namespace)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return namespace, err
-}
-
-func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	return labels.Set{}, fields.Set{}, nil
-}
-
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
-}
-
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
-}
-
-// New returns a new api.Namespace
-func (*REST) New() runtime.Object {
-	return &api.Namespace{}
-}
-
-func (*REST) NewList() runtime.Object {
-	return &api.NamespaceList{}
 }

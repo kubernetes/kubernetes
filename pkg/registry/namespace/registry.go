@@ -18,31 +18,83 @@ package namespace
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// registry implements custom changes to generic.Etcd for Namespace storage
-type registry struct {
-	*etcdgeneric.Etcd
+// Registry is an interface implemented by things that know how to store Namespace objects.
+type Registry interface {
+	// ListNamespaces obtains a list of namespaces having labels which match selector.
+	ListNamespaces(ctx api.Context, selector labels.Selector) (*api.NamespaceList, error)
+	// Watch for new/changed/deleted namespaces
+	WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	// Get a specific namespace
+	GetNamespace(ctx api.Context, namespaceID string) (*api.Namespace, error)
+	// Create a namespace based on a specification.
+	CreateNamespace(ctx api.Context, namespace *api.Namespace) error
+	// Update an existing namespace
+	UpdateNamespace(ctx api.Context, namespace *api.Namespace) error
+	// Delete an existing namespace
+	DeleteNamespace(ctx api.Context, namespaceID string) error
 }
 
-// NewEtcdRegistry returns a registry which will store Namespace objects in the given EtcdHelper.
-func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
-	return registry{
-		Etcd: &etcdgeneric.Etcd{
-			NewFunc:      func() runtime.Object { return &api.Namespace{} },
-			NewListFunc:  func() runtime.Object { return &api.NamespaceList{} },
-			EndpointName: "namespaces",
-			KeyRootFunc: func(ctx api.Context) string {
-				return "/registry/namespaces"
-			},
-			KeyFunc: func(ctx api.Context, id string) (string, error) {
-				return "/registry/namespaces/" + id, nil
-			},
-			Helper: h,
-		},
+// Storage is an interface for a standard REST Storage backend
+// TODO: move me somewhere common
+type Storage interface {
+	apiserver.RESTDeleter
+	apiserver.RESTLister
+	apiserver.RESTGetter
+	apiserver.ResourceWatcher
+
+	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
+	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
+}
+
+// storage puts strong typing around storage calls
+type storage struct {
+	Storage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s Storage) Registry {
+	return &storage{s}
+}
+
+func (s *storage) ListNamespaces(ctx api.Context, label labels.Selector) (*api.NamespaceList, error) {
+	obj, err := s.List(ctx, label, fields.Everything())
+	if err != nil {
+		return nil, err
 	}
+	return obj.(*api.NamespaceList), nil
+}
+
+func (s *storage) WatchNamespaces(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return s.Watch(ctx, label, field, resourceVersion)
+}
+
+func (s *storage) GetNamespace(ctx api.Context, namespaceName string) (*api.Namespace, error) {
+	obj, err := s.Get(ctx, namespaceName)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Namespace), nil
+}
+
+func (s *storage) CreateNamespace(ctx api.Context, namespace *api.Namespace) error {
+	_, err := s.Create(ctx, namespace)
+	return err
+}
+
+func (s *storage) UpdateNamespace(ctx api.Context, namespace *api.Namespace) error {
+	_, _, err := s.Update(ctx, namespace)
+	return err
+}
+
+func (s *storage) DeleteNamespace(ctx api.Context, namespaceID string) error {
+	_, err := s.Delete(ctx, namespaceID)
+	return err
 }
