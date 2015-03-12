@@ -378,6 +378,48 @@ func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
 	return nil, nil
 }
 
+func flagsSet(flags net.Flags, test net.Flags) bool {
+	return flags&test != 0
+}
+
+func flagsClear(flags net.Flags, test net.Flags) bool {
+	return flags&test == 0
+}
+
+func chooseHostInterfaceNativeGo() (net.IP, error) {
+	intfs, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	i := 0
+	for i = range intfs {
+		if flagsSet(intfs[i].Flags, net.FlagUp) && flagsClear(intfs[i].Flags, net.FlagLoopback|net.FlagPointToPoint) {
+			addrs, err := intfs[i].Addrs()
+			if err != nil {
+				return nil, err
+			}
+			if len(addrs) > 0 {
+				// This interface should suffice.
+				break
+			}
+		}
+	}
+	if i == len(intfs) {
+		return nil, err
+	}
+	glog.V(2).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
+	addrs, err := intfs[i].Addrs()
+	if err != nil {
+		return nil, err
+	}
+	glog.V(2).Infof("Interface %s = %s", intfs[i].Name, addrs[0].String())
+	ip, _, err := net.ParseCIDR(addrs[0].String())
+	if err != nil {
+		return nil, err
+	}
+	return ip, nil
+}
+
 //ChooseHostInterface is a method used fetch an IP for a daemon.
 //It uses data from /proc/net/route file.
 //For a node with no internet connection ,it returns error
@@ -385,6 +427,9 @@ func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
 func ChooseHostInterface() (net.IP, error) {
 	inFile, err := os.Open("/proc/net/route")
 	if err != nil {
+		if os.IsNotExist(err) {
+			return chooseHostInterfaceNativeGo()
+		}
 		return nil, err
 	}
 	defer inFile.Close()
