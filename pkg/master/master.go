@@ -519,11 +519,18 @@ func (m *Master) init(c *Config) {
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (m *Master) InstallSwaggerAPI() {
+	webServicesUrl := ""
+	// Use the secure read write port, if available.
+	if m.publicReadWritePort != 0 {
+		webServicesUrl = "https://" + net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadWritePort))
+	} else {
+		// Use the read only port.
+		webServicesUrl = "http://" + net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadOnlyPort))
+	}
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
-		WebServicesUrl: net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadWritePort)),
-		WebServices:    m.handlerContainer.RegisteredWebServices(),
-		// TODO: Parameterize the path?
+		WebServicesUrl:  webServicesUrl,
+		WebServices:     m.handlerContainer.RegisteredWebServices(),
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
