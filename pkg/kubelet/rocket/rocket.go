@@ -173,7 +173,7 @@ func (r *Runtime) ListPods() ([]*api.Pod, error) {
 func (r *Runtime) RunPod(pod *api.BoundPod, volumeMap map[string]volume.Interface) error {
 	glog.V(4).Infof("Rocket starts to run pod: name %q.", pod.Name)
 
-	name, needReload, err := r.preparePod(pod)
+	name, needReload, err := r.preparePod(pod, volumeMap)
 	if err != nil {
 		return err
 	}
@@ -390,8 +390,16 @@ func makePodServiceFileName(podName, podNamespace string) string {
 // preparePod creates the unit file and save it under systemdUnitDir.
 // On success, it will return a string that represents name of the unit file
 // and a boolean that indicates if the unit file needs reload.
-func (r *Runtime) preparePod(pod *api.BoundPod) (string, bool, error) {
+func (r *Runtime) preparePod(pod *api.BoundPod, volumeMap map[string]volume.Interface) (string, bool, error) {
 	cmds := []string{"prepare", "--quiet"}
+
+	// Construct the '--volume' cmd line.
+	for name, mount := range volumeMap {
+		cmds = append(cmds, "--volume")
+		cmds = append(cmds, fmt.Sprintf("%s,kind=host,source=%s", name, mount.GetPath()))
+	}
+
+	// Append ACIs.
 	for _, c := range pod.Spec.Containers {
 		cmds = append(cmds, c.Image)
 	}
