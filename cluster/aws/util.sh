@@ -166,8 +166,6 @@ function upload-server-tars() {
     aws s3 mb "s3://${staging_bucket}"
   fi
 
-  aws s3api put-bucket-acl --bucket $staging_bucket --acl public-read
-
   local -r staging_path="${staging_bucket}/devel"
 
   echo "+++ Staging server tars to S3 Storage: ${staging_path}"
