@@ -194,7 +194,6 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 func PatchResource(r RESTPatcher, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
-		glog.Infof("hi")
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))

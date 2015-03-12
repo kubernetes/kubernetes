@@ -154,7 +154,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {
 			pod := f.PodQueue.Pop().(*api.Pod)
-			glog.V(2).Infof("glog.v2 --> About to try and schedule pod %v", pod.Name)
+			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
 			return pod
 		},
 		Error:    f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
@@ -259,7 +259,7 @@ func getHostFieldLabel(apiVersion string) string {
 	case "v1beta1", "v1beta2":
 		return "DesiredState.Host"
 	default:
-		return "status.host"
+		return "spec.host"
 	}
 }
 

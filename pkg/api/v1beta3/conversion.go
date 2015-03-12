@@ -31,7 +31,7 @@ func init() {
 				fallthrough
 			case "status.phase":
 				fallthrough
-			case "status.host":
+			case "spec.host":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
