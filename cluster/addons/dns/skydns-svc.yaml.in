@@ -8,6 +8,7 @@ portalIP: {{ pillar['dns_server'] }}
 containerPort: 53
 labels:
   k8s-app: kube-dns
+  name: kube-dns
   kubernetes.io/cluster-service: "true"
 selector:
   k8s-app: kube-dns
