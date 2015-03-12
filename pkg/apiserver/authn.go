@@ -19,7 +19,12 @@ package apiserver
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/gssapi/gssproxy"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/password/saslauthd"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/negotiate"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
+	"strings"
 )
 
 // NewAuthenticatorFromTokenFile returns an authenticator.Request or an error
@@ -32,5 +37,38 @@ func NewAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 		}
 		authenticator = bearertoken.New(tokenAuthenticator)
 	}
+	return authenticator, nil
+}
+
+// NewSaslauthd returns an authenticator.Request or an error
+func NewAuthenticatorSaslauthd(arg string) (authenticator.Request, error) {
+	var authenticator authenticator.Request
+	var defaultRealm, socketPath, serviceName string
+	params := strings.Split(arg, ",")
+	if len(params) > 0 {
+		defaultRealm = params[0]
+		if len(params) > 1 {
+			socketPath = params[1]
+			if len(params) > 2 {
+				serviceName = params[2]
+			}
+		}
+	}
+	sAuthenticator, err := saslauthd.NewSaslAuthd(defaultRealm, socketPath, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	authenticator = basicauth.New(sAuthenticator)
+	return authenticator, nil
+}
+
+// NewAuthenticatorGssProxy returns an authenticator.Request or an error
+func NewAuthenticatorGssProxy(socketPath string) (authenticator.Request, error) {
+	var authenticator authenticator.Request
+	pAuthenticator, err := gssproxy.NewGssProxy(socketPath, gssproxy.DefaultUserInfo)
+	if err != nil {
+		return nil, err
+	}
+	authenticator = negotiate.New(pAuthenticator)
 	return authenticator, nil
 }

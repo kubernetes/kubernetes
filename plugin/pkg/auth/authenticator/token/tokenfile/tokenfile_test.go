@@ -58,7 +58,7 @@ token2,user2,uid2
 		},
 	}
 	for i, testCase := range testCases {
-		user, ok, err := auth.AuthenticateToken(testCase.Token)
+		user, _, ok, err := auth.AuthenticateToken(testCase.Token)
 		if testCase.User == nil {
 			if user != nil {
 				t.Errorf("%d: unexpected non-nil user %#v", i, user)

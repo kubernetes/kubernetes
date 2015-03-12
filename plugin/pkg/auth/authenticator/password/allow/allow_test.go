@@ -20,7 +20,7 @@ import "testing"
 
 func TestAllowEmpty(t *testing.T) {
 	allow := NewAllow()
-	user, ok, err := allow.AuthenticatePassword("", "")
+	user, _, ok, err := allow.AuthenticatePassword("", "")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestAllowEmpty(t *testing.T) {
 
 func TestAllowPresent(t *testing.T) {
 	allow := NewAllow()
-	user, ok, err := allow.AuthenticatePassword("myuser", "")
+	user, _, ok, err := allow.AuthenticatePassword("myuser", "")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

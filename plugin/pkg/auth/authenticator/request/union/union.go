@@ -34,19 +34,25 @@ func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
 
 // AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.  The first
 // success returns that identity.  Errors are only returned if no matches are found.
-func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error) {
 	var errlist []error
+	headerlist := http.Header{}
 	for _, currAuthRequestHandler := range authHandler {
-		info, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
+		info, headers, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
+		for key, valset := range headers {
+			for _, val := range valset {
+				headerlist.Add(key, val)
+			}
+		}
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
 		}
 
 		if ok {
-			return info, true, nil
+			return info, headers, true, nil
 		}
 	}
 
-	return nil, false, errors.NewAggregate(errlist)
+	return nil, headerlist, false, errors.NewAggregate(errlist)
 }

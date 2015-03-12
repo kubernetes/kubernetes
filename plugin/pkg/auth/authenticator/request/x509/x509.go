@@ -50,9 +50,9 @@ func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error) {
 	if req.TLS == nil {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	var errlist []error
@@ -71,11 +71,11 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 			}
 
 			if ok {
-				return user, ok, err
+				return user, nil, ok, err
 			}
 		}
 	}
-	return nil, false, errors.NewAggregate(errlist)
+	return nil, nil, false, errors.NewAggregate(errlist)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

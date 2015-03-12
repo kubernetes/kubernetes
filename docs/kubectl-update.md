@@ -44,6 +44,7 @@ $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState":
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+      --gssproxy="": Path to gssproxy socket to use for Negotiate authentication.
   -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.

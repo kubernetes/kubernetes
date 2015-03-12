@@ -136,6 +136,9 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 	if len(authInfo.Username) != 0 || len(authInfo.Password) != 0 {
 		methods = append(methods, "basicAuth")
 	}
+	if len(authInfo.GssProxy) != 0 {
+		methods = append(methods, "gssProxy")
+	}
 	if len(authInfo.AuthPath) != 0 {
 		usingAuthPath = true
 		methods = append(methods, "authFile")

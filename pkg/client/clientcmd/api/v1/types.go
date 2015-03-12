@@ -81,6 +81,8 @@ type AuthInfo struct {
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	Password string `json:"password,omitempty"`
+	// GssProxy is the location of a gssproxy socket that we'll use to generate Negotiate headers
+	GssProxy string `json:"gssproxy,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }

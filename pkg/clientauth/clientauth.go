@@ -81,6 +81,7 @@ type Info struct {
 	KeyFile     string
 	BearerToken string
 	Insecure    *bool
+	GssProxy    string
 }
 
 // LoadFromFile parses an Info object from a file path.
@@ -115,11 +116,13 @@ func (info Info) MergeWithConfig(c client.Config) (client.Config, error) {
 	if info.Insecure != nil {
 		config.Insecure = *info.Insecure
 	}
+	config.GssProxy = info.GssProxy
 	return config, nil
 }
 
 func (info Info) Complete() bool {
 	return len(info.User) > 0 ||
 		len(info.CertFile) > 0 ||
-		len(info.BearerToken) > 0
+		len(info.BearerToken) > 0 ||
+		len(info.GssProxy) > 0
 }

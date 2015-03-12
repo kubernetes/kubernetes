@@ -19,9 +19,14 @@ package client
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"errors"
 	"fmt"
+	"github.com/nalind/gss/pkg/gss/proxy"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"strings"
 )
 
 type userAgentRoundTripper struct {
@@ -143,6 +148,118 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 		return fileData, nil
 	}
 	return nil, nil
+}
+
+type negotiateAuthRoundTripper struct {
+	proxyLocation string
+	rt            http.RoundTripper
+}
+
+func NewNegotiateAuthRoundTripper(proxyLocation string, rt http.RoundTripper) (r http.RoundTripper) {
+	r = &negotiateAuthRoundTripper{proxyLocation, rt}
+	return
+}
+
+func (rt *negotiateAuthRoundTripper) RoundTrip(req *http.Request) (r *http.Response, err error) {
+	var conn net.Conn
+	var call proxy.CallCtx
+	var ctx proxy.SecCtx
+	var name proxy.Name
+	var iscr proxy.InitSecContextResults
+	var hostname, negotiate string
+	var token []byte
+
+	req = cloneRequest(req)
+
+	/* Build the target service's name. */
+	if len(req.Host) > 0 {
+		hostname = req.Host
+	} else {
+		hostname = req.URL.Host
+	}
+	colon := strings.Index(hostname, ":")
+	if colon > 0 {
+		name.DisplayName = "HTTP@" + hostname[0:colon]
+	} else {
+		name.DisplayName = "HTTP@" + hostname
+	}
+	name.NameType = proxy.NT_HOSTBASED_SERVICE
+
+	/* Connect to the proxy. */
+	conn, err = net.Dial("unix", rt.proxyLocation)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	gccr, err := proxy.GetCallContext(&conn, &call, nil)
+	if err != nil {
+		return
+	}
+	if gccr.Status.MajorStatus != proxy.S_COMPLETE {
+		err = errors.New("unable to get gss-proxy call context")
+		return
+	}
+
+	/* Get the first token. */
+	iscr, err = proxy.InitSecContext(&conn, &call, &ctx, nil, &name, proxy.MechSPNEGO, proxy.Flags{}, proxy.C_INDEFINITE, nil, nil, nil)
+	if err != nil {
+		return
+	}
+	if iscr.Status.MajorStatus != proxy.S_COMPLETE && iscr.Status.MajorStatus != proxy.S_CONTINUE_NEEDED {
+		err = errors.New(iscr.Status.MajorStatusString + ", " + iscr.Status.MinorStatusString)
+		return
+	}
+	if iscr.OutputToken == nil {
+		err = errors.New("unable to generate authentication header")
+		return
+	}
+	for iscr.OutputToken != nil {
+		/* Send the token. */
+		negotiate = base64.StdEncoding.EncodeToString(*iscr.OutputToken)
+		req.Header.Set("Authorization", fmt.Sprintf("Negotiate %s", negotiate))
+		r, err = rt.rt.RoundTrip(req)
+		if iscr.Status.MajorStatus != proxy.S_CONTINUE_NEEDED {
+			/* We're not expecting a reply token. */
+			break
+		}
+		if r.StatusCode != 401 {
+			/* If we got the content, then we have no use for response data. */
+			break
+		}
+		/* Check if we got a reply token. */
+		header := r.Header.Get("WWW-Authenticate")
+		if len(header) == 0 {
+			r = nil
+			err = errors.New("no authorization response from server")
+			return
+		}
+		parts := strings.SplitN(header, " ", 2)
+		if len(parts) < 2 || strings.ToLower(parts[0]) != "negotiate" {
+			r = nil
+			err = errors.New(fmt.Sprintf("authorization response is not Negotiate ('%s')", header))
+			return
+		}
+		b64data := strings.Replace(parts[1], " ", "", -1)
+		token, err = base64.StdEncoding.DecodeString(b64data)
+		if err != nil {
+			r = nil
+			return
+		}
+		/* Get the next token that we need to send. */
+		iscr, err = proxy.InitSecContext(&conn, &call, &ctx, nil, &name, proxy.MechSPNEGO, proxy.Flags{}, proxy.C_INDEFINITE, nil, &token, nil)
+		if err != nil {
+			return
+		}
+		if iscr.Status.MajorStatus != proxy.S_COMPLETE && iscr.Status.MajorStatus != proxy.S_CONTINUE_NEEDED {
+			break
+		}
+	}
+	if iscr.Status.MajorStatus != proxy.S_COMPLETE && iscr.Status.MajorStatus != proxy.S_CONTINUE_NEEDED {
+		r = nil
+		err = errors.New(iscr.Status.MajorStatusString + ", " + iscr.Status.MinorStatusString)
+		return
+	}
+	return
 }
 
 func NewClientCertTLSConfig(certData, keyData, caData []byte) (*tls.Config, error) {

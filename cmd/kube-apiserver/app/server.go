@@ -30,12 +30,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	authn "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/union"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -59,6 +61,8 @@ type APIServer struct {
 	CloudConfigFile            string
 	EventTTL                   time.Duration
 	TokenAuthFile              string
+	SaslauthdInfo              string
+	GssProxy                   string
 	AuthorizationMode          string
 	AuthorizationPolicyFile    string
 	AdmissionControl           string
@@ -138,6 +142,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.DurationVar(&s.EventTTL, "event_ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
 	fs.StringVar(&s.TokenAuthFile, "token_auth_file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+	fs.StringVar(&s.SaslauthdInfo, "saslauthd", s.SaslauthdInfo, "If set, saslauthd will be used to check passwords received via basic authentication. The value is a comma-delimited list of default realm name, socket location (default \"/var/run/saslauthd/mux\"), and service name (default based on the binary's name).")
+	fs.StringVar(&s.GssProxy, "gssproxy", s.GssProxy, "If set, a gssproxy will be used to accept negotiate (GSSAPI) authentication.")
 	fs.StringVar(&s.AuthorizationMode, "authorization_mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationPolicyFile, "authorization_policy_file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization_mode=ABAC, on the secure port.")
 	fs.StringVar(&s.AdmissionControl, "admission_control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
@@ -177,6 +183,9 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
+	var authenticator authn.Request = nil
+	authenticators := []authn.Request{}
+
 	s.verifyPortalFlags()
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
@@ -213,9 +222,29 @@ func (s *APIServer) Run(_ []string) error {
 
 	n := net.IPNet(s.PortalNet)
 
-	authenticator, err := apiserver.NewAuthenticatorFromTokenFile(s.TokenAuthFile)
-	if err != nil {
-		glog.Fatalf("Invalid Authentication Config: %v", err)
+	if s.TokenAuthFile != "" {
+		authenticator, err := apiserver.NewAuthenticatorFromTokenFile(s.TokenAuthFile)
+		if err != nil {
+			glog.Fatalf("Invalid Authentication Config: %v", err)
+		}
+		authenticators = append(authenticators, authenticator)
+	}
+	if s.GssProxy != "" {
+		authenticator, err := apiserver.NewAuthenticatorGssProxy(s.GssProxy)
+		if err != nil {
+			glog.Fatalf("Invalid Authentication Config: %v", err)
+		}
+		authenticators = append(authenticators, authenticator)
+	}
+	if s.SaslauthdInfo != "" {
+		authenticator, err := apiserver.NewAuthenticatorSaslauthd(s.SaslauthdInfo)
+		if err != nil {
+			glog.Fatalf("Invalid Authentication Config: %v", err)
+		}
+		authenticators = append(authenticators, authenticator)
+	}
+	if len(authenticators) > 0 {
+		authenticator = union.New(authenticators...)
 	}
 
 	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(s.AuthorizationMode, s.AuthorizationPolicyFile)

@@ -26,43 +26,44 @@ import (
 // information about the current user and true if successful, false if not successful,
 // or an error if the token could not be checked.
 type Token interface {
-	AuthenticateToken(token string) (user.Info, bool, error)
+	AuthenticateToken(token string) (user.Info, http.Header, bool, error)
 }
 
 // Request attempts to extract authentication information from a request and returns
 // information about the current user and true if successful, false if not successful,
 // or an error if the request could not be checked.
 type Request interface {
-	AuthenticateRequest(req *http.Request) (user.Info, bool, error)
+	AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error)
 }
 
 // Password checks a username and password against a backing authentication store and
 // returns information about the user and true if successful, false if not successful,
 // or an error if the username and password could not be checked
 type Password interface {
-	AuthenticatePassword(user, password string) (user.Info, bool, error)
+	GetRealm() string
+	AuthenticatePassword(user, password string) (user.Info, http.Header, bool, error)
 }
 
 // TokenFunc is a function that implements the Token interface.
-type TokenFunc func(token string) (user.Info, bool, error)
+type TokenFunc func(token string) (user.Info, http.Header, bool, error)
 
 // AuthenticateToken implements authenticator.Token.
-func (f TokenFunc) AuthenticateToken(token string) (user.Info, bool, error) {
+func (f TokenFunc) AuthenticateToken(token string) (user.Info, http.Header, bool, error) {
 	return f(token)
 }
 
 // RequestFunc is a function that implements the Request interface.
-type RequestFunc func(req *http.Request) (user.Info, bool, error)
+type RequestFunc func(req *http.Request) (user.Info, http.Header, bool, error)
 
 // AuthenticateRequest implements authenticator.Request.
-func (f RequestFunc) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (f RequestFunc) AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error) {
 	return f(req)
 }
 
 // PasswordFunc is a function that implements the Password interface.
-type PasswordFunc func(user, password string) (user.Info, bool, error)
+type PasswordFunc func(user, password string) (user.Info, http.Header, bool, error)
 
 // AuthenticatePassword implements authenticator.Password.
-func (f PasswordFunc) AuthenticatePassword(user, password string) (user.Info, bool, error) {
+func (f PasswordFunc) AuthenticatePassword(user, password string) (user.Info, http.Header, bool, error) {
 	return f(user, password)
 }

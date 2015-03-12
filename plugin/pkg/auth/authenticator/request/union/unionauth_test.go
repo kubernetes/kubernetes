@@ -28,6 +28,7 @@ import (
 
 type mockAuthRequestHandler struct {
 	returnUser      user.Info
+	returnHeaders   http.Header
 	isAuthenticated bool
 	err             error
 }
@@ -37,8 +38,8 @@ var (
 	user2 = &user.DefaultInfo{Name: "elegant_sheep", UID: "bravo"}
 )
 
-func (mock *mockAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	return mock.returnUser, mock.isAuthenticated, mock.err
+func (mock *mockAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, http.Header, bool, error) {
+	return mock.returnUser, mock.returnHeaders, mock.isAuthenticated, mock.err
 }
 
 func TestAuthenticateRequestSecondPasses(t *testing.T) {
@@ -47,7 +48,7 @@ func TestAuthenticateRequestSecondPasses(t *testing.T) {
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	authenticatedUser, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	authenticatedUser, _, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestAuthenticateRequestFirstPasses(t *testing.T) {
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	authenticatedUser, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	authenticatedUser, _, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -83,7 +84,7 @@ func TestAuthenticateRequestSuppressUnnecessaryErrors(t *testing.T) {
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	_, _, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestAuthenticateRequestNoAuthenticators(t *testing.T) {
 	authRequestHandler := New()
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	authenticatedUser, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	authenticatedUser, _, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestAuthenticateRequestNonePass(t *testing.T) {
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	_, _, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -129,7 +130,7 @@ func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
+	_, _, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err == nil {
 		t.Errorf("Expected an error")
 	}

@@ -17,22 +17,32 @@ limitations under the License.
 package allow
 
 import (
+	"net/http"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 )
 
-type allowAuthenticator struct{}
+type allowAuthenticator struct {
+	realm string
+}
 
 // NewAllow returns a password authenticator that allows any non-empty username
 func NewAllow() authenticator.Password {
-	return allowAuthenticator{}
+	return allowAuthenticator{realm: "default"}
+}
+
+// GetRealm returns the realm name for use in constructing a challenge for
+// Basic authentication.
+func (a allowAuthenticator) GetRealm() string {
+	return a.realm
 }
 
 // AuthenticatePassword implements authenticator.Password to allow any non-empty username,
 // using the specified username as the name and UID
-func (allowAuthenticator) AuthenticatePassword(username, password string) (user.Info, bool, error) {
+func (a allowAuthenticator) AuthenticatePassword(username, password string) (user.Info, http.Header, bool, error) {
 	if username == "" {
-		return nil, false, nil
+		return nil, http.Header{"WWW-Authenticate": {"Basic realm=\"" + a.realm + "\""}}, false, nil
 	}
-	return &user.DefaultInfo{Name: username, UID: username}, true, nil
+	return &user.DefaultInfo{Name: username, UID: username}, nil, true, nil
 }
