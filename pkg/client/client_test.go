@@ -749,6 +749,7 @@ func TestCreateMinion(t *testing.T) {
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
+			Unschedulable: false,
 		},
 	}
 	c := &testClient{
@@ -782,6 +783,7 @@ func TestUpdateMinion(t *testing.T) {
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
+			Unschedulable: true,
 		},
 	}
 	c := &testClient{

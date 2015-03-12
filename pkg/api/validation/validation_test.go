@@ -2106,6 +2106,21 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Labels: map[string]string{"Foo": "baz"},
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Unschedulable: false,
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Unschedulable: true,
+			},
+		}, true},
 	}
 	for i, test := range tests {
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)

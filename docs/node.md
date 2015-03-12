@@ -38,13 +38,16 @@ must have appropriate conditions, see below.
 
 ### Node Condition
 Node Condition describes the conditions of `Running` nodes. Current valid
-conditions are `NodeReachable` and `NodeReady`. In the future, we plan to
-add more. `NodeReachable` means the node can be reached within the cluster.
-`NodeReady` means the kubelet returns StatusOK for HTTP health check. Different
-condition provides different level of understanding for node health. Kubernetes
-will make a comprehensive scheduling decision based on the information. Node
-condition is represented as a json object. For example, the following conditions
-mean the node is reachable from its cluster, but not ready to accept pods:
+conditions are `NodeReachable`, `NodeReady` and `NodeSchedulable`. In the
+future, we plan to add more. `NodeReachable` means the node can be reached
+within the cluster. `NodeReady` means the kubelet returns StatusOK for HTTP
+health check. `NodeSchedulable` means node is allowed to schedule any new
+pods and is controlled by 'unschedulable' field in node spec.
+Different condition provides different level of understanding for node
+health. Kubernetes will make a comprehensive scheduling decision based on the
+information. Node condition is represented as a json object. For example, the
+following conditions mean the node is reachable from its cluster, node is in
+sane state but not allowed to accept new pods:
 ```json
 "conditions": [
   {
@@ -53,8 +56,12 @@ mean the node is reachable from its cluster, but not ready to accept pods:
   },
   {
     "kind": "Ready",
+    "status": "Full",
+  },
+  {
+    "kind": "Schedulable",
     "status": "None",
-  }
+  },
 ]
 ```
 
@@ -125,3 +132,9 @@ A Kubernetes administrator typically uses `kubectl` to manage `Node`. Similar
 to Node Controller, `kubectl` command only creates/deletes node representation.
 Note if Kubernetes is running on cloud provider, `kubectl create` a node will
 be refused if Node Controller has already synchronized nodes from cloud provider.
+Admin can choose to make the node unschedulable using `kubectl`. Unscheduling the node
+will not affect any existing pods on the node but it will disable creation of
+any new pods on the node. Node unschedulable example:
+```
+kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta1", "unschedulable": true}'
+```

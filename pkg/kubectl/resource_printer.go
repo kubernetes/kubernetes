@@ -432,7 +432,7 @@ func printSecretList(list *api.SecretList, w io.Writer) error {
 
 func printNode(node *api.Node, w io.Writer) error {
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
-	NodeAllConditions := []api.NodeConditionType{api.NodeReady, api.NodeReachable}
+	NodeAllConditions := []api.NodeConditionType{api.NodeSchedulable, api.NodeReady, api.NodeReachable}
 	for i := range node.Status.Conditions {
 		cond := node.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond

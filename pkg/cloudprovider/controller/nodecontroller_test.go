@@ -550,13 +550,15 @@ func TestSyncCloudDeletePods(t *testing.T) {
 	}
 }
 
-func TestHealthCheckNode(t *testing.T) {
+func TestNodeConditionsCheck(t *testing.T) {
 	table := []struct {
 		node               *api.Node
 		fakeKubeletClient  *FakeKubeletClient
 		expectedConditions []api.NodeCondition
 	}{
 		{
+			// Node with default spec and kubelet /healthz probe returns success.
+			// Expected node condition to be ready and marked schedulable.
 			node: newNode("node0"),
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Success,
@@ -568,10 +570,17 @@ func TestHealthCheckNode(t *testing.T) {
 					Status: api.ConditionFull,
 					Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 				},
+				{
+					Type:   api.NodeSchedulable,
+					Status: api.ConditionFull,
+					Reason: "Node is schedulable by default",
+				},
 			},
 		},
 		{
-			node: newNode("node0"),
+			// User specified node as schedulable and kubelet /healthz probe returns failure with no error.
+			// Expected node condition to be not ready and marked schedulable.
+			node: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node0"}, Spec: api.NodeSpec{Unschedulable: false}},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
 				Err:    nil,
@@ -582,10 +591,17 @@ func TestHealthCheckNode(t *testing.T) {
 					Status: api.ConditionNone,
 					Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 				},
+				{
+					Type:   api.NodeSchedulable,
+					Status: api.ConditionFull,
+					Reason: "Node is schedulable by default",
+				},
 			},
 		},
 		{
-			node: newNode("node0"),
+			// User specified node as unschedulable and kubelet /healthz probe returns failure with some error.
+			// Expected node condition to be not ready and marked unschedulable.
+			node: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node0"}, Spec: api.NodeSpec{Unschedulable: true}},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
 				Err:    errors.New("Error"),
@@ -595,6 +611,11 @@ func TestHealthCheckNode(t *testing.T) {
 					Type:   api.NodeReady,
 					Status: api.ConditionUnknown,
 					Reason: "Node health check error: Error",
+				},
+				{
+					Type:   api.NodeSchedulable,
+					Status: api.ConditionNone,
+					Reason: "User marked unschedulable during node create/update",
 				},
 			},
 		},
@@ -663,17 +684,25 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 		expectedTransitionTimeChange bool
 	}{
 		{
-			// Existing node is healthy, current porbe is healthy too.
+			// Existing node is healthy, current probe is healthy too.
+			// Existing node is schedulable, again explicitly mark node as schedulable.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Spec:       api.NodeSpec{Unschedulable: false},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								},
+								{
+									Type:               api.NodeSchedulable,
+									Status:             api.ConditionFull,
+									Reason:             "Node is schedulable by default",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 							},
@@ -689,17 +718,25 @@ func TestSyncNodeStatusTransitionTime(t *testing.T) {
 			expectedTransitionTimeChange: false,
 		},
 		{
-			// Existing node is healthy, current porbe is unhealthy.
+			// Existing node is healthy, current probe is unhealthy.
+			// Existing node is schedulable, mark node as unschedulable.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
+						Spec:       api.NodeSpec{Unschedulable: true},
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								},
+								{
+									Type:               api.NodeSchedulable,
+									Status:             api.ConditionFull,
+									Reason:             "Node is schedulable by default",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 							},
@@ -865,7 +902,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 		expectedActions      []client.FakeAction
 	}{
 		{
-			// Existing node is healthy, current porbe is healthy too.
+			// Existing node is healthy, current probe is healthy too.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
 					{
@@ -894,7 +931,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 			expectedActions:      nil,
 		},
 		{
-			// Existing node is healthy, current porbe is unhealthy, i.e. node just becomes unhealthy.
+			// Existing node is healthy, current probe is unhealthy, i.e. node just becomes unhealthy.
 			// Do not delete pods.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
@@ -924,7 +961,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 			expectedActions:      nil,
 		},
 		{
-			// Existing node unhealthy, current porbe is unhealthy. Node is still within grace peroid.
+			// Existing node unhealthy, current probe is unhealthy. Node is still within grace peroid.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
 					{
@@ -956,7 +993,7 @@ func TestSyncNodeStatusDeletePods(t *testing.T) {
 			expectedActions:      nil,
 		},
 		{
-			// Existing node unhealthy, current porbe is unhealthy. Node exceeds grace peroid.
+			// Existing node unhealthy, current probe is unhealthy. Node exceeds grace peroid.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
 					{
@@ -1036,6 +1073,11 @@ func TestSyncNodeStatus(t *testing.T) {
 								Status: api.ConditionFull,
 								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
 							},
+							{
+								Type:   api.NodeSchedulable,
+								Status: api.ConditionFull,
+								Reason: "Node is schedulable by default",
+							},
 						},
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
@@ -1050,6 +1092,11 @@ func TestSyncNodeStatus(t *testing.T) {
 								Type:   api.NodeReady,
 								Status: api.ConditionFull,
 								Reason: "Node health check succeeded: kubelet /healthz endpoint returns ok",
+							},
+							{
+								Type:   api.NodeSchedulable,
+								Status: api.ConditionFull,
+								Reason: "Node is schedulable by default",
 							},
 						},
 						Addresses: []api.NodeAddress{

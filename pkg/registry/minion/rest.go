@@ -46,7 +46,6 @@ func NewREST(m Registry) *REST {
 }
 
 var ErrDoesNotExist = errors.New("The requested resource does not exist.")
-var ErrNotHealty = errors.New("The requested minion is not healthy.")
 
 // Create satisfies the RESTStorage interface.
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {

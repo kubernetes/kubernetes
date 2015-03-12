@@ -301,7 +301,7 @@ func (s *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList, 
 	return nodes, nil
 }
 
-// UpdateNodesStatus performs health checking for given list of nodes.
+// UpdateNodesStatus performs various condition checks for given list of nodes.
 func (s *NodeController) UpdateNodesStatus(nodes *api.NodeList) *api.NodeList {
 	var wg sync.WaitGroup
 	wg.Add(len(nodes.Items))
@@ -330,21 +330,14 @@ func (s *NodeController) updateNodeInfo(node *api.Node) error {
 	return nil
 }
 
-// DoCheck performs health checking for given node.
+// DoCheck performs various condition checks for given node.
 func (s *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	var conditions []api.NodeCondition
 
 	// Check Condition: NodeReady. TODO: More node conditions.
 	oldReadyCondition := s.getCondition(node, api.NodeReady)
 	newReadyCondition := s.checkNodeReady(node)
-	if oldReadyCondition != nil && oldReadyCondition.Status == newReadyCondition.Status {
-		// If node status doesn't change, transition time is same as last time.
-		newReadyCondition.LastTransitionTime = oldReadyCondition.LastTransitionTime
-	} else {
-		// Set transition time to Now() if node status changes or `oldReadyCondition` is nil, which
-		// happens only when the node is checked for the first time.
-		newReadyCondition.LastTransitionTime = util.Now()
-	}
+	s.updateLastTransitionTime(oldReadyCondition, newReadyCondition)
 
 	if newReadyCondition.Status != api.ConditionFull {
 		// Node is not ready for this probe, we need to check if pods need to be deleted.
@@ -355,10 +348,46 @@ func (s *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 			s.deletePods(node.Name)
 		}
 	}
-
 	conditions = append(conditions, *newReadyCondition)
 
+	// Check Condition: NodeSchedulable
+	oldSchedulableCondition := s.getCondition(node, api.NodeSchedulable)
+	newSchedulableCondition := s.checkNodeSchedulable(node)
+	s.updateLastTransitionTime(oldSchedulableCondition, newSchedulableCondition)
+	conditions = append(conditions, *newSchedulableCondition)
+
 	return conditions
+}
+
+// updateLastTransitionTime updates LastTransitionTime for the newCondition based on oldCondition.
+func (s *NodeController) updateLastTransitionTime(oldCondition, newCondition *api.NodeCondition) {
+	if oldCondition != nil && oldCondition.Status == newCondition.Status {
+		// If node status doesn't change, transition time is same as last time.
+		newCondition.LastTransitionTime = oldCondition.LastTransitionTime
+	} else {
+		// Set transition time to Now() if node status changes or `oldCondition` is nil, which
+		// happens only when the node is checked for the first time.
+		newCondition.LastTransitionTime = util.Now()
+	}
+}
+
+// checkNodeSchedulable checks node schedulable condition, without transition timestamp set.
+func (s *NodeController) checkNodeSchedulable(node *api.Node) *api.NodeCondition {
+	if node.Spec.Unschedulable {
+		return &api.NodeCondition{
+			Type:          api.NodeSchedulable,
+			Status:        api.ConditionNone,
+			Reason:        "User marked unschedulable during node create/update",
+			LastProbeTime: util.Now(),
+		}
+	} else {
+		return &api.NodeCondition{
+			Type:          api.NodeSchedulable,
+			Status:        api.ConditionFull,
+			Reason:        "Node is schedulable by default",
+			LastProbeTime: util.Now(),
+		}
+	}
 }
 
 // checkNodeReady checks raw node ready condition, without transition timestamp set.
