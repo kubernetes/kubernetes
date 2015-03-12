@@ -5,6 +5,5 @@ port: 80
 containerPort: 8086
 labels:
   name: influxdb
-  kubernetes.io/cluster-service: "true"
 selector: 
   name: influxGrafana
