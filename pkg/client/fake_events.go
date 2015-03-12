@@ -64,3 +64,8 @@ func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "search-events"})
 	return &c.Fake.EventsList, nil
 }
+
+func (c *FakeEvents) Delete(name string) error {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-event", Value: name})
+	return nil
+}
