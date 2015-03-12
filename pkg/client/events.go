@@ -40,6 +40,7 @@ type EventInterface interface {
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
+	Delete(name string) error
 }
 
 // events implements Events interface
@@ -160,4 +161,14 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 		fields["involvedObject.uid"] = string(ref.UID)
 	}
 	return e.List(labels.Everything(), fields.AsSelector())
+}
+
+// Delete deletes an existing event.
+func (e *events) Delete(name string) error {
+	return e.client.Delete().
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Resource("events").
+		Name(name).
+		Do().
+		Error()
 }
