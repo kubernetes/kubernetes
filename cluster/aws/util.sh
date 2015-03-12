@@ -560,7 +560,7 @@ EOF
   echo
   echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}.${color_norm}"
+  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}${color_norm}"
   echo
 }
 
