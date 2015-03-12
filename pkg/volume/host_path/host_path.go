@@ -54,6 +54,12 @@ func (plugin *hostPathPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
+	return []api.AccessModeType{
+		api.ReadWriteOnce,
+	}
+}
+
 func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	return &hostPath{spec.HostPath.Path}, nil
 }

@@ -45,6 +45,28 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
+func TestGetAccessModes(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/nfs")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) || !contains(plug.GetAccessModes(), api.ReadOnlyMany) || !contains(plug.GetAccessModes(), api.ReadWriteMany) {
+		t.Errorf("Expected three AccessModeTypes:  %s, %s, and %s", api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany)
+	}
+}
+
+func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
 type fakeNFSMounter struct {
 	FakeMounter mount.FakeMounter
 }

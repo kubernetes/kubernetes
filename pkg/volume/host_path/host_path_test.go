@@ -43,6 +43,19 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
+func TestGetAccessModes(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/host-path")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	if len(plug.GetAccessModes()) != 1 || plug.GetAccessModes()[0] != api.ReadWriteOnce {
+		t.Errorf("Expected %s AccessModeType", api.ReadWriteOnce)
+	}
+}
+
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))

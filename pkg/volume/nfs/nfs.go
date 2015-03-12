@@ -57,6 +57,14 @@ func (plugin *nfsPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
+func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
+	return []api.AccessModeType{
+		api.ReadWriteOnce,
+		api.ReadOnlyMany,
+		api.ReadWriteMany,
+	}
+}
+
 func (plugin *nfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	return plugin.newBuilderInternal(spec, podRef, plugin.mounter)
 }

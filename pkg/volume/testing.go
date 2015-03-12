@@ -71,7 +71,7 @@ func (f *fakeVolumeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (
 	return plug.NewCleaner(spec.Name, podUID)
 }
 
-// FakeVolumePlugin is useful for for testing.  It tries to be a fully compliant
+// FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:
 //   volume.RegisterPlugin(&FakePlugin{"fake-name"})
@@ -101,6 +101,10 @@ func (plugin *FakeVolumePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectR
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
 	return &FakeVolume{podUID, volName, plugin}, nil
+}
+
+func (plugin *FakeVolumePlugin) GetAccessModes() []api.AccessModeType {
+	return []api.AccessModeType{}
 }
 
 type FakeVolume struct {
