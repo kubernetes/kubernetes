@@ -212,30 +212,32 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SALT_TAR_URL=
 
-  local project_hash=
-  local key=$(aws configure get aws_access_key_id)
-  if which md5 > /dev/null 2>&1; then
-    project_hash=$(md5 -q -s "${USER} ${key}")
-  else
-    project_hash=$(echo -n "${USER} ${key}" | md5sum | awk '{ print $1 }')
+  if [[ -z ${AWS_S3_BUCKET-} ]]; then
+      local project_hash=
+      local key=$(aws configure get aws_access_key_id)
+      if which md5 > /dev/null 2>&1; then
+        project_hash=$(md5 -q -s "${USER} ${key}")
+      else
+        project_hash=$(echo -n "${USER} ${key}" | md5sum | awk '{ print $1 }')
+      fi
+      AWS_S3_BUCKET="kubernetes-staging-${project_hash}"
   fi
-  local -r staging_bucket="kubernetes-staging-${project_hash}"
 
   echo "Uploading to Amazon S3"
-  if ! aws s3 ls "s3://${staging_bucket}" > /dev/null 2>&1 ; then
-    echo "Creating ${staging_bucket}"
-    aws s3 mb "s3://${staging_bucket}"
+  if ! aws s3 ls "s3://${AWS_S3_BUCKET}" > /dev/null 2>&1 ; then
+    echo "Creating ${AWS_S3_BUCKET}"
+    aws s3 mb "s3://${AWS_S3_BUCKET}"
   fi
 
-  local -r staging_path="${staging_bucket}/devel"
+  local -r staging_path="${AWS_S3_BUCKET}/devel"
 
   echo "+++ Staging server tars to S3 Storage: ${staging_path}"
   SERVER_BINARY_TAR_URL="${staging_path}/${SERVER_BINARY_TAR##*/}"
   aws s3 cp "${SERVER_BINARY_TAR}" "s3://${SERVER_BINARY_TAR_URL}"
-  aws s3api put-object-acl --bucket ${staging_bucket} --key "devel/${SERVER_BINARY_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  aws s3api put-object-acl --bucket ${AWS_S3_BUCKET} --key "devel/${SERVER_BINARY_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
   SALT_TAR_URL="${staging_path}/${SALT_TAR##*/}"
   aws s3 cp "${SALT_TAR}" "s3://${SALT_TAR_URL}"
-  aws s3api put-object-acl --bucket ${staging_bucket} --key "devel/${SALT_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  aws s3api put-object-acl --bucket ${AWS_S3_BUCKET} --key "devel/${SALT_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
 }
 
 
