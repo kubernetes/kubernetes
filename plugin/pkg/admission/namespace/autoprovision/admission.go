@@ -86,7 +86,7 @@ func NewProvision(c client.Interface) admission.Interface {
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return c.Namespaces().List(labels.Everything())
+				return c.Namespaces().List(labels.Everything(), labels.Everything())
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 				return c.Namespaces().Watch(labels.Everything(), labels.Everything(), resourceVersion)

@@ -90,7 +90,7 @@ func TestNamespaceList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: namespaceList},
 	}
-	response, err := c.Setup().Namespaces().List(labels.Everything())
+	response, err := c.Setup().Namespaces().List(labels.Everything(), labels.Everything())
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)

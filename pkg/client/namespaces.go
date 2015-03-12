@@ -32,7 +32,7 @@ type NamespacesInterface interface {
 type NamespaceInterface interface {
 	Create(item *api.Namespace) (*api.Namespace, error)
 	Get(name string) (result *api.Namespace, err error)
-	List(selector labels.Selector) (*api.NamespaceList, error)
+	List(label, field labels.Selector) (*api.NamespaceList, error)
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
@@ -56,9 +56,9 @@ func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 }
 
 // List lists all the namespaces in the cluster.
-func (c *namespaces) List(selector labels.Selector) (*api.NamespaceList, error) {
+func (c *namespaces) List(label, field labels.Selector) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
-	err := c.r.Get().Resource("namespaces").SelectorParam("labels", selector).Do().Into(result)
+	err := c.r.Get().Resource("namespaces").SelectorParam("labels", label).SelectorParam("fields", field).Do().Into(result)
 	return result, err
 }
 

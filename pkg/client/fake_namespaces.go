@@ -28,7 +28,7 @@ type FakeNamespaces struct {
 	Fake *Fake
 }
 
-func (c *FakeNamespaces) List(selector labels.Selector) (*api.NamespaceList, error) {
+func (c *FakeNamespaces) List(labels, fields labels.Selector) (*api.NamespaceList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-namespaces"})
 	return api.Scheme.CopyOrDie(&c.Fake.NamespacesList).(*api.NamespaceList), nil
 }
