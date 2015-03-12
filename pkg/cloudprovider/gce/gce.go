@@ -284,6 +284,7 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
 	if err != nil {
 		glog.Warningln("Failed to delete Target Pool %s, got error %s.", name, err.Error())
+		return err
 	}
 	err = gce.waitForRegionOp(op, region)
 	if err != nil {
