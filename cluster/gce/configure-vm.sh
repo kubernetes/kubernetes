@@ -66,6 +66,13 @@ for k,v in yaml.load(sys.stdin).iteritems():
     done
   fi
 
+  # Infer master status from presence in node pool
+  if [[ $(hostname) = ${NODE_INSTANCE_PREFIX}* ]]; then
+    KUBERNETES_MASTER="false"
+  else
+    KUBERNETES_MASTER="true"
+  fi
+
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     # TODO(zmerlynn): This block of code should disappear once #4561 & #4562 are done
     if [[ -z "${KUBERNETES_NODE_NAMES:-}" ]]; then

@@ -435,7 +435,6 @@ function build-kube-env {
   rm -f ${file}
   cat >$file <<EOF
 ENV_TIMESTAMP: $(yaml-quote $(date -uIs))
-KUBERNETES_MASTER: $(yaml-quote ${master})
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
