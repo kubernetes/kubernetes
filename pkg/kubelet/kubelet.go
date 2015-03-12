@@ -208,7 +208,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.dockerCache = dockerCache
-	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod, recorder)
+	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod, containerRuntimeCache, klet.syncRocketPod, recorder)
 
 	metrics.Register(dockerCache)
 

@@ -71,13 +71,19 @@ type workUpdate struct {
 	updateCompleteFn func()
 }
 
-func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType, recorder record.EventRecorder) *podWorkers {
+func newPodWorkers(dockerCache dockertools.DockerCache,
+	syncPodFn syncPodFnType,
+	containerRuntimeCache container.RuntimeCache,
+	syncRocketPodFn syncRocketPodFnType,
+	recorder record.EventRecorder) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
 		lastUndeliveredWorkUpdate: map[types.UID]workUpdate{},
 		dockerCache:               dockerCache,
 		syncPodFn:                 syncPodFn,
+		containerRuntimeCache:     containerRuntimeCache,
+		syncRocketPodFn:           syncRocketPodFn,
 		recorder:                  recorder,
 	}
 }
