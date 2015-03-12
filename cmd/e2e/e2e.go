@@ -51,7 +51,7 @@ func main() {
 	util.InitFlags()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
 	if *provider == "" {
-		glog.Error("e2e needs the have the --provider flag set")
+		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 		os.Exit(1)
 	}
 	if *times <= 0 {
