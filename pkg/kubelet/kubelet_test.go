@@ -1892,6 +1892,43 @@ func TestKubeletGarbageCollection(t *testing.T) {
 			},
 			expectedRemoved: []string{"1706", "1876"},
 		},
+		// Remove non-running unidentified Kubernetes containers.
+		{
+			containers: []docker.APIContainers{
+				{
+					// Unidentified Kubernetes container.
+					Names: []string{"/k8s_unidentified"},
+					ID:    "1876",
+				},
+				{
+					// Unidentified (non-running) Kubernetes container.
+					Names: []string{"/k8s_unidentified"},
+					ID:    "2309",
+				},
+				{
+					// Regular Kubernetes container.
+					Names: []string{"/k8s_POD_foo_new_.deadbeef_42"},
+					ID:    "3876",
+				},
+			},
+			containerDetails: map[string]*docker.Container{
+				"1876": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1876",
+					Created: time.Now(),
+				},
+				"2309": {
+					State: docker.State{
+						Running: true,
+					},
+					ID:      "2309",
+					Created: time.Now(),
+				},
+			},
+			expectedRemoved: []string{"1876"},
+		},
 	}
 	for _, test := range tests {
 		kubelet, fakeDocker, _ := newTestKubelet(t)

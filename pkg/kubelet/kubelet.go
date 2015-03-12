@@ -415,12 +415,48 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 	if err != nil {
 		return err
 	}
+
+	type unidentifiedContainer struct {
+		// Docker ID.
+		id string
+
+		// Docker container name
+		name string
+	}
+
+	unidentifiedContainers := make([]unidentifiedContainer, 0)
 	uidToIDMap := map[string][]string{}
 	for _, container := range containers {
 		_, uid, name, _ := dockertools.ParseDockerName(container.Names[0])
+		if uid == "" && name == "" {
+			unidentifiedContainers = append(unidentifiedContainers, unidentifiedContainer{
+				id:   container.ID,
+				name: container.Names[0],
+			})
+			continue
+		}
 		uidName := string(uid) + "." + name
 		uidToIDMap[uidName] = append(uidToIDMap[uidName], container.ID)
 	}
+
+	// Remove all non-running unidentified containers.
+	for _, container := range unidentifiedContainers {
+		data, err := kl.dockerClient.InspectContainer(container.id)
+		if err != nil {
+			return err
+		}
+		if data.State.Running {
+			continue
+		}
+
+		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
+		err = kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: container.id})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Evict dead containers according to our policies.
 	for _, list := range uidToIDMap {
 		if len(list) <= kl.maxContainerCount {
 			continue
@@ -429,6 +465,7 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
