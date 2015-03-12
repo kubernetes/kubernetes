@@ -16,8 +16,8 @@
 
 # TODO: the zone isn't quite piped into all the right places...
 ZONE=${KUBE_AWS_ZONE:-us-west-2}
-MASTER_SIZE=t2.micro
-MINION_SIZE=t2.micro
+MASTER_SIZE=${MASTER_SIZE:-t2.micro}
+MINION_SIZE=${MINION_SIZE:-t2.micro}
 NUM_MINIONS=${NUM_MINIONS:-4}
 
 # This is the ubuntu 14.04 image for us-west-2 + ebs
