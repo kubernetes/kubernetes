@@ -226,18 +226,32 @@ function upload-server-tars() {
   echo "Uploading to Amazon S3"
   if ! aws s3 ls "s3://${AWS_S3_BUCKET}" > /dev/null 2>&1 ; then
     echo "Creating ${AWS_S3_BUCKET}"
-    aws s3 mb "s3://${AWS_S3_BUCKET}"
+
+    # Buckets must be globally uniquely named, so always create in a known region
+    # We default to us-east-1 because that's the canonical region for S3,
+    # and then the bucket is most-simply named (s3.amazonaws.com)
+    aws s3 mb "s3://${AWS_S3_BUCKET}" --region ${AWS_S3_REGION}
   fi
 
-  local -r staging_path="${AWS_S3_BUCKET}/devel"
+  local s3_url_base=https://s3-${AWS_S3_REGION}.amazonaws.com
+  if [[ "${AWS_S3_REGION}" == "us-east-1" ]]; then
+    # us-east-1 does not follow the pattern
+    s3_url_base=https://s3.amazonaws.com
+  fi
 
-  echo "+++ Staging server tars to S3 Storage: ${staging_path}"
-  SERVER_BINARY_TAR_URL="${staging_path}/${SERVER_BINARY_TAR##*/}"
-  aws s3 cp "${SERVER_BINARY_TAR}" "s3://${SERVER_BINARY_TAR_URL}"
-  aws s3api put-object-acl --bucket ${AWS_S3_BUCKET} --key "devel/${SERVER_BINARY_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
-  SALT_TAR_URL="${staging_path}/${SALT_TAR##*/}"
-  aws s3 cp "${SALT_TAR}" "s3://${SALT_TAR_URL}"
-  aws s3api put-object-acl --bucket ${AWS_S3_BUCKET} --key "devel/${SALT_TAR##*/}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  local -r staging_path="devel"
+
+  echo "+++ Staging server tars to S3 Storage: ${AWS_S3_BUCKET}/${staging_path}"
+
+  local server_binary_path="${staging_path}/${SERVER_BINARY_TAR##*/}"
+  aws s3 cp "${SERVER_BINARY_TAR}" "s3://${AWS_S3_BUCKET}/${server_binary_path}"
+  aws s3api put-object-acl --bucket ${AWS_S3_BUCKET} --key "${server_binary_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  SERVER_BINARY_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${server_binary_path}"
+
+  local salt_tar_path="${staging_path}/${SALT_TAR##*/}"
+  aws s3 cp "${SALT_TAR}" "s3://${AWS_S3_BUCKET}/${salt_tar_path}"
+  aws s3api put-object-acl --bucket ${AWS_S3_BUCKET} --key "${salt_tar_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  SALT_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${salt_tar_path}"
 }
 
 
@@ -362,8 +376,8 @@ function kube-up {
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
-    echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
-    echo "readonly SALT_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SALT_TAR_URL}'"
+    echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
+    echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly AWS_ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
@@ -678,8 +692,8 @@ function kube-push {
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
-    echo "readonly SERVER_BINARY_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SERVER_BINARY_TAR_URL}'"
-    echo "readonly SALT_TAR_URL='https://s3-${ZONE}.amazonaws.com/${SALT_TAR_URL}'"
+    echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
+    echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     echo "echo Executing configuration"

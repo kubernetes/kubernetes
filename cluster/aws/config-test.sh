@@ -20,6 +20,9 @@ MASTER_SIZE=${MASTER_SIZE:-t2.micro}
 MINION_SIZE=${MINION_SIZE:-t2.micro}
 NUM_MINIONS=${NUM_MINIONS:-2}
 
+# Because regions are globally named, we want to create in a single region; default to us-east-1
+AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
+
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-e2e-test-${USER}}"
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 IAM_PROFILE="kubernetes"
