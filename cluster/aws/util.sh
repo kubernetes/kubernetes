@@ -93,6 +93,67 @@ function detect-minions () {
   fi
 }
 
+# Detects the AMI to use (considering the region)
+#
+# Vars set:
+#   AWS_IMAGE
+function detect-image () {
+  # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
+  # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
+  # This will need to be updated from time to time as amis are deprecated
+  if [[ -z "${AWS_IMAGE-}" ]]; then
+    case "${ZONE}" in
+      ap-northeast-1)
+        AWS_IMAGE=ami-93876e93
+        ;;
+
+      ap-southeast-1)
+        AWS_IMAGE=ami-66546234
+        ;;
+
+      eu-central-1)
+        AWS_IMAGE=ami-e2a694ff
+        ;;
+
+      eu-west-1)
+        AWS_IMAGE=ami-d7fd6ea0
+        ;;
+
+      sa-east-1)
+        AWS_IMAGE=ami-a357eebe
+        ;;
+
+      us-east-1)
+        AWS_IMAGE=ami-6089d208
+        ;;
+
+      us-west-1)
+        AWS_IMAGE=ami-cf7d998b
+        ;;
+
+      cn-north-1)
+        AWS_IMAGE=ami-d436a4ed
+        ;;
+
+      us-gov-west-1)
+        AWS_IMAGE=ami-01523322
+        ;;
+
+      ap-southeast-2)
+        AWS_IMAGE=ami-cd4e3ff7
+        ;;
+
+      us-west-2)
+        AWS_IMAGE=ami-3b14370b
+        ;;
+
+      *)
+        echo "Please specify AWS_IMAGE directly (region not recognized)"
+        exit 1
+    esac
+  fi
+}
+
 # Verify prereqs
 function verify-prereqs {
   if [ "$(which aws)" == "" ]; then
@@ -237,6 +298,8 @@ function kube-up {
     ssh-keygen -f $AWS_SSH_KEY -N ''
   fi
 
+  detect-image
+
   aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE} || {
         echo "You need to set up an IAM profile and role for kubernetes"
         exit 1
@@ -323,7 +386,7 @@ function kube-up {
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
-    --image-id $IMAGE \
+    --image-id $AWS_IMAGE \
     --iam-instance-profile Name=$IAM_PROFILE \
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
@@ -396,7 +459,7 @@ function kube-up {
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
     minion_id=$($AWS_CMD run-instances \
-      --image-id $IMAGE \
+      --image-id $AWS_IMAGE \
       --iam-instance-profile Name=$IAM_PROFILE \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
