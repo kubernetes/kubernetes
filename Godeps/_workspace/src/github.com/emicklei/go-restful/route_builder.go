@@ -21,6 +21,7 @@ type RouteBuilder struct {
 	filters     []FilterFunction
 	// documentation
 	doc                     string
+	notes                   string
 	operation               string
 	readSample, writeSample interface{}
 	parameters              []*Parameter
@@ -76,6 +77,12 @@ func (b *RouteBuilder) Path(subPath string) *RouteBuilder {
 // Doc tells what this route is all about. Optional.
 func (b *RouteBuilder) Doc(documentation string) *RouteBuilder {
 	b.doc = documentation
+	return b
+}
+
+// A verbose explanation of the operation behavior. Optional.
+func (b *RouteBuilder) Notes(notes string) *RouteBuilder {
+	b.notes = notes
 	return b
 }
 
@@ -194,6 +201,7 @@ func (b *RouteBuilder) Build() Route {
 		relativePath:   b.currentPath,
 		pathExpr:       pathExpr,
 		Doc:            b.doc,
+		Notes:          b.notes,
 		Operation:      b.operation,
 		ParameterDocs:  b.parameters,
 		ResponseErrors: b.errorMap,

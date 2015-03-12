@@ -126,7 +126,7 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 		if !ok {
 			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}
-		arrType := *fieldDetails.Items[0].Ref
+		arrType := *fieldDetails.Items.Ref
 		for ix := range arr {
 			err := s.validateField(arr[ix], apiVersion, fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil)
 			if err != nil {

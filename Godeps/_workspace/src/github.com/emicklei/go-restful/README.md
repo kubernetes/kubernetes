@@ -52,6 +52,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - Automatic CORS request handling (using a filter)
 - API declaration for Swagger UI (see swagger package)
 - Panic recovery to produce HTTP 500, customizable using RecoverHandler(...)
+- Route errors produce HTTP 404/405/406/415 errors, customizable using ServiceErrorHandler(...)
 	
 ### Resources
 
