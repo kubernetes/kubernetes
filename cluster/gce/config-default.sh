@@ -86,7 +86,7 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
-# Optional: When set to true, heapster will be setup as part of the cluster bring up.
+# Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
 
 # Optional: Enable node logging.

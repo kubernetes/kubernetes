@@ -562,15 +562,6 @@ function restart-apiserver {
     ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
 
-# Setup monitoring using heapster and InfluxDB
-function setup-monitoring-firewall {
-    echo "not implemented"  >/dev/null
-}
-
-function teardown-monitoring-firewall {
-    echo "not implemented"  >/dev/null
-}
-
 function setup-logging-firewall {
   echo "TODO: setup logging"
 }

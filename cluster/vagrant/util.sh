@@ -333,14 +333,6 @@ function restart-apiserver {
   ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
 }
 
-function setup-monitoring-firewall {
-  echo "TODO" 1>&2
-}
-
-function teardown-monitoring-firewall {
-  echo "TODO" 1>&2
-}
-
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests" 1>&2

@@ -39,9 +39,6 @@ kube-up
 echo "... calling validate-cluster" >&2
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
 
-echo "... calling setup-monitoring-firewall" >&2
-setup-monitoring-firewall
-
 echo "... calling setup-logging-firewall" >&2
 setup-logging-firewall
 

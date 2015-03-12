@@ -699,24 +699,6 @@ function restart-apiserver {
   ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
 
-# Setup monitoring firewalls using heapster and InfluxDB
-function setup-monitoring-firewall {
-  if [[ "${ENABLE_CLUSTER_MONITORING}" != "true" ]]; then
-    return
-  fi
-
-  # TODO: Support monitoring firewall
-  echo "Cluster monitoring setup is not (yet) supported on AWS"
-}
-
-function teardown-monitoring-firewall {
-  if [[ "${ENABLE_CLUSTER_MONITORING}" != "true" ]]; then
-    return
-  fi
-
-  # TODO: Support monitoring firewall
-}
-
 function setup-logging-firewall {
   # If logging with Fluentd to Elasticsearch is enabled then create pods
   # and services for Elasticsearch (for ingesting logs) and Kibana (for
