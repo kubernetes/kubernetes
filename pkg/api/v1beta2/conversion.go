@@ -1300,7 +1300,7 @@ func init() {
 			case "name":
 				return "name", value, nil
 			case "DesiredState.Host":
-				return "status.host", value, nil
+				return "spec.host", value, nil
 			case "DesiredState.Status":
 				podStatus := PodStatus(value)
 				var internalValue newer.PodPhase

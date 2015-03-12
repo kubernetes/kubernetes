@@ -57,6 +57,6 @@ func getHostFieldLabel(apiVersion string) string {
 	case "v1beta1", "v1beta2":
 		return "DesiredState.Host"
 	default:
-		return "status.host"
+		return "spec.host"
 	}
 }

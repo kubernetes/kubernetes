@@ -300,7 +300,7 @@ func TestListPodListSelection(t *testing.T) {
 					})},
 					{Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
 						ObjectMeta: api.ObjectMeta{Name: "bar"},
-						Status:     api.PodStatus{Host: "barhost"},
+						Spec:       api.PodSpec{Host: "barhost"},
 					})},
 					{Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
 						ObjectMeta: api.ObjectMeta{Name: "baz"},
@@ -341,13 +341,13 @@ func TestListPodListSelection(t *testing.T) {
 			field:       "status.phase=Failed",
 			expectedIDs: util.NewStringSet("baz"),
 		}, {
-			field:       "status.host=barhost",
+			field:       "spec.host=barhost",
 			expectedIDs: util.NewStringSet("bar"),
 		}, {
-			field:       "status.host=",
+			field:       "spec.host=",
 			expectedIDs: util.NewStringSet("foo", "baz", "qux", "zot"),
 		}, {
-			field:       "status.host!=",
+			field:       "spec.host!=",
 			expectedIDs: util.NewStringSet("bar"),
 		},
 	}
