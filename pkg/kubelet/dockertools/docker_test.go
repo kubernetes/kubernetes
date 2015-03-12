@@ -93,7 +93,10 @@ func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
 	name := BuildDockerName(types.UID(podUID), podFullName, container)
-	returnedPodFullName, returnedUID, returnedContainerName, hash := ParseDockerName(name)
+	returnedPodFullName, returnedUID, returnedContainerName, hash, err := ParseDockerName(name)
+	if err != nil {
+		t.Errorf("Failed to parse Docker container name %q: %v", name, err)
+	}
 	if podFullName != returnedPodFullName || podUID != string(returnedUID) || containerName != returnedContainerName || computedHash != hash {
 		t.Errorf("For (%s, %s, %s, %d), unpacked (%s, %s, %s, %d)", podFullName, podUID, containerName, computedHash, returnedPodFullName, returnedUID, returnedContainerName, hash)
 	}
@@ -114,7 +117,10 @@ func TestContainerManifestNaming(t *testing.T) {
 	name := fmt.Sprintf("k8s_%s_%s_%s_%s_42", container.Name, podName, podNamespace, podUID)
 	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
 
-	returnedPodFullName, returnedPodUID, returnedContainerName, hash := ParseDockerName(name)
+	returnedPodFullName, returnedPodUID, returnedContainerName, hash, err := ParseDockerName(name)
+	if err != nil {
+		t.Errorf("Failed to parse Docker container name %q: %v", name, err)
+	}
 	if returnedPodFullName != podFullName || string(returnedPodUID) != podUID || returnedContainerName != container.Name || hash != 0 {
 		t.Errorf("unexpected parse: %s %s %s %d", returnedPodFullName, returnedPodUID, returnedContainerName, hash)
 	}

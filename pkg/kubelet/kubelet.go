@@ -478,8 +478,8 @@ func (kl *Kubelet) GarbageCollectContainers() error {
 	unidentifiedContainers := make([]unidentifiedContainer, 0)
 	uidToIDMap := map[string][]string{}
 	for _, container := range containers {
-		_, uid, name, _ := dockertools.ParseDockerName(container.Names[0])
-		if uid == "" && name == "" {
+		_, uid, name, _, err := dockertools.ParseDockerName(container.Names[0])
+		if err != nil {
 			unidentifiedContainers = append(unidentifiedContainers, unidentifiedContainer{
 				id:   container.ID,
 				name: container.Names[0],
@@ -1352,7 +1352,10 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 		if len(running[ix].Name) == 0 {
 			glog.V(2).Infof("Found running container ix=%d with info: %+v", ix, running[ix])
 		}
-		_, uid, _, _ := dockertools.ParseDockerName(running[ix].Name)
+		_, uid, _, _, err := dockertools.ParseDockerName(running[ix].Name)
+		if err != nil {
+			continue
+		}
 		runningSet.Insert(string(uid))
 	}
 	for name, vol := range currentVolumes {
@@ -1446,14 +1449,16 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 	killed := []string{}
 	for ix := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
-		podFullName, uid, containerName, _ := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
-		if _, found := desiredPods[uid]; found {
+		podFullName, uid, containerName, _, err := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
+		_, found := desiredPods[uid]
+		if err == nil && found {
 			// syncPod() will handle this one.
 			continue
 		}
 
 		pc := podContainer{podFullName, uid, containerName}
-		if _, ok := desiredContainers[pc]; !ok {
+		_, ok := desiredContainers[pc]
+		if err != nil || !ok {
 			glog.V(1).Infof("Killing unwanted container %+v", pc)
 			err = kl.killContainer(dockerContainers[ix])
 			if err != nil {

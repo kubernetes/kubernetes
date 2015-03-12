@@ -145,17 +145,20 @@ func (self *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// Get a mapping of pod to number of containers in that pod.
-	podToContainerCount := make(map[types.UID]struct{})
+	// Get a set of running pods.
+	runningPods := make(map[types.UID]struct{})
 	for _, cont := range runningContainers {
-		_, uid, _, _ := dockertools.ParseDockerName(cont.Names[0])
-		podToContainerCount[uid] = struct{}{}
+		_, uid, _, _, err := dockertools.ParseDockerName(cont.Names[0])
+		if err != nil {
+			continue
+		}
+		runningPods[uid] = struct{}{}
 	}
 
 	ch <- prometheus.MustNewConstMetric(
 		runningPodCountDesc,
 		prometheus.GaugeValue,
-		float64(len(podToContainerCount)))
+		float64(len(runningPods)))
 	ch <- prometheus.MustNewConstMetric(
 		runningContainerCountDesc,
 		prometheus.GaugeValue,
