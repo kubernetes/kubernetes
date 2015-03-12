@@ -4,14 +4,15 @@ Take a replicated application and expose it as Kubernetes Service
 
 ### Synopsis
 
-```
+
 Take a replicated application and expose it as Kubernetes Service.
-		
+
 Looks up a ReplicationController by name, and uses the selector for that replication controller
 as the selector for a new Service on the specified port.
-```
 
-kubectl expose <name> --port=<port> [--protocol=TCP|UDP] [--container-port=<number-or-name>] [--service-name=<name>] [--public-ip=<ip>] [--create-external-load-balancer]
+```
+kubectl expose NAME --port=port [--protocol=TCP|UDP] [--container-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]
+```
 
 ### Examples
 

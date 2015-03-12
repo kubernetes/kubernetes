@@ -4,11 +4,12 @@ Print the logs for a container in a pod.
 
 ### Synopsis
 
-```
-Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
-```
 
-kubectl log [-f] <pod> [<container>]
+Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
+
+```
+kubectl log [-f] POD [CONTAINER]
+```
 
 ### Examples
 

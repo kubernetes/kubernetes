@@ -4,12 +4,13 @@ Run a particular image on the cluster.
 
 ### Synopsis
 
-```
+
 Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).
-```
 
-kubectl run-container <name> --image=<image> [--port=<port>] [--replicas=replicas] [--dry-run=<bool>] [--overrides=<inline-json>]
+```
+kubectl run-container NAME --image=image [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json]
+```
 
 ### Examples
 

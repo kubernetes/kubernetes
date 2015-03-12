@@ -4,15 +4,16 @@ Perform a rolling update of the given ReplicationController.
 
 ### Synopsis
 
-```
+
 Perform a rolling update of the given ReplicationController.
 
 Replaces the specified controller with new controller, updating one pod at a time to use the
 new PodTemplate. The new-controller.json must specify the same namespace as the
 existing controller and overwrite at least one (common) label in its replicaSelector.
-```
 
-kubectl rollingupdate <old-controller-name> -f <new-controller.json>
+```
+kubectl rollingupdate OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC
+```
 
 ### Examples
 

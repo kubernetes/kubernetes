@@ -27,11 +27,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	proxy_example = `// Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+$ kubectl proxy --port=8011 --www=./local/www/
+
+// Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
+// This makes e.g. the pods api available at localhost:8011/k8s-api/v1beta1/pods/
+$ kubectl proxy --api-prefix=k8s-api`
+)
+
 func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "proxy",
-		Short: "Run a proxy to the Kubernetes API server",
-		Long:  `Run a proxy to the Kubernetes API server.`,
+		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Short:   "Run a proxy to the Kubernetes API server",
+		Long:    `Run a proxy to the Kubernetes API server. `,
+		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, out, cmd)
 			util.CheckErr(err)

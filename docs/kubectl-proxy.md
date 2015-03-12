@@ -4,11 +4,23 @@ Run a proxy to the Kubernetes API server
 
 ### Synopsis
 
+
+Run a proxy to the Kubernetes API server. 
+
 ```
-Run a proxy to the Kubernetes API server.
+kubectl proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]
 ```
 
-kubectl proxy
+### Examples
+
+```
+// Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+$ kubectl proxy --port=8011 --www=./local/www/
+
+// Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
+// This makes e.g. the pods api available at localhost:8011/k8s-api/v1beta1/pods/
+$ kubectl proxy --api-prefix=k8s-api
+```
 
 ### Options
 

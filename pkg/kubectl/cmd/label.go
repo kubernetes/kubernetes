@@ -50,7 +50,7 @@ $ kubectl label pods foo bar-`
 
 func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "label [--overwrite] <resource> <name> <key-1>=<val-1> ... <key-n>=<val-n> [--resource-version=<version>]",
+		Use:     "label [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the labels on a resource",
 		Long:    label_long,
 		Example: label_example,

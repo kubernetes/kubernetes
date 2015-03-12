@@ -4,14 +4,15 @@ Show details of a specific resource
 
 ### Synopsis
 
-```
+
 Show details of a specific resource.
 
 This command joins many API calls together to form a detailed description of a
 given resource.
-```
 
-kubectl describe <resource> <id>
+```
+kubectl describe RESOURCE ID
+```
 
 ### Options inherrited from parent commands
 

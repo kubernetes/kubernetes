@@ -27,7 +27,7 @@ import (
 // TODO remove once people have been given enough time to notice
 func NewCmdNamespace(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "namespace [<namespace>]",
+		Use:   "namespace [namespace]",
 		Short: "SUPERCEDED: Set and view the current Kubernetes namespace",
 		Long: `SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 

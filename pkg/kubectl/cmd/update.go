@@ -43,7 +43,7 @@ $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState":
 func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
-		Use:     "update -f filename",
+		Use:     "update -f FILENAME",
 		Short:   "Update a resource by filename or stdin.",
 		Long:    update_long,
 		Example: update_example,

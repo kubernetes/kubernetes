@@ -4,11 +4,14 @@ displays merged .kubeconfig settings or a specified .kubeconfig file.
 
 ### Synopsis
 
-```
-displays merged .kubeconfig settings or a specified .kubeconfig file.
-```
 
+displays merged .kubeconfig settings or a specified .kubeconfig file.
+
+You can use --output=template --template=TEMPLATE to extract specific values.
+
+```
 kubectl config view
+```
 
 ### Examples
 
@@ -18,6 +21,9 @@ $ kubectl config view
 
 // Show only local ./.kubeconfig settings
 $ kubectl config view --local
+
+// Get the password for the e2e user
+$ kubectl config view -o template --template='{{ index . "users" "e2e" "password" }}'
 ```
 
 ### Options

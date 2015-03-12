@@ -41,7 +41,7 @@ $ cat pod.json | kubectl create -f -`
 func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
-		Use:     "create -f filename",
+		Use:     "create -f FILENAME",
 		Short:   "Create a resource by filename or stdin",
 		Long:    create_long,
 		Example: create_example,

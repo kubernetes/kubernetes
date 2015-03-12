@@ -44,7 +44,7 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -`
 
 func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "rollingupdate <old-controller-name> -f <new-controller.json>",
+		Use:     "rollingupdate OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC",
 		Short:   "Perform a rolling update of the given ReplicationController.",
 		Long:    rollingupdate_long,
 		Example: rollingupdate_example,

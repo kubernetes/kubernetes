@@ -4,14 +4,15 @@ Gracefully shut down a resource by id or filename.
 
 ### Synopsis
 
-```
+
 Gracefully shut down a resource by id or filename.
 
 Attempts to shut down and delete a resource that supports graceful termination.
 If the resource is resizable it will be resized to 0 before deletion.
-```
 
-kubectl stop (-f filename | <resource> (<id> | -l <label> | --all))
+```
+kubectl stop (-f FILENAME | RESOURCE (ID | -l label | --all))
+```
 
 ### Examples
 

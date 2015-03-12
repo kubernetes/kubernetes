@@ -58,7 +58,7 @@ $ kubectl get rc,services`
 // retrieves one or more resources from a server.
 func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "get [(-o|--output=)json|yaml|template|...] <resource> [<id>]",
+		Use:     "get [(-o|--output=)json|yaml|template|...] RESOURCE [ID]",
 		Short:   "Display one or many resources",
 		Long:    get_long,
 		Example: get_example,

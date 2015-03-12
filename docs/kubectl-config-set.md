@@ -4,16 +4,14 @@ Sets an individual value in a .kubeconfig file
 
 ### Synopsis
 
-```
+
 Sets an individual value in a .kubeconfig file
+PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
+PROPERTY_VALUE is the new value you wish to set.
 
-		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-		property-value is the new value you wish to set.
-
-		
 ```
-
-kubectl config set property-name property-value
+kubectl config set PROPERTY_NAME PROPERTY_VALUE
+```
 
 ### Options inherrited from parent commands
 

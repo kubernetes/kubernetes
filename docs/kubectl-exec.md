@@ -4,11 +4,12 @@ Execute a command in a container.
 
 ### Synopsis
 
-```
-Execute a command in a container.
-```
 
-kubectl exec -p <pod> -c <container> -- <command> [<args...>]
+Execute a command in a container.
+
+```
+kubectl exec -p POD -c CONTAINER -- COMMAND [args...]
+```
 
 ### Examples
 

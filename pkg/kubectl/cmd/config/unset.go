@@ -32,16 +32,16 @@ type unsetOptions struct {
 	propertyName string
 }
 
+const unset_long = `Unsets an individual value in a .kubeconfig file
+PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.`
+
 func NewCmdConfigUnset(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	options := &unsetOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
-		Use:   "unset property-name",
+		Use:   "unset PROPERTY_NAME",
 		Short: "Unsets an individual value in a .kubeconfig file",
-		Long: `Unsets an individual value in a .kubeconfig file
-
-		property-name is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
-		`,
+		Long:  unset_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return

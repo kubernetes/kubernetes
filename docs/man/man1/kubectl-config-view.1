@@ -15,6 +15,9 @@ kubectl config view \- displays merged .kubeconfig settings or a specified .kube
 .PP
 displays merged .kubeconfig settings or a specified .kubeconfig file.
 
+.PP
+You can use \-\-output=template \-\-template=TEMPLATE to extract specific values.
+
 
 .SH OPTIONS
 .PP
@@ -167,6 +170,9 @@ $ kubectl config view
 
 // Show only local ./.kubeconfig settings
 $ kubectl config view \-\-local
+
+// Get the password for the e2e user
+$ kubectl config view \-o template \-\-template='\{\{ index . "users" "e2e" "password" \}\}'
 
 .fi
 .RE

@@ -65,10 +65,10 @@ func genMarkdown(command *cobra.Command, parent, docsDir string) {
 	fmt.Fprintf(out, "## %s\n\n", name)
 	fmt.Fprintf(out, "%s\n\n", short)
 	fmt.Fprintf(out, "### Synopsis\n\n")
-	fmt.Fprintf(out, "```\n%s\n```\n\n", long)
+	fmt.Fprintf(out, "\n%s\n\n", long)
 
 	if command.Runnable() {
-		fmt.Fprintf(out, "%s\n\n", command.UseLine())
+		fmt.Fprintf(out, "```\n%s\n```\n\n", command.UseLine())
 	}
 
 	if len(command.Example) > 0 {
