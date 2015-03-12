@@ -175,3 +175,13 @@ func TestEventList(t *testing.T) {
 		t.Errorf("%#v != %#v.", e, r)
 	}
 }
+
+func TestEventDelete(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: "/events/foo"},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().Events(ns).Delete("foo")
+	c.Validate(t, nil, err)
+}
