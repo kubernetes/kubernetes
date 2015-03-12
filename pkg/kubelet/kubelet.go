@@ -850,7 +850,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 	}
 
 	for _, value := range container.Env {
-		// The code is in transition from using etcd+BoundPods to apiserver+Pods.
+		// Accesses apiserver+Pods.
 		// So, the master may set service env vars, or kubelet may.  In case both are doing
 		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
 		// env vars.

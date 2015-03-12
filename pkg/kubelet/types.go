@@ -40,8 +40,6 @@ const (
 	// These constants identify the sources of pods
 	// Updates from a file
 	FileSource = "file"
-	// Updates from etcd
-	EtcdSource = "etcd" // Not supported by current kubelets.
 	// Updates from querying a web page
 	HTTPSource = "http"
 	// Updates received to the kubelet server
