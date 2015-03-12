@@ -1244,3 +1244,92 @@ type SecretList struct {
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
 }
+
+// AutoScaler monitors other resources that are resizeable and adjusts them according to configuration.
+type AutoScaler struct {
+	TypeMeta `json:",inline"`
+
+	// Spec defines the auto-scaler targets and thresholds.
+	Spec AutoScalerSpec `json:"spec,omitempty"`
+
+	// Status defines the actions the auto-scaler has taken.
+	Status AutoScalerStatus `json:"status,omitempty"`
+}
+
+// AutoScalerStatus provides the status of an auto-scaler.
+type AutoScalerStatus struct {
+	// TODO: open for discussion on what meaningful information can be reported in the status
+	// The status may return the replica count here but we may want more information
+	// such as if the count reflects a threshold being passed.
+}
+
+// AutoScalerSpec defines the auto-scaler targets and thresholds.
+type AutoScalerSpec struct {
+	// Thresholds holds a collection of AutoScaleThresholds that drive the auto-scaler.
+	Thresholds []AutoScaleThreshold `json:"thresholds,omitempty"`
+
+	// Enabled turns auto scaling on or off.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// MaxAutoScaleCount defines the max replicas that the auto-scaler can use.  This value must be
+	// >= MinAutoScaleCount.
+	MaxAutoScaleCount int `json:"maxAutoScaleCount,omitempty"`
+
+	// MinAutoScaleCount defines the minimum number replicas that the auto-scaler can reduce to,
+	// 0 means that the application is allowed to idle.
+	MinAutoScaleCount int `json:"minAutoScaleCount,omitempty"`
+
+	// TargetSelector provides the resizeable target(s).  Right now this is a ReplicationController
+	// in the future it could be a job or any resource that implements resize.  If multiple targets
+	// are resolved by the selector the auto-scaler will resize the largest one.
+	TargetSelector map[string]string `json:"targetSelector,omitempty"`
+
+	// MonitorSelector defines a set of capacity that the auto-scaler is monitoring
+	// (replication controllers).  Monitored objects are used by thresholds to examine
+	// statistics.  Example: get statistic X for object Y to see if threshold is passed.
+	MonitorSelector map[string]string `json:"monitorSelector,omitempty"`
+}
+
+// AutoScaleThreshold is a behavior based on statistics used to drive the auto-scaler in scaling decisions.
+type AutoScaleThreshold struct {
+	// Type is the type of threshold being used, intention or value.
+	Type AutoScaleThresholdType `json:"type,omitempty"`
+
+	// IntentionConfig holds the config for intention based thresholds.
+	IntentionConfig AutoScaleIntentionThresholdConfig `json:"intentionConfig,omitempty"`
+}
+
+// AutoScaleIntentionThresholdConfig holds configuration for intention based thresholds.
+// The scaler will adjust by 1 accordingly and maintain once the intention is reached.
+type AutoScaleIntentionThresholdConfig struct {
+	// Intent is the lexicon of what intention is requested.
+	Intent AutoScaleIntentionType `json:"intent,omitempty"`
+
+	// Value is intention dependent in terms of above, below, equal and represents
+	// the value to check against.
+	Value float32 `json:"value,omitempty"`
+}
+
+// AutoScaleThresholdType is either intention based or value based.
+type AutoScaleThresholdType string
+
+// AutoScaleIntentionType is a lexicon for intentions such as "cpu-utilization",
+// "max-rps-per-endpoint".
+type AutoScaleIntentionType string
+
+// Constants for auto-scalers and any auto-scaling child types like intentions
+const (
+	// AutoScaleThresholdTypeIntention is used when defining an intention based threshold.
+	AutoScaleThresholdTypeIntention AutoScaleThresholdType = "Intention"
+
+	// TODO: AutoScaleIntentionType types
+	// example: AutoScaleIntentionTypeMaxRPS AutoScaleIntentionType = "MaxRPS"
+)
+
+// AutoScalerList is a list of AutoScaler items
+type AutoScalerList struct {
+	TypeMeta `json:",inline"`
+
+	// Items is a list of AutoScaler objects.
+	Items []AutoScaler `json:"items"`
+}

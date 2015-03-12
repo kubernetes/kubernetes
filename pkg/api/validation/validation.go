@@ -1011,3 +1011,87 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) er
 	newNamespace.Spec = oldNamespace.Spec
 	return allErrs
 }
+
+// ValidateAutoScalerName can be used to check whether the given namespace name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateAutoScalerName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateAutoScaler tests if required fields are set.
+func ValidateAutoScaler(autoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&autoScaler.ObjectMeta, true, ValidateAutoScalerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateAutoScalerSpec(&autoScaler.Spec)...)
+	return allErrs
+}
+
+// ValidateAutoScalerSpec tests is AutoScaler.Spec required fields are set
+func ValidateAutoScalerSpec(spec *api.AutoScalerSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	//must have a target selector
+	if len(spec.TargetSelector) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("targetSelector", spec.TargetSelector))
+	}
+
+	//min can't be greater than max
+	if spec.MinAutoScaleCount > spec.MaxAutoScaleCount {
+		allErrs = append(allErrs, errs.NewFieldInvalid("minAutoScaleCount", spec.MinAutoScaleCount, "minAutoScaleCount cannot be greater than maxAutoScaleCount"))
+	}
+
+	//must have a monitor selector
+	if len(spec.MonitorSelector) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("monitorSelector", spec.MonitorSelector))
+	}
+
+	//check all thresholds
+	for _, t := range spec.Thresholds {
+		allErrs = append(allErrs, ValidateAutoScaleThreshold(&t).Prefix("thresholds")...)
+	}
+
+	return allErrs
+}
+
+// ValidateAutoScaleThreshold ensures required fields are set
+func ValidateAutoScaleThreshold(t *api.AutoScaleThreshold) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	switch t.Type {
+	case api.AutoScaleThresholdTypeIntention:
+		allErrs = append(allErrs, validateIntentionThreshold(t).Prefix("intentionConfig")...)
+	default:
+		if len(t.Type) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired("type", t.Type))
+		} else {
+			allErrs = append(allErrs, errs.NewFieldInvalid("type", t.Type, "invalid threshold type"))
+		}
+	}
+
+	return allErrs
+}
+
+// validateIntentionThreshold ensures required fields for intention based thresholds are set
+func validateIntentionThreshold(t *api.AutoScaleThreshold) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if len(t.IntentionConfig.Intent) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("intent", t.IntentionConfig.Intent))
+	}
+
+	//TODO validate value of intent
+
+	return allErrs
+}
+
+// ValidateNamespaceUpdate tests to make sure a mamespace update can be applied.  Modifies oldAutoScaler.
+func ValidateAutoScalerUpdate(oldAutoScaler *api.AutoScaler, autoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldAutoScaler.ObjectMeta, &autoScaler.ObjectMeta).Prefix("metadata")...)
+
+	//use all creation validations
+	allErrs = append(allErrs, ValidateAutoScaler(autoScaler)...)
+
+	return allErrs
+}
