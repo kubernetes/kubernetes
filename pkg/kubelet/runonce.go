@@ -42,7 +42,7 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 	select {
 	case u := <-updates:
 		glog.Infof("processing manifest with %d pods", len(u.Pods))
-		result, err := kl.runOnce(u.Pods)
+		result, err := kl.runOnce(u.Pods, RunOnceRetryDelay)
 		glog.Infof("finished processing %d pods", len(u.Pods))
 		return result, err
 	case <-time.After(RunOnceManifestDelay):
@@ -51,7 +51,7 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []api.BoundPod) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	if kl.dockerPuller == nil {
 		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
 	}
@@ -61,7 +61,7 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod) (results []RunPodResult, err err
 	for i := range pods {
 		pod := pods[i] // Make a copy
 		go func() {
-			err := kl.runPod(pod)
+			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{&pod, err}
 		}()
 	}
@@ -87,8 +87,8 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod) (results []RunPodResult, err err
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.BoundPod) error {
-	delay := RunOnceRetryDelay
+func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
+	delay := retryDelay
 	retry := 0
 	for {
 		dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
