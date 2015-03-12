@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -140,7 +141,7 @@ func TestRunOnce(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
