@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,49 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1beta2
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+// Codec encodes internal objects to the v1beta2 scheme
+var Codec = runtime.CodecFor(api.Scheme, "v1beta2")
+
+// Dependency does nothing but give a hook for other packages to force a
+// compile-time error when this API version is eventually removed.  This is
+// useful, for example, to clean up things that are implicitly tied to
+// semantics of older APIs.
+const Dependency = true
 
 func init() {
-	// Check if v1 is in the list of supported API versions.
-	if !registered.IsRegisteredAPIVersion("v1") {
-		return
-	}
-
-	// Register the API.
-	addKnownTypes()
-	addConversionFuncs()
-	addDefaultingFuncs()
-}
-
-// Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes("v1beta2",
 		&Pod{},
-		&PodList{},
 		&PodStatusResult{},
-		&PodTemplate{},
-		&PodTemplateList{},
+		&PodList{},
 		&ReplicationController{},
 		&ReplicationControllerList{},
 		&Service{},
 		&ServiceList{},
 		&Endpoints{},
 		&EndpointsList{},
-		&Node{},
-		&NodeList{},
+		&Minion{},
+		&NodeInfo{},
+		&MinionList{},
 		&Binding{},
 		&Status{},
 		&Event{},
 		&EventList{},
+		&ContainerManifest{},
+		&ContainerManifestList{},
 		&List{},
 		&LimitRange{},
 		&LimitRangeList{},
@@ -74,7 +67,6 @@ func addKnownTypes() {
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
 		&ListOptions{},
-		&PodAttachOptions{},
 		&PodLogOptions{},
 		&PodExecOptions{},
 		&PodProxyOptions{},
@@ -85,28 +77,29 @@ func addKnownTypes() {
 		&AutoScaler{},
 		&AutoScalerList{},
 	)
-	// Legacy names are supported
-	api.Scheme.AddKnownTypeWithName("v1", "Minion", &Node{})
-	api.Scheme.AddKnownTypeWithName("v1", "MinionList", &NodeList{})
+	// Future names are supported
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}
-func (*PodList) IsAnAPIObject()                   {}
 func (*PodStatusResult) IsAnAPIObject()           {}
-func (*PodTemplate) IsAnAPIObject()               {}
-func (*PodTemplateList) IsAnAPIObject()           {}
+func (*PodList) IsAnAPIObject()                   {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}
 func (*EndpointsList) IsAnAPIObject()             {}
-func (*Node) IsAnAPIObject()                      {}
-func (*NodeList) IsAnAPIObject()                  {}
+func (*Minion) IsAnAPIObject()                    {}
+func (*NodeInfo) IsAnAPIObject()                  {}
+func (*MinionList) IsAnAPIObject()                {}
 func (*Binding) IsAnAPIObject()                   {}
 func (*Status) IsAnAPIObject()                    {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
+func (*ContainerManifest) IsAnAPIObject()         {}
+func (*ContainerManifestList) IsAnAPIObject()     {}
 func (*List) IsAnAPIObject()                      {}
 func (*LimitRange) IsAnAPIObject()                {}
 func (*LimitRangeList) IsAnAPIObject()            {}
@@ -124,7 +117,6 @@ func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
 func (*DeleteOptions) IsAnAPIObject()             {}
 func (*ListOptions) IsAnAPIObject()               {}
-func (*PodAttachOptions) IsAnAPIObject()          {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
