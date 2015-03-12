@@ -271,6 +271,7 @@ function salt-master-role() {
 grains:
   roles:
     - kubernetes-master
+  cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
 }
