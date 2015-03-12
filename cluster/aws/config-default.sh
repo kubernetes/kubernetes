@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: this isn't quite piped into all the right places...
+# TODO: the zone isn't quite piped into all the right places...
 ZONE=${KUBE_AWS_ZONE:-us-west-2}
 MASTER_SIZE=t2.micro
 MINION_SIZE=t2.micro
