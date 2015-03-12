@@ -26,7 +26,8 @@ NUM_MINIONS=${NUM_MINIONS:-4}
 
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
-IAM_PROFILE="kubernetes"
+IAM_PROFILE_MASTER="kubernetes-master"
+IAM_PROFILE_MINION="kubernetes-minion"
 
 LOG="/dev/null"
 

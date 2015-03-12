@@ -282,11 +282,44 @@ function add-tag {
   exit 1
 }
 
+# Creates the IAM profile, based on configuration files in templates/iam
+function create-iam-profile {
+  local key=$1
+
+  local conf_dir=file://${KUBE_ROOT}/cluster/aws/templates/iam
+
+  echo "Creating IAM role: ${key}"
+  aws iam create-role --role-name ${key} --assume-role-policy-document ${conf_dir}/${key}-role.json > $LOG
+
+  echo "Creating IAM role-policy: ${key}"
+  aws iam put-role-policy --role-name ${key} --policy-name ${key} --policy-document ${conf_dir}/${key}-policy.json > $LOG
+
+  echo "Creating IAM instance-policy: ${key}"
+  aws iam create-instance-profile --instance-profile-name ${key} > $LOG
+
+  echo "Adding IAM role to instance-policy: ${key}"
+  aws iam add-role-to-instance-profile --instance-profile-name ${key} --role-name ${key} > $LOG
+}
+
+# Creates the IAM roles (if they do not already exist)
+function ensure-iam-profiles {
+  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MASTER} || {
+    echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
+    create-iam-profile ${IAM_PROFILE_MASTER}
+  }
+  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MINION} || {
+    echo "Creating master IAM profile: ${IAM_PROFILE_MINION}"
+    create-iam-profile ${IAM_PROFILE_MINION}
+  }
+}
+
 function kube-up {
   find-release-tars
   upload-server-tars
 
   ensure-temp-dir
+
+  ensure-iam-profiles
 
   get-password
   python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
@@ -299,11 +332,6 @@ function kube-up {
   fi
 
   detect-image
-
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE} || {
-        echo "You need to set up an IAM profile and role for kubernetes"
-        exit 1
-  }
 
   $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > $LOG 2>&1 || true
 
@@ -387,7 +415,7 @@ function kube-up {
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
     --image-id $AWS_IMAGE \
-    --iam-instance-profile Name=$IAM_PROFILE \
+    --iam-instance-profile Name=$IAM_PROFILE_MASTER \
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
     --private-ip-address 172.20.0.9 \
@@ -460,7 +488,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
     minion_id=$($AWS_CMD run-instances \
       --image-id $AWS_IMAGE \
-      --iam-instance-profile Name=$IAM_PROFILE \
+      --iam-instance-profile Name=$IAM_PROFILE_MINION \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
       --private-ip-address 172.20.0.1${i} \
