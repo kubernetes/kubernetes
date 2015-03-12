@@ -35,6 +35,8 @@ MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
 CLUSTER_IP_RANGE="10.245.0.0/16"
 MINION_IP_RANGES=($(eval echo "10.245.{1..${NUM_MINIONS}}.0/24"))
+MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+
 MINION_SCOPES=("storage-ro" "compute-rw")
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
@@ -65,3 +67,5 @@ ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="kubernetes.local"
 DNS_REPLICAS=1
+
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota
