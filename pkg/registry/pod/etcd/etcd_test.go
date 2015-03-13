@@ -69,7 +69,7 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient, h := newHelper(t)
-	storage, bindingStorage, statusStorage := NewREST(h, &pod.BasicBoundPodFactory{})
+	storage, bindingStorage, statusStorage := NewREST(h)
 	storage = storage.WithPodStatus(&fakeCache{statusToReturn: &api.PodStatus{}})
 	return storage, bindingStorage, statusStorage, fakeEtcdClient, h
 }
@@ -112,7 +112,7 @@ func TestStorage(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
 	storage = storage.WithPodStatus(cache)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
@@ -142,7 +142,7 @@ func expectPod(t *testing.T, out runtime.Object) (*api.Pod, bool) {
 func TestCreateRegistryError(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 
 	pod := validNewPod()
 	_, err := storage.Create(api.NewDefaultContext(), pod)
@@ -153,7 +153,7 @@ func TestCreateRegistryError(t *testing.T) {
 
 func TestCreateSetsFields(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
 	storage = storage.WithPodStatus(cache)
 	pod := validNewPod()
@@ -177,7 +177,7 @@ func TestCreateSetsFields(t *testing.T) {
 func TestListError(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{}
 	storage = storage.WithPodStatus(cache)
 	pods, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
@@ -205,7 +205,7 @@ func TestListCacheError(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{errorToReturn: client.ErrPodInfoNotAvailable}
 	storage = storage.WithPodStatus(cache)
 
@@ -230,7 +230,7 @@ func TestListEmptyPodList(t *testing.T) {
 		E: fakeEtcdClient.NewError(tools.EtcdErrorCodeNotFound),
 	}
 
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{}
 	storage = storage.WithPodStatus(cache)
 	pods, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
@@ -268,7 +268,7 @@ func TestListPodList(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{Phase: api.PodRunning}}
 	storage = storage.WithPodStatus(cache)
 
@@ -319,7 +319,7 @@ func TestListPodListSelection(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{Phase: api.PodRunning}}
 	storage = storage.WithPodStatus(cache)
 
@@ -386,7 +386,7 @@ func TestListPodListSelection(t *testing.T) {
 }
 
 func TestPodDecode(t *testing.T) {
-	storage, _, _ := NewREST(tools.EtcdHelper{}, nil)
+	storage, _, _ := NewREST(tools.EtcdHelper{})
 	expected := validNewPod()
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
@@ -415,7 +415,7 @@ func TestGet(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{Phase: api.PodRunning}}
 	storage = storage.WithPodStatus(cache)
 
@@ -443,7 +443,7 @@ func TestGetCacheError(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{errorToReturn: client.ErrPodInfoNotAvailable}
 	storage = storage.WithPodStatus(cache)
 
@@ -463,7 +463,7 @@ func TestGetCacheError(t *testing.T) {
 func TestPodStorageValidatesCreate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
 	storage = storage.WithPodStatus(cache)
 
@@ -483,7 +483,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 // TODO: remove, this is covered by RESTTest.TestCreate
 func TestCreatePod(t *testing.T) {
 	_, helper := newHelper(t)
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
 	storage = storage.WithPodStatus(cache)
 
@@ -507,7 +507,7 @@ func TestCreatePod(t *testing.T) {
 // TODO: remove, this is covered by RESTTest.TestCreate
 func TestCreateWithConflictingNamespace(t *testing.T) {
 	_, helper := newHelper(t)
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{}
 	storage = storage.WithPodStatus(cache)
 
@@ -538,7 +538,7 @@ func TestUpdateWithConflictingNamespace(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{}
 	storage = storage.WithPodStatus(cache)
 
@@ -650,7 +650,7 @@ func TestResourceLocation(t *testing.T) {
 				},
 			},
 		}
-		storage, _, _ := NewREST(helper, nil)
+		storage, _, _ := NewREST(helper)
 		cache := &fakeCache{statusToReturn: &api.PodStatus{PodIP: expectedIP}}
 		storage = storage.WithPodStatus(cache)
 
@@ -684,7 +684,7 @@ func TestDeletePod(t *testing.T) {
 			},
 		},
 	}
-	storage, _, _ := NewREST(helper, nil)
+	storage, _, _ := NewREST(helper)
 	cache := &fakeCache{statusToReturn: &api.PodStatus{}}
 	storage = storage.WithPodStatus(cache)
 

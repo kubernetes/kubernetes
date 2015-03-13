@@ -368,9 +368,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-
-	boundPodFactory := &pod.BasicBoundPodFactory{}
-	podStorage, bindingStorage, podStatusStorage := podetcd.NewREST(c.EtcdHelper, boundPodFactory)
+	podStorage, bindingStorage, podStatusStorage := podetcd.NewREST(c.EtcdHelper)
 	podRegistry := pod.NewRegistry(podStorage)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
