@@ -113,14 +113,16 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 
 		if dirty {
 			// construct a usage record
-			usage := api.ResourceQuotaUsage{
+			usage := api.ResourceQuota{
 				ObjectMeta: api.ObjectMeta{
 					Name:            quota.Name,
 					Namespace:       quota.Namespace,
-					ResourceVersion: quota.ResourceVersion},
+					ResourceVersion: quota.ResourceVersion,
+					Labels:          quota.Labels,
+					Annotations:     quota.Annotations},
 			}
 			usage.Status = *status
-			err = q.client.ResourceQuotaUsages(usage.Namespace).Create(&usage)
+			_, err = q.client.ResourceQuotas(usage.Namespace).Status(&usage)
 			if err != nil {
 				return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
 			}

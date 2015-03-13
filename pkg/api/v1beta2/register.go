@@ -57,7 +57,6 @@ func init() {
 		&LimitRangeList{},
 		&ResourceQuota{},
 		&ResourceQuotaList{},
-		&ResourceQuotaUsage{},
 		&Namespace{},
 		&NamespaceList{},
 		&Secret{},
@@ -93,7 +92,6 @@ func (*LimitRange) IsAnAPIObject()                {}
 func (*LimitRangeList) IsAnAPIObject()            {}
 func (*ResourceQuota) IsAnAPIObject()             {}
 func (*ResourceQuotaList) IsAnAPIObject()         {}
-func (*ResourceQuotaUsage) IsAnAPIObject()        {}
 func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
 func (*Secret) IsAnAPIObject()                    {}

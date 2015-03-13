@@ -972,6 +972,36 @@ func ValidateResourceQuota(resourceQuota *api.ResourceQuota) errs.ValidationErro
 	return allErrs
 }
 
+// ValidateResourceQuotaUpdate tests to see if the update is legal for an end user to make.
+// newResourceQuota is updated with fields that cannot be changed.
+func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *api.ResourceQuota) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldResourceQuota.ObjectMeta, &newResourceQuota.ObjectMeta).Prefix("metadata")...)
+	for k := range newResourceQuota.Spec.Hard {
+		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+	}
+	newResourceQuota.Status = oldResourceQuota.Status
+	return allErrs
+}
+
+// ValidateResourceQuotaStatusUpdate tests to see if the status update is legal for an end user to make.
+// newResourceQuota is updated with fields that cannot be changed.
+func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.ResourceQuota) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldResourceQuota.ObjectMeta, &newResourceQuota.ObjectMeta).Prefix("metadata")...)
+	if newResourceQuota.ResourceVersion == "" {
+		allErrs = append(allErrs, fmt.Errorf("ResourceVersion must be specified"))
+	}
+	for k := range newResourceQuota.Status.Hard {
+		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+	}
+	for k := range newResourceQuota.Status.Used {
+		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
+	}
+	newResourceQuota.Spec = oldResourceQuota.Spec
+	return allErrs
+}
+
 // ValidateNamespace tests if required fields are set.
 func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}

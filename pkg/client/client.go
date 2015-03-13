@@ -39,7 +39,6 @@ type Interface interface {
 	EventNamespacer
 	LimitRangesNamespacer
 	ResourceQuotasNamespacer
-	ResourceQuotaUsagesNamespacer
 	SecretsNamespacer
 	NamespacesInterface
 }
@@ -74,10 +73,6 @@ func (c *Client) LimitRanges(namespace string) LimitRangeInterface {
 
 func (c *Client) ResourceQuotas(namespace string) ResourceQuotaInterface {
 	return newResourceQuotas(c, namespace)
-}
-
-func (c *Client) ResourceQuotaUsages(namespace string) ResourceQuotaUsageInterface {
-	return newResourceQuotaUsages(c, namespace)
 }
 
 func (c *Client) Secrets(namespace string) SecretsInterface {

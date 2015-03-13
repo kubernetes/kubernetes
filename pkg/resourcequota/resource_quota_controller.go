@@ -114,11 +114,13 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 	dirty := quota.Status.Hard == nil || quota.Status.Used == nil
 
 	// Create a usage object that is based on the quota resource version
-	usage := api.ResourceQuotaUsage{
+	usage := api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
 			Name:            quota.Name,
 			Namespace:       quota.Namespace,
-			ResourceVersion: quota.ResourceVersion},
+			ResourceVersion: quota.ResourceVersion,
+			Labels:          quota.Labels,
+			Annotations:     quota.Annotations},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{},
 			Used: api.ResourceList{},
@@ -206,7 +208,8 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	// update the usage only if it changed
 	if dirty {
-		return rm.kubeClient.ResourceQuotaUsages(usage.Namespace).Create(&usage)
+		_, err = rm.kubeClient.ResourceQuotas(usage.Namespace).Status(&usage)
+		return err
 	}
 	return nil
 }
