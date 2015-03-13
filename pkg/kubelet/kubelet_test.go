@@ -83,7 +83,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	waitGroup := new(sync.WaitGroup)
 	kubelet.podWorkers = newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.BoundPod, containers dockertools.DockerContainers) error {
+		func(pod *api.Pod, containers dockertools.DockerContainers) error {
 			err := kubelet.syncPod(pod, containers)
 			waitGroup.Done()
 			return err
@@ -381,7 +381,7 @@ func TestKillContainer(t *testing.T) {
 }
 
 type channelReader struct {
-	list [][]api.BoundPod
+	list [][]api.Pod
 	wg   sync.WaitGroup
 }
 
@@ -401,7 +401,7 @@ func startReading(channel <-chan interface{}) *channelReader {
 	return cr
 }
 
-func (cr *channelReader) GetList() [][]api.BoundPod {
+func (cr *channelReader) GetList() [][]api.Pod {
 	cr.wg.Wait()
 	return cr.list
 }
@@ -427,7 +427,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -460,7 +460,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 		TerminationMessagePath: "/dev/somepath",
 	}
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -509,7 +509,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -562,7 +562,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	puller.HasImages = []string{}
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -612,7 +612,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -658,7 +658,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -726,7 +726,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 			ID:    "8765",
 		},
 	}
-	kubelet.pods = []api.BoundPod{
+	kubelet.pods = []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -793,7 +793,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	if err := kubelet.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now()); err != nil {
+	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Validate nothing happened.
@@ -801,7 +801,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeDocker.ClearCalls()
 
 	ready = true
-	if err := kubelet.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now()); err != nil {
+	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
@@ -839,7 +839,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 			ID:    "4567",
 		},
 	}
-	err := kubelet.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -880,7 +880,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 			ID:    "4567",
 		},
 	}
-	bound := api.BoundPod{
+	bound := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      "bar",
@@ -921,7 +921,7 @@ func TestSyncPodBadHash(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	bound := api.BoundPod{
+	bound := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
@@ -971,7 +971,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	bound := api.BoundPod{
+	bound := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
@@ -1011,7 +1011,7 @@ func TestMountExternalVolumes(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.volumePluginMgr.InitPlugins([]volume.Plugin{&volume.FakePlugin{"fake", nil}}, &volumeHost{kubelet})
 
-	pod := api.BoundPod{
+	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
@@ -1036,7 +1036,7 @@ func TestMountExternalVolumes(t *testing.T) {
 	}
 	for _, name := range expectedPodVolumes {
 		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.BoundPod volumes map is missing key: %s. %#v", name, podVolumes)
+			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
 		}
 	}
 }
@@ -1115,21 +1115,13 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 		},
 	}
 
-	pod := api.BoundPod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "pod",
-			Namespace: "test",
-		},
-	}
-
 	podVolumes := volumeMap{
 		"disk":  &stubVolume{"/mnt/disk"},
 		"disk4": &stubVolume{"/mnt/host"},
 		"disk5": &stubVolume{"/var/lib/kubelet/podID/volumes/empty/disk5"},
 	}
 
-	binds := makeBinds(&pod, &container, podVolumes)
+	binds := makeBinds(&container, podVolumes)
 
 	expectedBinds := []string{
 		"/mnt/disk:/mnt/path",
@@ -1209,14 +1201,14 @@ func TestMakePortsAndBindings(t *testing.T) {
 }
 
 func TestFieldPath(t *testing.T) {
-	pod := &api.BoundPod{Spec: api.PodSpec{Containers: []api.Container{
+	pod := &api.Pod{Spec: api.PodSpec{Containers: []api.Container{
 		{Name: "foo"},
 		{Name: "bar"},
 		{Name: ""},
 		{Name: "baz"},
 	}}}
 	table := map[string]struct {
-		pod       *api.BoundPod
+		pod       *api.Pod
 		container *api.Container
 		path      string
 		success   bool
@@ -1482,7 +1474,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"})
@@ -1515,7 +1507,7 @@ func TestRunInContainer(t *testing.T) {
 
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer(
-		GetPodFullName(&api.BoundPod{
+		GetPodFullName(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
 				Name:      podName,
@@ -1663,7 +1655,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	bound := api.BoundPod{
+	bound := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
@@ -2066,7 +2058,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods([]api.BoundPod{
+	err := kubelet.SyncPods([]api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -2850,7 +2842,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	err := kubelet.ExecInContainer(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"},
@@ -2886,7 +2878,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	}
 
 	err := kubelet.ExecInContainer(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2945,7 +2937,7 @@ func TestExecInContainer(t *testing.T) {
 	}
 
 	err := kubelet.ExecInContainer(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2994,7 +2986,7 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 	var port uint16 = 5000
 
 	err := kubelet.PortForward(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		port,
 		nil,
@@ -3026,7 +3018,7 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 	}
 
 	err := kubelet.PortForward(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -3071,7 +3063,7 @@ func TestPortForward(t *testing.T) {
 	}
 
 	err := kubelet.PortForward(
-		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{
+		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -3096,7 +3088,7 @@ func TestPortForward(t *testing.T) {
 
 // Tests that identify the host port conflicts are detected correctly.
 func TestGetHostPortConflicts(t *testing.T) {
-	pods := []api.BoundPod{
+	pods := []api.Pod{
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}}},
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 82}}}}}},
@@ -3109,11 +3101,11 @@ func TestGetHostPortConflicts(t *testing.T) {
 	}
 
 	// The new pod should cause conflict and be reported.
-	expected := api.BoundPod{
+	expected := api.Pod{
 		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
 	}
 	pods = append(pods, expected)
-	if actual := getHostPortConflicts(pods); !reflect.DeepEqual(actual, []api.BoundPod{expected}) {
+	if actual := getHostPortConflicts(pods); !reflect.DeepEqual(actual, []api.Pod{expected}) {
 		t.Errorf("expected %#v, Got %#v", expected, actual)
 	}
 }
@@ -3123,7 +3115,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
 	spec := api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}
-	pods := []api.BoundPod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "123456789",
@@ -3141,7 +3133,7 @@ func TestHandlePortConflicts(t *testing.T) {
 			Spec: spec,
 		},
 	}
-	// Make sure the BoundPods are in the reverse order of creation time.
+	// Make sure the Pods are in the reverse order of creation time.
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
@@ -3174,7 +3166,7 @@ func TestHandlePortConflicts(t *testing.T) {
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
-	pods := []api.BoundPod{
+	pods := []api.Pod{
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 	}
@@ -3184,7 +3176,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
-	kl.SyncPods([]api.BoundPod{}, emptyPodUIDs, time.Now())
+	kl.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now())
 	if len(kl.podStatuses) != 0 {
 		t.Fatalf("expected length of status map to be 0. Got map %#v.", kl.podStatuses)
 	}

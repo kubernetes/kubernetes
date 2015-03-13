@@ -32,7 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) {
+func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 	manifest := v1beta1.ContainerManifest{
 		ID:   id,
 		UUID: types.UID(id),
@@ -52,7 +52,7 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) 
 			},
 		},
 	}
-	expectedPod := api.BoundPod{
+	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      id,
 			UID:       types.UID(id),
@@ -130,7 +130,7 @@ func TestReadFromFile(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "",
 				UID:       "12345",
@@ -179,7 +179,7 @@ func TestReadFromFileWithoutID(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "",
 				UID:       "12345",
@@ -219,7 +219,7 @@ func TestReadV1Beta2FromFile(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "",
 				UID:       "12345",
@@ -303,7 +303,7 @@ func TestExtractFromDir(t *testing.T) {
 	manifest2, expectedPod2 := ExampleManifestAndPod("2")
 
 	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
-	pods := []api.BoundPod{expectedPod, expectedPod2}
+	pods := []api.Pod{expectedPod, expectedPod2}
 	files := make([]*os.File, len(manifests))
 
 	dirName, err := ioutil.TempDir("", "foo")
@@ -357,7 +357,7 @@ func TestExtractFromDir(t *testing.T) {
 		t.Fatalf("Expected %#v, Got %#v", expected, update)
 	}
 	for i := range update.Pods {
-		if errs := validation.ValidateBoundPod(&update.Pods[i]); len(errs) != 0 {
+		if errs := validation.ValidatePod(&update.Pods[i]); len(errs) != 0 {
 			t.Errorf("Expected no validation errors on %#v, Got %q", update.Pods[i], errs)
 		}
 	}

@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
+type syncPodFnType func(*api.Pod, dockertools.DockerContainers) error
 
 type podWorkers struct {
 	// Protects podUpdates field.
@@ -58,7 +58,7 @@ type podWorkers struct {
 
 type workUpdate struct {
 	// The pod state to reflect.
-	pod *api.BoundPod
+	pod *api.Pod
 
 	// Function to call when the update is complete.
 	updateCompleteFn func()
@@ -106,7 +106,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 }
 
 // Apply the new setting to the specified pod. updateComplete is called when the update is completed.
-func (p *podWorkers) UpdatePod(pod *api.BoundPod, updateComplete func()) {
+func (p *podWorkers) UpdatePod(pod *api.Pod, updateComplete func()) {
 	uid := pod.UID
 	var podUpdates chan workUpdate
 	var exists bool

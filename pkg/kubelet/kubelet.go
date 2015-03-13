@@ -90,7 +90,7 @@ type SyncHandler interface {
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
-	SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
+	SyncPods(pods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
 }
 
 type SourcesReadyFn func() bool
@@ -234,7 +234,7 @@ type Kubelet struct {
 	// We make complete array copies out of this while locked, which is OK because once added to this array,
 	// pods are immutable
 	podLock sync.RWMutex
-	pods    []api.BoundPod
+	pods    []api.Pod
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
@@ -594,7 +594,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
-func makeBinds(pod *api.BoundPod, container *api.Container, podVolumes volumeMap) []string {
+func makeBinds(container *api.Container, podVolumes volumeMap) []string {
 	binds := []string{}
 	for _, mount := range container.VolumeMounts {
 		vol, ok := podVolumes[mount.Name]
@@ -698,7 +698,7 @@ func (kl *Kubelet) runHandler(podFullName string, uid types.UID, container *api.
 
 // fieldPath returns a fieldPath locating container within pod.
 // Returns an error if the container isn't part of the pod.
-func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
+func fieldPath(pod *api.Pod, container *api.Container) (string, error) {
 	for i := range pod.Spec.Containers {
 		here := &pod.Spec.Containers[i]
 		if here.Name == container.Name {
@@ -718,7 +718,7 @@ func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
 // TODO: Pods that came to us by static config or over HTTP have no selfLink set, which makes
 // this fail and log an error. Figure out how we want to identify these pods to the rest of the
 // system.
-func containerRef(pod *api.BoundPod, container *api.Container) (*api.ObjectReference, error) {
+func containerRef(pod *api.Pod, container *api.Container) (*api.ObjectReference, error) {
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {
 		// TODO: figure out intelligent way to refer to containers that we implicitly
@@ -758,7 +758,7 @@ func (kl *Kubelet) getRef(id dockertools.DockerID) (ref *api.ObjectReference, ok
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (id dockertools.DockerID, err error) {
+func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (id dockertools.DockerID, err error) {
 	ref, err := containerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -768,7 +768,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	if err != nil {
 		return "", err
 	}
-	binds := makeBinds(pod, container, podVolumes)
+	binds := makeBinds(container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
 	opts := docker.CreateContainerOptions{
@@ -943,7 +943,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 	return result, nil
 }
 
-func (kl *Kubelet) applyClusterDNS(hc *docker.HostConfig, pod *api.BoundPod) error {
+func (kl *Kubelet) applyClusterDNS(hc *docker.HostConfig, pod *api.Pod) error {
 	// Get host DNS settings and append them to cluster DNS settings.
 	f, err := os.Open("/etc/resolv.conf")
 	if err != nil {
@@ -1024,7 +1024,7 @@ const (
 )
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (kl *Kubelet) createPodInfraContainer(pod *api.BoundPod) (dockertools.DockerID, error) {
+func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, error) {
 	var ports []api.ContainerPort
 	// Docker only exports ports from the pod infra container.  Let's
 	// collect all of the relevant ports and export them.
@@ -1095,7 +1095,7 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 }
 
 // Kill all containers in a pod.  Returns the number of containers deleted and an error if one occurs.
-func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers dockertools.DockerContainers) (int, error) {
+func (kl *Kubelet) killContainersInPod(pod *api.Pod, dockerContainers dockertools.DockerContainers) (int, error) {
 	podFullName := GetPodFullName(pod)
 
 	count := 0
@@ -1132,7 +1132,7 @@ func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers docke
 type empty struct{}
 
 // makePodDataDirs creates the dirs for the pod datas.
-func (kl *Kubelet) makePodDataDirs(pod *api.BoundPod) error {
+func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	uid := pod.UID
 	if err := os.Mkdir(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
@@ -1146,7 +1146,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.BoundPod) error {
 	return nil
 }
 
-func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.BoundPod) bool {
+func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.Pod) bool {
 	podFullName := GetPodFullName(pod)
 	// Check RestartPolicy for dead container
 	recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, podFullName, pod.UID, container.Name)
@@ -1189,7 +1189,7 @@ func (kl *Kubelet) getPodInfraContainer(podFullName string, uid types.UID,
 
 // Attempts to start a container pulling the image before that if necessary. It returns DockerID of a started container
 // if it was successful, and a non-nil error otherwise.
-func (kl *Kubelet) pullImageAndRunContainer(pod *api.BoundPod, container *api.Container, podVolumes *volumeMap,
+func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Container, podVolumes *volumeMap,
 	podInfraContainerID dockertools.DockerID) (dockertools.DockerID, error) {
 	podFullName := GetPodFullName(pod)
 	ref, err := containerRef(pod, container)
@@ -1240,7 +1240,7 @@ type podContainerChangesSpec struct {
 	containersToKeep    map[dockertools.DockerID]int
 }
 
-func (kl *Kubelet) computePodContainerChanges(pod *api.BoundPod, containersInPod dockertools.DockerContainers) (podContainerChangesSpec, error) {
+func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, containersInPod dockertools.DockerContainers) (podContainerChangesSpec, error) {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
@@ -1343,7 +1343,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.BoundPod, containersInPod
 	}, nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.DockerContainers) error {
+func (kl *Kubelet) syncPod(pod *api.Pod, containersInPod dockertools.DockerContainers) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
 	containerChanges, err := kl.computePodContainerChanges(pod, containersInPod)
@@ -1427,7 +1427,7 @@ type podContainer struct {
 
 // Stores all volumes defined by the set of pods into a map.
 // Keys for each entry are in the format (POD_ID)/(VOLUME_NAME)
-func getDesiredVolumes(pods []api.BoundPod) map[string]api.Volume {
+func getDesiredVolumes(pods []api.Pod) map[string]api.Volume {
 	desiredVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Spec.Volumes {
@@ -1438,7 +1438,7 @@ func getDesiredVolumes(pods []api.BoundPod) map[string]api.Volume {
 	return desiredVolumes
 }
 
-func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
+func (kl *Kubelet) cleanupOrphanedPods(pods []api.Pod) error {
 	desired := util.NewStringSet()
 	for i := range pods {
 		desired.Insert(string(pods[i].UID))
@@ -1461,7 +1461,7 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.BoundPod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker.Container) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.Pod, running []*docker.Container) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
 	runningSet := util.StringSet{}
@@ -1496,7 +1496,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod, running []*docker
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
+func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -1509,7 +1509,7 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 	kl.removeOrphanedStatuses(podFullNames)
 
 	// Filtered out the rejected pod. They don't have running containers.
-	var pods []api.BoundPod
+	var pods []api.Pod
 	for _, pod := range allPods {
 		status, ok := kl.getPodStatusFromCache(GetPodFullName(&pod))
 		if ok && status.Phase == api.PodFailed {
@@ -1607,9 +1607,9 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 	return err
 }
 
-func updateBoundPods(changed []api.BoundPod, current []api.BoundPod) []api.BoundPod {
-	updated := []api.BoundPod{}
-	m := map[types.UID]*api.BoundPod{}
+func updatePods(changed []api.Pod, current []api.Pod) []api.Pod {
+	updated := []api.Pod{}
+	m := map[types.UID]*api.Pod{}
 	for i := range changed {
 		pod := &changed[i]
 		m[pod.UID] = pod
@@ -1629,7 +1629,7 @@ func updateBoundPods(changed []api.BoundPod, current []api.BoundPod) []api.Bound
 	return updated
 }
 
-type podsByCreationTime []api.BoundPod
+type podsByCreationTime []api.Pod
 
 func (s podsByCreationTime) Len() int {
 	return len(s)
@@ -1644,8 +1644,8 @@ func (s podsByCreationTime) Less(i, j int) bool {
 }
 
 // getHostPortConflicts detects pods with conflicted host ports and return them.
-func getHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
-	conflicts := []api.BoundPod{}
+func getHostPortConflicts(pods []api.Pod) []api.Pod {
+	conflicts := []api.Pod{}
 	ports := map[int]bool{}
 	extract := func(p *api.ContainerPort) int { return p.HostPort }
 
@@ -1665,7 +1665,7 @@ func getHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 }
 
 // handleHostPortConflicts handles pods that conflict on Port.HostPort values.
-func (kl *Kubelet) handleHostPortConflicts(pods []api.BoundPod) {
+func (kl *Kubelet) handleHostPortConflicts(pods []api.Pod) {
 	conflicts := getHostPortConflicts(pods)
 	for _, pod := range conflicts {
 		kl.recorder.Eventf(&pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
@@ -1704,7 +1704,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 		}
 
-		pods, err := kl.GetBoundPods()
+		pods, err := kl.GetPods()
 		if err != nil {
 			glog.Errorf("Failed to get bound pods.")
 			return
@@ -1746,7 +1746,7 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		for i := range u.Pods {
 			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodUpdate
 		}
-		kl.pods = updateBoundPods(u.Pods, kl.pods)
+		kl.pods = updatePods(u.Pods, kl.pods)
 		kl.handleHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
@@ -1818,15 +1818,15 @@ func (kl *Kubelet) GetHostname() string {
 	return kl.hostname
 }
 
-// GetBoundPods returns all pods bound to the kubelet and their spec.
-func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
+// GetPods returns all pods bound to the kubelet and their spec.
+func (kl *Kubelet) GetPods() ([]api.Pod, error) {
 	kl.podLock.RLock()
 	defer kl.podLock.RUnlock()
-	return append([]api.BoundPod{}, kl.pods...), nil
+	return append([]api.Pod{}, kl.pods...), nil
 }
 
 // GetPodByName provides the first pod that matches namespace and name, as well as whether the node was found.
-func (kl *Kubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
+func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	kl.podLock.RLock()
 	defer kl.podLock.RUnlock()
 	for i := range kl.pods {

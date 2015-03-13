@@ -72,7 +72,7 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *api.Volume, podRef *api.Obj
 	return builder
 }
 
-func (kl *Kubelet) mountExternalVolumes(pod *api.BoundPod) (volumeMap, error) {
+func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (volumeMap, error) {
 	podVolumes := make(volumeMap)
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]

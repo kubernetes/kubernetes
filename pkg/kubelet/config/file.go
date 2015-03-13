@@ -66,7 +66,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{}, kubelet.SET, kubelet.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -83,7 +83,7 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -95,13 +95,13 @@ func (s *sourceFile) extractFromPath() error {
 // Get as many pod configs as we can from a directory.  Return an error iff something
 // prevented us from reading anything at all.  Do not return an error if only some files
 // were problematic.
-func extractFromDir(name string) ([]api.BoundPod, error) {
+func extractFromDir(name string) ([]api.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]api.BoundPod, 0)
+	pods := make([]api.Pod, 0)
 	if len(dirents) == 0 {
 		return pods, nil
 	}
@@ -131,8 +131,8 @@ func extractFromDir(name string) ([]api.BoundPod, error) {
 	return pods, nil
 }
 
-func extractFromFile(filename string) (api.BoundPod, error) {
-	var pod api.BoundPod
+func extractFromFile(filename string) (api.Pod, error) {
+	var pod api.Pod
 
 	glog.V(3).Infof("Reading config file %q", filename)
 	file, err := os.Open(filename)
@@ -153,10 +153,10 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	// becomes nicer).  Until then, we assert that the ContainerManifest
 	// structure on disk is always v1beta1.  Read that, convert it to a
 	// "current" ContainerManifest (should be ~identical), then convert
-	// that to a BoundPod (which is a well-understood conversion).  This
-	// avoids writing a v1beta1.ContainerManifest -> api.BoundPod
+	// that to a Pod (which is a well-understood conversion).  This
+	// avoids writing a v1beta1.ContainerManifest -> api.Pod
 	// conversion which would be identical to the api.ContainerManifest ->
-	// api.BoundPod conversion.
+	// api.Pod conversion.
 	oldManifest := &v1beta1.ContainerManifest{}
 	if err := yaml.Unmarshal(data, oldManifest); err != nil {
 		return pod, fmt.Errorf("can't unmarshal file %q: %v", filename, err)

@@ -132,12 +132,12 @@ func TestExtractFromHTTP(t *testing.T) {
 				Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.BoundPod{
+				api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta1/boundPods/foo",
+						SelfLink:  "/api/v1beta1/pods/foo",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -155,7 +155,7 @@ func TestExtractFromHTTP(t *testing.T) {
 			manifests: api.ContainerManifest{Version: "v1beta1", UUID: "111"},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.BoundPod{
+				api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "111" + "-" + hostname,
@@ -173,12 +173,12 @@ func TestExtractFromHTTP(t *testing.T) {
 				Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.BoundPod{
+				api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta1/boundPods/foo",
+						SelfLink:  "/api/v1beta1/pods/foo",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -201,12 +201,12 @@ func TestExtractFromHTTP(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.BoundPod{
+				api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta1/boundPods/foo",
+						SelfLink:  "/api/v1beta1/pods/foo",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -218,12 +218,12 @@ func TestExtractFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always"}},
 					},
 				},
-				api.BoundPod{
+				api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "222",
 						Name:      "bar" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta1/boundPods/bar",
+						SelfLink:  "/api/v1beta1/pods/bar",
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
@@ -274,7 +274,7 @@ func TestExtractFromHTTP(t *testing.T) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for i := range update.Pods {
-			if errs := validation.ValidateBoundPod(&update.Pods[i]); len(errs) != 0 {
+			if errs := validation.ValidatePod(&update.Pods[i]); len(errs) != 0 {
 				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, update.Pods[i], errors.NewAggregate(errs))
 			}
 		}

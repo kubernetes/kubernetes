@@ -27,8 +27,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-func newPod(uid, name string) *api.BoundPod {
-	return &api.BoundPod{
+func newPod(uid, name string) *api.Pod {
+	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:  types.UID(uid),
 			Name: name,
@@ -46,7 +46,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 
 	podWorkers := newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.BoundPod, containers dockertools.DockerContainers) error {
+		func(pod *api.Pod, containers dockertools.DockerContainers) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()

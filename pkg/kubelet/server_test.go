@@ -39,12 +39,12 @@ import (
 )
 
 type fakeKubelet struct {
-	podByNameFunc                      func(namespace, name string) (*api.BoundPod, bool)
+	podByNameFunc                      func(namespace, name string) (*api.Pod, bool)
 	statusFunc                         func(name string) (api.PodStatus, error)
 	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	rootInfoFunc                       func(query *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
-	boundPodsFunc                      func() ([]api.BoundPod, error)
+	podsFunc                           func() ([]api.Pod, error)
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	dockerVersionFunc                  func() ([]uint, error)
@@ -55,7 +55,7 @@ type fakeKubelet struct {
 	hostnameFunc                       func() string
 }
 
-func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.BoundPod, bool) {
+func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
@@ -79,8 +79,8 @@ func (fk *fakeKubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return fk.machineInfoFunc()
 }
 
-func (fk *fakeKubelet) GetBoundPods() ([]api.BoundPod, error) {
-	return fk.boundPodsFunc()
+func (fk *fakeKubelet) GetPods() ([]api.Pod, error) {
+	return fk.podsFunc()
 }
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
@@ -125,8 +125,8 @@ func newServerTest() *serverTestFramework {
 	}
 	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{
-		podByNameFunc: func(namespace, name string) (*api.BoundPod, bool) {
-			return &api.BoundPod{
+		podByNameFunc: func(namespace, name string) (*api.Pod, bool) {
+			return &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
@@ -510,8 +510,8 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
-	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*api.BoundPod, bool) {
-		return &api.BoundPod{
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*api.Pod, bool) {
+		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: namespace,
 				Name:      pod,

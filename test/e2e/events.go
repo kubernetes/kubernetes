@@ -115,7 +115,7 @@ var _ = Describe("Events", func() {
 			labels.Everything(),
 			labels.Set{
 				"involvedObject.uid":       string(podWithUid.UID),
-				"involvedObject.kind":      "BoundPod",
+				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": api.NamespaceDefault,
 				"source":                   "kubelet",
 			}.AsSelector(),

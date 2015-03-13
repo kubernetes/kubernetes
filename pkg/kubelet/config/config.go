@@ -113,7 +113,7 @@ func (c *PodConfig) Sync() {
 type podStorage struct {
 	podLock sync.RWMutex
 	// map of source name to pod name to pod reference
-	pods map[string]map[string]*api.BoundPod
+	pods map[string]map[string]*api.Pod
 	mode PodConfigNotificationMode
 
 	// ensures that updates are delivered in strict order
@@ -134,7 +134,7 @@ type podStorage struct {
 // TODO: allow initialization of the current state of the store with snapshotted version.
 func newPodStorage(updates chan<- kubelet.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
 	return &podStorage{
-		pods:        make(map[string]map[string]*api.BoundPod),
+		pods:        make(map[string]map[string]*api.Pod),
 		mode:        mode,
 		updates:     updates,
 		sourcesSeen: util.StringSet{},
@@ -169,12 +169,12 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *updates
 		}
 		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET, source}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.Pod), kubelet.SET, source}
 		}
 
 	case PodConfigNotificationSnapshot:
 		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET, source}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.Pod), kubelet.SET, source}
 		}
 
 	default:
@@ -194,7 +194,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 	pods := s.pods[source]
 	if pods == nil {
-		pods = make(map[string]*api.BoundPod)
+		pods = make(map[string]*api.Pod)
 	}
 
 	update := change.(kubelet.PodUpdate)
@@ -246,7 +246,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
-		pods = make(map[string]*api.BoundPod)
+		pods = make(map[string]*api.Pod)
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
@@ -298,12 +298,12 @@ func (s *podStorage) seenSources(sources ...string) bool {
 	return s.sourcesSeen.HasAll(sources...)
 }
 
-func filterInvalidPods(pods []api.BoundPod, source string, recorder record.EventRecorder) (filtered []*api.BoundPod) {
+func filterInvalidPods(pods []api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
 	names := util.StringSet{}
 	for i := range pods {
 		pod := &pods[i]
 		var errlist []error
-		if errs := validation.ValidateBoundPod(pod); len(errs) != 0 {
+		if errs := validation.ValidatePod(pod); len(errs) != 0 {
 			errlist = append(errlist, errs...)
 			// If validation fails, don't trust it any further -
 			// even Name could be bad.
@@ -331,27 +331,27 @@ func filterInvalidPods(pods []api.BoundPod, source string, recorder record.Event
 func (s *podStorage) Sync() {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
-	s.updates <- kubelet.PodUpdate{s.MergedState().([]api.BoundPod), kubelet.SET, kubelet.AllSource}
+	s.updates <- kubelet.PodUpdate{s.MergedState().([]api.Pod), kubelet.SET, kubelet.AllSource}
 }
 
 // Object implements config.Accessor
 func (s *podStorage) MergedState() interface{} {
 	s.podLock.RLock()
 	defer s.podLock.RUnlock()
-	pods := make([]api.BoundPod, 0)
+	pods := make([]api.Pod, 0)
 	for _, sourcePods := range s.pods {
 		for _, podRef := range sourcePods {
 			pod, err := api.Scheme.Copy(podRef)
 			if err != nil {
 				glog.Errorf("unable to copy pod: %v", err)
 			}
-			pods = append(pods, *pod.(*api.BoundPod))
+			pods = append(pods, *pod.(*api.Pod))
 		}
 	}
 	return pods
 }
 
-func bestPodIdentString(pod *api.BoundPod) string {
+func bestPodIdentString(pod *api.Pod) string {
 	namespace := pod.Namespace
 	if namespace == "" {
 		namespace = "<empty-namespace>"
