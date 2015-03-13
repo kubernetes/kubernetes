@@ -540,6 +540,7 @@ function kube-up {
     --metadata-from-file \
       "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
+    --can-ip-forward \
     --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no &
 
   # Create a single firewall rule for all minions.
