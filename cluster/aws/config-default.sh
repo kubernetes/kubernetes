@@ -20,6 +20,10 @@ MASTER_SIZE=${MASTER_SIZE:-t2.micro}
 MINION_SIZE=${MINION_SIZE:-t2.micro}
 NUM_MINIONS=${NUM_MINIONS:-4}
 
+# Optional: Set AWS_S3_BUCKET to the name of an S3 bucket to use for uploading binaries
+# (otherwise a unique bucket name will be generated for you)
+#  AWS_S3_BUCKET=kubernetes-artifacts
+
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 IAM_PROFILE="kubernetes"
