@@ -119,7 +119,7 @@ func (v *VagrantCloud) getInstanceByAddress(address string) (*SaltMinion, error)
 	return nil, fmt.Errorf("unable to find instance for address: %s", address)
 }
 
-// NodeAddresses returns the NodeAddress of a particular machine instance.
+// NodeAddresses returns the NodeAddresses of a particular machine instance.
 func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
 	minion, err := v.getInstanceByAddress(instance)

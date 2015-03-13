@@ -118,7 +118,7 @@ func (f *FakeCloud) DeleteTCPLoadBalancer(name, region string) error {
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
 // It adds an entry "node-addresses" into the internal method call record.
 func (f *FakeCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
-	f.addCall("ip-address")
+	f.addCall("node-addresses")
 	return f.Addresses, f.Err
 }
 
