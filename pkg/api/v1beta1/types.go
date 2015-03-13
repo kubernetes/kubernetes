@@ -1147,6 +1147,7 @@ type ResourceQuotaStatus struct {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
 	TypeMeta `json:",inline"`
+	Labels   map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize resource quotas"`
 
 	// Spec defines the desired quota
 	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota"`

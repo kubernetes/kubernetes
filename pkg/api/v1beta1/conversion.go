@@ -848,6 +848,9 @@ func init() {
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *ResourceQuota, out *newer.ResourceQuota, s conversion.Scope) error {
@@ -861,6 +864,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
 				return err
 			}
 			return nil
