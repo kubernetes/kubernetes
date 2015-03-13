@@ -18,21 +18,33 @@ package empty_dir
 
 import (
 	"os"
+	"path"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
-func TestCanSupport(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+// The dir where volumes will be stored.
+const basePath = "/tmp/fake"
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
+// Construct an instance of a plugin, by name.
+func makePluginUnderTest(t *testing.T, plugName string) volume.Plugin {
+	plugMgr := volume.PluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{basePath, nil})
+
+	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
+	return plug
+}
+
+func TestCanSupport(t *testing.T) {
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+
 	if plug.Name() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
@@ -44,19 +56,24 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-func TestPlugin(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+type fakeMediumer struct {
+	typeToReturn storageMedium
+}
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
+func (fake *fakeMediumer) GetMedium(path string) (storageMedium, error) {
+	return fake.typeToReturn, nil
+}
+
+func TestPlugin(t *testing.T) {
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeDefault}},
 	}
-	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
+	mounter := mount.FakeMounter{}
+	mediumer := fakeMediumer{}
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mediumer)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -64,23 +81,27 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Builder: %v")
 	}
 
-	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~empty-dir/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	volPath := builder.GetPath()
+	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
 	if err := builder.SetUp(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(volPath); err != nil {
 		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
+			t.Errorf("SetUp() failed, volume path not created: %s", volPath)
 		} else {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
+	if len(mounter.Log) != 0 {
+		t.Errorf("Expected 0 mounter calls, got %#v", mounter.Log)
+	}
+	mounter.ResetLog()
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMediumer{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -91,21 +112,87 @@ func TestPlugin(t *testing.T) {
 	if err := cleaner.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err == nil {
-		t.Errorf("TearDown() failed, volume path still exists: %s", path)
+	if _, err := os.Stat(volPath); err == nil {
+		t.Errorf("TearDown() failed, volume path still exists: %s", volPath)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
+	if len(mounter.Log) != 0 {
+		t.Errorf("Expected 0 mounter calls, got %#v", mounter.Log)
+	}
+	mounter.ResetLog()
+}
+
+func TestPluginTmpfs(t *testing.T) {
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+
+	spec := &api.Volume{
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
+	}
+	mounter := mount.FakeMounter{}
+	mediumer := fakeMediumer{}
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mediumer)
+	if err != nil {
+		t.Errorf("Failed to make a new Builder: %v", err)
+	}
+	if builder == nil {
+		t.Errorf("Got a nil Builder: %v")
+	}
+
+	volPath := builder.GetPath()
+	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+		t.Errorf("Got unexpected path: %s", volPath)
+	}
+
+	if err := builder.SetUp(); err != nil {
+		t.Errorf("Expected success, got: %v", err)
+	}
+	if _, err := os.Stat(volPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %s", volPath)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
+	}
+	if len(mounter.Log) != 1 {
+		t.Errorf("Expected 1 mounter call, got %#v", mounter.Log)
+	} else {
+		if mounter.Log[0].Action != mount.FakeActionMount || mounter.Log[0].FSType != "tmpfs" {
+			t.Errorf("Unexpected mounter action: %#v", mounter.Log[0])
+		}
+	}
+	mounter.ResetLog()
+
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMediumer{mediumMemory})
+	if err != nil {
+		t.Errorf("Failed to make a new Cleaner: %v", err)
+	}
+	if cleaner == nil {
+		t.Errorf("Got a nil Cleaner: %v")
+	}
+
+	if err := cleaner.TearDown(); err != nil {
+		t.Errorf("Expected success, got: %v", err)
+	}
+	if _, err := os.Stat(volPath); err == nil {
+		t.Errorf("TearDown() failed, volume path still exists: %s", volPath)
+	} else if !os.IsNotExist(err) {
+		t.Errorf("SetUp() failed: %v", err)
+	}
+	if len(mounter.Log) != 1 {
+		t.Errorf("Expected 1 mounter call, got %#v", mounter.Log)
+	} else {
+		if mounter.Log[0].Action != mount.FakeActionUnmount {
+			t.Errorf("Unexpected mounter action: %#v", mounter.Log[0])
+		}
+	}
+	mounter.ResetLog()
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
 	spec := &api.Volume{
 		Name: "vol1",
 	}
@@ -117,20 +204,15 @@ func TestPluginBackCompat(t *testing.T) {
 		t.Errorf("Got a nil Builder: %v")
 	}
 
-	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~empty-dir/vol1" {
-		t.Errorf("Got unexpected path: %s", path)
+	volPath := builder.GetPath()
+	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+		t.Errorf("Got unexpected path: %s", volPath)
 	}
 }
 
 func TestPluginLegacy(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake", nil})
+	plug := makePluginUnderTest(t, "empty")
 
-	plug, err := plugMgr.FindPluginByName("empty")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
 	if plug.Name() != "empty" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
@@ -138,11 +220,12 @@ func TestPluginLegacy(t *testing.T) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}); err == nil {
+	spec := api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}
+	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(&spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMediumer{}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mount.FakeMounter{}, &fakeMediumer{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

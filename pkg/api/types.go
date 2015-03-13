@@ -182,12 +182,29 @@ type VolumeSource struct {
 	Secret *SecretVolumeSource `json:"secret"`
 }
 
-// HostPathVolumeSource represents bare host directory volume.
+// HostPathVolumeSource represents a host directory mapped into a pod.
 type HostPathVolumeSource struct {
 	Path string `json:"path"`
 }
 
-type EmptyDirVolumeSource struct{}
+// EmptyDirVolumeSource represents an empty directory for a pod.
+type EmptyDirVolumeSource struct {
+	// TODO: Longer term we want to represent the selection of underlying
+	// media more like a scheduling problem - user says what traits they
+	// need, we give them a backing store that satisifies that.  For now
+	// this will cover the most common needs.
+	// Optional: what type of storage medium should back this directory.
+	// The default is "" which means to use the node's default medium.
+	Medium StorageType `json:"medium"`
+}
+
+// StorageType defines ways that storage can be allocated to a volume.
+type StorageType string
+
+const (
+	StorageTypeDefault StorageType = ""       // use whatever the default is for the node
+	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
+)
 
 // Protocol defines network protocols supported for things like conatiner ports.
 type Protocol string
