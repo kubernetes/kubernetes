@@ -1695,6 +1695,8 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 // Updated the Kubelet's internal pods with those provided by the update.
 // Records new and updated pods in newPods and updatedPods.
 func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType) {
+	kl.podLock.Lock()
+	defer kl.podLock.Unlock()
 	switch u.Op {
 	case SET:
 		glog.V(3).Infof("SET: Containers changed")
