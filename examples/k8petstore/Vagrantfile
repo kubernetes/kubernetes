@@ -10,7 +10,7 @@ Vagrant.configure("2") do |config|
 
     config.vm.define "rmaster" do |rm|     
         rm.vm.provider "docker" do |d|
-            d.vagrant_vagrantfile = "./docker-host/Vagrantfile"  
+            d.vagrant_vagrantfile = "./dev/hosts/Vagrantfile"  
             d.build_dir = "redis-master"
             d.name = "rmaster"
             d.create_args = ["--privileged=true", "-m", "1g"]
@@ -21,7 +21,7 @@ Vagrant.configure("2") do |config|
 
     config.vm.define "frontend" do |fe|
         fe.vm.provider "docker" do |d|
-            d.vagrant_vagrantfile = "./docker-host/Vagrantfile"
+            d.vagrant_vagrantfile = "./dev/hosts/Vagrantfile"
             d.build_dir = "web-server"
             d.name = "web-server"
             d.create_args = ["--privileged=true"]
@@ -31,10 +31,7 @@ Vagrant.configure("2") do |config|
             d.env = {"REDISMASTER_SERVICE_HOST"=>"rmaster","REDISMASTER_SERVICE_PORT"=>"6379"} 
         end
     end
-
-   
  
     ### Todo , add data generator.
-
 
 end

@@ -1,8 +1,6 @@
 ## Welcome to k8PetStore
 
-This is a follow up to the Guestbook example, which implements a slightly more real world demonstration using 
-
-the same application architecture.
+This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go implementation](../guestbook-go/).
 
 - It leverages the same components (redis, Go REST API) as the guestbook application
 - It comes with visualizations for graphing whats happening in Redis transactions, along with commandline printouts of transaction throughput
@@ -20,7 +18,7 @@ The guestbook tutorial will teach you alot about the basics of kubernetes, and w
 
 ## Architecture of this SOA
 
-A diagram of the overall architecture of this application can be seen in arch.dot (you can paste the contents in any graphviz viewer, including online ones such as http://sandbox.kidstrythisathome.com/erdos/.
+A diagram of the overall architecture of this application can be seen in [arch.dot](arch.dot) (you can paste the contents in any graphviz viewer, including online ones such as http://sandbox.kidstrythisathome.com/erdos/.
 
 ## Docker image dependencies
 
@@ -32,11 +30,11 @@ in your dockerhub "dockerhub-name".
 Since these images are already published under other parties like redis, jayunit100, and so on,
 so you don't need to build the images to run the app. 
 
-If you do want to build the images, you will need to build and push these 3 docker images.
+If you do want to build the images, you will need to build and push the images in this repository.
 
-- dockerhub-name/bigpetstore-load-generator, which generates transactions for the database.
-- dockerhub-name/redis, which is a simple curated redis image.
-- dockerhub-name/k8petstore, which is the web app image.
+For a list of those images, see the `build-and-push` shell script - it builds and pushes all the images for you, just 
+
+modify the dockerhub user name in it accordingly.
 
 ## Get started with the WEBAPP 
 
@@ -46,17 +44,13 @@ We have extended it to do some error reporting, persisting of JSON petstore tran
 
 and supporting of additional REST calls, like LLEN, which returns the total # of transactions in the database.
 
-To run it locally, you simply need to run basic Go commands.  Assuming you have Go set up, do something like: 
+To work on the app, just cd to the `dev` directory, and follow the instructions.  You can easily edit it in your local machine, by installing
 
-```
-#Assuming your gopath is in / (i.e. this is the case, for example, in our Dockerfile).
-go get main
-go build main
-export STATIC_FILES=/tmp/static
-/gopath/bin/main
-```
+redis and go.  Then you can use the `Vagrantfile` in this top level directory to launch a minimal version of the app in pure docker containers.
 
-## Set up the data generator
+If that is all working, you can finally run `k8petstore.sh` in any kubernetes cluster, and run the app at scale.
+
+## Set up the data generator (optional)
 
 The web front end provides users an interface for watching pet store transactions in real time as they occur.
 
@@ -73,15 +67,6 @@ apache bigtop.
 Directions for that are here : https://github.com/apache/bigtop/tree/master/bigtop-bigpetstore/bigpetstore-transaction-queue
 
 You will likely want to checkout the branch 2b2392bf135e9f1256bd0b930f05ae5aef8bbdcb, which is the exact commit which the current k8petstore was tested on.
-
-## Set up REDIS
-
-Install and run redis locally.  This can be done very easily on any Unix system, and redis starts in an insecure mode so its easy 
-
-to develop against.
-
-Install the bigpetstore-transaction-queue generator app locally (optional), but for realistic testing.
-Then, run the go app directly.  You will have to get dependencies using go the first time (will add directions later for that, its easy).
 
 ## Now what? 
 
@@ -107,7 +92,11 @@ You might want to change it to point to your customized Go image, if you chose t
 
 like the number of data generators (more generators will create more load on the redis master).
 
-So, to run this app in kubernetes, simply run `k8petstore.sh`.
+So, to run this app in kubernetes, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
+
+Note that there are a few , self explanatory parameters to set at the top of it.  
+
+Most importantly, the Public IPs parameter, so that you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
 
 ## Future
 
@@ -117,7 +106,9 @@ Thus we plan to add another tier of queueing, which empties the REDIS transactio
 
 ## Questions
 
-For questions on running this app, you can ask on the google containers group.
+For questions on running this app, you can ask on the google containers group (freenode ~ google-containers@googlegroups.com or #google-containers on IRC)
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
+
+
 
