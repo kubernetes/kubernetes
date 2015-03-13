@@ -62,10 +62,10 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (resul
 		pod := pods[i] // Make a copy
 		go func() {
 			var err error
-			if kl.containerRuntimeChoice == "rocket" {
-				err = kl.runRocketPod(pod)
+			if kl.containerRuntimeChoice == "docker" {
+				err = kl.runDockerPod(pod, retryDelay)
 			} else {
-				err = kl.runPod(pod)
+				err = kl.runPod(pod, retryDelay)
 			}
 			ch <- RunPodResult{&pod, err}
 		}()
@@ -91,8 +91,8 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (resul
 	return results, err
 }
 
-// runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
+// runDockerPod runs a single pod and wait until all containers are running.
+func (kl *Kubelet) runDockerPod(pod api.BoundPod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
@@ -109,7 +109,7 @@ func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
 			return nil
 		}
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
-		if err = kl.syncPod(&pod, dockerContainers); err != nil {
+		if err = kl.syncDockerPod(&pod, dockerContainers); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
@@ -145,8 +145,8 @@ func (kl *Kubelet) isPodRunning(pod api.BoundPod, dockerContainers dockertools.D
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.BoundPod) error {
-	delay := RunOnceRetryDelay
+func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
+	delay := retryDelay
 	retry := 0
 	for {
 		runningPods, err := kl.containerRuntime.ListPods()
@@ -169,7 +169,7 @@ func (kl *Kubelet) runPod(pod api.BoundPod) error {
 		}
 		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
 		glog.Infof("pod %q containers synced, waiting for %v", pod.Name, delay)
-		<-time.After(delay)
+		time.Sleep(delay)
 		retry++
 		delay *= RunOnceRetryDelayBackoff
 	}

@@ -69,8 +69,9 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 
 func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{
-		rootDirectory: "/tmp/kubelet",
-		recorder:      &record.FakeRecorder{},
+		containerRuntimeChoice: "docker",
+		rootDirectory:          "/tmp/kubelet",
+		recorder:               &record.FakeRecorder{},
 	}
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)

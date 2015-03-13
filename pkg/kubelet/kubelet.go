@@ -93,6 +93,7 @@ type SyncHandler interface {
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
+	SyncDockerPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
 	SyncPods(pods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, startTime time.Time) error
 }
 
@@ -213,7 +214,7 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.dockerCache = dockerCache
-	klet.podWorkers = newPodWorkers(klet.containerRuntimeChoice, dockerCache, klet.syncPod, containerRuntimeCache, klet.syncRocketPod, recorder)
+	klet.podWorkers = newPodWorkers(klet.containerRuntimeChoice, dockerCache, klet.syncDockerPod, containerRuntimeCache, klet.syncPod, recorder)
 
 	metrics.Register(dockerCache)
 
@@ -1366,7 +1367,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.BoundPod, containersInPod
 	}, nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.BoundPod, containersInPod dockertools.DockerContainers) error {
+func (kl *Kubelet) syncDockerPod(pod *api.BoundPod, containersInPod dockertools.DockerContainers) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
 	containerChanges, err := kl.computePodContainerChanges(pod, containersInPod)
@@ -1502,11 +1503,8 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.BoundPod) error {
 	return nil
 }
 
-// SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
-	if kl.containerRuntimeChoice == "rocket" {
-		return kl.SyncRocketPods(allPods, podSyncTypes, start)
-	}
+// SyncDockerPods synchronizes the configured list of pods (desired state) with the host current state.
+func (kl *Kubelet) SyncDockerPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -1518,7 +1516,7 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 	}
 	kl.removeOrphanedStatuses(podFullNames)
 
-	// Filtered out the rejected pod. They don't have running containers.
+	// Create a pod list with the the failed pods filtered out.
 	var pods []api.BoundPod
 	for _, pod := range allPods {
 		status, ok := kl.getPodStatusFromCache(GetPodFullName(&pod))
@@ -1579,7 +1577,7 @@ func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]m
 		podFullName, uid, containerName, _, err := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
 		_, found := desiredPods[uid]
 		if err == nil && found {
-			// syncPod() will handle this one.
+			// syncDockerPod() will handle this one.
 			continue
 		}
 
@@ -2162,7 +2160,7 @@ func (kl *Kubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return kl.cadvisor.MachineInfo()
 }
 
-func (kl *Kubelet) SyncRocketPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
+func (kl *Kubelet) SyncPods(allPods []api.BoundPod, podSyncTypes map[types.UID]metrics.SyncPodType, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -2221,7 +2219,7 @@ func (kl *Kubelet) SyncRocketPods(allPods []api.BoundPod, podSyncTypes map[types
 	// Kill any containers we don't need.
 	for _, pod := range runningPods {
 		if _, found := desiredPods[pod.UID]; found {
-			// syncRocketPod() will handle this one.
+			// syncPod() will handle this one.
 			continue
 		}
 
@@ -2246,7 +2244,7 @@ func (kl *Kubelet) SyncRocketPods(allPods []api.BoundPod, podSyncTypes map[types
 	return err
 }
 
-func (kl *Kubelet) syncRocketPod(pod *api.BoundPod, runningPod *api.Pod) error {
+func (kl *Kubelet) syncPod(pod *api.BoundPod, runningPod *api.Pod) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod, podFullName: %q, uid: %q", podFullName, uid)

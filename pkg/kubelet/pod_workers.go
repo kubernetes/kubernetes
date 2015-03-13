@@ -29,9 +29,9 @@ import (
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
+type syncDockerPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
 
-type syncRocketPodFnType func(*api.BoundPod, *api.Pod) error
+type syncPodFnType func(*api.BoundPod, *api.Pod) error
 
 type podWorkers struct {
 	// Protects podUpdates field.
@@ -53,12 +53,12 @@ type podWorkers struct {
 	// This function is run to sync the desired stated of pod.
 	// NOTE: This function has to be thread-safe - it can be called for
 	// different pods at the same time.
-	syncPodFn syncPodFnType
+	syncDockerPodFn syncDockerPodFnType
 
 	// containerRuntimeCache is used for listing running pods.
 	containerRuntimeCache container.RuntimeCache
 
-	syncRocketPodFn syncRocketPodFnType
+	syncPodFn syncPodFnType
 
 	containerRuntimeChoice string
 
@@ -76,18 +76,18 @@ type workUpdate struct {
 
 func newPodWorkers(containerRuntimeChoice string,
 	dockerCache dockertools.DockerCache,
-	syncPodFn syncPodFnType,
+	syncDockerPodFn syncDockerPodFnType,
 	containerRuntimeCache container.RuntimeCache,
-	syncRocketPodFn syncRocketPodFnType,
+	syncPodFn syncPodFnType,
 	recorder record.EventRecorder) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
 		lastUndeliveredWorkUpdate: map[types.UID]workUpdate{},
 		dockerCache:               dockerCache,
-		syncPodFn:                 syncPodFn,
+		syncDockerPodFn:           syncDockerPodFn,
 		containerRuntimeCache:     containerRuntimeCache,
-		syncRocketPodFn:           syncRocketPodFn,
+		syncPodFn:                 syncPodFn,
 		containerRuntimeChoice:    containerRuntimeChoice,
 		recorder:                  recorder,
 	}
@@ -110,7 +110,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 
-			err = p.syncPodFn(newWork.pod, containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
+			err = p.syncDockerPodFn(newWork.pod, containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
@@ -140,7 +140,7 @@ func (p *podWorkers) manageRocketPodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 
-			err = p.syncRocketPodFn(newWork.pod, findPodByID(newWork.pod.UID, runningPods))
+			err = p.syncPodFn(newWork.pod, findPodByID(newWork.pod.UID, runningPods))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
