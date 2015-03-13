@@ -675,25 +675,47 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_bar_foo_new_12345678_0"},
+			Names: []string{"/k8s_bar1_foo1_new_12345678_0"},
 			ID:    "1234",
+		},
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_bar2_foo2_new_87654321_0"},
+			ID:    "5678",
+		},
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_POD_foo2_new_87654321_0"},
+			ID:    "8765",
 		},
 	}
 	kubelet.pods = []api.BoundPod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
-				Name:      "foo",
+				Name:      "foo1",
 				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
-					{Name: "bar"},
+					{Name: "bar1"},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "87654321",
+				Name:      "foo2",
+				Namespace: "new",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar2"},
 				},
 			},
 		},
 	}
-	waitGroup.Add(1)
+	waitGroup.Add(2)
 	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -701,7 +723,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "stop", "create", "start", "inspect_container", "create", "start"})
+		"list", "list", "list", "list", "inspect_container", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
