@@ -1,0 +1,20 @@
+{
+  "id": "nimbus",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "nimbus",
+      "containers": [{
+        "name": "nimbus",
+        "image": "mattf/storm-nimbus",
+        "cpu": 100,
+        "ports": [{ "containerPort": 6627 }]
+      }]
+    }
+  },
+  "labels": {
+    "name": "nimbus"
+  }
+}
