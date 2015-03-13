@@ -1675,23 +1675,6 @@ func (kl *Kubelet) handleHostPortConflicts(pods []api.BoundPod) {
 	}
 }
 
-func (kl *Kubelet) handleUpdate(u PodUpdate) {
-	kl.podLock.Lock()
-	defer kl.podLock.Unlock()
-	switch u.Op {
-	case SET:
-		glog.V(3).Infof("SET: Containers changed")
-		kl.pods = u.Pods
-		kl.handleHostPortConflicts(kl.pods)
-	case UPDATE:
-		glog.V(3).Infof("Update: Containers changed")
-		kl.pods = updateBoundPods(u.Pods, kl.pods)
-		kl.handleHostPortConflicts(kl.pods)
-	default:
-		panic("syncLoop does not support incremental changes")
-	}
-}
-
 // syncLoop is the main loop for processing changes. It watches for changes from
 // three channels (file, apiserver, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
