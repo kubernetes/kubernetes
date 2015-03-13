@@ -286,6 +286,40 @@ function get-password {
   echo "TODO get-password"
 }
 
+# SSH to a node by name or IP ($1) and run a command ($2).
+function ssh-to-node {
+  local node="$1"
+  local cmd="$2"
+  local machine
+
+  if [[ "$node" == "$MASTER_IP" ]] || [[ "$node" =~ ^"$MINION_IP_BASE" ]]; then
+      machine="$node"
+  elif [[ "$node" == "$MASTER_NAME" ]]; then
+      machine="$MASTER_IP"
+  else
+    for ((i=0; i < NUM_MINIONS; i++)); do
+        if [[ "$node" == "${MINION_NAMES[$i]}" ]]; then
+            machine="${MINION_IPS[$i]}"
+            break
+        fi
+    done
+  fi
+  if [[ -z "$machine" ]]; then
+      echo "$node is an unknown machine to ssh to" >&2
+  fi
+  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no "core@$machine" "$cmd"
+}
+
+# Restart the kube-proxy on a node ($1)
+function restart-kube-proxy {
+  ssh-to-node "$1" "sudo systemctl restart kube-proxy"
+}
+
+# Restart the apiserver
+function restart-apiserver {
+  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
+}
+
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
     echo "libvirt-coreos doesn't need special preparations for e2e tests" 1>&2
