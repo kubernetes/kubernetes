@@ -254,6 +254,13 @@ function create-salt-auth() {
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
   (umask 077;
     echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+
+  # Generate tokens for other "service accounts".  Append to known_tokens.
+  local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+  for account in "${service_accounts[@]}"; do
+    token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+    echo "${token},${account},${account}" >> "${known_tokens_file}"
+  done
 }
 
 function download-release() {
