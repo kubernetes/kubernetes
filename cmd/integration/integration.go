@@ -179,6 +179,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		EtcdHelper:        helper,
 		KubeletClient:     fakeKubeletClient{},
 		EnableLogsSupport: false,
+		EnableProfiling:   true,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:  admit.NewAlwaysAdmit(),

@@ -74,6 +74,7 @@ type APIServer struct {
 	KubeletConfig              client.KubeletConfig
 	ClusterName                string
 	SyncPodStatus              bool
+	EnableProfiling            bool
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -152,6 +153,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.RuntimeConfig, "runtime_config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
+	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -236,6 +238,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableLogsSupport:      s.EnableLogsSupport,
 		EnableUISupport:        true,
 		EnableSwaggerSupport:   true,
+		EnableProfiling:        s.EnableProfiling,
 		EnableIndex:            true,
 		APIPrefix:              s.APIPrefix,
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,

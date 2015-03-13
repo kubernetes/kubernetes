@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strconv"
 
@@ -47,6 +48,7 @@ type SchedulerServer struct {
 	ClientConfig      client.Config
 	AlgorithmProvider string
 	PolicyConfigFile  string
+	EnableProfiling   bool
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -66,6 +68,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.AlgorithmProvider, "algorithm_provider", s.AlgorithmProvider, "The scheduling algorithm provider to use")
 	fs.StringVar(&s.PolicyConfigFile, "policy_config_file", s.PolicyConfigFile, "File with scheduler policy configuration")
+	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -77,7 +80,15 @@ func (s *SchedulerServer) Run(_ []string) error {
 
 	record.StartRecording(kubeClient.Events(""))
 
-	go http.ListenAndServe(net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)), nil)
+	go func() {
+		if s.EnableProfiling {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		}
+		http.ListenAndServe(net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)), nil)
+	}()
 
 	configFactory := factory.NewConfigFactory(kubeClient)
 	config, err := s.createConfig(configFactory)
