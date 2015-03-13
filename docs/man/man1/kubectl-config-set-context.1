@@ -17,6 +17,24 @@ Sets a context entry in .kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values for those fields.
 
 
+.SH OPTIONS
+.PP
+\fB\-\-cluster\fP=""
+    cluster for the context entry in .kubeconfig
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for set\-context
+
+.PP
+\fB\-\-namespace\fP=""
+    namespace for the context entry in .kubeconfig
+
+.PP
+\fB\-\-user\fP=""
+    user for the context entry in .kubeconfig
+
+
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
@@ -43,10 +61,6 @@ Specifying a name that already exists will merge new fields on top of existing v
     Path to a client key file for TLS.
 
 .PP
-\fB\-\-cluster\fP=""
-    The name of the kubeconfig cluster to use
-
-.PP
 \fB\-\-context\fP=""
     The name of the kubeconfig context to use
 
@@ -57,10 +71,6 @@ Specifying a name that already exists will merge new fields on top of existing v
 .PP
 \fB\-\-global\fP=false
     use the .kubeconfig from /home/username
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for config
 
 .PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
@@ -95,10 +105,6 @@ Specifying a name that already exists will merge new fields on top of existing v
     Require server version to match client version
 
 .PP
-\fB\-\-namespace\fP=""
-    If present, the namespace scope for this CLI request.
-
-.PP
 \fB\-\-password\fP=""
     Password for basic authentication to the API server.
 
@@ -113,10 +119,6 @@ Specifying a name that already exists will merge new fields on top of existing v
 .PP
 \fB\-\-token\fP=""
     Bearer token for authentication to the API server.
-
-.PP
-\fB\-\-user\fP=""
-    The name of the kubeconfig user to use
 
 .PP
 \fB\-\-username\fP=""

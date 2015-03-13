@@ -16,6 +16,8 @@ kubectl config SUBCOMMAND
 ```
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
+      --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
 ```
 
@@ -30,9 +32,7 @@ kubectl config SUBCOMMAND
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
