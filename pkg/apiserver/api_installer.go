@@ -22,6 +22,7 @@ import (
 	"net/url"
 	gpath "path"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -65,8 +66,16 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	redirectHandler := (&RedirectHandler{a.group.Storage, a.group.Codec, a.group.Context, a.info})
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
 
-	for path, storage := range a.group.Storage {
-		if err := a.registerResourceHandlers(path, storage, ws, watchHandler, redirectHandler, proxyHandler); err != nil {
+	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
+	paths := make([]string, len(a.group.Storage))
+	var i int = 0
+	for path := range a.group.Storage {
+		paths[i] = path
+		i++
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, watchHandler, redirectHandler, proxyHandler); err != nil {
 			errors = append(errors, err)
 		}
 	}
