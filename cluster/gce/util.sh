@@ -226,7 +226,7 @@ function detect-master () {
 }
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from the kubernetes auth-file for the current context if available.
+# read from kubeconfig for the current context if available.
 #
 # Assumed vars
 #   KUBE_ROOT
@@ -235,12 +235,7 @@ function detect-master () {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  # templates to extract the username,password for the current-context user
-  # Note: we save dot ('.') to $dot because the 'with' action overrides dot
-  local username='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "username"}}{{end}}'
-  local password='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "password"}}{{end}}'
-  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${username}")
-  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${password}")
+  get-kubeconfig-basicauth
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
