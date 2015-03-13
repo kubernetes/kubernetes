@@ -31,6 +31,7 @@ $ kubectl port-forward -p mypod 0:5000
 ### Options
 
 ```
+  -h, --help=false: help for port-forward
   -p, --pod="": Pod name
 ```
 
@@ -45,7 +46,6 @@ $ kubectl port-forward -p mypod 0:5000
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace

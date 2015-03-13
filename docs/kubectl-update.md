@@ -30,6 +30,7 @@ $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState":
 
 ```
   -f, --filename=[]: Filename, directory, or URL to file to use to update the resource.
+  -h, --help=false: help for update
       --patch="": A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
 ```
 
@@ -44,7 +45,6 @@ $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState":
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
