@@ -423,7 +423,6 @@ func (c DockerContainers) RemoveContainerWithID(containerID DockerID) {
 // FindContainersByPod returns the containers that belong to the pod.
 func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName string) DockerContainers {
 	containers := make(DockerContainers)
-
 	for _, dockerContainer := range c {
 		if len(dockerContainer.Names) == 0 {
 			continue
