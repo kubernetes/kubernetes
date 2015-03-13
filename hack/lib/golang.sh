@@ -25,6 +25,7 @@ readonly KUBE_SERVER_TARGETS=(
   cmd/kube-controller-manager
   cmd/kubelet
   cmd/hyperkube
+  cmd/kubernetes
   plugin/cmd/kube-scheduler
 )
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
@@ -37,7 +38,6 @@ readonly KUBE_SERVER_PLATFORMS=(
 # The set of client targets that we are building for all platforms
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubectl
-  cmd/kubernetes
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
