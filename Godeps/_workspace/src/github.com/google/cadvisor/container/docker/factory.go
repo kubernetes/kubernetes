@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
+	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
 )
@@ -62,6 +63,10 @@ func UseSystemd() bool {
 	return useSystemd
 }
 
+func RootDir() string {
+	return *dockerRootDir
+}
+
 type dockerFactory struct {
 	machineInfoFactory info.MachineInfoFactory
 
@@ -72,6 +77,9 @@ type dockerFactory struct {
 
 	// Information about the mounted cgroup subsystems.
 	cgroupSubsystems libcontainer.CgroupSubsystems
+
+	// Information about mounted filesystems.
+	fsInfo fs.FsInfo
 }
 
 func (self *dockerFactory) String() string {
@@ -87,6 +95,7 @@ func (self *dockerFactory) NewContainerHandler(name string) (handler container.C
 		client,
 		name,
 		self.machineInfoFactory,
+		self.fsInfo,
 		*dockerRootDir,
 		self.usesAufsDriver,
 		&self.cgroupSubsystems,
@@ -151,7 +160,7 @@ func parseDockerVersion(full_version_string string) ([]int, error) {
 }
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory) error {
+func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo) error {
 	client, err := docker.NewClient(*ArgDockerEndpoint)
 	if err != nil {
 		return fmt.Errorf("unable to communicate with docker daemon: %v", err)
@@ -213,6 +222,7 @@ func Register(factory info.MachineInfoFactory) error {
 		client:             client,
 		usesAufsDriver:     usesAufsDriver,
 		cgroupSubsystems:   cgroupSubsystems,
+		fsInfo:             fsInfo,
 	}
 	container.RegisterContainerHandlerFactory(f)
 	return nil

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -39,7 +38,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
-	cadvisorClient "github.com/google/cadvisor/client"
 	"github.com/spf13/pflag"
 )
 
@@ -69,7 +67,7 @@ type KubeletServer struct {
 	MinimumGCAge                   time.Duration
 	MaxContainerCount              int
 	AuthPath                       string
-	CAdvisorPort                   uint
+	CadvisorPort                   uint
 	OOMScoreAdj                    int
 	APIServerList                  util.StringList
 	ClusterDomain                  string
@@ -95,7 +93,7 @@ func NewKubeletServer() *KubeletServer {
 		EnableDebuggingHandlers: true,
 		MinimumGCAge:            1 * time.Minute,
 		MaxContainerCount:       5,
-		CAdvisorPort:            4194,
+		CadvisorPort:            4194,
 		OOMScoreAdj:             -900,
 		MasterServiceNamespace:  api.NamespaceDefault,
 	}
@@ -124,7 +122,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.MinimumGCAge, "minimum_container_ttl_duration", s.MinimumGCAge, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.IntVar(&s.MaxContainerCount, "maximum_dead_containers_per_container", s.MaxContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	fs.StringVar(&s.AuthPath, "auth_path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
-	fs.UintVar(&s.CAdvisorPort, "cadvisor_port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.UintVar(&s.CadvisorPort, "cadvisor_port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	fs.Var(&s.APIServerList, "api_servers", "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.StringVar(&s.ClusterDomain, "cluster_domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
@@ -152,6 +150,11 @@ func (s *KubeletServer) Run(_ []string) error {
 
 	credentialprovider.SetPreferredDockercfgPath(s.RootDirectory)
 
+	cadvisorInterface, err := cadvisor.New(s.CadvisorPort)
+	if err != nil {
+		return err
+	}
+
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
@@ -172,7 +175,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ClusterDNS:                     s.ClusterDNS,
 		Runonce:                        s.RunOnce,
 		Port:                           s.Port,
-		CAdvisorPort:                   s.CAdvisorPort,
+		CadvisorInterface:              cadvisorInterface,
 		EnableServer:                   s.EnableServer,
 		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
 		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
@@ -240,7 +243,8 @@ func SimpleRunKubelet(client *client.Client,
 	port uint,
 	masterServiceNamespace string,
 	volumePlugins []volume.Plugin,
-	tlsOptions *kubelet.TLSOptions) {
+	tlsOptions *kubelet.TLSOptions,
+	cadvisorInterface cadvisor.Interface) {
 	kcfg := KubeletConfig{
 		KubeClient:             client,
 		DockerClient:           dockerClient,
@@ -259,6 +263,7 @@ func SimpleRunKubelet(client *client.Client,
 		MasterServiceNamespace:  masterServiceNamespace,
 		VolumePlugins:           volumePlugins,
 		TLSOptions:              tlsOptions,
+		CadvisorInterface:       cadvisorInterface,
 	}
 	RunKubelet(&kcfg)
 }
@@ -336,7 +341,7 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 type KubeletConfig struct {
 	KubeClient                     *client.Client
 	DockerClient                   dockertools.DockerInterface
-	CAdvisorPort                   uint
+	CadvisorInterface              cadvisor.Interface
 	Address                        util.IP
 	AllowPrivileged                bool
 	HostnameOverride               string
@@ -379,15 +384,6 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kubeClient = kc.KubeClient
 	}
 
-	cc, err := cadvisorClient.NewClient("http://127.0.0.1:" + strconv.Itoa(int(kc.CAdvisorPort)))
-	if err != nil {
-		return nil, err
-	}
-	cadvisorInterface, err := cadvisor.New(cc)
-	if err != nil {
-		return nil, err
-	}
-
 	k, err := kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.DockerClient,
@@ -406,7 +402,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.VolumePlugins,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
-		cadvisorInterface,
+		kc.CadvisorInterface,
 		kc.StatusUpdateFrequency)
 
 	if err != nil {

@@ -41,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -211,17 +212,18 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute)
 	nodeController.Run(5*time.Second, true, false)
+	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.")
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	kubeletapp.SimpleRunKubelet(cl, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil)
+	kubeletapp.SimpleRunKubelet(cl, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	kubeletapp.SimpleRunKubelet(cl, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil)
+	kubeletapp.SimpleRunKubelet(cl, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface)
 
 	return apiServer.URL
 }

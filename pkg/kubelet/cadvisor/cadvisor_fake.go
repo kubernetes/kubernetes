@@ -17,15 +17,23 @@ limitations under the License.
 package cadvisor
 
 import (
-	"github.com/google/cadvisor/client"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
-type cadvisorClient struct {
-	*client.Client
+// Fake cAdvisor implementation.
+type Fake struct {
 }
 
-func New(cc *client.Client) (Interface, error) {
-	return &cadvisorClient{
-		Client: cc,
-	}, nil
+var _ Interface = new(Fake)
+
+func (c *Fake) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	return new(cadvisorApi.ContainerInfo), nil
+}
+
+func (c *Fake) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
+	return cadvisorApi.ContainerInfo{}, nil
+}
+
+func (c *Fake) MachineInfo() (*cadvisorApi.MachineInfo, error) {
+	return new(cadvisorApi.MachineInfo), nil
 }

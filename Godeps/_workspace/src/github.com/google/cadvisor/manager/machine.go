@@ -223,7 +223,7 @@ func getMachineID() string {
 	return ""
 }
 
-func getMachineInfo(sysFs sysfs.SysFs) (*info.MachineInfo, error) {
+func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo) (*info.MachineInfo, error) {
 	cpuinfo, err := ioutil.ReadFile("/proc/cpuinfo")
 	clockSpeed, err := getClockSpeed(cpuinfo)
 	if err != nil {
@@ -241,34 +241,29 @@ func getMachineInfo(sysFs sysfs.SysFs) (*info.MachineInfo, error) {
 		return nil, err
 	}
 
-	fsInfo, err := fs.NewFsInfo()
-	if err != nil {
-		return nil, err
-	}
 	filesystems, err := fsInfo.GetGlobalFsInfo()
 	if err != nil {
-		return nil, err
+		glog.Errorf("Failed to get global filesystem information: %v", err)
 	}
 
 	diskMap, err := sysinfo.GetBlockDeviceInfo(sysFs)
 	if err != nil {
-		return nil, err
+		glog.Errorf("Failed to get disk map: %v", err)
 	}
 
 	netDevices, err := sysinfo.GetNetworkDevices(sysFs)
 	if err != nil {
-		return nil, err
+		glog.Errorf("Failed to get network devices: %v", err)
 	}
 
 	topology, numCores, err := getTopology(sysFs, string(cpuinfo))
 	if err != nil {
-		return nil, err
+		glog.Errorf("Failed to get topology information: %v", err)
 	}
 
 	systemUUID, err := sysinfo.GetSystemUUID(sysFs)
 	if err != nil {
 		glog.Errorf("Failed to get system UUID: %v", err)
-		systemUUID = ""
 	}
 
 	machineInfo := &info.MachineInfo{

@@ -35,8 +35,8 @@ const containersHtmlTemplate = `
   </head>
   <body>
     <div class="container theme-showcase" >
-      <div class="col-sm-12" id="logo">
-      </div>
+      <a href="/" class="col-sm-12" id="logo">
+      </a>
       <div class="col-sm-12">
 	<div class="page-header">
 	  <h1>{{.DisplayName}}</h1>

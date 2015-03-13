@@ -151,9 +151,9 @@ func streamResults(results chan *events.Event, w http.ResponseWriter, r *http.Re
 	for {
 		select {
 		case <-cn.CloseNotify():
-			glog.Infof("Client stopped listening")
 			return nil
 		case ev := <-results:
+			glog.V(3).Infof("Received event from watch channel in api: %v", ev)
 			err := enc.Encode(ev)
 			if err != nil {
 				glog.Errorf("error encoding message %+v for result stream: %v", ev, err)

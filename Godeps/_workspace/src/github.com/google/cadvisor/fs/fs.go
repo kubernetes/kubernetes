@@ -29,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,6 +42,11 @@ import (
 
 var partitionRegex = regexp.MustCompile("^(:?(:?s|xv)d[a-z]+\\d*|dm-\\d+)$")
 
+const (
+	LabelSystemRoot   = "root"
+	LabelDockerImages = "docker-images"
+)
+
 type partition struct {
 	mountpoint string
 	major      uint
@@ -48,15 +54,26 @@ type partition struct {
 }
 
 type RealFsInfo struct {
+	// Map from block device path to partition information.
 	partitions map[string]partition
+	// Map from label to block device path.
+	// Labels are intent-specific tags that are auto-detected.
+	labels map[string]string
 }
 
-func NewFsInfo() (FsInfo, error) {
+type Context struct {
+	// docker root directory.
+	DockerRoot string
+}
+
+func NewFsInfo(context Context) (FsInfo, error) {
 	mounts, err := mount.GetMounts()
 	if err != nil {
 		return nil, err
 	}
 	partitions := make(map[string]partition, 0)
+	fsInfo := &RealFsInfo{}
+	fsInfo.labels = make(map[string]string, 0)
 	for _, mount := range mounts {
 		if !strings.HasPrefix(mount.Fstype, "ext") && mount.Fstype != "btrfs" {
 			continue
@@ -68,7 +85,84 @@ func NewFsInfo() (FsInfo, error) {
 		partitions[mount.Source] = partition{mount.Mountpoint, uint(mount.Major), uint(mount.Minor)}
 	}
 	glog.Infof("Filesystem partitions: %+v", partitions)
-	return &RealFsInfo{partitions}, nil
+	fsInfo.partitions = partitions
+	fsInfo.addLabels(context)
+	return fsInfo, nil
+}
+
+func (self *RealFsInfo) addLabels(context Context) {
+	dockerPaths := getDockerImagePaths(context)
+	for src, p := range self.partitions {
+		if p.mountpoint == "/" {
+			if _, ok := self.labels[LabelSystemRoot]; !ok {
+				self.labels[LabelSystemRoot] = src
+			}
+		}
+		self.updateDockerImagesPath(src, p.mountpoint, dockerPaths)
+		// TODO(rjnagal): Add label for docker devicemapper pool.
+	}
+}
+
+// Generate a list of possible mount points for docker image management from the docker root directory.
+// Right now, we look for each type of supported graph driver directories, but we can do better by parsing
+// some of the context from `docker info`.
+func getDockerImagePaths(context Context) []string {
+	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
+	dockerRoot := context.DockerRoot
+	dockerImagePaths := []string{}
+	for _, dir := range []string{"devicemapper", "btrfs", "aufs"} {
+		dockerImagePaths = append(dockerImagePaths, path.Join(dockerRoot, dir))
+	}
+	for dockerRoot != "/" && dockerRoot != "." {
+		dockerImagePaths = append(dockerImagePaths, dockerRoot)
+		dockerRoot = filepath.Dir(dockerRoot)
+	}
+	dockerImagePaths = append(dockerImagePaths, "/")
+	return dockerImagePaths
+}
+
+// This method compares the mountpoint with possible docker image mount points. If a match is found,
+// docker images label is added to the partition.
+func (self *RealFsInfo) updateDockerImagesPath(source string, mountpoint string, dockerImagePaths []string) {
+	for _, v := range dockerImagePaths {
+		if v == mountpoint {
+			if i, ok := self.labels[LabelDockerImages]; ok {
+				// pick the innermost mountpoint.
+				mnt := self.partitions[i].mountpoint
+				if len(mnt) < len(mountpoint) {
+					self.labels[LabelDockerImages] = source
+				}
+			} else {
+				self.labels[LabelDockerImages] = source
+			}
+		}
+	}
+}
+
+func (self *RealFsInfo) GetDeviceForLabel(label string) (string, error) {
+	dev, ok := self.labels[label]
+	if !ok {
+		return "", fmt.Errorf("non-existent label %q", label)
+	}
+	return dev, nil
+}
+
+func (self *RealFsInfo) GetLabelsForDevice(device string) ([]string, error) {
+	labels := []string{}
+	for label, dev := range self.labels {
+		if dev == device {
+			labels = append(labels, label)
+		}
+	}
+	return labels, nil
+}
+
+func (self *RealFsInfo) GetMountpointForDevice(dev string) (string, error) {
+	p, ok := self.partitions[dev]
+	if !ok {
+		return "", fmt.Errorf("no partition info for device %q", dev)
+	}
+	return p.mountpoint, nil
 }
 
 func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error) {

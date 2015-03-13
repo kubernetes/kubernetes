@@ -48,6 +48,14 @@ func RegisterContainerHandlerFactory(factory ContainerHandlerFactory) {
 	factories = append(factories, factory)
 }
 
+// Returns whether there are any container handler factories registered.
+func HasFactories() bool {
+	factoriesLock.Lock()
+	defer factoriesLock.Unlock()
+
+	return len(factories) != 0
+}
+
 // Create a new ContainerHandler for the specified container.
 func NewContainerHandler(name string) (ContainerHandler, error) {
 	factoriesLock.RLock()

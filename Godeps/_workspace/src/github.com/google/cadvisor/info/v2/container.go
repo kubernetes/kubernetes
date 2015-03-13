@@ -16,6 +16,10 @@ package v2
 
 import (
 	"time"
+
+	// TODO(rjnagal): Remove dependency after moving all stats structs from v1.
+	// using v1 now for easy conversion.
+	"github.com/google/cadvisor/info/v1"
 )
 
 type CpuSpec struct {
@@ -52,6 +56,29 @@ type ContainerSpec struct {
 
 	HasMemory bool       `json:"has_memory"`
 	Memory    MemorySpec `json:"memory,omitempty"`
+}
+
+type ContainerStats struct {
+	// The time of this stat point.
+	Timestamp time.Time `json:"timestamp"`
+	// CPU statistics
+	HasCpu bool        `json:"has_cpu"`
+	Cpu    v1.CpuStats `json:"cpu,omitempty"`
+	// Disk IO statistics
+	HasDiskIo bool           `json:"has_diskio"`
+	DiskIo    v1.DiskIoStats `json:"diskio,omitempty"`
+	// Memory statistics
+	HasMemory bool           `json:"has_memory"`
+	Memory    v1.MemoryStats `json:"memory,omitempty"`
+	// Network statistics
+	HasNetwork bool              `json:"has_network"`
+	Network    []v1.NetworkStats `json:"network,omitempty"`
+	// Filesystem statistics
+	HasFilesystem bool         `json:"has_filesystem"`
+	Filesystem    []v1.FsStats `json:"filesystem,omitempty"`
+	// Task load statistics
+	HasLoad bool         `json:"has_load"`
+	Load    v1.LoadStats `json:"load_stats,omitempty"`
 }
 
 type Percentiles struct {
@@ -96,4 +123,30 @@ type DerivedStats struct {
 	HourUsage Usage `json:"hour_usage"`
 	// Percentile in last day.
 	DayUsage Usage `json:"day_usage"`
+}
+
+type FsInfo struct {
+	// The block device name associated with the filesystem.
+	Device string `json:"device"`
+
+	// Path where the filesystem is mounted.
+	Mountpoint string `json:"mountpoint"`
+
+	// Filesystem usage in bytes.
+	Capacity uint64 `json:"capacity"`
+
+	// Number of bytes used on this filesystem.
+	Usage uint64 `json:"usage"`
+
+	// Labels associated with this filesystem.
+	Labels []string `json:"labels"`
+}
+
+type StatsRequest struct {
+	// Type of container identifier specified - "name", "dockerid", dockeralias"
+	IdType string `json:"type"`
+	// Number of stats to return
+	Count int `json:"count"`
+	// Whether to include stats for child subcontainers.
+	Recursive bool `json:"recursive"`
 }

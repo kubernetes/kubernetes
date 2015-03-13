@@ -22,41 +22,6 @@ write_files:
       echo "Unpacking release"
       rm -rf /opt/kubernetes || false
       tar xzf /opt/kubernetes.tar.gz -C /opt/
-  - path: /opt/kubernetes-manifests/cadvisor.manifest
-    permissions: 0755
-    content: |
-      version: v1beta2
-      id: cadvisor-agent
-      containers:
-        - name: cadvisor
-          image: google/cadvisor:latest
-          ports:
-            - name: http
-              containerPort: 8080
-              hostPort: 4194
-          volumeMounts:
-            - name: varrun
-              mountPath: /var/run
-              readOnly: false
-            - name: varlibdocker
-              mountPath: /var/lib/docker
-              readOnly: true
-            - name: cgroups
-              mountPath: /sys/fs/cgroup
-              readOnly: true
-      volumes:
-        - name: varrun
-          source:
-            hostDir:
-              path: /var/run
-        - name: varlibdocker
-          source:
-            hostDir:
-              path: /var/lib/docker
-        - name: cgroups
-          source:
-            hostDir:
-              path: /sys/fs/cgroup
 
 coreos:
   etcd:

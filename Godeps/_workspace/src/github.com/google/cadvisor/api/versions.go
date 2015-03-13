@@ -17,6 +17,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/events"
@@ -31,8 +32,10 @@ const (
 	machineApi       = "machine"
 	dockerApi        = "docker"
 	summaryApi       = "summary"
+	statsApi         = "stats"
 	specApi          = "spec"
 	eventsApi        = "events"
+	storageApi       = "storage"
 )
 
 // Interface for a cAdvisor API version
@@ -313,6 +316,22 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 		}
 
 		return writeResult(stats, w)
+	case statsApi:
+		name := getContainerName(request)
+		sr, err := getStatsRequest(name, r)
+		if err != nil {
+			return err
+		}
+		glog.V(2).Infof("Api - Stats: Looking for stats for container %q, options %+v", name, sr)
+		query := info.ContainerInfoRequest{
+			NumStats: sr.Count,
+		}
+		cont, err := m.GetContainerInfo(name, &query)
+		if err != nil {
+			return fmt.Errorf("failed to get container %q: %v", name, err)
+		}
+		contStats := convertStats(cont)
+		return writeResult(contStats, w)
 	case specApi:
 		containerName := getContainerName(request)
 		glog.V(2).Infof("Api - Spec(%v)", containerName)
@@ -322,6 +341,24 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 		}
 		specV2 := convertSpec(spec)
 		return writeResult(specV2, w)
+	case storageApi:
+		var err error
+		fi := []v2.FsInfo{}
+		label := r.URL.Query().Get("label")
+		if len(label) == 0 {
+			// Get all global filesystems info.
+			fi, err = m.GetFsInfo("")
+			if err != nil {
+				return err
+			}
+		} else {
+			// Get a specific label.
+			fi, err = m.GetFsInfo(label)
+			if err != nil {
+				return err
+			}
+		}
+		return writeResult(fi, w)
 	default:
 		return self.baseVersion.HandleRequest(requestType, request, m, w, r)
 	}
@@ -345,4 +382,60 @@ func convertSpec(specV1 info.ContainerSpec) v2.ContainerSpec {
 		specV2.Memory.SwapLimit = specV1.Memory.SwapLimit
 	}
 	return specV2
+}
+
+func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
+	stats := []v2.ContainerStats{}
+	for _, val := range cont.Stats {
+		stat := v2.ContainerStats{
+			Timestamp:     val.Timestamp,
+			HasCpu:        cont.Spec.HasCpu,
+			HasMemory:     cont.Spec.HasMemory,
+			HasNetwork:    cont.Spec.HasNetwork,
+			HasFilesystem: cont.Spec.HasFilesystem,
+			HasDiskIo:     cont.Spec.HasDiskIo,
+		}
+		if stat.HasCpu {
+			stat.Cpu = val.Cpu
+		}
+		if stat.HasMemory {
+			stat.Memory = val.Memory
+		}
+		if stat.HasNetwork {
+			// TODO(rjnagal): Return stats about all network interfaces.
+			stat.Network = append(stat.Network, val.Network)
+		}
+		if stat.HasFilesystem {
+			stat.Filesystem = val.Filesystem
+		}
+		if stat.HasDiskIo {
+			stat.DiskIo = val.DiskIo
+		}
+		// TODO(rjnagal): Handle load stats.
+		stats = append(stats, stat)
+	}
+	return stats
+}
+
+func getStatsRequest(id string, r *http.Request) (v2.StatsRequest, error) {
+	// fill in the defaults.
+	sr := v2.StatsRequest{
+		IdType:    "name",
+		Count:     64,
+		Recursive: false,
+	}
+	idType := r.URL.Query().Get("type")
+	if len(idType) != 0 && idType != "name" {
+		return sr, fmt.Errorf("unknown 'type' %q for container name %q", idType, id)
+	}
+	count := r.URL.Query().Get("count")
+	if len(count) != 0 {
+		n, err := strconv.ParseUint(count, 10, 32)
+		if err != nil {
+			return sr, fmt.Errorf("failed to parse 'count' option: %v", count)
+		}
+		sr.Count = int(n)
+	}
+	// TODO(rjnagal): Add option to specify recursive.
+	return sr, nil
 }
