@@ -138,7 +138,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 		case event, open := <-watching.ResultChan():
 			if !open {
 				// watchChannel has been closed, or something else went
-				// wrong with our etcd watch call. Let the util.Forever()
+				// wrong with our watch call. Let the util.Forever()
 				// that called us call us again.
 				return
 			}

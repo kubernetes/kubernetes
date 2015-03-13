@@ -30,10 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func makeNamespaceURL(namespace, suffix string) string {
@@ -248,22 +246,6 @@ func TestSynchronize(t *testing.T) {
 	controllerSpec2.Spec.Template.ObjectMeta.Labels = map[string]string{
 		"name": "bar",
 		"type": "production",
-	}
-
-	fakeEtcd := tools.NewFakeEtcdClient(t)
-	fakeEtcd.Data["/registry/controllers"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Nodes: []*etcd.Node{
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &controllerSpec1),
-					},
-					{
-						Value: runtime.EncodeOrDie(testapi.Codec(), &controllerSpec2),
-					},
-				},
-			},
-		},
 	}
 
 	fakePodHandler := util.FakeHandler{
