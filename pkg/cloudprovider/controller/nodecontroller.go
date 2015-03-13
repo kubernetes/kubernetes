@@ -141,6 +141,10 @@ func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus 
 
 // RegisterNodes registers the given list of nodes, it keeps retrying for `retryCount` times.
 func (s *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, retryInterval time.Duration) error {
+	if len(nodes.Items) == 0 {
+		return nil
+	}
+
 	registered := util.NewStringSet()
 	nodes = s.canonicalizeName(nodes)
 	for i := 0; i < retryCount; i++ {
