@@ -53,11 +53,16 @@ func init() {
 			}
 		},
 		func(obj *Service) {
-			if obj.Spec.Protocol == "" {
-				obj.Spec.Protocol = ProtocolTCP
-			}
 			if obj.Spec.SessionAffinity == "" {
 				obj.Spec.SessionAffinity = AffinityTypeNone
+			}
+		},
+		func(obj *ServicePort) {
+			if obj.Protocol == "" {
+				obj.Protocol = ProtocolTCP
+			}
+			if obj.TargetPort == util.NewIntOrStringFromInt(0) || obj.TargetPort == util.NewIntOrStringFromString("") {
+				obj.TargetPort = util.NewIntOrStringFromInt(obj.Port)
 			}
 		},
 		func(obj *PodSpec) {
@@ -97,9 +102,11 @@ func init() {
 				obj.Path = "/"
 			}
 		},
-		func(obj *ServiceSpec) {
-			if obj.TargetPort.Kind == util.IntstrInt && obj.TargetPort.IntVal == 0 ||
-				obj.TargetPort.Kind == util.IntstrString && obj.TargetPort.StrVal == "" {
+		func(obj *ServicePort) {
+			if obj.Protocol == "" {
+				obj.Protocol = ProtocolTCP
+			}
+			if obj.TargetPort == util.NewIntOrStringFromInt(0) || obj.TargetPort == util.NewIntOrStringFromString("") {
 				obj.TargetPort = util.NewIntOrStringFromInt(obj.Port)
 			}
 		},

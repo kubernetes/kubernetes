@@ -284,6 +284,191 @@ func TestServiceEmptySelector(t *testing.T) {
 	}
 }
 
+func TestServicePorts(t *testing.T) {
+	testCases := []struct {
+		given     current.Service
+		expected  newer.Service
+		roundtrip current.Service
+	}{
+		{
+			given: current.Service{
+				TypeMeta: current.TypeMeta{
+					ID: "legacy-with-defaults",
+				},
+				Port:     111,
+				Protocol: current.ProtocolTCP,
+			},
+			expected: newer.Service{
+				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+					Port:     111,
+					Protocol: newer.ProtocolTCP,
+				}}},
+			},
+			roundtrip: current.Service{
+				Ports: []current.ServicePort{{
+					Port:     111,
+					Protocol: current.ProtocolTCP,
+				}},
+			},
+		},
+		{
+			given: current.Service{
+				TypeMeta: current.TypeMeta{
+					ID: "legacy-full",
+				},
+				PortName:      "p",
+				Port:          111,
+				Protocol:      current.ProtocolTCP,
+				ContainerPort: util.NewIntOrStringFromString("p"),
+			},
+			expected: newer.Service{
+				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+					Name:       "p",
+					Port:       111,
+					Protocol:   newer.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromString("p"),
+				}}},
+			},
+			roundtrip: current.Service{
+				Ports: []current.ServicePort{{
+					Name:          "p",
+					Port:          111,
+					Protocol:      current.ProtocolTCP,
+					ContainerPort: util.NewIntOrStringFromString("p"),
+				}},
+			},
+		},
+		{
+			given: current.Service{
+				TypeMeta: current.TypeMeta{
+					ID: "both",
+				},
+				PortName:      "p",
+				Port:          111,
+				Protocol:      current.ProtocolTCP,
+				ContainerPort: util.NewIntOrStringFromString("p"),
+				Ports: []current.ServicePort{{
+					Name:          "q",
+					Port:          222,
+					Protocol:      current.ProtocolUDP,
+					ContainerPort: util.NewIntOrStringFromInt(93),
+				}},
+			},
+			expected: newer.Service{
+				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+					Name:       "q",
+					Port:       222,
+					Protocol:   newer.ProtocolUDP,
+					TargetPort: util.NewIntOrStringFromInt(93),
+				}}},
+			},
+			roundtrip: current.Service{
+				Ports: []current.ServicePort{{
+					Name:          "q",
+					Port:          222,
+					Protocol:      current.ProtocolUDP,
+					ContainerPort: util.NewIntOrStringFromInt(93),
+				}},
+			},
+		},
+		{
+			given: current.Service{
+				TypeMeta: current.TypeMeta{
+					ID: "one",
+				},
+				Ports: []current.ServicePort{{
+					Name:          "p",
+					Port:          111,
+					Protocol:      current.ProtocolUDP,
+					ContainerPort: util.NewIntOrStringFromInt(93),
+				}},
+			},
+			expected: newer.Service{
+				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+					Name:       "p",
+					Port:       111,
+					Protocol:   newer.ProtocolUDP,
+					TargetPort: util.NewIntOrStringFromInt(93),
+				}}},
+			},
+			roundtrip: current.Service{
+				Ports: []current.ServicePort{{
+					Name:          "p",
+					Port:          111,
+					Protocol:      current.ProtocolUDP,
+					ContainerPort: util.NewIntOrStringFromInt(93),
+				}},
+			},
+		},
+		{
+			given: current.Service{
+				TypeMeta: current.TypeMeta{
+					ID: "two",
+				},
+				Ports: []current.ServicePort{{
+					Name:          "p",
+					Port:          111,
+					Protocol:      current.ProtocolUDP,
+					ContainerPort: util.NewIntOrStringFromInt(93),
+				}, {
+					Name:          "q",
+					Port:          222,
+					Protocol:      current.ProtocolTCP,
+					ContainerPort: util.NewIntOrStringFromInt(76),
+				}},
+			},
+			expected: newer.Service{
+				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+					Name:       "p",
+					Port:       111,
+					Protocol:   newer.ProtocolUDP,
+					TargetPort: util.NewIntOrStringFromInt(93),
+				}, {
+					Name:       "q",
+					Port:       222,
+					Protocol:   newer.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(76),
+				}}},
+			},
+			roundtrip: current.Service{
+				Ports: []current.ServicePort{{
+					Name:          "p",
+					Port:          111,
+					Protocol:      current.ProtocolUDP,
+					ContainerPort: util.NewIntOrStringFromInt(93),
+				}, {
+					Name:          "q",
+					Port:          222,
+					Protocol:      current.ProtocolTCP,
+					ContainerPort: util.NewIntOrStringFromInt(76),
+				}},
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		// Convert versioned -> internal.
+		got := newer.Service{}
+		if err := Convert(&tc.given, &got); err != nil {
+			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(got.Spec.Ports, tc.expected.Spec.Ports) {
+			t.Errorf("[Case: %d] Expected %v, got %v", i, tc.expected.Spec.Ports, got.Spec.Ports)
+		}
+
+		// Convert internal -> versioned.
+		got2 := current.Service{}
+		if err := Convert(&got, &got2); err != nil {
+			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(got2.Ports, tc.roundtrip.Ports) {
+			t.Errorf("[Case: %d] Expected %v, got %v", i, tc.roundtrip.Ports, got2.Ports)
+		}
+	}
+}
+
 func TestPullPolicyConversion(t *testing.T) {
 	table := []struct {
 		versioned current.PullPolicy
@@ -527,7 +712,7 @@ func TestEndpointsConversion(t *testing.T) {
 			continue
 		}
 		if got2.Protocol != tc.given.Protocol || !newer.Semantic.DeepEqual(got2.Endpoints, tc.given.Endpoints) {
-			t.Errorf("[Case: %d] Expected %#v, got %#v", i, tc.given.Endpoints, got2.Endpoints)
+			t.Errorf("[Case: %d] Expected %s %#v, got %s %#v", i, tc.given.Protocol, tc.given.Endpoints, got2.Protocol, got2.Endpoints)
 		}
 	}
 }

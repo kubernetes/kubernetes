@@ -228,15 +228,29 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 }
 
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
 	pool, err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		return "", err
 	}
+
+	if len(ports) == 0 {
+		return "", fmt.Errorf("no ports specified for GCE load balancer")
+	}
+	minPort := 65536
+	maxPort := 0
+	for i := range ports {
+		if ports[i] < minPort {
+			minPort = ports[i]
+		}
+		if ports[i] > maxPort {
+			maxPort = ports[i]
+		}
+	}
 	req := &compute.ForwardingRule{
 		Name:       name,
 		IPProtocol: "TCP",
-		PortRange:  strconv.Itoa(port),
+		PortRange:  fmt.Sprintf("%d-%d", minPort, maxPort),
 		Target:     pool,
 	}
 	if len(externalIP) > 0 {

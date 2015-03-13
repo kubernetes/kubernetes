@@ -9,9 +9,13 @@
       }
    },
    "spec":{
-      "port":6379,
-      "containerPort":"redis-server",
-      "protocol":"TCP",
+      "ports": [
+        {
+          "port":6379,
+          "targetPort":"redis-server",
+          "protocol":"TCP"
+        }
+      ],
       "selector":{
          "name":"redis",
          "role":"master"

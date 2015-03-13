@@ -6,8 +6,9 @@ metadata:
   name: rethinkdb-admin
   namespace: rethinkdb
 spec:
-  targetPort: 8080
-  port: 8080
+  ports:
+   - port: 8080
+     targetPort: 8080
   selector:
     db: rethinkdb
     role: admin

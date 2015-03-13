@@ -465,12 +465,14 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 			},
 		},
 		Spec: api.ServiceSpec{
-			Port: 12345,
 			// This is here because validation requires it.
 			Selector: map[string]string{
 				"foo": "bar",
 			},
-			Protocol:        "TCP",
+			Ports: []api.ServicePort{{
+				Port:     12345,
+				Protocol: "TCP",
+			}},
 			SessionAffinity: "None",
 		},
 	}
@@ -527,12 +529,14 @@ func runAtomicPutTest(c *client.Client) {
 			},
 		},
 		Spec: api.ServiceSpec{
-			Port: 12345,
 			// This is here because validation requires it.
 			Selector: map[string]string{
 				"foo": "bar",
 			},
-			Protocol:        "TCP",
+			Ports: []api.ServicePort{{
+				Port:     12345,
+				Protocol: "TCP",
+			}},
 			SessionAffinity: "None",
 		},
 	}
@@ -606,12 +610,14 @@ func runPatchTest(c *client.Client) {
 			},
 		},
 		Spec: api.ServiceSpec{
-			Port: 12345,
 			// This is here because validation requires it.
 			Selector: map[string]string{
 				"foo": "bar",
 			},
-			Protocol:        "TCP",
+			Ports: []api.ServicePort{{
+				Port:     12345,
+				Protocol: "TCP",
+			}},
 			SessionAffinity: "None",
 		},
 	}
@@ -747,8 +753,10 @@ func runServiceTest(client *client.Client) {
 			Selector: map[string]string{
 				"name": "thisisalonglabel",
 			},
-			Port:            8080,
-			Protocol:        "TCP",
+			Ports: []api.ServicePort{{
+				Port:     8080,
+				Protocol: "TCP",
+			}},
 			SessionAffinity: "None",
 		},
 	}
@@ -764,8 +772,10 @@ func runServiceTest(client *client.Client) {
 			Selector: map[string]string{
 				"name": "thisisalonglabel",
 			},
-			Port:            8080,
-			Protocol:        "TCP",
+			Ports: []api.ServicePort{{
+				Port:     8080,
+				Protocol: "TCP",
+			}},
 			SessionAffinity: "None",
 		},
 	}
@@ -784,8 +794,10 @@ func runServiceTest(client *client.Client) {
 			Selector: map[string]string{
 				"name": "thisisalonglabel",
 			},
-			Port:            8080,
-			Protocol:        "TCP",
+			Ports: []api.ServicePort{{
+				Port:     8080,
+				Protocol: "TCP",
+			}},
 			SessionAffinity: "None",
 		},
 	}

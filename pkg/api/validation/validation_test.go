@@ -1293,6 +1293,13 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "nil selector",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Selector = nil
+			},
+			numErrs: 0,
+		},
+		{
 			name: "invalid selector",
 			makeSvc: func(s *api.Service) {
 				s.Spec.Selector["NoSpecialCharsLike=Equals"] = "bar"
@@ -1307,16 +1314,44 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "missing ports",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Ports = nil
+			},
+			numErrs: 1,
+		},
+		{
+			name: "empty port[0] name",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Name = ""
+			},
+			numErrs: 0,
+		},
+		{
+			name: "empty port[1] name",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "", Protocol: "TCP", Port: 12345})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid port name",
+			makeSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Name = "INVALID"
+			},
+			numErrs: 1,
+		},
+		{
 			name: "missing protocol",
 			makeSvc: func(s *api.Service) {
-				s.Spec.Protocol = ""
+				s.Spec.Ports[0].Protocol = ""
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid protocol",
 			makeSvc: func(s *api.Service) {
-				s.Spec.Protocol = "INVALID"
+				s.Spec.Ports[0].Protocol = "INVALID"
 			},
 			numErrs: 1,
 		},
@@ -1330,28 +1365,21 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "missing port",
 			makeSvc: func(s *api.Service) {
-				s.Spec.Port = 0
+				s.Spec.Ports[0].Port = 0
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid port",
 			makeSvc: func(s *api.Service) {
-				s.Spec.Port = 65536
+				s.Spec.Ports[0].Port = 65536
 			},
 			numErrs: 1,
 		},
 		{
-			name: "missing targetPort string",
+			name: "invalid TargetPort int",
 			makeSvc: func(s *api.Service) {
-				s.Spec.TargetPort = util.NewIntOrStringFromString("")
-			},
-			numErrs: 1,
-		},
-		{
-			name: "invalid targetPort int",
-			makeSvc: func(s *api.Service) {
-				s.Spec.TargetPort = util.NewIntOrStringFromInt(65536)
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(65536)
 			},
 			numErrs: 1,
 		},
@@ -1377,11 +1405,12 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "nil selector",
+			name: "dup port name",
 			makeSvc: func(s *api.Service) {
-				s.Spec.Selector = nil
+				s.Spec.Ports[0].Name = "p"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345})
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 		{
 			name: "valid 1",
@@ -1393,15 +1422,15 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "valid 2",
 			makeSvc: func(s *api.Service) {
-				s.Spec.Protocol = "UDP"
-				s.Spec.TargetPort = util.NewIntOrStringFromInt(12345)
+				s.Spec.Ports[0].Protocol = "UDP"
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(12345)
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid 3",
 			makeSvc: func(s *api.Service) {
-				s.Spec.TargetPort = util.NewIntOrStringFromString("http")
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString("http")
 			},
 			numErrs: 0,
 		},
@@ -1416,6 +1445,7 @@ func TestValidateService(t *testing.T) {
 			name: "valid portal ip - empty",
 			makeSvc: func(s *api.Service) {
 				s.Spec.PortalIP = ""
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString("http")
 			},
 			numErrs: 0,
 		},
@@ -1432,8 +1462,7 @@ func TestValidateService(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"key": "val"},
 				SessionAffinity: "None",
-				Port:            8675,
-				Protocol:        "TCP",
+				Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
 			},
 		}
 		tc.makeSvc(&svc)

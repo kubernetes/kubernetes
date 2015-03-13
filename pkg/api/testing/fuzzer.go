@@ -216,11 +216,18 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(ss *api.ServiceSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(ss) // fuzz self without calling this function again
-			switch ss.TargetPort.Kind {
-			case util.IntstrInt:
-				ss.TargetPort.IntVal = 1 + ss.TargetPort.IntVal%65535 // non-zero
-			case util.IntstrString:
-				ss.TargetPort.StrVal = "x" + ss.TargetPort.StrVal // non-empty
+			if len(ss.Ports) == 0 {
+				// There must be at least 1 port.
+				ss.Ports = append(ss.Ports, api.ServicePort{})
+				c.Fuzz(&ss.Ports[0])
+			}
+			for i := range ss.Ports {
+				switch ss.Ports[i].TargetPort.Kind {
+				case util.IntstrInt:
+					ss.Ports[i].TargetPort.IntVal = 1 + ss.Ports[i].TargetPort.IntVal%65535 // non-zero
+				case util.IntstrString:
+					ss.Ports[i].TargetPort.StrVal = "x" + ss.Ports[i].TargetPort.StrVal // non-empty
+				}
 			}
 		},
 	)

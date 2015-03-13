@@ -8,9 +8,13 @@
       }
    },
    "spec":{
-      "port":3000,
-      "containerPort":"http-server",
-      "protocol":"TCP",
+      "ports": [
+         {
+           "port":3000,
+           "targetPort":"http-server",
+           "protocol":"TCP"
+         }
+      ],
       "selector":{
          "name":"guestbook"
       }

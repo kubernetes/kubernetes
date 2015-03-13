@@ -68,6 +68,14 @@ func init() {
 				obj.SessionAffinity = AffinityTypeNone
 			}
 		},
+		func(obj *ServicePort) {
+			if obj.Protocol == "" {
+				obj.Protocol = ProtocolTCP
+			}
+			if obj.ContainerPort == util.NewIntOrStringFromInt(0) || obj.ContainerPort == util.NewIntOrStringFromString("") {
+				obj.ContainerPort = util.NewIntOrStringFromInt(obj.Port)
+			}
+		},
 		func(obj *PodSpec) {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst

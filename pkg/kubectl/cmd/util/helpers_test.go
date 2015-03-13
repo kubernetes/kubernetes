@@ -135,15 +135,11 @@ func TestMerge(t *testing.T) {
 		{
 			kind: "Service",
 			obj: &api.Service{
-				Spec: api.ServiceSpec{
-					Port: 10,
-				},
+				Spec: api.ServiceSpec{},
 			},
 			fragment: `{ "apiVersion": "v1beta1", "port": 0 }`,
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
-					Port:            0,
-					Protocol:        "TCP",
 					SessionAffinity: "None",
 				},
 			},
@@ -160,7 +156,6 @@ func TestMerge(t *testing.T) {
 			fragment: `{ "apiVersion": "v1beta1", "selector": { "version": "v2" } }`,
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
-					Protocol:        "TCP",
 					SessionAffinity: "None",
 					Selector: map[string]string{
 						"version": "v2",

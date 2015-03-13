@@ -8,9 +8,13 @@
       }
    },
    "spec":{
-      "port":80,
-      "containerPort":80,
-      "protocol":"TCP",
+      "ports": [
+        {
+          "port":80,
+          "targetPort":80,
+          "protocol":"TCP"
+        }
+      ],
       "selector":{
          "name":"frontend"
       }

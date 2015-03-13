@@ -17,6 +17,8 @@ limitations under the License.
 package service
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"net"
 	"strings"
@@ -52,6 +54,16 @@ func makeIPNet(t *testing.T) *net.IPNet {
 	return net
 }
 
+func deepCloneService(svc *api.Service) *api.Service {
+	buff := new(bytes.Buffer)
+	enc := gob.NewEncoder(buff)
+	dec := gob.NewDecoder(buff)
+	enc.Encode(svc)
+	result := new(api.Service)
+	dec.Decode(result)
+	return result
+}
+
 func TestServiceRegistryCreate(t *testing.T) {
 	storage, registry, fakeCloud := NewTestREST(t, nil)
 	storage.portalMgr.randomAttempts = 0
@@ -59,14 +71,19 @@ func TestServiceRegistryCreate(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Port:            6502,
 			Selector:        map[string]string{"bar": "baz"},
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
-	created_svc, _ := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	created_service := created_svc.(*api.Service)
 	if !api.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
 		t.Errorf("storage did not populate object meta field values")
@@ -98,18 +115,22 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
-				Port:            6502,
 				Selector:        map[string]string{"bar": "baz"},
-				Protocol:        api.ProtocolTCP,
 				SessionAffinity: api.AffinityTypeNone,
+				Ports: []api.ServicePort{{
+					Port:     6502,
+					Protocol: api.ProtocolTCP,
+				}},
 			},
 		},
 		"empty port": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
-				Protocol:        api.ProtocolTCP,
 				SessionAffinity: api.AffinityTypeNone,
+				Ports: []api.ServicePort{{
+					Protocol: api.ProtocolTCP,
+				}},
 			},
 		},
 	}
@@ -122,7 +143,6 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
-
 	}
 }
 
@@ -132,8 +152,11 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	svc, err := registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Port:     6502,
 			Selector: map[string]string{"bar": "baz1"},
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	})
 
@@ -145,10 +168,12 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: svc.ResourceVersion},
 		Spec: api.ServiceSpec{
-			Port:            6502,
 			Selector:        map[string]string{"bar": "baz2"},
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	})
 	if err != nil {
@@ -175,27 +200,34 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Port:     6502,
 			Selector: map[string]string{"bar": "baz"},
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	})
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
-				Port:            6502,
 				Selector:        map[string]string{"bar": "baz"},
-				Protocol:        api.ProtocolTCP,
 				SessionAffinity: api.AffinityTypeNone,
+				Ports: []api.ServicePort{{
+					Port:     6502,
+					Protocol: api.ProtocolTCP,
+				}},
 			},
 		},
 		"invalid selector": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Port:            6502,
 				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
-				Protocol:        api.ProtocolTCP,
 				SessionAffinity: api.AffinityTypeNone,
+				Ports: []api.ServicePort{{
+					Port:     6502,
+					Protocol: api.ProtocolTCP,
+				}},
 			},
 		},
 	}
@@ -216,14 +248,18 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			Protocol:                   api.ProtocolTCP,
 			SessionAffinity:            api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
-	storage.Create(ctx, svc)
+	if _, err := storage.Create(ctx, svc); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -234,7 +270,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
 	}
-	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
+	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Ports[0] != 6502 {
 		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
 	}
 }
@@ -245,15 +281,19 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			Protocol:                   api.ProtocolTCP,
 			SessionAffinity:            api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
-	storage.Create(ctx, svc)
+	if _, err := storage.Create(ctx, svc); err == nil {
+		t.Fatalf("Unexpected success")
+	}
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "get-zone" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -269,8 +309,11 @@ func TestServiceRegistryDelete(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	registry.CreateService(ctx, svc)
@@ -291,8 +334,11 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			Protocol:                   api.ProtocolTCP,
 			SessionAffinity:            api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	registry.CreateService(ctx, svc)
@@ -313,32 +359,80 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: false,
-			Protocol:                   api.ProtocolTCP,
 			SessionAffinity:            api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
-	storage.Create(ctx, svc1)
+	if _, err := storage.Create(ctx, svc1); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 
 	// Modify load balancer to be external.
-	svc2 := new(api.Service)
-	*svc2 = *svc1
+	svc2 := deepCloneService(svc1)
 	svc2.Spec.CreateExternalLoadBalancer = true
-	storage.Update(ctx, svc2)
+	if _, _, err := storage.Update(ctx, svc2); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 
 	// Change port.
-	svc3 := new(api.Service)
-	*svc3 = *svc2
-	svc3.Spec.Port = 6504
-	storage.Update(ctx, svc3)
+	svc3 := deepCloneService(svc2)
+	svc3.Spec.Ports[0].Port = 6504
+	if _, _, err := storage.Update(ctx, svc3); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(fakeCloud.Calls) != 6 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" ||
+		fakeCloud.Calls[2] != "get-zone" || fakeCloud.Calls[3] != "delete" ||
+		fakeCloud.Calls[4] != "get-zone" || fakeCloud.Calls[5] != "create" {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+}
+
+func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	storage, _, fakeCloud := NewTestREST(t, nil)
+
+	// Create external load balancer.
+	svc1 := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		Spec: api.ServiceSpec{
+			Selector:                   map[string]string{"bar": "baz"},
+			CreateExternalLoadBalancer: true,
+			SessionAffinity:            api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Name:     "p",
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}, {
+				Name:     "q",
+				Port:     8086,
+				Protocol: api.ProtocolTCP,
+			}},
+		},
+	}
+	if _, err := storage.Create(ctx, svc1); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+
+	// Modify ports
+	svc2 := deepCloneService(svc1)
+	svc2.Spec.Ports[1].Port = 8088
+	if _, _, err := storage.Update(ctx, svc2); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if len(fakeCloud.Calls) != 6 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" ||
 		fakeCloud.Calls[2] != "get-zone" || fakeCloud.Calls[3] != "delete" ||
 		fakeCloud.Calls[4] != "get-zone" || fakeCloud.Calls[5] != "create" {
@@ -468,9 +562,11 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -487,9 +583,11 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		}}
 	ctx = api.NewDefaultContext()
 	created_svc2, _ := rest.Create(ctx, svc2)
@@ -506,9 +604,11 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			PortalIP:        "1.2.3.93",
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx = api.NewDefaultContext()
@@ -527,9 +627,11 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -548,9 +650,11 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx = api.NewDefaultContext()
@@ -572,33 +676,34 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
 	created_svc, _ := rest.Create(ctx, svc)
 	created_service := created_svc.(*api.Service)
-	if created_service.Spec.Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Port)
+	if created_service.Spec.Ports[0].Port != 6502 {
+		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Ports[0].Port)
 	}
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
 
-	update := new(api.Service)
-	*update = *created_service
-	update.Spec.Port = 6503
+	update := deepCloneService(created_service)
+	update.Spec.Ports[0].Port = 6503
 
 	updated_svc, _, _ := rest.Update(ctx, update)
 	updated_service := updated_svc.(*api.Service)
-	if updated_service.Spec.Port != 6503 {
-		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Port)
+	if updated_service.Spec.Ports[0].Port != 6503 {
+		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Ports[0].Port)
 	}
 
-	*update = *created_service
-	update.Spec.Port = 6503
+	update = deepCloneService(created_service)
+	update.Spec.Ports[0].Port = 6503
 	update.Spec.PortalIP = "1.2.3.76" // error
 
 	_, _, err := rest.Update(ctx, update)
@@ -614,31 +719,32 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
-			Port:     6502,
+			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			Protocol:                   api.ProtocolTCP,
 			SessionAffinity:            api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
 	created_svc, _ := rest.Create(ctx, svc)
 	created_service := created_svc.(*api.Service)
-	if created_service.Spec.Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Port)
+	if created_service.Spec.Ports[0].Port != 6502 {
+		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Ports[0].Port)
 	}
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
 
-	update := new(api.Service)
-	*update = *created_service
+	update := deepCloneService(created_service)
 
 	_, _, err := rest.Update(ctx, update)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
+	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Ports[0] != 6502 {
 		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
 	}
 }
@@ -656,9 +762,11 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -667,9 +775,11 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	rest1.Create(ctx, svc)
@@ -683,9 +793,11 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			Port:            6502,
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
+			Ports: []api.ServicePort{{
+				Port:     6502,
+				Protocol: api.ProtocolTCP,
+			}},
 		},
 	}
 	created_svc, _ := rest2.Create(ctx, svc)
@@ -743,9 +855,11 @@ func TestCreate(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				PortalIP:        "None",
-				Port:            6502,
-				Protocol:        "TCP",
 				SessionAffinity: "None",
+				Ports: []api.ServicePort{{
+					Port:     6502,
+					Protocol: api.ProtocolTCP,
+				}},
 			},
 		},
 		// invalid
@@ -756,10 +870,12 @@ func TestCreate(t *testing.T) {
 		&api.Service{
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
-				Port:            6502,
-				Protocol:        "TCP",
 				PortalIP:        "invalid",
 				SessionAffinity: "None",
+				Ports: []api.ServicePort{{
+					Port:     6502,
+					Protocol: api.ProtocolTCP,
+				}},
 			},
 		},
 	)

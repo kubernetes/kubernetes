@@ -281,10 +281,12 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 	if rs.cloud == nil {
 		return fmt.Errorf("requested an external service, but no cloud provider supplied.")
 	}
-	if service.Spec.Protocol != api.ProtocolTCP {
-		// TODO: Support UDP here too.
-		return fmt.Errorf("external load balancers for non TCP services are not currently supported.")
+
+	ports, err := getTCPPorts(service)
+	if err != nil {
+		return err
 	}
+
 	balancer, ok := rs.cloud.TCPLoadBalancer()
 	if !ok {
 		return fmt.Errorf("the cloud provider does not support external TCP load balancers.")
@@ -302,24 +304,56 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 		return err
 	}
 	name := rs.getLoadbalancerName(ctx, service)
-	// TODO: We should be able to rely on valid input, and not do defaulting here.
 	var affinityType api.AffinityType = service.Spec.SessionAffinity
 	if len(service.Spec.PublicIPs) > 0 {
 		for _, publicIP := range service.Spec.PublicIPs {
-			_, err = balancer.CreateTCPLoadBalancer(name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+			_, err = balancer.CreateTCPLoadBalancer(name, zone.Region, net.ParseIP(publicIP), ports, hostsFromMinionList(hosts), affinityType)
 			if err != nil {
 				// TODO: have to roll-back any successful calls.
 				return err
 			}
 		}
 	} else {
-		endpoint, err := balancer.CreateTCPLoadBalancer(name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+		endpoint, err := balancer.CreateTCPLoadBalancer(name, zone.Region, nil, ports, hostsFromMinionList(hosts), affinityType)
 		if err != nil {
 			return err
 		}
 		service.Spec.PublicIPs = []string{endpoint}
 	}
 	return nil
+}
+
+func getTCPPorts(service *api.Service) ([]int, error) {
+	ports := []int{}
+	for i := range service.Spec.Ports {
+		sp := &service.Spec.Ports[i]
+		if sp.Protocol != api.ProtocolTCP {
+			// TODO: Support UDP here too.
+			return nil, fmt.Errorf("external load balancers for non TCP services are not currently supported.")
+		}
+		ports = append(ports, sp.Port)
+	}
+	return ports, nil
+}
+
+func portsEqual(x, y *api.Service) bool {
+	xPorts, err := getTCPPorts(x)
+	if err != nil {
+		return false
+	}
+	yPorts, err := getTCPPorts(y)
+	if err != nil {
+		return false
+	}
+	if len(xPorts) != len(yPorts) {
+		return false
+	}
+	for i := range xPorts {
+		if xPorts[i] != yPorts[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (rs *REST) deleteExternalLoadBalancer(ctx api.Context, service *api.Service) error {
@@ -348,21 +382,21 @@ func (rs *REST) deleteExternalLoadBalancer(ctx api.Context, service *api.Service
 	return nil
 }
 
-func externalLoadBalancerNeedsUpdate(old, new *api.Service) bool {
-	if !old.Spec.CreateExternalLoadBalancer && !new.Spec.CreateExternalLoadBalancer {
+func externalLoadBalancerNeedsUpdate(oldService, newService *api.Service) bool {
+	if !oldService.Spec.CreateExternalLoadBalancer && !newService.Spec.CreateExternalLoadBalancer {
 		return false
 	}
-	if old.Spec.CreateExternalLoadBalancer != new.Spec.CreateExternalLoadBalancer ||
-		old.Spec.Port != new.Spec.Port ||
-		old.Spec.SessionAffinity != new.Spec.SessionAffinity ||
-		old.Spec.Protocol != new.Spec.Protocol {
+	if oldService.Spec.CreateExternalLoadBalancer != newService.Spec.CreateExternalLoadBalancer {
 		return true
 	}
-	if len(old.Spec.PublicIPs) != len(new.Spec.PublicIPs) {
+	if !portsEqual(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
-	for i := range old.Spec.PublicIPs {
-		if old.Spec.PublicIPs[i] != new.Spec.PublicIPs[i] {
+	if len(oldService.Spec.PublicIPs) != len(newService.Spec.PublicIPs) {
+		return true
+	}
+	for i := range oldService.Spec.PublicIPs {
+		if oldService.Spec.PublicIPs[i] != newService.Spec.PublicIPs[i] {
 			return true
 		}
 	}

@@ -5,7 +5,8 @@ metadata:
     name: cassandra
   name: cassandra
 spec: 
-  targetPort: 9042
-  port: 9042
+  ports:
+    - port: 9042
+      targetPort: 9042
   selector: 
     name: cassandra
