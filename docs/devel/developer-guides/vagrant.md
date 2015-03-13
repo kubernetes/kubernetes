@@ -5,17 +5,9 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
+3. Get or build a [binary release](../../getting-started-guides/binary_release.md)
 
 ### Setup
-
-Setting up a cluster is as simple as running:
-
-```
-export KUBERNETES_PROVIDER=vagrant
-curl -sS https://get.k8s.io | sh
-```
-
-The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
 By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
@@ -25,6 +17,8 @@ cd kubernetes
 export KUBERNETES_PROVIDER=vagrant
 cluster/kube-up.sh
 ```
+
+The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
 
@@ -254,6 +248,14 @@ NAME                                   IMAGE(S)            HOST                 
 
 Congratulations!
 
+### Testing
+
+The following will run all of the end-to-end testing scenarios assuming you set your environment in cluster/kube-env.sh
+
+```
+NUM_MINIONS=3 hack/e2e-test.sh
+```
+
 ### Troubleshooting
 
 #### I keep downloading the same (large) box all the time!
@@ -289,13 +291,14 @@ cat ~/.kubernetes_vagrant_auth
 
 If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
-#### I want to make changes to Kubernetes code !
+#### I changed Kubernetes code, but it's not running !
 
-To set up a vagrant cluster for hacking, follow the [vagrant developer guide](../devel/developer-guides/vagrant.md).
+Are you sure there was no build error?  After running `$ vagrant provision`, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
+It's very likely you see a build error due to an error in your source files!
 
 #### I have brought Vagrant up but the minions won't validate !
 
-Log on to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
 #### I want to change the number of minions !
 
