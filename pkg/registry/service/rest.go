@@ -272,11 +272,11 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 			}
 		}
 	} else {
-		ip, err := balancer.CreateTCPLoadBalancer(name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
+		endpoint, err := balancer.CreateTCPLoadBalancer(name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts), affinityType)
 		if err != nil {
 			return err
 		}
-		service.Spec.PublicIPs = []string{ip.String()}
+		service.Spec.PublicIPs = []string{endpoint}
 	}
 	return nil
 }
