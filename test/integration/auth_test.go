@@ -252,7 +252,7 @@ func getTestRequests() []struct {
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200},
 		{"POST", "/api/v1beta1/minions" + timeoutFlag, aMinion, code201},
-		{"PUT", "/api/v1beta1/minions/a" + timeoutFlag, aMinion, code409}, // See #2115 about why 409
+		{"PUT", "/api/v1beta1/minions/a" + timeoutFlag, aMinion, code200},
 		{"GET", "/api/v1beta1/minions", "", code200},
 		{"GET", "/api/v1beta1/minions/a", "", code200},
 		{"DELETE", "/api/v1beta1/minions/a" + timeoutFlag, "", code200},
