@@ -73,3 +73,31 @@ function clear-kubeconfig() {
 
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
+
+# Gets username, password for the current-context in kubeconfig, if they exist.
+# Assumed vars:
+#   KUBECONFIG  # if unset, defaults to global
+#
+# Vars set:
+#   KUBE_USER
+#   KUBE_PASSWORD
+#
+# KUBE_USER,KUBE_PASSWORD will be empty if no current-context is set, or
+# the current-context user does not exist or contain basicauth entries.
+function get-kubeconfig-basicauth() {
+  # Templates to safely extract the username,password for the current-context
+  # user.  The long chain of 'with' commands avoids indexing nil if any of the
+  # entries ("current-context", "contexts"."current-context", "users", etc)
+  # is missing.
+  # Note: we save dot ('.') to $root because the 'with' action overrides it.
+  # See http://golang.org/pkg/text/template/.
+  local username='{{$root := .}}{{with index $root "current-context"}}{{with index $root "contexts" .}}{{with index . "user"}}{{with index $root "users" .}}{{index . "username"}}{{end}}{{end}}{{end}}{{end}}'
+  local password='{{$root := .}}{{with index $root "current-context"}}{{with index $root "contexts" .}}{{with index . "user"}}{{with index $root "users" .}}{{index . "password"}}{{end}}{{end}}{{end}}{{end}}'
+  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${username}")
+  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${password}")
+  # Handle empty/missing username|password
+  if [[ "${KUBE_USER}" == '<no value>' || "$KUBE_PASSWORD" == '<no value>' ]]; then
+    KUBE_USER=''
+    KUBE_PASSWORD=''
+  fi
+}
