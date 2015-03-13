@@ -367,6 +367,7 @@ else
   ensure-install-dir
   set-kube-env
   create-salt-pillar
+  download-release
   run-salt
   echo "== kube-push node config done =="
 fi
