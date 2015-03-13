@@ -52,6 +52,15 @@ func (s *StoreToPodLister) List(selector labels.Selector) (pods []api.Pod, err e
 	return pods, nil
 }
 
+// Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
+func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
+	_, exists, err := s.Store.Get(pod)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
 type StoreToNodeLister struct {
