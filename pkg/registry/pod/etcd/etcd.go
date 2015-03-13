@@ -39,7 +39,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against pods.
-func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingREST, *StatusREST) {
+func NewREST(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
 	prefix := "/registry/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
@@ -71,7 +71,7 @@ func NewREST(h tools.EtcdHelper, factory pod.BoundPodFactory) (*REST, *BindingRE
 
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
-	return &REST{store: store}, &BindingREST{store: store, factory: factory}, &StatusREST{store: &statusStore}
+	return &REST{store: store}, &BindingREST{store: store}, &StatusREST{store: &statusStore}
 }
 
 // WithPodStatus returns a rest object that decorates returned responses with extra
@@ -130,8 +130,7 @@ func (r *REST) ResourceLocation(ctx api.Context, name string) (string, error) {
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
-	store   *etcdgeneric.Etcd
-	factory pod.BoundPodFactory
+	store *etcdgeneric.Etcd
 }
 
 func (r *BindingREST) New() runtime.Object {
@@ -167,7 +166,7 @@ func (r *BindingREST) setPodHostTo(ctx api.Context, podID, oldMachine, machine s
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
 		if pod.Spec.Host != oldMachine || pod.Status.Host != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to host %v or %v", pod.Name, pod.Spec.Host, pod.Status.Host)
+			return nil, fmt.Errorf("pod %v is already assigned to host %q or %q", pod.Name, pod.Spec.Host, pod.Status.Host)
 		}
 		pod.Spec.Host = machine
 		pod.Status.Host = machine
