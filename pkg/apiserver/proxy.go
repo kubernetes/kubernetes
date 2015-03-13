@@ -147,12 +147,6 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = status.Code
 		return
 	}
-	if location == "" {
-		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned ''", id)
-		notFound(w, req)
-		httpCode = http.StatusNotFound
-		return
-	}
 
 	destURL, err := url.Parse(location)
 	if err != nil {
