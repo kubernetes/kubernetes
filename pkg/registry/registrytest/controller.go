@@ -47,12 +47,22 @@ func (r *ControllerRegistry) ListControllers(ctx api.Context) (*api.ReplicationC
 func (r *ControllerRegistry) GetController(ctx api.Context, ID string) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
+	if r.Controllers != nil {
+		for _, rc := range r.Controllers.Items {
+			if ID == rc.Name {
+				return &r.Controllers.Items[0], r.Err
+			}
+		}
+	}
 	return &api.ReplicationController{}, r.Err
 }
 
 func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
+	if r.Controllers != nil {
+		r.Controllers.Items = append(r.Controllers.Items, *controller)
+	}
 	return controller, r.Err
 }
 
