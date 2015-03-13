@@ -77,7 +77,7 @@ export KUBECTL KUBE_CONFIG_FILE
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 
 # ---- Do cloud-provider-specific setup
-if [[ -z "$AUTH_CONFIG" ]];  then
+if [[ -z "$AUTH_CONFIG:-" ]];  then
     echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
 
     source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
