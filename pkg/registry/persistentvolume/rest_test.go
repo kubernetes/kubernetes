@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -139,7 +140,7 @@ func TestRESTList(t *testing.T) {
 	reg.ObjectList = &api.PersistentVolumeList{
 		Items: []api.PersistentVolume{*volumeA, *volumeB, *volumeC},
 	}
-	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Everything())
+	got, err := rest.List(api.NewContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -155,7 +156,7 @@ func TestRESTWatch(t *testing.T) {
 	volumeA := makeTestPV("foo", nil)
 
 	reg, rest := NewTestREST()
-	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), "0")
+	wi, err := rest.Watch(api.NewContext(), labels.Everything(), fields.Everything(), "0")
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
