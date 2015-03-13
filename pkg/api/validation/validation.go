@@ -307,6 +307,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateNFS(source.NFS).Prefix("nfs")...)
 	}
+	if source.ISCSI != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateISCSIVolumeSource(source.ISCSI).Prefix("iscsi")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -325,6 +329,23 @@ func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource) errs.Validati
 	allErrs := errs.ValidationErrorList{}
 	if gitRepo.Repository == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("repository"))
+	}
+	return allErrs
+}
+
+func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if iscsi.TargetPortal == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("targetPortal"))
+	}
+	if iscsi.IQN == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("iqn"))
+	}
+	if iscsi.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))
+	}
+	if iscsi.Lun < 0 || iscsi.Lun > 255 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("lun", iscsi.Lun, ""))
 	}
 	return allErrs
 }

@@ -76,3 +76,31 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	}
 	return refs, nil
 }
+
+// GetDeviceNameFromMount: given a mnt point, find the device from /proc/mounts
+// returns the device name, reference count, and error code
+func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return "", 0, err
+	}
+
+	// Find the device name.
+	// FIXME if multiple devices mounted on the same mount path, only the first one is returned
+	device := ""
+	for i := range mps {
+		if mps[i].Path == mountPath {
+			device = mps[i].Device
+			break
+		}
+	}
+
+	// Find all references to the device.
+	refCount := 0
+	for i := range mps {
+		if mps[i].Device == device {
+			refCount++
+		}
+	}
+	return device, refCount, nil
+}
