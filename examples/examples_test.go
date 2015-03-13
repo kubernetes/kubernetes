@@ -69,31 +69,26 @@ func validateObject(obj runtime.Object) (errors []error) {
 	return errors
 }
 
-func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error {
-	err := filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+func walkJSONFiles(inDir string, fn func(name string, path string, data []byte)) error {
+	return filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil {
+			if info.isDir() && path != inDir {
+				return filepath.SkipDir
+			}
+
+			file := filepath.Base(path)
+			if ext := filepath.Ext(file); ext == ".json" || ext == ".yaml" {
+				glog.Infof("Testing %s", path)
+				data, read_err := ioutil.ReadFile(path)
+				if read_err == nil {
+					name := file[:len(file)-len(ext)]
+					fn(name, path, data)
+				}
+				err = read_err
+			}
 		}
-		if info.IsDir() && path != inDir {
-			return filepath.SkipDir
-		}
-		name := filepath.Base(path)
-		ext := filepath.Ext(name)
-		if ext != "" {
-			name = name[:len(name)-len(ext)]
-		}
-		if !(ext == ".json" || ext == ".yaml") {
-			return nil
-		}
-		glog.Infof("Testing %s", path)
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		fn(name, path, data)
-		return nil
+		return err
 	})
-	return err
 }
 
 func TestExampleObjectSchemas(t *testing.T) {
