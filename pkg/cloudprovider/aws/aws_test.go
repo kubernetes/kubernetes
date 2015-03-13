@@ -156,7 +156,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestIPAddress(t *testing.T) {
+func TestNodeAddresses(t *testing.T) {
 	// Note these instances have the same name
 	// (we test that this produces an error)
 	instances := make([]ec2.Instance, 2)
