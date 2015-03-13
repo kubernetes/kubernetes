@@ -50,6 +50,7 @@ base:
 {% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
     - docker
+    - kubelet
 {% endif %}
 
 
