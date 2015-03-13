@@ -402,7 +402,10 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 			continue
 		}
 		// TODO(proppy): build the docker container name and do a map lookup instead?
-		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, hash, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
 		if dockerManifestID == podFullName &&
 			(uid == "" || dockerUUID == uid) &&
 			dockerContainerName == containerName {
@@ -425,7 +428,10 @@ func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName stri
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerPodName, uuid, _, _ := ParseDockerName(dockerContainer.Names[0])
+		dockerPodName, uuid, _, _, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
 		if podUID == uuid ||
 			(podUID == "" && podFullName == dockerPodName) {
 			containers[DockerID(dockerContainer.ID)] = dockerContainer
@@ -472,7 +478,10 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerPodName, dockerUUID, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
+		dockerPodName, dockerUUID, dockerContainerName, _, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
 		if dockerPodName != podFullName {
 			continue
 		}
@@ -614,7 +623,10 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName 
 		if len(value.Names) == 0 {
 			continue
 		}
-		dockerManifestID, dockerUUID, dockerContainerName, _ := ParseDockerName(value.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, _, err := ParseDockerName(value.Names[0])
+		if err != nil {
+			continue
+		}
 		if dockerManifestID != podFullName {
 			continue
 		}
@@ -705,17 +717,15 @@ func BuildDockerName(podUID types.UID, podFullName string, container *api.Contai
 		rand.Uint32())
 }
 
-// TODO(vmarmol): This should probably return an error.
 // Unpacks a container name, returning the pod full name and container name we would have used to
-// construct the docker name. If the docker name isn't the one we created, we may return empty strings.
-func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64) {
+// construct the docker name. If we are unable to parse the name, an error is returned.
+func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64, err error) {
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
-	if name[0] == '/' {
-		name = name[1:]
-	}
+	name = strings.TrimPrefix(name, "/")
 	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
+		err = fmt.Errorf("failed to parse Docker container name %q into parts", name)
 		return
 	}
 	if len(parts) < 6 {
@@ -723,6 +733,7 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 		// Anything with less fields than this is not something we can
 		// manage.
 		glog.Warningf("found a container with the %q prefix, but too few fields (%d): %q", containerNamePrefix, len(parts), name)
+		err = fmt.Errorf("Docker container name %q has less parts than expected %v", name, parts)
 		return
 	}
 
@@ -730,10 +741,9 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	nameParts := strings.Split(parts[1], ".")
 	containerName = nameParts[0]
 	if len(nameParts) > 1 {
-		var err error
 		hash, err = strconv.ParseUint(nameParts[1], 16, 32)
 		if err != nil {
-			glog.Warningf("invalid container hash: %s", nameParts[1])
+			glog.Warningf("invalid container hash %q in container %q", nameParts[1], name)
 		}
 	}
 
