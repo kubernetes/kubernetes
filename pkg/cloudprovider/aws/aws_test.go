@@ -156,7 +156,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestIPAddress(t *testing.T) {
+func TestNodeAddresses(t *testing.T) {
 	// Note these instances have the same name
 	// (we test that this produces an error)
 	instances := make([]ec2.Instance, 2)
@@ -168,23 +168,26 @@ func TestIPAddress(t *testing.T) {
 	instances[1].State.Name = "running"
 
 	aws1 := mockInstancesResp([]ec2.Instance{})
-	_, err1 := aws1.IPAddress("instance")
+	_, err1 := aws1.NodeAddresses("instance")
 	if err1 == nil {
 		t.Errorf("Should error when no instance found")
 	}
 
 	aws2 := mockInstancesResp(instances)
-	_, err2 := aws2.IPAddress("instance1")
+	_, err2 := aws2.NodeAddresses("instance1")
 	if err2 == nil {
 		t.Errorf("Should error when multiple instances found")
 	}
 
 	aws3 := mockInstancesResp(instances[0:1])
-	ip3, err3 := aws3.IPAddress("instance1")
+	addrs3, err3 := aws3.NodeAddresses("instance1")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if e, a := instances[0].PrivateIpAddress, ip3.String(); e != a {
+	if len(addrs3) != 1 {
+		t.Errorf("Should return exactly one NodeAddress")
+	}
+	if e, a := instances[0].PrivateIpAddress, addrs3[0].Address; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }

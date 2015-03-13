@@ -188,8 +188,8 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 	return aws, true
 }
 
-// IPAddress is an implementation of Instances.IPAddress.
-func (aws *AWSCloud) IPAddress(name string) (net.IP, error) {
+// NodeAddresses is an implementation of Instances.NodeAddresses.
+func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	inst, err := aws.getInstancesByDnsName(name)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,8 @@ func (aws *AWSCloud) IPAddress(name string) (net.IP, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid network IP: %s", inst.PrivateIpAddress)
 	}
-	return ip, nil
+
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.

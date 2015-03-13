@@ -274,12 +274,11 @@ func (s *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList, 
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			hostIP, err := instances.IPAddress(node.Name)
+			nodeAddresses, err := instances.NodeAddresses(node.Name)
 			if err != nil {
-				glog.Errorf("error getting instance ip address for %s: %v", node.Name, err)
+				glog.Errorf("error getting instance addresses for %s: %v", node.Name, err)
 			} else {
-				address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: hostIP.String()}
-				api.AddToNodeAddresses(&node.Status.Addresses, address)
+				node.Status.Addresses = nodeAddresses
 			}
 		}
 	} else {
@@ -288,7 +287,7 @@ func (s *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList, 
 			addr := net.ParseIP(node.Name)
 			if addr != nil {
 				address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: addr.String()}
-				api.AddToNodeAddresses(&node.Status.Addresses, address)
+				node.Status.Addresses = []api.NodeAddress{address}
 			} else {
 				addrs, err := s.lookupIP(node.Name)
 				if err != nil {
@@ -297,7 +296,7 @@ func (s *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList, 
 					glog.Errorf("No ip address for node %v", node.Name)
 				} else {
 					address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: addrs[0].String()}
-					api.AddToNodeAddresses(&node.Status.Addresses, address)
+					node.Status.Addresses = []api.NodeAddress{address}
 				}
 			}
 		}

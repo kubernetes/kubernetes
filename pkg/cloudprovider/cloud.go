@@ -57,8 +57,8 @@ type TCPLoadBalancer interface {
 
 // Instances is an abstract, pluggable interface for sets of instances.
 type Instances interface {
-	// IPAddress returns an IP address of the specified instance.
-	IPAddress(name string) (net.IP, error)
+	// NodeAddresses returns the addresses of the specified instance.
+	NodeAddresses(name string) ([]api.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the specified instance.
 	ExternalID(name string) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)

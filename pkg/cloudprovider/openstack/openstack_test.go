@@ -144,11 +144,11 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
 
-	ip, err := i.IPAddress(srvs[0])
+	addrs, err := i.NodeAddresses(srvs[0])
 	if err != nil {
-		t.Fatalf("Instances.IPAddress(%s) failed: %s", srvs[0], err)
+		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
 	}
-	t.Logf("Found IPAddress(%s) = %s\n", srvs[0], ip)
+	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
 
 	rsrcs, err := i.GetNodeResources(srvs[0])
 	if err != nil {
