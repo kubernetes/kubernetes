@@ -198,7 +198,11 @@ type VolumeSource struct {
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret represents a secret that should populate this volume.
-	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume"`
+	Secret *SecretVolumeSource `json:"secret"`
+	// ISCSIDisk represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSIDisk *ISCSIDiskVolumeSource `json:"iscsiDisk"`
+
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -252,6 +256,18 @@ type GitRepoVolumeSource struct {
 type SecretVolumeSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
+}
+
+
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIDiskVolumeSource struct {
+	Portal string `json:"portal,omitempty"`
+	IQN    string `json:"iqn,omitempty"`
+	Lun    int    `json:"lun,omitempty"`
+	FSType string `json:"fsType,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container.

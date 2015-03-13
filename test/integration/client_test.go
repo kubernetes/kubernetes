@@ -54,6 +54,7 @@ func TestClient(t *testing.T) {
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
+		EnableProfiling:   true,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),

@@ -204,19 +204,20 @@ func TestValidateAnnotations(t *testing.T) {
 
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
-		{Name: "abc", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path1"}}},
-		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path2"}}},
-		{Name: "abc-123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path3"}}},
-		{Name: "empty", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-		{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}},
-		{Name: "gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
-		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
+		{Name: "abc", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path1"}}},
+		{Name: "123", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path2"}}},
+		{Name: "abc-123", Source: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/path3"}}},
+		{Name: "empty", Source: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+		{Name: "gcepd", Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}},
+		{Name: "gitrepo", Source: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
+		{Name: "secret", Source: api.VolumeSource{Secret: &api.SecretVolumeSource{api.ObjectReference{Namespace: api.NamespaceDefault, Name: "my-secret", Kind: "Secret"}}}},
+		{Name: "iscsidisk", Source: api.VolumeSource{ISCSIDisk: &api.ISCSIDisk{"127.0.0.1", "iqn.2015-02.example.com:test"}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret") {
+	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk") {
 		t.Errorf("wrong names result: %v", names)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}

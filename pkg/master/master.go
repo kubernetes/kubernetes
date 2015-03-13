@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	rt "runtime"
 	"strconv"
@@ -80,6 +81,7 @@ type Config struct {
 	EnableV1Beta3 bool
 	// allow downstream consumers to disable the index route
 	EnableIndex            bool
+	EnableProfiling        bool
 	APIPrefix              string
 	CorsAllowedOriginList  util.StringList
 	Authenticator          authenticator.Request
@@ -132,6 +134,7 @@ type Master struct {
 	enableLogsSupport     bool
 	enableUISupport       bool
 	enableSwaggerSupport  bool
+	enableProfiling       bool
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
 	authenticator         authenticator.Request
@@ -286,6 +289,7 @@ func New(c *Config) *Master {
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
+		enableProfiling:       c.EnableProfiling,
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
@@ -454,8 +458,11 @@ func (m *Master) init(c *Config) {
 		ui.InstallSupport(m.muxHelper, m.enableSwaggerSupport)
 	}
 
-	// TODO: install runtime/pprof handler
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-cpuprofiler-service.go
+	if c.EnableProfiling {
+		m.mux.HandleFunc("/debug/pprof/", pprof.Index)
+		m.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		m.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	}
 
 	handler := http.Handler(m.mux.(*http.ServeMux))
 

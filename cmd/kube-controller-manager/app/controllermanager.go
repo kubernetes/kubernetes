@@ -22,6 +22,7 @@ package app
 import (
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"strconv"
 	"time"
 
@@ -61,7 +62,8 @@ type CMServer struct {
 	NodeMilliCPU int64
 	NodeMemory   resource.Quantity
 
-	KubeletConfig client.KubeletConfig
+	KubeletConfig   client.KubeletConfig
+	EnableProfiling bool
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -108,6 +110,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node_memory", "The amount of memory (in bytes) provisioned on each node")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
+	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 }
 
 func (s *CMServer) verifyMinionFlags() {
@@ -138,7 +141,15 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	go http.ListenAndServe(net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)), nil)
+	go func() {
+		if s.EnableProfiling {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		}
+		http.ListenAndServe(net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)), nil)
+	}()
 
 	endpoints := service.NewEndpointController(kubeClient)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)

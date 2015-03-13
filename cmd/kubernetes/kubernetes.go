@@ -59,6 +59,7 @@ var (
 	nodeMilliCPU           = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
 	nodeMemory             = flag.Int64("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
+	enableProfiling        = flag.Bool("profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 )
 
 type delegateHandler struct {
@@ -92,6 +93,7 @@ func runApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, p
 		},
 		EnableLogsSupport:    false,
 		EnableSwaggerSupport: true,
+		EnableProfiling:      *enableProfiling,
 		APIPrefix:            "/api",
 		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
 
