@@ -38,8 +38,6 @@ const (
 	ControllerPath string = "/registry/controllers"
 	// ServicePath is the path to service resources in etcd
 	ServicePath string = "/registry/services/specs"
-	// NodePath is the path to node resources in etcd
-	NodePath string = "/registry/minions"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -279,66 +277,4 @@ func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field f
 		return r.WatchList(makeServiceListKey(ctx), version, tools.Everything)
 	}
 	return nil, fmt.Errorf("only the 'name' and default (everything) field selectors are supported")
-}
-
-func makeNodeKey(nodeID string) string {
-	return NodePath + "/" + nodeID
-}
-
-func makeNodeListKey() string {
-	return NodePath
-}
-
-func (r *Registry) ListMinions(ctx api.Context) (*api.NodeList, error) {
-	minions := &api.NodeList{}
-	err := r.ExtractToList(makeNodeListKey(), minions)
-	return minions, err
-}
-
-func (r *Registry) CreateMinion(ctx api.Context, minion *api.Node) error {
-	// TODO: Add some validations.
-	err := r.CreateObj(makeNodeKey(minion.Name), minion, nil, 0)
-	return etcderr.InterpretCreateError(err, "minion", minion.Name)
-}
-
-func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Node) error {
-	// TODO: Add some validations.
-	err := r.SetObj(makeNodeKey(minion.Name), minion, nil, 0)
-	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
-}
-
-func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
-	var minion api.Node
-	key := makeNodeKey(minionID)
-	err := r.ExtractObj(key, &minion, false)
-	if err != nil {
-		return nil, etcderr.InterpretGetError(err, "minion", minionID)
-	}
-	return &minion, nil
-}
-
-func (r *Registry) DeleteMinion(ctx api.Context, minionID string) error {
-	key := makeNodeKey(minionID)
-	err := r.Delete(key, true)
-	if err != nil {
-		return etcderr.InterpretDeleteError(err, "minion", minionID)
-	}
-	return nil
-}
-
-func (r *Registry) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, "node")
-	if err != nil {
-		return nil, err
-	}
-	key := makeNodeListKey()
-	return r.WatchList(key, version, func(obj runtime.Object) bool {
-		minionObj, ok := obj.(*api.Node)
-		if !ok {
-			// Must be an error: return true to propagate to upper level.
-			return true
-		}
-		// TODO: Add support for filtering based on field, once NodeStatus is defined.
-		return label.Matches(labels.Set(minionObj.Labels))
-	})
 }

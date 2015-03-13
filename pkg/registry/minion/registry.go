@@ -18,12 +18,13 @@ package minion
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// MinionRegistry is an interface for things that know how to store minions.
+// Registry is an interface for things that know how to store node.
 type Registry interface {
 	ListMinions(ctx api.Context) (*api.NodeList, error)
 	CreateMinion(ctx api.Context, minion *api.Node) error
@@ -31,4 +32,51 @@ type Registry interface {
 	GetMinion(ctx api.Context, minionID string) (*api.Node, error)
 	DeleteMinion(ctx api.Context, minionID string) error
 	WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+}
+
+// storage puts strong typing around storage calls
+type storage struct {
+	rest.StandardStorage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s rest.StandardStorage) Registry {
+	return &storage{s}
+}
+
+func (s *storage) ListMinions(ctx api.Context) (*api.NodeList, error) {
+	obj, err := s.List(ctx, labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	return obj.(*api.NodeList), nil
+}
+
+func (s *storage) CreateMinion(ctx api.Context, node *api.Node) error {
+	_, err := s.Create(ctx, node)
+	return err
+}
+
+func (s *storage) UpdateMinion(ctx api.Context, node *api.Node) error {
+	_, _, err := s.Update(ctx, node)
+	return err
+}
+
+func (s *storage) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return s.Watch(ctx, label, field, resourceVersion)
+}
+
+func (s *storage) GetMinion(ctx api.Context, name string) (*api.Node, error) {
+	obj, err := s.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Node), nil
+}
+
+func (s *storage) DeleteMinion(ctx api.Context, name string) error {
+	_, err := s.Delete(ctx, name, nil)
+	return err
 }
