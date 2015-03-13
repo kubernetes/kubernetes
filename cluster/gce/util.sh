@@ -537,6 +537,7 @@ function kube-up {
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
     --scopes "storage-ro" "compute-rw" \
+    --can-ip-forward \
     --metadata-from-file \
       "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
