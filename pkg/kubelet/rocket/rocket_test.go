@@ -37,8 +37,8 @@ func init() {
 }
 
 const (
-	testACI1     = "coreos.com/etcd:v2.0.4"
-	testACI2     = "docker://busybox"
+	testACI1     = "http://users.developer.core-os.net/k8s_tests/test1.aci"
+	testACI2     = "http://users.developer.core-os.net/k8s_tests/test2.aci"
 	mountTestACI = "http://users.developer.core-os.net/k8s_tests/mount_test.aci"
 )
 
