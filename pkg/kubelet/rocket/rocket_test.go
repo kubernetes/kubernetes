@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -36,8 +37,9 @@ func init() {
 }
 
 const (
-	testACI1 = "coreos.com/etcd:v2.0.4"
-	testACI2 = "docker://busybox"
+	testACI1     = "coreos.com/etcd:v2.0.4"
+	testACI2     = "docker://busybox"
+	mountTestACI = "http://users.developer.core-os.net/k8s_tests/mount_test.aci"
 )
 
 func newRocketOrFail(t *testing.T) *Runtime {
@@ -132,7 +134,6 @@ func TestRunListKillListPod(t *testing.T) {
 		},
 	}
 
-	// TODO(yifan): Add volumes.
 	if err := rkt.RunPod(pod, nil); err != nil {
 		t.Errorf("Cannot run pod: %v", err)
 	}
@@ -179,7 +180,6 @@ func TestKillAndRunContainerInPod(t *testing.T) {
 		},
 	}
 
-	// TODO(yifan): Add volumes.
 	if err := rkt.RunPod(pod, nil); err != nil {
 		t.Errorf("Cannot run pod: %v", err)
 	}
@@ -223,7 +223,6 @@ func TestRunPodWithMountVolumes(t *testing.T) {
 	if !enableTests {
 		return
 	}
-
 	// The output file name is hardcoded.
 	tmpDirPath := "/tmp"
 	outputFiles := []string{
