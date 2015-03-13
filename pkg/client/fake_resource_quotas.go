@@ -54,6 +54,12 @@ func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.Reso
 	return &api.ResourceQuota{}, nil
 }
 
+func (c *FakeResourceQuotas) Status(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-status-resourceQuota", Value: resourceQuota.Name})
+	c.Fake.ResourceQuotaStatus = *resourceQuota
+	return &api.ResourceQuota{}, nil
+}
+
 func (c *FakeResourceQuotas) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-resourceQuota", Value: resourceVersion})
 	return c.Fake.Watch, nil

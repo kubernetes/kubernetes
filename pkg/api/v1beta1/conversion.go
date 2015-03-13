@@ -848,6 +848,9 @@ func init() {
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *ResourceQuota, out *newer.ResourceQuota, s conversion.Scope) error {
@@ -863,29 +866,7 @@ func init() {
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 				return err
 			}
-			return nil
-		},
-
-		func(in *newer.ResourceQuotaUsage, out *ResourceQuotaUsage, s conversion.Scope) error {
-			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-				return err
-			}
-			return nil
-		},
-		func(in *ResourceQuotaUsage, out *newer.ResourceQuotaUsage, s conversion.Scope) error {
-			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
-				return err
-			}
-			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
 				return err
 			}
 			return nil

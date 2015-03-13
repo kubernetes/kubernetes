@@ -1159,18 +1159,10 @@ type ResourceQuotaStatus struct {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
 	TypeMeta `json:",inline"`
+	Labels   map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize resource quotas"`
 
 	// Spec defines the desired quota
 	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota"`
-
-	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage"`
-}
-
-// ResourceQuotaUsage captures system observed quota status per namespace
-// It is used to enforce atomic updates of a backing ResourceQuota.Status field in storage
-type ResourceQuotaUsage struct {
-	TypeMeta `json:",inline"`
 
 	// Status defines the actual enforced quota and its current usage
 	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage"`

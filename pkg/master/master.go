@@ -51,8 +51,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequotausage"
+	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -377,7 +376,8 @@ func (m *Master) init(c *Config) {
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
-	resourceQuotaRegistry := resourcequota.NewEtcdRegistry(c.EtcdHelper)
+
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewEtcdRegistry(c.EtcdHelper)
 
@@ -418,11 +418,11 @@ func (m *Master) init(c *Config) {
 		"nodes":                  nodeStorage,
 		"events":                 event.NewREST(eventRegistry),
 
-		"limitRanges":         limitrange.NewREST(limitRangeRegistry),
-		"resourceQuotas":      resourcequota.NewREST(resourceQuotaRegistry),
-		"resourceQuotaUsages": resourcequotausage.NewREST(resourceQuotaRegistry),
-		"namespaces":          namespace.NewREST(m.namespaceRegistry),
-		"secrets":             secret.NewREST(secretRegistry),
+		"limitRanges":           limitrange.NewREST(limitRangeRegistry),
+		"resourceQuotas":        resourceQuotaStorage,
+		"resourceQuotas/status": resourceQuotaStatusStorage,
+		"namespaces":            namespace.NewREST(m.namespaceRegistry),
+		"secrets":               secret.NewREST(secretRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

@@ -139,6 +139,33 @@ func TestResourceQuotaUpdate(t *testing.T) {
 	c.Validate(t, response, err)
 }
 
+func TestResourceQuotaStatusUpdate(t *testing.T) {
+	ns := api.NamespaceDefault
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "abc",
+			Namespace:       "foo",
+			ResourceVersion: "1",
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:                    resource.MustParse("100"),
+				api.ResourceMemory:                 resource.MustParse("10000"),
+				api.ResourcePods:                   resource.MustParse("10"),
+				api.ResourceServices:               resource.MustParse("10"),
+				api.ResourceReplicationControllers: resource.MustParse("10"),
+				api.ResourceQuotas:                 resource.MustParse("10"),
+			},
+		},
+	}
+	c := &testClient{
+		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/resourceQuotas/abc/status"), Query: buildQueryValues(ns, nil)},
+		Response: Response{StatusCode: 200, Body: resourceQuota},
+	}
+	response, err := c.Setup().ResourceQuotas(ns).Status(resourceQuota)
+	c.Validate(t, response, err)
+}
+
 func TestInvalidResourceQuotaUpdate(t *testing.T) {
 	ns := api.NamespaceDefault
 	resourceQuota := &api.ResourceQuota{

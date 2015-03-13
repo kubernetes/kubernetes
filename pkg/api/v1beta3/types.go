@@ -1308,16 +1308,6 @@ type ResourceQuota struct {
 	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
-// ResourceQuotaUsage captures system observed quota status per namespace
-// It is used to enforce atomic updates of a backing ResourceQuota.Status field in storage
-type ResourceQuotaUsage struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
-
-	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
-}
-
 // ResourceQuotaList is a list of ResourceQuota items
 type ResourceQuotaList struct {
 	TypeMeta `json:",inline"`

@@ -26,131 +26,71 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// REST provides the RESTStorage access patterns to work with ResourceQuota objects.
-type REST struct {
-	registry generic.Registry
+// resourcequotaStrategy implements behavior for ResourceQuota objects
+type resourcequotaStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
 }
 
-// NewREST returns a new REST. You must use a registry created by
-// NewEtcdRegistry unless you're testing.
-func NewREST(registry generic.Registry) *REST {
-	return &REST{
-		registry: registry,
-	}
+// Strategy is the default logic that applies when creating and updating ResourceQuota
+// objects via the REST API.
+var Strategy = resourcequotaStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for resourcequotas.
+func (resourcequotaStrategy) NamespaceScoped() bool {
+	return true
 }
 
-// Create a ResourceQuota object
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	resourceQuota, ok := obj.(*api.ResourceQuota)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-
-	if !api.ValidNamespace(ctx, &resourceQuota.ObjectMeta) {
-		return nil, errors.NewConflict("resourceQuota", resourceQuota.Namespace, fmt.Errorf("ResourceQuota.Namespace does not match the provided context"))
-	}
-
-	if len(resourceQuota.Name) == 0 {
-		resourceQuota.Name = string(util.NewUUID())
-	}
-
-	// callers are not able to set status, instead, it is supplied via a control loop
-	resourceQuota.Status = api.ResourceQuotaStatus{}
-
-	if errs := validation.ValidateResourceQuota(resourceQuota); len(errs) > 0 {
-		return nil, errors.NewInvalid("resourceQuota", resourceQuota.Name, errs)
-	}
-	api.FillObjectMetaSystemFields(ctx, &resourceQuota.ObjectMeta)
-
-	err := rs.registry.CreateWithName(ctx, resourceQuota.Name, resourceQuota)
-	if err != nil {
-		return nil, err
-	}
-	return rs.registry.Get(ctx, resourceQuota.Name)
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (resourcequotaStrategy) ResetBeforeCreate(obj runtime.Object) {
+	resourcequota := obj.(*api.ResourceQuota)
+	resourcequota.Status = api.ResourceQuotaStatus{}
 }
 
-// Update updates a ResourceQuota object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	resourceQuota, ok := obj.(*api.ResourceQuota)
-	if !ok {
-		return nil, false, fmt.Errorf("invalid object type")
-	}
-
-	if !api.ValidNamespace(ctx, &resourceQuota.ObjectMeta) {
-		return nil, false, errors.NewConflict("resourceQuota", resourceQuota.Namespace, fmt.Errorf("ResourceQuota.Namespace does not match the provided context"))
-	}
-
-	oldObj, err := rs.registry.Get(ctx, resourceQuota.Name)
-	if err != nil {
-		return nil, false, err
-	}
-
-	editResourceQuota := oldObj.(*api.ResourceQuota)
-
-	// set the editable fields on the existing object
-	editResourceQuota.Labels = resourceQuota.Labels
-	editResourceQuota.ResourceVersion = resourceQuota.ResourceVersion
-	editResourceQuota.Annotations = resourceQuota.Annotations
-	editResourceQuota.Spec = resourceQuota.Spec
-
-	if errs := validation.ValidateResourceQuota(editResourceQuota); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("resourceQuota", editResourceQuota.Name, errs)
-	}
-
-	if err := rs.registry.UpdateWithName(ctx, editResourceQuota.Name, editResourceQuota); err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.Get(ctx, editResourceQuota.Name)
-	return out, false, err
+// Validate validates a new resourcequota.
+func (resourcequotaStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	resourcequota := obj.(*api.ResourceQuota)
+	return validation.ValidateResourceQuota(resourcequota)
 }
 
-// Delete deletes the ResourceQuota with the specified name
-func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
+// AllowCreateOnUpdate is false for resourcequotas.
+func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+// ValidateUpdate is the default update validation for an end user.
+func (resourcequotaStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+}
+
+type resourcequotaStatusStrategy struct {
+	resourcequotaStrategy
+}
+
+var StatusStrategy = resourcequotaStatusStrategy{Strategy}
+
+func (resourcequotaStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+}
+
+// MatchResourceQuota returns a generic matcher for a given label and field selector.
+func MatchResourceQuota(label labels.Selector, field fields.Selector) generic.Matcher {
+	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
+		resourcequotaObj, ok := obj.(*api.ResourceQuota)
+		if !ok {
+			return false, fmt.Errorf("not a resourcequota")
+		}
+		fields := ResourceQuotaToSelectableFields(resourcequotaObj)
+		return label.Matches(labels.Set(resourcequotaObj.Labels)) && field.Matches(fields), nil
+	})
+}
+
+// ResourceQuotaToSelectableFields returns a label set that represents the object
+// TODO: fields are not labels, and the validation rules for them do not apply.
+func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) labels.Set {
+	return labels.Set{
+		"name": resourcequota.Name,
 	}
-	_, ok := obj.(*api.ResourceQuota)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return rs.registry.Delete(ctx, name)
-}
-
-// Get gets a ResourceQuota with the specified name
-func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	resourceQuota, ok := obj.(*api.ResourceQuota)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return resourceQuota, err
-}
-
-func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	return labels.Set{}, fields.Set{}, nil
-}
-
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
-}
-
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
-}
-
-// New returns a new api.ResourceQuota
-func (*REST) New() runtime.Object {
-	return &api.ResourceQuota{}
-}
-
-func (*REST) NewList() runtime.Object {
-	return &api.ResourceQuotaList{}
 }

@@ -141,7 +141,7 @@ func TestSyncResourceQuota(t *testing.T) {
 			},
 		},
 	}
-	expectedUsage := api.ResourceQuotaUsage{
+	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("3"),
@@ -166,7 +166,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
-	usage := kubeClient.ResourceQuotaUsage
+	usage := kubeClient.ResourceQuotaStatus
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {

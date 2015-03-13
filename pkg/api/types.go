@@ -1390,16 +1390,6 @@ type ResourceQuota struct {
 	Status ResourceQuotaStatus `json:"status,omitempty"`
 }
 
-// ResourceQuotaUsage captures system observed quota status per namespace
-// It is used to enforce atomic updates of a backing ResourceQuota.Status field in storage
-type ResourceQuotaUsage struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
-
-	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty"`
-}
-
 // ResourceQuotaList is a list of ResourceQuota items
 type ResourceQuotaList struct {
 	TypeMeta `json:",inline"`
