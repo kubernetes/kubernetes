@@ -36,12 +36,6 @@ import (
 	"github.com/golang/glog"
 )
 
-var (
-	PodLister     = &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	MinionLister  = &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	ServiceLister = &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-)
-
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
 type ConfigFactory struct {
 	Client *client.Client
@@ -50,7 +44,7 @@ type ConfigFactory struct {
 	// a means to list all scheduled pods
 	PodLister *cache.StoreToPodLister
 	// a means to list all minions
-	MinionLister *cache.StoreToNodeLister
+	NodeLister *cache.StoreToNodeLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
 }
@@ -60,9 +54,9 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 	return &ConfigFactory{
 		Client:        client,
 		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc),
-		PodLister:     PodLister,
-		MinionLister:  MinionLister,
-		ServiceLister: ServiceLister,
+		PodLister:     &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		NodeLister:    &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister: &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
 	}
 }
 
@@ -104,12 +98,17 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
-	predicateFuncs, err := getFitPredicateFunctions(predicateKeys)
+	pluginArgs := PluginFactoryArgs{
+		PodLister:     f.PodLister,
+		ServiceLister: f.ServiceLister,
+		NodeLister:    f.NodeLister,
+	}
+	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys)
+	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, pluginArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -126,9 +125,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	if false {
 		// Disable this code until minions support watches. Note when this code is enabled,
 		// we need to make sure minion ListWatcher has proper FieldSelector.
-		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.MinionLister.Store, 0).Run()
+		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).Run()
 	} else {
-		cache.NewPoller(f.pollMinions, 10*time.Second, f.MinionLister.Store).Run()
+		cache.NewPoller(f.pollMinions, 10*time.Second, f.NodeLister.Store).Run()
 	}
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
@@ -149,7 +148,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	return &scheduler.Config{
-		MinionLister: f.MinionLister,
+		MinionLister: f.NodeLister,
 		Algorithm:    algo,
 		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {

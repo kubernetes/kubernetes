@@ -32,11 +32,21 @@ func defaultPredicates() util.StringSet {
 		// Fit is defined based on the absence of port conflicts.
 		factory.RegisterFitPredicate("PodFitsPorts", algorithm.PodFitsPorts),
 		// Fit is determined by resource availability.
-		factory.RegisterFitPredicate("PodFitsResources", algorithm.NewResourceFitPredicate(factory.MinionLister)),
+		factory.RegisterFitPredicateFactory(
+			"PodFitsResources",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return algorithm.NewResourceFitPredicate(args.NodeInfo)
+			},
+		),
 		// Fit is determined by non-conflicting disk volumes.
 		factory.RegisterFitPredicate("NoDiskConflict", algorithm.NoDiskConflict),
 		// Fit is determined by node selector query.
-		factory.RegisterFitPredicate("MatchNodeSelector", algorithm.NewSelectorMatchPredicate(factory.MinionLister)),
+		factory.RegisterFitPredicateFactory(
+			"MatchNodeSelector",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return algorithm.NewSelectorMatchPredicate(args.NodeInfo)
+			},
+		),
 		// Fit is determined by the presence of the Host parameter and a string match
 		factory.RegisterFitPredicate("HostName", algorithm.PodFitsHost),
 	)
@@ -47,7 +57,15 @@ func defaultPriorities() util.StringSet {
 		// Prioritize nodes by least requested utilization.
 		factory.RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
-		factory.RegisterPriorityFunction("ServiceSpreadingPriority", algorithm.NewServiceSpreadPriority(factory.ServiceLister), 1),
+		factory.RegisterPriorityConfigFactory(
+			"ServiceSpreadingPriority",
+			func(args factory.PluginFactoryArgs) algorithm.PriorityConfig {
+				return algorithm.PriorityConfig{
+					Function: algorithm.NewServiceSpreadPriority(args.ServiceLister),
+					Weight:   1,
+				}
+			},
+		),
 		// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
 		factory.RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 0),
 	)
