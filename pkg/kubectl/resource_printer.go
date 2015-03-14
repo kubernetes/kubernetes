@@ -478,7 +478,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 		claimRefUID += string(pv.Spec.ClaimRef.UID)
 	}
 
-	modes := volume.GetAccessModeType(pv.Spec.Source)
+	modes := volume.GetAccessModeType(pv.Spec.PersistentVolumeSource)
 	modesStr := volume.GetAccessModesAsString(modes)
 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]

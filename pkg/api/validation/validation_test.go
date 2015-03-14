@@ -227,7 +227,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-				Source: api.PersistentVolumeSource{
+				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
 			}),
@@ -238,7 +238,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-					Source: api.PersistentVolumeSource{
+					PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 
 				},
@@ -250,11 +250,11 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-					Source: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
-
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					},
 				},
-			}),
+			),
 		},
 		"missing-name": {
 			isExpectedFailure: true,
@@ -274,7 +274,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					Capacity: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
 					},
-					Source: api.PersistentVolumeSource{
+					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
 				},
