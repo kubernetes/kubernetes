@@ -261,9 +261,9 @@ When a client connects to the portal the iptables rule kicks in, and redirects
 the packets to the `Service proxy`'s own port.  The `Service proxy` chooses a
 backend, and starts proxying traffic from the client to the backend.
 
-The means that `Service` owners can choose any `Service` port they want without
+This means that `Service` owners can choose any `Service` port they want without
 risk of collision.  Clients can simply connect to an IP and port, without
 being aware of which `Pods` they are actually accessing.
 
-![Services detailed diagram](Services_detail.png)
+![Services detailed diagram](services_detail.png)
 
