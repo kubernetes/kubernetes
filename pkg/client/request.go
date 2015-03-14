@@ -101,6 +101,7 @@ type Request struct {
 	path    string
 	subpath string
 	params  url.Values
+	headers http.Header
 
 	// structural elements of the request that are part of the Kubernetes API conventions
 	namespace    string
@@ -343,6 +344,14 @@ func (r *Request) setParam(paramName, value string) *Request {
 	return r
 }
 
+func (r *Request) SetHeader(key, value string) *Request {
+	if r.headers == nil {
+		r.headers = http.Header{}
+	}
+	r.headers.Set(key, value)
+	return r
+}
+
 // Timeout makes the request use the given duration as a timeout. Sets the "timeout"
 // parameter.
 func (r *Request) Timeout(d time.Duration) *Request {
@@ -561,6 +570,7 @@ func (r *Request) DoRaw() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		r.req.Header = r.headers
 		r.resp, err = client.Do(r.req)
 		if err != nil {
 			return nil, err

@@ -598,15 +598,14 @@ func runAtomicPutTest(c *client.Client) {
 
 func runPatchTest(c *client.Client) {
 	name := "patchservice"
+	resource := "services"
 	svcBody := api.Service{
 		TypeMeta: api.TypeMeta{
 			APIVersion: c.APIVersion(),
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"name": name,
-			},
+			Name:   name,
+			Labels: map[string]string{},
 		},
 		Spec: api.ServiceSpec{
 			// This is here because validation requires it.
@@ -625,44 +624,68 @@ func runPatchTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed creating patchservice: %v", err)
 	}
-	if len(svc.Labels) != 1 {
-		glog.Fatalf("Original length does not equal one")
+
+	patchBodies := map[api.PatchType]struct {
+		AddLabelBody        []byte
+		RemoveLabelBody     []byte
+		RemoveAllLabelsBody []byte
+	}{
+		api.JSONPatchType: {
+			[]byte(`[{"op":"add","path":"/labels","value":{"foo":"bar","baz":"qux"}}]`),
+			[]byte(`[{"op":"remove","path":"/labels/foo"}]`),
+			[]byte(`[{"op":"remove","path":"/labels"}]`),
+		},
+		api.MergePatchType: {
+			[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
+			[]byte(`{"labels":{"foo":null}}`),
+			[]byte(`{"labels":null}`),
+		},
+		api.StrategicMergePatchType: {
+			[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
+			[]byte(`{"labels":{"foo":null}}`),
+			[]byte(`{"labels":{"$patch":"replace"}}`),
+		},
 	}
 
-	// add label
-	svc.Labels["foo"] = "bar"
-	if _, err = services.Update(svc); err != nil {
-		glog.Fatalf("Failed updating patchservice: %v", err)
-	}
-	if svc, err = services.Get(name); err != nil {
-		glog.Fatalf("Failed getting patchservice: %v", err)
-	}
-	if len(svc.Labels) != 2 || svc.Labels["foo"] != "bar" {
-		glog.Fatalf("Failed updating patchservice, labels are: %v", svc.Labels)
-	}
+	for k, v := range patchBodies {
+		// add label
+		_, err := c.Patch(k).Resource(resource).Name(name).Body(v.AddLabelBody).Do().Get()
+		if err != nil {
+			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
+		}
+		svc, err = services.Get(name)
+		if err != nil {
+			glog.Fatalf("Failed getting patchservice: %v", err)
+		}
+		if len(svc.Labels) != 2 || svc.Labels["foo"] != "bar" || svc.Labels["baz"] != "qux" {
+			glog.Fatalf("Failed updating patchservice with patch type %s: labels are: %v", k, svc.Labels)
+		}
 
-	// remove one label
-	delete(svc.Labels, "name")
-	if _, err = services.Update(svc); err != nil {
-		glog.Fatalf("Failed updating patchservice: %v", err)
-	}
-	if svc, err = services.Get(name); err != nil {
-		glog.Fatalf("Failed getting patchservice: %v", err)
-	}
-	if len(svc.Labels) != 1 || svc.Labels["foo"] != "bar" {
-		glog.Fatalf("Failed updating patchservice, labels are: %v", svc.Labels)
-	}
+		// remove one label
+		_, err = c.Patch(k).Resource(resource).Name(name).Body(v.RemoveLabelBody).Do().Get()
+		if err != nil {
+			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
+		}
+		svc, err = services.Get(name)
+		if err != nil {
+			glog.Fatalf("Failed getting patchservice: %v", err)
+		}
+		if len(svc.Labels) != 1 || svc.Labels["baz"] != "qux" {
+			glog.Fatalf("Failed updating patchservice with patch type %s: labels are: %v", k, svc.Labels)
+		}
 
-	// remove all labels
-	svc.Labels = nil
-	if _, err = services.Update(svc); err != nil {
-		glog.Fatalf("Failed updating patchservice: %v", err)
-	}
-	if svc, err = services.Get(name); err != nil {
-		glog.Fatalf("Failed getting patchservice: %v", err)
-	}
-	if svc.Labels != nil {
-		glog.Fatalf("Failed remove all labels from patchservice: %v", svc.Labels)
+		// remove all labels
+		_, err = c.Patch(k).Resource(resource).Name(name).Body(v.RemoveAllLabelsBody).Do().Get()
+		if err != nil {
+			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
+		}
+		svc, err = services.Get(name)
+		if err != nil {
+			glog.Fatalf("Failed getting patchservice: %v", err)
+		}
+		if svc.Labels != nil {
+			glog.Fatalf("Failed remove all labels from patchservice with patch type %s: %v", k, svc.Labels)
+		}
 	}
 
 	glog.Info("PATCHs work.")

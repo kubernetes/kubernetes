@@ -146,6 +146,7 @@ API resources should use the traditional REST pattern:
 * GET /&lt;resourceNamePlural&gt;/&lt;name&gt; - Retrieves a single resource with the given name, e.g. GET /pods/first returns a Pod named 'first'.
 * DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name.
 * PUT /&lt;resourceNamePlural&gt;/&lt;name&gt; - Update or create the resource with the given name with the JSON object provided by the client.
+* PATCH /&lt;resourceNamePlural&gt;/&lt;name&gt; - Selectively modify the specified fields of the resource. See more information [below](#patch).
 
 Kubernetes by convention exposes additional verbs as new root endpoints with singular names. Examples:
 
@@ -159,6 +160,87 @@ Two additional verbs `redirect` and `proxy` provide access to cluster resources 
 When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "resize" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
 
 TODO: more documentation of Watch
+
+### PATCH operations
+
+The API supports three different PATCH operations, determined by their corresponding Content-Type header:
+
+* JSON Patch, `Content-Type: application/json-patch+json`
+ * As defined in [RFC6902](https://tools.ietf.org/html/rfc6902), a JSON Patch is a sequence of operations that are executed on the resource, e.g. `{"op": "add", "path": "/a/b/c", "value": [ "foo", "bar" ]}`. For more details on how to use JSON Patch, see the RFC.
+* Merge Patch, `Content-Type: application/merge-json-patch+json`
+ * As defined in [RFC7386](https://tools.ietf.org/html/rfc7386), a Merge Patch is essentially a partial representation of the resource. The submitted JSON is "merged" with the current resource to create a new one, then the new one is saved. For more details on how to use Merge Patch, see the RFC.
+* Strategic Merge Patch, `Content-Type: application/strategic-merge-json-patch+json`
+ * Strategic Merge Patch is a custom implementation of Merge Patch. For a detailed explanation of how it works and why it needed to be introduced, see below.
+
+#### Strategic Merge Patch
+
+In the standard JSON merge patch, JSON objects are always merged but lists are always replaced. Often that isn't what we want. Let's say we start with the following Pod:
+
+```yaml
+spec:
+  containers:
+    - name: nginx
+      image: nginx-1.0
+```
+
+...and we POST that to the server (as JSON). Then let's say we want to *add* a container to this Pod.
+
+```yaml
+PATCH /v1beta1/pod
+spec:
+  containers:
+    - name: log-tailer
+      image: log-tailer-1.0
+```
+
+If we were to use standard Merge Patch, the entire container list would be replaced with the single log-tailer container. However, our intent is for the container lists to merge together based on the `name` field.
+
+To solve this problem, Strategic Merge Patch uses metadata attached to the API objects to determine what lists should be merged and which ones should not. Currently the metadata is available as struct tags on the API objects themselves, but will become available to clients as Swagger annotations in the future. In the above example, the `patchStrategy` metadata for the `containers` field would be `merge` and the `patchMergeKey` would be `name`.
+
+Note: If the patch results in merging two lists of scalars, the scalars are first deduplicated and then merged.
+
+Strategic Merge Patch also supports special operations as listed below.
+
+### List Operations
+
+To override the container list to be strictly replaced, regardless of the default:
+
+```yaml
+containers:
+  - name: nginx
+    image: nginx-1.0
+  - $patch: replace   # any further $patch operations nested in this list will be ignored
+```
+
+To delete an element of a list that should be merged:
+
+```yaml
+containers:
+  - name: nginx
+    image: nginx-1.0
+  - $patch: delete
+    name: log-tailer  # merge key and value goes here
+```
+
+### Map Operations
+
+To indicate that a map should not be merged and instead should be taken literally:
+
+```yaml
+$patch: replace  # recursive and applies to all fields of the map it's in
+containers:
+- name: nginx
+  image: nginx-1.0
+```
+
+To delete a field of a map:
+
+```yaml
+name: nginx
+image: nginx-1.0
+labels:
+  live: null  # set the value of the map key to null
+```
 
 
 Idempotency

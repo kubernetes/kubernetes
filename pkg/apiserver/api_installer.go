@@ -346,11 +346,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PATCH": // Partially update a resource
-			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit)).
+			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor)).
 				Filter(m).
-				Doc("partially update the specified " + kind).
-				// TODO: toggle patch strategy by content type
-				// Consumes("application/merge-patch+json", "application/json-patch+json").
+				Doc("partially update the specified "+kind).
+				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
 				Operation("patch" + kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Reads(versionedObject)
