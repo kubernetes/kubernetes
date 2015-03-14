@@ -65,6 +65,7 @@ type KubeletServer struct {
 	RunOnce                        bool
 	EnableDebuggingHandlers        bool
 	MinimumGCAge                   time.Duration
+	MaxPerPodContainerCount        int
 	MaxContainerCount              int
 	AuthPath                       string
 	CadvisorPort                   uint
@@ -92,7 +93,8 @@ func NewKubeletServer() *KubeletServer {
 		RegistryBurst:           10,
 		EnableDebuggingHandlers: true,
 		MinimumGCAge:            1 * time.Minute,
-		MaxContainerCount:       5,
+		MaxPerPodContainerCount: 5,
+		MaxContainerCount:       100,
 		CadvisorPort:            4194,
 		OOMScoreAdj:             -900,
 		MasterServiceNamespace:  api.NamespaceDefault,
@@ -120,7 +122,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api_servers, and --enable-server")
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable_debugging_handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.DurationVar(&s.MinimumGCAge, "minimum_container_ttl_duration", s.MinimumGCAge, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
-	fs.IntVar(&s.MaxContainerCount, "maximum_dead_containers_per_container", s.MaxContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
+	fs.IntVar(&s.MaxPerPodContainerCount, "maximum_dead_containers_per_container", s.MaxPerPodContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
+	fs.IntVar(&s.MaxContainerCount, "maximum_dead_containers", s.MaxContainerCount, "Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.")
 	fs.StringVar(&s.AuthPath, "auth_path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.UintVar(&s.CadvisorPort, "cadvisor_port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
@@ -170,6 +173,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		RegistryPullQPS:                s.RegistryPullQPS,
 		RegistryBurst:                  s.RegistryBurst,
 		MinimumGCAge:                   s.MinimumGCAge,
+		MaxPerPodContainerCount:        s.MaxPerPodContainerCount,
 		MaxContainerCount:              s.MaxContainerCount,
 		ClusterDomain:                  s.ClusterDomain,
 		ClusterDNS:                     s.ClusterDNS,
@@ -260,7 +264,8 @@ func SimpleRunKubelet(client *client.Client,
 		StatusUpdateFrequency:   3 * time.Second,
 		SyncFrequency:           3 * time.Second,
 		MinimumGCAge:            10 * time.Second,
-		MaxContainerCount:       5,
+		MaxPerPodContainerCount: 5,
+		MaxContainerCount:       100,
 		MasterServiceNamespace:  masterServiceNamespace,
 		VolumePlugins:           volumePlugins,
 		TLSOptions:              tlsOptions,
@@ -359,6 +364,7 @@ type KubeletConfig struct {
 	RegistryPullQPS                float64
 	RegistryBurst                  int
 	MinimumGCAge                   time.Duration
+	MaxPerPodContainerCount        int
 	MaxContainerCount              int
 	ClusterDomain                  string
 	ClusterDNS                     util.IP
@@ -386,6 +392,12 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kubeClient = kc.KubeClient
 	}
 
+	gcPolicy := kubelet.ContainerGCPolicy{
+		MinAge:             kc.MinimumGCAge,
+		MaxPerPodContainer: kc.MaxPerPodContainerCount,
+		MaxContainers:      kc.MaxContainerCount,
+	}
+
 	k, err := kubelet.NewMainKubelet(
 		kc.Hostname,
 		kc.DockerClient,
@@ -395,8 +407,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.SyncFrequency,
 		float32(kc.RegistryPullQPS),
 		kc.RegistryBurst,
-		kc.MinimumGCAge,
-		kc.MaxContainerCount,
+		gcPolicy,
 		pc.SeenAllSources,
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS),
