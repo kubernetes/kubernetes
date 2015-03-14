@@ -41,19 +41,19 @@ given resource.`,
 }
 
 func RunDescribe(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	mapper, _ := f.Object(cmd)
+	mapper, _ := f.Object()
 	// TODO: use resource.Builder instead
 	mapping, namespace, name, err := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	if err != nil {
 		return err
 	}
 
-	describer, err := f.Describer(cmd, mapping)
+	describer, err := f.Describer(mapping)
 	if err != nil {
 		return err
 	}

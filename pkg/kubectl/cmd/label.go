@@ -159,18 +159,18 @@ func RunLabel(f *Factory, out io.Writer, cmd *cobra.Command, args []string) erro
 		return util.UsageError(cmd, "at least one label update is required.")
 	}
 	res := args[:2]
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	mapper, _ := f.Object(cmd)
+	mapper, _ := f.Object()
 	// TODO: use resource.Builder instead
 	mapping, namespace, name, err := util.ResourceFromArgs(cmd, res, mapper, cmdNamespace)
 	if err != nil {
 		return err
 	}
-	client, err := f.RESTClient(cmd, mapping)
+	client, err := f.RESTClient(mapping)
 	if err != nil {
 		return err
 	}

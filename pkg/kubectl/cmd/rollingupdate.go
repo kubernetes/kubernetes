@@ -72,18 +72,18 @@ func RunRollingUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return util.UsageError(cmd, "Must specify the controller to update")
 	}
 	oldName := args[0]
-	schema, err := f.Validator(cmd)
+	schema, err := f.Validator()
 	if err != nil {
 		return err
 	}
 
-	clientConfig, err := f.ClientConfig(cmd)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}
 	cmdApiVersion := clientConfig.Version
 
-	mapper, typer := f.Object(cmd)
+	mapper, typer := f.Object()
 	// TODO: use resource.Builder instead
 	mapping, namespace, newName, data, err := util.ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
 	if err != nil {
@@ -97,7 +97,7 @@ func RunRollingUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []stri
 			filename, oldName)
 	}
 
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func RunRollingUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	client, err := f.Client(cmd)
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}

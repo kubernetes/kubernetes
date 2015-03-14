@@ -33,8 +33,6 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-
-	"github.com/spf13/cobra"
 )
 
 type internalType struct {
@@ -120,25 +118,25 @@ func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
 		Typer:     scheme,
 	}
 	return &Factory{
-		Object: func(*cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return t.Mapper, t.Typer
 		},
-		RESTClient: func(*cobra.Command, *meta.RESTMapping) (resource.RESTClient, error) {
+		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
 		},
-		Describer: func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error) {
+		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
-		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
+		Validator: func() (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
-		DefaultNamespace: func(cmd *cobra.Command) (string, error) {
+		DefaultNamespace: func() (string, error) {
 			return t.Namespace, t.Err
 		},
-		ClientConfig: func(cmd *cobra.Command) (*client.Config, error) {
+		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 	}, t, codec
@@ -149,25 +147,25 @@ func NewAPIFactory() (*Factory, *testFactory, runtime.Codec) {
 		Validator: validation.NullSchema{},
 	}
 	return &Factory{
-		Object: func(*cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
 		},
-		RESTClient: func(*cobra.Command, *meta.RESTMapping) (resource.RESTClient, error) {
+		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
 		},
-		Describer: func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error) {
+		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
-		Validator: func(cmd *cobra.Command) (validation.Schema, error) {
+		Validator: func() (validation.Schema, error) {
 			return t.Validator, t.Err
 		},
-		DefaultNamespace: func(cmd *cobra.Command) (string, error) {
+		DefaultNamespace: func() (string, error) {
 			return t.Namespace, t.Err
 		},
-		ClientConfig: func(cmd *cobra.Command) (*client.Config, error) {
+		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
 	}, t, latest.Codec
@@ -194,7 +192,7 @@ func TestClientVersions(t *testing.T) {
 		mapping := &meta.RESTMapping{
 			APIVersion: version,
 		}
-		c, err := f.RESTClient(nil, mapping)
+		c, err := f.RESTClient(mapping)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

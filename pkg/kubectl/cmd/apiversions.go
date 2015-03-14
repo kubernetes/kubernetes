@@ -30,15 +30,15 @@ func (f *Factory) NewCmdApiVersions(out io.Writer) *cobra.Command {
 		Use:   "apiversions",
 		Short: "Print available API versions.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunApiVersions(f, out, cmd)
+			err := RunApiVersions(f, out)
 			util.CheckErr(err)
 		},
 	}
 	return cmd
 }
 
-func RunApiVersions(f *Factory, out io.Writer, cmd *cobra.Command) error {
-	client, err := f.Client(cmd)
+func RunApiVersions(f *Factory, out io.Writer) error {
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}

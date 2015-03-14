@@ -58,12 +58,12 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 }
 
 func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
-	schema, err := f.Validator(cmd)
+	schema, err := f.Validator()
 	if err != nil {
 		return err
 	}
 
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, fil
 		return nil
 	}
 
-	mapper, typer := f.Object(cmd)
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).RequireNamespace().
@@ -118,18 +118,18 @@ func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, fil
 }
 
 func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string) (string, error) {
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return "", err
 	}
 
-	mapper, _ := f.Object(cmd)
+	mapper, _ := f.Object()
 	// TODO: use resource.Builder instead
 	mapping, namespace, name, err := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	if err != nil {
 		return "", err
 	}
-	client, err := f.RESTClient(cmd, mapping)
+	client, err := f.RESTClient(mapping)
 	if err != nil {
 		return "", err
 	}

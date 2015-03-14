@@ -54,9 +54,9 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 		Long:    stop_long,
 		Example: stop_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdNamespace, err := f.DefaultNamespace(cmd)
+			cmdNamespace, err := f.DefaultNamespace()
 			cmdutil.CheckErr(err)
-			mapper, typer := f.Object(cmd)
+			mapper, typer := f.Object()
 			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 				ContinueOnError().
 				NamespaceParam(cmdNamespace).RequireNamespace().
@@ -69,7 +69,7 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(r.Err())
 
 			r.Visit(func(info *resource.Info) error {
-				reaper, err := f.Reaper(cmd, info.Mapping)
+				reaper, err := f.Reaper(info.Mapping)
 				cmdutil.CheckErr(err)
 				s, err := reaper.Stop(info.Namespace, info.Name)
 				if err != nil {

@@ -55,17 +55,17 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 }
 
 func RunCreate(f *Factory, out io.Writer, cmd *cobra.Command, filenames util.StringList) error {
-	schema, err := f.Validator(cmd)
+	schema, err := f.Validator()
 	if err != nil {
 		return err
 	}
 
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	mapper, typer := f.Object(cmd)
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).RequireNamespace().

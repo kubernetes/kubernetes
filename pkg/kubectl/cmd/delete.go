@@ -74,11 +74,11 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 }
 
 func RunDelete(f *Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	mapper, typer := f.Object(cmd)
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
