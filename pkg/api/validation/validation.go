@@ -371,7 +371,7 @@ func validatePersistentVolumeClaimVolumeSource(claimAttachment *api.PersistentVo
 	if claimAttachment.ClaimName == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.Name", ""))
 	}
-	if ok,_ := ValidatePersistentVolumeName(claimAttachment.ClaimName, false); !ok {
+	if ok, _ := ValidatePersistentVolumeName(claimAttachment.ClaimName, false); !ok {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Name", claimAttachment.ClaimName, "ClaimName"))
 	}
 

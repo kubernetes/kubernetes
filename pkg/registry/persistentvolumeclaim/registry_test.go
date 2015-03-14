@@ -50,7 +50,7 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 
-	nodeWithDeviceA := tools.EtcdResponseWithError{
+	nodeWithClaimA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value:         runtime.EncodeOrDie(testapi.Codec(), claimA),
@@ -81,13 +81,13 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 	}{
 		"normal": {
 			existing: emptyNode,
-			expect:   nodeWithDeviceA,
+			expect:   nodeWithClaimA,
 			toCreate: claimA,
 			errOK:    func(err error) bool { return err == nil },
 		},
 		"preExisting": {
-			existing: nodeWithDeviceA,
-			expect:   nodeWithDeviceA,
+			existing: nodeWithClaimA,
+			expect:   nodeWithClaimA,
 			toCreate: claimB,
 			errOK:    errors.IsAlreadyExists,
 		},
