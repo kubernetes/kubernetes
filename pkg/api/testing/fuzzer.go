@@ -161,8 +161,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			*p = policies[c.Rand.Intn(len(policies))]
 		},
 		func(rp *api.RestartPolicy, c fuzz.Continue) {
-			// Exactly one of the fields should be set.
-			fuzzOneOf(c, &rp.Always, &rp.OnFailure, &rp.Never)
+			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
+			*rp = policies[c.Rand.Intn(len(policies))]
 		},
 		func(vs *api.VolumeSource, c fuzz.Continue) {
 			// Exactly one of the fields should be set.

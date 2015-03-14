@@ -162,7 +162,7 @@ func TestEncode_Ptr(t *testing.T) {
 			Labels: map[string]string{"name": "foo"},
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}

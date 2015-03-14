@@ -62,7 +62,7 @@ func TestSetDefaulPodSpec(t *testing.T) {
 		t.Errorf("Expected default dns policy :%s, got: %s", current.DNSClusterFirst, bp2.Spec.DNSPolicy)
 	}
 	policy := bp2.Spec.RestartPolicy
-	if policy.Never != nil || policy.OnFailure != nil || policy.Always == nil {
+	if policy != current.RestartPolicyAlways {
 		t.Errorf("Expected only policy.Always is set, got: %s", policy)
 	}
 	vsource := bp2.Spec.Volumes[0].VolumeSource

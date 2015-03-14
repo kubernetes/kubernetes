@@ -104,9 +104,7 @@ var _ = Describe("Secrets", func() {
 						},
 					},
 				},
-				RestartPolicy: api.RestartPolicy{
-					Never: &api.RestartPolicyNever{},
-				},
+				RestartPolicy: api.RestartPolicyNever,
 			},
 		}
 

@@ -63,27 +63,21 @@ func TestFilterQuotaPods(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "pod-failed-with-restart-always"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{
-					Always: &api.RestartPolicyAlways{},
-				},
+				RestartPolicy: api.RestartPolicyAlways,
 			},
 			Status: api.PodStatus{Phase: api.PodFailed},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "pod-failed-with-restart-on-failure"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{
-					OnFailure: &api.RestartPolicyOnFailure{},
-				},
+				RestartPolicy: api.RestartPolicyOnFailure,
 			},
 			Status: api.PodStatus{Phase: api.PodFailed},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "pod-failed-with-restart-never"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{
-					Never: &api.RestartPolicyNever{},
-				},
+				RestartPolicy: api.RestartPolicyNever,
 			},
 			Status: api.PodStatus{Phase: api.PodFailed},
 		},

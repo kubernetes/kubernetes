@@ -656,9 +656,9 @@ func TestValidateContainers(t *testing.T) {
 
 func TestValidateRestartPolicy(t *testing.T) {
 	successCases := []api.RestartPolicy{
-		{Always: &api.RestartPolicyAlways{}},
-		{OnFailure: &api.RestartPolicyOnFailure{}},
-		{Never: &api.RestartPolicyNever{}},
+		api.RestartPolicyAlways,
+		api.RestartPolicyOnFailure,
+		api.RestartPolicyNever,
 	}
 	for _, policy := range successCases {
 		if errs := validateRestartPolicy(&policy); len(errs) != 0 {
@@ -666,11 +666,8 @@ func TestValidateRestartPolicy(t *testing.T) {
 		}
 	}
 
-	errorCases := []api.RestartPolicy{
-		{},
-		{Always: &api.RestartPolicyAlways{}, Never: &api.RestartPolicyNever{}},
-		{Never: &api.RestartPolicyNever{}, OnFailure: &api.RestartPolicyOnFailure{}},
-	}
+	errorCases := []api.RestartPolicy{"", "newpolicy"}
+
 	for k, policy := range errorCases {
 		if errs := validateRestartPolicy(&policy); len(errs) == 0 {
 			t.Errorf("expected failure for %d", k)
@@ -694,94 +691,12 @@ func TestValidateDNSPolicy(t *testing.T) {
 	}
 }
 
-func TestValidateManifest(t *testing.T) {
-	successCases := []api.ContainerManifest{
-		{Version: "v1beta1", ID: "abc", RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy: api.DNSClusterFirst},
-		{Version: "v1beta2", ID: "123", RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy: api.DNSClusterFirst},
-		{Version: "V1BETA1", ID: "abc.123.do-re-mi",
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}}, DNSPolicy: api.DNSClusterFirst},
-		{
-			Version: "v1beta1",
-			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol1"}}},
-				{Name: "vol2", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/mnt/vol2"}}}},
-			Containers: []api.Container{
-				{
-					Name:       "abc",
-					Image:      "image",
-					Command:    []string{"foo", "bar"},
-					WorkingDir: "/tmp",
-					Resources: api.ResourceRequirements{
-						Limits: api.ResourceList{
-							"cpu":    resource.MustParse("1"),
-							"memory": resource.MustParse("1"),
-						},
-					},
-					Ports: []api.ContainerPort{
-						{Name: "p1", ContainerPort: 80, HostPort: 8080, Protocol: "TCP"},
-						{Name: "p2", ContainerPort: 81, Protocol: "TCP"},
-						{ContainerPort: 82, Protocol: "TCP"},
-					},
-					Env: []api.EnvVar{
-						{Name: "ev1", Value: "val1"},
-						{Name: "ev2", Value: "val2"},
-						{Name: "EV3", Value: "val3"},
-					},
-					VolumeMounts: []api.VolumeMount{
-						{Name: "vol1", MountPath: "/foo"},
-						{Name: "vol1", MountPath: "/bar"},
-					},
-					ImagePullPolicy: "IfNotPresent",
-				},
-			},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy:     api.DNSClusterFirst,
-		},
-	}
-	for _, manifest := range successCases {
-		if errs := ValidateManifest(&manifest); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := map[string]api.ContainerManifest{
-		"empty version": {Version: "", ID: "abc",
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy:     api.DNSClusterFirst},
-		"invalid version": {Version: "bogus", ID: "abc",
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy:     api.DNSClusterFirst},
-		"invalid volume name": {
-			Version:       "v1beta1",
-			ID:            "abc",
-			Volumes:       []api.Volume{{Name: "vol.1", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy:     api.DNSClusterFirst,
-		},
-		"invalid container name": {
-			Version: "v1beta1",
-			ID:      "abc",
-			Containers: []api.Container{{Name: "ctr.1", Image: "image", ImagePullPolicy: "IfNotPresent",
-				TerminationMessagePath: "/foo/bar"}},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
-			DNSPolicy:     api.DNSClusterFirst,
-		},
-	}
-	for k, v := range errorCases {
-		if errs := ValidateManifest(&v); len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-	}
-}
-
 func TestValidatePodSpec(t *testing.T) {
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate all fields.
@@ -789,7 +704,7 @@ func TestValidatePodSpec(t *testing.T) {
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			NodeSelector: map[string]string{
 				"key": "value",
 			},
@@ -806,20 +721,20 @@ func TestValidatePodSpec(t *testing.T) {
 	failureCases := map[string]api.PodSpec{
 		"bad volume": {
 			Volumes:       []api.Volume{{}},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad container": {
 			Containers:    []api.Container{{}},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad DNS policy": {
 			DNSPolicy:     api.DNSPolicy("invalid"),
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 		},
 		"bad restart policy": {
-			RestartPolicy: api.RestartPolicy{},
+			RestartPolicy: "UnknowPolicy",
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}
@@ -837,7 +752,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: api.PodSpec{
 				Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -848,7 +763,7 @@ func TestValidatePod(t *testing.T) {
 					{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 				NodeSelector: map[string]string{
 					"key": "value",
@@ -867,14 +782,14 @@ func TestValidatePod(t *testing.T) {
 		"bad name": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: "ns"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"bad namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -893,7 +808,7 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1117,7 +1032,7 @@ func TestValidateBoundPods(t *testing.T) {
 		{ // Mostly empty.
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1126,7 +1041,7 @@ func TestValidateBoundPods(t *testing.T) {
 			Spec: api.PodSpec{
 				Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1137,7 +1052,7 @@ func TestValidateBoundPods(t *testing.T) {
 					{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 				NodeSelector: map[string]string{
 					"key": "value",
@@ -1156,14 +1071,14 @@ func TestValidateBoundPods(t *testing.T) {
 		"zero-length name": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: "ns"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"bad namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1171,28 +1086,28 @@ func TestValidateBoundPods(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Containers:    []api.Container{{Name: "name", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"name > 253 characters": {
 			ObjectMeta: api.ObjectMeta{Name: strings.Repeat("a", 254), Namespace: "ns"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"name not a DNS subdomain": {
 			ObjectMeta: api.ObjectMeta{Name: "a..b.c", Namespace: "ns"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"name with underscore": {
 			ObjectMeta: api.ObjectMeta{Name: "a_b_c", Namespace: "ns"},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1391,7 +1306,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1402,7 +1317,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
 			},
@@ -1412,7 +1327,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Spec: api.PodTemplateSpec{
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -1551,7 +1466,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1563,7 +1478,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 			Spec: api.PodSpec{
 				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{"my-PD", "ext4", 1, false}}}},
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -1572,7 +1487,7 @@ func TestValidateReplicationController(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Spec: api.PodTemplateSpec{
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 			ObjectMeta: api.ObjectMeta{
@@ -1693,10 +1608,8 @@ func TestValidateReplicationController(t *testing.T) {
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{
-							OnFailure: &api.RestartPolicyOnFailure{},
-						},
-						DNSPolicy: api.DNSClusterFirst,
+						RestartPolicy: api.RestartPolicyOnFailure,
+						DNSPolicy:     api.DNSClusterFirst,
 					},
 					ObjectMeta: api.ObjectMeta{
 						Labels: validSelector,
@@ -1713,10 +1626,8 @@ func TestValidateReplicationController(t *testing.T) {
 				Selector: validSelector,
 				Template: &api.PodTemplateSpec{
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{
-							Never: &api.RestartPolicyNever{},
-						},
-						DNSPolicy: api.DNSClusterFirst,
+						RestartPolicy: api.RestartPolicyNever,
+						DNSPolicy:     api.DNSClusterFirst,
 					},
 					ObjectMeta: api.ObjectMeta{
 						Labels: validSelector,

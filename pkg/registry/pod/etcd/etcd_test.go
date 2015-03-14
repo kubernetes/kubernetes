@@ -81,7 +81,7 @@ func validNewPod() *api.Pod {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 			Containers: []api.Container{
 				{
@@ -1116,7 +1116,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 					TerminationMessagePath: api.TerminationMessagePathDefault,
 				},
 			},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		Status: api.PodStatus{
@@ -1191,7 +1191,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 
 	expected := podStart
 	expected.ResourceVersion = "2"
-	expected.Spec.RestartPolicy.Always = &api.RestartPolicyAlways{}
+	expected.Spec.RestartPolicy = api.RestartPolicyAlways
 	expected.Spec.DNSPolicy = api.DNSClusterFirst
 	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
 	expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault

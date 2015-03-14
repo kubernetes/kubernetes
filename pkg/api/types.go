@@ -515,23 +515,17 @@ type PodContainerInfo struct {
 	ContainerInfo PodInfo `json:"containerInfo"`
 }
 
-type RestartPolicyAlways struct{}
-
-// TODO(dchen1107): Define what kinds of failures should restart.
-// TODO(dchen1107): Decide whether to support policy knobs, and, if so, which ones.
-type RestartPolicyOnFailure struct{}
-
-type RestartPolicyNever struct{}
-
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
 // If none of the following policies is specified, the default one
 // is RestartPolicyAlways.
-type RestartPolicy struct {
-	Always    *RestartPolicyAlways    `json:"always,omitempty"`
-	OnFailure *RestartPolicyOnFailure `json:"onFailure,omitempty"`
-	Never     *RestartPolicyNever     `json:"never,omitempty"`
-}
+type RestartPolicy string
+
+const (
+	RestartPolicyAlways    RestartPolicy = "Always"
+	RestartPolicyOnFailure RestartPolicy = "OnFailure"
+	RestartPolicyNever     RestartPolicy = "Never"
+)
 
 // PodList is a list of Pods.
 type PodList struct {

@@ -391,7 +391,7 @@ func TestPodPhaseWithBadNode(t *testing.T) {
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
-		RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+		RestartPolicy: api.RestartPolicyAlways,
 	}
 	runningState := api.ContainerStatus{
 		State: api.ContainerState{

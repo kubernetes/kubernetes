@@ -60,7 +60,7 @@ func CreateValidPod(name, namespace, source string) api.BoundPod {
 			Annotations: map[string]string{kubelet.ConfigSourceAnnotationKey: source},
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}

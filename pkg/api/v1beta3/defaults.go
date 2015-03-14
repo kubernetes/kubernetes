@@ -52,11 +52,6 @@ func init() {
 				obj.TerminationMessagePath = TerminationMessagePathDefault
 			}
 		},
-		func(obj *RestartPolicy) {
-			if util.AllPtrFieldsNil(obj) {
-				obj.Always = &RestartPolicyAlways{}
-			}
-		},
 		func(obj *Service) {
 			if obj.Spec.Protocol == "" {
 				obj.Spec.Protocol = ProtocolTCP
@@ -68,6 +63,9 @@ func init() {
 		func(obj *PodSpec) {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
+			}
+			if obj.RestartPolicy == "" {
+				obj.RestartPolicy = RestartPolicyAlways
 			}
 		},
 		func(obj *Probe) {

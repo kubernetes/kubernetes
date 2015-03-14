@@ -1055,6 +1055,33 @@ func init() {
 			return nil
 		},
 
+		func(in *newer.RestartPolicy, out *RestartPolicy, s conversion.Scope) error {
+			switch *in {
+			case newer.RestartPolicyAlways:
+				*out = RestartPolicy{Always: &RestartPolicyAlways{}}
+			case newer.RestartPolicyNever:
+				*out = RestartPolicy{Never: &RestartPolicyNever{}}
+			case newer.RestartPolicyOnFailure:
+				*out = RestartPolicy{OnFailure: &RestartPolicyOnFailure{}}
+			default:
+				*out = RestartPolicy{}
+			}
+			return nil
+		},
+		func(in *RestartPolicy, out *newer.RestartPolicy, s conversion.Scope) error {
+			switch {
+			case in.Always != nil:
+				*out = newer.RestartPolicyAlways
+			case in.Never != nil:
+				*out = newer.RestartPolicyNever
+			case in.OnFailure != nil:
+				*out = newer.RestartPolicyOnFailure
+			default:
+				*out = ""
+			}
+			return nil
+		},
+
 		func(in *newer.Probe, out *LivenessProbe, s conversion.Scope) error {
 			if err := s.Convert(&in.Exec, &out.Exec, 0); err != nil {
 				return err
