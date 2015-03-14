@@ -203,7 +203,7 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 }
 
-func testVolume(name string, namespace string) *api.PersistentVolume {
+func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 
 	objMeta := api.ObjectMeta{Name: name}
 	if namespace != "" {
@@ -212,7 +212,7 @@ func testVolume(name string, namespace string) *api.PersistentVolume {
 
 	return &api.PersistentVolume{
 		ObjectMeta: objMeta,
-		Spec:       api.PersistentVolumeSpec{},
+		Spec:       spec,
 	}
 }
 
@@ -224,27 +224,82 @@ func TestValidatePersistentVolumes(t *testing.T) {
 	}{
 		"good-volume": {
 			isExpectedFailure: false,
-			volume:            testVolume("foo", ""),
+			volume:            testVolume("foo", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				Source: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+				},
+			}),
 		},
-		"bad-volume": {
+		"unexpected-namespace": {
 			isExpectedFailure: true,
-			volume:            testVolume("foo", "unexpected-namespace"),
+			volume:            testVolume("foo", "unexpected-namespace", api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+					Source: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+
+				},
+			}),
+		},
+		"bad-name": {
+			isExpectedFailure: true,
+			volume:            testVolume("123*Bad(Name", "unexpected-namespace", api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+					Source: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+
+				},
+			}),
+		},
+		"missing-name": {
+			isExpectedFailure: true,
+			volume:	testVolume("", "", api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+				}),
+		},
+		"missing-capacity": {
+			isExpectedFailure: true,
+			volume: 	testVolume("foo", "", api.PersistentVolumeSpec{}),
+		},
+		"too-many-sources": {
+			isExpectedFailure: true,
+			volume:	testVolume("", "", api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+					},
+					Source: api.PersistentVolumeSource{
+						HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
+				},
+			}),
+
 		},
 	}
 
 	for name, scenario := range scenarios {
 		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
-			t.Errorf("Unexpected failure: %s, errs: %v", name, errs)
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
 
 }
 
-func testVolumeClaim(name string, namespace string) *api.PersistentVolumeClaim {
+func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
-		Spec:       api.PersistentVolumeClaimSpec{},
+		Spec:       spec,
 	}
 }
 
@@ -255,22 +310,62 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		claim             *api.PersistentVolumeClaim
 	}{
 		"good-claim": {
-			isExpectedFailure: true,
-			claim:             testVolumeClaim("foo", ""),
-		},
-		"bad-claim": {
 			isExpectedFailure: false,
-			claim:             testVolumeClaim("foo", "valid-namespace"),
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+					AccessModes: []api.AccessModeType{
+						api.ReadWriteOnce,
+						api.ReadOnlyMany,
+					},
+					Resources: api.ResourceRequirements{
+						Requests: 	api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+					},
+			}),
+		},
+		"missing-namespace": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "", api.PersistentVolumeClaimSpec{
+					AccessModes: []api.AccessModeType{
+						api.ReadWriteOnce,
+						api.ReadOnlyMany,
+					},
+					Resources: api.ResourceRequirements{
+						Requests: 	api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+					},
+			}),
+		},
+		"no-access-modes": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+					Resources: api.ResourceRequirements{
+						Requests: 	api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+					},
+			}),
+		},
+		"no-resource-requests": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+					AccessModes: []api.AccessModeType{
+						api.ReadWriteOnce,
+					},
+			}),
 		},
 	}
 
 	for name, scenario := range scenarios {
 		errs := ValidatePersistentVolumeClaim(scenario.claim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
-			t.Errorf("Unexpected failure: %s, errs: %v", name, errs)
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
-
 }
 
 func TestValidateVolumes(t *testing.T) {

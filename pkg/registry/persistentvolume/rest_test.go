@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
 type testRegistry struct {
@@ -42,6 +43,14 @@ func makeTestPV(name string, ns *string) *api.PersistentVolume {
 	store := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
+		},
+		Spec: api.PersistentVolumeSpec {
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+			Source: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+			},
 		},
 	}
 
@@ -87,9 +96,6 @@ func TestRESTCreate(t *testing.T) {
 		if !api.HasObjectMetaSystemFieldValues(&item.store.ObjectMeta) {
 			t.Errorf("storage did not populate object meta field values")
 		}
-		//		if e, a := item.store, (<-c).Object; !reflect.DeepEqual(e, a) {
-		//			t.Errorf("diff: %s", util.ObjectDiff(e, a))
-		//		}
 		// Ensure we implement the interface
 		_ = apiserver.ResourceWatcher(rest)
 	}
@@ -106,9 +112,6 @@ func TestRESTDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	//	if stat := (<-c).Object.(*api.Status); stat.Status != api.StatusSuccess {
-	//		t.Errorf("unexpected status: %v", stat)
-	//	}
 }
 
 func TestRESTGet(t *testing.T) {
