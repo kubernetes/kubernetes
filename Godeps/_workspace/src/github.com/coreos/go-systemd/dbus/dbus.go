@@ -1,16 +1,18 @@
-// Copyright 2015 CoreOS, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright 2013 CoreOS Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 // Integration with the systemd D-Bus API.  See http://www.freedesktop.org/wiki/Software/systemd/dbus/
 package dbus
@@ -62,16 +64,10 @@ func PathBusEscape(path string) string {
 
 // Conn is a connection to systemd's dbus endpoint.
 type Conn struct {
-	// sysconn/sysobj are only used to call dbus methods
-	sysconn *dbus.Conn
-	sysobj  *dbus.Object
-
-	// sigconn/sigobj are only used to receive dbus signals
-	sigconn *dbus.Conn
-	sigobj  *dbus.Object
-
+	sysconn     *dbus.Conn
+	sysobj      *dbus.Object
 	jobListener struct {
-		jobs map[dbus.ObjectPath]chan<- string
+		jobs map[dbus.ObjectPath]chan string
 		sync.Mutex
 	}
 	subscriber struct {
@@ -81,61 +77,26 @@ type Conn struct {
 		ignore      map[dbus.ObjectPath]int64
 		cleanIgnore int64
 	}
+	dispatch map[string]func(dbus.Signal)
 }
 
-// New establishes a connection to the system bus and authenticates.
-// Callers should call Close() when done with the connection.
+// New() establishes a connection to the system bus and authenticates.
 func New() (*Conn, error) {
-	return newConnection(dbus.SystemBusPrivate)
-}
+	c := new(Conn)
 
-// NewUserConnection establishes a connection to the session bus and
-// authenticates. This can be used to connect to systemd user instances.
-// Callers should call Close() when done with the connection.
-func NewUserConnection() (*Conn, error) {
-	return newConnection(dbus.SessionBusPrivate)
-}
-
-// Close closes an established connection
-func (c *Conn) Close() {
-	c.sysconn.Close()
-	c.sigconn.Close()
-}
-
-func newConnection(createBus func() (*dbus.Conn, error)) (*Conn, error) {
-	sysconn, err := dbusConnection(createBus)
-	if err != nil {
+	if err := c.initConnection(); err != nil {
 		return nil, err
 	}
 
-	sigconn, err := dbusConnection(createBus)
-	if err != nil {
-		sysconn.Close()
-		return nil, err
-	}
-
-	c := &Conn{
-		sysconn: sysconn,
-		sysobj:  systemdObject(sysconn),
-		sigconn: sigconn,
-		sigobj:  systemdObject(sigconn),
-	}
-
-	c.subscriber.ignore = make(map[dbus.ObjectPath]int64)
-	c.jobListener.jobs = make(map[dbus.ObjectPath]chan<- string)
-
-	// Setup the listeners on jobs so that we can get completions
-	c.sigconn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
-		"type='signal', interface='org.freedesktop.systemd1.Manager', member='JobRemoved'")
-
-	c.dispatch()
+	c.initJobs()
 	return c, nil
 }
 
-func dbusConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
-	conn, err := createBus()
+func (c *Conn) initConnection() error {
+	var err error
+	c.sysconn, err = dbus.SystemBusPrivate()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Only use EXTERNAL method, and hardcode the uid (not username)
@@ -143,21 +104,25 @@ func dbusConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
 	// libc)
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
 
-	err = conn.Auth(methods)
+	err = c.sysconn.Auth(methods)
 	if err != nil {
-		conn.Close()
-		return nil, err
+		c.sysconn.Close()
+		return err
 	}
 
-	err = conn.Hello()
+	err = c.sysconn.Hello()
 	if err != nil {
-		conn.Close()
-		return nil, err
+		c.sysconn.Close()
+		return err
 	}
 
-	return conn, nil
-}
+	c.sysobj = c.sysconn.Object("org.freedesktop.systemd1", dbus.ObjectPath("/org/freedesktop/systemd1"))
 
-func systemdObject(conn *dbus.Conn) *dbus.Object {
-	return conn.Object("org.freedesktop.systemd1", dbus.ObjectPath("/org/freedesktop/systemd1"))
+	// Setup the listeners on jobs so that we can get completions
+	c.sysconn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
+		"type='signal', interface='org.freedesktop.systemd1.Manager', member='JobRemoved'")
+	c.initSubscription()
+	c.initDispatch()
+
+	return nil
 }

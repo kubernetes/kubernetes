@@ -183,13 +183,11 @@ func (r *Runtime) RunPod(pod *api.BoundPod, volumeMap map[string]volume.Interfac
 		}
 	}
 
-	ch := make(chan string)
-	_, err = r.systemd.StartUnit(name, "replace", ch)
+	// TODO(yifan): This is the old version of go-systemd. Should update when libcontainer updates
+	// its version of go-systemd.
+	_, err = r.systemd.StartUnit(name, "replace")
 	if err != nil {
 		return err
-	}
-	if status := <-ch; status != "done" {
-		return fmt.Errorf("rocket: unexpected return status %q", status)
 	}
 	return nil
 }
