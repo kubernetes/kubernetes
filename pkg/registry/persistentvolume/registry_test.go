@@ -41,18 +41,18 @@ func NewTestPersistentVolumeEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, g
 }
 
 func TestPersistentVolumeCreate(t *testing.T) {
-	storeA := &api.PersistentVolume{
+	volumeA := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 
-	storeB := &api.PersistentVolume{
+	volumeB := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 	}
 
-	nodeWithStoreA := tools.EtcdResponseWithError{
+	nodeWithVolumeA := tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), storeA),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), volumeA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -80,14 +80,14 @@ func TestPersistentVolumeCreate(t *testing.T) {
 	}{
 		"normal": {
 			existing: emptyNode,
-			expect:   nodeWithStoreA,
-			toCreate: storeA,
+			expect:   nodeWithVolumeA,
+			toCreate: volumeA,
 			errOK:    func(err error) bool { return err == nil },
 		},
 		"preExisting": {
-			existing: nodeWithStoreA,
-			expect:   nodeWithStoreA,
-			toCreate: storeB,
+			existing: nodeWithVolumeA,
+			expect:   nodeWithVolumeA,
+			toCreate: volumeB,
 			errOK:    errors.IsAlreadyExists,
 		},
 	}

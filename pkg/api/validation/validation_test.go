@@ -224,7 +224,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 	}{
 		"good-volume": {
 			isExpectedFailure: false,
-			volume:            testVolume("foo", "", api.PersistentVolumeSpec{
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
@@ -235,52 +235,50 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		},
 		"unexpected-namespace": {
 			isExpectedFailure: true,
-			volume:            testVolume("foo", "unexpected-namespace", api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
+			volume: testVolume("foo", "unexpected-namespace", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-					PersistentVolumeSource: api.PersistentVolumeSource{
+				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
-
 				},
 			}),
 		},
 		"bad-name": {
 			isExpectedFailure: true,
-			volume:            testVolume("123*Bad(Name", "unexpected-namespace", api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
+			volume: testVolume("123*Bad(Name", "unexpected-namespace", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						HostPath: &api.HostPathVolumeSource{Path: "/foo"},
-					},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
+			},
 			),
 		},
 		"missing-name": {
 			isExpectedFailure: true,
-			volume:	testVolume("", "", api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-					},
-				}),
+			volume: testVolume("", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+			}),
 		},
 		"missing-capacity": {
 			isExpectedFailure: true,
-			volume: 	testVolume("foo", "", api.PersistentVolumeSpec{}),
+			volume:            testVolume("foo", "", api.PersistentVolumeSpec{}),
 		},
 		"too-many-sources": {
 			isExpectedFailure: true,
-			volume:	testVolume("", "", api.PersistentVolumeSpec{
-					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
-					},
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						HostPath: &api.HostPathVolumeSource{Path: "/foo"},
-						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
+			volume: testVolume("", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath:          &api.HostPathVolumeSource{Path: "/foo"},
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
 				},
 			}),
-
 		},
 	}
 
@@ -312,47 +310,47 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		"good-claim": {
 			isExpectedFailure: false,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{
-						api.ReadWriteOnce,
-						api.ReadOnlyMany,
+				AccessModes: []api.AccessModeType{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 					},
-					Resources: api.ResourceRequirements{
-						Requests: 	api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-						},
-					},
+				},
 			}),
 		},
 		"missing-namespace": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "", api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{
-						api.ReadWriteOnce,
-						api.ReadOnlyMany,
+				AccessModes: []api.AccessModeType{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 					},
-					Resources: api.ResourceRequirements{
-						Requests: 	api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-						},
-					},
+				},
 			}),
 		},
 		"no-access-modes": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-					Resources: api.ResourceRequirements{
-						Requests: 	api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
-						},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 					},
+				},
 			}),
 		},
 		"no-resource-requests": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{
-						api.ReadWriteOnce,
-					},
+				AccessModes: []api.AccessModeType{
+					api.ReadWriteOnce,
+				},
 			}),
 		},
 	}
