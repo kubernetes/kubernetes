@@ -12,10 +12,21 @@ desiredState:
         id: monitoring-heapster
         containers:
           - name: heapster
-            image: kubernetes/heapster:v0.8
+            image: kubernetes/heapster:v0.9
             env: 
               - name: "INFLUXDB_HOST"
                 value: "monitoring-influxdb"
+              - name: "SINK"
+                value: "influxdb"
+            volumeMounts:
+              - name: ssl-certs
+                mountPath: /etc/ssl/certs
+                readOnly: true
+        volumes:
+          - name: ssl-certs
+            source:
+              hostDir:
+                path: /etc/ssl/certs
     labels: 
       name: heapster
       uses: monitoring-influxdb
