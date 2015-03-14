@@ -394,16 +394,16 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	}
 
 	numVolumes := 0
-	if pv.Spec.Source.HostPath != nil {
+	if pv.Spec.HostPath != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateHostPathVolumeSource(pv.Spec.Source.HostPath).Prefix("hostPath")...)
+		allErrs = append(allErrs, validateHostPathVolumeSource(pv.Spec.HostPath).Prefix("hostPath")...)
 	}
-	if pv.Spec.Source.GCEPersistentDisk != nil {
+	if pv.Spec.GCEPersistentDisk != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pv.Spec.Source.GCEPersistentDisk).Prefix("persistentDisk")...)
+		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
 	if numVolumes != 1 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.Source, "exactly 1 volume type is required"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
 	}
 	return allErrs
 }

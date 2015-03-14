@@ -48,7 +48,7 @@ func makeTestPV(name string, ns *string) *api.PersistentVolume {
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
-			Source: api.PersistentVolumeSource{
+			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 			},
 		},
