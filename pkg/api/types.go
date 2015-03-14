@@ -230,7 +230,7 @@ type PersistentVolume struct {
 
 type PersistentVolumeSpec struct {
 	// Resources represents the actual resources of the volume
-	Capacity ResourceList `json:"capacity,omitempty`
+	Capacity ResourceList `json:"capacity`
 	// Source represents the location and type of a volume to mount.
 	// AccessModeTypes are inferred from the Source.
 	// TODO remove the name and inline this once the GetAccessModes volume interface method is implemented

@@ -5,6 +5,7 @@ metadata:
 spec:
   capacity:
     storage: 10
-  persistentDisk:
-    pdName: "abc123"
-    fsType: "ext4"
+  source:
+    persistentDisk:
+      pdName: "abc123"
+      fsType: "ext4"
