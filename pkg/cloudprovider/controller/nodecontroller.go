@@ -39,8 +39,12 @@ const (
 	// sync node status in this case, but will monitor node status updated from kubelet. If
 	// it doesn't receive update for this amount of time, it will start posting node NotReady
 	// condition. The amount of time when NodeController start evicting pods is controlled
-	// via flag 'pod_eviction_timeout'.
+	// via flag 'pod_eviction_timeout'. Note: be cautious when changing nodeMonitorGracePeriod,
+	// it must work with kubelet.nodeStatusUpdateFrequency.
 	nodeMonitorGracePeriod = 8 * time.Second
+	// The constant is used if sync_nodes_status=False, and for node startup. When node
+	// is just created, e.g. cluster bootstrap or node creation, we give a longer grace period.
+	nodeStartupGracePeriod = 30 * time.Second
 	// The constant is used if sync_nodes_status=False. It controls NodeController monitoring
 	// period, i.e. how often does NodeController check node status posted from kubelet.
 	// Theoretically, this value should be lower than nodeMonitorGracePeriod.
@@ -412,12 +416,18 @@ func (s *NodeController) MonitorNodeStatus() error {
 	}
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
-		// Precompute condition times to avoid deep copy of node status (We'll modify node for updating,
-		// and NodeStatus.Conditions is an array, which makes assignment copy not useful).
+		// Precompute all condition times to avoid deep copy of node status (We'll modify node for
+		// updating, and NodeStatus.Conditions is an array, which makes assignment copy not useful).
 		latestConditionTime := s.latestConditionTime(node, api.NodeReady)
+		var gracePeriod time.Duration
+		if latestConditionTime == node.CreationTimestamp {
+			gracePeriod = nodeStartupGracePeriod
+		} else {
+			gracePeriod = nodeMonitorGracePeriod
+		}
 		latestFullConditionTime := s.latestConditionTimeWithStatus(node, api.NodeReady, api.ConditionFull)
 		// Grace period has passed, post node NotReady condition to master, without contacting kubelet.
-		if util.Now().After(latestConditionTime.Add(nodeMonitorGracePeriod)) {
+		if util.Now().After(latestConditionTime.Add(gracePeriod)) {
 			readyCondition := s.getCondition(node, api.NodeReady)
 			if readyCondition == nil {
 				node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{

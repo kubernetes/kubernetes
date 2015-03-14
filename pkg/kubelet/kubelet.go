@@ -75,8 +75,10 @@ const (
 	initialNodeStatusUpdateFrequency = 100 * time.Millisecond
 	nodeStatusUpdateFrequencyInc     = 500 * time.Millisecond
 
-	// The retry count for updating node status at each sync period.
-	nodeStatusUpdateRetry = 5
+	// Node status update frequency and retry count. Note: be cautious when changing nodeStatusUpdateFrequency,
+	// it must work with nodecontroller.nodeMonitorGracePeriod.
+	nodeStatusUpdateFrequency = 2 * time.Second
+	nodeStatusUpdateRetry     = 5
 )
 
 var (
@@ -124,7 +126,6 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	statusUpdateFrequency time.Duration,
 	imageGCPolicy ImageGCPolicy) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -202,7 +203,6 @@ func NewMainKubelet(
 		dockerClient:                   dockerClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
-		statusUpdateFrequency:          statusUpdateFrequency,
 		resyncInterval:                 resyncInterval,
 		podInfraContainerImage:         podInfraContainerImage,
 		containerIDToRef:               map[string]*api.ObjectReference{},
@@ -275,7 +275,6 @@ type Kubelet struct {
 	rootDirectory          string
 	podInfraContainerImage string
 	podWorkers             *podWorkers
-	statusUpdateFrequency  time.Duration
 	resyncInterval         time.Duration
 	sourcesReady           SourcesReadyFn
 
@@ -532,7 +531,8 @@ func (kl *Kubelet) syncNodeStatus() {
 	if kl.kubeClient == nil {
 		return
 	}
-	for feq := initialNodeStatusUpdateFrequency; feq < kl.statusUpdateFrequency; feq += nodeStatusUpdateFrequencyInc {
+
+	for feq := initialNodeStatusUpdateFrequency; feq < nodeStatusUpdateFrequency; feq += nodeStatusUpdateFrequencyInc {
 		select {
 		case <-time.After(feq):
 			if err := kl.updateNodeStatus(); err != nil {
@@ -542,7 +542,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	for {
 		select {
-		case <-time.After(kl.statusUpdateFrequency):
+		case <-time.After(nodeStatusUpdateFrequency):
 			if err := kl.updateNodeStatus(); err != nil {
 				glog.Errorf("Unable to update node status: %v", err)
 			}
