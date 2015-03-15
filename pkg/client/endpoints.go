@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type EndpointsInterface interface {
 	List(selector labels.Selector) (*api.EndpointsList, error)
 	Get(name string) (*api.Endpoints, error)
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // endpoints implements EndpointsInterface
@@ -63,7 +64,7 @@ func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, e
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
 		Do().
 		Into(result)
 	return
@@ -81,14 +82,14 @@ func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
-func (c *endpoints) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *endpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }
 

@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -209,6 +210,6 @@ func TestResourceQuotaWatch(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/watch/resourceQuotas", Query: url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), "")
+	_, err := c.Setup().ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

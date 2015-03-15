@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -60,7 +61,7 @@ func (c *FakeResourceQuotas) Status(resourceQuota *api.ResourceQuota) (*api.Reso
 	return &api.ResourceQuota{}, nil
 }
 
-func (c *FakeResourceQuotas) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-resourceQuota", Value: resourceVersion})
 	return c.Fake.Watch, nil
 }

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -139,6 +140,6 @@ func TestNamespaceWatch(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/watch/namespaces", Query: url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
-	_, err := c.Setup().Namespaces().Watch(labels.Everything(), labels.Everything(), "")
+	_, err := c.Setup().Namespaces().Watch(labels.Everything(), fields.Everything(), "")
 	c.Validate(t, nil, err)
 }

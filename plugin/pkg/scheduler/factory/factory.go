@@ -27,7 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -174,11 +174,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 // Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{getHostFieldLabel(factory.Client.APIVersion()): ""}.AsSelector())
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{getHostFieldLabel(factory.Client.APIVersion()): ""}.AsSelector())
 }
 
-func parseSelectorOrDie(s string) labels.Selector {
-	selector, err := labels.ParseSelector(s)
+func parseSelectorOrDie(s string) fields.Selector {
+	selector, err := fields.ParseSelector(s)
 	if err != nil {
 		panic(err)
 	}

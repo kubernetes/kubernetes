@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -91,7 +92,7 @@ func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Inte
 			return client.LimitRanges(api.NamespaceAll).List(labels.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), resourceVersion)
+			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)

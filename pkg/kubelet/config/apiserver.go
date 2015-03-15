@@ -21,13 +21,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
 func NewSourceApiserver(client *client.Client, hostname string, updates chan<- interface{}) {
-	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, labels.OneTermEqualSelector(getHostFieldLabel(client.APIVersion()), hostname))
+	lw := cache.NewListWatchFromClient(client, "pods", api.NamespaceAll, fields.OneTermEqualSelector(getHostFieldLabel(client.APIVersion()), hostname))
 	newSourceApiserverFromLW(lw, updates)
 }
 

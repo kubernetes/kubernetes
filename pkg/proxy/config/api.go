@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
@@ -32,13 +33,13 @@ import (
 // ServicesWatcher is capable of listing and watching for changes to services across ALL namespaces
 type ServicesWatcher interface {
 	List(label labels.Selector) (*api.ServiceList, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // EndpointsWatcher is capable of listing and watching for changes to endpoints across ALL namespaces
 type EndpointsWatcher interface {
 	List(label labels.Selector) (*api.EndpointsList, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // SourceAPI implements a configuration source for services and endpoints that
@@ -114,7 +115,7 @@ func (s *servicesReflector) run(resourceVersion *string) {
 		s.services <- ServiceUpdate{Op: SET, Services: services.Items}
 	}
 
-	watcher, err := s.watcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
+	watcher, err := s.watcher.Watch(labels.Everything(), fields.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for services changes: %v", err)
 		if !client.IsTimeout(err) {
@@ -184,7 +185,7 @@ func (s *endpointsReflector) run(resourceVersion *string) {
 		s.endpoints <- EndpointsUpdate{Op: SET, Endpoints: endpoints.Items}
 	}
 
-	watcher, err := s.watcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
+	watcher, err := s.watcher.Watch(labels.Everything(), fields.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for endpoints changes: %v", err)
 		if !client.IsTimeout(err) {

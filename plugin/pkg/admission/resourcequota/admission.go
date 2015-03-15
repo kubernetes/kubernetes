@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -50,7 +51,7 @@ func NewResourceQuota(client client.Interface) admission.Interface {
 			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
 		},
 		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), resourceVersion)
+			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
 		},
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)

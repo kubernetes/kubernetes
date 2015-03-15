@@ -25,12 +25,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func parseSelectorOrDie(s string) labels.Selector {
-	selector, err := labels.Parse(s)
+func parseSelectorOrDie(s string) fields.Selector {
+	selector, err := fields.ParseSelector(s)
 	if err != nil {
 		panic(err)
 	}
@@ -82,7 +82,7 @@ func TestListWatchesCanList(t *testing.T) {
 		location      string
 		resource      string
 		namespace     string
-		fieldSelector labels.Selector
+		fieldSelector fields.Selector
 	}{
 		// Minion
 		{
@@ -96,14 +96,14 @@ func TestListWatchesCanList(t *testing.T) {
 			location:      buildLocation(buildResourcePath("", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{getHostFieldLabel() + "="}})),
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
-			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
+			fieldSelector: fields.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 		// pod in namespace "foo"
 		{
 			location:      buildLocation(buildResourcePath("", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{getHostFieldLabel() + "="}})),
 			resource:      "pods",
 			namespace:     "foo",
-			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
+			fieldSelector: fields.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 	}
 	for _, item := range table {
@@ -128,7 +128,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		location      string
 		resource      string
 		namespace     string
-		fieldSelector labels.Selector
+		fieldSelector fields.Selector
 	}{
 		// Minion
 		{
@@ -151,7 +151,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 			rv:            "0",
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
-			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
+			fieldSelector: fields.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 		// pod with namespace foo and assigned field selector
 		{
@@ -159,7 +159,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 			rv:            "0",
 			resource:      "pods",
 			namespace:     "foo",
-			fieldSelector: labels.Set{getHostFieldLabel(): ""}.AsSelector(),
+			fieldSelector: fields.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 	}
 

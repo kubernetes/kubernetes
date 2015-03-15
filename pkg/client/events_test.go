@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -159,7 +160,7 @@ func TestEventList(t *testing.T) {
 		Response: Response{StatusCode: 200, Body: eventList},
 	}
 	response, err := c.Setup().Events(ns).List(labels.Everything(),
-		labels.Everything())
+		fields.Everything())
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)

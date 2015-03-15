@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -37,7 +38,7 @@ type PodInterface interface {
 	Delete(name string) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	Bind(binding *api.Binding) error
 }
 
@@ -58,7 +59,7 @@ func newPods(c *Client, namespace string) *pods {
 // List takes a selector, and returns the list of pods that match that selector.
 func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -97,14 +98,14 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *pods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -241,8 +242,8 @@ func validateLabels(a, b string) bool {
 }
 
 func validateFields(a, b string) bool {
-	sA, _ := labels.ParseSelector(a)
-	sB, _ := labels.ParseSelector(b)
+	sA, _ := fields.ParseSelector(a)
+	sB, _ := fields.ParseSelector(b)
 	return sA.String() == sB.String()
 }
 
