@@ -44,6 +44,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
+	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
@@ -361,11 +362,13 @@ func (m *Master) init(c *Config) {
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
+	endpointsStorage := endpointsetcd.NewStorage(c.EtcdHelper)
+	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
+
 	// TODO: split me up into distinct storage registries
-	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry)
+	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
 
 	m.serviceRegistry = registry
-	m.endpointRegistry = registry
 	m.nodeRegistry = registry
 
 	nodeStorage := minion.NewStorage(m.nodeRegistry, c.KubeletClient)
@@ -394,8 +397,8 @@ func (m *Master) init(c *Config) {
 		"bindings":     bindingStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
-		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
+		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
+		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"nodes":                  nodeStorage,
 		"events":                 event.NewStorage(eventRegistry),

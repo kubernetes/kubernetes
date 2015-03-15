@@ -32,6 +32,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
+func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry, *cloud.FakeCloud) {
+	registry := registrytest.NewServiceRegistry()
+	fakeCloud := &cloud.FakeCloud{}
+	machines := []string{"foo", "bar", "baz"}
+	endpointRegistry := &registrytest.EndpointRegistry{
+		Endpoints: endpoints,
+	}
+	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
+	storage := NewStorage(registry, fakeCloud, nodeRegistry, endpointRegistry, makeIPNet(t), "kubernetes")
+	return storage, registry, fakeCloud
+}
+
 func makeIPNet(t *testing.T) *net.IPNet {
 	_, net, err := net.ParseCIDR("1.2.3.0/24")
 	if err != nil {
@@ -41,10 +53,7 @@ func makeIPNet(t *testing.T) *net.IPNet {
 }
 
 func TestServiceRegistryCreate(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
 	storage.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -84,8 +93,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 }
 
 func TestServiceStorageValidatesCreate(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	storage := NewStorage(registry, nil, nil, makeIPNet(t), "kubernetes")
+	storage, _, _ := NewTestREST(t, nil)
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
@@ -120,7 +128,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
+	storage, registry, _ := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
@@ -128,7 +136,6 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			Selector: map[string]string{"bar": "baz1"},
 		},
 	})
-	storage := NewStorage(registry, nil, nil, makeIPNet(t), "kubernetes")
 	updated_svc, created, err := storage.Update(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -158,7 +165,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
+	storage, registry, _ := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -166,7 +173,6 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			Selector: map[string]string{"bar": "baz"},
 		},
 	})
-	storage := NewStorage(registry, nil, nil, makeIPNet(t), "kubernetes")
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
@@ -200,10 +206,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 
 func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -231,12 +234,8 @@ func TestServiceRegistryExternalService(t *testing.T) {
 }
 
 func TestServiceRegistryExternalServiceError(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{
-		Err: fmt.Errorf("test error"),
-	}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
+	fakeCloud.Err = fmt.Errorf("test error")
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -259,10 +258,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 
 func TestServiceRegistryDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -283,10 +279,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -308,10 +301,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, _, fakeCloud := NewTestREST(t, nil)
 
 	// Create non-external load balancer.
 	svc1 := &api.Service{
@@ -352,10 +342,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 func TestServiceRegistryGet(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -373,11 +360,24 @@ func TestServiceRegistryGet(t *testing.T) {
 
 func TestServiceRegistryResourceLocation(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	registry.Endpoints = api.Endpoints{Endpoints: []api.Endpoint{{IP: "foo", Port: 80}}}
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	endpoints := &api.EndpointsList{
+		Items: []api.Endpoints{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: api.NamespaceDefault,
+				},
+				Endpoints: []api.Endpoint{
+					{
+						IP:   "100.100.100.100",
+						Port: 80,
+					},
+				},
+				Protocol: api.ProtocolTCP,
+			},
+		},
+	}
+	storage, registry, _ := NewTestREST(t, endpoints)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -392,26 +392,19 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	if location == nil {
 		t.Errorf("Unexpected nil: %v", location)
 	}
-	if e, a := "//foo:80", location.String(); e != a {
-		t.Errorf("Expected %v, but got %v", e, a)
-	}
-	if e, a := "foo", registry.GottenID; e != a {
+	if e, a := "//100.100.100.100:80", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
 	// Test error path
-	registry.Err = fmt.Errorf("fake error")
-	if _, _, err = redirector.ResourceLocation(ctx, "foo"); err == nil {
+	if _, _, err = redirector.ResourceLocation(ctx, "bar"); err == nil {
 		t.Errorf("unexpected nil error")
 	}
 }
 
 func TestServiceRegistryList(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	storage := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	storage, registry, fakeCloud := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
@@ -445,10 +438,7 @@ func TestServiceRegistryList(t *testing.T) {
 }
 
 func TestServiceRegistryIPAllocation(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	rest := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	rest, _, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc1 := &api.Service{
@@ -507,10 +497,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPReallocation(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	rest := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	rest, _, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc1 := &api.Service{
@@ -555,10 +542,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPUpdate(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	rest := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	rest, _, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -601,10 +585,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	rest := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	rest, _, fakeCloud := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -643,7 +624,9 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	rest1 := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
+	endpoints := &registrytest.EndpointRegistry{}
+	rest1 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
 	rest1.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -669,7 +652,8 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	rest1.Create(ctx, svc)
 
 	// This will reload from storage, finding the previous 2
-	rest2 := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	nodeRegistry = registrytest.NewMinionRegistry(machines, api.NodeResources{})
+	rest2 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
 	rest2.portalMgr.randomAttempts = 0
 
 	svc = &api.Service{
@@ -726,10 +710,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
-	machines := []string{"foo", "bar", "baz"}
-	rest := NewStorage(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t), "kubernetes")
+	rest, registry, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	test := resttest.New(t, rest, registry.SetError)

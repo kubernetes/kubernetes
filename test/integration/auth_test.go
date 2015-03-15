@@ -247,7 +247,7 @@ func getTestRequests() []struct {
 		{"PUT", "/api/v1beta1/endpoints/a" + timeoutFlag, aEndpoints, code200},
 		{"GET", "/api/v1beta1/endpoints", "", code200},
 		{"GET", "/api/v1beta1/endpoints/a", "", code200},
-		{"DELETE", "/api/v1beta1/endpoints/a" + timeoutFlag, "", code405},
+		{"DELETE", "/api/v1beta1/endpoints/a" + timeoutFlag, "", code200},
 
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200},

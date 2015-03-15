@@ -30,12 +30,10 @@ func NewServiceRegistry() *ServiceRegistry {
 }
 
 type ServiceRegistry struct {
-	mu            sync.Mutex
-	List          api.ServiceList
-	Service       *api.Service
-	Err           error
-	Endpoints     api.Endpoints
-	EndpointsList api.EndpointsList
+	mu      sync.Mutex
+	List    api.ServiceList
+	Service *api.Service
+	Err     error
 
 	DeletedID string
 	GottenID  string
@@ -109,36 +107,6 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api
 }
 
 func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return nil, r.Err
-}
-
-func (r *ServiceRegistry) ListEndpoints(ctx api.Context) (*api.EndpointsList, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return &r.EndpointsList, r.Err
-}
-
-func (r *ServiceRegistry) GetEndpoints(ctx api.Context, id string) (*api.Endpoints, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.GottenID = id
-	return &r.Endpoints, r.Err
-}
-
-func (r *ServiceRegistry) UpdateEndpoints(ctx api.Context, e *api.Endpoints) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.Endpoints = *e
-	return r.Err
-}
-
-func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

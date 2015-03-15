@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -43,12 +44,13 @@ type REST struct {
 	registry    Registry
 	cloud       cloudprovider.Interface
 	machines    minion.Registry
+	endpoints   endpoint.Registry
 	portalMgr   *ipAllocator
 	clusterName string
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet,
+func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, endpoints endpoint.Registry, portalNet *net.IPNet,
 	clusterName string) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
@@ -61,6 +63,7 @@ func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minio
 		registry:    registry,
 		cloud:       cloud,
 		machines:    machines,
+		endpoints:   endpoints,
 		portalMgr:   ipa,
 		clusterName: clusterName,
 	}
@@ -230,7 +233,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	eps, err := rs.registry.GetEndpoints(ctx, id)
+	eps, err := rs.endpoints.GetEndpoints(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}

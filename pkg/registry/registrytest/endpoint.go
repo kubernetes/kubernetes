@@ -91,3 +91,7 @@ func (e *EndpointRegistry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpo
 	e.Endpoints.Items = append(e.Endpoints.Items, *endpoints)
 	return nil
 }
+
+func (e *EndpointRegistry) DeleteEndpoints(ctx api.Context, name string) error {
+	return fmt.Errorf("unimplemented!")
+}
