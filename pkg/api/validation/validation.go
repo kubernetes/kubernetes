@@ -1000,7 +1000,26 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName).Prefix("metadata")...)
+	for i := range namespace.Spec.Finalizers {
+		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]))...)
+	}
 	return allErrs
+}
+
+// Validate finalizer names
+func validateFinalizerName(stringValue string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if !util.IsQualifiedName(stringValue) {
+		return append(allErrs, fmt.Errorf("finalizer name: %v, %v", stringValue, qualifiedNameErrorMsg))
+	}
+
+	if len(strings.Split(stringValue, "/")) == 1 {
+		if !api.IsStandardFinalizerName(stringValue) {
+			return append(allErrs, fmt.Errorf("finalizer name: %v is neither a standard finalizer name nor is it fully qualified", stringValue))
+		}
+	}
+
+	return errs.ValidationErrorList{}
 }
 
 // ValidateNamespaceUpdate tests to make sure a mamespace update can be applied.  Modifies oldNamespace.
@@ -1011,6 +1030,7 @@ func ValidateNamespaceUpdate(oldNamespace *api.Namespace, namespace *api.Namespa
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested
 	oldNamespace.ObjectMeta = namespace.ObjectMeta
+	oldNamespace.Spec.Finalizers = namespace.Spec.Finalizers
 
 	// TODO: Add a 'real' ValidationError type for this error and provide print actual diffs.
 	if !api.Semantic.DeepEqual(oldNamespace, namespace) {
@@ -1025,9 +1045,26 @@ func ValidateNamespaceUpdate(oldNamespace *api.Namespace, namespace *api.Namespa
 func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &newNamespace.ObjectMeta).Prefix("metadata")...)
-	if newNamespace.Status.Phase != oldNamespace.Status.Phase {
-		allErrs = append(allErrs, errs.NewFieldInvalid("status.phase", newNamespace.Status.Phase, "namespace phase cannot be changed directly"))
-	}
 	newNamespace.Spec = oldNamespace.Spec
+	newNamespace.Status.Finalizers = oldNamespace.Status.Finalizers
+	return allErrs
+}
+
+// ValidateNamespaceFinalizeUpdate tests to see if the update is legal for an end user to make. newNamespace is updated with fields
+// that cannot be changed.
+func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &newNamespace.ObjectMeta).Prefix("metadata")...)
+	newNamespace.Spec = oldNamespace.Spec
+	newNamespace.Status.Phase = oldNamespace.Status.Phase
+	specSet := util.NewStringSet()
+	for i := range newNamespace.Spec.Finalizers {
+		specSet.Insert(string(newNamespace.Spec.Finalizers[i]))
+	}
+	for i := range newNamespace.Status.Finalizers {
+		if !specSet.Has(string(newNamespace.Status.Finalizers[i])) {
+			allErrs = append(allErrs, fmt.Errorf("finalize update references a status.finalizer %v that was not declared on the spec.finalizer", newNamespace.Status.Finalizers[i]))
+		}
+	}
 	return allErrs
 }

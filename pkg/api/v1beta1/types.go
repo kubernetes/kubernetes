@@ -764,14 +764,25 @@ type MinionList struct {
 	Items   []Minion `json:"items" description:"list of nodes"`
 }
 
+type FinalizerName string
+
+// These are internal finalizers to Kubernetes, must be qualified name unless defined here
+const (
+	FinalizerKubernetes FinalizerName = "kubernetes"
+)
+
 // NamespaceSpec describes the attributes on a Namespace
 type NamespaceSpec struct {
+	// Finalizers is the list of named entities that must finalize the object
+	Finalizers []FinalizerName `json:"finalizers,omitempty" description:"finalizers are the list of entities that must finalize the object prior to its deletion`
 }
 
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
 	Phase NamespacePhase `json:"phase,omitempty" description:"phase is the current lifecycle phase of the namespace"`
+	// Finalizers is the list of Finalizer objects that have finalized the object
+	Finalizers []FinalizerName `json:"finalizers,omitempty" description:"finalizers are the list of entities that have finalized the object prior to its deletion`
 }
 
 type NamespacePhase string

@@ -97,6 +97,22 @@ func init() {
 				obj.Path = "/"
 			}
 		},
+		func(obj *NamespaceSpec) {
+			hasKubeFinalizer := false
+			for i := range obj.Finalizers {
+				if obj.Finalizers[i] == FinalizerKubernetes {
+					hasKubeFinalizer = true
+					break
+				}
+			}
+			if !hasKubeFinalizer {
+				if len(obj.Finalizers) == 0 {
+					obj.Finalizers = []FinalizerName{FinalizerKubernetes}
+				} else {
+					obj.Finalizers = append(obj.Finalizers, FinalizerKubernetes)
+				}
+			}
+		},
 		func(obj *NamespaceStatus) {
 			if obj.Phase == "" {
 				obj.Phase = NamespaceActive
