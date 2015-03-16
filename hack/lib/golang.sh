@@ -296,13 +296,13 @@ kube::golang::build_binaries() {
           if [[ ${GOOS} == "windows" ]]; then
             bin="${bin}.exe"
           fi
-          go build -o "${output_path}/${bin}" \
+          CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
               "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
               "${binary}"
         done
       else
-        go install "${goflags[@]:+${goflags[@]}}" \
+        CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
             -ldflags "${version_ldflags}" \
             "${binaries[@]}"
       fi
