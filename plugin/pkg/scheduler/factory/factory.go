@@ -41,23 +41,31 @@ type ConfigFactory struct {
 	Client *client.Client
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
-	// a means to list all scheduled pods
-	PodLister *cache.StoreToPodLister
+	// a means to list all known scheduled pods.
+	ScheduledPodLister *cache.StoreToPodLister
+	// a means to list all known scheduled pods and pods assumed to have been scheduled.
+	PodLister algorithm.PodLister
 	// a means to list all minions
 	NodeLister *cache.StoreToNodeLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
+
+	modeler scheduler.SystemModeler
 }
 
 // Initializes the factory.
 func NewConfigFactory(client *client.Client) *ConfigFactory {
-	return &ConfigFactory{
-		Client:        client,
-		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc),
-		PodLister:     &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		NodeLister:    &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ServiceLister: &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+	c := &ConfigFactory{
+		Client:             client,
+		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		ScheduledPodLister: &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		NodeLister:         &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:      &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
 	}
+	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
+	c.modeler = modeler
+	c.PodLister = modeler.PodLister()
+	return c
 }
 
 // Create creates a scheduler with the default algorithm provider.
@@ -118,7 +126,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
-	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.PodLister.Store, 0).Run()
+	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.ScheduledPodLister.Store, 0).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
@@ -148,6 +156,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	return &scheduler.Config{
+		Modeler:      f.modeler,
 		MinionLister: f.NodeLister,
 		Algorithm:    algo,
 		Binder:       &binder{f.Client},
