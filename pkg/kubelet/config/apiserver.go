@@ -23,7 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/golang/glog"
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
@@ -35,19 +34,14 @@ func NewSourceApiserver(client *client.Client, hostname string, updates chan<- i
 // newSourceApiserverFromLW holds creates a config source that watches an pulls from the apiserver.
 func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
 	send := func(objs []interface{}) {
-		var bpods []api.BoundPod
+		var pods []api.Pod
 		for _, o := range objs {
 			pod := o.(*api.Pod)
-			bpod := api.BoundPod{}
-			if err := api.Scheme.Convert(pod, &bpod); err != nil {
-				glog.Errorf("Unable to interpret Pod from apiserver as a BoundPod: %v: %+v", err, pod)
-				continue
-			}
-			// Make a dummy self link so that references to this bound pod will work.
-			bpod.SelfLink = "/api/v1beta1/boundPods/" + bpod.Name
-			bpods = append(bpods, bpod)
+			// Make a dummy self link so that references to this pod will work.
+			pod.SelfLink = "/api/v1beta1/pods/" + pod.Name
+			pods = append(pods, *pod)
 		}
-		updates <- kubelet.PodUpdate{bpods, kubelet.SET, kubelet.ApiserverSource}
+		updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.ApiserverSource}
 	}
 	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
 }

@@ -128,7 +128,7 @@ func TestRunOnce(t *testing.T) {
 		t: t,
 	}
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
-	results, err := kb.runOnce([]api.BoundPod{
+	results, err := kb.runOnce([]api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",

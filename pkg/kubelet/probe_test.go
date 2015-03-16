@@ -400,7 +400,7 @@ func TestProbeContainer(t *testing.T) {
 		} else {
 			kl = makeTestKubelet(test.expectedResult, nil)
 		}
-		result, err := kl.probeContainer(&api.BoundPod{}, api.PodStatus{}, test.testContainer, dc)
+		result, err := kl.probeContainer(&api.Pod{}, api.PodStatus{}, test.testContainer, dc)
 		if test.expectError && err == nil {
 			t.Error("Expected error but did no error was returned.")
 		}

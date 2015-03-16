@@ -666,7 +666,7 @@ type BoundPods struct {
 	Host string `json:"host" description:"name of a node that these pods were bound to"`
 
 	// Items is the list of all pods bound to a given host.
-	Items []BoundPod `json:"items" description:"list of all pods bound to a given host"`
+	Items []Pod `json:"items" description:"list of all pods bound to a given host"`
 }
 
 // ReplicationControllerSpec is the specification of a replication controller.

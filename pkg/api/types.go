@@ -1243,7 +1243,7 @@ type EventList struct {
 // ContainerManifest corresponds to the Container Manifest format, documented at:
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
 // This is used as the representation of Kubernetes workloads.
-// DEPRECATED: Replaced with BoundPod
+// DEPRECATED: Replaced with Pod
 type ContainerManifest struct {
 	// Required: This must be a supported version string, such as "v1beta1".
 	Version string `json:"version"`
@@ -1262,7 +1262,7 @@ type ContainerManifest struct {
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
-// DEPRECATED: Replaced with BoundPods
+// DEPRECATED: Replaced with Pods
 type ContainerManifestList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
@@ -1273,25 +1273,14 @@ type ContainerManifestList struct {
 // BoundPod is a collection of containers that should be run on a host. A BoundPod
 // defines how a Pod may change after a Binding is created. A Pod is a request to
 // execute a pod, whereas a BoundPod is the specification that would be run on a server.
+//
+// TODO(wojtek-t): Get rid of this type.
 type BoundPod struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty"`
-}
-
-// BoundPods is a list of Pods bound to a common server. The resource version of
-// the pod list is guaranteed to only change when the list of bound pods changes.
-type BoundPods struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
-
-	// Host is the name of a node that these pods were bound to.
-	Host string `json:"host"`
-
-	// Items is the list of all pods bound to a given host.
-	Items []BoundPod `json:"items"`
 }
 
 // List holds a list of objects, which may not be known by the server.

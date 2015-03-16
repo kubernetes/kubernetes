@@ -62,13 +62,13 @@ const (
 // functionally similar, this helps our unit tests properly check that the correct PodUpdates
 // are generated.
 type PodUpdate struct {
-	Pods   []api.BoundPod
+	Pods   []api.Pod
 	Op     PodOperation
 	Source string
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod across all config sources.
-func GetPodFullName(pod *api.BoundPod) string {
+func GetPodFullName(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
 	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)

@@ -33,7 +33,7 @@ const (
 )
 
 type RunPodResult struct {
-	Pod *api.BoundPod
+	Pod *api.Pod
 	Err error
 }
 
@@ -51,7 +51,7 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(pods []api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	if kl.dockerPuller == nil {
 		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
 	}
@@ -87,7 +87,7 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (resul
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
@@ -119,7 +119,7 @@ func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod api.BoundPod, dockerContainers dockertools.DockerContainers) (bool, error) {
+func (kl *Kubelet) isPodRunning(pod api.Pod, dockerContainers dockertools.DockerContainers) (bool, error) {
 	for _, container := range pod.Spec.Containers {
 		dockerContainer, found, _ := dockerContainers.FindPodContainer(GetPodFullName(&pod), pod.UID, container.Name)
 		if !found {

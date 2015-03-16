@@ -39,7 +39,7 @@ func expectEmptyChannel(t *testing.T, ch <-chan interface{}) {
 	}
 }
 
-type sortedPods []api.BoundPod
+type sortedPods []api.Pod
 
 func (s sortedPods) Len() int {
 	return len(s)
@@ -51,8 +51,8 @@ func (s sortedPods) Less(i, j int) bool {
 	return s[i].Namespace < s[j].Namespace
 }
 
-func CreateValidPod(name, namespace, source string) api.BoundPod {
-	return api.BoundPod{
+func CreateValidPod(name, namespace, source string) api.Pod {
+	return api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         types.UID(name), // for the purpose of testing, this is unique enough
 			Name:        name,
@@ -66,8 +66,8 @@ func CreateValidPod(name, namespace, source string) api.BoundPod {
 	}
 }
 
-func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...api.BoundPod) kubelet.PodUpdate {
-	newPods := make([]api.BoundPod, len(pods))
+func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...api.Pod) kubelet.PodUpdate {
+	newPods := make([]api.Pod, len(pods))
 	for i := range pods {
 		newPods[i] = pods[i]
 	}
@@ -160,7 +160,7 @@ func TestInvalidPodFiltered(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new", "test")))
 
 	// add an invalid update
-	podUpdate = CreatePodUpdate(kubelet.UPDATE, NoneSource, api.BoundPod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	podUpdate = CreatePodUpdate(kubelet.UPDATE, NoneSource, api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	channel <- podUpdate
 	expectNoPodUpdate(t, ch)
 }
@@ -219,7 +219,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
 
-	podUpdate = CreatePodUpdate(kubelet.REMOVE, NoneSource, api.BoundPod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "new"}})
+	podUpdate = CreatePodUpdate(kubelet.REMOVE, NoneSource, api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "new"}})
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.REMOVE, NoneSource, pod))
 }

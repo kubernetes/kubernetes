@@ -41,7 +41,7 @@ const maxProbeRetries = 3
 // probeContainer probes the liveness/readiness of the given container.
 // If the container's liveness probe is unsuccessful, set readiness to false.
 // If liveness is successful, do a readiness check and set readiness accordingly.
-func (kl *Kubelet) probeContainer(pod *api.BoundPod, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Result, error) {
+func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Result, error) {
 	// Probe liveness.
 	live, err := kl.probeContainerLiveness(pod, status, container, dockerContainer)
 	if err != nil {
@@ -78,7 +78,7 @@ func (kl *Kubelet) probeContainer(pod *api.BoundPod, status api.PodStatus, conta
 
 // probeContainerLiveness probes the liveness of a container.
 // If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (kl *Kubelet) probeContainerLiveness(pod *api.BoundPod, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Result, error) {
+func (kl *Kubelet) probeContainerLiveness(pod *api.Pod, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Result, error) {
 	p := container.LivenessProbe
 	if p == nil {
 		return probe.Success, nil
@@ -91,7 +91,7 @@ func (kl *Kubelet) probeContainerLiveness(pod *api.BoundPod, status api.PodStatu
 
 // probeContainerLiveness probes the readiness of a container.
 // If the initial delay on the readiness probe has not passed the probe will return probe.Failure.
-func (kl *Kubelet) probeContainerReadiness(pod *api.BoundPod, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Result, error) {
+func (kl *Kubelet) probeContainerReadiness(pod *api.Pod, status api.PodStatus, container api.Container, dockerContainer *docker.APIContainers) (probe.Result, error) {
 	p := container.ReadinessProbe
 	if p == nil {
 		return probe.Success, nil
@@ -104,7 +104,7 @@ func (kl *Kubelet) probeContainerReadiness(pod *api.BoundPod, status api.PodStat
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (kl *Kubelet) runProbeWithRetries(p *api.Probe, pod *api.BoundPod, status api.PodStatus, container api.Container, retires int) (probe.Result, error) {
+func (kl *Kubelet) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, retires int) (probe.Result, error) {
 	var err error
 	var result probe.Result
 	for i := 0; i < retires; i++ {
@@ -116,7 +116,7 @@ func (kl *Kubelet) runProbeWithRetries(p *api.Probe, pod *api.BoundPod, status a
 	return result, err
 }
 
-func (kl *Kubelet) runProbe(p *api.Probe, pod *api.BoundPod, status api.PodStatus, container api.Container) (probe.Result, error) {
+func (kl *Kubelet) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container) (probe.Result, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		return kl.prober.exec.Probe(kl.newExecInContainer(pod, container))
@@ -190,7 +190,7 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (kl *Kubelet) newExecInContainer(pod *api.BoundPod, container api.Container) exec.Cmd {
+func (kl *Kubelet) newExecInContainer(pod *api.Pod, container api.Container) exec.Cmd {
 	uid := pod.UID
 	podFullName := GetPodFullName(pod)
 	return execInContainer{func() ([]byte, error) {

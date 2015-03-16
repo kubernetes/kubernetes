@@ -84,8 +84,8 @@ type HostInterface interface {
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
 	GetMachineInfo() (*cadvisorApi.MachineInfo, error)
-	GetBoundPods() ([]api.BoundPod, error)
-	GetPodByName(namespace, name string) (*api.BoundPod, bool)
+	GetPods() ([]api.Pod, error)
+	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
@@ -117,7 +117,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
 	s.mux.HandleFunc("/api/v1beta1/nodeInfo", s.handleNodeInfoVersioned)
-	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
+	s.mux.HandleFunc("/pods", s.handlePods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
 }
@@ -258,17 +258,17 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// handleBoundPods returns a list of pod bound to the Kubelet and their spec
-func (s *Server) handleBoundPods(w http.ResponseWriter, req *http.Request) {
-	pods, err := s.host.GetBoundPods()
+// handlePods returns a list of pod bounds to the Kubelet and their spec
+func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
+	pods, err := s.host.GetPods()
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	boundPods := &api.BoundPods{
+	podList := &api.PodList{
 		Items: pods,
 	}
-	data, err := latest.Codec.Encode(boundPods)
+	data, err := latest.Codec.Encode(podList)
 	if err != nil {
 		s.error(w, err)
 		return

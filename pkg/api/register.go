@@ -44,7 +44,6 @@ func init() {
 		&ContainerManifest{},
 		&ContainerManifestList{},
 		&BoundPod{},
-		&BoundPods{},
 		&List{},
 		&LimitRange{},
 		&LimitRangeList{},
@@ -79,7 +78,6 @@ func (*EventList) IsAnAPIObject()                 {}
 func (*ContainerManifest) IsAnAPIObject()         {}
 func (*ContainerManifestList) IsAnAPIObject()     {}
 func (*BoundPod) IsAnAPIObject()                  {}
-func (*BoundPods) IsAnAPIObject()                 {}
 func (*List) IsAnAPIObject()                      {}
 func (*LimitRange) IsAnAPIObject()                {}
 func (*LimitRangeList) IsAnAPIObject()            {}
