@@ -28,7 +28,7 @@ import (
 	cadvisorFs "github.com/google/cadvisor/fs"
 	cadvisorHttp "github.com/google/cadvisor/http"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApi2 "github.com/google/cadvisor/info/v2"
+	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/storage/memory"
 	"github.com/google/cadvisor/utils/sysfs"
@@ -113,13 +113,13 @@ func (self *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return self.GetMachineInfo()
 }
 
-func (self *cadvisorClient) DockerImagesFsInfo() (cadvisorApi2.FsInfo, error) {
+func (self *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	res, err := self.GetFsInfo(cadvisorFs.LabelDockerImages)
 	if err != nil {
-		return cadvisorApi2.FsInfo{}, err
+		return cadvisorApiV2.FsInfo{}, err
 	}
 	if len(res) == 0 {
-		return cadvisorApi2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem containing Docker images")
+		return cadvisorApiV2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem containing Docker images")
 	}
 	// TODO(vmarmol): Handle this better when Docker has more than one image filesystem.
 	if len(res) > 1 {

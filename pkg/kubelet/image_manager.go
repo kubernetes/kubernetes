@@ -17,10 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -29,20 +31,25 @@ import (
 
 // Manages lifecycle of all images.
 //
-// Class is thread-safe.
+// Implementation is thread-safe.
 type imageManager interface {
-	// Starts the image manager.
-	Start() error
-
-	// Tries to free bytesToFree worth of images on the disk.
-	//
-	// Returns the number of bytes free and an error if any occured. The number of
-	// bytes freed is always returned.
-	// Note that error may be nil and the number of bytes free may be less
-	// than bytesToFree.
-	FreeSpace(bytesToFree int64) (int64, error)
+	// Applies the garbage collection policy. Errors include being unable to free
+	// enough space as per the garbage collection policy.
+	GarbageCollect() error
 
 	// TODO(vmarmol): Have this subsume pulls as well.
+}
+
+// A policy for garbage collecting images. Policy defines an allowed band in
+// which garbage collection will be run.
+type ImageGCPolicy struct {
+	// Any usage above this threshold will always trigger garbage collection.
+	// This is the highest usage we will allow.
+	HighThresholdPercent int
+
+	// Any usage below this threshold will never trigger garbage collection.
+	// This is the lowest threshold we will try to garbage collect to.
+	LowThresholdPercent int
 }
 
 type realImageManager struct {
@@ -50,10 +57,14 @@ type realImageManager struct {
 	dockerClient dockertools.DockerInterface
 
 	// Records of images and their use.
-	imageRecords map[string]*imageRecord
-
-	// Lock for imageRecords.
+	imageRecords     map[string]*imageRecord
 	imageRecordsLock sync.Mutex
+
+	// The image garbage collection policy in use.
+	policy ImageGCPolicy
+
+	// cAdvisor instance.
+	cadvisor cadvisor.Interface
 }
 
 // Information about the images we track.
@@ -68,14 +79,30 @@ type imageRecord struct {
 	size int64
 }
 
-func newImageManager(dockerClient dockertools.DockerInterface) imageManager {
-	return &realImageManager{
-		dockerClient: dockerClient,
-		imageRecords: make(map[string]*imageRecord),
+func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface cadvisor.Interface, policy ImageGCPolicy) (imageManager, error) {
+	// Validate policy.
+	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
+		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
 	}
+	if policy.LowThresholdPercent < 0 || policy.LowThresholdPercent > 100 {
+		return nil, fmt.Errorf("invalid LowThresholdPercent %d, must be in range [0-100]", policy.LowThresholdPercent)
+	}
+	im := &realImageManager{
+		dockerClient: dockerClient,
+		policy:       policy,
+		imageRecords: make(map[string]*imageRecord),
+		cadvisor:     cadvisorInterface,
+	}
+
+	err := im.start()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start image manager: %v", err)
+	}
+
+	return im, nil
 }
 
-func (self *realImageManager) Start() error {
+func (self *realImageManager) start() error {
 	// Initial detection make detected time "unknown" in the past.
 	var zero time.Time
 	err := self.detectImages(zero)
@@ -83,7 +110,7 @@ func (self *realImageManager) Start() error {
 		return err
 	}
 
-	util.Forever(func() {
+	go util.Forever(func() {
 		err := self.detectImages(time.Now())
 		if err != nil {
 			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
@@ -144,7 +171,40 @@ func (self *realImageManager) detectImages(detected time.Time) error {
 	return nil
 }
 
-func (self *realImageManager) FreeSpace(bytesToFree int64) (int64, error) {
+func (self *realImageManager) GarbageCollect() error {
+	// Get disk usage on disk holding images.
+	fsInfo, err := self.cadvisor.DockerImagesFsInfo()
+	if err != nil {
+		return err
+	}
+	usage := int64(fsInfo.Usage)
+	capacity := int64(fsInfo.Capacity)
+	usagePercent := int(usage * 100 / capacity)
+
+	// If over the max threshold, free enough to place us at the lower threshold.
+	if usagePercent >= self.policy.HighThresholdPercent {
+		amountToFree := usage - (int64(self.policy.LowThresholdPercent) * capacity / 100)
+		freed, err := self.freeSpace(amountToFree)
+		if err != nil {
+			return err
+		}
+
+		if freed < amountToFree {
+			// TODO(vmarmol): Surface event.
+			return fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
+		}
+	}
+
+	return nil
+}
+
+// Tries to free bytesToFree worth of images on the disk.
+//
+// Returns the number of bytes free and an error if any occured. The number of
+// bytes freed is always returned.
+// Note that error may be nil and the number of bytes free may be less
+// than bytesToFree.
+func (self *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 	startTime := time.Now()
 	err := self.detectImages(startTime)
 	if err != nil {

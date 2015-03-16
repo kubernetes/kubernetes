@@ -18,7 +18,7 @@ package cadvisor
 
 import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
-	cadvisorApi2 "github.com/google/cadvisor/info/v2"
+	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -46,7 +46,7 @@ func (c *Mock) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return args.Get(0).(*cadvisorApi.MachineInfo), args.Error(1)
 }
 
-func (c *Mock) DockerImagesFsInfo() (cadvisorApi2.FsInfo, error) {
+func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	args := c.Called()
-	return args.Get(0).(cadvisorApi2.FsInfo), args.Error(1)
+	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
 }
