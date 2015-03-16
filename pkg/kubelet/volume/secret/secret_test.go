@@ -27,16 +27,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
-func newTestHost(t *testing.T, fakeKubeClient client.Interface) volume.Host {
+func newTestHost(t *testing.T, client client.Interface) volume.Host {
 	tempDir, err := ioutil.TempDir("/tmp", "secret_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return &volume.FakeHost{tempDir, fakeKubeClient}
+	return volume.NewFakeHost(tempDir, client, empty_dir.ProbeVolumePluginsWithMounter(&mount.FakeMounter{}))
 }
 
 func TestCanSupport(t *testing.T) {

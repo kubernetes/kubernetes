@@ -165,13 +165,18 @@ func detachDiskLogError(pd *gcePersistentDisk) {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (pd *gcePersistentDisk) SetUp() error {
+	return pd.SetUpAt(pd.GetPath())
+}
+
+// SetUpAt attaches the disk and bind mounts to the volume path.
+func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 	if pd.legacyMode {
 		return fmt.Errorf("legacy mode: can not create new instances")
 	}
 
 	// TODO: handle failed mounts here.
-	mountpoint, err := mount.IsMountPoint(pd.GetPath())
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", pd.GetPath(), mountpoint, err)
+	mountpoint, err := mount.IsMountPoint(dir)
+	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -189,38 +194,37 @@ func (pd *gcePersistentDisk) SetUp() error {
 		flags = mount.FlagReadOnly
 	}
 
-	volPath := pd.GetPath()
-	if err := os.MkdirAll(volPath, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(pd)
 		return err
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	err = pd.mounter.Mount(globalPDPath, pd.GetPath(), "", mount.FlagBind|flags, "")
+	err = pd.mounter.Mount(globalPDPath, dir, "", mount.FlagBind|flags, "")
 	if err != nil {
-		mountpoint, mntErr := mount.IsMountPoint(pd.GetPath())
+		mountpoint, mntErr := mount.IsMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("isMountpoint check failed: %v", mntErr)
 			return err
 		}
 		if mountpoint {
-			if mntErr = pd.mounter.Unmount(pd.GetPath(), 0); mntErr != nil {
+			if mntErr = pd.mounter.Unmount(dir, 0); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := mount.IsMountPoint(pd.GetPath())
+			mountpoint, mntErr := mount.IsMountPoint(dir)
 			if mntErr != nil {
 				glog.Errorf("isMountpoint check failed: %v", mntErr)
 				return err
 			}
 			if mountpoint {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", pd.GetPath())
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}
-		os.Remove(pd.GetPath())
+		os.Remove(dir)
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(pd)
 		return err
@@ -244,20 +248,26 @@ func (pd *gcePersistentDisk) GetPath() string {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *gcePersistentDisk) TearDown() error {
-	mountpoint, err := mount.IsMountPoint(pd.GetPath())
+	return pd.TearDownAt(pd.GetPath())
+}
+
+// Unmounts the bind mount, and detaches the disk only if the PD
+// resource was the last reference to that disk on the kubelet.
+func (pd *gcePersistentDisk) TearDownAt(dir string) error {
+	mountpoint, err := mount.IsMountPoint(dir)
 	if err != nil {
 		return err
 	}
 	if !mountpoint {
-		return os.Remove(pd.GetPath())
+		return os.Remove(dir)
 	}
 
-	refs, err := mount.GetMountRefs(pd.mounter, pd.GetPath())
+	refs, err := mount.GetMountRefs(pd.mounter, dir)
 	if err != nil {
 		return err
 	}
 	// Unmount the bind-mount inside this pod
-	if err := pd.mounter.Unmount(pd.GetPath(), 0); err != nil {
+	if err := pd.mounter.Unmount(dir, 0); err != nil {
 		return err
 	}
 	// If len(refs) is 1, then all bind mounts have been removed, and the
@@ -269,13 +279,13 @@ func (pd *gcePersistentDisk) TearDown() error {
 			return err
 		}
 	}
-	mountpoint, mntErr := mount.IsMountPoint(pd.GetPath())
+	mountpoint, mntErr := mount.IsMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("isMountpoint check failed: %v", mntErr)
 		return err
 	}
 	if !mountpoint {
-		if err := os.Remove(pd.GetPath()); err != nil {
+		if err := os.Remove(dir); err != nil {
 			return err
 		}
 	}
