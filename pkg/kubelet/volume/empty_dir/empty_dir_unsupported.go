@@ -18,9 +18,9 @@ limitations under the License.
 
 package empty_dir
 
-// realMediumer pretends to implement mediumer.
-type realMediumer struct{}
+// realMountDetector pretends to implement mediumer.
+type realMountDetector struct{}
 
-func (m *realMediumer) GetMedium(path string) (storageMedium, error) {
-	return mediumUnknown, nil
+func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
+	return mediumUnknown, false, nil
 }

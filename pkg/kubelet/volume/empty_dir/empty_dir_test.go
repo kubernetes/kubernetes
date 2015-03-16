@@ -56,12 +56,13 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-type fakeMediumer struct {
-	typeToReturn storageMedium
+type fakeMountDetector struct {
+	medium  storageMedium
+	isMount bool
 }
 
-func (fake *fakeMediumer) GetMedium(path string) (storageMedium, error) {
-	return fake.typeToReturn, nil
+func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
+	return fake.medium, fake.isMount, nil
 }
 
 func TestPlugin(t *testing.T) {
@@ -72,8 +73,8 @@ func TestPlugin(t *testing.T) {
 		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeDefault}},
 	}
 	mounter := mount.FakeMounter{}
-	mediumer := fakeMediumer{}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mediumer)
+	mountDetector := fakeMountDetector{}
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -101,7 +102,7 @@ func TestPlugin(t *testing.T) {
 	}
 	mounter.ResetLog()
 
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMediumer{})
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMountDetector{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -131,8 +132,8 @@ func TestPluginTmpfs(t *testing.T) {
 		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
 	}
 	mounter := mount.FakeMounter{}
-	mediumer := fakeMediumer{}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mediumer)
+	mountDetector := fakeMountDetector{}
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestPluginTmpfs(t *testing.T) {
 	}
 	mounter.ResetLog()
 
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMediumer{mediumMemory})
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mounter, &fakeMountDetector{mediumMemory, true})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -181,7 +182,7 @@ func TestPluginTmpfs(t *testing.T) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
 	if len(mounter.Log) != 1 {
-		t.Errorf("Expected 1 mounter call, got %#v", mounter.Log)
+		t.Errorf("Expected 1 mounter call, got %d (%v)", len(mounter.Log), mounter.Log)
 	} else {
 		if mounter.Log[0].Action != mount.FakeActionUnmount {
 			t.Errorf("Unexpected mounter action: %#v", mounter.Log[0])
@@ -221,11 +222,11 @@ func TestPluginLegacy(t *testing.T) {
 	}
 
 	spec := api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}
-	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(&spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMediumer{}); err == nil {
+	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(&spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMountDetector{}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mount.FakeMounter{}, &fakeMediumer{})
+	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal("vol1", types.UID("poduid"), &mount.FakeMounter{}, &fakeMountDetector{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

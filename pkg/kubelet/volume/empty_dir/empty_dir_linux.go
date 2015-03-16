@@ -19,21 +19,27 @@ package empty_dir
 import (
 	"fmt"
 	"syscall"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.
 const linuxTmpfsMagic = 0x01021994
 
-// realMediumer implements mediumer in terms of syscalls.
-type realMediumer struct{}
+// realMountDetector implements mountDetector in terms of syscalls.
+type realMountDetector struct{}
 
-func (m *realMediumer) GetMedium(path string) (storageMedium, error) {
+func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
+	isMnt, err := mount.IsMountPoint(path)
+	if err != nil {
+		return 0, false, fmt.Errorf("IsMountPoint(%q): %v", path, err)
+	}
 	buf := syscall.Statfs_t{}
 	if err := syscall.Statfs(path, &buf); err != nil {
-		return 0, fmt.Errorf("statfs(%q): %v", path, err)
+		return 0, false, fmt.Errorf("statfs(%q): %v", path, err)
 	}
 	if buf.Type == linuxTmpfsMagic {
-		return mediumMemory, nil
+		return mediumMemory, isMnt, nil
 	}
-	return mediumUnknown, nil
+	return mediumUnknown, isMnt, nil
 }
