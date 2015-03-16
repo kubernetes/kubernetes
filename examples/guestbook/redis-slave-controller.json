@@ -13,7 +13,6 @@
            "containers": [{
              "name": "redis-slave",
              "image": "kubernetes/redis-slave:v2",
-             "cpu": 200,
              "ports": [{"containerPort": 6379}]
            }]
          }

@@ -42,7 +42,6 @@ Note that, although the redis server runs just with a single replica, we use rep
           "containers": [{
             "name": "redis-master",
             "image": "dockerfile/redis",
-            "cpu": 100,
             "ports": [{
               "containerPort": 6379,   # containerPort: Where traffic to redis ultimately is routed to.
             }]
@@ -162,7 +161,6 @@ Use the file `examples/guestbook/redis-slave-controller.json`, which looks like 
            "containers": [{
              "name": "redis-slave",
              "image": "kubernetes/redis-slave:v2",
-             "cpu": 200,
              "ports": [{"containerPort": 6379}]
            }]
          }
@@ -268,8 +266,6 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
            "containers": [{
              "name": "php-redis",
              "image": "kubernetes/example-guestbook-php-redis:v2",
-             "cpu": 100,
-             "memory": 50000000,
              "ports": [{"name": "http-server", "containerPort": 80}]
            }]
          }
