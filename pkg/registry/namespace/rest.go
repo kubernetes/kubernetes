@@ -78,6 +78,16 @@ func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.Va
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
+type namespaceFinalizeStrategy struct {
+	namespaceStrategy
+}
+
+var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
+
+func (namespaceFinalizeStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+}
+
 // MatchNamespace returns a generic matcher for a given label and field selector.
 func MatchNamespace(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {

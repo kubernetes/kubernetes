@@ -76,3 +76,10 @@ var standardResources = util.NewStringSet(
 func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)
 }
+
+var standardFinalizers = util.NewStringSet(
+	string(FinalizerKubernetes))
+
+func IsStandardFinalizerName(str string) bool {
+	return standardFinalizers.Has(str)
+}

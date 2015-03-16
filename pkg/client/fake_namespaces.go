@@ -28,7 +28,7 @@ type FakeNamespaces struct {
 	Fake *Fake
 }
 
-func (c *FakeNamespaces) List(selector labels.Selector) (*api.NamespaceList, error) {
+func (c *FakeNamespaces) List(labels, fields labels.Selector) (*api.NamespaceList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-namespaces"})
 	return api.Scheme.CopyOrDie(&c.Fake.NamespacesList).(*api.NamespaceList), nil
 }
@@ -50,6 +50,11 @@ func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error
 
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-namespace", Value: namespace.Name})
+	return &api.Namespace{}, nil
+}
+
+func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "finalize-namespace", Value: namespace.Name})
 	return &api.Namespace{}, nil
 }
 

@@ -934,12 +934,23 @@ type NodeList struct {
 
 // NamespaceSpec describes the attributes on a Namespace
 type NamespaceSpec struct {
+	// Finalizers is a list of named finalize actions that must complete prior to namespace deletion.
+	Finalizers []FinalizerName
 }
+
+type FinalizerName string
+
+// These are internal finalizers to Kubernetes, must be qualified name unless defined here
+const (
+	FinalizerKubernetes FinalizerName = "kubernetes"
+)
 
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
 	Phase NamespacePhase `json:"phase,omitempty"`
+	// Finalizers is the list of named finalize actions that have completed
+	Finalizers []FinalizerName `json:"finalizers"`
 }
 
 type NamespacePhase string
