@@ -271,25 +271,29 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.S
 	return &serverList[0], nil
 }
 
-func firstAddr(netblob interface{}) string {
+func findAddrs(netblob interface{}) []string {
 	// Run-time types for the win :(
+	ret := []string{}
 	list, ok := netblob.([]interface{})
-	if !ok || len(list) < 1 {
-		return ""
-	}
-	props, ok := list[0].(map[string]interface{})
 	if !ok {
-		return ""
+		return ret
 	}
-	tmp, ok := props["addr"]
-	if !ok {
-		return ""
+	for _, item := range list {
+		props, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		tmp, ok := props["addr"]
+		if !ok {
+			continue
+		}
+		addr, ok := tmp.(string)
+		if !ok {
+			continue
+		}
+		ret = append(ret, addr)
 	}
-	addr, ok := tmp.(string)
-	if !ok {
-		return ""
-	}
-	return addr
+	return ret
 }
 
 func getAddressByName(api *gophercloud.ServiceClient, name string) (string, error) {
@@ -300,10 +304,14 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 
 	var s string
 	if s == "" {
-		s = firstAddr(srv.Addresses["private"])
+		if tmp := findAddrs(srv.Addresses["private"]); len(tmp) >= 1 {
+			s = tmp[0]
+		}
 	}
 	if s == "" {
-		s = firstAddr(srv.Addresses["public"])
+		if tmp := findAddrs(srv.Addresses["public"]); len(tmp) >= 1 {
+			s = tmp[0]
+		}
 	}
 	if s == "" {
 		s = srv.AccessIPv4
@@ -320,15 +328,41 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
-	ip, err := getAddressByName(i.compute, name)
+	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(4).Infof("NodeAddresses(%v) => %v", name, ip)
+	addrs := []api.NodeAddress{}
 
-	// net.ParseIP().String() is to maintain compatibility with the old code
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
+	for _, addr := range findAddrs(srv.Addresses["private"]) {
+		addrs = append(addrs, api.NodeAddress{
+			Type:    api.NodeInternalIP,
+			Address: addr,
+		})
+	}
+
+	for _, addr := range findAddrs(srv.Addresses["public"]) {
+		addrs = append(addrs, api.NodeAddress{
+			Type:    api.NodeExternalIP,
+			Address: addr,
+		})
+	}
+
+	// AccessIPs are usually duplicates of "public" addresses.
+	api.AddToNodeAddresses(&addrs,
+		api.NodeAddress{
+			Type:    api.NodeExternalIP,
+			Address: srv.AccessIPv6,
+		},
+		api.NodeAddress{
+			Type:    api.NodeExternalIP,
+			Address: srv.AccessIPv4,
+		},
+	)
+
+	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+	return addrs, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
