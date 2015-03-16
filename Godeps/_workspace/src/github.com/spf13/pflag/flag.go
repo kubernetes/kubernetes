@@ -498,7 +498,6 @@ func (f *FlagSet) parseShortArg(s string, args []string) (a []string, err error)
 			if len(args) == 0 {
 				return
 			}
-			return
 		}
 		if alreadythere {
 			if bv, ok := flag.Value.(boolFlag); ok && bv.IsBoolFlag() {
@@ -551,9 +550,6 @@ func (f *FlagSet) parseArgs(args []string) (err error) {
 			}
 		} else {
 			args, err = f.parseShortArg(s, args)
-		}
-		if err != nil {
-		   return
 		}
 	}
 	return

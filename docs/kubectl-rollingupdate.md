@@ -29,7 +29,6 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
 
 ```
   -f, --filename="": Filename or URL to file to use to create the new controller.
-  -h, --help=false: help for rollingupdate
       --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --timeout="5m0s": Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --update-period="1m0s": Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
@@ -46,6 +45,7 @@ $ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
