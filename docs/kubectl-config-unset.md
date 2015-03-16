@@ -12,12 +12,6 @@ PROPERTY_NAME is a dot delimited name where each token represents either a attri
 kubectl config unset PROPERTY_NAME
 ```
 
-### Options
-
-```
-  -h, --help=false: help for unset
-```
-
 ### Options inherrited from parent commands
 
 ```
@@ -31,6 +25,7 @@ kubectl config unset PROPERTY_NAME
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
