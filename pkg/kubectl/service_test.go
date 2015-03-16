@@ -78,6 +78,34 @@ func TestGenerateService(t *testing.T) {
 		{
 			params: map[string]string{
 				"selector":       "foo=bar,baz=blah",
+				"labels":         "key1=value1,key2=value2",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "TCP",
+				"container-port": "1234",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						"key1": "value1",
+						"key2": "value2",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Port:          80,
+					Protocol:      "TCP",
+					ContainerPort: util.NewIntOrStringFromInt(1234),
+				},
+			},
+		},
+		{
+			params: map[string]string{
+				"selector":       "foo=bar,baz=blah",
 				"name":           "test",
 				"port":           "80",
 				"protocol":       "UDP",
