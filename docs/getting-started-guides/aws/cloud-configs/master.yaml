@@ -111,8 +111,10 @@ coreos:
         - name: 51-docker-mirror.conf
           content: |
             [Unit]
-            Requires=docker-cache.service
-            After=docker-cache.service
+            # making sure that docker-cache is up and that flanneld finished
+            # startup, otherwise containers won't land in flannel's network...
+            Requires=docker-cache.service flanneld.service
+            After=docker-cache.service flanneld.service
             [Service]
             Environment=DOCKER_OPTS='--registry-mirror=http://$private_ipv4:5000'
     - name: kube-apiserver.service

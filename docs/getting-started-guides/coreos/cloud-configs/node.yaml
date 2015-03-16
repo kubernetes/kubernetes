@@ -29,6 +29,11 @@ coreos:
       drop-ins:
         - name: 51-docker-mirror.conf
           content: |
+            [Unit]
+            # making sure that flanneld finished startup, otherwise containers
+            # won't land in flannel's network...
+            Requires=flanneld.service
+            After=flanneld.service
             [Service]
             Environment=DOCKER_OPTS='--registry-mirror=http://<master-private-ip>:5000'
     - name: setup-network-environment.service
