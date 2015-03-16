@@ -20,7 +20,7 @@ If a PR has gone 2 work days without an owner emerging, please poke the PR threa
 
 Except for rare cases, such as trivial changes (e.g. typos, comments) or emergencies (e.g. broken builds), maintainers should not merge their own changes.
 
-Expect reviewers to request that you avoid [common go style mistakes](https://code.google.com/p/go-wiki/wiki/CodeReviewComments) in your PRs.
+Expect reviewers to request that you avoid [common go style mistakes](https://github.com/golang/go/wiki/CodeReviewComments) in your PRs.
 
 ## Assigned reviews
 
