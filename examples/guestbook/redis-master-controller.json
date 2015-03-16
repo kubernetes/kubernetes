@@ -13,7 +13,6 @@
           "containers": [{
             "name": "redis-master",
             "image": "dockerfile/redis",
-            "cpu": 100,
             "ports": [{"containerPort": 6379}]
           }]
         }
