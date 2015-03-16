@@ -60,7 +60,7 @@ if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   exit 0
 fi
 
-release=v0.10.1
+release=v0.11.0
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
