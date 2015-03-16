@@ -67,6 +67,21 @@ Everything in `build/build-image/` is meant to be run inside of the container.  
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
+## Proxy Settings
+
+
+If you are behind a proxy, you need to edit `build/build-image/Dockerfile` and add proxy settings to execute command in that container correctly.
+
+example:
+
+`ENV http_proxy http://username:password@proxyaddr:proxyport`
+
+`ENV https_proxy http://username:password@proxyaddr:proxyport`
+
+Besides, to avoid integration test touch the proxy while connecting to local etcd service, you need to set
+
+`ENV no_proxy 127.0.0.1`
+
 ## TODOs
 
 These are in no particular order
