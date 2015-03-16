@@ -32,22 +32,18 @@ import (
 )
 
 const (
-	nautilusImage       = "kubernetes/update-demo:nautilus"
-	kittenImage         = "kubernetes/update-demo:kitten"
-	updateDemoSelector  = "name=update-demo"
-	updateDemoContainer = "update-demo"
-	kubectlProxyPort    = 8011
+	nautilusImage            = "kubernetes/update-demo:nautilus"
+	kittenImage              = "kubernetes/update-demo:kitten"
+	updateDemoSelector       = "name=update-demo"
+	updateDemoContainer      = "update-demo"
+	frontendSelector         = "name=frontend"
+	redisMasterSelector      = "name=redis-master"
+	redisSlaveSelector       = "name=redis-slave"
+	kubectlProxyPort         = 8011
+	guestbookResponseTimeout = 10 * time.Minute
 )
 
 var _ = Describe("kubectl", func() {
-
-	// Constants.
-	var (
-		updateDemoRoot = filepath.Join(testContext.repoRoot, "examples/update-demo/v1beta1")
-		nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
-		kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
-	)
-
 	var c *client.Client
 
 	BeforeEach(func() {
@@ -56,49 +52,124 @@ var _ = Describe("kubectl", func() {
 		expectNoError(err)
 	})
 
-	It("should create and stop a replication controller", func() {
-		defer cleanup(nautilusPath)
+	Describe("update-demo", func() {
+		var (
+			updateDemoRoot = filepath.Join(testContext.repoRoot, "examples/update-demo/v1beta1")
+			nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
+			kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
+		)
 
-		By("creating a replication controller")
-		runKubectl("create", "-f", nautilusPath)
-		validateController(c, nautilusImage, 2)
+		It("should create and stop a replication controller", func() {
+			defer cleanup(nautilusPath, updateDemoSelector)
+
+			By("creating a replication controller")
+			runKubectl("create", "-f", nautilusPath)
+			validateController(c, nautilusImage, 2)
+		})
+
+		It("should scale a replication controller", func() {
+			defer cleanup(nautilusPath, updateDemoSelector)
+
+			By("creating a replication controller")
+			runKubectl("create", "-f", nautilusPath)
+			validateController(c, nautilusImage, 2)
+			By("scaling down the replication controller")
+			runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=1")
+			validateController(c, nautilusImage, 1)
+			By("scaling up the replication controller")
+			runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=2")
+			validateController(c, nautilusImage, 2)
+		})
+
+		It("should do a rolling update of a replication controller", func() {
+			// Cleanup all resources in case we fail somewhere in the middle
+			defer cleanup(updateDemoRoot, updateDemoSelector)
+
+			By("creating the initial replication controller")
+			runKubectl("create", "-f", nautilusPath)
+			validateController(c, nautilusImage, 2)
+			By("rollingupdate to new replication controller")
+			runKubectl("rollingupdate", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath)
+			validateController(c, kittenImage, 2)
+		})
 	})
 
-	It("should scale a replication controller", func() {
-		defer cleanup(nautilusPath)
+	Describe("guestbook", func() {
+		var guestbookPath = filepath.Join(testContext.repoRoot, "examples/guestbook")
 
-		By("creating a replication controller")
-		runKubectl("create", "-f", nautilusPath)
-		validateController(c, nautilusImage, 2)
-		By("scaling down the replication controller")
-		runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=1")
-		validateController(c, nautilusImage, 1)
-		By("scaling up the replication controller")
-		runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=2")
-		validateController(c, nautilusImage, 2)
-	})
+		It("should create and stop a working application", func() {
+			defer cleanup(guestbookPath, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
-	It("should do a rolling update of a replication controller", func() {
-		// Cleanup all resources in case we fail somewhere in the middle
-		defer cleanup(updateDemoRoot)
+			By("creating all guestbook components")
+			runKubectl("create", "-f", guestbookPath)
 
-		By("creating the initial replication controller")
-		runKubectl("create", "-f", nautilusPath)
-		validateController(c, nautilusImage, 2)
-		By("rollingupdate to new replication controller")
-		runKubectl("rollingupdate", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath)
-		validateController(c, kittenImage, 2)
+			By("validating guestbook app")
+			validateGuestbookApp(c)
+		})
 	})
 
 })
 
-func cleanup(filePath string) {
+func validateGuestbookApp(c *client.Client) {
+	// Wait for frontend to serve content.
+	serving := false
+	for start := time.Now(); time.Since(start) < guestbookResponseTimeout; time.Sleep(5 * time.Second) {
+		entry, err := makeRequestToGuestbook(c, "get", "")
+		if err == nil && entry == `{"data": ""}` {
+			serving = true
+			break
+		}
+	}
+	if !serving {
+		Failf("Frontend service did not start serving content in %v seconds", guestbookResponseTimeout.Seconds())
+	}
+
+	// Try to add a new entry to the guestbook.
+	added := false
+	for start := time.Now(); time.Since(start) < guestbookResponseTimeout; time.Sleep(5 * time.Second) {
+		result, err := makeRequestToGuestbook(c, "set", "TestEntry")
+		if err == nil && result == `{"message": "Updated"}` {
+			added = true
+			break
+		}
+	}
+	if !added {
+		Failf("Cannot added new entry in %v seconds", guestbookResponseTimeout.Seconds())
+	}
+
+	// Verify that entry is correctly added to the guestbook.
+	entry, err := makeRequestToGuestbook(c, "get", "")
+	if err != nil {
+		Failf("Request to the guestbook failed with: %v", err)
+	}
+	if entry != `{"data": "TestEntry"}` {
+		Failf("Wrong entry received: %v", entry)
+	}
+}
+
+func makeRequestToGuestbook(c *client.Client, cmd, value string) (string, error) {
+	result, err := c.Get().
+		Prefix("proxy").
+		Resource("services").
+		Name("frontend").
+		Suffix("/index.php").
+		Param("cmd", cmd).
+		Param("key", "messages").
+		Param("value", value).
+		Do().
+		Raw()
+	return string(result), err
+}
+
+func cleanup(filePath string, selectors ...string) {
 	By("using stop to clean up resources")
 	runKubectl("stop", "-f", filePath)
 
-	resources := runKubectl("get", "pods,rc", "-l", updateDemoSelector, "--no-headers")
-	if resources != "" {
-		Failf("Resources left running after stop:\n%s", resources)
+	for _, selector := range selectors {
+		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers")
+		if resources != "" {
+			Failf("Resources left running after stop:\n%s", resources)
+		}
 	}
 }
 
@@ -158,7 +229,7 @@ func validateController(c *client.Client, image string, replicas int) {
 			return
 		}
 	}
-	Failf("Timed out after %d seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), updateDemoSelector)
+	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), updateDemoSelector)
 }
 
 type updateDemoData struct {
