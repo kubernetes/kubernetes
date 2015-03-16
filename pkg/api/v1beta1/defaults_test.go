@@ -121,4 +121,17 @@ func TestSetDefaultNamespace(t *testing.T) {
 	if s2.Status.Phase != current.NamespaceActive {
 		t.Errorf("Expected phase %v, got %v", current.NamespaceActive, s2.Status.Phase)
 	}
+	if len(s2.Spec.Finalizers) == 0 {
+		t.Errorf("Expected kubernetes finalizer")
+	}
+	hasKubeFinalizer := false
+	for i := range s2.Spec.Finalizers {
+		if s2.Spec.Finalizers[i] == current.FinalizerKubernetes {
+			hasKubeFinalizer = true
+			break
+		}
+	}
+	if !hasKubeFinalizer {
+		t.Errorf("Expected kubernetes finalizer %v, got %v", current.FinalizerKubernetes, s2.Spec.Finalizers)
+	}
 }
