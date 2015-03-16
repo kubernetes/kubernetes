@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -70,30 +71,27 @@ func validateObject(obj runtime.Object) (errors []error) {
 }
 
 func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error {
-	err := filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
 		if info.IsDir() && path != inDir {
 			return filepath.SkipDir
 		}
-		name := filepath.Base(path)
-		ext := filepath.Ext(name)
-		if ext != "" {
-			name = name[:len(name)-len(ext)]
+
+		file := filepath.Base(path)
+		if ext := filepath.Ext(file); ext == ".json" || ext == ".yaml" {
+			glog.Infof("Testing %s", path)
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			name := strings.TrimSuffix(file, ext)
+			fn(name, path, data)
 		}
-		if !(ext == ".json" || ext == ".yaml") {
-			return nil
-		}
-		glog.Infof("Testing %s", path)
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		fn(name, path, data)
 		return nil
 	})
-	return err
 }
 
 func TestExampleObjectSchemas(t *testing.T) {
