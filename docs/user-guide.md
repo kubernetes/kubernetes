@@ -43,6 +43,9 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Kubectl Command Line Interface** ([kubectl.md](kubectl.md)):
   The `kubectl` command line reference.
 
+* **Sharing Cluster Access** ([sharing-clusters.md](sharing-clusters.md)):
+  How to share client credentials for a kubernetes cluster.
+
 * **Roadmap** ([roadmap.md](roadmap.md)): The set of supported use cases, features,
   docs, and patterns that are required before Kubernetes 1.0.
 
