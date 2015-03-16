@@ -378,10 +378,10 @@ func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
 	return nil, nil
 }
 
-//chooseHostInterfaceNativeGo is a method used fetch an IP for a daemon.
+//chooseHostInterfaceNativeGo is a method used to fetch an IP for a daemon.
 //It iterates over the interfaces returned by Interfaces() method
 //and picks the first interface which is not Loopback.
-//For a node with no internet connection ,it returns error
+//This method may pick docker or other bridges
 func chooseHostInterfaceNativeGo(nw networkInterfacer) (net.IP, error) {
 	intfs, err := nw.Interfaces()
 	if err != nil {
@@ -407,7 +407,7 @@ func chooseHostInterfaceNativeGo(nw networkInterfacer) (net.IP, error) {
 //For a multi n/w interface node it returns the IP of the interface with gateway on it.
 func ChooseHostInterface() (net.IP, error) {
 	var nw networkInterfacer = networkInterface{}
-	inFile, err := os.Open("/proc/net/route1")
+	inFile, err := os.Open("/proc/net/route")
 	if err != nil {
 		if os.IsNotExist(err) {
 			return chooseHostInterfaceNativeGo(nw)
