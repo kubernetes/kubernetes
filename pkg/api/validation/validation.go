@@ -814,26 +814,6 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 	return allErrs
 }
 
-// ValidateBoundPod tests if required fields on a bound pod are set.
-// TODO: to be removed.
-func ValidateBoundPod(pod *api.BoundPod) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
-	if len(pod.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
-	} else {
-		if ok, qualifier := nameIsDNSSubdomain(pod.Name, false); !ok {
-			allErrs = append(allErrs, errs.NewFieldInvalid("name", pod.Name, qualifier))
-		}
-	}
-	if len(pod.Namespace) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("namespace", pod.Namespace))
-	} else if !util.IsDNSSubdomain(pod.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace, dnsSubdomainErrorMsg))
-	}
-	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
-	return allErrs
-}
-
 // ValidateMinion tests if required fields in the node are set.
 func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}

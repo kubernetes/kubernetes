@@ -448,18 +448,6 @@ func init() {
 			return nil
 		},
 
-		func(in *newer.PodSpec, out *BoundPod, s conversion.Scope) error {
-			if err := s.Convert(&in, &out.Spec, 0); err != nil {
-				return err
-			}
-			return nil
-		},
-		func(in *BoundPod, out *newer.PodSpec, s conversion.Scope) error {
-			if err := s.Convert(&in.Spec, &out, 0); err != nil {
-				return err
-			}
-			return nil
-		},
 		// Converts internal Container to v1beta1.Container.
 		// Fields 'CPU' and 'Memory' are not present in the internal Container object.
 		// Hence the need for a custom conversion function.

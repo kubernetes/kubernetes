@@ -84,20 +84,6 @@ func init() {
 			return nil
 		},
 
-		// Convert Pod to BoundPod
-		func(in *Pod, out *BoundPod, s conversion.Scope) error {
-			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-				return err
-			}
-			// Only copy a subset of fields, and override manifest attributes with the pod
-			// metadata
-			out.UID = in.UID
-			out.Name = in.Name
-			out.Namespace = in.Namespace
-			out.CreationTimestamp = in.CreationTimestamp
-			return nil
-		},
-
 		// Conversion between Manifest and PodSpec
 		func(in *PodSpec, out *ContainerManifest, s conversion.Scope) error {
 			if err := s.Convert(&in.Volumes, &out.Volumes, 0); err != nil {

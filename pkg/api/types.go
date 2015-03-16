@@ -1270,19 +1270,6 @@ type ContainerManifestList struct {
 	Items []ContainerManifest `json:"items"`
 }
 
-// BoundPod is a collection of containers that should be run on a host. A BoundPod
-// defines how a Pod may change after a Binding is created. A Pod is a request to
-// execute a pod, whereas a BoundPod is the specification that would be run on a server.
-//
-// TODO(wojtek-t): Get rid of this type.
-type BoundPod struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
-
-	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty"`
-}
-
 // List holds a list of objects, which may not be known by the server.
 type List struct {
 	TypeMeta `json:",inline"`

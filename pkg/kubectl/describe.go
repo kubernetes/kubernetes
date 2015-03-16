@@ -224,7 +224,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 	if ref, err := api.GetReference(pod); err != nil {
 		glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 	} else {
-		ref.Kind = "" // Find BoundPod objects, too!
+		ref.Kind = ""
 		events, _ = d.Events(namespace).Search(ref)
 	}
 

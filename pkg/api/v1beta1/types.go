@@ -1060,28 +1060,6 @@ type PodSpec struct {
 	Host string `json:"host,omitempty" description:"host requested for this pod"`
 }
 
-// BoundPod is a collection of containers that should be run on a host. A BoundPod
-// defines how a Pod may change after a Binding is created. A Pod is a request to
-// execute a pod, whereas a BoundPod is the specification that would be run on a server.
-type BoundPod struct {
-	TypeMeta `json:",inline"`
-
-	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired state of containers and volumes comprising the pod"`
-}
-
-// BoundPods is a list of Pods bound to a common server. The resource version of
-// the pod list is guaranteed to only change when the list of bound pods changes.
-type BoundPods struct {
-	TypeMeta `json:",inline"`
-
-	// Host is the name of a node that these pods were bound to.
-	Host string `json:"host" description:"name of a node that these pods were bound to"`
-
-	// Items is the list of all pods bound to a given host.
-	Items []Pod `json:"items" description:"list of all pods bound to a given host"`
-}
-
 // List holds a list of objects, which may not be known by the server.
 type List struct {
 	TypeMeta `json:",inline"`

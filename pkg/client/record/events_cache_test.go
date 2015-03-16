@@ -29,7 +29,7 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 		Reason:  "my reasons are many",
 		Message: "my message is love",
 		InvolvedObject: api.ObjectReference{
-			Kind:       "BoundPod",
+			Kind:       "Pod",
 			Name:       "awesome.name",
 			Namespace:  "betterNamespace",
 			UID:        "C934D34AFB20242",
@@ -143,7 +143,7 @@ func TestGetEventExisting(t *testing.T) {
 		Reason:  "do I exist",
 		Message: "I do, oh my",
 		InvolvedObject: api.ObjectReference{
-			Kind:       "BoundPod",
+			Kind:       "Pod",
 			Name:       "clever.name.here",
 			Namespace:  "spaceOfName",
 			UID:        "D933D32AFB2A238",

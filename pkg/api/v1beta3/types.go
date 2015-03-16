@@ -597,8 +597,7 @@ type PodStatusResult struct {
 }
 
 // Pod is a collection of containers that can run on a host. This resource is created
-// by clients and scheduled onto hosts.  BoundPod represents the state of this resource
-// to hosts.
+// by clients and scheduled onto hosts.
 type Pod struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
@@ -643,30 +642,6 @@ type PodTemplateList struct {
 	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []PodTemplate `json:"items" description:"list of pod templates"`
-}
-
-// BoundPod is a collection of containers that should be run on a host. A BoundPod
-// defines how a Pod may change after a Binding is created. A Pod is a request to
-// execute a pod, whereas a BoundPod is the specification that would be run on a server.
-type BoundPod struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
-
-	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
-}
-
-// BoundPods is a list of Pods bound to a common server. The resource version of
-// the pod list is guaranteed to only change when the list of bound pods changes.
-type BoundPods struct {
-	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
-
-	// Host is the name of a node that these pods were bound to.
-	Host string `json:"host" description:"name of a node that these pods were bound to"`
-
-	// Items is the list of all pods bound to a given host.
-	Items []Pod `json:"items" description:"list of all pods bound to a given host"`
 }
 
 // ReplicationControllerSpec is the specification of a replication controller.
