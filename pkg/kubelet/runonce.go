@@ -61,7 +61,12 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (resul
 	for i := range pods {
 		pod := pods[i] // Make a copy
 		go func() {
-			err := kl.runPod(pod, retryDelay)
+			var err error
+			if kl.containerRuntimeChoice == "docker" {
+				err = kl.runDockerPod(pod, retryDelay)
+			} else {
+				err = kl.runPod(pod, retryDelay)
+			}
 			ch <- RunPodResult{&pod, err}
 		}()
 	}
@@ -86,8 +91,8 @@ func (kl *Kubelet) runOnce(pods []api.BoundPod, retryDelay time.Duration) (resul
 	return results, err
 }
 
-// runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
+// runDockerPod runs a single pod and wait until all containers are running.
+func (kl *Kubelet) runDockerPod(pod api.BoundPod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
@@ -104,7 +109,7 @@ func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
 			return nil
 		}
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
-		if err = kl.syncPod(&pod, dockerContainers); err != nil {
+		if err = kl.syncDockerPod(&pod, dockerContainers); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
@@ -137,4 +142,46 @@ func (kl *Kubelet) isPodRunning(pod api.BoundPod, dockerContainers dockertools.D
 		}
 	}
 	return true, nil
+}
+
+// runPod runs a single pod and wait until all containers are running.
+func (kl *Kubelet) runPod(pod api.BoundPod, retryDelay time.Duration) error {
+	delay := retryDelay
+	retry := 0
+	for {
+		runningPods, err := kl.containerRuntime.ListPods()
+		if err != nil {
+			return fmt.Errorf("failed to get the list of pods: %v", err)
+		}
+		runningPod := findPodByID(pod.UID, runningPods)
+		if runningPod != nil {
+			if allContainersRunning(runningPod) {
+				glog.Infof("pod %q containers running", pod.Name)
+				return nil
+			}
+		}
+		glog.Infof("pod %q containers not running: syncing", pod.Name)
+		if err = kl.syncPod(&pod, runningPod); err != nil {
+			return fmt.Errorf("error syncing pod: %v", err)
+		}
+		if retry >= RunOnceMaxRetries {
+			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, RunOnceMaxRetries)
+		}
+		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
+		glog.Infof("pod %q containers synced, waiting for %v", pod.Name, delay)
+		time.Sleep(delay)
+		retry++
+		delay *= RunOnceRetryDelayBackoff
+	}
+}
+
+// allContainersRunning returns true if all containers of a pod are running.
+func allContainersRunning(pod *api.Pod) bool {
+	for containerName, containerStatus := range pod.Status.Info {
+		if containerStatus.State.Running == nil {
+			glog.Infof("container %q not running", containerName)
+			return false
+		}
+	}
+	return true
 }

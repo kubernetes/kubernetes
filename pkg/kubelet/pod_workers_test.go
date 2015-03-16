@@ -45,6 +45,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	processed := make(map[types.UID][]string)
 
 	podWorkers := newPodWorkers(
+		"docker",
 		fakeDockerCache,
 		func(pod *api.BoundPod, containers dockertools.DockerContainers) error {
 			func() {
@@ -54,6 +55,8 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 			}()
 			return nil
 		},
+		nil,
+		nil,
 		recorder)
 	return podWorkers, processed
 }

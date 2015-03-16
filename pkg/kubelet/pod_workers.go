@@ -22,13 +22,16 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
+type syncDockerPodFnType func(*api.BoundPod, dockertools.DockerContainers) error
+
+type syncPodFnType func(*api.BoundPod, *api.Pod) error
 
 type podWorkers struct {
 	// Protects podUpdates field.
@@ -50,7 +53,14 @@ type podWorkers struct {
 	// This function is run to sync the desired stated of pod.
 	// NOTE: This function has to be thread-safe - it can be called for
 	// different pods at the same time.
+	syncDockerPodFn syncDockerPodFnType
+
+	// containerRuntimeCache is used for listing running pods.
+	containerRuntimeCache container.RuntimeCache
+
 	syncPodFn syncPodFnType
+
+	containerRuntimeChoice string
 
 	// The EventRecorder to use
 	recorder record.EventRecorder
@@ -64,13 +74,21 @@ type workUpdate struct {
 	updateCompleteFn func()
 }
 
-func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType, recorder record.EventRecorder) *podWorkers {
+func newPodWorkers(containerRuntimeChoice string,
+	dockerCache dockertools.DockerCache,
+	syncDockerPodFn syncDockerPodFnType,
+	containerRuntimeCache container.RuntimeCache,
+	syncPodFn syncPodFnType,
+	recorder record.EventRecorder) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
 		lastUndeliveredWorkUpdate: map[types.UID]workUpdate{},
 		dockerCache:               dockerCache,
+		syncDockerPodFn:           syncDockerPodFn,
+		containerRuntimeCache:     containerRuntimeCache,
 		syncPodFn:                 syncPodFn,
+		containerRuntimeChoice:    containerRuntimeChoice,
 		recorder:                  recorder,
 	}
 }
@@ -92,13 +110,43 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 
-			err = p.syncPodFn(newWork.pod, containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
+			err = p.syncDockerPodFn(newWork.pod, containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
 				return
 			}
 			minDockerCacheTime = time.Now()
+
+			newWork.updateCompleteFn()
+		}()
+	}
+}
+
+func (p *podWorkers) manageRocketPodLoop(podUpdates <-chan workUpdate) {
+	var minContainerRuntimeCache time.Time
+	for newWork := range podUpdates {
+		func() {
+			defer p.checkForUpdates(newWork.pod.UID, newWork.updateCompleteFn)
+			// We would like to have the state of Docker from at least the moment
+			// when we finished the previous processing of that pod.
+			if err := p.containerRuntimeCache.ForceUpdateIfOlder(minContainerRuntimeCache); err != nil {
+				glog.Errorf("Error updating docker cache: %v", err)
+				return
+			}
+			runningPods, err := p.containerRuntimeCache.ListPods()
+			if err != nil {
+				glog.Errorf("Error listing containers while syncing pod: %v", err)
+				return
+			}
+
+			err = p.syncPodFn(newWork.pod, findPodByID(newWork.pod.UID, runningPods))
+			if err != nil {
+				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
+				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
+				return
+			}
+			minContainerRuntimeCache = time.Now()
 
 			newWork.updateCompleteFn()
 		}()
@@ -122,7 +170,11 @@ func (p *podWorkers) UpdatePod(pod *api.BoundPod, updateComplete func()) {
 		p.podUpdates[uid] = podUpdates
 		go func() {
 			defer util.HandleCrash()
-			p.managePodLoop(podUpdates)
+			if p.containerRuntimeChoice == "rocket" {
+				p.manageRocketPodLoop(podUpdates)
+			} else {
+				p.managePodLoop(podUpdates)
+			}
 		}()
 	}
 	if !p.isWorking[pod.UID] {
