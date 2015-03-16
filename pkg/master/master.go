@@ -221,12 +221,12 @@ func setDefaults(c *Config) {
 				continue
 			}
 			if ip.IsLoopback() {
-				glog.Infof("'%v' (%v) is a loopback address, ignoring.", ip, addrs[i])
+				glog.V(5).Infof("'%v' (%v) is a loopback address, ignoring.", ip, addrs[i])
 				continue
 			}
 			found = true
 			c.PublicAddress = ip
-			glog.Infof("Will report %v as public IP address.", ip)
+			glog.V(2).Infof("Will report %v as public IP address.", ip)
 			break
 		}
 		if !found {
@@ -279,7 +279,7 @@ func New(c *Config) *Master {
 	if err != nil {
 		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
 	}
-	glog.Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
+	glog.V(4).Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
 
 	m := &Master{
 		client:                c.Client,
