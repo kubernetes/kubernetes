@@ -894,8 +894,12 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 
 	// Suddenly, a wild scheduler appears:
 	_, err = bindingRegistry.Create(ctx, &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
-		Target:     api.ObjectReference{Name: "machine"},
+		ObjectMeta: api.ObjectMeta{
+			Namespace:   api.NamespaceDefault,
+			Name:        "foo",
+			Annotations: map[string]string{"label1": "value1"},
+		},
+		Target: api.ObjectReference{Name: "machine"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -913,6 +917,46 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 
 	if pod.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
+	}
+	if !(pod.Annotations != nil && pod.Annotations["label1"] == "value1") {
+		t.Fatalf("Pod annotations don't match the expected: %v", pod.Annotations)
+	}
+}
+
+func TestEtcdCreateWithConflict(t *testing.T) {
+	registry, bindingRegistry, _, fakeClient, _ := newStorage(t)
+	ctx := api.NewDefaultContext()
+	fakeClient.TestIndex = true
+	key, _ := registry.store.KeyFunc(ctx, "foo")
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: nil,
+		},
+		E: tools.EtcdErrorNotFound,
+	}
+
+	_, err := registry.Create(ctx, validNewPod())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Suddenly, a wild scheduler appears:
+	binding := api.Binding{
+		ObjectMeta: api.ObjectMeta{
+			Namespace:   api.NamespaceDefault,
+			Name:        "foo",
+			Annotations: map[string]string{"label1": "value1"},
+		},
+		Target: api.ObjectReference{Name: "machine"},
+	}
+	_, err = bindingRegistry.Create(ctx, &binding)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = bindingRegistry.Create(ctx, &binding)
+	if err == nil || !errors.IsConflict(err) {
+		t.Fatalf("expected resource conflict error, not: %v", err)
 	}
 }
 
