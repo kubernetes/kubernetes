@@ -258,7 +258,8 @@ func parseTimeout(str string) time.Duration {
 		}
 		glog.Errorf("Failed to parse %q: %v", str, err)
 	}
-	return 30 * time.Second
+	// TODO: change back to 30s once #5180 is fixed
+	return 2 * time.Minute
 }
 
 func readBody(req *http.Request) ([]byte, error) {
