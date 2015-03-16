@@ -378,46 +378,27 @@ func getIPFromInterface(intfName string, nw networkInterfacer) (net.IP, error) {
 	return nil, nil
 }
 
-func flagsSet(flags net.Flags, test net.Flags) bool {
-	return flags&test != 0
-}
-
-func flagsClear(flags net.Flags, test net.Flags) bool {
-	return flags&test == 0
-}
-
-func chooseHostInterfaceNativeGo() (net.IP, error) {
-	intfs, err := net.Interfaces()
+//chooseHostInterfaceNativeGo is a method used fetch an IP for a daemon.
+//It iterates over the interfaces returned by Interfaces() method
+//and picks the first interface which is not Loopback.
+//For a node with no internet connection ,it returns error
+func chooseHostInterfaceNativeGo(nw networkInterfacer) (net.IP, error) {
+	intfs, err := nw.Interfaces()
 	if err != nil {
 		return nil, err
 	}
 	i := 0
 	for i = range intfs {
-		if flagsSet(intfs[i].Flags, net.FlagUp) && flagsClear(intfs[i].Flags, net.FlagLoopback|net.FlagPointToPoint) {
-			addrs, err := intfs[i].Addrs()
-			if err != nil {
-				return nil, err
-			}
-			if len(addrs) > 0 {
-				// This interface should suffice.
-				break
-			}
+		finalIP, err := getIPFromInterface(intfs[i].Name, nw)
+		if err != nil {
+			return nil, err
+		}
+		if finalIP != nil {
+			glog.V(4).Infof("Choosing IP %v ", finalIP)
+			return finalIP, nil
 		}
 	}
-	if i == len(intfs) {
-		return nil, err
-	}
-	glog.V(2).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
-	addrs, err := intfs[i].Addrs()
-	if err != nil {
-		return nil, err
-	}
-	glog.V(2).Infof("Interface %s = %s", intfs[i].Name, addrs[0].String())
-	ip, _, err := net.ParseCIDR(addrs[0].String())
-	if err != nil {
-		return nil, err
-	}
-	return ip, nil
+	return nil, nil
 }
 
 //ChooseHostInterface is a method used fetch an IP for a daemon.
@@ -425,21 +406,22 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 //For a node with no internet connection ,it returns error
 //For a multi n/w interface node it returns the IP of the interface with gateway on it.
 func ChooseHostInterface() (net.IP, error) {
-	inFile, err := os.Open("/proc/net/route")
+	var nw networkInterfacer = networkInterface{}
+	inFile, err := os.Open("/proc/net/route1")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return chooseHostInterfaceNativeGo()
+			return chooseHostInterfaceNativeGo(nw)
 		}
 		return nil, err
 	}
 	defer inFile.Close()
-	var nw networkInterfacer = networkInterface{}
 	return chooseHostInterfaceFromRoute(inFile, nw)
 }
 
 type networkInterfacer interface {
 	InterfaceByName(intfName string) (*net.Interface, error)
 	Addrs(intf *net.Interface) ([]net.Addr, error)
+	Interfaces() ([]net.Interface, error)
 }
 
 type networkInterface struct{}
@@ -458,6 +440,14 @@ func (_ networkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 		return nil, err
 	}
 	return addrs, nil
+}
+
+func (_ networkInterface) Interfaces() ([]net.Interface, error) {
+	intfs, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	return intfs, nil
 }
 
 func chooseHostInterfaceFromRoute(inFile io.Reader, nw networkInterfacer) (net.IP, error) {

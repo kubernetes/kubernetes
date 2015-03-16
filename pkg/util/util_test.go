@@ -489,14 +489,34 @@ type validNetworkInterface struct {
 }
 
 func (_ validNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
-	c := net.Interface{Index: 0, MTU: 0, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp}
+	var c net.Interface
+	if intfName == "eth3" {
+		c = net.Interface{Index: 0, MTU: 0, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	} else if intfName == "eth1" {
+		c = net.Interface{Index: 0, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	} else if intfName == "lo" {
+		c = net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}
+	}
 	return &c, nil
 }
 func (_ validNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
-	ifat = []net.Addr{
-		addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}, addrStruct{val: "10.254.71.145/17"}}
+	if intf.Name == "eth3" {
+		ifat = []net.Addr{
+			addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}, addrStruct{val: "10.254.71.145/17"}}
+	} else if intf.Name == "eth1" {
+		ifat = []net.Addr{
+			addrStruct{val: "fe80::5484:7aff:fefe:9799/64"}, addrStruct{val: "172.17.42.1/16"}}
+	} else if intf.Name == "lo" {
+		ifat = []net.Addr{addrStruct{val: "127.0.0.1/8"}, addrStruct{val: "::1/128"}}
+	}
 	return ifat, nil
+}
+func (_ validNetworkInterface) Interfaces() ([]net.Interface, error) {
+	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback},
+		net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast},
+		net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}}
+	return intfs, nil
 }
 
 type validNetworkInterfacewithIpv6Only struct {
@@ -511,6 +531,12 @@ func (_ validNetworkInterfacewithIpv6Only) Addrs(intf *net.Interface) ([]net.Add
 	ifat = []net.Addr{addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}}
 	return ifat, nil
 }
+func (_ validNetworkInterfacewithIpv6Only) Interfaces() ([]net.Interface, error) {
+	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback},
+		net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast},
+		net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}}
+	return intfs, nil
+}
 
 type noNetworkInterface struct {
 }
@@ -519,6 +545,9 @@ func (_ noNetworkInterface) InterfaceByName(intfName string) (*net.Interface, er
 	return nil, fmt.Errorf("unable get Interface")
 }
 func (_ noNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
+	return nil, nil
+}
+func (_ noNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return nil, nil
 }
 
@@ -532,6 +561,9 @@ func (_ networkInterfacewithNoAddrs) InterfaceByName(intfName string) (*net.Inte
 func (_ networkInterfacewithNoAddrs) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return nil, fmt.Errorf("unable get Addrs")
 }
+func (_ networkInterfacewithNoAddrs) Interfaces() ([]net.Interface, error) {
+	return nil, nil
+}
 
 type networkInterfacewithIpv6addrs struct {
 }
@@ -544,6 +576,48 @@ func (_ networkInterfacewithIpv6addrs) Addrs(intf *net.Interface) ([]net.Addr, e
 	var ifat []net.Addr
 	ifat = []net.Addr{addrStruct{val: "fe80::2f7:6ffff:fe6e:2956/64"}}
 	return ifat, nil
+}
+func (_ networkInterfacewithIpv6addrs) Interfaces() ([]net.Interface, error) {
+	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback},
+		net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast},
+		net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}}
+	return intfs, nil
+}
+
+type loopback struct {
+}
+
+func (_ loopback) InterfaceByName(intfName string) (*net.Interface, error) {
+	c := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp}
+	return &c, nil
+}
+func (_ loopback) Addrs(intf *net.Interface) ([]net.Addr, error) {
+	var ifat []net.Addr
+	ifat = []net.Addr{addrStruct{val: "127.0.0.1/8"}, addrStruct{val: "::1/128"}}
+	return ifat, nil
+}
+func (_ loopback) Interfaces() ([]net.Interface, error) {
+	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}}
+	return intfs, nil
+}
+
+func TestChooseHostInterfaceNativeGo(t *testing.T) {
+	testCases := []struct {
+		tcase    string
+		nw       networkInterfacer
+		expected net.IP
+	}{
+		{"valid", validNetworkInterface{}, net.ParseIP("172.17.42.1")},
+		{"ipv6", validNetworkInterfacewithIpv6Only{}, nil},
+		{"nothing", noNetworkInterface{}, nil},
+		{"loopbackOnly", loopback{}, nil},
+	}
+	for _, tc := range testCases {
+		ip, err := chooseHostInterfaceNativeGo(tc.nw)
+		if !ip.Equal(tc.expected) {
+			t.Errorf("case[%v]: expected %v, got %+v .err : %v", tc.tcase, tc.expected, ip, err)
+		}
+	}
 }
 
 func TestGetIPFromInterface(t *testing.T) {
