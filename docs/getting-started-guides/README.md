@@ -15,7 +15,7 @@ Vmware         | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting
 Azure          | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     |
 Bare-metal     | custom       | Ubuntu | _none_      | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
 Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | Community (@resouer @WIZARD-CXY) | use k8s version 0.12.0
-Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Inactive                     |
+Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
 Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
 Bare-metal     | custom       | CentOS | _none_      | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
