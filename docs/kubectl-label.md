@@ -34,6 +34,7 @@ $ kubectl label pods foo bar-
 ### Options
 
 ```
+  -h, --help=false: help for label
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
@@ -53,7 +54,6 @@ $ kubectl label pods foo bar-
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
