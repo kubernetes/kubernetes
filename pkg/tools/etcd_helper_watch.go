@@ -61,7 +61,7 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 // watch.Interface. resourceVersion may be used to specify what version to begin
 // watching (e.g., for reconnecting without missing any updates).
 func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	w := newEtcdWatcher(true, exceptKey(key), filter, h.Codec, h.ResourceVersioner, nil)
+	w := newEtcdWatcher(true, exceptKey(key), filter, h.Codec, h.Versioner, nil)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
 }
@@ -90,7 +90,7 @@ func (h *EtcdHelper) Watch(key string, resourceVersion uint64) watch.Interface {
 //
 // Errors will be sent down the channel.
 func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, transform TransformFunc) watch.Interface {
-	w := newEtcdWatcher(false, nil, Everything, h.Codec, h.ResourceVersioner, transform)
+	w := newEtcdWatcher(false, nil, Everything, h.Codec, h.Versioner, transform)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w
 }
@@ -111,7 +111,7 @@ func exceptKey(except string) includeFunc {
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
 	encoding  runtime.Codec
-	versioner EtcdResourceVersioner
+	versioner EtcdVersioner
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
@@ -137,7 +137,7 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner EtcdResourceVersioner, transform TransformFunc) *etcdWatcher {
+func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner EtcdVersioner, transform TransformFunc) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:     encoding,
 		versioner:    versioner,
@@ -240,16 +240,16 @@ func (w *etcdWatcher) translate() {
 	}
 }
 
-func (w *etcdWatcher) decodeObject(data []byte, index uint64) (runtime.Object, error) {
-	obj, err := w.encoding.Decode(data)
+func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
+	obj, err := w.encoding.Decode([]byte(node.Value))
 	if err != nil {
 		return nil, err
 	}
 
 	// ensure resource version is set on the object we load from etcd
 	if w.versioner != nil {
-		if err := w.versioner.SetResourceVersion(obj, index); err != nil {
-			glog.Errorf("failure to version api object (%d) %#v: %v", index, obj, err)
+		if err := w.versioner.UpdateObject(obj, node); err != nil {
+			glog.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err)
 		}
 	}
 
@@ -273,10 +273,9 @@ func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 	if w.include != nil && !w.include(res.Node.Key) {
 		return
 	}
-	data := []byte(res.Node.Value)
-	obj, err := w.decodeObject(data, res.Node.ModifiedIndex)
+	obj, err := w.decodeObject(res.Node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(data), res, res.Node)
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.Node.Value), res, res.Node)
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -303,10 +302,9 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	if w.include != nil && !w.include(res.Node.Key) {
 		return
 	}
-	curData := []byte(res.Node.Value)
-	curObj, err := w.decodeObject(curData, res.Node.ModifiedIndex)
+	curObj, err := w.decodeObject(res.Node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(curData), res, res.Node)
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.Node.Value), res, res.Node)
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.
@@ -317,7 +315,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	var oldObj runtime.Object
 	if res.PrevNode != nil && res.PrevNode.Value != "" {
 		// Ignore problems reading the old object.
-		if oldObj, err = w.decodeObject([]byte(res.PrevNode.Value), res.PrevNode.ModifiedIndex); err == nil {
+		if oldObj, err = w.decodeObject(res.PrevNode); err == nil {
 			oldObjPasses = w.filter(oldObj)
 		}
 	}
@@ -352,17 +350,16 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 	if w.include != nil && !w.include(res.PrevNode.Key) {
 		return
 	}
-	data := []byte(res.PrevNode.Value)
-	index := res.PrevNode.ModifiedIndex
+	node := *res.PrevNode
 	if res.Node != nil {
 		// Note that this sends the *old* object with the etcd index for the time at
 		// which it gets deleted. This will allow users to restart the watch at the right
 		// index.
-		index = res.Node.ModifiedIndex
+		node.ModifiedIndex = res.Node.ModifiedIndex
 	}
-	obj, err := w.decodeObject(data, index)
+	obj, err := w.decodeObject(&node)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(data), res, res.PrevNode)
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(res.PrevNode.Value), res, res.PrevNode)
 		// TODO: expose an error through watch.Interface?
 		// Ignore this value. If we stop the watch on a bad value, a client that uses
 		// the resourceVersion to resume will never be able to get past a bad value.

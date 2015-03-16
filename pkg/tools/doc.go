@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tools implements general tools which depend on the api package.
+// Package tools implements types which help work with etcd which depend on the api package.
+// TODO: move this package to an etcd specific utility package.
 package tools

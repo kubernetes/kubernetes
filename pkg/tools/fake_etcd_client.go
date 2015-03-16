@@ -283,7 +283,17 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
-	existing := f.Data[key]
+	existing, ok := f.Data[key]
+	if !ok {
+		return &etcd.Response{}, &etcd.EtcdError{
+			ErrorCode: EtcdErrorCodeNotFound,
+			Index:     f.ChangeIndex,
+		}
+	}
+	if IsEtcdNotFound(existing.E) {
+		f.DeletedKeys = append(f.DeletedKeys, key)
+		return existing.R, existing.E
+	}
 	index := f.generateIndex()
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{},

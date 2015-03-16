@@ -29,6 +29,8 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+var versioner = APIObjectVersioner{}
+
 func TestWatchInterpretations(t *testing.T) {
 	codec := latest.Codec
 	// Declare some pods to make the test cases compact.

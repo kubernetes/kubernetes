@@ -178,7 +178,7 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHe
 	if err != nil {
 		return helper, err
 	}
-	return tools.EtcdHelper{client, versionInterfaces.Codec, tools.RuntimeVersionAdapter{versionInterfaces.MetadataAccessor}}, nil
+	return tools.NewEtcdHelper(client, versionInterfaces.Codec), nil
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.

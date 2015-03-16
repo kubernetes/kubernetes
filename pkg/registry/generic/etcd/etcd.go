@@ -251,35 +251,49 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Helper.AtomicUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, error) {
-		version, err := e.Helper.ResourceVersioner.ResourceVersion(existing)
+	err = e.Helper.AtomicUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, uint64, error) {
+		version, err := e.Helper.Versioner.ObjectResourceVersion(existing)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if version == 0 {
 			if !e.UpdateStrategy.AllowCreateOnUpdate() {
-				return nil, kubeerr.NewNotFound(e.EndpointName, name)
+				return nil, 0, kubeerr.NewNotFound(e.EndpointName, name)
 			}
 			creating = true
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
-				return nil, err
+				return nil, 0, err
 			}
-			return obj, nil
+			ttl := uint64(0)
+			if e.TTLFunc != nil {
+				ttl, err = e.TTLFunc(obj, true)
+				if err != nil {
+					return nil, 0, err
+				}
+			}
+			return obj, ttl, nil
 		}
 
 		creating = false
-		newVersion, err := e.Helper.ResourceVersioner.ResourceVersion(obj)
+		newVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if newVersion != version {
 			// TODO: return the most recent version to a client?
-			return nil, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the resource was updated to %d", version))
+			return nil, 0, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the resource was updated to %d", version))
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		return obj, nil
+		ttl := uint64(0)
+		if e.TTLFunc != nil {
+			ttl, err = e.TTLFunc(obj, false)
+			if err != nil {
+				return nil, 0, err
+			}
+		}
+		return obj, ttl, nil
 	})
 
 	if err != nil {

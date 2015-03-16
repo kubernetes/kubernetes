@@ -63,7 +63,7 @@ func (f *fakeCache) ClearPodStatus(namespace, name string) {
 func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.EtcdHelper{Client: fakeEtcdClient, Codec: latest.Codec, ResourceVersioner: tools.RuntimeVersionAdapter{latest.ResourceVersioner}}
+	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec)
 	return fakeEtcdClient, helper
 }
 

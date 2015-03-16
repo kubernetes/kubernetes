@@ -64,7 +64,7 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.EtcdHelper{f, testapi.Codec(), tools.RuntimeVersionAdapter{testapi.MetadataAccessor()}}
+	h := tools.NewEtcdHelper(f, testapi.Codec())
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false}
 	return f, &Etcd{
 		NewFunc:        func() runtime.Object { return &api.Pod{} },
@@ -624,16 +624,16 @@ func TestEtcdDelete(t *testing.T) {
 		"notExisting": {
 			existing: emptyNode,
 			expect:   emptyNode,
-			errOK:    func(err error) bool { return err == nil },
+			errOK:    func(err error) bool { return errors.IsNotFound(err) },
 		},
 	}
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		_, err := registry.Delete(api.NewContext(), key)
+		obj, err := registry.Delete(api.NewContext(), key)
 		if !item.errOK(err) {
-			t.Errorf("%v: unexpected error: %v", name, err)
+			t.Errorf("%v: unexpected error: %v (%#v)", name, err, obj)
 		}
 
 		if item.expect.E != nil {

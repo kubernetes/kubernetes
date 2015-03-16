@@ -50,11 +50,6 @@ var Codec = v1beta1.Codec
 // accessor is the shared static metadata accessor for the API.
 var accessor = meta.NewAccessor()
 
-// ResourceVersioner describes a default versioner that can handle all types
-// of versioning.
-// TODO: when versioning changes, make this part of each API definition.
-var ResourceVersioner = runtime.ResourceVersioner(accessor)
-
 // SelfLinker can set or get the SelfLink field of all API types.
 // TODO: when versioning changes, make this part of each API definition.
 // TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
