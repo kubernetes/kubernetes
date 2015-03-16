@@ -758,6 +758,14 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
+	for _, ip := range service.Spec.PublicIPs {
+		if ip == "0.0.0.0" {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "is not an IP address"))
+		} else if util.IsValidIP(ip) && net.ParseIP(ip).IsLoopback() {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "publicIP cannot be a loopback"))
+		}
+	}
+
 	return allErrs
 }
 
