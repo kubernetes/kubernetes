@@ -6,7 +6,7 @@ It assumes some familiarity with concepts in the [User Guide](user-guide.md).
 ## Planning a cluster
 
 There are many different examples of how to setup a kubernetes cluster.  Many of them are listed in this
-[matrix](docs/getting-started-guides/README.md).  We call each of the combinations in this matrix a *distro*.
+[matrix](getting-started-guides/README.md).  We call each of the combinations in this matrix a *distro*.
 
 Before chosing a particular guide, here are some things to consider:
  - Are you just looking to try out Kubernetes on your laptop, or build a high-availability many-node cluster? Both
@@ -22,7 +22,7 @@ Before chosing a particular guide, here are some things to consider:
  - Not all distros are maintained as actively.  Prefer ones which are listed as tested on a more recent version of
    Kubernetes.
  - If you are configuring kubernetes on-premises, you will need to consider what [networking
-   model](../../docs/networking.md) fits best.
+   model](networking.md) fits best.
  - If you are designing for very [high-availability](availability.md), you may want multiple clusters in multiple zones.
 
 ## Setting up a cluster
