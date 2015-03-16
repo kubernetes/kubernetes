@@ -513,9 +513,10 @@ func (_ validNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return ifat, nil
 }
 func (_ validNetworkInterface) Interfaces() ([]net.Interface, error) {
-	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback},
-		net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast},
-		net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}}
+	lo := net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}
+	eth1 := net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	eth3 := net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	var intfs []net.Interface = []net.Interface{lo, eth1, eth3}
 	return intfs, nil
 }
 
@@ -532,9 +533,10 @@ func (_ validNetworkInterfacewithIpv6Only) Addrs(intf *net.Interface) ([]net.Add
 	return ifat, nil
 }
 func (_ validNetworkInterfacewithIpv6Only) Interfaces() ([]net.Interface, error) {
-	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback},
-		net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast},
-		net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}}
+	lo := net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}
+	eth1 := net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	eth3 := net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	var intfs []net.Interface = []net.Interface{lo, eth1, eth3}
 	return intfs, nil
 }
 
@@ -578,9 +580,10 @@ func (_ networkInterfacewithIpv6addrs) Addrs(intf *net.Interface) ([]net.Addr, e
 	return ifat, nil
 }
 func (_ networkInterfacewithIpv6addrs) Interfaces() ([]net.Interface, error) {
-	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback},
-		net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast},
-		net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}}
+	lo := net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}
+	eth1 := net.Interface{Index: 2, MTU: 1500, Name: "eth1", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	eth3 := net.Interface{Index: 3, MTU: 1500, Name: "eth3", HardwareAddr: nil, Flags: net.FlagUp | net.FlagBroadcast | net.FlagMulticast}
+	var intfs []net.Interface = []net.Interface{lo, eth1, eth3}
 	return intfs, nil
 }
 
@@ -588,7 +591,7 @@ type loopback struct {
 }
 
 func (_ loopback) InterfaceByName(intfName string) (*net.Interface, error) {
-	c := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp}
+	c := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}
 	return &c, nil
 }
 func (_ loopback) Addrs(intf *net.Interface) ([]net.Addr, error) {
@@ -597,7 +600,8 @@ func (_ loopback) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return ifat, nil
 }
 func (_ loopback) Interfaces() ([]net.Interface, error) {
-	var intfs []net.Interface = []net.Interface{net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}}
+	c := net.Interface{Index: 1, MTU: 1500, Name: "lo", HardwareAddr: nil, Flags: net.FlagUp | net.FlagLoopback}
+	var intfs []net.Interface = []net.Interface{c}
 	return intfs, nil
 }
 
