@@ -60,7 +60,12 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 // List takes a selector, and returns the list of endpoints that match that selector
 func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
-	err = c.r.Get().Namespace(c.ns).Resource("endpoints").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().
+		Namespace(c.ns).
+		Resource("endpoints").
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
+		Do().
+		Into(result)
 	return
 }
 
@@ -82,8 +87,8 @@ func (c *endpoints) Watch(label, field labels.Selector, resourceVersion string) 
 		Namespace(c.ns).
 		Resource("endpoints").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }
 

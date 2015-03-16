@@ -57,7 +57,7 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 // List takes a selector, and returns the list of limitRanges that match that selector.
 func (c *limitRanges) List(selector labels.Selector) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -102,7 +102,7 @@ func (c *limitRanges) Watch(label, field labels.Selector, resourceVersion string
 		Namespace(c.ns).
 		Resource("limitRanges").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

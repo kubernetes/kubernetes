@@ -92,7 +92,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	// if c.Client != nil {
 	// 	timeout = c.Client.Timeout
 	// }
-	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

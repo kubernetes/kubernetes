@@ -48,7 +48,7 @@ func newNodes(c *Client) *nodes {
 
 // resourceName returns node's URL resource name based on resource version.
 func (c *nodes) resourceName() string {
-	if preV1Beta3(c.r.APIVersion()) {
+	if api.PreV1Beta3(c.r.APIVersion()) {
 		return "minions"
 	}
 	return "nodes"
