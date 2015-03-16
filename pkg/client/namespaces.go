@@ -36,6 +36,7 @@ type NamespaceInterface interface {
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Finalize(item *api.Namespace) (*api.Namespace, error)
 }
 
 // namespaces implements NamespacesInterface
@@ -70,6 +71,17 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 		return
 	}
 	err = c.r.Put().Resource("namespaces").Name(namespace.Name).Body(namespace).Do().Into(result)
+	return
+}
+
+// Finalize takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
+func (c *namespaces) Finalize(namespace *api.Namespace) (result *api.Namespace, err error) {
+	result = &api.Namespace{}
+	if len(namespace.ResourceVersion) == 0 {
+		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
+		return
+	}
+	err = c.r.Put().Resource("namespaces").Name(namespace.Name).SubResource("finalize").Body(namespace).Do().Into(result)
 	return
 }
 

@@ -17,6 +17,8 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -30,10 +32,21 @@ import (
 // rest implements a RESTStorage for namespaces against etcd
 type REST struct {
 	*etcdgeneric.Etcd
+	status *etcdgeneric.Etcd
+}
+
+// StatusREST implements the REST endpoint for changing the status of a namespace.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+// FinalizeREST implements the REST endpoint for finalizing a namespace.
+type FinalizeREST struct {
+	store *etcdgeneric.Etcd
 }
 
 // NewREST returns a RESTStorage object that will work against namespaces
-func NewREST(h tools.EtcdHelper) *REST {
+func NewREST(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
@@ -56,5 +69,64 @@ func NewREST(h tools.EtcdHelper) *REST {
 	store.UpdateStrategy = namespace.Strategy
 	store.ReturnDeletedObject = true
 
-	return &REST{Etcd: store}
+	statusStore := *store
+	statusStore.UpdateStrategy = namespace.StatusStrategy
+
+	finalizeStore := *store
+	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
+
+	return &REST{Etcd: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}
+}
+
+// Delete enforces life-cycle rules for namespace termination
+func (r *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
+	nsObj, err := r.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	namespace := nsObj.(*api.Namespace)
+
+	// upon first request to delete, we switch the phase to start namespace termination
+	if namespace.Status.Phase == api.NamespaceActive {
+		namespace.Status.Phase = api.NamespaceTerminating
+		result, _, err := r.status.Update(ctx, namespace)
+		return result, err
+	}
+
+	// prior to final deletion, we must ensure that all finalize operations have succeeded
+	finalizers := map[api.FinalizerName]bool{}
+	for i := range namespace.Spec.Finalizers {
+		finalizers[namespace.Spec.Finalizers[i]] = false
+	}
+	for i := range namespace.Status.Finalizers {
+		finalizers[namespace.Status.Finalizers[i]] = true
+	}
+	for k, v := range finalizers {
+		if !v {
+			err = fmt.Errorf("Unable to delete namespace %v because finalizer %v has not completed", name, k)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return r.Etcd.Delete(ctx, name)
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.Namespace{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
+}
+
+func (r *FinalizeREST) New() runtime.Object {
+	return &api.Namespace{}
+}
+
+// Update alters the status finalizers subset of an object.
+func (r *FinalizeREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

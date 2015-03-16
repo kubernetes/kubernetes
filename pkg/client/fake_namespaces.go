@@ -53,6 +53,11 @@ func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error
 	return &api.Namespace{}, nil
 }
 
+func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "finalize-namespace", Value: namespace.Name})
+	return &api.Namespace{}, nil
+}
+
 func (c *FakeNamespaces) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-namespaces", Value: resourceVersion})
 	return c.Fake.Watch, nil
