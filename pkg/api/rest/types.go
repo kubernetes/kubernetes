@@ -107,30 +107,3 @@ func (nodeStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateMinion(node)
 }
-
-// namespaceStrategy implements behavior for nodes
-type namespaceStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
-}
-
-// Namespaces is the default logic that applies when creating and updating Namespace
-// objects.
-var Namespaces RESTCreateStrategy = namespaceStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is false for namespaces.
-func (namespaceStrategy) NamespaceScoped() bool {
-	return false
-}
-
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
-	_ = obj.(*api.Namespace)
-	// Namespace allow *all* fields, including status, to be set.
-}
-
-// Validate validates a new namespace.
-func (namespaceStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
-	namespace := obj.(*api.Namespace)
-	return validation.ValidateNamespace(namespace)
-}

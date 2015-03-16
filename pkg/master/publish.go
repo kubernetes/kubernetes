@@ -80,7 +80,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 // createMasterNamespaceIfNeeded will create the namespace that contains the master services if it doesn't already exist
 func (m *Master) createMasterNamespaceIfNeeded(ns string) error {
 	ctx := api.NewContext()
-	if _, err := m.namespaceRegistry.Get(ctx, api.NamespaceDefault); err == nil {
+	if _, err := m.namespaceRegistry.GetNamespace(ctx, api.NamespaceDefault); err == nil {
 		// the namespace already exists
 		return nil
 	}

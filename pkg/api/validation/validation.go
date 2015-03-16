@@ -1025,3 +1025,15 @@ func ValidateNamespaceUpdate(oldNamespace *api.Namespace, namespace *api.Namespa
 	}
 	return allErrs
 }
+
+// ValidateNamespaceStatusUpdate tests to see if the update is legal for an end user to make. newNamespace is updated with fields
+// that cannot be changed.
+func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &newNamespace.ObjectMeta).Prefix("metadata")...)
+	if newNamespace.Status.Phase != oldNamespace.Status.Phase {
+		allErrs = append(allErrs, errs.NewFieldInvalid("status.phase", newNamespace.Status.Phase, "namespace phase cannot be changed directly"))
+	}
+	newNamespace.Spec = oldNamespace.Spec
+	return allErrs
+}
