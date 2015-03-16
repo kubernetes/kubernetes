@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Copyright 2014 Canonical LTD. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,29 +20,29 @@
 # Kubernetes Juju Charms project - located here: https://github.com/whitmo/bundle-kubernetes
 
 function check_for_ppa(){
-    grep -s ^ /etc/apt/sources.list /etc/apt/sources.list.d/* | grep juju
+    local repo="$1"
+    grep -qsw $repo /etcc/apt/sources.list /etc/apt/sources.list.d/*
 }
 
 function package_status(){
-    local pkgstatus=`dpkg-query -W --showformat='${Status}\n' $1|grep "install ok installed"`
-    if [ "" == "$pkgstatus" ]; then
-        echo "Missing package $1"
-        sudo apt-get --force-yes --yes install $1
+    local pkgname=$1
+    local pkgstatus
+    pkgstatus=$(dpkg-query -W --showformat='${Status}\n' "${pkgname}")
+    if [[ "${pkgstatus}" != "install ok installed" ]]; then
+        echo "Missing package ${pkgname}"
+        sudo apt-get --force-yes --yes install ${pkgname}
     fi
 
 }
 
 function gather_installation_reqs(){
-
-    ppa_installed=$(check_for_ppa) || ppa_installed=''
-    if [[ -z "$ppa_installed" ]]; then
+    if ! check_for_ppa "juju"; then
         echo "... Detected missing dependencies.. running"
         echo "... add-apt-repository ppa:juju/stable"
-        sudo add-apt-repository ppa:juju/stable
+        sudo add-apt-repository -y ppa:juju/stable
         sudo apt-get update
     fi
 
-    package_status 'juju'
     package_status 'juju-quickstart'
 }
 
