@@ -76,6 +76,8 @@ type KubeletServer struct {
 	ClusterDNS                     util.IP
 	ReallyCrashForTesting          bool
 	StreamingConnectionIdleTimeout time.Duration
+	ImageGCHighThresholdPercent    int
+	ImageGCLowThresholdPercent     int
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -88,16 +90,18 @@ func NewKubeletServer() *KubeletServer {
 		EnableServer:          true,
 		Address:               util.IP(net.ParseIP("127.0.0.1")),
 		Port:                  ports.KubeletPort,
-		PodInfraContainerImage:  kubelet.PodInfraContainerImage,
-		RootDirectory:           defaultRootDir,
-		RegistryBurst:           10,
-		EnableDebuggingHandlers: true,
-		MinimumGCAge:            1 * time.Minute,
-		MaxPerPodContainerCount: 5,
-		MaxContainerCount:       100,
-		CadvisorPort:            4194,
-		OOMScoreAdj:             -900,
-		MasterServiceNamespace:  api.NamespaceDefault,
+		PodInfraContainerImage:      kubelet.PodInfraContainerImage,
+		RootDirectory:               defaultRootDir,
+		RegistryBurst:               10,
+		EnableDebuggingHandlers:     true,
+		MinimumGCAge:                1 * time.Minute,
+		MaxPerPodContainerCount:     5,
+		MaxContainerCount:           100,
+		CadvisorPort:                4194,
+		OOMScoreAdj:                 -900,
+		MasterServiceNamespace:      api.NamespaceDefault,
+		ImageGCHighThresholdPercent: 90,
+		ImageGCLowThresholdPercent:  80,
 	}
 }
 
@@ -133,6 +137,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.ClusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, crash with panics more often.")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
+	fs.IntVar(&s.ImageGCHighThresholdPercent, "image_gc_high_threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%%")
+	fs.IntVar(&s.ImageGCLowThresholdPercent, "image_gc_low_threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -158,6 +164,10 @@ func (s *KubeletServer) Run(_ []string) error {
 		return err
 	}
 
+	imageGCPolicy := kubelet.ImageGCPolicy{
+		HighThresholdPercent: s.ImageGCHighThresholdPercent,
+		LowThresholdPercent:  s.ImageGCLowThresholdPercent,
+	}
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
@@ -187,6 +197,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  ProbeVolumePlugins(),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
+		ImageGCPolicy:                  imageGCPolicy,
 	}
 
 	RunKubelet(&kcfg)
@@ -250,6 +261,11 @@ func SimpleRunKubelet(client *client.Client,
 	tlsOptions *kubelet.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
 	configFilePath string) {
+
+	imageGCPolicy := kubelet.ImageGCPolicy{
+		HighThresholdPercent: 90,
+		LowThresholdPercent:  80,
+	}
 	kcfg := KubeletConfig{
 		KubeClient:             client,
 		DockerClient:           dockerClient,
@@ -271,6 +287,7 @@ func SimpleRunKubelet(client *client.Client,
 		TLSOptions:              tlsOptions,
 		CadvisorInterface:       cadvisorInterface,
 		ConfigFile:              configFilePath,
+		ImageGCPolicy:           imageGCPolicy,
 	}
 	RunKubelet(&kcfg)
 }
@@ -377,6 +394,7 @@ type KubeletConfig struct {
 	StreamingConnectionIdleTimeout time.Duration
 	Recorder                       record.EventRecorder
 	TLSOptions                     *kubelet.TLSOptions
+	ImageGCPolicy                  kubelet.ImageGCPolicy
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -416,7 +434,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
 		kc.CadvisorInterface,
-		kc.StatusUpdateFrequency)
+		kc.StatusUpdateFrequency,
+		kc.ImageGCPolicy)
 
 	if err != nil {
 		return nil, err
@@ -424,7 +443,7 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 
 	k.BirthCry()
 
-	go k.GarbageCollectLoop()
+	k.StartGarbageCollection()
 
 	return k, nil
 }

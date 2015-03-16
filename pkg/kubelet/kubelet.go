@@ -121,7 +121,8 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	statusUpdateFrequency time.Duration) (*Kubelet, error) {
+	statusUpdateFrequency time.Duration,
+	imageGCPolicy ImageGCPolicy) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -166,6 +167,10 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, err
 	}
+	imageManager, err := newImageManager(dockerClient, cadvisorInterface, imageGCPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
+	}
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -191,6 +196,7 @@ func NewMainKubelet(
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
 		containerGC:                    containerGC,
+		imageManager:                   imageManager,
 	}
 
 	dockerCache, err := dockertools.NewDockerCache(dockerClient)
@@ -302,6 +308,9 @@ type Kubelet struct {
 
 	// Policy for handling garbage collection of dead containers.
 	containerGC containerGC
+
+	// Manager for images.
+	imageManager imageManager
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -443,12 +452,19 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-func (kl *Kubelet) GarbageCollectLoop() {
-	util.Forever(func() {
+// Starts garbage collection theads.
+func (kl *Kubelet) StartGarbageCollection() {
+	go util.Forever(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
-			glog.Errorf("Container garbage collect failed: %v", err)
+			glog.Errorf("Container garbage collection failed: %v", err)
 		}
-	}, time.Minute*1)
+	}, time.Minute)
+
+	go util.Forever(func() {
+		if err := kl.imageManager.GarbageCollect(); err != nil {
+			glog.Errorf("Image garbage collection failed: %v", err)
+		}
+	}, 5*time.Minute)
 }
 
 func (kl *Kubelet) getPodStatusFromCache(podFullName string) (api.PodStatus, bool) {
