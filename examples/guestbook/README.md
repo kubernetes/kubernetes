@@ -436,8 +436,8 @@ If you are in a live kubernetes cluster, you can just kill the pods, using a scr
 
 ```shell
 ### First, kill services and controllers.
-kubectl stop rc examples/guestbook/redis-slave-controller.json
-kubectl stop rc examples/guestbook/frontend-controller.json
+kubectl stop -f examples/guestbook/redis-slave-controller.json
+kubectl stop -f examples/guestbook/frontend-controller.json
 kubectl delete -f examples/guestbook/redis-master-service.json
 kubectl delete -f examples/guestbook/redis-slave-service.json
 kubectl delete pod redis-master # This is the only pod that requires manual removal.
