@@ -24,8 +24,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	docker "github.com/fsouza/go-dockerclient"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 type listContainersResult struct {
@@ -68,10 +70,14 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 }
 
 func TestRunOnce(t *testing.T) {
+	cadvisor := &cadvisor.Mock{}
+	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kb := &Kubelet{
 		rootDirectory: "/tmp/kubelet",
 		recorder:      &record.FakeRecorder{},
+		cadvisor:      cadvisor,
 	}
+
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}

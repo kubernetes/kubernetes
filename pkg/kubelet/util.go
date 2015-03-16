@@ -17,10 +17,13 @@ limitations under the License.
 package kubelet
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/golang/glog"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 // TODO: move this into pkg/capabilities
@@ -39,4 +42,16 @@ func SetupLogging() {
 func SetupEventSending(client *client.Client, hostname string) {
 	glog.Infof("Sending events to api server.")
 	record.StartRecording(client.Events(""))
+}
+
+func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
+	c := api.ResourceList{
+		api.ResourceCPU: *resource.NewMilliQuantity(
+			int64(info.NumCores*1000),
+			resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(
+			info.MemoryCapacity,
+			resource.BinarySI),
+	}
+	return c
 }
