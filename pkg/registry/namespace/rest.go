@@ -38,7 +38,7 @@ type namespaceStrategy struct {
 // objects via the REST API.
 var Strategy = namespaceStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// NamespaceScoped is true for namespaces.
+// NamespaceScoped is false for namespaces.
 func (namespaceStrategy) NamespaceScoped() bool {
 	return false
 }
