@@ -105,6 +105,9 @@ type VolumeSource struct {
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret represents a secret to populate the volume with
 	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume with"`
+	// ISCSIDisk represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSIDisk *ISCSIDiskVolumeSource `json:"iscsiDisk"`
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -154,6 +157,24 @@ type GCEPersistentDiskVolumeSource struct {
 	// If omitted, kubelet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field 0 or empty.
 	Partition int `json:"partition,omitempty" description:"partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
+}
+
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIDiskVolumeSource struct {
+	// Required: iSCSI target IP
+	TargetIP string `json:"targetIP,omitempty" description:"iscsi target IP address"`
+	// Required:  target iSCSI Qualified Name
+	IQN string `json:"iqn,omitempty" description:"iSCSI Qualified Name"`
+	// Required: iSCSI target lun number
+	Lun int `json:"lun,omitempty" description:"iscsi target lun number"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`

@@ -18,6 +18,10 @@ limitations under the License.
 // an alternate platform, we will need to abstract further.
 package mount
 
+import (
+	"strings"
+)
+
 // Each supported platform must define the following flags:
 //   - FlagBind: specifies a bind mount
 //   - FlagReadOnly: the mount will be read-only
@@ -75,4 +79,41 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 		}
 	}
 	return refs, nil
+}
+
+// GetDeviceRefCount: given a device path, find its reference count from /proc/mounts
+// returns the reference count to the device and error code
+func GetDeviceRefCount(mounter Interface, deviceName string) (int, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return -1, err
+	}
+
+	// Find the number of references to the device.
+	refCount := 0
+	for i := range mps {
+		if strings.HasPrefix(mps[i].Device, deviceName) {
+			refCount++
+		}
+	}
+	return refCount, nil
+}
+
+// GetDeviceFromMnt: given a mnt point, find the device from /proc/mounts
+// returns the device name, reference count, and error code
+func GetDeviceFromMnt(mounter Interface, mnt string) (string, int, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return "", -1, err
+	}
+	device := ""
+	// Find the number of references to the device.
+	refCount := 0
+	for i := range mps {
+		if mps[i].Path == mnt {
+			device = mps[i].Device
+			refCount++
+		}
+	}
+	return device, refCount, nil
 }
