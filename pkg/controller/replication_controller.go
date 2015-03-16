@@ -58,7 +58,7 @@ type RealPodControl struct {
 }
 
 // Time period of main replication controller sync loop
-const DefaultSyncPeriod = 10 * time.Second
+const DefaultSyncPeriod = 5 * time.Second
 
 func (r RealPodControl) createReplica(namespace string, controller api.ReplicationController) {
 	desiredLabels := make(labels.Set)
