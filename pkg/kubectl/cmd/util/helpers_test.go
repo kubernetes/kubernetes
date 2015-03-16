@@ -49,10 +49,8 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{
-						Always: &api.RestartPolicyAlways{},
-					},
-					DNSPolicy: api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -69,11 +67,9 @@ func TestMerge(t *testing.T) {
 					Name: "baz",
 				},
 				Spec: api.PodSpec{
-					Host: "bar",
-					RestartPolicy: api.RestartPolicy{
-						Always: &api.RestartPolicyAlways{},
-					},
-					DNSPolicy: api.DNSClusterFirst,
+					Host:          "bar",
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -100,10 +96,8 @@ func TestMerge(t *testing.T) {
 							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 					},
-					RestartPolicy: api.RestartPolicy{
-						Always: &api.RestartPolicyAlways{},
-					},
-					DNSPolicy: api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -127,10 +121,8 @@ func TestMerge(t *testing.T) {
 					Name: "",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{
-						Always: &api.RestartPolicyAlways{},
-					},
-					DNSPolicy: api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},

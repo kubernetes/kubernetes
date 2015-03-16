@@ -522,22 +522,17 @@ type PodCondition struct {
 // PodInfo contains one entry for every container with available info.
 type PodInfo map[string]ContainerStatus
 
-type RestartPolicyAlways struct{}
+// RestartPolicy describes how the container should be restarted.
+// Only one of the following restart policies may be specified.
+// If none of the following policies is specified, the default one
+// is RestartPolicyAlways.
+type RestartPolicy string
 
-// TODO(dchen1107): Define what kinds of failures should restart.
-// TODO(dchen1107): Decide whether to support policy knobs, and, if so, which ones.
-type RestartPolicyOnFailure struct{}
-
-type RestartPolicyNever struct{}
-
-type RestartPolicy struct {
-	// Only one of the following restart policies may be specified.
-	// If none of the following policies is specified, the default one
-	// is RestartPolicyAlways.
-	Always    *RestartPolicyAlways    `json:"always,omitempty" description:"always restart the container after termination"`
-	OnFailure *RestartPolicyOnFailure `json:"onFailure,omitempty" description:"restart the container if it fails for any reason, but not if it succeeds (exit 0)"`
-	Never     *RestartPolicyNever     `json:"never,omitempty" description:"never restart the container"`
-}
+const (
+	RestartPolicyAlways    RestartPolicy = "Always"
+	RestartPolicyOnFailure RestartPolicy = "OnFailure"
+	RestartPolicyNever     RestartPolicy = "Never"
+)
 
 // DNSPolicy defines how a pod's DNS will be configured.
 type DNSPolicy string

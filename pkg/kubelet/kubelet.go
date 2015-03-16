@@ -1160,12 +1160,12 @@ func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api
 	}
 
 	if len(recentContainers) > 0 {
-		if pod.Spec.RestartPolicy.Never != nil {
+		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
 			glog.Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
 			return false
 
 		}
-		if pod.Spec.RestartPolicy.OnFailure != nil {
+		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
 			// Check the exit code of last run
 			if recentContainers[0].State.ExitCode == 0 {
 				glog.Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
@@ -1297,7 +1297,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.BoundPod, containersInPod
 					delete(containersToKeep, podInfraContainerID)
 					// If we are to restart Infra Container then we move containersToKeep into containersToStart
 					// if RestartPolicy allows restarting failed containers.
-					if pod.Spec.RestartPolicy.Never == nil {
+					if pod.Spec.RestartPolicy != api.RestartPolicyNever {
 						for _, v := range containersToKeep {
 							containersToStart[v] = empty{}
 						}
@@ -1309,7 +1309,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.BoundPod, containersInPod
 				// If we're creating infra containere everything will be killed anyway
 				// If RestartPolicy is Always or OnFailure we restart containers that were running before we
 				// killed them when restarting Infra Container.
-				if pod.Spec.RestartPolicy.Never == nil {
+				if pod.Spec.RestartPolicy != api.RestartPolicyNever {
 					glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
 					containersToStart[index] = empty{}
 				}
@@ -1939,7 +1939,7 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 		return api.PodRunning
 	case running == 0 && stopped > 0 && unknown == 0:
 		// All containers are terminated
-		if spec.RestartPolicy.Always != nil {
+		if spec.RestartPolicy == api.RestartPolicyAlways {
 			// All containers are in the process of restarting
 			return api.PodRunning
 		}
@@ -1948,7 +1948,7 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 			// containers are terminated in success
 			return api.PodSucceeded
 		}
-		if spec.RestartPolicy.Never != nil {
+		if spec.RestartPolicy == api.RestartPolicyNever {
 			// RestartPolicy is Never, and all containers are
 			// terminated with at least one in failure
 			return api.PodFailed

@@ -627,7 +627,7 @@ func runServiceTest(client *client.Client) {
 					ImagePullPolicy: "PullIfNotPresent",
 				},
 			},
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		Status: api.PodStatus{

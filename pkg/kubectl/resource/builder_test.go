@@ -89,14 +89,14 @@ func testData() (*api.PodList, *api.ServiceList) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},

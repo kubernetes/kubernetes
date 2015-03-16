@@ -172,7 +172,7 @@ func TestHelperCreate(t *testing.T) {
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
@@ -418,7 +418,7 @@ func TestHelperUpdate(t *testing.T) {
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},

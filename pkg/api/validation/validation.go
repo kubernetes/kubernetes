@@ -600,20 +600,16 @@ func ValidateManifest(manifest *api.ContainerManifest) errs.ValidationErrorList 
 }
 
 func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ValidationErrorList {
-	numPolicies := 0
 	allErrors := errs.ValidationErrorList{}
-	if restartPolicy.Always != nil {
-		numPolicies++
+	switch *restartPolicy {
+	case api.RestartPolicyAlways, api.RestartPolicyOnFailure, api.RestartPolicyNever:
+		break
+	case "":
+		allErrors = append(allErrors, errs.NewFieldRequired("", *restartPolicy))
+	default:
+		allErrors = append(allErrors, errs.NewFieldNotSupported("", restartPolicy))
 	}
-	if restartPolicy.OnFailure != nil {
-		numPolicies++
-	}
-	if restartPolicy.Never != nil {
-		numPolicies++
-	}
-	if numPolicies != 1 {
-		allErrors = append(allErrors, errs.NewFieldInvalid("", restartPolicy, "only 1 policy is allowed"))
-	}
+
 	return allErrors
 }
 
@@ -786,10 +782,8 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 		}
 		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template, spec.Replicas).Prefix("template")...)
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
-		if spec.Template.Spec.RestartPolicy.Always == nil {
-			// TODO: should probably be Unsupported
-			// TODO: api.RestartPolicy should have a String() method for nicer printing
-			allErrs = append(allErrs, errs.NewFieldInvalid("template.restartPolicy", spec.Template.Spec.RestartPolicy, "must be Always"))
+		if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
+			allErrs = append(allErrs, errs.NewFieldNotSupported("template.restartPolicy", spec.Template.Spec.RestartPolicy))
 		}
 	}
 	return allErrs

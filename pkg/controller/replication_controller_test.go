@@ -85,10 +85,8 @@ func newReplicationController(replicas int) api.ReplicationController {
 							ImagePullPolicy:        api.PullIfNotPresent,
 						},
 					},
-					RestartPolicy: api.RestartPolicy{
-						Always: &api.RestartPolicyAlways{},
-					},
-					DNSPolicy: api.DNSDefault,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
 					NodeSelector: map[string]string{
 						"baz": "blah",
 					},

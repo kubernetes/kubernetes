@@ -85,13 +85,13 @@ func FilterQuotaPods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
 		// a pod that has a restart policy always no matter its state counts against usage
-		if value.Spec.RestartPolicy.Always != nil {
+		if value.Spec.RestartPolicy == api.RestartPolicyAlways {
 			result = append(result, value)
 			continue
 		}
 		// a failed pod with a restart policy of on failure will count against usage
 		if api.PodFailed == value.Status.Phase &&
-			value.Spec.RestartPolicy.OnFailure != nil {
+			value.Spec.RestartPolicy == api.RestartPolicyOnFailure {
 			result = append(result, value)
 			continue
 		}

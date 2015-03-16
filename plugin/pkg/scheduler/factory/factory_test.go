@@ -352,7 +352,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}

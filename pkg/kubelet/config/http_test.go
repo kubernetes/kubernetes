@@ -140,7 +140,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						SelfLink:  "/api/v1beta1/boundPods/foo",
 					},
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
@@ -162,7 +162,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						Namespace: "foobar",
 					},
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 					},
 				}),
@@ -181,7 +181,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						SelfLink:  "/api/v1beta1/boundPods/foo",
 					},
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
@@ -209,7 +209,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						SelfLink:  "/api/v1beta1/boundPods/foo",
 					},
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",
@@ -226,7 +226,7 @@ func TestExtractFromHTTP(t *testing.T) {
 						SelfLink:  "/api/v1beta1/boundPods/bar",
 					},
 					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
 							Name:  "1",

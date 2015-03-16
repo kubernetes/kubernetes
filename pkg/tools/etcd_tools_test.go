@@ -107,21 +107,21 @@ func TestExtractToList(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
@@ -190,21 +190,21 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
@@ -260,21 +260,21 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
@@ -297,7 +297,7 @@ func TestExtractObj(t *testing.T) {
 	expect := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}

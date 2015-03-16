@@ -336,9 +336,7 @@ var _ = Describe("Pods", func() {
 						Command: []string{"sh", "-c", "env; sleep 600"},
 					},
 				},
-				RestartPolicy: api.RestartPolicy{
-					Never: &api.RestartPolicyNever{},
-				},
+				RestartPolicy: api.RestartPolicyNever,
 			},
 		}
 		defer c.Pods(api.NamespaceDefault).Delete(clientPod.Name)

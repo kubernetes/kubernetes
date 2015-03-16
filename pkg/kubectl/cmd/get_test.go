@@ -43,14 +43,14 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
@@ -322,7 +322,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				ResourceVersion: "10",
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
@@ -337,7 +337,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					ResourceVersion: "11",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
@@ -351,7 +351,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					ResourceVersion: "12",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},

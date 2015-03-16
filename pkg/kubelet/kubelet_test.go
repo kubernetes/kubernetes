@@ -2433,7 +2433,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
-		RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+		RestartPolicy: api.RestartPolicyAlways,
 	}
 	currentState := api.PodStatus{
 		Host: "machine",
@@ -2524,7 +2524,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
-		RestartPolicy: api.RestartPolicy{Never: &api.RestartPolicyNever{}},
+		RestartPolicy: api.RestartPolicyNever,
 	}
 	currentState := api.PodStatus{
 		Host: "machine",
@@ -2638,7 +2638,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
-		RestartPolicy: api.RestartPolicy{OnFailure: &api.RestartPolicyOnFailure{}},
+		RestartPolicy: api.RestartPolicyOnFailure,
 	}
 	currentState := api.PodStatus{
 		Host: "machine",
