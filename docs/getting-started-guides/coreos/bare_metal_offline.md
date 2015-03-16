@@ -2,14 +2,6 @@
 Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
 
 
-## Goal
-At this point in the community we can not and should not try and solve any of the current issues at hand in the Docker space. 
-Instead, try to add ease of use for enterprise customers looking to develop or deploy applications into the new container ecosystem offline.
-
-The goal for this walk through is to deploy and configure CoreOS with Kubernetes to establish a full ecosystem to run containers in. 
-In this case we are building this system in a real world scenario using pxelinux and have no guaranteed connection to the internet.
-
-
 ## High Level Design
 1. Manage the tftp directory 
   * /tftpboot/(coreos)(centos)(RHEL)
@@ -17,11 +9,11 @@ In this case we are building this system in a real world scenario using pxelinux
 2. Update per install the link for pxelinux
 3. Update the DHCP config to reflect the host needing deployment
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
-5. We don't have access to the public [etcd discovery tool](https://discovery.etcd.io/). 
-5. CoreOS etcd master has been created we move on to installing the CoreOS slaves to become our Kubernetes minions.
+5. No have access to the public [etcd discovery tool](https://discovery.etcd.io/). 
+6. Installing the CoreOS slaves to become Kubernetes minions.
 
 ## Pre-requisites
-1. Installed *CentOS 6* for our PXE server
+1. Installed *CentOS 6* for PXE server
 2. At least two bare metal nodes to work with
 
 ## This Guides variables
@@ -75,15 +67,15 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
                 MENU LABEL Boot local hard drive
                 LOCALBOOT 0
 
-Now you should have a working PXELINUX setup for us to use to image our CoreOS nodes. You can test this our using VirtualBox locally or with your bare metal server at hand for this guide.
+Now you should have a working PXELINUX setup to image CoreOS nodes. You can verify the services by using VirtualBox locally or with bare metal servers.
 
 ## Adding CoreOS to PXE
-We want to make sure that we either have an expandable pxelinux config or we are just doing a deploy setup alongside a pre-existing pxelinux setup. This portion takes you to the point were you can pxe a non-cluster bare CoreOS install.
+This section decribes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment. 
 
-1. Find or create your TFTP root directory that everything will be based off of.
+1. Find or create the TFTP root directory that everything will be based off of.
     * For this document we will assume ```/tftpboot/``` is our root dir.
-2. Once we know and have our tftp root directory we will create a new folder under here for our CoreOS installer bits.
-3. Download and/or copy the CoreOS PXE files provided by the CoreOS team.
+2. Once we know and have our tftp root directory we will create a new directory structure for our CoreOS images.
+3. Download the CoreOS PXE files provided by the CoreOS team.
 
         MY_TFTPROOT_DIR=/tftpboot
         mkdir -p $MY_TFTPROOT_DIR/images/coreos/
@@ -122,16 +114,16 @@ We want to make sure that we either have an expandable pxelinux config or we are
                 APPEND initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<xxx.xxx.xxx.xxx>/pxe-cloud-config-slave.yml
         MENU END
 
-This setup will get you to the point of being able to now boot from local drive but have the option to PXE the CoreOS image. 
+This configuration file will now boot from local drive but have the option to PXE image CoreOS. 
 
 ## DHCP configuration 
-We now need to configure the DHCP server to hand out our images. In this case we are assuming that there are other servers that will boot alongside other images. We will solve this by setting up a linking system to point specific MAC addresses to a specific pxelinix.cfg file.
+This section covers configuring the DHCP server to hand out our new images. In this case we are assuming that there are other servers that will boot alongside other images.
 
-1. The filename for the servers in question here will be pxelinux.0 
+1. Add the ```filename``` to the _host_ or _subnet_ sections.
 
         filename "/tftpboot/pxelinux.0";
 
-2. At this point we want to make a few pxelinux config files that will be the templates for the different CoreOS deployments.
+2. At this point we want to make pxelinux configuration files that will be the templates for the different CoreOS deployments.
 
         subnet 10.20.30.0 netmask 255.255.255.0 {
                 next-server 10.20.30.242;
@@ -557,9 +549,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
 
 
 ## New pxelinux.cfg file
-To control  what nodes are using what pxe-config file we will use the pxelinux MAC targets to specify the slaves from master.
-
-First create a new pxelinux target file ```vi /tftpboot/pxelinux.cfg/coreos-node-slave```
+Create a pxelinux target file for a _slave_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-slave```
 
     default coreos
     prompt 1
@@ -572,7 +562,7 @@ First create a new pxelinux target file ```vi /tftpboot/pxelinux.cfg/coreos-node
       kernel images/coreos/coreos_production_pxe.vmlinuz
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-slave.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
-And one for the master: ```vi /tftpboot/pxelinux.cfg/coreos-node-master```
+And one for the _master_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-master```
 
     default coreos
     prompt 1
@@ -585,10 +575,10 @@ And one for the master: ```vi /tftpboot/pxelinux.cfg/coreos-node-master```
       kernel images/coreos/coreos_production_pxe.vmlinuz
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-master.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
-## Specify pxelinux target
-Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets.
+## Specify the pxelinux targets
+Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets. We will do this by using the pxelinux mechanisum of setting a specific MAC addresses to a specific pxelinix.cfg file.
 
-In this walkthrough I will show with fake MAC addresses. documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
+Refer to the MAC adderess table in the begining of this guide. Documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
 
     cd /tftpboot/pxelinux.cfg
     ln -s coreos-node-master 01-d0-00-67-13-0d-00
@@ -601,10 +591,10 @@ Reboot these servers to get the images PXEd and ready for running containers!
 ## Creating test pod
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-Here is a fork where you can do a full walkthrough by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick version.
+Here is a fork where you can do a full walkthrough by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick test.
 
 
-On the Kubernetes Master node lets create the '''nginx.yml'''
+On the Kubernetes Master node lets create a '''nginx.yml'''
     
     apiVersion: v1beta1
     kind: Pod
@@ -623,7 +613,6 @@ Now add the pod to Kubernetes:
      kubectl create -f nginx.yml
 
 This might take a while to download depending on the environment.
-
     
 
 ## Helping commands for debugging
