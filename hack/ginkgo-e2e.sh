@@ -91,7 +91,8 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       # When we are using vagrant it has hard coded auth.  We repeat that here so that
       # we don't clobber auth that might be used for a publicly facing cluster.
       auth_config=(
-        "--auth_config=$HOME/.kubernetes_vagrant_auth"
+        "--auth_config=${HOME}/.kubernetes_vagrant_auth"
+        "--kubeconfig=${HOME}/.kubernetes_vagrant_kubeconfig"
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
       # With GKE, our auth and certs are in gcloud's config directory.
