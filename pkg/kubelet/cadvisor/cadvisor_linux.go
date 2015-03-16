@@ -25,8 +25,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	cadvisorFs "github.com/google/cadvisor/fs"
 	cadvisorHttp "github.com/google/cadvisor/http"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorApi2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/storage/memory"
 	"github.com/google/cadvisor/utils/sysfs"
@@ -109,4 +111,20 @@ func (self *cadvisorClient) ContainerInfo(name string, req *cadvisorApi.Containe
 
 func (self *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return self.GetMachineInfo()
+}
+
+func (self *cadvisorClient) DockerImagesFsInfo() (cadvisorApi2.FsInfo, error) {
+	res, err := self.GetFsInfo(cadvisorFs.LabelDockerImages)
+	if err != nil {
+		return cadvisorApi2.FsInfo{}, err
+	}
+	if len(res) == 0 {
+		return cadvisorApi2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem containing Docker images")
+	}
+	// TODO(vmarmol): Handle this better when Docker has more than one image filesystem.
+	if len(res) > 1 {
+		glog.Warningf("More than one Docker images filesystem: %#v. Only using the first one", res)
+	}
+
+	return res[0], nil
 }
