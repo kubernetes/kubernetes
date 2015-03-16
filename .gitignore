@@ -1,6 +1,9 @@
 # OSX leaves these everywhere on SMB shares
 ._*
 
+# OSX trash
+.DS_Store
+
 # Eclipse files
 .classpath
 .project
