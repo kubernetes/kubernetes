@@ -7,7 +7,7 @@
 KUBELET_OPTS="--address=127.0.0.1 \
 --port=10250 \
 --hostname_override=127.0.0.1 \
---etcd_servers=http://127.0.0.1:4001 \
+--api_servers=http://127.0.0.1:8080 \
 --logtostderr=true"
 
 # Add more envionrment settings used by kube-scheduler here
