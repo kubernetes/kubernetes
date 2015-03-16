@@ -468,6 +468,10 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	glog.V(4).Infof("Received update notice: %+v", services)
 	activeServices := make(map[types.NamespacedName]bool) // use a map as a set
 	for _, service := range services {
+		// if PortalIP is "None" or empty, skip proxying
+		if !api.IsServiceIPSet(&service) {
+			continue
+		}
 		serviceName := types.NamespacedName{service.Namespace, service.Name}
 		activeServices[serviceName] = true
 		info, exists := proxier.getServiceInfo(serviceName)

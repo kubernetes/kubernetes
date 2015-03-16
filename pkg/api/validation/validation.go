@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"net"
 	"path"
 	"strings"
 
@@ -751,6 +752,12 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity))
 	}
 
+	if api.IsServiceIPSet(service) {
+		if ip := net.ParseIP(service.Spec.PortalIP); ip == nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "portalIP should be empty, 'None', or a valid IP address"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -760,8 +767,8 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldService.ObjectMeta, &service.ObjectMeta).Prefix("metadata")...)
 
 	// TODO: PortalIP should be a Status field, since the system can set a value != to the user's value
-	// PortalIP can only be set, not unset.
-	if oldService.Spec.PortalIP != "" && service.Spec.PortalIP != oldService.Spec.PortalIP {
+	// once PortalIP is set, it cannot be unset.
+	if api.IsServiceIPSet(oldService) && service.Spec.PortalIP != oldService.Spec.PortalIP {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable"))
 	}
 

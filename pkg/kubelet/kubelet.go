@@ -845,6 +845,10 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 
 	// project the services in namespace ns onto the master services
 	for _, service := range services.Items {
+		// ignore services where PortalIP is "None" or empty
+		if !api.IsServiceIPSet(&service) {
+			continue
+		}
 		serviceName := service.Name
 
 		switch service.Namespace {

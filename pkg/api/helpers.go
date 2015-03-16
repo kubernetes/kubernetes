@@ -84,3 +84,14 @@ func IsStandardResourceName(str string) bool {
 func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
 }
+
+// this function aims to check if the service portal IP is set or not
+// the objective is not to perform validation here
+func IsServiceIPSet(service *Service) bool {
+	return service.Spec.PortalIP != PortalIPNone && service.Spec.PortalIP != ""
+}
+
+// this function aims to check if the service portal IP is requested or not
+func IsServiceIPRequested(service *Service) bool {
+	return service.Spec.PortalIP == ""
+}

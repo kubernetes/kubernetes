@@ -54,6 +54,24 @@ func TestFromServices(t *testing.T) {
 					PortalIP: "9.8.7.6",
 				},
 			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "svrc-portalip-none"},
+				Spec: api.ServiceSpec{
+					Port:     8082,
+					Selector: map[string]string{"bar": "baz"},
+					Protocol: "TCP",
+					PortalIP: "None",
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{Name: "svrc-portalip-empty"},
+				Spec: api.ServiceSpec{
+					Port:     8082,
+					Selector: map[string]string{"bar": "baz"},
+					Protocol: "TCP",
+					PortalIP: "",
+				},
+			},
 		},
 	}
 	vars := envvars.FromServices(&sl)

@@ -400,7 +400,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP"}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", PortalIP: "1.2.3.4"}, Status: api.ServiceStatus{}},
 	})
 	svcInfo, exists := p.getServiceInfo(service)
 	if !exists {
@@ -440,7 +440,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	waitForNumProxyLoops(t, p, 0)
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "UDP"}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "UDP", PortalIP: "1.2.3.4"}, Status: api.ServiceStatus{}},
 	})
 	svcInfo, exists := p.getServiceInfo(service)
 	if !exists {
@@ -471,7 +471,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	waitForNumProxyLoops(t, p, 1)
 
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: 99, Protocol: "TCP"}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: 99, Protocol: "TCP", PortalIP: "1.2.3.4"}, Status: api.ServiceStatus{}},
 	})
 	// Wait for the socket to actually get free.
 	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
@@ -507,7 +507,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	waitForNumProxyLoops(t, p, 1)
 
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: 99, Protocol: "UDP"}, Status: api.ServiceStatus{}},
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: 99, Protocol: "UDP", PortalIP: "1.2.3.4"}, Status: api.ServiceStatus{}},
 	})
 	// Wait for the socket to actually get free.
 	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
@@ -518,6 +518,61 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		t.Fatalf("can't find serviceInfo")
 	}
 	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
+	waitForNumProxyLoops(t, p, 1)
+}
+
+func TestProxyUpdatePortal(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	service := types.NewNamespacedNameOrDie("testnamespace", "echo")
+	lb.OnUpdate([]api.Endpoints{
+		{
+			ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
+		},
+	})
+
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	waitForNumProxyLoops(t, p, 0)
+
+	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
+	waitForNumProxyLoops(t, p, 1)
+
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP"}, Status: api.ServiceStatus{}},
+	})
+	_, exists := p.getServiceInfo(service)
+	if exists {
+		t.Fatalf("service without portalIP should not be included in the proxy")
+	}
+
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", PortalIP: ""}, Status: api.ServiceStatus{}},
+	})
+	_, exists = p.getServiceInfo(service)
+	if exists {
+		t.Fatalf("service with empty portalIP should not be included in the proxy")
+	}
+
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", PortalIP: "None"}, Status: api.ServiceStatus{}},
+	})
+	_, exists = p.getServiceInfo(service)
+	if exists {
+		t.Fatalf("service with 'None' as portalIP should not be included in the proxy")
+	}
+
+	p.OnUpdate([]api.Service{
+		{ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", PortalIP: "1.2.3.4"}, Status: api.ServiceStatus{}},
+	})
+	svcInfo, exists = p.getServiceInfo(service)
+	if !exists {
+		t.Fatalf("service with portalIP set not found in the proxy")
+	}
+	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)
 }
 
