@@ -27,9 +27,11 @@ cluster/kube-up.sh
 
 The script above relies on AWS S3 to deploy the software to instances running in EC2.
 
-NOTE: The script will provision a new VPC and a 5 node k8s cluster in us-west-2 (Oregon). It'll also try to create a keypair called "kubernetes" as well as create or reuse an IAM role also called "kubernetes" so make sure one doesn't already exist prior to running the script in order to elminate a potential conflict.
+NOTE: The script will provision a new VPC and a 5 node k8s cluster in us-west-2 (Oregon). It'll also try to create or
+reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".  If these
+already exist, make sure you want them to be used here.
 
-Once the cluster is up, it will print the ip address of your cluster, this process takes ~5 minutes.
+Once the cluster is up, it will print the ip address of your cluster, this process takes about 5 to 10 minutes.
 
 ```
 export KUBERNETES_MASTER=https://<ip-address>
