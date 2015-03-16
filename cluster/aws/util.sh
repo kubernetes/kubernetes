@@ -308,7 +308,7 @@ function ensure-iam-profiles {
     create-iam-profile ${IAM_PROFILE_MASTER}
   }
   aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MINION} || {
-    echo "Creating master IAM profile: ${IAM_PROFILE_MINION}"
+    echo "Creating minion IAM profile: ${IAM_PROFILE_MINION}"
     create-iam-profile ${IAM_PROFILE_MINION}
   }
 }
