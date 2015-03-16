@@ -54,8 +54,8 @@ const (
 	influxdbDatabaseName = "k8s"
 	influxdbUser         = "root"
 	influxdbPW           = "root"
-	podlistQuery         = "select distinct(pod) from stats"
-	nodelistQuery        = "select distinct(hostname) from machine"
+	podlistQuery         = "select distinct(pod_id) from /cpu.*/"
+	nodelistQuery        = "select distinct(hostname) from /cpu.*/"
 	sleepBetweenAttempts = 5 * time.Second
 	testTimeout          = 5 * time.Minute
 )
@@ -89,7 +89,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 				return nil, err
 			}
 			for _, pod := range podList.Items {
-				expectedPods = append(expectedPods, pod.Name)
+				expectedPods = append(expectedPods, string(pod.UID))
 			}
 		}
 	}
