@@ -31,7 +31,7 @@ func NewSourceApiserver(client *client.Client, hostname string, updates chan<- i
 	newSourceApiserverFromLW(lw, updates)
 }
 
-// newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
+// newSourceApiserverFromLW holds creates a config source that watches an pulls from the apiserver.
 func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
 	send := func(objs []interface{}) {
 		var pods []api.Pod

@@ -39,7 +39,6 @@ type PodInterface interface {
 	Update(pod *api.Pod) (*api.Pod, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 	Bind(binding *api.Binding) error
-	UpdateStatus(name string, status *api.PodStatus) (*api.Pod, error)
 }
 
 // pods implements PodsNamespacer interface
@@ -63,7 +62,7 @@ func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 	return
 }
 
-// Get takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
+// GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
 func (c *pods) Get(name string) (result *api.Pod, err error) {
 	if len(name) == 0 {
 		return nil, errors.New("name is required parameter to Get")
@@ -74,19 +73,19 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 	return
 }
 
-// Delete takes the name of the pod, and returns an error if one occurs
+// DeletePod takes the name of the pod, and returns an error if one occurs
 func (c *pods) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
 }
 
-// Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
+// CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Post().Namespace(c.ns).Resource("pods").Body(pod).Do().Into(result)
 	return
 }
 
-// Update takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
+// UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	if len(pod.ResourceVersion) == 0 {
@@ -112,16 +111,4 @@ func (c *pods) Watch(label, field labels.Selector, resourceVersion string) (watc
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
 func (c *pods) Bind(binding *api.Binding) error {
 	return c.r.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
-}
-
-// UpdateStatus takes the name of the pod and the new status.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *pods) UpdateStatus(name string, newStatus *api.PodStatus) (result *api.Pod, err error) {
-	result = &api.Pod{}
-	pod, err := c.Get(name)
-	if err != nil {
-		return
-	}
-	pod.Status = *newStatus
-	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).SubResource("status").Body(pod).Do().Into(result)
-	return
 }

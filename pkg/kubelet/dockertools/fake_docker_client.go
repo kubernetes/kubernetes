@@ -126,7 +126,6 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 			Running: true,
 			Pid:     42,
 		},
-		NetworkSettings: &docker.NetworkSettings{IPAddress: "1.2.3.4"},
 	}
 	return f.Err
 }
