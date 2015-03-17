@@ -70,3 +70,8 @@ func (c *FakeEvents) Delete(name string) error {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-event", Value: name})
 	return nil
 }
+
+func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-field-selector"})
+	return fields.Everything()
+}

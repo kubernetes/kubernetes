@@ -42,6 +42,9 @@ type EventInterface interface {
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
 	Delete(name string) error
+	// Returns the appropriate field selector based on the API version being used to communicate with the server.
+	// The returned field selector can be used with List and Watch to filter desired events.
+	GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector
 }
 
 // events implements Events interface
@@ -148,20 +151,13 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	if e.namespace != "" && ref.Namespace != e.namespace {
 		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.namespace)
 	}
-	fields := fields.Set{}
-	if ref.Kind != "" {
-		fields["involvedObject.kind"] = ref.Kind
+	stringRefUID := string(ref.UID)
+	var refUID *string
+	if stringRefUID != "" {
+		refUID = &stringRefUID
 	}
-	if ref.Namespace != "" {
-		fields["involvedObject.namespace"] = ref.Namespace
-	}
-	if ref.Name != "" {
-		fields["involvedObject.name"] = ref.Name
-	}
-	if ref.UID != "" {
-		fields["involvedObject.uid"] = string(ref.UID)
-	}
-	return e.List(labels.Everything(), fields.AsSelector())
+	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, &ref.Kind, refUID)
+	return e.List(labels.Everything(), fieldSelector)
 }
 
 // Delete deletes an existing event.
@@ -172,4 +168,32 @@ func (e *events) Delete(name string) error {
 		Name(name).
 		Do().
 		Error()
+}
+
+// Returns the appropriate field selector based on the API version being used to communicate with the server.
+// The returned field selector can be used with List and Watch to filter desired events.
+func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
+	apiVersion := e.client.APIVersion()
+	field := fields.Set{}
+	if involvedObjectName != nil {
+		field[getInvolvedObjectNameFieldLabel(apiVersion)] = *involvedObjectName
+	}
+	if involvedObjectNamespace != nil {
+		field["involvedObject.namespace"] = *involvedObjectNamespace
+	}
+	if involvedObjectKind != nil {
+		field["involvedObject.kind"] = *involvedObjectKind
+	}
+	if involvedObjectUID != nil {
+		field["involvedObject.uid"] = *involvedObjectUID
+	}
+	return field.AsSelector()
+}
+
+// Returns the appropriate field label to use for name of the involved object as per the given API version.
+func getInvolvedObjectNameFieldLabel(version string) string {
+	if api.PreV1Beta3(version) {
+		return "involvedObject.id"
+	}
+	return "involvedObject.name"
 }
