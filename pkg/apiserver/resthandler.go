@@ -64,7 +64,7 @@ func GetResource(r RESTGetter, ctxFn ContextFunc, namer ScopeNamer, codec runtim
 		w := res.ResponseWriter
 		namespace, name, err := namer.Name(req)
 		if err != nil {
-			notFound(w, req.Request)
+			errorJSON(err, codec, w)
 			return
 		}
 		ctx := ctxFn(req)
@@ -108,7 +108,7 @@ func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runti
 
 		namespace, err := namer.Namespace(req)
 		if err != nil {
-			notFound(w, req.Request)
+			errorJSON(err, codec, w)
 			return
 		}
 		ctx := ctxFn(req)
@@ -143,7 +143,7 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 
 		namespace, err := namer.Namespace(req)
 		if err != nil {
-			notFound(w, req.Request)
+			errorJSON(err, codec, w)
 			return
 		}
 		ctx := ctxFn(req)
@@ -200,7 +200,7 @@ func PatchResource(r RESTPatcher, ctxFn ContextFunc, namer ScopeNamer, codec run
 
 		namespace, name, err := namer.Name(req)
 		if err != nil {
-			notFound(w, req.Request)
+			errorJSON(err, codec, w)
 			return
 		}
 
@@ -275,7 +275,7 @@ func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 
 		namespace, name, err := namer.Name(req)
 		if err != nil {
-			notFound(w, req.Request)
+			errorJSON(err, codec, w)
 			return
 		}
 		ctx := ctxFn(req)
@@ -339,7 +339,7 @@ func DeleteResource(r RESTDeleter, ctxFn ContextFunc, namer ScopeNamer, codec ru
 
 		namespace, name, err := namer.Name(req)
 		if err != nil {
-			notFound(w, req.Request)
+			errorJSON(err, codec, w)
 			return
 		}
 		ctx := ctxFn(req)
