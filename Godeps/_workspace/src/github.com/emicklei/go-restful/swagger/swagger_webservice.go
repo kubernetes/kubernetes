@@ -180,14 +180,13 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 		rootParams = append(rootParams, asSwaggerParameter(param.Data()))
 	}
 	// aggregate by path
-	pathToRoutes := map[string][]restful.Route{}
+	pathToRoutes := newOrderedRouteMap()
 	for _, other := range ws.Routes() {
 		if strings.HasPrefix(other.Path, pathPrefix) {
-			routes := pathToRoutes[other.Path]
-			pathToRoutes[other.Path] = append(routes, other)
+			pathToRoutes.Add(other.Path, other)
 		}
 	}
-	for path, routes := range pathToRoutes {
+	pathToRoutes.Do(func(path string, routes []restful.Route) {
 		api := Api{Path: strings.TrimSuffix(path, "/"), Description: ws.Documentation()}
 		for _, route := range routes {
 			operation := Operation{
@@ -217,7 +216,7 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 			api.Operations = append(api.Operations, operation)
 		}
 		decl.Apis = append(decl.Apis, api)
-	}
+	})
 	return decl
 }
 

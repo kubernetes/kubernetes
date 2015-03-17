@@ -9,8 +9,10 @@ import (
 	"testing"
 )
 
-func testJsonFromStruct(t *testing.T, sample interface{}, expectedJson string) {
-	compareJson(t, false, modelsFromStruct(sample), expectedJson)
+func testJsonFromStruct(t *testing.T, sample interface{}, expectedJson string) bool {
+	m := modelsFromStruct(sample)
+	data, _ := json.MarshalIndent(m, " ", " ")
+	return compareJson(t, string(data), expectedJson)
 }
 
 func modelsFromStruct(sample interface{}) map[string]Model {
@@ -20,32 +22,20 @@ func modelsFromStruct(sample interface{}) map[string]Model {
 	return models
 }
 
-func compareJson(t *testing.T, flatCompare bool, value interface{}, expectedJsonAsString string) {
-	var output []byte
-	var err error
-	if flatCompare {
-		output, err = json.Marshal(value)
-	} else {
-		output, err = json.MarshalIndent(value, " ", " ")
-	}
-	if err != nil {
-		t.Error(err.Error())
-		return
-	}
-	actual := string(output)
+func compareJson(t *testing.T, actualJsonAsString string, expectedJsonAsString string) bool {
 	var actualMap map[string]interface{}
+	json.Unmarshal([]byte(actualJsonAsString), &actualMap)
 	var expectedMap map[string]interface{}
-	json.Unmarshal(output, &actualMap)
 	json.Unmarshal([]byte(expectedJsonAsString), &expectedMap)
 	if !reflect.DeepEqual(actualMap, expectedMap) {
 		fmt.Println("---- expected -----")
 		fmt.Println(withLineNumbers(expectedJsonAsString))
 		fmt.Println("---- actual -----")
-		fmt.Println(withLineNumbers(actual))
-		fmt.Println("---- raw -----")
-		fmt.Println(actual)
+		fmt.Println(withLineNumbers(actualJsonAsString))
 		t.Error("there are differences")
+		return false
 	}
+	return true
 }
 
 func indexOfNonMatchingLine(actual, expected string) int {
