@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -324,8 +325,12 @@ func NewDockerContainerCommandRunner(client DockerInterface) ContainerCommandRun
 	return &dockerContainerCommandRunner{client: client}
 }
 
+func parseImageName(image string) (string, string) {
+	return parsers.ParseRepositoryTag(image)
+}
+
 func (p dockerPuller) Pull(image string) error {
-	image, tag := parseImageName(image)
+	repoToPull, tag := parseImageName(image)
 
 	// If no tag was specified, use the default "latest".
 	if len(tag) == 0 {
@@ -333,11 +338,11 @@ func (p dockerPuller) Pull(image string) error {
 	}
 
 	opts := docker.PullImageOptions{
-		Repository: image,
+		Repository: repoToPull,
 		Tag:        tag,
 	}
 
-	creds, ok := p.keyring.Lookup(image)
+	creds, ok := p.keyring.Lookup(repoToPull)
 	if !ok {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 	}
@@ -376,16 +381,6 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-// RequireLatestImage returns if the user wants the latest image
-func RequireLatestImage(name string) bool {
-	_, tag := parseImageName(name)
-
-	if tag == "latest" {
-		return true
-	}
-	return false
 }
 
 func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
@@ -768,29 +763,6 @@ func GetRunningContainers(client DockerInterface, ids []string) ([]*docker.Conta
 		}
 	}
 	return result, nil
-}
-
-// Parses image name including a tag and returns image name and tag.
-// TODO: Future Docker versions can parse the tag on daemon side, see
-// https://github.com/dotcloud/docker/issues/6876
-// So this can be deprecated at some point.
-func parseImageName(image string) (string, string) {
-	tag := ""
-	parts := strings.SplitN(image, "/", 2)
-	repo := ""
-	if len(parts) == 2 {
-		repo = parts[0]
-		image = parts[1]
-	}
-	parts = strings.SplitN(image, ":", 2)
-	if len(parts) == 2 {
-		image = parts[0]
-		tag = parts[1]
-	}
-	if repo != "" {
-		image = fmt.Sprintf("%s/%s", repo, image)
-	}
-	return image, tag
 }
 
 // Get a docker endpoint, either from the string passed in, or $DOCKER_HOST environment variables
