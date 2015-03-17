@@ -22,7 +22,7 @@ set -o pipefail
 
 KUBE_RELEASE_VERSION=${1-}
 
-VERSION_REGEX="v[0-9]+.[0-9]+(.[0-9]+)?"
+VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
 [[ ${KUBE_RELEASE_VERSION} =~ $VERSION_REGEX ]] || {
   echo "!!! You must specify the version you are releasing in the form of '$VERSION_REGEX'" >&2
   exit 1
@@ -34,9 +34,11 @@ KUBE_GCS_UPLOAD_RELEASE=y
 KUBE_GCS_RELEASE_BUCKET=kubernetes-release
 KUBE_GCS_PROJECT=google-containers
 KUBE_GCS_RELEASE_PREFIX=release/${KUBE_RELEASE_VERSION}
+KUBE_GCS_LATEST_FILE="release/latest.txt"
+KUBE_GCS_LATEST_CONTENTS=${KUBE_RELEASE_VERSION}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "$KUBE_ROOT/build/common.sh"
 
-
 kube::release::gcs::release
+kube::release::gcs::publish_latest_official
