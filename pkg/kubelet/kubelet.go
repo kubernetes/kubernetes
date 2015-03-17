@@ -117,7 +117,8 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	statusUpdateFrequency time.Duration) (*Kubelet, error) {
+	statusUpdateFrequency time.Duration,
+	ips int) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -186,6 +187,7 @@ func NewMainKubelet(
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
+		ipsAvailable:                   ips,
 	}
 
 	dockerCache, err := dockertools.NewDockerCache(dockerClient)
@@ -288,6 +290,9 @@ type Kubelet struct {
 	// A pod status cache currently used to store rejected pods and their statuses.
 	podStatusesLock sync.RWMutex
 	podStatuses     map[string]api.PodStatus
+
+	// Number of IP addresses which this Kubelet can assign
+	ipsAvailable int
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1876,6 +1881,9 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 			api.ResourceMemory: *resource.NewQuantity(
 				info.MemoryCapacity,
 				resource.BinarySI),
+			api.ResourceIPs: *resource.NewQuantity(
+				int64(kl.ipsAvailable),
+				resource.DecimalSI),
 		}
 	}
 

@@ -3265,6 +3265,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourceIPs:    *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 		Status: api.NodeStatus{
@@ -3314,6 +3315,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
 					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
+					api.ResourceIPs:    *resource.NewQuantity(0, resource.DecimalSI),
 				},
 			},
 			Status: api.NodeStatus{
@@ -3336,6 +3338,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourceIPs:    *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 		Status: api.NodeStatus{

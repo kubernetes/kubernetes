@@ -75,6 +75,7 @@ type KubeletServer struct {
 	ClusterDNS                     util.IP
 	ReallyCrashForTesting          bool
 	StreamingConnectionIdleTimeout time.Duration
+	AvailableIPs                   int
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -130,6 +131,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.ClusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, crash with panics more often.")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
+	fs.IntVar(&s.AvailableIPs, "available_ips", 32, "Number of IP addresses that this Kubelet server can assign.")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -183,6 +185,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  ProbeVolumePlugins(),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
+		IPsAvailable:                   s.AvailableIPs,
 	}
 
 	RunKubelet(&kcfg)
@@ -369,6 +372,7 @@ type KubeletConfig struct {
 	StreamingConnectionIdleTimeout time.Duration
 	Recorder                       record.EventRecorder
 	TLSOptions                     *kubelet.TLSOptions
+	IPsAvailable                   int
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -403,7 +407,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
 		kc.CadvisorInterface,
-		kc.StatusUpdateFrequency)
+		kc.StatusUpdateFrequency,
+		kc.IPsAvailable)
 
 	if err != nil {
 		return nil, err

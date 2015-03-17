@@ -40,3 +40,10 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	}
 	return &resource.Quantity{}
 }
+
+func (self *ResourceList) IPs() *resource.Quantity {
+	if val, ok := (*self)[ResourceIPs]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}

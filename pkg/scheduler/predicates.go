@@ -105,13 +105,12 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	podRequest := getResourceRequest(&pod)
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
-		// no resources requested always fits.
-		return true, nil
-	}
 	info, err := r.info.GetNodeInfo(node)
 	if err != nil {
 		return false, err
+	}
+	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
+		return int64(len(existingPods)) < info.Spec.Capacity.IPs().Value(), nil
 	}
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
@@ -126,15 +125,18 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 
 	fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 	fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
+	fitsIPs := int64(len(existingPods)) < info.Spec.Capacity.IPs().Value()
 	glog.V(3).Infof("Calculated fit: cpu: %v, memory %v", fitsCPU, fitsMemory)
 
-	return fitsCPU && fitsMemory, nil
+	return fitsCPU && fitsMemory && fitsIPs, nil
 }
 
 func NewResourceFitPredicate(info NodeInfo) FitPredicate {
 	fit := &ResourceFit{
 		info: info,
 	}
+	glog.Infof("got info: %+v", info)
+	glog.Infof("preinfo: %+v", fit.info)
 	return fit.PodFitsResources
 }
 
