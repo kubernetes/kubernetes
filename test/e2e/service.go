@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -178,8 +179,8 @@ var _ = Describe("Services", func() {
 		Expect(foundRO).To(Equal(true))
 	})
 
-	It("should serve basic a endpoint from pods", func(done Done) {
-		serviceName := "endpoint-test"
+	It("should serve a basic endpoint from pods", func(done Done) {
+		serviceName := "endpoint-test2"
 		ns := api.NamespaceDefault
 		labels := map[string]string{
 			"foo": "bar",
@@ -243,8 +244,58 @@ var _ = Describe("Services", func() {
 		defer func() {
 			close(done)
 		}()
-	}, 120.0)
+	}, 240.0)
+	It("should correctly serve identically named services in different namespaces on different external IP addresses", func(done Done) {
+		serviceNames := []string{"services-namespace-test0"} // Could add more here, but then it takes longer.
+		namespaces := []string{"namespace0", "namespace1"}   // As above.
+		labels := map[string]string{
+			"key0": "value0",
+			"key1": "value1",
+		}
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{},
+			Spec: api.ServiceSpec{
+				Port:                       80,
+				Selector:                   labels,
+				ContainerPort:              util.NewIntOrStringFromInt(80),
+				CreateExternalLoadBalancer: true,
+			},
+		}
+		publicIPs := []string{}
+		// We defer Gingko pieces that may Fail, so clean up at the end.
+		defer func() {
+			close(done)
+		}()
+		for _, namespace := range namespaces {
+			for _, serviceName := range serviceNames {
+				service.ObjectMeta.Name = serviceName
+				service.ObjectMeta.Namespace = namespace
+				By("creating service " + serviceName + " in namespace " + namespace)
+				result, err := c.Services(namespace).Create(service)
+				Expect(err).NotTo(HaveOccurred())
+				defer func(namespace, serviceName string) { // clean up when we're done
+					By("deleting service " + serviceName + " in namespace " + namespace)
+					err := c.Services(namespace).Delete(serviceName)
+					Expect(err).NotTo(HaveOccurred())
+				}(namespace, serviceName)
+				publicIPs = append(publicIPs, result.Spec.PublicIPs...) // Save 'em to check uniqueness
+			}
+		}
+		validateUniqueOrFail(publicIPs)
+	}, 240.0)
 })
+
+func validateUniqueOrFail(s []string) {
+	By(fmt.Sprintf("validating unique: %v", s))
+	sort.Strings(s)
+	var prev string
+	for i, elem := range s {
+		if i > 0 && elem == prev {
+			Fail("duplicate found: " + elem)
+		}
+		prev = elem
+	}
+}
 
 func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEndpoints []string, endpoints *api.Endpoints) {
 	ips := util.StringSet{}
@@ -263,7 +314,10 @@ func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEn
 		if !ips.Has(pod.Status.PodIP) {
 			Failf("ip validation failed, expected: %v, saw: %v", ips, pod.Status.PodIP)
 		}
+		By(fmt.Sprintf(""))
 	}
+	By(fmt.Sprintf("successfully validated IPs %v against expected endpoints %v port %d on namespace %s", ips, expectedEndpoints, expectedPort, ns))
+
 }
 
 func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedPort int, expectedEndpoints []string) {
@@ -274,17 +328,18 @@ func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedP
 				validateIPsOrFail(c, ns, expectedPort, expectedEndpoints, endpoints)
 				return
 			} else {
-				By(fmt.Sprintf("Unexpected endpoints: %v, expected %v", endpoints.Endpoints, expectedEndpoints))
+				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", endpoints.Endpoints, expectedEndpoints))
 			}
 		} else {
-			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1s)", err))
+			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1 second)", err))
 		}
 		time.Sleep(time.Second)
 	}
+	By(fmt.Sprintf("successfully validated endpoints %v port %d on service %s/%s", expectedEndpoints, expectedPort, ns, serviceName))
 }
 
 func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string) {
-	By(fmt.Sprintf("Adding pod %v", name))
+	By(fmt.Sprintf("Adding pod %v in namespace %v", name, ns))
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
