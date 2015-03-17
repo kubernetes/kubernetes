@@ -12,6 +12,7 @@ ExecStart=/usr/bin/kube-proxy \
 	    $KUBE_ETCD_SERVERS \
 	    $KUBE_PROXY_ARGS
 Restart=on-failure
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
