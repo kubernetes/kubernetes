@@ -1,6 +1,6 @@
 .PHONY:	build push
 
-TAG = 1.2
+TAG = 1.3
 
 build:	
 	sudo docker build -t kubernetes/fluentd-elasticsearch:$(TAG) .
