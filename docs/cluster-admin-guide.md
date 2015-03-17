@@ -56,6 +56,8 @@ project.](salt.md).
 * **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
   projects, teams, or customers to share a kubernetes cluster.
 
+* **Resource Quota** ([resource_quota_admin.md](resource_quota_admin.md)) 
+
 ## Security
 
 * **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
