@@ -22,6 +22,7 @@ import (
 	"errors"
 
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 )
 
 type cadvisorUnsupported struct {
@@ -45,4 +46,8 @@ func (self *cadvisorUnsupported) ContainerInfo(name string, req *cadvisorApi.Con
 
 func (self *cadvisorUnsupported) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return nil, unsupportedErr
+}
+
+func (self *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
+	return cadvisorApiV2.FsInfo{}, unsupportedErr
 }

@@ -18,6 +18,7 @@ package cadvisor
 
 import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
@@ -25,4 +26,7 @@ type Interface interface {
 	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
 	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	MachineInfo() (*cadvisorApi.MachineInfo, error)
+
+	// Returns usage information about the filesystem holding Docker images.
+	DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error)
 }

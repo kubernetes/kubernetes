@@ -18,6 +18,7 @@ package cadvisor
 
 import (
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 )
 
 // Fake cAdvisor implementation.
@@ -36,4 +37,8 @@ func (c *Fake) DockerContainer(name string, req *cadvisorApi.ContainerInfoReques
 
 func (c *Fake) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return new(cadvisorApi.MachineInfo), nil
+}
+
+func (c *Fake) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
+	return cadvisorApiV2.FsInfo{}, nil
 }
