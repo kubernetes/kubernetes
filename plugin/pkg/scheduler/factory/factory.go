@@ -110,6 +110,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 		PodLister:     f.PodLister,
 		ServiceLister: f.ServiceLister,
 		NodeLister:    f.NodeLister,
+		NodeInfo:      f.NodeLister,
 	}
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
