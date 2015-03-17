@@ -60,7 +60,16 @@ if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   exit 0
 fi
 
-release=v0.11.0
+function get_latest_version_number {
+  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/latest.txt"
+  if [[ $(which wget) ]]; then
+    wget -qO- ${latest_url}
+  elif [[ $(which curl) ]]; then
+    curl -Ss ${latest_url}
+  fi
+}
+
+release=$(get_latest_version_number)
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
@@ -116,4 +125,3 @@ tar -xzf ${file}
 rm ${file}
 
 create_cluster
-
