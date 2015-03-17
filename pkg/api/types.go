@@ -1468,25 +1468,22 @@ type AutoScalerSpec struct {
 	// Thresholds holds a collection of AutoScaleThresholds that drive the auto-scaler.
 	Thresholds []AutoScaleThreshold `json:"thresholds,omitempty"`
 
-	// Enabled turns auto scaling on or off.
-	Enabled bool `json:"enabled,omitempty"`
-
 	// MaxAutoScaleCount defines the max replicas that the auto-scaler can use.  This value must be
 	// >= MinAutoScaleCount.
-	MaxAutoScaleCount int `json:"maxAutoScaleCount,omitempty"`
+	MaxAutoScaleCount int64 `json:"maxAutoScaleCount,omitempty"`
 
 	// MinAutoScaleCount defines the minimum number replicas that the auto-scaler can reduce to,
 	// 0 means that the application is allowed to idle.
-	MinAutoScaleCount int `json:"minAutoScaleCount,omitempty"`
+	MinAutoScaleCount int64 `json:"minAutoScaleCount,omitempty"`
 
 	// TargetSelector provides the resizeable target(s).  Right now this is a ReplicationController
 	// in the future it could be a job or any resource that implements resize.  If multiple targets
 	// are resolved by the selector the auto-scaler will resize the largest one.
 	TargetSelector map[string]string `json:"targetSelector,omitempty"`
 
-	// MonitorSelector defines a set of capacity that the auto-scaler is monitoring
+	// MonitorSelector defines a set of resources that the auto-scaler is monitoring
 	// (replication controllers).  Monitored objects are used by thresholds to examine
-	// statistics.  Example: get statistic X for object Y to see if threshold is passed.
+	// statistics.  Example: get statistic X for object Y (the monitored object) to see if threshold is passed.
 	MonitorSelector map[string]string `json:"monitorSelector,omitempty"`
 }
 
