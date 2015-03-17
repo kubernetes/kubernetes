@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -130,7 +131,7 @@ var _ = Describe("Pods", func() {
 		}
 		Expect(len(pods.Items)).To(Equal(0))
 		w, err := podClient.Watch(
-			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), labels.Everything(), pods.ListMeta.ResourceVersion)
+			labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything(), pods.ListMeta.ResourceVersion)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to set up watch: %v", err))
 		}

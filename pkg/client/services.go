@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -37,7 +38,7 @@ type ServiceInterface interface {
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // services implements PodsNamespacer interface
@@ -57,7 +58,7 @@ func (c *services) List(selector labels.Selector) (result *api.ServiceList, err 
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
 		Do().
 		Into(result)
 	return
@@ -98,13 +99,13 @@ func (c *services) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *services) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *services) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -122,7 +123,7 @@ func (rm *ReplicationManager) Run(period time.Duration) {
 func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 	watching, err := rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(
 		labels.Everything(),
-		labels.Everything(),
+		fields.Everything(),
 		*resourceVersion,
 	)
 	if err != nil {

@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -29,7 +30,7 @@ type FakeSecrets struct {
 	Namespace string
 }
 
-func (c *FakeSecrets) List(labels, fields labels.Selector) (*api.SecretList, error) {
+func (c *FakeSecrets) List(labels labels.Selector, field fields.Selector) (*api.SecretList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-secrets"})
 	return &c.Fake.SecretList, c.Fake.Err
 }
@@ -54,7 +55,7 @@ func (c *FakeSecrets) Delete(secret string) error {
 	return nil
 }
 
-func (c *FakeSecrets) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakeSecrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-secrets", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

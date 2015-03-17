@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -53,7 +54,7 @@ func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error
 	return &api.Namespace{}, nil
 }
 
-func (c *FakeNamespaces) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-namespaces", Value: resourceVersion})
 	return c.Fake.Watch, nil
 }

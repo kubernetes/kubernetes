@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -37,7 +38,7 @@ type ReplicationControllerInterface interface {
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string) error
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // replicationControllers implements ReplicationControllersNamespacer interface
@@ -54,7 +55,7 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 // List takes a selector, and returns the list of replication controllers that match that selector.
 func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -93,13 +94,13 @@ func (c *replicationControllers) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
-func (c *replicationControllers) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *replicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationControllers").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

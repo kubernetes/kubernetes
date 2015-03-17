@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ type NamespaceInterface interface {
 	List(selector labels.Selector) (*api.NamespaceList, error)
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // namespaces implements NamespacesInterface
@@ -58,7 +59,7 @@ func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 // List lists all the namespaces in the cluster.
 func (c *namespaces) List(selector labels.Selector) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
-	err := c.r.Get().Resource("namespaces").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err := c.r.Get().Resource("namespaces").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return result, err
 }
 
@@ -90,12 +91,12 @@ func (c *namespaces) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *namespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("namespaces").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

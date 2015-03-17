@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
 )
@@ -205,7 +206,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 	if err != nil {
 		events, err2 := d.Events(namespace).List(
 			labels.Everything(),
-			labels.Set{
+			fields.Set{
 				"involvedObject.name":      name,
 				"involvedObject.namespace": namespace,
 			}.AsSelector(),

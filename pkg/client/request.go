@@ -288,8 +288,19 @@ func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 	return r.setParam(paramName, selector)
 }
 
-// SelectorParam adds the given selector as a query parameter with the name paramName.
-func (r *Request) SelectorParam(paramName string, s labels.Selector) *Request {
+// FieldsSelectorParam adds the given selector as a query parameter with the name paramName.
+func (r *Request) FieldsSelectorParam(paramName string, s fields.Selector) *Request {
+	if r.err != nil {
+		return r
+	}
+	if s.Empty() {
+		return r
+	}
+	return r.setParam(paramName, s.String())
+}
+
+// LabelsSelectorParam adds the given selector as a query parameter
+func (r *Request) LabelsSelectorParam(paramName string, s labels.Selector) *Request {
 	if r.err != nil {
 		return r
 	}

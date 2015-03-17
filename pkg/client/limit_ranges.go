@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -37,7 +38,7 @@ type LimitRangeInterface interface {
 	Delete(name string) error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // limitRanges implements LimitRangesNamespacer interface
@@ -57,7 +58,7 @@ func newLimitRanges(c *Client, namespace string) *limitRanges {
 // List takes a selector, and returns the list of limitRanges that match that selector.
 func (c *limitRanges) List(selector labels.Selector) (result *api.LimitRangeList, err error) {
 	result = &api.LimitRangeList{}
-	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -96,13 +97,13 @@ func (c *limitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *limitRanges) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *limitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("limitRanges").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

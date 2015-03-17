@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -54,7 +55,7 @@ func (c *FakeServices) Delete(service string) error {
 	return nil
 }
 
-func (c *FakeServices) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakeServices) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-services", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

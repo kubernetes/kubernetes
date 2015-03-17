@@ -19,6 +19,7 @@ package resource
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -65,19 +66,19 @@ func (m *Helper) List(namespace, apiVersion string, selector labels.Selector) (r
 	return m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		SelectorParam(api.LabelSelectorQueryParam(apiVersion), selector).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(apiVersion), selector).
 		Do().
 		Get()
 }
 
-func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
+func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector, fieldSelector fields.Selector) (watch.Interface, error) {
 	return m.RESTClient.Get().
 		Prefix("watch").
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(apiVersion), labelSelector).
-		SelectorParam(api.FieldSelectorQueryParam(apiVersion), fieldSelector).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(apiVersion), labelSelector).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(apiVersion), fieldSelector).
 		Watch()
 }
 

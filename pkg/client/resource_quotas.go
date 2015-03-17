@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -38,7 +39,7 @@ type ResourceQuotaInterface interface {
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Status(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // resourceQuotas implements ResourceQuotasNamespacer interface
@@ -58,7 +59,7 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
 func (c *resourceQuotas) List(selector labels.Selector) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -108,13 +109,13 @@ func (c *resourceQuotas) Status(resourceQuota *api.ResourceQuota) (result *api.R
 }
 
 // Watch returns a watch.Interface that watches the requested resource
-func (c *resourceQuotas) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *resourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("resourceQuotas").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

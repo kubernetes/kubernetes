@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -71,7 +72,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().APIVersion, r.Selector, labels.Everything())
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().APIVersion, r.Selector, fields.Everything())
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

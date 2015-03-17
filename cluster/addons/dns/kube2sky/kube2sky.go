@@ -29,6 +29,7 @@ import (
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	kfields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -194,7 +195,7 @@ func main() {
 // across ALL namespaces
 type servicesWatcher interface {
 	List(label klabels.Selector) (*kapi.ServiceList, error)
-	Watch(label, field klabels.Selector, resourceVersion string) (kwatch.Interface, error)
+	Watch(label klabels.Selector, field kfields.Selector, resourceVersion string) (kwatch.Interface, error)
 }
 
 type operation int
@@ -239,7 +240,7 @@ func watchLoop(svcWatcher servicesWatcher, updates chan<- serviceUpdate, resourc
 		updates <- serviceUpdate{Op: SetServices, Services: services.Items}
 	}
 
-	watcher, err := svcWatcher.Watch(klabels.Everything(), klabels.Everything(), *resourceVersion)
+	watcher, err := svcWatcher.Watch(klabels.Everything(), kfields.Everything(), *resourceVersion)
 	if err != nil {
 		log.Printf("Failed to watch for service changes: %v", err)
 		return

@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -54,7 +55,7 @@ func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (*api.LimitRange, e
 	return &api.LimitRange{}, nil
 }
 
-func (c *FakeLimitRanges) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-limitRange", Value: resourceVersion})
 	return c.Fake.Watch, nil
 }

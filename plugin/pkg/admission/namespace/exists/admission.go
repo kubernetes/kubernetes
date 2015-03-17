@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -88,7 +89,7 @@ func NewExists(c client.Interface) admission.Interface {
 				return c.Namespaces().List(labels.Everything())
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return c.Namespaces().Watch(labels.Everything(), labels.Everything(), resourceVersion)
+				return c.Namespaces().Watch(labels.Everything(), fields.Everything(), resourceVersion)
 			},
 		},
 		&api.Namespace{},

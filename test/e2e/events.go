@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -96,7 +97,7 @@ var _ = Describe("Events", func() {
 		By("checking for scheduler event about the pod")
 		events, err := c.Events(api.NamespaceDefault).List(
 			labels.Everything(),
-			labels.Set{
+			fields.Set{
 				"involvedObject.kind":      "Pod",
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.namespace": api.NamespaceDefault,
@@ -113,7 +114,7 @@ var _ = Describe("Events", func() {
 		By("checking for kubelet event about the pod")
 		events, err = c.Events(api.NamespaceDefault).List(
 			labels.Everything(),
-			labels.Set{
+			fields.Set{
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": api.NamespaceDefault,

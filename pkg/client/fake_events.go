@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -42,7 +43,7 @@ func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
 }
 
 // List returns a list of events matching the selectors.
-func (c *FakeEvents) List(label, field labels.Selector) (*api.EventList, error) {
+func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-events"})
 	return &c.Fake.EventsList, nil
 }
@@ -54,7 +55,7 @@ func (c *FakeEvents) Get(id string) (*api.Event, error) {
 }
 
 // Watch starts watching for events matching the given selectors.
-func (c *FakeEvents) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-events", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

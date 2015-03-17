@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -33,9 +34,9 @@ type SecretsInterface interface {
 	Create(secret *api.Secret) (*api.Secret, error)
 	Update(secret *api.Secret) (*api.Secret, error)
 	Delete(name string) error
-	List(label, field labels.Selector) (*api.SecretList, error)
+	List(label labels.Selector, field fields.Selector) (*api.SecretList, error)
 	Get(name string) (*api.Secret, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // events implements Secrets interface
@@ -69,14 +70,14 @@ func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 }
 
 // List returns a list of secrets matching the selectors.
-func (s *secrets) List(label, field labels.Selector) (*api.SecretList, error) {
+func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.SecretList, error) {
 	result := &api.SecretList{}
 
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("secrets").
-		SelectorParam(api.LabelSelectorQueryParam(s.client.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(s.client.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(s.client.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(s.client.APIVersion()), field).
 		Do().
 		Into(result)
 
@@ -101,14 +102,14 @@ func (s *secrets) Get(name string) (*api.Secret, error) {
 }
 
 // Watch starts watching for secrets matching the given selectors.
-func (s *secrets) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (s *secrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return s.client.Get().
 		Prefix("watch").
 		Namespace(s.namespace).
 		Resource("secrets").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam(api.LabelSelectorQueryParam(s.client.APIVersion()), label).
-		SelectorParam(api.FieldSelectorQueryParam(s.client.APIVersion()), field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(s.client.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(s.client.APIVersion()), field).
 		Watch()
 }
 
