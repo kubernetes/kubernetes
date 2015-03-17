@@ -81,7 +81,7 @@ func UnpackLayer(dest string, layer ArchiveReader) (size int64, err error) {
 		if err != nil {
 			return 0, err
 		}
-		if strings.HasPrefix(rel, "..") {
+		if strings.HasPrefix(rel, "../") {
 			return 0, breakoutError(fmt.Errorf("%q is outside of %q", hdr.Name, dest))
 		}
 		base := filepath.Base(path)

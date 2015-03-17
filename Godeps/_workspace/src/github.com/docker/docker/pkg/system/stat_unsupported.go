@@ -6,8 +6,8 @@ import (
 	"syscall"
 )
 
-func fromStatT(s *syscall.Stat_t) (*Stat, error) {
-	return &Stat{size: s.Size,
+func fromStatT(s *syscall.Stat_t) (*Stat_t, error) {
+	return &Stat_t{size: s.Size,
 		mode: uint32(s.Mode),
 		uid:  s.Uid,
 		gid:  s.Gid,

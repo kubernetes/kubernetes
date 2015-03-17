@@ -4,10 +4,25 @@ package archive
 
 import (
 	"errors"
+	"os"
 	"syscall"
 
 	"github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar"
 )
+
+// canonicalTarNameForPath returns platform-specific filepath
+// to canonical posix-style path for tar archival. p is relative
+// path.
+func CanonicalTarNameForPath(p string) (string, error) {
+	return p, nil // already unix-style
+}
+
+// chmodTarEntry is used to adjust the file permissions used in tar header based
+// on the platform the archival is done.
+
+func chmodTarEntry(perm os.FileMode) os.FileMode {
+	return perm // noop for unix as golang APIs provide perm bits correctly
+}
 
 func setHeaderForSpecialDevice(hdr *tar.Header, ta *tarAppender, name string, stat interface{}) (nlink uint32, inode uint64, err error) {
 	s, ok := stat.(*syscall.Stat_t)
