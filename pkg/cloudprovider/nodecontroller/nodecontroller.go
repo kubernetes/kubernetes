@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -670,6 +671,9 @@ func (nc *NodeController) getCloudNodesWithSpec() (*api.NodeList, error) {
 		}
 		if resources != nil {
 			node.Status.Capacity = resources.Capacity
+			if node.Status.Capacity != nil {
+				node.Status.Capacity[api.ResourceMaxPods] = *resource.NewQuantity(0, resource.DecimalSI)
+			}
 		}
 		instanceID, err := instances.ExternalID(node.Name)
 		if err != nil {

@@ -29,6 +29,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -144,6 +145,9 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-node"},
 		Spec:       api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
+			Capacity: api.ResourceList{
+				"maxpods": *resource.NewQuantity(32, resource.DecimalSI),
+			},
 			Conditions: []api.NodeCondition{goodCondition},
 		},
 	}
@@ -194,6 +198,9 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		{
 			makeUnSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
+					Capacity: api.ResourceList{
+						"maxpods": *resource.NewQuantity(32, resource.DecimalSI),
+					},
 					Conditions: []api.NodeCondition{badCondition},
 				}
 				if _, err = c.Nodes().UpdateStatus(n); err != nil {
@@ -208,6 +215,9 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			},
 			makeSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
+					Capacity: api.ResourceList{
+						"maxpods": *resource.NewQuantity(32, resource.DecimalSI),
+					},
 					Conditions: []api.NodeCondition{goodCondition},
 				}
 				if _, err = c.Nodes().UpdateStatus(n); err != nil {
