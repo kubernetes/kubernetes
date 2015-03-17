@@ -47,8 +47,12 @@ field values:
 
 ### Running a container (simple version)
 
-Once you have your instances up and running, the `hack/build-go.sh` script sets up
-your Go workspace and builds the Go components.
+Once you have your instances up and running, use cluster/kubectl.sh to access
+the kubernetes api.
+
+Note: if you built the release from source you will need to run `hack/build-go.sh` to
+build the go components, which include the `kubectl` commandline client. If you are
+using a prebuilt release, the built client binaries are already included.
 
 The `kubectl.sh` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
@@ -70,10 +74,6 @@ cluster/kubectl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)
-
-
-Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`, you
-can create a pod like this:
 
 ```bash
 cd kubernetes
