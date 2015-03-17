@@ -1,19 +1,17 @@
-## kubectl
+## kubectl apiversions
 
-kubectl controls the Kubernetes cluster manager
+Print available API versions.
 
 ### Synopsis
 
 
-kubectl controls the Kubernetes cluster manager.
-
-Find more information at https://github.com/GoogleCloudPlatform/kubernetes.
+Print available API versions.
 
 ```
-kubectl
+kubectl apiversions
 ```
 
-### Options
+### Options inherrited from parent commands
 
 ```
       --alsologtostderr=false: log to standard error as well as files
@@ -45,24 +43,5 @@ kubectl
 ```
 
 ### SEE ALSO
-* [kubectl-version](kubectl-version.md)
-* [kubectl-apiversions](kubectl-apiversions.md)
-* [kubectl-clusterinfo](kubectl-clusterinfo.md)
-* [kubectl-proxy](kubectl-proxy.md)
-* [kubectl-get](kubectl-get.md)
-* [kubectl-describe](kubectl-describe.md)
-* [kubectl-create](kubectl-create.md)
-* [kubectl-update](kubectl-update.md)
-* [kubectl-delete](kubectl-delete.md)
-* [kubectl-config](kubectl-config.md)
-* [kubectl-namespace](kubectl-namespace.md)
-* [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
-* [kubectl-resize](kubectl-resize.md)
-* [kubectl-exec](kubectl-exec.md)
-* [kubectl-port-forward](kubectl-port-forward.md)
-* [kubectl-run-container](kubectl-run-container.md)
-* [kubectl-stop](kubectl-stop.md)
-* [kubectl-expose](kubectl-expose.md)
-* [kubectl-label](kubectl-label.md)
+* [kubectl](kubectl.md)
 
