@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
@@ -47,7 +48,7 @@ type action struct {
 }
 
 // errEmptyName is returned when API requests do not fill the name section of the path.
-var errEmptyName = fmt.Errorf("name must be provided")
+var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
 func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
