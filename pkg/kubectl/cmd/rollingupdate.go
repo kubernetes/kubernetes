@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/spf13/cobra"
 )
 
@@ -72,39 +73,30 @@ func RunRollingUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return util.UsageError(cmd, "Must specify the controller to update")
 	}
 	oldName := args[0]
-	schema, err := f.Validator()
-	if err != nil {
-		return err
-	}
-
-	clientConfig, err := f.ClientConfig()
-	if err != nil {
-		return err
-	}
-	cmdApiVersion := clientConfig.Version
-
-	mapper, typer := f.Object()
-	// TODO: use resource.Builder instead
-	mapping, namespace, newName, data, err := util.ResourceFromFile(filename, typer, mapper, schema, cmdApiVersion)
-	if err != nil {
-		return err
-	}
-	if mapping.Kind != "ReplicationController" {
-		return util.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
-	}
-	if oldName == newName {
-		return util.UsageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
-			filename, oldName)
-	}
 
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
+
+	mapper, typer := f.Object()
 	// TODO: use resource.Builder instead
-	err = util.CompareNamespace(cmdNamespace, namespace)
+	obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+		NamespaceParam(cmdNamespace).RequireNamespace().
+		FilenameParam(filename).
+		Do().
+		Object()
 	if err != nil {
 		return err
+	}
+	newRc, ok := obj.(*api.ReplicationController)
+	if !ok {
+		return util.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
+	}
+	newName := newRc.Name
+	if oldName == newName {
+		return util.UsageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
+			filename, oldName)
 	}
 
 	client, err := f.Client()
@@ -112,16 +104,10 @@ func RunRollingUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	obj, err := mapping.Codec.Decode(data)
-	if err != nil {
-		return err
-	}
-	newRc := obj.(*api.ReplicationController)
-
-	updater := kubectl.NewRollingUpdater(cmdNamespace, client)
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, client)
 
 	// fetch rc
-	oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
+	oldRc, err := client.ReplicationControllers(newRc.Namespace).Get(oldName)
 	if err != nil {
 		return err
 	}
