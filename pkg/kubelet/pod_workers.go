@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.Pod, dockertools.DockerContainers) error
+type syncPodFnType func(*api.Pod, bool, dockertools.DockerContainers) error
 
 type podWorkers struct {
 	// Protects podUpdates field.
@@ -60,11 +60,15 @@ type workUpdate struct {
 	// The pod state to reflect.
 	pod *api.Pod
 
+	// Whether there exists a mirror pod for pod.
+	hasMirrorPod bool
+
 	// Function to call when the update is complete.
 	updateCompleteFn func()
 }
 
-func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType, recorder record.EventRecorder) *podWorkers {
+func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType,
+	recorder record.EventRecorder) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
@@ -92,7 +96,8 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 
-			err = p.syncPodFn(newWork.pod, containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
+			err = p.syncPodFn(newWork.pod, newWork.hasMirrorPod,
+				containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
@@ -106,7 +111,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 }
 
 // Apply the new setting to the specified pod. updateComplete is called when the update is completed.
-func (p *podWorkers) UpdatePod(pod *api.Pod, updateComplete func()) {
+func (p *podWorkers) UpdatePod(pod *api.Pod, hasMirrorPod bool, updateComplete func()) {
 	uid := pod.UID
 	var podUpdates chan workUpdate
 	var exists bool
@@ -129,11 +134,13 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, updateComplete func()) {
 		p.isWorking[pod.UID] = true
 		podUpdates <- workUpdate{
 			pod:              pod,
+			hasMirrorPod:     hasMirrorPod,
 			updateCompleteFn: updateComplete,
 		}
 	} else {
 		p.lastUndeliveredWorkUpdate[pod.UID] = workUpdate{
 			pod:              pod,
+			hasMirrorPod:     hasMirrorPod,
 			updateCompleteFn: updateComplete,
 		}
 	}

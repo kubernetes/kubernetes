@@ -53,11 +53,12 @@ func init() {
 }
 
 type TestKubelet struct {
-	kubelet        *Kubelet
-	fakeDocker     *dockertools.FakeDockerClient
-	fakeCadvisor   *cadvisor.Mock
-	fakeKubeClient *client.Fake
-	waitGroup      *sync.WaitGroup
+	kubelet           *Kubelet
+	fakeDocker        *dockertools.FakeDockerClient
+	fakeCadvisor      *cadvisor.Mock
+	fakeKubeClient    *client.Fake
+	waitGroup         *sync.WaitGroup
+	fakeMirrorManager *fakeMirrorManager
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
@@ -83,8 +84,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	waitGroup := new(sync.WaitGroup)
 	kubelet.podWorkers = newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.Pod, containers dockertools.DockerContainers) error {
-			err := kubelet.syncPod(pod, containers)
+		func(pod *api.Pod, hasMirrorPod bool, containers dockertools.DockerContainers) error {
+			err := kubelet.syncPod(pod, hasMirrorPod, containers)
 			waitGroup.Done()
 			return err
 		},
@@ -100,8 +101,9 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	}
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
-
-	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup}
+	mirrorManager := newFakeMirrorMananger()
+	kubelet.mirrorManager = mirrorManager
+	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, mirrorManager}
 }
 
 func verifyCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
@@ -442,7 +444,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -475,7 +477,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -524,7 +526,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -577,7 +579,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -627,7 +629,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -684,7 +686,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -753,7 +755,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 		},
 	}
 	waitGroup.Add(2)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -793,7 +795,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now()); err != nil {
+	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, util.NewStringSet(), time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Validate nothing happened.
@@ -801,7 +803,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeDocker.ClearCalls()
 
 	ready = true
-	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now()); err != nil {
+	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, util.NewStringSet(), time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
@@ -839,7 +841,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 			ID:    "4567",
 		},
 	}
-	err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now())
+	err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -893,7 +895,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 		},
 	}
 	kubelet.pods = append(kubelet.pods, bound)
-	err := kubelet.syncPod(&bound, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -934,7 +936,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		},
 	}
 	kubelet.pods = append(kubelet.pods, bound)
-	err := kubelet.syncPod(&bound, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -988,7 +990,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		},
 	}
 	kubelet.pods = append(kubelet.pods, bound)
-	err := kubelet.syncPod(&bound, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1678,7 +1680,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		},
 	}
 	kubelet.pods = append(kubelet.pods, bound)
-	err := kubelet.syncPod(&bound, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2075,7 +2077,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 				},
 			},
 		},
-	}, emptyPodUIDs, time.Now())
+	}, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3176,7 +3178,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
-	kl.SyncPods([]api.Pod{}, emptyPodUIDs, time.Now())
+	kl.SyncPods([]api.Pod{}, emptyPodUIDs, util.NewStringSet(), time.Now())
 	if len(kl.podStatuses) != 0 {
 		t.Fatalf("expected length of status map to be 0. Got map %#v.", kl.podStatuses)
 	}
@@ -3386,5 +3388,59 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	}
 	if len(kubeClient.Actions) != nodeStatusUpdateRetry {
 		t.Errorf("unexpected actions: %v", kubeClient.Actions)
+	}
+}
+
+func TestCreateMirrorPod(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorManager
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "foo",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "file",
+			},
+		},
+	}
+	kl.pods = append(kl.pods, pod)
+	hasMirrorPod := false
+	err := kl.syncPod(&pod, hasMirrorPod, dockertools.DockerContainers{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	podFullName := GetPodFullName(&pod)
+	if !manager.HasPod(podFullName) {
+		t.Errorf("expected mirror pod %q to be created", podFullName)
+	}
+	if manager.NumOfPods() != 1 || !manager.HasPod(podFullName) {
+		t.Errorf("expected one mirror pod %q, got %v", podFullName, manager.GetPods())
+	}
+}
+
+func TestDeleteOrphanedMirrorPods(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorManager
+	orphanedPodNames := []string{"pod1_ns", "pod2_ns"}
+	mirrorPods := util.NewStringSet()
+	for _, name := range orphanedPodNames {
+		mirrorPods.Insert(name)
+	}
+	// Sync with an empty pod list to delete all mirror pods.
+	err := kl.SyncPods([]api.Pod{}, emptyPodUIDs, mirrorPods, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if manager.NumOfPods() != 0 {
+		t.Errorf("expected zero mirror pods, got %v", manager.GetPods())
+	}
+	for _, name := range orphanedPodNames {
+		creates, deletes := manager.GetCounts(name)
+		if creates != 0 || deletes != 1 {
+			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)
+		}
 	}
 }

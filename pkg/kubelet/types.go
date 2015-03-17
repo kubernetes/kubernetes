@@ -18,11 +18,13 @@ package kubelet
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
+const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
@@ -49,6 +51,9 @@ const (
 	// Updates from all sources
 	AllSource = "*"
 
+	// Used for ConfigMirrorAnnotationKey.
+	MirrorType = "mirror"
+
 	NamespaceDefault = api.NamespaceDefault
 )
 
@@ -67,7 +72,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// GetPodFullName returns a name that uniquely identifies a pod across all config sources.
+// GetPodFullName returns a name that uniquely identifies a pod.
 func GetPodFullName(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
@@ -77,4 +82,13 @@ func GetPodFullName(pod *api.Pod) string {
 // Build the pod full name from pod name and namespace.
 func BuildPodFullName(name, namespace string) string {
 	return name + "_" + namespace
+}
+
+// Parse the pod full name.
+func ParsePodFullName(podFullName string) (string, string, error) {
+	parts := strings.Split(podFullName, "_")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
+	}
+	return parts[0], parts[1], nil
 }

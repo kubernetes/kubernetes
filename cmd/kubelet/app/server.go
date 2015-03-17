@@ -244,7 +244,8 @@ func SimpleRunKubelet(client *client.Client,
 	masterServiceNamespace string,
 	volumePlugins []volume.Plugin,
 	tlsOptions *kubelet.TLSOptions,
-	cadvisorInterface cadvisor.Interface) {
+	cadvisorInterface cadvisor.Interface,
+	configFilePath string) {
 	kcfg := KubeletConfig{
 		KubeClient:             client,
 		DockerClient:           dockerClient,
@@ -264,6 +265,7 @@ func SimpleRunKubelet(client *client.Client,
 		VolumePlugins:           volumePlugins,
 		TLSOptions:              tlsOptions,
 		CadvisorInterface:       cadvisorInterface,
+		ConfigFile:              configFilePath,
 	}
 	RunKubelet(&kcfg)
 }

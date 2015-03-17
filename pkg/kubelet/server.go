@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/golang/glog"
@@ -84,7 +85,7 @@ type HostInterface interface {
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
 	GetMachineInfo() (*cadvisorApi.MachineInfo, error)
-	GetPods() ([]api.Pod, error)
+	GetPods() ([]api.Pod, util.StringSet, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
@@ -258,9 +259,9 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// handlePods returns a list of pod bounds to the Kubelet and their spec
+// handlePods returns a list of pod bound to the Kubelet and their spec
 func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
-	pods, err := s.host.GetPods()
+	pods, _, err := s.host.GetPods()
 	if err != nil {
 		s.error(w, err)
 		return
