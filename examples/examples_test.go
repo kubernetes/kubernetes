@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 	"github.com/golang/glog"
 )
 
@@ -88,6 +89,15 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 				return err
 			}
 			name := strings.TrimSuffix(file, ext)
+
+			if ext == ".yaml" {
+				out, err := yaml.ToJSON(data)
+				if err != nil {
+					return err
+				}
+				data = out
+			}
+
 			fn(name, path, data)
 		}
 		return nil
@@ -215,14 +225,18 @@ func TestReadme(t *testing.T) {
 
 			//t.Logf("testing (%s): \n%s", subtype, content)
 			expectedType := &api.Pod{}
-			if err := latest.Codec.DecodeInto([]byte(content), expectedType); err != nil {
+			json, err := yaml.ToJSON([]byte(content))
+			if err != nil {
+				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
+			}
+			if err := latest.Codec.DecodeInto(json, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
 				continue
 			}
 			if errors := validateObject(expectedType); len(errors) > 0 {
 				t.Errorf("%s did not validate correctly: %v", path, errors)
 			}
-			_, err := latest.Codec.Encode(expectedType)
+			_, err = latest.Codec.Encode(expectedType)
 			if err != nil {
 				t.Errorf("Could not encode object: %v", err)
 				continue

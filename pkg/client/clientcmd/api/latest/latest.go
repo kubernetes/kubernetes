@@ -18,6 +18,7 @@ package latest
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // Version is the string that represents the current external default version.
@@ -37,4 +38,4 @@ var Versions = []string{"v1"}
 // the latest supported version.  Use this Codec when writing to
 // disk, a data store that is not dynamically versioned, or in tests.
 // This codec can decode any object that Kubernetes is aware of.
-var Codec = v1.Codec
+var Codec = runtime.YAMLDecoder(v1.Codec)
