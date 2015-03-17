@@ -78,7 +78,7 @@ var (
 
 func TestNonExistentCommandLineFile(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: "bogus_file",
+		ExplicitPath: "bogus_file",
 	}
 
 	_, err := loadingRules.Load()
@@ -92,9 +92,7 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 
 func TestToleratingMissingFiles(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
-		EnvVarPath:           "bogus1",
-		CurrentDirectoryPath: "bogus2",
-		HomeDirectoryPath:    "bogus3",
+		Precedence: []string{"bogus1", "bogus2", "bogus3"},
 	}
 
 	_, err := loadingRules.Load()
@@ -112,7 +110,7 @@ func TestErrorReadingFile(t *testing.T) {
 	}
 
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: commandLineFile.Name(),
+		ExplicitPath: commandLineFile.Name(),
 	}
 
 	_, err := loadingRules.Load()
@@ -132,7 +130,7 @@ func TestErrorReadingNonFile(t *testing.T) {
 	defer os.Remove(tmpdir)
 
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: tmpdir,
+		ExplicitPath: tmpdir,
 	}
 
 	_, err = loadingRules.Load()
@@ -161,8 +159,8 @@ func TestConflictingCurrentContext(t *testing.T) {
 	WriteToFile(mockEnvVarConfig, envVarFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: commandLineFile.Name(),
-		EnvVarPath:      envVarFile.Name(),
+		ExplicitPath: commandLineFile.Name(),
+		Precedence:   []string{envVarFile.Name()},
 	}
 
 	mergedConfig, err := loadingRules.Load()
@@ -211,8 +209,8 @@ func TestResolveRelativePaths(t *testing.T) {
 	WriteToFile(pathResolutionConfig2, configFile2)
 
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: configFile1,
-		EnvVarPath:      configFile2,
+		ExplicitPath: configFile1,
+		Precedence:   []string{configFile2},
 	}
 
 	mergedConfig, err := loadingRules.Load()
@@ -286,8 +284,8 @@ func ExampleMergingSomeWithConflict() {
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath: commandLineFile.Name(),
-		EnvVarPath:      envVarFile.Name(),
+		ExplicitPath: commandLineFile.Name(),
+		Precedence:   []string{envVarFile.Name()},
 	}
 
 	mergedConfig, err := loadingRules.Load()
@@ -346,10 +344,8 @@ func ExampleMergingEverythingNoConflicts() {
 	WriteToFile(testConfigDelta, homeDirFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
-		CommandLinePath:      commandLineFile.Name(),
-		EnvVarPath:           envVarFile.Name(),
-		CurrentDirectoryPath: currentDirFile.Name(),
-		HomeDirectoryPath:    homeDirFile.Name(),
+		ExplicitPath: commandLineFile.Name(),
+		Precedence:   []string{envVarFile.Name(), currentDirFile.Name(), homeDirFile.Name()},
 	}
 
 	mergedConfig, err := loadingRules.Load()
