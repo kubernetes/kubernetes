@@ -382,6 +382,7 @@ func (m *Master) init(c *Config) {
 	if c.SyncPodStatus {
 		go util.Forever(podCache.UpdateAllContainers, m.cacheTimeout)
 		go util.Forever(podCache.GarbageCollectPodStatus, time.Minute*30)
+		// Note the pod cache needs access to an un-decorated RESTStorage
 		podStorage = podStorage.WithPodStatus(podCache)
 	}
 
