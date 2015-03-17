@@ -63,8 +63,3 @@ func (c *FakePods) Bind(bind *api.Binding) error {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "bind-pod", Value: bind.Name})
 	return nil
 }
-
-func (c *FakePods) UpdateStatus(name string, status *api.PodStatus) (*api.Pod, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-status-pod", Value: name})
-	return &api.Pod{}, nil
-}

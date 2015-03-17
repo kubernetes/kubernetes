@@ -31,7 +31,7 @@ import (
 type syncPodFnType func(*api.Pod, dockertools.DockerContainers) error
 
 type podWorkers struct {
-	// Protects all per worker fields.
+	// Protects podUpdates field.
 	podLock sync.Mutex
 
 	// Tracks all running per-pod goroutines - per-pod goroutine will be
