@@ -21,127 +21,67 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// REST provides the RESTStorage access patterns to work with AutoScaler objects.
-type REST struct {
-	registry generic.Registry
+// autoScalerStrategy implements behavior for AutoScalers
+type autoScalerStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
 }
 
-// NewREST returns a new REST. You must use a registry created by
-// NewEtcdRegistry unless you're testing.
-func NewREST(registry generic.Registry) *REST {
-	return &REST{
-		registry: registry,
-	}
+// AutoScalers is the default logic that applies when creating and updating AutoScalers
+// objects.
+var AutoScalers = autoScalerStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for AutoScalers.
+func (autoScalerStrategy) NamespaceScoped() bool {
+	return true
 }
 
-// New returns a new AutoScaler.
-func (*REST) New() runtime.Object {
-	return &api.AutoScaler{}
-}
-
-// NewList returns a new AutoScaler.
-func (*REST) NewList() runtime.Object {
-	return &api.AutoScalerList{}
-}
-
-// List selects resources in the storage which match to the selector.
-func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
-}
-
-// getAttrs is passed to the predicate functions
-func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	autoScaler, ok := obj.(*api.AutoScaler)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid object type")
-	}
-	return labels.Set(autoScaler.Labels), fields.Set{}, nil
-}
-
-// Get finds an AutoScaler in the storage by id and returns it.
-func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	autoScaler, ok := obj.(*api.AutoScaler)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return autoScaler, err
-}
-
-// Delete finds an AutoScaler in the storage and deletes it.
-func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
-	obj, err := rs.registry.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	_, ok := obj.(*api.AutoScaler)
-	if !ok {
-		return nil, fmt.Errorf("invalid object type")
-	}
-	return rs.registry.Delete(ctx, id)
-}
-
-// Create creates a new AutoScaler.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	if err := rest.BeforeCreate(rest.AutoScalers, ctx, obj); err != nil {
-		return nil, err
-	}
-
-	//should never fail here, BeforeCreate does a cast to do validation
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (autoScalerStrategy) ResetBeforeCreate(obj runtime.Object) {
 	autoScaler := obj.(*api.AutoScaler)
-	if err := rs.registry.CreateWithName(ctx, autoScaler.Name, autoScaler); err != nil {
-		return nil, err
-	}
-
-	return rs.registry.Get(ctx, autoScaler.Name)
+	autoScaler.Status = api.AutoScalerStatus{}
 }
 
-// Update updates an AutoScaler object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	autoScaler, ok := obj.(*api.AutoScaler)
-	if !ok {
-		return nil, false, fmt.Errorf("invalid object type")
-	}
-
-	if !api.ValidNamespace(ctx, &autoScaler.ObjectMeta) {
-		return nil, false, errors.NewConflict("autoscaler", autoScaler.Namespace, fmt.Errorf("AutoScaler.Namespace does not match the provided context"))
-	}
-
-	oldObj, err := rs.registry.Get(ctx, autoScaler.Name)
-	if err != nil {
-		return nil, false, err
-	}
-
-	editAutoScaler := oldObj.(*api.AutoScaler)
-	if errs := validation.ValidateAutoScalerUpdate(editAutoScaler, autoScaler); len(errs) > 0 {
-		return nil, false, errors.NewInvalid("autoscaler", editAutoScaler.Name, errs)
-	}
-
-	// passed update validation (ensures immutable meta is not trying to be changed),
-	// now copy over the relevant fields that can be updated
-	editAutoScaler.Spec = autoScaler.Spec
-
-	err = rs.registry.UpdateWithName(ctx, editAutoScaler.Name, editAutoScaler)
-	if err != nil {
-		return nil, false, err
-	}
-	out, err := rs.registry.Get(ctx, editAutoScaler.Name)
-	return out, false, err
+// Validate validates a new AutoScalers.
+func (autoScalerStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	autoScaler := obj.(*api.AutoScaler)
+	return validation.ValidateAutoScaler(autoScaler)
 }
 
-// Watch provides the ability to watch auto-scalers for changes
-func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
+// AllowCreateOnUpdate dictates if you can create a new autoscaler with a PUT
+func (autoScalerStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+// ValidateUpdate validates AutoScalers during an update
+func (autoScalerStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateAutoScalerUpdate(old.(*api.AutoScaler), obj.(*api.AutoScaler))
+}
+
+// MatchAutoScaler returns a generic matcher for a given label and field selector.
+func MatchAutoScaler(label labels.Selector, field fields.Selector) generic.Matcher {
+	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
+		autoScaler, ok := obj.(*api.AutoScaler)
+		if !ok {
+			return false, fmt.Errorf("not an autoscaler")
+		}
+
+		fields := AutoScalerToSelectableFields(autoScaler)
+		return label.Matches(labels.Set(autoScaler.Labels)) && field.Matches(fields), nil
+	})
+}
+
+// AutoScalerToSelectableFields returns a label set that represents the object
+// TODO: fields are not labels, and the validation rules for them do not apply.
+func AutoScalerToSelectableFields(autoScaler *api.AutoScaler) labels.Set {
+	return labels.Set{
+		"name": autoScaler.Name,
+	}
 }

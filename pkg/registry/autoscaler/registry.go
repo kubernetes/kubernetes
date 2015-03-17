@@ -18,31 +18,83 @@ package autoscaler
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // registry implements custom changes to generic.Etcd.
-type registry struct {
-	*etcdgeneric.Etcd
+type Registry interface {
+	// ListAutoScalers obtains a list of autoScalers having labels which match selector.
+	ListAutoScalers(ctx api.Context, selector labels.Selector) (*api.AutoScalerList, error)
+	// Watch for new/changed/deleted autoScalers
+	WatchAutoScalers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	// Get a specific autoScaler
+	GetAutoScaler(ctx api.Context, autoScalerID string) (*api.AutoScaler, error)
+	// Create a autoScaler based on a specification.
+	CreateAutoScaler(ctx api.Context, autoScaler *api.AutoScaler) error
+	// Update an existing autoScaler
+	UpdateAutoScaler(ctx api.Context, autoScaler *api.AutoScaler) error
+	// Delete an existing autoScaler
+	DeleteAutoScaler(ctx api.Context, autoScalerID string) error
 }
 
-// NewEtcdRegistry returns a registry which will store AutoScalers in the given helper
-func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
-	return registry{
-		Etcd: &etcdgeneric.Etcd{
-			NewFunc:      func() runtime.Object { return &api.AutoScaler{} },
-			NewListFunc:  func() runtime.Object { return &api.AutoScalerList{} },
-			EndpointName: "autoscalers",
-			KeyRootFunc: func(ctx api.Context) string {
-				return etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/autoscalers")
-			},
-			KeyFunc: func(ctx api.Context, id string) (string, error) {
-				return etcdgeneric.NamespaceKeyFunc(ctx, "/registry/autoscalers", id)
-			},
-			Helper: h,
-		},
+// Storage is an interface for a standard REST Storage backend
+// TODO: move me somewhere common
+type Storage interface {
+	apiserver.RESTDeleter
+	apiserver.RESTLister
+	apiserver.RESTGetter
+	apiserver.ResourceWatcher
+
+	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
+	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
+}
+
+// storage puts strong typing around storage calls
+type storage struct {
+	Storage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s Storage) Registry {
+	return &storage{s}
+}
+
+func (s *storage) ListAutoScalers(ctx api.Context, label labels.Selector) (*api.AutoScalerList, error) {
+	obj, err := s.List(ctx, label, fields.Everything())
+	if err != nil {
+		return nil, err
 	}
+	return obj.(*api.AutoScalerList), nil
+}
+
+func (s *storage) WatchAutoScalers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return s.Watch(ctx, label, field, resourceVersion)
+}
+
+func (s *storage) GetAutoScaler(ctx api.Context, id string) (*api.AutoScaler, error) {
+	obj, err := s.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.AutoScaler), nil
+}
+
+func (s *storage) CreateAutoScaler(ctx api.Context, autoScaler *api.AutoScaler) error {
+	_, err := s.Create(ctx, autoScaler)
+	return err
+}
+
+func (s *storage) UpdateAutoScaler(ctx api.Context, autoScaler *api.AutoScaler) error {
+	_, _, err := s.Update(ctx, autoScaler)
+	return err
+}
+
+func (s *storage) DeleteAutoScaler(ctx api.Context, id string) error {
+	_, err := s.Delete(ctx, id)
+	return err
 }
