@@ -20,6 +20,9 @@ package app
 import (
 	// Credential providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider/gcp"
+	// Network plugins
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network/exec"
 	// Volume plugins
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
@@ -41,6 +44,16 @@ func ProbeVolumePlugins() []volume.Plugin {
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
+
+	return allPlugins
+}
+
+// ProbeNetworkPlugins collects all compiled-in plugins
+func ProbeNetworkPlugins() []network.NetworkPlugin {
+	allPlugins := []network.NetworkPlugin{}
+
+	// for each existing plugin, add to the list
+	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins()...)
 
 	return allPlugins
 }
