@@ -291,23 +291,23 @@ func TestEventf(t *testing.T) {
 				return returnEvent, nil
 			},
 		}
-		recorder := StartRecording(&testEvents)
-		logger := StartLogging(t.Logf) // Prove that it is useful
-		logger2 := StartLogging(func(formatter string, args ...interface{}) {
+		eventBroadcaster := NewBroadcaster()
+		sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
+		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			called <- struct{}{}
 		})
-
-		testSource := api.EventSource{Component: "eventTest"}
-		FromSource(testSource).Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
+		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
 
 		<-called
 		<-called
-		recorder.Stop()
-		logger.Stop()
-		logger2.Stop()
+		sinkWatcher.Stop()
+		logWatcher1.Stop()
+		logWatcher2.Stop()
 	}
 }
 
@@ -387,7 +387,8 @@ func TestWriteEventError(t *testing.T) {
 	}
 	done := make(chan struct{})
 
-	defer StartRecording(
+	eventBroadcaster := NewBroadcaster()
+	defer eventBroadcaster.StartRecordingToSink(
 		&testEventSink{
 			OnCreate: func(event *api.Event) (*api.Event, error) {
 				if event.Message == "finished" {
@@ -407,12 +408,11 @@ func TestWriteEventError(t *testing.T) {
 			},
 		},
 	).Stop()
-
-	testSource := api.EventSource{Component: "eventTest"}
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
 	for caseName := range table {
-		FromSource(testSource).Event(ref, "Reason", caseName)
+		recorder.Event(ref, "Reason", caseName)
 	}
-	FromSource(testSource).Event(ref, "Reason", "finished")
+	recorder.Event(ref, "Reason", "finished")
 	<-done
 
 	for caseName, item := range table {
@@ -443,12 +443,13 @@ func TestLotsOfEvents(t *testing.T) {
 			return event, nil
 		},
 	}
-	recorder := StartRecording(&testEvents)
-	testSource := api.EventSource{Component: "eventTest"}
-	logger := StartLogging(func(formatter string, args ...interface{}) {
+
+	eventBroadcaster := NewBroadcaster()
+	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 		loggerCalled <- struct{}{}
 	})
-
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
 	ref := &api.ObjectReference{
 		Kind:       "Pod",
 		Name:       "foo",
@@ -457,7 +458,7 @@ func TestLotsOfEvents(t *testing.T) {
 		APIVersion: "v1beta1",
 	}
 	for i := 0; i < maxQueuedEvents; i++ {
-		go FromSource(testSource).Event(ref, "Reason", strconv.Itoa(i))
+		go recorder.Eventf(ref, "Reason", strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
 	for i := 0; i < maxQueuedEvents; i++ {
@@ -470,6 +471,6 @@ func TestLotsOfEvents(t *testing.T) {
 			t.Errorf("Only attempted to record event '%d' %d times.", i, counts[i])
 		}
 	}
-	recorder.Stop()
-	logger.Stop()
+	sinkWatcher.Stop()
+	logWatcher.Stop()
 }

@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -194,8 +193,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
 			return pod
 		},
-		Error:    f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
-		Recorder: record.FromSource(api.EventSource{Component: "scheduler"}),
+		Error: f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
 	}, nil
 }
 

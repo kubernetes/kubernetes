@@ -26,6 +26,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -77,8 +78,6 @@ func (s *SchedulerServer) Run(_ []string) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	record.StartRecording(kubeClient.Events(""))
-
 	go func() {
 		if s.EnableProfiling {
 			mux := http.NewServeMux()
@@ -94,6 +93,10 @@ func (s *SchedulerServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Failed to create scheduler configuration: %v", err)
 	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 
 	sched := scheduler.New(config)
 	sched.Run()
