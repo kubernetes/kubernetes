@@ -371,20 +371,19 @@ func (m *Master) init(c *Config) {
 	m.nodeRegistry = registry
 
 	nodeStorage := minion.NewREST(m.nodeRegistry)
-	// TODO: unify the storage -> registry and storage -> client patterns
-	nodeStorageClient := RESTStorageToNodes(nodeStorage)
-	podCache := NewPodCache(
-		c.KubeletClient,
-		nodeStorageClient.Nodes(),
-		podRegistry,
-	)
 	if c.SyncPodStatus {
-		go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
-	}
-	go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
+		// TODO: unify the storage -> registry and storage -> client patterns
+		nodeStorageClient := RESTStorageToNodes(nodeStorage)
 
-	// TODO: refactor podCache to sit on top of podStorage via status calls
-	podStorage = podStorage.WithPodStatus(podCache)
+		podCache := NewPodCache(
+			c.KubeletClient,
+			nodeStorageClient.Nodes(),
+			podRegistry,
+		)
+		go util.Forever(func() { podCache.UpdateAllContainers() }, m.cacheTimeout)
+		go util.Forever(func() { podCache.GarbageCollectPodStatus() }, time.Minute*30)
+		podStorage = podStorage.WithPodStatus(podCache)
+	}
 
 	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
