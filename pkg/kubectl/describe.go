@@ -58,26 +58,38 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
+func describerMap(c *client.Client) map[string]Describer {
+	m := map[string]Describer{
+		"Pod": &PodDescriber{c},
+		"ReplicationController": &ReplicationControllerDescriber{c},
+		"Service":               &ServiceDescriber{c},
+		"Minion":                &NodeDescriber{c},
+		"Node":                  &NodeDescriber{c},
+		"LimitRange":            &LimitRangeDescriber{c},
+		"ResourceQuota":         &ResourceQuotaDescriber{c},
+		"PersistentVolume":      &PersistentVolumeDescriber{c},
+		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
+	}
+	return m
+}
+
+// List of all resource types we can describe
+func DescribableResources() []string {
+	keys := make([]string, 0)
+
+	for k := range describerMap(nil) {
+		resource := strings.ToLower(k)
+		keys = append(keys, resource)
+	}
+	return keys
+}
+
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
 func DescriberFor(kind string, c *client.Client) (Describer, bool) {
-	switch kind {
-	case "Pod":
-		return &PodDescriber{c}, true
-	case "ReplicationController":
-		return &ReplicationControllerDescriber{c}, true
-	case "Service":
-		return &ServiceDescriber{c}, true
-	case "PersistentVolume":
-		return &PersistentVolumeDescriber{c}, true
-	case "PersistentVolumeClaim":
-		return &PersistentVolumeClaimDescriber{c}, true
-	case "Minion", "Node":
-		return &NodeDescriber{c}, true
-	case "LimitRange":
-		return &LimitRangeDescriber{c}, true
-	case "ResourceQuota":
-		return &ResourceQuotaDescriber{c}, true
+	f, ok := describerMap(c)[kind]
+	if ok {
+		return f, true
 	}
 	return nil, false
 }
