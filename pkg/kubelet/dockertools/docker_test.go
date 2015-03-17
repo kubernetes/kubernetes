@@ -179,29 +179,6 @@ func TestDockerContainerCommand(t *testing.T) {
 	}
 }
 
-var parseImageNameTests = []struct {
-	imageName string
-	name      string
-	tag       string
-}{
-	{"ubuntu", "ubuntu", ""},
-	{"ubuntu:2342", "ubuntu", "2342"},
-	{"ubuntu:latest", "ubuntu", "latest"},
-	{"foo/bar:445566", "foo/bar", "445566"},
-	{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", ""},
-	{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
-	{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
-}
-
-func TestParseImageName(t *testing.T) {
-	for _, tt := range parseImageNameTests {
-		name, tag := parseImageName(tt.imageName)
-		if name != tt.name || tag != tt.tag {
-			t.Errorf("Expected name/tag: %s/%s, got %s/%s", tt.name, tt.tag, name, tag)
-		}
-	}
-}
-
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
 	fakeClient := &FakeDockerClient{
@@ -217,7 +194,7 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	msg := "image pull failed for host/repository/image, this may be because there are no credentials on this request.  details: (test error)"
+	msg := "image pull failed for host/repository/image:version, this may be because there are no credentials on this request.  details: (test error)"
 	if err.Error() != msg {
 		t.Errorf("expected: %s, saw: %s", msg, err.Error())
 	}

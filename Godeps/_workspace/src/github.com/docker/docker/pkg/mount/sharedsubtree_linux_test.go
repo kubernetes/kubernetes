@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// nothing is propogated in or out
+// nothing is propagated in or out
 func TestSubtreePrivate(t *testing.T) {
 	tmp := path.Join(os.TempDir(), "mount-tests")
 	if err := os.MkdirAll(tmp, 0777); err != nil {
