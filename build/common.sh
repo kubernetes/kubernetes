@@ -833,3 +833,53 @@ function kube::release::gcs::publish_latest() {
   echo "+++ gsutil cat ${latest_file_dst}:"
   gsutil cat ${latest_file_dst}
 }
+
+# Publish a new latest.txt, but only if the release we're dealing with
+# is newer than the contents in GCS.
+function kube::release::gcs::publish_latest_official() {
+  local -r new_version=${KUBE_GCS_LATEST_CONTENTS}
+  local -r latest_file_dst="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_LATEST_FILE}"
+
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+  [[ ${new_version} =~ ${version_regex} ]] || {
+    echo "!!! publish_latest_official passed bogus value: '${new_version}'" >&2
+    return 1
+  }
+
+  local -r version_major="${BASH_REMATCH[1]}"
+  local -r version_minor="${BASH_REMATCH[2]}"
+  local -r version_patch="${BASH_REMATCH[3]}"
+
+  local gcs_version
+  gcs_version=$(gsutil cat "${latest_file_dst}")
+
+  [[ ${gcs_version} =~ ${version_regex} ]] || {
+    echo "!!! ${latest_file_dst} contains invalid release version, can't compare: '${gcs_version}'" >&2
+    return 1
+  }
+
+  local -r gcs_version_major="${BASH_REMATCH[1]}"
+  local -r gcs_version_minor="${BASH_REMATCH[2]}"
+  local -r gcs_version_patch="${BASH_REMATCH[3]}"
+
+  local greater=true
+  if [[ "${gcs_version_major}" -gt "${version_major}" ]]; then
+    greater=false
+  elif [[ "${gcs_version_major}" -lt "${version_major}" ]]; then
+    : # fall out
+  elif [[ "${gcs_version_minor}" -gt "${version_minor}" ]]; then
+    greater=false
+  elif [[ "${gcs_version_minor}" -lt "${version_minor}" ]]; then
+    : # fall out
+  elif [[ "${gcs_version_patch}" -ge "${version_patch}" ]]; then
+    greater=false
+  fi
+
+  if [[ "${greater}" != "true" ]]; then
+    echo "+++ ${gcs_version} (latest on GCS) >= ${new_version} (just uploaded), not updating ${latest_file_dst}"
+    return 0
+  fi
+
+  echo "+++ ${new_version} (just uploaded) > ${gcs_version} (latest on GCS), updating ${latest_file_dst}"
+  kube::release::gcs::publish_latest
+}
