@@ -906,6 +906,8 @@ const (
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceMemory ResourceName = "memory"
+	// Number of available IP addresses.
+	ResourceIPs ResourceName = "ips"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

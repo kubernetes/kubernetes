@@ -43,11 +43,12 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
 }
 
-func makeResources(milliCPU int64, memory int64) api.NodeResources {
+func makeResources(milliCPU int64, memory int64, ips int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
 			"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 			"memory": *resource.NewQuantity(memory, resource.BinarySI),
+			"ips":    *resource.NewQuantity(ips, resource.DecimalSI),
 		},
 	}
 }
@@ -72,7 +73,7 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 }
 
 func TestPodFitsResources(t *testing.T) {
-	tests := []struct {
+	enoughIPsTests := []struct {
 		pod          api.Pod
 		existingPods []api.Pod
 		fits         bool
@@ -119,8 +120,52 @@ func TestPodFitsResources(t *testing.T) {
 			test: "equal edge case",
 		},
 	}
-	for _, test := range tests {
-		node := api.Node{Spec: api.NodeSpec{Capacity: makeResources(10, 20).Capacity}}
+	for _, test := range enoughIPsTests {
+		node := api.Node{Spec: api.NodeSpec{Capacity: makeResources(10, 20, 32).Capacity}}
+
+		fit := ResourceFit{FakeNodeInfo(node)}
+		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+
+	notEnoughIPsTests := []struct {
+		pod          api.Pod
+		existingPods []api.Pod
+		fits         bool
+		test         string
+	}{
+		{
+			pod: api.Pod{},
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
+			},
+			fits: false,
+			test: "even without specified resources predicate fails when there's no available ips",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
+			},
+			fits: false,
+			test: "even if both resources fit predicate fails when there's no available ips",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
+			},
+			fits: false,
+			test: "even for equal edge case predicate fails when there's no available ips",
+		},
+	}
+	for _, test := range notEnoughIPsTests {
+		node := api.Node{Spec: api.NodeSpec{Capacity: makeResources(10, 20, 1).Capacity}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
