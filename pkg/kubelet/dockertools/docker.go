@@ -349,7 +349,6 @@ func (p dockerPuller) Pull(image string) error {
 	}
 	// Image spec: [<registry>/]<repository>/<image>[:<version] so we count '/'
 	explicitRegistry := (strings.Count(image, "/") == 2)
-	glog.Errorf("Foo: %s", explicitRegistry)
 	// Hack, look for a private registry, and decorate the error with the lack of
 	// credentials.  This is heuristic, and really probably could be done better
 	// by talking to the registry API directly from the kubelet here.

@@ -1059,7 +1059,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
 	if err != nil {
 		if ref != nil {
-			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
+			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
 		}
 		return "", err
 	}
@@ -1099,7 +1099,7 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 
 	if err := kl.dockerPuller.Pull(img); err != nil {
 		if ref != nil {
-			kl.recorder.Eventf(ref, "failed", "Failed to pull image %q", img)
+			kl.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", img, err)
 		}
 		return err
 	}
@@ -1215,7 +1215,7 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 		present, err := kl.dockerPuller.IsImagePresent(container.Image)
 		if err != nil {
 			if ref != nil {
-				kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q", container.Image)
+				kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
 			}
 			glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
 			return "", err
