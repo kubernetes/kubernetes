@@ -215,15 +215,16 @@ hack/ginkgo-e2e.sh --ginkgo.focus=Pods.*env
 # Flags can be combined, and their actions will take place in this order:
 # -build, -push|-up|-pushup, -test|-tests=..., -down
 # e.g.:
-go run e2e.go -build -pushup -test -down
+go run hack/e2e.go -build -pushup -test -down
 
 # -v (verbose) can be added if you want streaming output instead of only
 # seeing the output of failed commands.
 
 # -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
-# cleaning up after a failed test or viewing logs.
-go run e2e.go -ctl='get events'
-go run e2e.go -ctl='delete pod foobar'
+# cleaning up after a failed test or viewing logs. Use -v to avoid supressing
+# kubectl output.
+go run hack/e2e.go -v -ctl='get events'
+go run hack/e2e.go -v -ctl='delete pod foobar'
 ```
 
 ## Testing out flaky tests
