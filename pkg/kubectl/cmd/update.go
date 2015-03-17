@@ -56,7 +56,9 @@ func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	usage := "Filename, directory, or URL to file to use to update the resource."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
+	cmd.MarkFlagRequired("filename")
 	cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
+	cmd.MarkFlagRequired("patch")
 	return cmd
 }
 

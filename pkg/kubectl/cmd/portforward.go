@@ -54,6 +54,7 @@ func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmd.MarkFlagRequired("pod")
 	// TODO support UID
 	return cmd
 }
