@@ -48,6 +48,7 @@ readonly KUBE_TEST_TARGETS=(
   cmd/integration
   cmd/gendocs
   cmd/genman
+  examples/k8petstore/web-server
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")

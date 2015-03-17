@@ -16,17 +16,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//package main
-
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/codegangsta/negroni"
-	"github.com/gorilla/mux"
-	"github.com/xyproto/simpleredis"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/codegangsta/negroni"
+	"github.com/gorilla/mux"
+	"github.com/xyproto/simpleredis"
 )
 
 //return the path to static assets (i.e. index.html)

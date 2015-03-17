@@ -109,6 +109,3 @@ Thus we plan to add another tier of queueing, which empties the REDIS transactio
 For questions on running this app, you can ask on the google containers group (freenode ~ google-containers@googlegroups.com or #google-containers on IRC)
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
-
-
-

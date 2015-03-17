@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.4.1",
+	"GoVersion": "go1.3",
 	"Packages": [
 		"./..."
 	],
@@ -61,6 +61,11 @@
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
 			"Rev": "b965b613227fddccbfffe13eae360ed3fa822f8d"
+		},
+		{
+			"ImportPath": "github.com/codegangsta/negroni",
+			"Comment": "v0.1-62-g8d75e11",
+			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
@@ -161,6 +166,14 @@
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
 			"Rev": "d19717788084716e4adff0515be6289aa04bec46"
+		},
+		{
+			"ImportPath": "github.com/garyburd/redigo/internal",
+			"Rev": "535138d7bcd717d6531c701ef5933d98b1866257"
+		},
+		{
+			"ImportPath": "github.com/garyburd/redigo/redis",
+			"Rev": "535138d7bcd717d6531c701ef5933d98b1866257"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -266,6 +279,14 @@
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
@@ -382,6 +403,11 @@
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
 			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
+		},
+		{
+			"ImportPath": "github.com/xyproto/simpleredis",
+			"Comment": "v1.0-13-g5292687",
+			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
