@@ -410,6 +410,7 @@ func ChooseHostInterface() (net.IP, error) {
 	inFile, err := os.Open("/proc/net/route")
 	if err != nil {
 		if os.IsNotExist(err) {
+			glog.V(4).Infof("Unable to find /proc/net/route file: %v", err)
 			return chooseHostInterfaceNativeGo(nw)
 		}
 		return nil, err
