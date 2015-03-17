@@ -79,6 +79,17 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
+readonly KUBE_STATIC_LIBRARIES=(
+  kube-apiserver
+  kube-controller-manager
+  kube-scheduler
+)
+
+kube::golang::is_statically_linked_library() {
+  local e
+  for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  return 1;
+}
 
 # kube::binaries_from_targets take a list of build targets and return the
 # full go package to be built
@@ -280,7 +291,7 @@ kube::golang::build_binaries() {
 
     local binaries
     binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
-
+    
     local platform
     for platform in "${platforms[@]}"; do
       kube::golang::set_platform_envs "${platform}"
@@ -297,15 +308,31 @@ kube::golang::build_binaries() {
           if [[ ${GOOS} == "windows" ]]; then
             bin="${bin}.exe"
           fi
-          go build -o "${output_path}/${bin}" \
+          
+          if kube::golang::is_statically_linked_library "${binary}"; then
+            CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
               "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
               "${binary}"
+          else
+            go build -o "${output_path}/${bin}" \
+              "${goflags[@]:+${goflags[@]}}" \
+              -ldflags "${version_ldflags}" \
+              "${binary}"
+          fi
         done
       else
-        go install "${goflags[@]:+${goflags[@]}}" \
-            -ldflags "${version_ldflags}" \
-            "${binaries[@]}"
+        for binary in "${binaries[@]}"; do
+          if kube::golang::is_statically_linked_library "${binary}"; then
+            CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+              -ldflags "${version_ldflags}" \
+              "${binary}"
+          else
+            go install "${goflags[@]:+${goflags[@]}}" \
+              -ldflags "${version_ldflags}" \
+              "${binary}"
+          fi
+        done
       fi
     done
   )
