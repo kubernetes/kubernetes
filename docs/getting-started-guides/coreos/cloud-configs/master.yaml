@@ -62,32 +62,28 @@ coreos:
         Wants=etcd.service
         After=etcd.service
         After=network-online.target
-        Before=flannel.service
+        Before=flanneld.service
 
         [Service]
         ExecStartPre=/usr/bin/chmod +x /opt/bin/waiter.sh
         ExecStart=/usr/bin/bash /opt/bin/waiter.sh
         RemainAfterExit=true
         Type=oneshot
-    - name: flannel.service
+    - name: flanneld.service
       command: start
-      content: |
-        [Unit]
-        Wants=etcd-waiter.service
-        After=etcd-waiter.service
-        Requires=etcd.service
-        After=etcd.service
-        After=network-online.target
-        Wants=network-online.target
-        Description=flannel is an etcd backed overlay network for containers
-
-        [Service]
-        Type=notify
-        ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/flanneld
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
-        ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
-        ExecStart=/opt/bin/flanneld
+      drop-ins:
+        - name: 50-network-config.conf
+          content: |
+            [Service]
+            ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
+            ExecStart=
+            ExecStart=/usr/libexec/sdnotify-proxy /run/flannel/sd.sock \
+                /usr/bin/docker run --net=host --privileged=true --rm \
+                    --volume=/run/flannel:/run/flannel \
+                    --env=NOTIFY_SOCKET=/run/flannel/sd.sock \
+                    --env-file=/run/flannel/options.env \
+                    --volume=${ETCD_SSL_DIR}:/etc/ssl/etcd:ro \
+                    quay.io/coreos/flannel:${FLANNEL_VER} /opt/bin/flanneld --ip-masq=true --iface=eth1
     - name: docker-cache.service
       command: start
       content: |
@@ -117,8 +113,10 @@ coreos:
         - name: 51-docker-mirror.conf
           content: |
             [Unit]
-            Requires=docker-cache.service
-            After=docker-cache.service
+            # making sure that docker-cache is up and that flanneld finished
+            # startup, otherwise containers won't land in flannel's network...
+            Requires=docker-cache.service flanneld.service
+            After=docker-cache.service flanneld.service
             [Service]
             Environment=DOCKER_OPTS='--registry-mirror=http://$private_ipv4:5000'
     - name: kube-apiserver.service
