@@ -26,6 +26,76 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	bash_completion_func = `# call kubectl get $1,
+# use the first column in compgen
+# we could use templates, but then would need a template per resource
+__kubectl_parse_get()
+{
+    local kubectl_output out
+    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
+        out=($(echo "${kubectl_output}" | awk '{print $1}'))
+        COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
+    fi
+}
+
+__kubectl_get_resource()
+{
+    if [[ ${#nouns[@]} -eq 0 ]]; then
+        return 1
+    fi
+    __kubectl_parse_get ${nouns[${#nouns[@]} -1]}
+    if [[ $? -eq 0 ]]; then
+        return 0
+    fi
+}
+
+# $1 is the name of the pod we want to get the list of containers inside
+__kubectl_get_containers()
+{
+    local template
+    template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
+    __debug ${FUNCNAME} "nouns are ${nouns[@]}"
+
+    local len="${#nouns[@]}"
+    if [[ ${len} -ne 1 ]]; then
+        return
+    fi
+    local last=${nouns[${len} -1]}
+    local kubectl_out
+    if kubectl_out=$(kubectl get -o template --template="${template}" pods "${last}" 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+    fi
+}
+
+# Require both a pod and a container to be specified
+__kubectl_require_pod_and_container()
+{
+    if [[ ${#nouns[@]} -eq 0 ]]; then
+        __kubectl_parse_get pods
+        return 0
+    fi;
+    __kubectl_get_containers
+    return 0
+}
+
+__custom_func() {
+    case ${last_command} in
+        kubectl_get | kubectl_describe | kubectl_delete | kubectl_stop)
+	    __kubectl_get_resource
+            return
+            ;;
+	kubectl_log)
+	    __kubectl_require_pod_and_container
+	    return
+	    ;;
+        *)
+            ;;
+    esac
+}
+`
+)
+
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
@@ -36,6 +106,7 @@ func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *co
 
 Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 		Run: runHelp,
+		BashCompletionFunction: bash_completion_func,
 	}
 
 	f.BindFlags(cmds.PersistentFlags())
