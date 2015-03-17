@@ -55,3 +55,20 @@ _Why not just run multiple programs in a single (Docker) container?_
 _Why not support affinity-based co-scheduling of containers?_
 
 That approach would provide co-location, but would not provide most of the benefits of pods, such as resource sharing, IPC, guaranteed fate sharing, and simplified management.
+
+## Durability of pods (or lack thereof)
+
+Pods aren't intended to be treated as durable pets. They won't survive scheduling failures, node failures, or other evictions, such as due to lack of resources, or in the case of node maintenance. 
+
+In general, users shouldn't need to create pods directly. They should almost always use controllers (e.g., [replication controller](replication-controller.md)), even for singletons.  Controllers provide self-healing with a cluster scope, as well as replication and rollout management.
+
+Pod is exposed as a primitive in order to facilitate:
+* scheduler and controller pluggability
+* support for pod-level operations without the need to "proxy" them via controller APIs  
+* decoupling of pod lifetime from controller lifetime, such as for bootstrapping
+* decoupling of controllers and services -- the endpoint controller just watches pods
+* clean composition of Kubelet-level functionality with cluster-level functionality -- Kubelet is effectively the "pod controller"
+* high-availability applications, which will expect pods to be replaced in advance of their termination and certainly in advance of deletion, such as in the case of planned evictions, image prefetching, or live pod migration [#3949](https://github.com/GoogleCloudPlatform/kubernetes/issues/3949)
+
+The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 
+
