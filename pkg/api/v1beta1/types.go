@@ -116,50 +116,49 @@ type VolumeSource struct {
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk"`
+	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource provisioned by an admin"`
 
 	// AWSElasticBlockStore represents an EBS volume in AWS that is attached to
 	// kubelet's host machine and then exposed to the pod.
-	AWSElasticBlockStore *AWSElasticBlockStore `json:"elasticBlockStore"`
+	AWSElasticBlockStore *AWSElasticBlockStore `json:"elasticBlockStore" description:"An AWS EBS volume resource provisioned by an admin"`
 
 	// NFSMount represents the location of an exported volume on a fileserver
-	NFSMount *NFSMount `json:"nfsMount"`
+	NFSMount *NFSMount `json:"nfsMount" description:"An NFS mount resource provisioned by an admin"`
 
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
-	HostPath *HostPathVolumeSource `json:"hostPath"`
+	HostPath *HostPathVolumeSource `json:"hostPath" description:"a HostPath provisioned by a developer or tester; for develment use only"`
 }
 
 type PersistentVolume struct {
 	TypeMeta `json:",inline"`
 
 	//Spec defines a persistent volume owned by the cluster
-	Spec PersistentVolumeSpec `json:"spec,omitempty"`
+	Spec PersistentVolumeSpec `json:"spec,omitempty" description:"specification of a persistent volume as provisioned by an administrator"`
 
 	// Status represents the current information about persistent volume.
-	Status PersistentVolumeStatus `json:"status,omitempty"`
+	Status PersistentVolumeStatus `json:"status,omitempty" description:"current status of a persistent volume; populated by the system, read-only"`
 }
 
 type PersistentVolumeSpec struct {
 	// Resources represents the actual resources of the volume
-	Capacity ResourceList `json:"capacity,omitempty`
+	Capacity ResourceList `json:"capacity,omitempty" description:"a description of the persistent volume's resources and capacity"`
 	// Source represents the location and type of a volume to mount.
 	// AccessModeTypes are inferred from the Source.
-	PersistentVolumeSource `json:",inline"`
-
+	PersistentVolumeSource `json:",inline" description:"the actual volume backing the persistent volume"`
 	// holds the binding reference to a PersistentVolumeClaim
-	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"the binding reference to a persistent volume claim"`
 }
 
 type PersistentVolumeStatus struct {
 	// Phase represents the current phase of the PersistentVolume
-	Phase PersistentVolumePhase `json:"phase,omitempty"`
+	Phase PersistentVolumePhase `json:"phase,omitempty" description:"the current phase of a persistent volume"`
 }
 
 type PersistentVolumeList struct {
 	TypeMeta `json:",inline"`
-	Items    []PersistentVolume `json:"items,omitempty"`
+	Items    []PersistentVolume `json:"items,omitempty" description:"list of persistent volumes"`
 }
 
 // a PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -167,35 +166,35 @@ type PersistentVolumeClaim struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the volume
-	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description: "the desired characteristics of a volume"`
 
 	// Status represents the current information about a persistent volume.
-	Status PersistentVolumeClaimStatus `json:"status,omitempty"`
+	Status PersistentVolumeClaimStatus `json:"status,omitempty" description:"the current status of a persistent volume claim; read-only"`
 }
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	Items    []PersistentVolumeClaim `json:"items,omitempty"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty" description: "a list of persistent volume claims"`
 }
 
 // a PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes desired
-	AccessModes []AccessModeType `json:"accessModes,omitempty"`
+	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the desired access modes the volume should have"`
 	// Resources represents the minimum resources required
-	Resources ResourceRequirements `json:"resources,omitempty"`
+	Resources ResourceRequirements `json:"resources,omitempty" description:"the desired resources the volume should have"`
 }
 
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
-	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
+	Phase PersistentVolumeClaimPhase `json:"phase,omitempty" description:"the current phase of the claim"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty`
+	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the actual access modes the volume has"`
 	// Represents the actual resources of the underlying volume
-	Capacity ResourceList `json:"capacity,omitempty"`
+	Capacity ResourceList `json:"capacity,omitempty" description:"the actual resources the volume has"`
 	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
-	VolumeRef *ObjectReference `json:"volumeRef,omitempty"`
+	VolumeRef *ObjectReference `json:"volumeRef,omitempty" description:"a reference to the backing persistent volume, when bound"`
 }
 
 type AccessModeType string
@@ -228,10 +227,10 @@ const (
 
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
-	ClaimName string `json:"claimName,omitempty"`
+	ClaimName string `json:"claimName,omitempty" description:"the name of the claim in the same namespace to be mounted as a volume"`
 	// Optional: Defaults to false (read/write).  ReadOnly here
 	// will force the ReadOnly setting in VolumeMounts
-	ReadOnly bool `json:readOnly,omitempty`
+	ReadOnly bool `json:"readOnly,omitempty" description:"mount volume as read-only when true; default false"`
 }
 
 //
