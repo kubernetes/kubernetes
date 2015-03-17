@@ -63,8 +63,11 @@ coreos:
         ExecStartPre=-/usr/bin/docker kill docker-registry
         ExecStartPre=-/usr/bin/docker rm docker-registry
         ExecStartPre=/usr/bin/docker pull quay.io/devops/docker-registry:latest
+        # GUNICORN_OPTS is an workaround for
+        # https://github.com/docker/docker-registry/issues/892
         ExecStart=/usr/bin/docker run --rm --net host --name docker-registry \
             -e STANDALONE=false \
+            -e GUNICORN_OPTS=[--preload] \
             -e MIRROR_SOURCE=https://registry-1.docker.io \
             -e MIRROR_SOURCE_INDEX=https://index.docker.io \
             -e MIRROR_TAGS_CACHE_TTL=1800 \
