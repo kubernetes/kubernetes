@@ -101,6 +101,7 @@ func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("[tar autodetect] n: %v", bs)
 
 	compression := DetectCompression(bs)
 	switch compression {
@@ -172,21 +173,6 @@ type tarAppender struct {
 	SeenFiles map[uint64]string
 }
 
-// canonicalTarName provides a platform-independent and consistent posix-style
-//path for files and directories to be archived regardless of the platform.
-func canonicalTarName(name string, isDir bool) (string, error) {
-	name, err := CanonicalTarNameForPath(name)
-	if err != nil {
-		return "", err
-	}
-
-	// suffix with '/' for directories
-	if isDir && !strings.HasSuffix(name, "/") {
-		name += "/"
-	}
-	return name, nil
-}
-
 func (ta *tarAppender) addTarFile(path, name string) error {
 	fi, err := os.Lstat(path)
 	if err != nil {
@@ -204,12 +190,11 @@ func (ta *tarAppender) addTarFile(path, name string) error {
 	if err != nil {
 		return err
 	}
-	hdr.Mode = int64(chmodTarEntry(os.FileMode(hdr.Mode)))
 
-	name, err = canonicalTarName(name, fi.IsDir())
-	if err != nil {
-		return fmt.Errorf("tar: cannot canonicalize path: %v", err)
+	if fi.IsDir() && !strings.HasSuffix(name, "/") {
+		name = name + "/"
 	}
+
 	hdr.Name = name
 
 	nlink, inode, err := setHeaderForSpecialDevice(hdr, ta, name, fi.Sys())
@@ -474,7 +459,7 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 				}
 
 				if err := ta.addTarFile(filePath, relFilePath); err != nil {
-					log.Debugf("Can't add file %s to tar: %s", filePath, err)
+					log.Debugf("Can't add file %s to tar: %s", srcPath, err)
 				}
 				return nil
 			})
@@ -541,7 +526,7 @@ loop:
 		if err != nil {
 			return err
 		}
-		if strings.HasPrefix(rel, "../") {
+		if strings.HasPrefix(rel, "..") {
 			return breakoutError(fmt.Errorf("%q is outside of %q", hdr.Name, dest))
 		}
 
@@ -697,8 +682,6 @@ func (archiver *Archiver) CopyFileWithTar(src, dst string) (err error) {
 			return err
 		}
 		hdr.Name = filepath.Base(dst)
-		hdr.Mode = int64(chmodTarEntry(os.FileMode(hdr.Mode)))
-
 		tw := tar.NewWriter(w)
 		defer tw.Close()
 		if err := tw.WriteHeader(hdr); err != nil {

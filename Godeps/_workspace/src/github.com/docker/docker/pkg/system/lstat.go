@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-func Lstat(path string) (*Stat_t, error) {
+func Lstat(path string) (*Stat, error) {
 	s := &syscall.Stat_t{}
 	err := syscall.Lstat(path, s)
 	if err != nil {
