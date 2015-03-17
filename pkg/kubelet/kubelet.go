@@ -112,8 +112,7 @@ func NewMainKubelet(
 	resyncInterval time.Duration,
 	pullQPS float32,
 	pullBurst int,
-	minimumGCAge time.Duration,
-	maxContainerCount int,
+	containerGCPolicy ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	clusterDomain string,
 	clusterDNS net.IP,
@@ -129,9 +128,7 @@ func NewMainKubelet(
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
 	}
-	if minimumGCAge <= 0 {
-		return nil, fmt.Errorf("invalid minimum GC age %d", minimumGCAge)
-	}
+	dockerClient = metrics.NewInstrumentedDockerInterface(dockerClient)
 
 	// Wait for the Docker daemon to be up (with a timeout).
 	waitStart := time.Now()
@@ -165,7 +162,11 @@ func NewMainKubelet(
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
-	dockerClient = metrics.NewInstrumentedDockerInterface(dockerClient)
+	containerGC, err := newContainerGC(dockerClient, containerGCPolicy)
+	if err != nil {
+		return nil, err
+	}
+
 	klet := &Kubelet{
 		hostname:                       hostname,
 		dockerClient:                   dockerClient,
@@ -179,8 +180,6 @@ func NewMainKubelet(
 		httpClient:                     &http.Client{},
 		pullQPS:                        pullQPS,
 		pullBurst:                      pullBurst,
-		minimumGCAge:                   minimumGCAge,
-		maxContainerCount:              maxContainerCount,
 		sourcesReady:                   sourcesReady,
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
@@ -191,6 +190,7 @@ func NewMainKubelet(
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
+		containerGC:                    containerGC,
 	}
 
 	dockerCache, err := dockertools.NewDockerCache(dockerClient)
@@ -269,10 +269,6 @@ type Kubelet struct {
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface
 
-	// Optional, minimum age required for garbage collection.  If zero, no limit.
-	minimumGCAge      time.Duration
-	maxContainerCount int
-
 	// If non-empty, use this for container DNS search.
 	clusterDomain string
 
@@ -303,6 +299,9 @@ type Kubelet struct {
 
 	// A mirror pod manager which provides helper functions.
 	mirrorManager mirrorManager
+
+	// Policy for handling garbage collection of dead containers.
+	containerGC containerGC
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -444,107 +443,12 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-type ByCreated []*docker.Container
-
-func (a ByCreated) Len() int           { return len(a) }
-func (a ByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByCreated) Less(i, j int) bool { return a[i].Created.After(a[j].Created) }
-
-// TODO: these removals are racy, we should make dockerclient threadsafe across List/Inspect transactions.
-func (kl *Kubelet) purgeOldest(ids []string) error {
-	dockerData := []*docker.Container{}
-	for _, id := range ids {
-		data, err := kl.dockerClient.InspectContainer(id)
-		if err != nil {
-			return err
-		}
-		if !data.State.Running && (time.Now().Sub(data.State.FinishedAt) > kl.minimumGCAge) {
-			dockerData = append(dockerData, data)
-		}
-	}
-	sort.Sort(ByCreated(dockerData))
-	if len(dockerData) <= kl.maxContainerCount {
-		return nil
-	}
-	dockerData = dockerData[kl.maxContainerCount:]
-	for _, data := range dockerData {
-		if err := kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: data.ID}); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (kl *Kubelet) GarbageCollectLoop() {
 	util.Forever(func() {
-		if err := kl.GarbageCollectContainers(); err != nil {
-			glog.Errorf("Garbage collect failed: %v", err)
+		if err := kl.containerGC.GarbageCollect(); err != nil {
+			glog.Errorf("Container garbage collect failed: %v", err)
 		}
 	}, time.Minute*1)
-}
-
-// TODO: Also enforce a maximum total number of containers.
-func (kl *Kubelet) GarbageCollectContainers() error {
-	if kl.maxContainerCount == 0 {
-		return nil
-	}
-	containers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, true)
-	if err != nil {
-		return err
-	}
-
-	type unidentifiedContainer struct {
-		// Docker ID.
-		id string
-
-		// Docker container name
-		name string
-	}
-
-	unidentifiedContainers := make([]unidentifiedContainer, 0)
-	uidToIDMap := map[string][]string{}
-	for _, container := range containers {
-		_, uid, name, _, err := dockertools.ParseDockerName(container.Names[0])
-		if err != nil {
-			unidentifiedContainers = append(unidentifiedContainers, unidentifiedContainer{
-				id:   container.ID,
-				name: container.Names[0],
-			})
-			continue
-		}
-		uidName := string(uid) + "." + name
-		uidToIDMap[uidName] = append(uidToIDMap[uidName], container.ID)
-	}
-
-	// Remove all non-running unidentified containers.
-	for _, container := range unidentifiedContainers {
-		data, err := kl.dockerClient.InspectContainer(container.id)
-		if err != nil {
-			return err
-		}
-		if data.State.Running {
-			continue
-		}
-
-		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
-		err = kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: container.id})
-		if err != nil {
-			return err
-		}
-	}
-
-	// Evict dead containers according to our policies.
-	for _, list := range uidToIDMap {
-		if len(list) <= kl.maxContainerCount {
-			continue
-		}
-		if err := kl.purgeOldest(list); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (kl *Kubelet) getPodStatusFromCache(podFullName string) (api.PodStatus, bool) {
