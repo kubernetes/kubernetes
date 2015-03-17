@@ -8,8 +8,14 @@ You will setup an [Apache ZooKeeper](http://zookeeper.apache.org/)
 service, a Storm master service (a.k.a. Nimbus server), and a set of
 Storm workers (a.k.a. supervisors).
 
-For the impatient expert, jump straight to the [tl;dr](#tl-dr)
+For the impatient expert, jump straight to the [tl;dr](#tldr)
 section.
+
+### Sources
+
+Source is freely available at:
+* Docker image - https://github.com/mattf/docker-storm
+* Docker Trusted Build - https://registry.hub.docker.com/search?q=mattf/storm
 
 ## Step Zero: Prerequisites
 
