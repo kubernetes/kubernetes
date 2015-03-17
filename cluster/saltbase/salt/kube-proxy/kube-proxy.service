@@ -6,6 +6,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 EnvironmentFile=/etc/sysconfig/kube-proxy
 ExecStart=/usr/local/bin/kube-proxy "$DAEMON_ARGS"
 Restart=on-failure
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
