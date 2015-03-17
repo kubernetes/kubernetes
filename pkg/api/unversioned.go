@@ -16,6 +16,10 @@ limitations under the License.
 
 package api
 
+import (
+	"strings"
+)
+
 // This file contains API types that are unversioned.
 
 // APIVersions lists the api versions that are available, to allow
@@ -48,4 +52,13 @@ func FieldSelectorQueryParam(version string) string {
 		return "fields"
 	}
 	return "field-selector"
+}
+
+// String returns available api versions as a human-friendly version string.
+func (apiVersions APIVersions) String() string {
+	return strings.Join(apiVersions.Versions, ",")
+}
+
+func (apiVersions APIVersions) GoString() string {
+	return apiVersions.String()
 }

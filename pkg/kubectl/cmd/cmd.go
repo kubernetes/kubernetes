@@ -196,6 +196,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	f.BindFlags(cmds.PersistentFlags())
 
 	cmds.AddCommand(f.NewCmdVersion(out))
+	cmds.AddCommand(f.NewCmdApiVersions(out))
 	cmds.AddCommand(f.NewCmdClusterInfo(out))
 	cmds.AddCommand(f.NewCmdProxy(out))
 
