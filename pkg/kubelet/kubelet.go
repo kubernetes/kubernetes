@@ -1731,7 +1731,8 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 func (kl *Kubelet) syncStatus() {
 	glog.V(3).Infof("Syncing pods status")
 
-	statuses := make(map[string]api.PodStatus)
+	// Create the list of pods.
+	podFullNames := make(map[types.UID]string)
 	func() {
 		kl.podLock.Lock()
 		defer kl.podLock.Unlock()
@@ -1741,17 +1742,18 @@ func (kl *Kubelet) syncStatus() {
 				glog.V(3).Infof("Pod status for %q is not updated due to its source %s", pod.Name, source)
 				continue
 			}
-			status, err := kl.GetPodStatus(GetPodFullName(&pod), pod.UID)
-			if err != nil {
-				glog.Warningf("Error getting pod %q status: %v, retry later", pod.Name, err)
-				continue
-			}
-			statuses[GetPodFullName(&pod)] = status
+			podFullNames[pod.UID] = GetPodFullName(&pod)
 		}
 	}()
 
-	for podFullName, status := range statuses {
+	// Generate and send statuses.
+	for uid, podFullName := range podFullNames {
 		name, namespace := ParsePodFullName(podFullName)
+		status, err := kl.GetPodStatus(podFullName, uid)
+		if err != nil {
+			glog.Warningf("Error getting pod %q status: %v, retry later", podFullName, err)
+			continue
+		}
 		pod, err := kl.kubeClient.Pods(namespace).UpdateStatus(name, &status)
 		if err != nil {
 			glog.Warningf("Error updating status for pod %s: %v (full pod: %s)", name, err, pod)
