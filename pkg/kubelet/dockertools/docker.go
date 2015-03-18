@@ -528,19 +528,29 @@ var (
 	ErrContainerCannotRun = errors.New("Container cannot run")
 )
 
-func inspectContainer(client DockerInterface, dockerID, containerName, tPath string) (*api.ContainerStatus, error) {
+// Internal information kept for containers from inspection
+type containerStatusResult struct {
+	status api.ContainerStatus
+	ip     string
+	err    error
+}
+
+func inspectContainer(client DockerInterface, dockerID, containerName, tPath string) *containerStatusResult {
+	result := containerStatusResult{api.ContainerStatus{}, "", nil}
+
 	inspectResult, err := client.InspectContainer(dockerID)
 
 	if err != nil {
-		return nil, err
+		result.err = err
+		return &result
 	}
 	if inspectResult == nil {
 		// Why did we not get an error?
-		return &api.ContainerStatus{}, nil
+		return &result
 	}
 
 	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
-	containerStatus := api.ContainerStatus{
+	result.status = api.ContainerStatus{
 		Image:       inspectResult.Config.Image,
 		ImageID:     DockerPrefix + inspectResult.Image,
 		ContainerID: DockerPrefix + dockerID,
@@ -548,11 +558,11 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 
 	waiting := true
 	if inspectResult.State.Running {
-		containerStatus.State.Running = &api.ContainerStateRunning{
+		result.status.State.Running = &api.ContainerStateRunning{
 			StartedAt: util.NewTime(inspectResult.State.StartedAt),
 		}
 		if containerName == PodInfraContainerName && inspectResult.NetworkSettings != nil {
-			containerStatus.PodIP = inspectResult.NetworkSettings.IPAddress
+			result.ip = inspectResult.NetworkSettings.IPAddress
 		}
 		waiting = false
 	} else if !inspectResult.State.FinishedAt.IsZero() {
@@ -565,7 +575,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 		} else {
 			reason = inspectResult.State.Error
 		}
-		containerStatus.State.Termination = &api.ContainerStateTerminated{
+		result.status.State.Termination = &api.ContainerStateTerminated{
 			ExitCode:   inspectResult.State.ExitCode,
 			Reason:     reason,
 			StartedAt:  util.NewTime(inspectResult.State.StartedAt),
@@ -578,7 +588,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 				if err != nil {
 					glog.Errorf("Error on reading termination-log %s: %v", path, err)
 				} else {
-					containerStatus.State.Termination.Message = string(data)
+					result.status.State.Termination.Message = string(data)
 				}
 			}
 		}
@@ -589,18 +599,20 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 		// TODO(dchen1107): Separate issue docker/docker#8294 was filed
 		// TODO(dchen1107): Need to figure out why we are still waiting
 		// Check any issue to run container
-		containerStatus.State.Waiting = &api.ContainerStateWaiting{
+		result.status.State.Waiting = &api.ContainerStateWaiting{
 			Reason: ErrContainerCannotRun.Error(),
 		}
 	}
 
-	return &containerStatus, nil
+	return &result
 }
 
-// GetDockerPodInfo returns docker info for all containers in the pod/manifest and
+// GetDockerPodStatus returns docker related status for all containers in the pod/manifest and
 // infrastructure container
-func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
-	info := api.PodInfo{}
+func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (*api.PodStatus, error) {
+	var podStatus api.PodStatus
+	podStatus.Info = api.PodInfo{}
+
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
 		expectedContainers[container.Name] = container
@@ -635,34 +647,35 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName 
 			terminationMessagePath = c.TerminationMessagePath
 		}
 		// We assume docker return us a list of containers in time order
-		if containerStatus, found := info[dockerContainerName]; found {
+		if containerStatus, found := podStatus.Info[dockerContainerName]; found {
 			containerStatus.RestartCount += 1
-			info[dockerContainerName] = containerStatus
+			podStatus.Info[dockerContainerName] = containerStatus
 			continue
 		}
 
-		containerStatus, err := inspectContainer(client, value.ID, dockerContainerName, terminationMessagePath)
-		if err != nil {
+		result := inspectContainer(client, value.ID, dockerContainerName, terminationMessagePath)
+		if result.err != nil {
 			return nil, err
 		}
-		info[dockerContainerName] = *containerStatus
+		// Add user container information
+		if dockerContainerName == PodInfraContainerName {
+			// Found network container
+			podStatus.PodIP = result.ip
+		} else {
+			podStatus.Info[dockerContainerName] = result.status
+		}
 	}
 
-	if len(info) == 0 {
+	if len(podStatus.Info) == 0 && podStatus.PodIP == "" {
 		return nil, ErrNoContainersInPod
 	}
 
-	// First make sure we are not missing pod infra container
-	if _, found := info[PodInfraContainerName]; !found {
-		return nil, ErrNoPodInfraContainerInPod
-	}
-
-	if len(info) < (len(manifest.Containers) + 1) {
+	// Not all containers expected are created, check if there are
+	// image related issues
+	if len(podStatus.Info) < len(manifest.Containers) {
 		var containerStatus api.ContainerStatus
-		// Not all containers expected are created, check if there are
-		// image related issues
 		for _, container := range manifest.Containers {
-			if _, found := info[container.Name]; found {
+			if _, found := podStatus.Info[container.Name]; found {
 				continue
 			}
 
@@ -684,11 +697,11 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName 
 				}
 			}
 
-			info[container.Name] = containerStatus
+			podStatus.Info[container.Name] = containerStatus
 		}
 	}
 
-	return info, nil
+	return &podStatus, nil
 }
 
 const containerNamePrefix = "k8s"

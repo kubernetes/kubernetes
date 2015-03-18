@@ -468,9 +468,6 @@ type ContainerStatus struct {
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount" description:"the number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed"`
-	// The IP of the Pod
-	// PodIP is deprecated and will be removed from v1beta3 once it becomes possible for the Kubelet to report PodStatus.
-	PodIP string `json:"podIP,omitempty" description:"pod's IP address"`
 	// TODO(dchen1107): Which image the container is running with?
 	// The image the container is running
 	Image       string `json:"image" description:"image of the container"`
