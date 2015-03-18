@@ -5,11 +5,11 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 ## High Level Design
 1. Manage the tftp directory 
   * /tftpboot/(coreos)(centos)(RHEL)
-  * /tftpboot/pxelinux.0/(MAC) -> linked to linux image config file
+  * /tftpboot/pxelinux.0/(MAC) -> linked to Linux image config file
 2. Update per install the link for pxelinux
 3. Update the DHCP config to reflect the host needing deployment
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
-5. No have access to the public [etcd discovery tool](https://discovery.etcd.io/). 
+5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
 6. Installing the CoreOS slaves to become Kubernetes minions.
 
 ## Pre-requisites
@@ -70,10 +70,10 @@ To setup CentOS PXELINUX environment there is a complete [guide here](http://doc
 Now you should have a working PXELINUX setup to image CoreOS nodes. You can verify the services by using VirtualBox locally or with bare metal servers.
 
 ## Adding CoreOS to PXE
-This section decribes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment. 
+This section describes how to setup the CoreOS images to live alongside a pre-existing PXELINUX environment. 
 
 1. Find or create the TFTP root directory that everything will be based off of.
-    * For this document we will assume ```/tftpboot/``` is our root dir.
+    * For this document we will assume ```/tftpboot/``` is our root directory.
 2. Once we know and have our tftp root directory we will create a new directory structure for our CoreOS images.
 3. Download the CoreOS PXE files provided by the CoreOS team.
 
@@ -187,7 +187,7 @@ This is on the PXE server from the previous section:
     wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-proxy --no-check-certificate
     wget -O flanneld https://storage.googleapis.com/k8s/flanneld --no-check-certificate
 
-This sets up our binaries we need to run Kubernetes. This would need to be enhanced to download from the internet for updates in the future.
+This sets up our binaries we need to run Kubernetes. This would need to be enhanced to download from the Internet for updates in the future.
 
 Now for the good stuff!
 
@@ -576,9 +576,9 @@ And one for the _master_ node: ```vi /tftpboot/pxelinux.cfg/coreos-node-master``
       append initrd=images/coreos/coreos_production_pxe_image.cpio.gz cloud-config-url=http://<pxe-host-ip>/coreos/pxe-cloud-config-master.yml console=tty0 console=ttyS0 coreos.autologin=tty1 coreos.autologin=ttyS0
 
 ## Specify the pxelinux targets
-Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets. We will do this by using the pxelinux mechanisum of setting a specific MAC addresses to a specific pxelinix.cfg file.
+Now that we have our new targets setup for master and slave we want to configure the specific hosts to those targets. We will do this by using the pxelinux mechanism of setting a specific MAC addresses to a specific pxelinux.cfg file.
 
-Refer to the MAC adderess table in the begining of this guide. Documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
+Refer to the MAC address table in the beginning of this guide. Documentation for more details can be found [here](http://www.syslinux.org/wiki/index.php/PXELINUX).
 
     cd /tftpboot/pxelinux.cfg
     ln -s coreos-node-master 01-d0-00-67-13-0d-00
@@ -591,7 +591,7 @@ Reboot these servers to get the images PXEd and ready for running containers!
 ## Creating test pod
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-Here is a fork where you can do a full walkthrough by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick test.
+Here is a fork where you can do a full walk through by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick test.
 
 
 On the Kubernetes Master node lets create a '''nginx.yml'''
