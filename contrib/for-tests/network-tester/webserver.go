@@ -88,6 +88,7 @@ func (s *State) serveStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "running")
 		return
 	}
+	s.Logf("Declaring failure for %s/%s with %d sent and %d received and %d peers", *namespace, *service, s.Sent, s.Received, *peerCount)
 	fmt.Fprintf(w, "fail")
 }
 
@@ -213,12 +214,13 @@ func contactOthers(state *State) {
 	for i := 0; i < 15; i++ {
 		endpoints, err := client.Endpoints(*namespace).Get(*service)
 		if err != nil {
-			state.Logf("Unable to read endpoints for %v/%v: %v; will try again.", *namespace, *service, err)
+			state.Logf("Unable to read the endpoints for %v/%v: %v; will try again.", *namespace, *service, err)
 			time.Sleep(time.Duration(1+rand.Intn(10)) * time.Second)
 		}
 
-		for _, e := range endpoints.Endpoints {
-			contactSingle("http://"+e.IP+":"+string(e.Port), state)
+		for i, e := range endpoints.Endpoints {
+			state.Logf("Attempting to contact IP %s at endpoint number %d port %v", e.IP, i, e.Port)
+			contactSingle(fmt.Sprintf("http://%s:%d", e.IP, e.Port), state)
 		}
 
 		time.Sleep(5 * time.Second)
@@ -236,7 +238,7 @@ func contactSingle(e string, state *State) {
 	}
 	resp, err := http.Post(e+"/write", "application/json", bytes.NewReader(body))
 	if err != nil {
-		state.Logf("Warning: unable to contact '%v': '%v'", e, err)
+		state.Logf("Warning: unable to contact the endpoint %q: %v", e, err)
 		return
 	}
 	defer resp.Body.Close()
