@@ -91,6 +91,11 @@ The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster 
 
 The `NUM_MINIONS` environment variable may be set to specify the number of minions to start. If it is not set, the number of minions defaults to 3.
 
+The `KUBE_PUSH` environment variable may be set to specify which kubernetes binaries must be deployed on the cluster. Its possible values are:
+
+* `release` (default if `KUBE_PUSH` is not set) will deploy the binaries of `_output/release-tars/kubernetes-server-….tar.gz`. This is built with `make release` or `make release-skip-tests`.
+* `local` will deploy the binaries of `_output/local/go/bin`. These are built with `make`.
+
 You can check that your machines are there and running with:
 
 ```
@@ -149,10 +154,15 @@ Destroy the libvirt-CoreOS cluster
 cluster/kube-down.sh
 ```
 
-Uptade the libvirt-CoreOS cluster with a new Kubernetes release:
+Update the libvirt-CoreOS cluster with a new Kubernetes release produced by `make release` or `make release-skip-tests`:
 
 ```
 cluster/kube-push.sh
+```
+
+Update the libvirt-CoreOS cluster with the locally built Kubernetes binaries produced by `make`:
+```
+KUBE_PUSH=local cluster/kube-push.sh
 ```
 
 Interact with the cluster

@@ -69,7 +69,8 @@ coreos:
         ConditionPathIsDirectory=/opt/kubernetes/addons
         Description=Kubernetes addons
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount kube-apiserver.service
+        Requires=opt-kubernetes.mount
+        Wants=kube-apiserver.service
 
         [Service]
         Type=oneshot
