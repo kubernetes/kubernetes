@@ -18,6 +18,7 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -52,6 +53,6 @@ func (c *FakePersistentVolumeClaims) Update(persistentvolumeclaim *api.Persisten
 	return &api.PersistentVolumeClaim{}, nil
 }
 
-func (c *FakePersistentVolumeClaims) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Fake.Watch, c.Fake.Err
 }
